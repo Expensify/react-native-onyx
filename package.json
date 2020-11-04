@@ -1,0 +1,20 @@
+{
+  "name": "react-ion",
+  "version": "1.0.0",
+  "author": "Expensify, Inc.",
+  "homepage": "https://expensify.com",
+  "description": "State management for React Native",
+  "private": true,
+  "scripts": {
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@react-native-community/async-storage": "^1.12.1",
+    "js-libs": "git+https://git@github.com:Expensify/JS-Libs.git#7b13151f15f631bbf2ef10a7ef57e36f89261b0e",
+    "underscore": "^1.11.0"
+  },
+  "devDependencies": {
+    "eslint": "^7.6.0",
+    "eslint-config-expensify": "^2.0.11"
+  }
+}
