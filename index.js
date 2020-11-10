@@ -147,13 +147,13 @@ function keyChanged(key, data) {
                 subscriber.callback(data, key);
             }
 
-            if (!subscriber.withIonInstance) {
+            if (!subscriber.withOnyxInstance) {
                 return;
             }
 
             // Check if we are subscribing to a collection key and add this item as a collection
             if (isCollectionKey(subscriber.key)) {
-                subscriber.withIonInstance.setState((prevState) => {
+                subscriber.withOnyxInstance.setState((prevState) => {
                     const collection = prevState[subscriber.statePropertyName] || {};
 
                     // If we have removed the value for this key or it has been
@@ -175,7 +175,7 @@ function keyChanged(key, data) {
                     };
                 });
             } else {
-                subscriber.withIonInstance.setState({
+                subscriber.withOnyxInstance.setState({
                     [subscriber.statePropertyName]: data,
                 });
             }
@@ -185,18 +185,18 @@ function keyChanged(key, data) {
 
 /**
  * Sends the data obtained from the keys to the connection. It either:
- *     - sets state on the withIonInstances
+ *     - sets state on the withOnyxInstances
  *     - triggers the callback function
  *
  * @param {object} config
- * @param {object} [config.withIonInstance]
+ * @param {object} [config.withOnyxInstance]
  * @param {string} [config.statePropertyName]
  * @param {function} [config.callback]
  * @param {*|null} val
  */
 function sendDataToConnection(config, val) {
-    if (config.withIonInstance) {
-        config.withIonInstance.setState({
+    if (config.withOnyxInstance) {
+        config.withOnyxInstance.setState({
             [config.statePropertyName]: val,
         });
     } else if (_.isFunction(config.callback)) {
@@ -207,13 +207,13 @@ function sendDataToConnection(config, val) {
 /**
  * Subscribes a react component's state directly to a store key
  *
- * @param {object} mapping the mapping information to connect Ion to the components state
+ * @param {object} mapping the mapping information to connect Onyx to the components state
  * @param {string} mapping.key
  * @param {string} mapping.statePropertyName the name of the property in the state to connect the data to
- * @param {object} [mapping.withIonInstance] whose setState() method will be called with any changed data
- *      This is used by React components to connect to Ion
+ * @param {object} [mapping.withOnyxInstance] whose setState() method will be called with any changed data
+ *      This is used by React components to connect to Onyx
  * @param {object} [mapping.callback] a method that will be called with changed data
- *      This is used by any non-React code to connect to Ion
+ *      This is used by any non-React code to connect to Onyx
  * @param {boolean} [mapping.initWithStoredValues] If set to false, then no data will be prefilled into the
  *  component
  * @returns {number} an ID to use when calling disconnect
@@ -227,7 +227,7 @@ function connect(mapping) {
     }
 
     // Check to see if this key is flagged as a safe eviction key and add it to the recentlyAccessedKeys list
-    if (mapping.withIonInstance && !isCollectionKey(mapping.key) && isSafeEvictionKey(mapping.key)) {
+    if (mapping.withOnyxInstance && !isCollectionKey(mapping.key) && isSafeEvictionKey(mapping.key)) {
         // All React components subscribing to a key flagged as a safe eviction
         // key must implement the canEvict property.
         if (_.isUndefined(mapping.canEvict)) {
@@ -253,7 +253,7 @@ function connect(mapping) {
             // to expect a single key or multiple keys in the case of a collection.
             // React components are an exception since we'll want to send their
             // initial data as a single object when using collection keys.
-            if (mapping.withIonInstance && isCollectionKey(mapping.key)) {
+            if (mapping.withOnyxInstance && isCollectionKey(mapping.key)) {
                 Promise.all(_.map(matchingKeys, key => get(key)))
                     .then(values => _.reduce(values, (finalObject, value, i) => ({
                         ...finalObject,
@@ -283,7 +283,7 @@ function disconnect(connectionID) {
 }
 
 /**
- * Remove a key from Ion and update the subscribers
+ * Remove a key from Onyx and update the subscribers
  *
  * @param {String} key
  * @return {Promise}
@@ -295,7 +295,7 @@ function remove(key) {
 
 /**
  * If we fail to set or merge we must handle this by
- * evicting some data from Ion and then retrying to do
+ * evicting some data from Onyx and then retrying to do
  * whatever it is we attempted to do.
  *
  * @param {Error} error
@@ -341,7 +341,7 @@ function set(key, val) {
 
 /**
  * Sets multiple keys and values. Example
- * Ion.multiSet({'key1': 'a', 'key2': 'b'});
+ * Onyx.multiSet({'key1': 'a', 'key2': 'b'});
  *
  * @param {object} data
  * @returns {Promise}
@@ -421,15 +421,15 @@ function merge(key, val) {
  *
  * @param {Object} [options]
  * @param {String[]} [options.safeEvictionKeys] This is an array of IONKEYS
- * (individual or collection patterns) that when provided to Ion are flagged
+ * (individual or collection patterns) that when provided to Onyx are flagged
  * as "safe" for removal. Any components subscribing to these keys must also
  * implement a canEvict option. See the README for more info.
  * @param {function} onStorageEvent a callback when a storage event happens.
  * This applies to web platforms where the local storage emits storage events
- * across all open tabs and allows Ion to stay in sync across all open tabs.
+ * across all open tabs and allows Onyx to stay in sync across all open tabs.
  */
 function init({initialKeyStates, safeEvictionKeys, onStorageEvent}) {
-    // Let Ion know about which keys are safe to evict
+    // Let Onyx know about which keys are safe to evict
     evictionAllowList = safeEvictionKeys;
 
     // Initialize all of our keys with data provided
@@ -439,7 +439,7 @@ function init({initialKeyStates, safeEvictionKeys, onStorageEvent}) {
     onStorageEvent((key, newValue) => keyChanged(key, newValue));
 }
 
-const Ion = {
+const Onyx = {
     connect,
     disconnect,
     set,
@@ -453,4 +453,4 @@ const Ion = {
     isSafeEvictionKey,
 };
 
-export default Ion;
+export default Onyx;
