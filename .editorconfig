@@ -1,8 +1,5 @@
 # EditorConfig is awesome: http://EditorConfig.org
 
-# Howto with your editor:
-#   Sublime: https://github.com/sindresorhus/editorconfig-sublime
-
 # top-most EditorConfig file
 root = true
 
