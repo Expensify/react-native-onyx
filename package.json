@@ -1,0 +1,22 @@
+{
+  "name": "react-native-onyx",
+  "version": "1.0.0",
+  "author": "Expensify, Inc.",
+  "homepage": "https://expensify.com",
+  "description": "State management for React Native",
+  "private": true,
+  "scripts": {
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@react-native-community/async-storage": "^1.12.1",
+    "js-libs": "git+https://git@github.com:Expensify/JS-Libs.git#92b874eed3640e7635f7342f8169ddf8f28ca7e4",
+    "react": "^17.0.1",
+    "underscore": "^1.11.0",
+    "lodash.merge": "^4.6.2"
+  },
+  "devDependencies": {
+    "eslint": "^7.6.0",
+    "eslint-config-expensify": "^2.0.11"
+  }
+}
