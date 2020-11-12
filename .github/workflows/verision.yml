@@ -1,0 +1,18 @@
+name: Create a new version
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  version:
+    runs-on: ubuntu-16.04
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          token: ${{$ secrets.BOTIFY_TOKEN }}
+        
+      - name: Inital Test
+        run: echo Hello, world!
