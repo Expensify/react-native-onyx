@@ -1,8 +1,7 @@
 name: Create a new version
 
 on:
-  push:
-    branches: [ master ]
+  push
 
 jobs:
   version:
@@ -10,9 +9,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-          token: ${{$ secrets.BOTIFY_TOKEN }}
+        
         
       - name: Inital Test
         run: echo Hello, world!
