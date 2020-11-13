@@ -9,7 +9,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-        
-        
+                
       - name: Inital Test
         run: echo Hello, world!
+
+      - name: Setup Node
+              uses: actions/setup-node@v1
+              with:
+                  node-version: '14.x'
+
+      - name: Install dependenices
+              run: npm install
