@@ -14,9 +14,8 @@ jobs:
         run: echo Hello, world!
 
       - name: Setup Node
-              uses: actions/setup-node@v1
-              with:
-                  node-version: '14.x'
-
-      - name: Install dependenices
-              run: npm install
+        uses: actions/setup-node@v2.1.2
+        with:
+            node-version: '14.x'
+      - run: npm install
+      - run: npm test
