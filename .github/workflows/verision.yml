@@ -1,21 +1,73 @@
 name: Create a new version
 
 on:
-  push
+    push:
+        branches: [master]
 
 jobs:
-  version:
-    runs-on: ubuntu-16.04
+    version:
+        runs-on: ubuntu-16.04
 
-    steps:
-      - uses: actions/checkout@v2
-                
-      - name: Inital Test
-        run: echo Hello, world!
+        steps:
+            - uses: actions/checkout@v2
+              with:
+                  fetch-depth: 0
+                  token: ${{ secrets.BOTIFY_TOKEN }}
 
-      - name: Setup Node
-        uses: actions/setup-node@v2.1.2
-        with:
-            node-version: '14.x'
-      - run: npm install
-      - run: npm test
+            - name: Setup Node
+              uses: actions/setup-node@v1
+              with:
+                  node-version: '14.x'
+
+            - uses: webfactory/ssh-agent@v0.4.1
+              with:
+                  ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+            - name: Install dependenices
+              run: npm ci
+
+            - name: Set up git
+              run: |
+                git fetch
+                git checkout master
+                git config user.name botify
+            - name: Checkout new branch
+              run: git checkout -b version-bump-${{ github.sha }}
+
+            - name: Generate version
+              run: npm version prerelease -m "Update version to %s"
+
+            - name: Push new version
+              run: git push --set-upstream origin version-bump-${{ github.sha }}
+
+            - name: Push tags
+              run: git push --tags
+
+            - name: Create Pull Request
+              uses: repo-sync/pull-request@v2
+              with:
+                    source_branch: version-bump-${{ github.sha }}
+                    destination_branch: "master"
+                    pr_label: "automerge"
+                    github_token: ${{ secrets.BOTIFY_TOKEN }}
+
+            # This Slack step is duplicated in all workflows, if you make a change to this step, make sure to update all
+            # the other workflows with the same change
+            - uses: 8398a7/action-slack@v3
+              name: Job failed Slack notification
+              if: ${{ failure() }}
+              with:
+                    status: custom
+                    fields: workflow, repo
+                    custom_payload: |
+                        {
+                          channel: '#announce',
+                          attachments: [{
+                            color: "#DB4545",
+                            pretext: `<!here>`,
+                            text: `💥 ${process.env.AS_REPO} failed on ${process.env.AS_WORKFLOW} workflow 💥`,
+                          }]
+                        }
+              env:
+                    GITHUB_TOKEN: ${{ github.token }}
+                    SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
