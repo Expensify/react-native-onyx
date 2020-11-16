@@ -10,10 +10,10 @@
   },
   "dependencies": {
     "@react-native-community/async-storage": "^1.12.1",
-    "js-libs": "git+https://git@github.com:Expensify/JS-Libs.git#92b874eed3640e7635f7342f8169ddf8f28ca7e4",
+    "expensify-common": "git+https://git@github.com:Expensify/expensify-common.git#5002f0a429e8c62bfc9daa7cbe35864784e67407",
+    "lodash.merge": "^4.6.2",
     "react": "^17.0.1",
-    "underscore": "^1.11.0",
-    "lodash.merge": "^4.6.2"
+    "underscore": "^1.11.0"
   },
   "devDependencies": {
     "eslint": "^7.6.0",
