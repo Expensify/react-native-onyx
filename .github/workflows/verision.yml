@@ -34,7 +34,7 @@ jobs:
               run: git checkout -b version-bump-${{ github.sha }}
 
             - name: Generate version
-              run: npm version prerelease -m "Update version to %s"
+              run: npm version patch -m "Update version to %s"
 
 
             - name: Create Pull Request
