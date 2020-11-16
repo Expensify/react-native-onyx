@@ -11,6 +11,7 @@ jobs:
             - uses: actions/checkout@v2
               with:
                   fetch-depth: 0
+                  token: ${{ secrets.BOTIFY_TOKEN }}
 
             - name: Setup Node
               uses: actions/setup-node@v1
@@ -43,6 +44,7 @@ jobs:
                     source_branch: version-bump-${{ github.sha }}
                     destination_branch: "master"
                     pr_title: "TESTING auto version bump"
+                    github_token: ${{ secrets.BOTIFY_TOKEN }}
 
             # This Slack step is duplicated in all workflows, if you make a change to this step, make sure to update all
             # the other workflows with the same change
