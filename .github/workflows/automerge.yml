@@ -2,7 +2,10 @@ name: Automerge PR
 
 # This workflow is triggered by a pull request that is labeled 'automerge'
 on:
-    push
+    pull_request:
+        types:
+            - labeled
+    status: {}
 
 jobs:
     automerge:
