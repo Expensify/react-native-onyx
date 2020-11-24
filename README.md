@@ -39,3 +39,5 @@ export default withOnyx({
     },
 })(ReportActionsView);
 ```
+
+Useless change, used to test auto-merge -- will be reverted in next commit
