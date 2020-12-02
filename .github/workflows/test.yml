@@ -32,6 +32,7 @@ jobs:
                   ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
             - run: npm ci
+
             - run: npm run test
               env:
                   CI: true

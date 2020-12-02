@@ -31,7 +31,8 @@ jobs:
               with:
                   ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-            - run: npm ci
+            - run: npm
+
             - run: npm run lint
               env:
                   CI: true
