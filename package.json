@@ -14,7 +14,7 @@
     "@react-native-community/async-storage": "^1.12.1",
     "expensify-common": "git+https://git@github.com:Expensify/expensify-common.git#5002f0a429e8c62bfc9daa7cbe35864784e67407",
     "lodash.merge": "^4.6.2",
-    "react": "^17.0.1",
+    "react": "^16.13.1",
     "underscore": "^1.11.0"
   },
   "devDependencies": {
@@ -36,7 +36,6 @@
     "jest": "^26.5.2",
     "jest-cli": "^26.5.2",
     "prop-types": "^15.7.2",
-    "react": "^16.13.1",
     "react-native": "0.63.3",
     "react-test-renderer": "16.13.1",
     "metro-react-native-babel-preset": "^0.61.0"
