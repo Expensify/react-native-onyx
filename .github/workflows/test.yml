@@ -1,4 +1,4 @@
-name: Lint JavaScript
+name: Test JavaScript
 
 # Only lint on branches that aren't related to master and the deploy process
 on:
@@ -32,6 +32,6 @@ jobs:
                   ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
             - run: npm ci
-            - run: npm run lint
+            - run: npm run test
               env:
                   CI: true
