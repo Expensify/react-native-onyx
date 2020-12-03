@@ -4,4 +4,7 @@ module.exports = {
         // Overwriting this for now because web-e will conflict with this
         'react/jsx-filename-extension': [1, {extensions: ['.js']}],
     },
+    env: {
+        jest: true,
+    },
 };
