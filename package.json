@@ -4,6 +4,7 @@
   "author": "Expensify, Inc.",
   "homepage": "https://expensify.com",
   "description": "State management for React Native",
+  "license": "MIT",
   "private": true,
   "scripts": {
     "lint": "eslint .",
