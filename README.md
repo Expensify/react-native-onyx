@@ -1,4 +1,4 @@
-# React-Native-Onyx
+# `React-Native-Onyx`
 This is a persistent storage solution wrapped in a Pub/Sub library. In general that means:
 
 - Onyx stores and retrieves data from persistent storage
