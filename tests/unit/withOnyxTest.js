@@ -8,9 +8,6 @@ import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 const TEST_KEY = 'test';
 
-jest.mock('../../node_modules/@react-native-community/async-storage',
-    () => require('./mocks/@react-native-community/async-storage'));
-
 Onyx.registerLogger(() => {});
 Onyx.init({
     keys: {

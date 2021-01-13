@@ -1,10 +1,8 @@
 import 'react-native';
 import Onyx from '../../index';
+import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 const TEST_KEY = 'test';
-
-jest.mock('../../node_modules/@react-native-community/async-storage',
-    () => require('./mocks/@react-native-community/async-storage'));
 
 Onyx.registerLogger(() => {});
 Onyx.init({
@@ -18,138 +16,147 @@ Onyx.init({
 describe('Onyx', () => {
     let connectionID;
 
-    afterEach((done) => {
+    afterEach(() => {
         Onyx.disconnect(connectionID);
-        Onyx.clear().then(done);
+        return Onyx.clear();
     });
 
-    it('should set a simple key', (done) => {
-        const mockCallback = jest.fn();
+    it('should set a simple key', () => {
+        let testKeyValue;
+
         connectionID = Onyx.connect({
             key: TEST_KEY,
             initWithStoredValues: false,
             callback: (value) => {
-                mockCallback(value);
-
-                try {
-                    expect(value).toBe('test');
-                    done();
-                } catch (error) {
-                    done(error);
-                }
-            }
+                testKeyValue = value;
+            },
         });
 
         // Set a simple key
-        Onyx.set(TEST_KEY, 'test');
-    });
-
-    it('should merge an object with another object', (done) => {
-        const mockCallback = jest.fn();
-        connectionID = Onyx.connect({
-            key: TEST_KEY,
-            initWithStoredValues: false,
-            callback: (value) => {
-                mockCallback(value);
-
-                try {
-                    if (mockCallback.mock.calls.length === 1) {
-                        expect(value).toStrictEqual({
-                            test1: 'test1',
-                        });
-                        return;
-                    }
-
-                    expect(value).toStrictEqual({
-                        test1: 'test1',
-                        test2: 'test2',
-                    });
-                    done();
-                } catch (error) {
-                    done(error);
-                }
-            }
-        });
-
-        Onyx.set(TEST_KEY, {test1: 'test1'});
-        Onyx.merge(TEST_KEY, {test2: 'test2'});
-    });
-
-    it('should notify subscribers when data has been cleared', (done) => {
-        const mockCallback = jest.fn();
-        connectionID = Onyx.connect({
-            key: TEST_KEY,
-            initWithStoredValues: false,
-            callback: (value) => {
-                mockCallback(value);
-
-                try {
-                    if (mockCallback.mock.calls.length === 1) {
-                        expect(value).toBe('test');
-                        return;
-                    }
-
-                    expect(value).toBe(null);
-                    done();
-                } catch (error) {
-                    done(error);
-                }
-            }
-        });
-
-        Onyx.set(TEST_KEY, 'test');
-        Onyx.clear();
-    });
-
-    it('should not notify subscribers after they have disconnected', (done) => {
-        const mockCallback = jest.fn();
-        connectionID = Onyx.connect({
-            key: TEST_KEY,
-            initWithStoredValues: false,
-            callback: (value) => {
-                mockCallback(value);
-                expect(value).toBe('test');
-            }
-        });
-
-        Onyx.set(TEST_KEY, 'test')
+        return Onyx.set(TEST_KEY, 'test')
             .then(() => {
+                expect(testKeyValue).toBe('test');
+            });
+    });
+
+    it('should merge an object with another object', () => {
+        let testKeyValue;
+
+        connectionID = Onyx.connect({
+            key: TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        return Onyx.set(TEST_KEY, {test1: 'test1'})
+            .then(() => {
+                expect(testKeyValue).toEqual({test1: 'test1'});
+                Onyx.merge(TEST_KEY, {test2: 'test2'});
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                expect(testKeyValue).toEqual({test1: 'test1', test2: 'test2'});
+            });
+    });
+
+    it('should notify subscribers when data has been cleared', () => {
+        let testKeyValue;
+        connectionID = Onyx.connect({
+            key: TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            }
+        });
+
+        return Onyx.set(TEST_KEY, 'test')
+            .then(() => {
+                expect(testKeyValue).toBe('test');
+                return Onyx.clear();
+            })
+            .then(() => {
+                expect(testKeyValue).toBeNull();
+            });
+    });
+
+    it('should not notify subscribers after they have disconnected', () => {
+        let testKeyValue;
+        connectionID = Onyx.connect({
+            key: TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        return Onyx.set(TEST_KEY, 'test')
+            .then(() => {
+                expect(testKeyValue).toBe('test');
                 Onyx.disconnect(connectionID);
                 return Onyx.set(TEST_KEY, 'test updated');
             })
             .then(() => {
-                try {
-                    expect(mockCallback.mock.calls.length).toBe(1);
-                    done();
-                } catch (error) {
-                    done(error);
-                }
+                // Test value has not changed
+                expect(testKeyValue).toBe('test');
             });
     });
 
-    it('should merge arrays by appending new items to the end of a value', (done) => {
-        const mockCallback = jest.fn();
+    it('should merge arrays by appending new items to the end of a value', () => {
+        let testKeyValue;
         connectionID = Onyx.connect({
             key: TEST_KEY,
             initWithStoredValues: false,
             callback: (value) => {
-                mockCallback(value);
-
-                try {
-                    if (mockCallback.mock.calls.length === 1) {
-                        expect(value).toStrictEqual(['test1']);
-                        return;
-                    }
-
-                    expect(value).toStrictEqual(['test1', 'test2', 'test3', 'test4']);
-                    done();
-                } catch (err) {
-                    done(err);
-                }
-            }
+                testKeyValue = value;
+            },
         });
 
-        Onyx.set(TEST_KEY, ['test1']);
-        Onyx.merge(TEST_KEY, ['test2', 'test3', 'test4']);
+        return Onyx.set(TEST_KEY, ['test1'])
+            .then(() => {
+                expect(testKeyValue).toStrictEqual(['test1']);
+                Onyx.merge(TEST_KEY, ['test2', 'test3', 'test4']);
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                expect(testKeyValue).toStrictEqual(['test1', 'test2', 'test3', 'test4']);
+            });
+    });
+
+    it('should merge 2 objects when it has no initial stored value for test key', () => {
+        let testKeyValue;
+        connectionID = Onyx.connect({
+            key: TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        Onyx.merge(TEST_KEY, {test1: 'test1'});
+        Onyx.merge(TEST_KEY, {test2: 'test2'});
+        return waitForPromisesToResolve()
+            .then(() => {
+                expect(testKeyValue).toStrictEqual({test1: 'test1', test2: 'test2'});
+            });
+    });
+
+    it('should merge 2 arrays when it has no initial stored value for test key', () => {
+        let testKeyValue;
+        connectionID = Onyx.connect({
+            key: TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        Onyx.merge(TEST_KEY, ['test1']);
+        Onyx.merge(TEST_KEY, ['test2']);
+        return waitForPromisesToResolve()
+            .then(() => {
+                expect(testKeyValue).toEqual(['test1', 'test2']);
+            });
     });
 });
