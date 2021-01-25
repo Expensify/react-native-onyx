@@ -13,13 +13,17 @@ const defaultProps = {
     collections: {},
 };
 
-const ViewWithCollections = props => (
-    <View>
-        {_.map(props.collections, collection => (
-            <Text>{collection.ID}</Text>
-        ))}
-    </View>
-);
+const ViewWithCollections = props => {
+    console.log('rendering ViewWithCollections');
+
+    return (
+        <View>
+            {_.map(props.collections, collection => (
+                <Text>{collection.ID}</Text>
+            ))}
+        </View>
+    );
+};
 
 ViewWithCollections.propTypes = propTypes;
 ViewWithCollections.defaultProps = defaultProps;
