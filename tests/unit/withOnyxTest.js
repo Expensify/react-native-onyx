@@ -94,7 +94,7 @@ describe('withOnyx', () => {
             },
         });
 
-        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}})
+        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, test_2: {ID: 234}, test_3: {ID: 345}})
             .then(() => {
                 expect(numberOfCallbacks).toEqual(3);
                 expect(valuesReceived[0]).toEqual({ID: 123});
