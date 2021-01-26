@@ -162,14 +162,12 @@ describe('Onyx', () => {
                 expect(testKeyValue).toEqual(['test1', 'test2']);
             });
     });
-});
 
-describe('withOnyx', () => {
     it('should properly set and merge when using mergeCollection', () => {
         const valuesReceived = {};
         let numberOfCallbacks = 0;
 
-        Onyx.connect({
+        connectionID = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
             initWithStoredValues: false,
             callback: (data) => {
@@ -225,9 +223,7 @@ describe('withOnyx', () => {
             expect(valuesReceived[567]).toEqual('one');
         });
     });
-});
 
-describe('withOnyx', () => {
     it('should throw error when a key not belonging to collection key is present in mergeCollection', () => {
         try {
             Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, not_my_test: {beep: 'boop'}})
