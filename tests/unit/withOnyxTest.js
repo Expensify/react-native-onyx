@@ -11,7 +11,7 @@ const ONYX_KEYS = {
     COLLECTION: {
         TEST_KEY: 'test_',
     }
-}
+};
 
 Onyx.registerLogger(() => {});
 Onyx.init({
@@ -52,13 +52,13 @@ describe('withOnyx', () => {
         })(ViewWithCollections);
         render(<TestComponentWithOnyx />);
 
-        Onyx.merge(ONYX_KEYS.COLLECTION.TEST_KEY + '1', {ID: 123});
-        Onyx.merge(ONYX_KEYS.COLLECTION.TEST_KEY + '2', {ID: 234});
-        Onyx.merge(ONYX_KEYS.COLLECTION.TEST_KEY + '3', {ID: 345});
+        Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`, {ID: 123});
+        Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}2`, {ID: 234});
+        Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}3`, {ID: 345});
         return waitForPromisesToResolve()
             .then(() => {
                 expect(logSpy).toHaveBeenCalledTimes(4);
-                console.log.mockClear();
+                console.log.mockClear(); // eslint-disable-line no-console
             });
     });
 });
@@ -77,7 +77,7 @@ describe('withOnyx', () => {
         return waitForPromisesToResolve()
             .then(() => {
                 expect(logSpy).toHaveBeenCalledTimes(2);
-                console.log.mockClear();
+                console.log.mockClear(); // eslint-disable-line no-console
             });
     });
 });

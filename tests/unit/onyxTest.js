@@ -210,7 +210,7 @@ describe('Onyx', () => {
                         ID: 567,
                         value: 'one'
                     }
-                })
+                });
                 return waitForPromisesToResolve();
             })
             .then(() => {
@@ -226,7 +226,7 @@ describe('Onyx', () => {
 
     it('should throw error when a key not belonging to collection key is present in mergeCollection', () => {
         try {
-            Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, not_my_test: {beep: 'boop'}})
+            Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, not_my_test: {beep: 'boop'}});
         } catch (error) {
             expect(error.message).toEqual(`Provided collection does not have all its data belonging to the same parent. CollectionKey: ${ONYX_KEYS.COLLECTION.TEST_KEY}, DataKey: not_my_test`);
         }
