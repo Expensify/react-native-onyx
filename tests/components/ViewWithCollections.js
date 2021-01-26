@@ -14,6 +14,7 @@ const defaultProps = {
 };
 
 const ViewWithCollections = (props) => {
+    /* eslint-disable no-console */
     console.log('rendering ViewWithCollections');
 
     return (
