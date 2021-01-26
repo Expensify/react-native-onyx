@@ -50,7 +50,7 @@ describe('withOnyx', () => {
             },
         })(ViewWithCollections);
         const onRender = jest.fn();
-        render(<TestComponentWithOnyx onRender={onRender} />); 
+        render(<TestComponentWithOnyx onRender={onRender} />);
 
         Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`, {ID: 123});
         Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}2`, {ID: 234});
@@ -70,7 +70,7 @@ describe('withOnyx', () => {
             },
         })(ViewWithCollections);
         const onRender = jest.fn();
-        render(<TestComponentWithOnyx onRender={onRender} />); 
+        render(<TestComponentWithOnyx onRender={onRender} />);
 
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, test_2: {ID: 234}, test_3: {ID: 345}});
         return waitForPromisesToResolve()
