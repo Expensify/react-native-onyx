@@ -164,15 +164,11 @@ describe('Onyx', () => {
 
     it('should properly set and merge when using mergeCollection', () => {
         const valuesReceived = {};
-        let numberOfCallbacks = 0;
-
+        const mockCallback = jest.fn(data => valuesReceived[data.ID] = data.value);
         connectionID = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
             initWithStoredValues: false,
-            callback: (data) => {
-                ++numberOfCallbacks;
-                valuesReceived[data.ID] = data.value;
-            },
+            callback: mockCallback,
         });
 
         // The first time we call mergeCollection we'll be doing a multiSet internally
@@ -193,7 +189,7 @@ describe('Onyx', () => {
             .then(() => {
                 // 2 key values to update and 2 new keys to add.
                 // MergeCollection will perform a mix of multiSet and multiMerge
-                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                     test_1: {
                         ID: 123,
                         value: 'five'
@@ -211,11 +207,32 @@ describe('Onyx', () => {
                         value: 'one'
                     }
                 });
-                return waitForPromisesToResolve();
             })
             .then(() => {
                 // 3 items on the first mergeCollection + 4 items the next mergeCollection
-                expect(numberOfCallbacks).toEqual(7);
+                expect(mockCallback.mock.calls.length).toBe(7);
+
+                expect(mockCallback.mock.calls[0][0]).toEqual({ID: 123, value: 'one'});
+                expect(mockCallback.mock.calls[0][1]).toEqual('test_1');
+
+                expect(mockCallback.mock.calls[1][0]).toEqual({ID: 234, value: 'two'});
+                expect(mockCallback.mock.calls[1][1]).toEqual('test_2');
+                
+                expect(mockCallback.mock.calls[2][0]).toEqual({ID: 345, value: 'three'});
+                expect(mockCallback.mock.calls[2][1]).toEqual('test_3');
+                
+                expect(mockCallback.mock.calls[3][0]).toEqual({ID: 123, value: 'five'});
+                expect(mockCallback.mock.calls[3][1]).toEqual('test_1');
+
+                expect(mockCallback.mock.calls[4][0]).toEqual({ID: 234, value: 'four'});
+                expect(mockCallback.mock.calls[4][1]).toEqual('test_2');
+
+                expect(mockCallback.mock.calls[5][0]).toEqual({ID: 456, value: 'two'});
+                expect(mockCallback.mock.calls[5][1]).toEqual('test_4');
+
+                expect(mockCallback.mock.calls[6][0]).toEqual({ID: 567, value: 'one'});
+                expect(mockCallback.mock.calls[6][1]).toEqual('test_5');
+
                 expect(valuesReceived[123]).toEqual('five');
                 expect(valuesReceived[234]).toEqual('four');
                 expect(valuesReceived[345]).toEqual('three');

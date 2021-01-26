@@ -44,40 +44,38 @@ describe('withOnyx', () => {
 
 describe('withOnyx', () => {
     it('should update withOnyx subscriber multiple times when merge is used', () => {
-        const logSpy = jest.spyOn(console, 'log');
         const TestComponentWithOnyx = withOnyx({
             text: {
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
             },
         })(ViewWithCollections);
-        render(<TestComponentWithOnyx />);
+        const onRender = jest.fn();
+        render(<TestComponentWithOnyx onRender={onRender} />); 
 
         Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`, {ID: 123});
         Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}2`, {ID: 234});
         Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}3`, {ID: 345});
         return waitForPromisesToResolve()
             .then(() => {
-                expect(logSpy).toHaveBeenCalledTimes(4);
-                console.log.mockClear(); // eslint-disable-line no-console
+                expect(onRender.mock.calls.length).toBe(4);
             });
     });
 });
 
 describe('withOnyx', () => {
     it('should update withOnyx subscriber just once when mergeCollection is used', () => {
-        const logSpy = jest.spyOn(console, 'log');
         const TestComponentWithOnyx = withOnyx({
             text: {
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
             },
         })(ViewWithCollections);
-        render(<TestComponentWithOnyx />);
+        const onRender = jest.fn();
+        render(<TestComponentWithOnyx onRender={onRender} />); 
 
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, test_2: {ID: 234}, test_3: {ID: 345}});
         return waitForPromisesToResolve()
             .then(() => {
-                expect(logSpy).toHaveBeenCalledTimes(2);
-                console.log.mockClear(); // eslint-disable-line no-console
+                expect(onRender.mock.calls.length).toBe(2);
             });
     });
 });

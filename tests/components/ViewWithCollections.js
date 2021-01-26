@@ -7,15 +7,16 @@ const propTypes = {
     collections: PropTypes.objectOf(PropTypes.shape({
         ID: PropTypes.number,
     })),
+    onRender: PropTypes.func,
 };
 
 const defaultProps = {
     collections: {},
+    onRender: () => {},
 };
 
 const ViewWithCollections = (props) => {
-    /* eslint-disable no-console */
-    console.log('rendering ViewWithCollections');
+    props.onRender();
 
     return (
         <View>
