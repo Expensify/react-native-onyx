@@ -187,6 +187,7 @@ describe('Onyx', () => {
             }
         })
             .then(() => (
+
                 // 2 key values to update and 2 new keys to add.
                 // MergeCollection will perform a mix of multiSet and multiMerge
                 Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
@@ -217,10 +218,10 @@ describe('Onyx', () => {
 
                 expect(mockCallback.mock.calls[1][0]).toEqual({ID: 234, value: 'two'});
                 expect(mockCallback.mock.calls[1][1]).toEqual('test_2');
-                
+
                 expect(mockCallback.mock.calls[2][0]).toEqual({ID: 345, value: 'three'});
                 expect(mockCallback.mock.calls[2][1]).toEqual('test_3');
-                
+
                 expect(mockCallback.mock.calls[3][0]).toEqual({ID: 123, value: 'five'});
                 expect(mockCallback.mock.calls[3][1]).toEqual('test_1');
 
