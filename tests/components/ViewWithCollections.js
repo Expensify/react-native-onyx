@@ -13,7 +13,7 @@ const defaultProps = {
     collections: {},
 };
 
-const ViewWithCollections = props => {
+const ViewWithCollections = (props) => {
     console.log('rendering ViewWithCollections');
 
     return (

@@ -2,13 +2,12 @@ import 'react-native';
 import Onyx from '../../index';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
-const TEST_KEY = 'test';
 const ONYX_KEYS = {
     TEST_KEY: 'test',
     COLLECTION: {
         TEST_KEY: 'test_',
     }
-}
+};
 
 Onyx.registerLogger(() => {});
 Onyx.init({
@@ -179,35 +178,36 @@ describe('Onyx', () => {
         // The first time we call mergeCollection we'll be doing a multiSet internally
         return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
             test_1: {
-                ID: 123, 
+                ID: 123,
                 value: 'one'
             }, 
             test_2: {
-                ID: 234, 
+                ID: 234,
                 value: 'two'
             }, 
             test_3: {
-                ID: 345, 
+                ID: 345,
                 value: 'three'
             }
         })
         .then(() => {
-            // 2 key values to update and 2 new keys to add. MergeCollection will perform a mix of multiSet and multiMerge
+            // 2 key values to update and 2 new keys to add. 
+            // MergeCollection will perform a mix of multiSet and multiMerge
             Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                 test_1: {
-                    ID: 123, 
+                    ID: 123,
                     value: 'five'
                 }, 
                 test_2: {
-                    ID: 234, 
+                    ID: 234,
                     value: 'four'
                 }, 
                 test_4: {
-                    ID: 456, 
+                    ID: 456,
                     value: 'two'
                 },
                 test_5: {
-                    ID: 567, 
+                    ID: 567,
                     value: 'one'
                 }
             })
