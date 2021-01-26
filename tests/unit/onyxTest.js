@@ -180,48 +180,48 @@ describe('Onyx', () => {
             test_1: {
                 ID: 123,
                 value: 'one'
-            }, 
+            },
             test_2: {
                 ID: 234,
                 value: 'two'
-            }, 
+            },
             test_3: {
                 ID: 345,
                 value: 'three'
             }
         })
-        .then(() => {
-            // 2 key values to update and 2 new keys to add. 
-            // MergeCollection will perform a mix of multiSet and multiMerge
-            Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
-                test_1: {
-                    ID: 123,
-                    value: 'five'
-                }, 
-                test_2: {
-                    ID: 234,
-                    value: 'four'
-                }, 
-                test_4: {
-                    ID: 456,
-                    value: 'two'
-                },
-                test_5: {
-                    ID: 567,
-                    value: 'one'
-                }
+            .then(() => {
+                // 2 key values to update and 2 new keys to add.
+                // MergeCollection will perform a mix of multiSet and multiMerge
+                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                    test_1: {
+                        ID: 123,
+                        value: 'five'
+                    },
+                    test_2: {
+                        ID: 234,
+                        value: 'four'
+                    },
+                    test_4: {
+                        ID: 456,
+                        value: 'two'
+                    },
+                    test_5: {
+                        ID: 567,
+                        value: 'one'
+                    }
+                })
+                return waitForPromisesToResolve();
             })
-            return waitForPromisesToResolve();
-        })
-        .then(() => {
-            // 3 items on the first mergeCollection + 4 items the next mergeCollection
-            expect(numberOfCallbacks).toEqual(7);
-            expect(valuesReceived[123]).toEqual('five');
-            expect(valuesReceived[234]).toEqual('four');
-            expect(valuesReceived[345]).toEqual('three');
-            expect(valuesReceived[456]).toEqual('two');
-            expect(valuesReceived[567]).toEqual('one');
-        });
+            .then(() => {
+                // 3 items on the first mergeCollection + 4 items the next mergeCollection
+                expect(numberOfCallbacks).toEqual(7);
+                expect(valuesReceived[123]).toEqual('five');
+                expect(valuesReceived[234]).toEqual('four');
+                expect(valuesReceived[345]).toEqual('three');
+                expect(valuesReceived[456]).toEqual('two');
+                expect(valuesReceived[567]).toEqual('one');
+            });
     });
 
     it('should throw error when a key not belonging to collection key is present in mergeCollection', () => {
