@@ -1,6 +1,5 @@
-import 'react-native';
-import {render} from '@testing-library/react-native';
 import React from 'react';
+import {render} from '@testing-library/react-native';
 import Onyx, {withOnyx} from '../../index';
 import ViewWithText from '../components/ViewWithText';
 import ViewWithCollections from '../components/ViewWithCollections';
@@ -13,7 +12,6 @@ const ONYX_KEYS = {
     }
 };
 
-Onyx.registerLogger(() => {});
 Onyx.init({
     keys: ONYX_KEYS,
     registerStorageEventListener: () => {},
