@@ -1,4 +1,3 @@
-import 'react-native';
 import Onyx from '../../index';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
@@ -9,7 +8,6 @@ const ONYX_KEYS = {
     }
 };
 
-Onyx.registerLogger(() => {});
 Onyx.init({
     keys: ONYX_KEYS,
     registerStorageEventListener: () => {},
