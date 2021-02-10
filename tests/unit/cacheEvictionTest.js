@@ -1,5 +1,5 @@
-import Onyx from '../../index';
 import AsyncStorage from '@react-native-community/async-storage';
+import Onyx from '../../index';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 const ONYX_KEYS = {
@@ -16,7 +16,6 @@ test('Cache eviction', () => {
     // Given an evictable key previously set in storage
     return AsyncStorage.setItem(`${ONYX_KEYS.COLLECTION.TEST_KEY}${RECORD_TO_EVICT}`, JSON.stringify({test: 'evict'}))
         .then(() => {
-
             // When we initialize Onyx and mark the set collection key as a safeEvictionKey
             Onyx.init({
                 keys: ONYX_KEYS,
@@ -29,7 +28,7 @@ test('Cache eviction', () => {
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
                 callback: (val, key) => {
                     if (!val) {
-                        delete collection[key]
+                        delete collection[key];
                     } else {
                         collection[key] = val;
                     }
