@@ -77,3 +77,22 @@ describe('withOnyx', () => {
             });
     });
 });
+
+describe('withOnyx', () => {
+    it('should update withOnyx subscribing to individual key if mergeCollection is used', () => {
+        const collectionItemID = 1;
+        const TestComponentWithOnyx = withOnyx({
+            text: {
+                key: `${ONYX_KEYS.COLLECTION.TEST_KEY}${collectionItemID}`,
+            },
+        })(ViewWithCollections);
+        const onRender = jest.fn();
+        render(<TestComponentWithOnyx onRender={onRender} />);
+
+        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, test_2: {ID: 234}, test_3: {ID: 345}});
+        return waitForPromisesToResolve()
+            .then(() => {
+                expect(onRender.mock.calls.length).toBe(2);
+            });
+    });
+});
