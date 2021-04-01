@@ -240,6 +240,51 @@ describe('Onyx', () => {
             });
     });
 
+    it('should notify subscribers when using mergeCollection', () => {
+        let valuesReceived;
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            initWithStoredValues: false, 
+            callback: (data) => {
+                //valuesReceived[data.ID] = data.value;
+                valuesReceived = data;
+            }
+        });
+
+        const data = {
+            test_1: {
+                ID: 123,
+                value: 'zero'
+            }
+        };
+
+        const data2 = {
+            test_1: {
+                ID: 123,
+                value: 'one'
+            },
+            test_2: {
+                ID: 234,
+                value: 'two'
+            },
+            test_3: {
+                ID: 345,
+                value: 'three'
+            }
+        };
+
+        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, data)
+            .then(() => {
+                console.debug(valuesReceived);
+            })
+            .then(() => {
+                return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, data2)  
+            })
+            .then(() => {
+                console.debug(valuesReceived);
+            });
+    });
+
     it('should throw error when a key not belonging to collection key is present in mergeCollection', () => {
         try {
             Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, not_my_test: {beep: 'boop'}});
