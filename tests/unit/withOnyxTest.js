@@ -7,9 +7,11 @@ import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
+    OTHER_TEST_KEY: 'otherTest',
     COLLECTION: {
         TEST_KEY: 'test_',
-    }
+        OTHER_TEST_KEY: 'otherTest_',
+    },
 };
 
 Onyx.init({
@@ -69,9 +71,11 @@ describe('withOnyx', () => {
         })(ViewWithCollections);
         const onRender = jest.fn();
         render(<TestComponentWithOnyx onRender={onRender} />);
-
-        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, test_2: {ID: 234}, test_3: {ID: 345}});
         return waitForPromisesToResolve()
+            .then(() => {
+                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, test_2: {ID: 234}, test_3: {ID: 345}});
+                return waitForPromisesToResolve();
+            })
             .then(() => {
                 expect(onRender.mock.calls.length).toBe(2);
             });
@@ -88,9 +92,11 @@ describe('withOnyx', () => {
         })(ViewWithCollections);
         const onRender = jest.fn();
         render(<TestComponentWithOnyx onRender={onRender} />);
-
-        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, test_2: {ID: 234}, test_3: {ID: 345}});
         return waitForPromisesToResolve()
+            .then(() => {
+                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, test_2: {ID: 234}, test_3: {ID: 345}});
+                return waitForPromisesToResolve();
+            })
             .then(() => {
                 expect(onRender.mock.calls.length).toBe(2);
             });
@@ -104,10 +110,15 @@ describe('withOnyx', () => {
             test: {
                 key: ({testID}) => `${ONYX_KEYS.COLLECTION.TEST_KEY}${testID}`,
             },
+            otherTest: {
+                key: ({testID}) => `${ONYX_KEYS.COLLECTION.OTHER_TEST_KEY}${testID}`,
+            },
         })(ViewWithCollections);
         const onRender = jest.fn();
 
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 1}, test_2: {ID: 2}, test_3: {ID: 3}});
+        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.OTHER_TEST_KEY, {otherTest_1: {ID: 1}, otherTest_2: {ID: 2}, otherTest_3: {ID: 3}});
+
         return waitForPromisesToResolve()
             .then(() => {
                 renderResult = render(<TestComponentWithOnyx onRender={onRender} testID="1" />);
