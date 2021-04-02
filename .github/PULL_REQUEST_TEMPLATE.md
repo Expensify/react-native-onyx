@@ -14,5 +14,5 @@ Most changes to Onyx should have an accompanying tests. Describe the tests you a
 
 ### Linked PRs
 <!---
-Please include links to any PRs where this change will be implemented.
+Please include links to any update PRs in repos that must change their package.json version.
 --->
