@@ -73,7 +73,11 @@ describe('withOnyx', () => {
         render(<TestComponentWithOnyx onRender={onRender} />);
         return waitForPromisesToResolve()
             .then(() => {
-                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, test_2: {ID: 234}, test_3: {ID: 345}});
+                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                    test_1: {ID: 123},
+                    test_2: {ID: 234},
+                    test_3: {ID: 345},
+                });
                 return waitForPromisesToResolve();
             })
             .then(() => {
@@ -94,7 +98,11 @@ describe('withOnyx', () => {
         render(<TestComponentWithOnyx onRender={onRender} />);
         return waitForPromisesToResolve()
             .then(() => {
-                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, test_2: {ID: 234}, test_3: {ID: 345}});
+                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                    test_1: {ID: 123},
+                    test_2: {ID: 234},
+                    test_3: {ID: 345},
+                });
                 return waitForPromisesToResolve();
             })
             .then(() => {
@@ -117,12 +125,16 @@ describe('withOnyx', () => {
         const onRender = jest.fn();
 
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 1}, test_2: {ID: 2}, test_3: {ID: 3}});
-        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.OTHER_TEST_KEY, {otherTest_1: {ID: 1}, otherTest_2: {ID: 2}, otherTest_3: {ID: 3}});
+        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.OTHER_TEST_KEY, {
+            otherTest_1: {ID: 1},
+            otherTest_2: {ID: 2},
+            otherTest_3: {ID: 3},
+        });
 
         return waitForPromisesToResolve()
             .then(() => {
                 renderResult = render(<TestComponentWithOnyx onRender={onRender} testID="1" />);
-                return waitForPromisesToResolve()
+                return waitForPromisesToResolve();
             })
             .then(() => {
                 renderResult.rerender(<TestComponentWithOnyx onRender={onRender} testID="2" />);
