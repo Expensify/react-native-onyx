@@ -96,3 +96,34 @@ describe('withOnyx', () => {
             });
     });
 });
+
+describe('withOnyx', () => {
+    it('should update withOnyx subscriber with prop dependent key only once when external prop changes', () => {
+        let renderResult;
+        const TestComponentWithOnyx = withOnyx({
+            test: {
+                key: ({testID}) => `${ONYX_KEYS.COLLECTION.TEST_KEY}${testID}`,
+            },
+        })(ViewWithCollections);
+        const onRender = jest.fn();
+
+        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 1}, test_2: {ID: 2}, test_3: {ID: 3}});
+        return waitForPromisesToResolve()
+            .then(() => {
+                renderResult = render(<TestComponentWithOnyx onRender={onRender} testID="1" />);
+                return waitForPromisesToResolve()
+            })
+            .then(() => {
+                renderResult.rerender(<TestComponentWithOnyx onRender={onRender} testID="2" />);
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                // We are calling onRender with the props inside the ViewWithCollections so we can validate them now
+                expect(onRender.mock.calls[0][0].testID).toBe('1');
+                expect(onRender.mock.calls[0][0].test).toEqual({ID: 1});
+                expect(onRender.mock.calls[1][0].testID).toBe('2');
+                expect(onRender.mock.calls[1][0].test).toEqual({ID: 2});
+                expect(onRender.mock.calls.length).toBe(2);
+            });
+    });
+});

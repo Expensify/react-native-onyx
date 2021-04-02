@@ -16,7 +16,7 @@ const defaultProps = {
 };
 
 const ViewWithCollections = (props) => {
-    props.onRender();
+    props.onRender(props);
 
     return (
         <View>
