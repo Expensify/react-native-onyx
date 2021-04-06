@@ -108,11 +108,11 @@ describe('withOnyx', () => {
         const onRender = jest.fn();
         render(<TestComponentWithOnyx onRender={onRender} />);
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_4: {ID: 456}, test_5: {ID: 567}});
-        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_4: {Name: "Test4"}, test_5: {Name: "Test5"}, test_6: {ID: 678, Name: "Test6"}});
+        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_4: {Name: 'Test4'}, test_5: {Name: 'Test5'}, test_6: {ID: 678, Name: 'Test6'}});
         return waitForPromisesToResolve()
             .then(() => {
                 expect(onRender.mock.calls.length).toBe(3);
-                expect(onRender.mock.instances[2].text).toEqual({ID: 456, Name: "Test4"});
+                expect(onRender.mock.instances[2].text).toEqual({ID: 456, Name: 'Test4'});
             });
     });
 });
