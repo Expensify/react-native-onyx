@@ -111,7 +111,7 @@ describe('withOnyx', () => {
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
             test_4: {Name: 'Test4'},
             test_5: {Name: 'Test5'},
-            test_6: {ID: 678, Name: 'Test6'}
+            test_6: {ID: 678, Name: 'Test6'},
         });
         return waitForPromisesToResolve()
             .then(() => {
