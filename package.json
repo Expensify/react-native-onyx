@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@react-native-community/async-storage": "^1.12.1",
-    "expensify-common": "git+https://github.com/Expensify/expensify-common.git#3d8fc7500ddd24cd4a543e6e160d4f1ad97cc145",
+    "expensify-common": "git+https://github.com/Expensify/expensify-common.git#679fc86cfc4f9bc701e3757d583d74057edbbe28",
     "lodash": "4.17.21",
     "react": "^16.13.1",
     "underscore": "^1.11.0"
