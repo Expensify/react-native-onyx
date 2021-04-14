@@ -9,7 +9,7 @@ GH_LINK
 
 ### Automated Tests
 <!---
-Most changes to Onyx should have an accompanying tests. Describe the tests you added or if no tests were added an explanation about why one was not needed.
+Most changes to Onyx should have accompanying tests. Describe the tests you added or if no tests were added an explanation about why one was not needed.
 --->
 
 ### Linked PRs
