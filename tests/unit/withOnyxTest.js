@@ -19,9 +19,7 @@ Onyx.init({
     registerStorageEventListener: () => {},
 });
 
-beforeEach(() => {
-    return Onyx.clear();
-});
+beforeEach(() => Onyx.clear());
 
 describe('withOnyx', () => {
     it('should render with the test data when using withOnyx', () => {
@@ -148,7 +146,7 @@ describe('withOnyx', () => {
                     }),
                 )(ViewWithCollections);
                 render(<TestComponentWithOnyx onRender={onRender} />);
-                return waitForPromisesToResolve()
+                return waitForPromisesToResolve();
             })
             .then(() => {
                 expect(onRender.mock.instances[0].testThing).toBe('Test');
