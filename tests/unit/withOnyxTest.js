@@ -4,17 +4,23 @@ import Onyx, {withOnyx} from '../../index';
 import ViewWithText from '../components/ViewWithText';
 import ViewWithCollections from '../components/ViewWithCollections';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
+import compose from '../../lib/compose';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
     COLLECTION: {
         TEST_KEY: 'test_',
-    }
+        RELATED_KEY: 'related_',
+    },
 };
 
 Onyx.init({
     keys: ONYX_KEYS,
     registerStorageEventListener: () => {},
+});
+
+beforeEach(() => {
+    return Onyx.clear();
 });
 
 describe('withOnyx', () => {
@@ -117,6 +123,35 @@ describe('withOnyx', () => {
             .then(() => {
                 expect(onRender.mock.calls.length).toBe(3);
                 expect(onRender.mock.instances[2].text).toEqual({ID: 456, Name: 'Test4'});
+            });
+    });
+});
+
+describe('withOnyx', () => {
+    it('should pass a prop from one connected component to another', () => {
+        const collectionItemID = 1;
+        const onRender = jest.fn();
+        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {id: 1}});
+        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.RELATED_KEY, {related_1: 'Test'});
+        return waitForPromisesToResolve()
+            .then(() => {
+                const TestComponentWithOnyx = compose(
+                    withOnyx({
+                        testObject: {
+                            key: `${ONYX_KEYS.COLLECTION.TEST_KEY}${collectionItemID}`,
+                        },
+                    }),
+                    withOnyx({
+                        testThing: {
+                            key: ({testObject}) => `${ONYX_KEYS.COLLECTION.RELATED_KEY}${testObject.id}`,
+                        },
+                    }),
+                )(ViewWithCollections);
+                render(<TestComponentWithOnyx onRender={onRender} />);
+                return waitForPromisesToResolve()
+            })
+            .then(() => {
+                expect(onRender.mock.instances[0].testThing).toBe('Test');
             });
     });
 });
