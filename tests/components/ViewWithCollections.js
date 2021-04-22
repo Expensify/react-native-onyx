@@ -17,7 +17,6 @@ const defaultProps = {
 };
 
 const ViewWithCollections = (props) => {
-    console.log('render', props.testObject)
     props.onRender(props);
 
     return (

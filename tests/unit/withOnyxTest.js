@@ -155,23 +155,23 @@ describe('withOnyx', () => {
     });
 });
 
-describe('withOnyxblah', () => {
-    it('should pass a prop from one connected component to another', () => {
-        const collectionItemID = 1;
+describe('withOnyx', () => {
+    it('using mergeCollection to modify one item should only effect one component', () => {
         const onRender1 = jest.fn();
         const onRender2 = jest.fn();
         const onRender3 = jest.fn();
+
+        // GIVEN there is a collection with three simple items in it
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
             test_1: {id: 1},
             test_2: {id: 2},
             test_3: {id: 3},
         });
-        let TestComponentWithOnyx1;
-        let TestComponentWithOnyx2;
-        let TestComponentWithOnyx3;
+
         return waitForPromisesToResolve()
             .then(() => {
-                TestComponentWithOnyx1 = compose(
+                // WHEN three components subscribe to each of the items in that collection
+                const TestComponentWithOnyx1 = compose(
                     withOnyx({
                         testObject: {
                             key: `${ONYX_KEYS.COLLECTION.TEST_KEY}1`,
@@ -180,7 +180,7 @@ describe('withOnyxblah', () => {
                 )(ViewWithCollections);
                 render(<TestComponentWithOnyx1 onRender={onRender1} />);
 
-                TestComponentWithOnyx2 = compose(
+                const TestComponentWithOnyx2 = compose(
                     withOnyx({
                         testObject: {
                             key: `${ONYX_KEYS.COLLECTION.TEST_KEY}2`,
@@ -189,7 +189,7 @@ describe('withOnyxblah', () => {
                 )(ViewWithCollections);
                 render(<TestComponentWithOnyx2 onRender={onRender2} />);
 
-                TestComponentWithOnyx3 = compose(
+                const TestComponentWithOnyx3 = compose(
                     withOnyx({
                         testObject: {
                             key: `${ONYX_KEYS.COLLECTION.TEST_KEY}3`,
@@ -201,14 +201,15 @@ describe('withOnyxblah', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                // Only update a single item in the collection, would expect that no other items in the collection
-                // will change
+                // WHEN a single item in the collection is updated with mergeCollect()
                 Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                     test_1: {id: 1, newProperty: 'yay'},
                 });
                 return waitForPromisesToResolve();
             })
             .then(() => {
+                // THEN the component subscribed to the modified item should have the new version of the item
+                // and all other components should be unchanged.
                 expect(onRender1.mock.calls[0][0].testObject).toStrictEqual({id: 1});
                 expect(onRender1.mock.calls[1][0].testObject).toStrictEqual({id: 1, newProperty: 'yay'});
                 expect(onRender2.mock.calls[0][0].testObject).toStrictEqual({id: 2});
