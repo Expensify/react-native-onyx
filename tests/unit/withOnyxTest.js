@@ -210,13 +210,11 @@ describe('withOnyx', () => {
             .then(() => {
                 // THEN the component subscribed to the modified item should have the new version of the item
                 // and all other components should be unchanged.
+                // Note: each component is rendered twice. Once when it is initially rendered, and then again
+                // when the collection is updated. That's why there are two checks here for each component.
                 expect(onRender1.mock.calls[0][0].testObject).toStrictEqual({id: 1});
                 expect(onRender1.mock.calls[1][0].testObject).toStrictEqual({id: 1, newProperty: 'yay'});
                 expect(onRender2.mock.calls[0][0].testObject).toStrictEqual({id: 2});
-
-                // BOOM!!!! Here is the bug
-                // HERE we EXPECT the item to NOT change, but Onyx called `setState()` with an undefined value
-                // so the prop ends up being set to whatever is in defaultProps (which is {isDefaultProp: true})
                 expect(onRender2.mock.calls[1][0].testObject).toStrictEqual({id: 2});
                 expect(onRender3.mock.calls[0][0].testObject).toStrictEqual({id: 3});
                 expect(onRender3.mock.calls[1][0].testObject).toStrictEqual({id: 3});
