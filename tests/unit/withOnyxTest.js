@@ -1,6 +1,5 @@
 import React from 'react';
 import {render} from '@testing-library/react-native';
-import renderer from 'react-test-renderer';
 import Onyx, {withOnyx} from '../../index';
 import ViewWithText from '../components/ViewWithText';
 import ViewWithCollections from '../components/ViewWithCollections';
@@ -163,9 +162,9 @@ describe('withOnyx', () => {
 
         // GIVEN there is a collection with three simple items in it
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
-            test_1: {id: 1},
-            test_2: {id: 2},
-            test_3: {id: 3},
+            test_1: {ID: 1},
+            test_2: {ID: 2},
+            test_3: {ID: 3},
         });
 
         return waitForPromisesToResolve()
@@ -203,7 +202,7 @@ describe('withOnyx', () => {
             .then(() => {
                 // WHEN a single item in the collection is updated with mergeCollect()
                 Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
-                    test_1: {id: 1, newProperty: 'yay'},
+                    test_1: {ID: 1, newProperty: 'yay'},
                 });
                 return waitForPromisesToResolve();
             })
@@ -212,12 +211,12 @@ describe('withOnyx', () => {
                 // and all other components should be unchanged.
                 // Note: each component is rendered twice. Once when it is initially rendered, and then again
                 // when the collection is updated. That's why there are two checks here for each component.
-                expect(onRender1.mock.calls[0][0].testObject).toStrictEqual({id: 1});
-                expect(onRender1.mock.calls[1][0].testObject).toStrictEqual({id: 1, newProperty: 'yay'});
-                expect(onRender2.mock.calls[0][0].testObject).toStrictEqual({id: 2});
-                expect(onRender2.mock.calls[1][0].testObject).toStrictEqual({id: 2});
-                expect(onRender3.mock.calls[0][0].testObject).toStrictEqual({id: 3});
-                expect(onRender3.mock.calls[1][0].testObject).toStrictEqual({id: 3});
+                expect(onRender1.mock.calls[0][0].testObject).toStrictEqual({ID: 1});
+                expect(onRender1.mock.calls[1][0].testObject).toStrictEqual({ID: 1, newProperty: 'yay'});
+                expect(onRender2.mock.calls[0][0].testObject).toStrictEqual({ID: 2});
+                expect(onRender2.mock.calls[1][0].testObject).toStrictEqual({ID: 2});
+                expect(onRender3.mock.calls[0][0].testObject).toStrictEqual({ID: 3});
+                expect(onRender3.mock.calls[1][0].testObject).toStrictEqual({ID: 3});
             });
     });
 });

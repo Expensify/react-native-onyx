@@ -7,6 +7,9 @@ const propTypes = {
     collections: PropTypes.objectOf(PropTypes.shape({
         ID: PropTypes.number,
     })),
+    textObject: PropTypes.shape({
+        ID: PropTypes.number,
+    }),
     onRender: PropTypes.func,
 };
 
