@@ -1,5 +1,6 @@
 import React from 'react';
 import {render} from '@testing-library/react-native';
+import renderer from 'react-test-renderer';
 import Onyx, {withOnyx} from '../../index';
 import ViewWithText from '../components/ViewWithText';
 import ViewWithCollections from '../components/ViewWithCollections';
@@ -150,6 +151,74 @@ describe('withOnyx', () => {
             })
             .then(() => {
                 expect(onRender.mock.instances[0].testThing).toBe('Test');
+            });
+    });
+});
+
+describe('withOnyxblah', () => {
+    it('should pass a prop from one connected component to another', () => {
+        const collectionItemID = 1;
+        const onRender1 = jest.fn();
+        const onRender2 = jest.fn();
+        const onRender3 = jest.fn();
+        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+            test_1: {id: 1},
+            test_2: {id: 2},
+            test_3: {id: 3},
+        });
+        let TestComponentWithOnyx1;
+        let TestComponentWithOnyx2;
+        let TestComponentWithOnyx3;
+        return waitForPromisesToResolve()
+            .then(() => {
+                TestComponentWithOnyx1 = compose(
+                    withOnyx({
+                        testObject: {
+                            key: `${ONYX_KEYS.COLLECTION.TEST_KEY}1`,
+                        },
+                    }),
+                )(ViewWithCollections);
+                render(<TestComponentWithOnyx1 onRender={onRender1} />);
+
+                TestComponentWithOnyx2 = compose(
+                    withOnyx({
+                        testObject: {
+                            key: `${ONYX_KEYS.COLLECTION.TEST_KEY}2`,
+                        },
+                    }),
+                )(ViewWithCollections);
+                render(<TestComponentWithOnyx2 onRender={onRender2} />);
+
+                TestComponentWithOnyx3 = compose(
+                    withOnyx({
+                        testObject: {
+                            key: `${ONYX_KEYS.COLLECTION.TEST_KEY}3`,
+                        },
+                    }),
+                )(ViewWithCollections);
+                render(<TestComponentWithOnyx3 onRender={onRender3} />);
+
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                // Only update a single item in the collection, would expect that no other items in the collection
+                // will change
+                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                    test_1: {id: 1, newProperty: 'yay'},
+                });
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                expect(onRender1.mock.calls[0][0].testObject).toStrictEqual({id: 1});
+                expect(onRender1.mock.calls[1][0].testObject).toStrictEqual({id: 1, newProperty: 'yay'});
+                expect(onRender2.mock.calls[0][0].testObject).toStrictEqual({id: 2});
+
+                // BOOM!!!! Here is the bug
+                // HERE we EXPECT the item to NOT change, but Onyx called `setState()` with an undefined value
+                // so the prop ends up being set to whatever is in defaultProps (which is {isDefaultProp: true})
+                expect(onRender2.mock.calls[1][0].testObject).toStrictEqual({id: 2});
+                expect(onRender3.mock.calls[0][0].testObject).toStrictEqual({id: 3});
+                expect(onRender3.mock.calls[1][0].testObject).toStrictEqual({id: 3});
             });
     });
 });

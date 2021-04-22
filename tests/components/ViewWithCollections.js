@@ -12,11 +12,13 @@ const propTypes = {
 
 const defaultProps = {
     collections: {},
+    testObject: {isDefaultProp: true},
     onRender: () => {},
 };
 
 const ViewWithCollections = (props) => {
-    props.onRender();
+    console.log('render', props.testObject)
+    props.onRender(props);
 
     return (
         <View>
