@@ -211,12 +211,15 @@ describe('withOnyx', () => {
                 // and all other components should be unchanged.
                 // Note: each component is rendered twice. Once when it is initially rendered, and then again
                 // when the collection is updated. That's why there are two checks here for each component.
+                expect(onRender1).toHaveBeenCalledTimes(2);
                 expect(onRender1.mock.calls[0][0].testObject).toStrictEqual({ID: 1});
                 expect(onRender1.mock.calls[1][0].testObject).toStrictEqual({ID: 1, newProperty: 'yay'});
+
+                expect(onRender2).toHaveBeenCalledTimes(1);
                 expect(onRender2.mock.calls[0][0].testObject).toStrictEqual({ID: 2});
-                expect(onRender2.mock.calls[1][0].testObject).toStrictEqual({ID: 2});
+
+                expect(onRender3).toHaveBeenCalledTimes(1);
                 expect(onRender3.mock.calls[0][0].testObject).toStrictEqual({ID: 3});
-                expect(onRender3.mock.calls[1][0].testObject).toStrictEqual({ID: 3});
             });
     });
 });
