@@ -42,9 +42,7 @@ describe('withOnyx', () => {
                 expect(result).toHaveBeenCalledTimes(999);
             });
     });
-});
-
-describe('withOnyx', () => {
+    
     it('should update withOnyx subscriber multiple times when merge is used', () => {
         const TestComponentWithOnyx = withOnyx({
             text: {
@@ -62,9 +60,7 @@ describe('withOnyx', () => {
                 expect(onRender.mock.calls.length).toBe(4);
             });
     });
-});
 
-describe('withOnyx', () => {
     it('should update withOnyx subscriber just once when mergeCollection is used', () => {
         const TestComponentWithOnyx = withOnyx({
             text: {
@@ -80,9 +76,7 @@ describe('withOnyx', () => {
                 expect(onRender.mock.calls.length).toBe(2);
             });
     });
-});
 
-describe('withOnyx', () => {
     it('should update withOnyx subscribing to individual key if mergeCollection is used', () => {
         const collectionItemID = 1;
         const TestComponentWithOnyx = withOnyx({
@@ -99,9 +93,7 @@ describe('withOnyx', () => {
                 expect(onRender.mock.calls.length).toBe(2);
             });
     });
-});
 
-describe('withOnyx', () => {
     it('should update withOnyx subscribing to individual key with merged value if mergeCollection is used', () => {
         const collectionItemID = 4;
         const TestComponentWithOnyx = withOnyx({
@@ -123,9 +115,7 @@ describe('withOnyx', () => {
                 expect(onRender.mock.instances[2].text).toEqual({ID: 456, Name: 'Test4'});
             });
     });
-});
 
-describe('withOnyx', () => {
     it('should pass a prop from one connected component to another', () => {
         const collectionItemID = 1;
         const onRender = jest.fn();
@@ -152,9 +142,7 @@ describe('withOnyx', () => {
                 expect(onRender.mock.instances[0].testThing).toBe('Test');
             });
     });
-});
 
-describe('withOnyx', () => {
     it('using mergeCollection to modify one item should only effect one component', () => {
         const onRender1 = jest.fn();
         const onRender2 = jest.fn();
