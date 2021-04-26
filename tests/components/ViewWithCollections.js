@@ -7,16 +7,20 @@ const propTypes = {
     collections: PropTypes.objectOf(PropTypes.shape({
         ID: PropTypes.number,
     })),
+    testObject: PropTypes.shape({
+        ID: PropTypes.number,
+    }),
     onRender: PropTypes.func,
 };
 
 const defaultProps = {
     collections: {},
+    testObject: {isDefaultProp: true},
     onRender: () => {},
 };
 
 const ViewWithCollections = (props) => {
-    props.onRender();
+    props.onRender(props);
 
     return (
         <View>
