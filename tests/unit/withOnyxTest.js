@@ -42,7 +42,7 @@ describe('withOnyx', () => {
                 expect(result).toHaveBeenCalledTimes(999);
             });
     });
-    
+
     it('should update withOnyx subscriber multiple times when merge is used', () => {
         const TestComponentWithOnyx = withOnyx({
             text: {
@@ -208,6 +208,45 @@ describe('withOnyx', () => {
 
                 expect(onRender3).toHaveBeenCalledTimes(1);
                 expect(onRender3.mock.calls[0][0].testObject).toStrictEqual({ID: 3});
+            });
+    });
+
+    it('mergeCollection should merge previous props correctly to the new state', () => {
+        const onRender = jest.fn();
+
+        // GIVEN there is a collection with a simple item in it
+        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+            test_1: {ID: 1, number: 1},
+        });
+
+        return waitForPromisesToResolve()
+            .then(() => {
+                // WHEN a component subscribes to the one item in that collection
+                const TestComponentWithOnyx = compose(
+                    withOnyx({
+                        testObject: {
+                            key: `${ONYX_KEYS.COLLECTION.TEST_KEY}1`,
+                        },
+                    }),
+                )(ViewWithCollections);
+                render(<TestComponentWithOnyx onRender={onRender} />);
+
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                // WHEN the `number` property is updated using mergeCollection
+                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                    test_1: {number: 2},
+                });
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                // THEN the component subscribed to the modified item should be rendered twice.
+                // The first time it will render with number === 1
+                // The second time it will render with number === 2
+                expect(onRender).toHaveBeenCalledTimes(2);
+                expect(onRender.mock.calls[0][0].testObject).toStrictEqual({ID: 1, number: 1});
+                expect(onRender.mock.calls[1][0].testObject).toStrictEqual({ID: 1, number: 2});
             });
     });
 });
