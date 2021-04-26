@@ -214,7 +214,7 @@ describe('withOnyx', () => {
     it('mergeCollection should merge previous props correctly to the new state', () => {
         const onRender = jest.fn();
 
-        // GIVEN there is a collection with a simple item in it
+        // GIVEN there is a collection with a simple item in it that has a `number` property set to 1
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
             test_1: {ID: 1, number: 1},
         });
@@ -234,7 +234,7 @@ describe('withOnyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                // WHEN the `number` property is updated using mergeCollection
+                // WHEN the `number` property is updated using mergeCollection to be 2
                 Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                     test_1: {number: 2},
                 });
