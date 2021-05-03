@@ -15,15 +15,16 @@ Onyx.init({
 
 describe('Onyx', () => {
     let connectionID;
-
+    let keyToSubscribeTo;
     afterEach(() => {
-        Onyx.disconnect(connectionID);
+        Onyx.disconnect(keyToSubscribeTo, connectionID);
         return Onyx.clear();
     });
 
     it('should set a simple key', () => {
         let testKeyValue;
 
+        keyToSubscribeTo = ONYX_KEYS.TEST_KEY;
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
@@ -42,6 +43,7 @@ describe('Onyx', () => {
     it('should merge an object with another object', () => {
         let testKeyValue;
 
+        keyToSubscribeTo = ONYX_KEYS.TEST_KEY;
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
@@ -63,6 +65,7 @@ describe('Onyx', () => {
 
     it('should notify subscribers when data has been cleared', () => {
         let testKeyValue;
+        keyToSubscribeTo = ONYX_KEYS.TEST_KEY;
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
@@ -83,6 +86,7 @@ describe('Onyx', () => {
 
     it('should not notify subscribers after they have disconnected', () => {
         let testKeyValue;
+        keyToSubscribeTo = ONYX_KEYS.TEST_KEY;
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
@@ -94,7 +98,7 @@ describe('Onyx', () => {
         return Onyx.set(ONYX_KEYS.TEST_KEY, 'test')
             .then(() => {
                 expect(testKeyValue).toBe('test');
-                Onyx.disconnect(connectionID);
+                Onyx.disconnect(keyToSubscribeTo, connectionID);
                 return Onyx.set(ONYX_KEYS.TEST_KEY, 'test updated');
             })
             .then(() => {
@@ -105,6 +109,7 @@ describe('Onyx', () => {
 
     it('should merge arrays by appending new items to the end of a value', () => {
         let testKeyValue;
+        keyToSubscribeTo = ONYX_KEYS.TEST_KEY;
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
@@ -126,6 +131,7 @@ describe('Onyx', () => {
 
     it('should merge 2 objects when it has no initial stored value for test key', () => {
         let testKeyValue;
+        keyToSubscribeTo = ONYX_KEYS.TEST_KEY;
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
@@ -144,6 +150,7 @@ describe('Onyx', () => {
 
     it('should merge 2 arrays when it has no initial stored value for test key', () => {
         let testKeyValue;
+        keyToSubscribeTo = ONYX_KEYS.TEST_KEY;
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
@@ -163,6 +170,7 @@ describe('Onyx', () => {
     it('should properly set and merge when using mergeCollection', () => {
         const valuesReceived = {};
         const mockCallback = jest.fn(data => valuesReceived[data.ID] = data.value);
+        keyToSubscribeTo = ONYX_KEYS.COLLECTION.TEST_KEY;
         connectionID = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
             initWithStoredValues: false,
