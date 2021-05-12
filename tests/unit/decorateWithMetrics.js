@@ -1,7 +1,7 @@
 import AsyncStorageMock from '@react-native-community/async-storage/jest/async-storage-mock';
 
 import OnyxInternal from '../../lib/Onyx.internal';
-import {decorateWithMetrics, getMetrics, restetMetrics} from '../../lib/decorateWithMetrics';
+import {decorateWithMetrics, getMetrics, resetMetrics} from '../../lib/decorateWithMetrics';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 describe('decorateWithMetrics', () => {
@@ -11,10 +11,12 @@ describe('decorateWithMetrics', () => {
         // In tests we're not decorating OnyxInternals directly as this will keep it decorated after the test
         testInstance = {
             get: OnyxInternal.get,
+            getAllKeys: OnyxInternal.getAllKeys,
             set: OnyxInternal.set,
         };
 
-        restetMetrics();
+        resetMetrics();
+        Object.keys(testInstance).forEach(name => decorateWithMetrics(testInstance, name));
     });
 
     it('Should collect metrics for a single method, single call', () => {
@@ -24,7 +26,6 @@ describe('decorateWithMetrics', () => {
             JSON.stringify(mockedResult)
         );
 
-        decorateWithMetrics(testInstance, 'get');
         testInstance.get('mockedKey');
 
         return waitForPromisesToResolve()
@@ -46,8 +47,6 @@ describe('decorateWithMetrics', () => {
             .mockResolvedValueOnce('{ "mock": "value" }')
             .mockResolvedValueOnce('{ "mock": "value" }');
 
-        decorateWithMetrics(testInstance, 'get');
-
         testInstance.get('mockedKey');
         testInstance.get('mockedKey3');
         testInstance.get('mockedKey2');
@@ -68,8 +67,6 @@ describe('decorateWithMetrics', () => {
         AsyncStorageMock.setItem
             .mockResolvedValueOnce()
             .mockResolvedValueOnce();
-
-        decorateWithMetrics(testInstance, 'set');
 
         testInstance.set('mockedKey', {ids: [1, 2, 3]});
         testInstance.set('mockedKey', {ids: [4, 5, 6]});
@@ -97,16 +94,28 @@ describe('decorateWithMetrics', () => {
             JSON.stringify(mockedResult)
         );
 
-        decorateWithMetrics(testInstance, 'get');
-
         return testInstance.get('mockedKey')
             .then((result) => {
                 expect(result).toEqual(mockedResult);
             });
     });
 
-    xit('Should collect metrics for a multiple methods, single call', () => {
+    it('Should collect metrics for a multiple methods, single call', () => {
+        AsyncStorageMock.getItem.mockResolvedValueOnce('{ "mock": "value" }');
+        AsyncStorageMock.getAllKeys.mockResolvedValueOnce(['my', 'mock', 'keys']);
 
+        testInstance.get('mockedKey');
+        testInstance.getAllKeys();
+
+        return waitForPromisesToResolve()
+            .then(() => {
+                const stats = getMetrics();
+                expect(stats).toHaveLength(2);
+                expect(stats).toEqual([
+                    expect.objectContaining({methodName: 'get', args: ['mockedKey'], result: {mock: 'value'}}),
+                    expect.objectContaining({methodName: 'getAllKeys', args: [], result: ['my', 'mock', 'keys']}),
+                ]);
+            });
     });
 
     xit('Should collect metrics for a multiple methods, multiple call', () => {
