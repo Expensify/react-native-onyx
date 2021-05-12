@@ -39,3 +39,14 @@ export default withOnyx({
     },
 })(ReportActionsView);
 ```
+
+### Benchmarks
+
+Set the BENCHMARK_ONYX environment variable before running a build, or the React native dev server
+
+```sh
+export BENCHMARK_ONYX=true
+npm run ios
+```
+
+Obtain the metrics collected by Onyx by calling `Onyx.getMetrics()`
