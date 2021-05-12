@@ -11,6 +11,7 @@ describe('decorateWithMetrics', () => {
         // In tests we're not decorating OnyxInternals directly as this will keep it decorated after the test
         testInstance = {
             get: OnyxInternal.get,
+            set: OnyxInternal.set,
         };
 
         restetMetrics();
@@ -24,9 +25,9 @@ describe('decorateWithMetrics', () => {
         );
 
         decorateWithMetrics(testInstance, 'get');
+        testInstance.get('mockedKey');
 
-        const promise = testInstance.get('mockedKey')
-            .then(waitForPromisesToResolve)
+        return waitForPromisesToResolve()
             .then(() => {
                 const stats = getMetrics('get');
                 expect(stats).toHaveLength(1);
@@ -37,14 +38,13 @@ describe('decorateWithMetrics', () => {
                 expect(firstCall.endTime).toEqual(expect.any(Number));
                 expect(firstCall.args).toEqual(['mockedKey']);
             });
-
-        waitForPromisesToResolve();
-
-        return promise;
     });
 
     it('Should collect metrics for a single method, multiple calls', () => {
-        AsyncStorageMock.getItem.mockResolvedValueOnce('{ "mock": "value" }');
+        AsyncStorageMock.getItem
+            .mockResolvedValueOnce('{ "mock": "value" }')
+            .mockResolvedValueOnce('{ "mock": "value" }')
+            .mockResolvedValueOnce('{ "mock": "value" }');
 
         decorateWithMetrics(testInstance, 'get');
 
@@ -60,6 +60,32 @@ describe('decorateWithMetrics', () => {
                     expect.objectContaining({args: ['mockedKey']}),
                     expect.objectContaining({args: ['mockedKey3']}),
                     expect.objectContaining({args: ['mockedKey2']}),
+                ]);
+            });
+    });
+
+    it('Should work for methods that return void', () => {
+        AsyncStorageMock.setItem
+            .mockResolvedValueOnce()
+            .mockResolvedValueOnce();
+
+        decorateWithMetrics(testInstance, 'set');
+
+        testInstance.set('mockedKey', {ids: [1, 2, 3]});
+        testInstance.set('mockedKey', {ids: [4, 5, 6]});
+
+        return waitForPromisesToResolve()
+            .then(() => {
+                const stats = getMetrics('set');
+                expect(stats).toHaveLength(2);
+                expect(stats).toEqual([
+                    expect.objectContaining({args: ['mockedKey', {ids: [1, 2, 3]}]}),
+                    expect.objectContaining({args: ['mockedKey', {ids: [4, 5, 6]}]}),
+                ]);
+
+                expect(stats).toEqual([
+                    expect.objectContaining({result: undefined}),
+                    expect.objectContaining({result: undefined}),
                 ]);
             });
     });
