@@ -90,6 +90,21 @@ describe('decorateWithMetrics', () => {
             });
     });
 
+    it('Should not affect the returned value from the original method', () => {
+        const mockedResult = {mockedKey: 'mockedValue'};
+
+        AsyncStorageMock.getItem.mockResolvedValueOnce(
+            JSON.stringify(mockedResult)
+        );
+
+        decorateWithMetrics(testInstance, 'get');
+
+        return testInstance.get('mockedKey')
+            .then((result) => {
+                expect(result).toEqual(mockedResult);
+            });
+    });
+
     xit('Should collect metrics for a multiple methods, single call', () => {
 
     });
