@@ -1,7 +1,11 @@
 import AsyncStorageMock from '@react-native-community/async-storage/jest/async-storage-mock';
 
 import OnyxInternal from '../../lib/Onyx.internal';
-import {decorateWithMetrics, getMetrics, resetMetrics} from '../../lib/decorateWithMetrics';
+import {
+    decorateWithMetricsMultiple,
+    getMetrics,
+    resetMetrics
+} from '../../lib/decorateWithMetrics';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 describe('decorateWithMetrics', () => {
@@ -16,7 +20,7 @@ describe('decorateWithMetrics', () => {
         };
 
         resetMetrics();
-        Object.keys(testInstance).forEach(name => decorateWithMetrics(testInstance, name));
+        decorateWithMetricsMultiple(testInstance, Object.keys(testInstance));
     });
 
     it('Should collect metrics for a single method, single call', () => {
