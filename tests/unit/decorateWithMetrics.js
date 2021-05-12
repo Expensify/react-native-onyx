@@ -118,7 +118,32 @@ describe('decorateWithMetrics', () => {
             });
     });
 
-    xit('Should collect metrics for a multiple methods, multiple call', () => {
+    it('Should collect metrics for a multiple methods, multiple call', () => {
+        AsyncStorageMock.getAllKeys
+            .mockResolvedValueOnce(['my', 'mock', 'keys'])
+            .mockResolvedValueOnce(['my', 'mock', 'keys', 'and'])
+            .mockResolvedValueOnce(['my', 'mock', 'keys', 'and', 'more']);
 
+        AsyncStorageMock.setItem
+            .mockResolvedValueOnce()
+            .mockResolvedValueOnce();
+
+        testInstance.getAllKeys();
+        testInstance.set('and', 'Mock value');
+        testInstance.getAllKeys();
+        testInstance.set('more', 'Mock value');
+        testInstance.getAllKeys();
+
+        return waitForPromisesToResolve()
+            .then(() => {
+                const allStats = getMetrics();
+                expect(allStats).toHaveLength(5);
+
+                const allKeysCalls = getMetrics('getAllKeys');
+                expect(allKeysCalls).toHaveLength(3);
+
+                const setCalls = getMetrics('set');
+                expect(setCalls).toHaveLength(2);
+            });
     });
 });
