@@ -42,11 +42,14 @@ export default withOnyx({
 
 ### Benchmarks
 
-Set the BENCHMARK_ONYX environment variable before running a build, or the React native dev server
+Provide the `captureMetrics` flag to `Onyx.init` to capture call statistics
 
-```sh
-export BENCHMARK_ONYX=true
-npm run ios
+```js
+Onyx.init({
+    keys: ONYXKEYS,
+    safeEvictionKeys: [ONYXKEYS.COLLECTION.REPORT_ACTIONS],
+    captureMetrics: Config.BENCHMARK_ONYX,
+});
 ```
 
 Obtain the metrics collected by Onyx by calling `Onyx.getMetrics()`
