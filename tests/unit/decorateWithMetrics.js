@@ -150,4 +150,34 @@ describe('decorateWithMetrics', () => {
                 expect(setCalls).toHaveLength(2);
             });
     });
+
+    it('Attempting to decorate already decorated method should throw', () => {
+        expect(() => decorateWithMetricsMultiple(testInstance, ['get'])).toThrow('"get" is already decorated');
+    });
+
+    it('Adding more data after clearing should work', () => {
+        AsyncStorageMock.setItem
+            .mockResolvedValueOnce()
+            .mockResolvedValueOnce()
+            .mockResolvedValueOnce();
+
+        testInstance.set('mockedKey', {ids: [1, 2, 3]});
+        testInstance.set('mockedKey', {ids: [4, 5, 6]});
+
+        resetMetrics();
+
+        return waitForPromisesToResolve()
+            .then(() => {
+                expect(getMetrics('set')).toHaveLength(2);
+                resetMetrics();
+
+                expect(getMetrics('set')).toHaveLength(0);
+                testInstance.set('mockedKey', {ids: [1, 2, 3]});
+
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                expect(getMetrics('set')).toHaveLength(1);
+            });
+    });
 });
