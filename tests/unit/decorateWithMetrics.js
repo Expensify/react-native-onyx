@@ -202,4 +202,26 @@ describe('decorateWithMetrics', () => {
             })
             .finally(resetMetrics);
     });
+
+    it('Should work with custom alias', () => {
+        const mockInstance = {
+            get: OnyxInternal.get,
+            set: OnyxInternal.set,
+        };
+
+        decorateWithMetricsMultiple(mockInstance, ['get', 'set'], 'mock:');
+
+        mockInstance.get('mockKey');
+        mockInstance.set('mockKey', {});
+
+        return waitForPromisesToResolve()
+            .then(() => {
+                const stats = getMetrics();
+                expect(stats).toEqual([
+                    expect.objectContaining({methodName: 'mock:get'}),
+                    expect.objectContaining({methodName: 'mock:set'}),
+                ]);
+            })
+            .finally(resetMetrics);
+    });
 });
