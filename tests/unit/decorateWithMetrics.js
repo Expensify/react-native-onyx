@@ -102,7 +102,8 @@ describe('decorateWithMetrics', () => {
         return testInstance.get('mockedKey')
             .then((result) => {
                 expect(result).toEqual(mockedResult);
-            });
+            })
+            .then(waitForPromisesToResolve);
     });
 
     it('Should collect metrics for a multiple methods, single call', () => {
