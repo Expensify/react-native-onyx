@@ -42,7 +42,7 @@ export default withOnyx({
 
 ### Benchmarks
 
-Provide the `captureMetrics` flag to `Onyx.init` to capture call statistics
+Provide the `captureMetrics` boolean flag to `Onyx.init` to capture call statistics
 
 ```js
 Onyx.init({
@@ -53,3 +53,18 @@ Onyx.init({
 ```
 
 Obtain the metrics collected by Onyx by calling `Onyx.getMetrics()`
+This will return a list of calls that were captured by the benchmark
+Each item in the list is a plain JSON object that contains data about:
+- method name
+- arguments used
+- start time in milliseconds - relative to app start time - e.g. 0 is the start of the app
+- end time
+- return value
+
+Use `Onyx.resetMetrics()` to clear captured data.
+This would allow to you to track what a specific interaction involves.
+E.g. `Onyx.resetMetrics()` perform a flow that uses Onyx then `Onyx.getMetrics()` to see timings
+and method calls
+
+You can also get the data only for a particular method by calling `Onyx.getMetrics(methodName)`
+e.g. `Onyx.getMetrics('connect')` to get only data regarding `connect` invocations
