@@ -3,6 +3,7 @@ import AsyncStorageMock from '@react-native-community/async-storage/jest/async-s
 import OnyxInternal from '../../lib/Onyx.internal';
 import {
     decorateWithMetricsMultiple,
+    decorateWithMetrics,
     getMetrics,
     resetMetrics
 } from '../../lib/decorateWithMetrics';
@@ -67,7 +68,7 @@ describe('decorateWithMetrics', () => {
             });
     });
 
-    it('Should work for methods that return void', () => {
+    it('Should work for methods that return Promise<void>', () => {
         AsyncStorageMock.setItem
             .mockResolvedValueOnce()
             .mockResolvedValueOnce();
@@ -179,5 +180,25 @@ describe('decorateWithMetrics', () => {
             .then(() => {
                 expect(getMetrics('set')).toHaveLength(1);
             });
+    });
+
+    it('Should work with non promise returning methods', () => {
+        const mockInstance = {
+            sampleSyncMethod: name => `Hello ${name}`
+        };
+
+        decorateWithMetrics(mockInstance, mockInstance.sampleSyncMethod.name);
+
+        const originalResult = mockInstance.sampleSyncMethod('Mock');
+        expect(originalResult).toEqual('Hello Mock');
+
+        return waitForPromisesToResolve()
+            .then(() => {
+                const stats = getMetrics();
+                expect(stats).toEqual([
+                    expect.objectContaining({args: ['Mock']}),
+                ]);
+            })
+            .finally(resetMetrics);
     });
 });
