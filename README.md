@@ -2,7 +2,7 @@
 This is a persistent storage solution wrapped in a Pub/Sub library. In general that means:
 
 - Onyx stores and retrieves data from persistent storage
-- Data is stored as key/value pairs, where the value can be anything from a single piece of data to a complex object
+- Data is stored as key/value pairs, where the value can be anything from a single piece of data to a complex object 
 - Collections of data are usually not stored as a single key (e.g. an array with multiple objects), but as individual keys+ID (e.g. `report_1234`, `report_4567`, etc.). Store collections as individual keys when a component will bind directly to one of those keys. For example: reports are stored as individual keys because `SidebarLink.js` binds to the individual report keys for each link. However, report actions are stored as an array of objects because nothing binds directly to a single report action.
 - Onyx allows other code to subscribe to changes in data, and then publishes change events whenever data is changed
 - Anything needing to read Onyx data needs to:
