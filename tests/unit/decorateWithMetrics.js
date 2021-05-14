@@ -209,10 +209,16 @@ describe('decorateWithMetrics', () => {
             set: OnyxInternal.set,
         };
 
+        const otherInstance = {
+            get: OnyxInternal.get,
+        };
+
         decorateWithMetricsMultiple(mockInstance, ['get', 'set'], 'mock:');
+        decorateWithMetrics(otherInstance, 'get', 'other:get');
 
         mockInstance.get('mockKey');
         mockInstance.set('mockKey', {});
+        otherInstance.get('mockKey');
 
         return waitForPromisesToResolve()
             .then(() => {
@@ -220,6 +226,7 @@ describe('decorateWithMetrics', () => {
                 expect(stats).toEqual([
                     expect.objectContaining({methodName: 'mock:get'}),
                     expect.objectContaining({methodName: 'mock:set'}),
+                    expect.objectContaining({methodName: 'other:get'}),
                 ]);
             })
             .finally(resetMetrics);
