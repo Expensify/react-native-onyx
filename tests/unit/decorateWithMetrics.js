@@ -1,8 +1,4 @@
-import AsyncStorageMock from '@react-native-community/async-storage/jest/async-storage-mock';
-
-import OnyxInternal from '../../lib/Onyx.internal';
 import {
-    decorateWithMetricsMultiple,
     decorateWithMetrics,
     getMetrics,
     resetMetrics
@@ -10,32 +6,21 @@ import {
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 describe('decorateWithMetrics', () => {
-    let testInstance;
-
     beforeEach(() => {
-        // In tests we're not decorating OnyxInternals directly as this will keep it decorated after the test
-        testInstance = {
-            get: OnyxInternal.get,
-            getAllKeys: OnyxInternal.getAllKeys,
-            set: OnyxInternal.set,
-        };
-
         resetMetrics();
-        decorateWithMetricsMultiple(testInstance, Object.keys(testInstance));
     });
 
     it('Should collect metrics for a single method, single call', () => {
         const mockedResult = {mockedKey: 'mockedValue'};
 
-        AsyncStorageMock.getItem.mockResolvedValueOnce(
-            JSON.stringify(mockedResult)
-        );
+        let mockFn = jest.fn().mockResolvedValueOnce(mockedResult);
 
-        testInstance.get('mockedKey');
+        mockFn = decorateWithMetrics(mockFn, 'mockFn', 'mockFn');
+        mockFn('mockedKey');
 
         return waitForPromisesToResolve()
             .then(() => {
-                const stats = getMetrics('get');
+                const stats = getMetrics('mockFn');
                 expect(stats).toHaveLength(1);
 
                 const firstCall = stats[0];
@@ -46,19 +31,38 @@ describe('decorateWithMetrics', () => {
             });
     });
 
-    it('Should collect metrics for a single method, multiple calls', () => {
-        AsyncStorageMock.getItem
+    it('Should use function.name when alias was not provided', () => {
+        function mockFunc() {}
+
+        // eslint-disable-next-line no-func-assign
+        mockFunc = decorateWithMetrics(mockFunc);
+        mockFunc();
+
+        waitForPromisesToResolve()
+            .then(() => {
+                const stats = getMetrics('mockFn');
+                expect(stats).toHaveLength(1);
+                expect(stats).toEqual([
+                    expect.objectContaining({methodName: 'mockFunc'})
+                ]);
+            });
+    });
+
+    it('Should collect metrics for multiple calls', () => {
+        let mockFn = jest.fn()
             .mockResolvedValueOnce('{ "mock": "value" }')
             .mockResolvedValueOnce('{ "mock": "value" }')
             .mockResolvedValueOnce('{ "mock": "value" }');
 
-        testInstance.get('mockedKey');
-        testInstance.get('mockedKey3');
-        testInstance.get('mockedKey2');
+        mockFn = decorateWithMetrics(mockFn, 'mockFn');
+
+        mockFn('mockedKey');
+        mockFn('mockedKey3');
+        mockFn('mockedKey2');
 
         return waitForPromisesToResolve()
             .then(() => {
-                const stats = getMetrics('get');
+                const stats = getMetrics('mockFn');
                 expect(stats).toHaveLength(3);
                 expect(stats).toEqual([
                     expect.objectContaining({args: ['mockedKey']}),
@@ -69,16 +73,18 @@ describe('decorateWithMetrics', () => {
     });
 
     it('Should work for methods that return Promise<void>', () => {
-        AsyncStorageMock.setItem
+        let mockFn = jest.fn()
             .mockResolvedValueOnce()
             .mockResolvedValueOnce();
 
-        testInstance.set('mockedKey', {ids: [1, 2, 3]});
-        testInstance.set('mockedKey', {ids: [4, 5, 6]});
+        mockFn = decorateWithMetrics(mockFn, 'mockFn');
+
+        mockFn('mockedKey', {ids: [1, 2, 3]});
+        mockFn('mockedKey', {ids: [4, 5, 6]});
 
         return waitForPromisesToResolve()
             .then(() => {
-                const stats = getMetrics('set');
+                const stats = getMetrics('mockFn');
                 expect(stats).toHaveLength(2);
                 expect(stats).toEqual([
                     expect.objectContaining({args: ['mockedKey', {ids: [1, 2, 3]}]}),
@@ -94,103 +100,110 @@ describe('decorateWithMetrics', () => {
 
     it('Should not affect the returned value from the original method', () => {
         const mockedResult = {mockedKey: 'mockedValue'};
+        let mockFn = jest.fn().mockResolvedValueOnce(mockedResult);
 
-        AsyncStorageMock.getItem.mockResolvedValueOnce(
-            JSON.stringify(mockedResult)
-        );
+        mockFn = decorateWithMetrics(mockFn, 'mockFn');
 
-        return testInstance.get('mockedKey')
+        return mockFn('mockedKey')
             .then((result) => {
                 expect(result).toEqual(mockedResult);
             })
             .then(waitForPromisesToResolve);
     });
 
-    it('Should collect metrics for a multiple methods, single call', () => {
-        AsyncStorageMock.getItem.mockResolvedValueOnce('{ "mock": "value" }');
-        AsyncStorageMock.getAllKeys.mockResolvedValueOnce(['my', 'mock', 'keys']);
+    it('Should collect metrics for a multiple functions, single call', () => {
+        let mockGet = jest.fn().mockResolvedValueOnce({mock: 'value'});
+        let mockGetAllKeys = jest.fn().mockResolvedValueOnce(['my', 'mock', 'keys']);
 
-        testInstance.get('mockedKey');
-        testInstance.getAllKeys();
+        mockGet = decorateWithMetrics(mockGet, 'mockGet');
+        mockGetAllKeys = decorateWithMetrics(mockGetAllKeys, 'mockGetAllKeys');
+
+        mockGet('mockedKey');
+        mockGetAllKeys();
 
         return waitForPromisesToResolve()
             .then(() => {
                 const stats = getMetrics();
                 expect(stats).toHaveLength(2);
                 expect(stats).toEqual([
-                    expect.objectContaining({methodName: 'get', args: ['mockedKey'], result: {mock: 'value'}}),
-                    expect.objectContaining({methodName: 'getAllKeys', args: [], result: ['my', 'mock', 'keys']}),
+                    expect.objectContaining({methodName: 'mockGet', args: ['mockedKey'], result: {mock: 'value'}}),
+                    expect.objectContaining({methodName: 'mockGetAllKeys', args: [], result: ['my', 'mock', 'keys']}),
                 ]);
             });
     });
 
-    it('Should collect metrics for a multiple methods, multiple call', () => {
-        AsyncStorageMock.getAllKeys
+    it('Should collect metrics for a multiple functions, multiple call', () => {
+        let mockGetAllKeys = jest.fn()
             .mockResolvedValueOnce(['my', 'mock', 'keys'])
             .mockResolvedValueOnce(['my', 'mock', 'keys', 'and'])
             .mockResolvedValueOnce(['my', 'mock', 'keys', 'and', 'more']);
 
-        AsyncStorageMock.setItem
+        let mockSetItem = jest.fn()
             .mockResolvedValueOnce()
             .mockResolvedValueOnce();
 
-        testInstance.getAllKeys();
-        testInstance.set('and', 'Mock value');
-        testInstance.getAllKeys();
-        testInstance.set('more', 'Mock value');
-        testInstance.getAllKeys();
+        mockGetAllKeys = decorateWithMetrics(mockGetAllKeys, 'mockGetAllKeys');
+        mockSetItem = decorateWithMetrics(mockSetItem, 'mockSetItem');
+
+        mockGetAllKeys();
+        mockSetItem('and', 'Mock value');
+        mockGetAllKeys();
+        mockSetItem('more', 'Mock value');
+        mockGetAllKeys();
 
         return waitForPromisesToResolve()
             .then(() => {
                 const allStats = getMetrics();
                 expect(allStats).toHaveLength(5);
 
-                const allKeysCalls = getMetrics('getAllKeys');
+                const allKeysCalls = getMetrics('mockGetAllKeys');
                 expect(allKeysCalls).toHaveLength(3);
 
-                const setCalls = getMetrics('set');
+                const setCalls = getMetrics('mockSetItem');
                 expect(setCalls).toHaveLength(2);
             });
     });
 
     it('Attempting to decorate already decorated method should throw', () => {
-        expect(() => decorateWithMetricsMultiple(testInstance, ['get'])).toThrow('"get" is already decorated');
+        let mockFn = jest.fn();
+        mockFn = decorateWithMetrics(mockFn, 'mockFn');
+        expect(() => decorateWithMetrics(mockFn, 'mockFn')).toThrow('"mockFn" is already decorated');
     });
 
     it('Adding more data after clearing should work', () => {
-        AsyncStorageMock.setItem
+        let mockFn = jest.fn()
             .mockResolvedValueOnce()
             .mockResolvedValueOnce()
             .mockResolvedValueOnce();
 
-        testInstance.set('mockedKey', {ids: [1, 2, 3]});
-        testInstance.set('mockedKey', {ids: [4, 5, 6]});
+        mockFn = decorateWithMetrics(mockFn, 'mockFn');
+
+        mockFn('mockedKey', {ids: [1, 2, 3]});
+        mockFn('mockedKey', {ids: [4, 5, 6]});
 
         resetMetrics();
 
         return waitForPromisesToResolve()
             .then(() => {
-                expect(getMetrics('set')).toHaveLength(2);
+                expect(getMetrics('mockFn')).toHaveLength(2);
                 resetMetrics();
 
-                expect(getMetrics('set')).toHaveLength(0);
-                testInstance.set('mockedKey', {ids: [1, 2, 3]});
+                expect(getMetrics('mockFn')).toHaveLength(0);
+                mockFn('mockedKey', {ids: [1, 2, 3]});
 
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                expect(getMetrics('set')).toHaveLength(1);
+                expect(getMetrics('mockFn')).toHaveLength(1);
             });
     });
 
     it('Should work with non promise returning methods', () => {
-        const mockInstance = {
-            sampleSyncMethod: name => `Hello ${name}`
-        };
+        let mockFn = name => `Hello ${name}`;
 
-        decorateWithMetrics(mockInstance, mockInstance.sampleSyncMethod.name);
+        mockFn = decorateWithMetrics(mockFn, 'mockFn');
 
-        const originalResult = mockInstance.sampleSyncMethod('Mock');
+        const originalResult = mockFn('Mock');
         expect(originalResult).toEqual('Hello Mock');
 
         return waitForPromisesToResolve()
@@ -204,29 +217,17 @@ describe('decorateWithMetrics', () => {
     });
 
     it('Should work with custom alias', () => {
-        const mockInstance = {
-            get: OnyxInternal.get,
-            set: OnyxInternal.set,
-        };
+        const mockedResult = {mockedKey: 'mockedValue'};
 
-        const otherInstance = {
-            get: OnyxInternal.get,
-        };
-
-        decorateWithMetricsMultiple(mockInstance, ['get', 'set'], 'mock:');
-        decorateWithMetrics(otherInstance, 'get', 'other:get');
-
-        mockInstance.get('mockKey');
-        mockInstance.set('mockKey', {});
-        otherInstance.get('mockKey');
+        let mockFn = jest.fn().mockResolvedValueOnce(mockedResult);
+        mockFn = decorateWithMetrics(mockFn, 'mock:get');
+        mockFn('mockKey');
 
         return waitForPromisesToResolve()
             .then(() => {
                 const stats = getMetrics();
                 expect(stats).toEqual([
                     expect.objectContaining({methodName: 'mock:get'}),
-                    expect.objectContaining({methodName: 'mock:set'}),
-                    expect.objectContaining({methodName: 'other:get'}),
                 ]);
             })
             .finally(resetMetrics);
