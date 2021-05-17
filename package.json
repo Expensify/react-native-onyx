@@ -16,7 +16,7 @@
     "expensify-common": "git+https://github.com/Expensify/expensify-common.git#2e5cff552cf132da90a3fb9756e6b4fb6ae7b40c",
     "lodash": "4.17.21",
     "react": "^16.13.1",
-    "underscore": "^1.13.0"
+    "underscore": "^1.13.1"
   },
   "devDependencies": {
     "@babel/core": "^7.11.1",
