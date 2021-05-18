@@ -3,6 +3,7 @@ import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
+    ANOTHER_TEST: 'anotherTest',
     COLLECTION: {
         TEST_KEY: 'test_',
     }
@@ -11,6 +12,9 @@ const ONYX_KEYS = {
 Onyx.init({
     keys: ONYX_KEYS,
     registerStorageEventListener: () => {},
+    initialKeyStates: {
+        [ONYX_KEYS.ANOTHER_TEST]: 42,
+    },
 });
 
 describe('Onyx', () => {
@@ -68,16 +72,28 @@ describe('Onyx', () => {
             initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
-            }
+            },
         });
 
-        return Onyx.set(ONYX_KEYS.TEST_KEY, 'test')
+        let anotherTestValue;
+        const anotherTestConnectionID = Onyx.connect({
+            key: ONYX_KEYS.ANOTHER_TEST,
+            callback: (value) => {
+                anotherTestValue = value;
+            },
+        });
+
+        return waitForPromisesToResolve()
+            .then(() => Onyx.set(ONYX_KEYS.TEST_KEY, 'test'))
             .then(() => {
                 expect(testKeyValue).toBe('test');
-                return Onyx.clear();
+                expect(anotherTestValue).toBe(42);
+                return Onyx.clear().then(waitForPromisesToResolve);
             })
             .then(() => {
                 expect(testKeyValue).toBeNull();
+                expect(anotherTestValue).toBe(42);
+                return Onyx.disconnect(anotherTestConnectionID);
             });
     });
 
