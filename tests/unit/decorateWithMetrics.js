@@ -26,7 +26,6 @@ describe('decorateWithMetrics', () => {
                     totalTime: expect.any(Number),
                     averageTime: expect.any(Number),
                     summaries: expect.objectContaining({mockFn: expect.any(Object)}),
-                    print: expect.any(Function),
                 }));
 
                 expect(Object.keys(metrics.summaries)).toHaveLength(1);
