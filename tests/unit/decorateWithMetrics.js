@@ -25,13 +25,13 @@ describe('decorateWithMetrics', () => {
                 expect(metrics).toEqual(expect.objectContaining({
                     totalTime: expect.any(Number),
                     averageTime: expect.any(Number),
-                    stats: expect.any(Array),
+                    summaries: expect.objectContaining({mockFn: expect.any(Object)}),
                     print: expect.any(Function),
                 }));
 
-                expect(metrics.stats).toHaveLength(1);
+                expect(Object.keys(metrics.summaries)).toHaveLength(1);
 
-                const firstCall = metrics.stats[0];
+                const firstCall = metrics.summaries.mockFn.calls[0];
                 expect(firstCall.startTime).toEqual(expect.any(Number));
                 expect(firstCall.endTime).toEqual(expect.any(Number));
                 expect(firstCall.args).toEqual(['mockedKey']);
@@ -76,9 +76,9 @@ describe('decorateWithMetrics', () => {
         return waitForPromisesToResolve()
             .then(() => {
                 // THEN stats should have data regarding each call
-                const stats = getMetrics().stats;
-                expect(stats).toHaveLength(3);
-                expect(stats).toEqual([
+                const calls = getMetrics().summaries.mockFn.calls;
+                expect(calls).toHaveLength(3);
+                expect(calls).toEqual([
                     expect.objectContaining({args: ['mockedKey']}),
                     expect.objectContaining({args: ['mockedKey3']}),
                     expect.objectContaining({args: ['mockedKey2']}),
@@ -100,9 +100,9 @@ describe('decorateWithMetrics', () => {
         return waitForPromisesToResolve()
             .then(() => {
                 // THEN stats should still contain data about the calls
-                const stats = getMetrics().stats;
-                expect(stats).toHaveLength(2);
-                expect(stats).toEqual([
+                const calls = getMetrics().summaries.mockFn.calls;
+                expect(calls).toHaveLength(2);
+                expect(calls).toEqual([
                     expect.objectContaining({args: ['mockedKey', {ids: [1, 2, 3]}]}),
                     expect.objectContaining({args: ['mockedKey', {ids: [4, 5, 6]}]}),
                 ]);
@@ -130,7 +130,7 @@ describe('decorateWithMetrics', () => {
         let mockGet = jest.fn().mockResolvedValueOnce({mock: 'value'});
         let mockGetAllKeys = jest.fn().mockResolvedValueOnce(['my', 'mock', 'keys']);
 
-        // WHEN they are decorated and executed
+        // WHEN each is decorated and executed one time
         mockGet = decorateWithMetrics(mockGet, 'mockGet');
         mockGetAllKeys = decorateWithMetrics(mockGetAllKeys, 'mockGetAllKeys');
 
@@ -140,12 +140,16 @@ describe('decorateWithMetrics', () => {
         return waitForPromisesToResolve()
             .then(() => {
                 // THEN stats should contain data for each function and each call under the correct function alias
-                const stats = getMetrics().stats;
-                expect(stats).toHaveLength(2);
-                expect(stats).toEqual([
-                    expect.objectContaining({methodName: 'mockGet', args: ['mockedKey']}),
-                    expect.objectContaining({methodName: 'mockGetAllKeys', args: []}),
-                ]);
+                const stats = getMetrics().summaries;
+                expect(Object.keys(stats)).toHaveLength(2);
+
+                expect(stats).toEqual(expect.objectContaining({
+                    mockGet: expect.any(Object),
+                    mockGetAllKeys: expect.any(Object),
+                }));
+
+                expect(stats.mockGet.calls).toHaveLength(1);
+                expect(stats.mockGetAllKeys.calls).toHaveLength(1);
             });
     });
 
@@ -160,10 +164,11 @@ describe('decorateWithMetrics', () => {
             .mockResolvedValueOnce()
             .mockResolvedValueOnce();
 
-        // WHEN they are decorated and executed
+        // WHEN they are decorated
         mockGetAllKeys = decorateWithMetrics(mockGetAllKeys, 'mockGetAllKeys');
         mockSetItem = decorateWithMetrics(mockSetItem, 'mockSetItem');
 
+        // WHEN each is executed multiple times
         mockGetAllKeys();
         mockSetItem('and', 'Mock value');
         mockGetAllKeys();
@@ -173,23 +178,16 @@ describe('decorateWithMetrics', () => {
         return waitForPromisesToResolve()
             .then(() => {
                 // THEN stats should contain data for each function and each call under the correct function alias
-                const stats = getMetrics().stats;
-                expect(stats).toHaveLength(5);
+                const stats = getMetrics().summaries;
+                expect(Object.keys(stats)).toHaveLength(2);
 
-                expect(stats).toEqual(
-                    expect.arrayContaining([
-                        expect.objectContaining({methodName: 'mockGetAllKeys', args: []}),
-                        expect.objectContaining({methodName: 'mockGetAllKeys', args: []}),
-                        expect.objectContaining({methodName: 'mockGetAllKeys', args: []}),
-                    ])
-                );
+                expect(stats).toEqual(expect.objectContaining({
+                    mockGetAllKeys: expect.any(Object),
+                    mockSetItem: expect.any(Object),
+                }));
 
-                expect(stats).toEqual(
-                    expect.arrayContaining([
-                        expect.objectContaining({methodName: 'mockSetItem', args: ['and', 'Mock value']}),
-                        expect.objectContaining({methodName: 'mockSetItem', args: ['more', 'Mock value']}),
-                    ])
-                );
+                expect(stats.mockGetAllKeys.calls).toHaveLength(3);
+                expect(stats.mockSetItem.calls).toHaveLength(2);
             });
     });
 
@@ -221,11 +219,11 @@ describe('decorateWithMetrics', () => {
         return waitForPromisesToResolve()
             .then(() => {
                 // WHEN metrics are reset
-                expect(getMetrics().stats).toHaveLength(2);
+                expect(getMetrics().summaries.mockFn.calls).toHaveLength(2);
                 resetMetrics();
 
                 // THEN no data regarding the calls that happened before should exist
-                expect(getMetrics().stats).toHaveLength(0);
+                expect(getMetrics().summaries.mockFn).not.toBeDefined();
 
                 // WHEN more calls are made
                 mockFn('mockedKey', {ids: [1, 2, 3]});
@@ -234,7 +232,7 @@ describe('decorateWithMetrics', () => {
             })
             .then(() => {
                 // THEN only these calls should appear in stats
-                expect(getMetrics().stats).toHaveLength(1);
+                expect(getMetrics().summaries.mockFn.calls).toHaveLength(1);
             });
     });
 
@@ -250,10 +248,10 @@ describe('decorateWithMetrics', () => {
         return waitForPromisesToResolve()
             .then(() => {
                 // THEN stats should contain data regarding the calls under that custom alias
-                const stats = getMetrics().stats;
-                expect(stats).toEqual([
-                    expect.objectContaining({methodName: 'mock:get', args: ['mockKey']}),
-                ]);
+                const stats = getMetrics().summaries;
+                expect(stats).toEqual(expect.objectContaining({
+                    'mock:get': expect.any(Object),
+                }));
             })
             .finally(resetMetrics);
     });
@@ -265,7 +263,7 @@ describe('decorateWithMetrics', () => {
         const result = getMetrics();
 
         // THEN stats should be empty and the total time 0
-        expect(result.stats).toEqual([]);
+        expect(result.summaries).toEqual({});
         expect(result.totalTime).toEqual(0);
         expect(result.averageTime).toEqual(0);
     });
