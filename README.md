@@ -52,19 +52,38 @@ Onyx.init({
 });
 ```
 
-Obtain the metrics collected by Onyx by calling `Onyx.getMetrics()`
-This will return a list of calls that were captured by the benchmark
-Each item in the list is a plain JSON object that contains data about:
-- method name
-- arguments used
-- start time in milliseconds - relative to app start time - e.g. 0 is the start of the app
-- end time
-- return value
+At any point you can get the collected statistics using `Onyx.getMetrics()`.
+This will return an object containing `totalTime`, `averageTime` and `summaries`.
+`summaries` is a collection of statistics for each method it contains data about:
+  - method name
+  - total, max, min, average times for this method calls
+  - calls - a list of individual calls with each having: start time; end time; call duration; call arguments
+    - start/end times are relative to application launch time - 0.00 being exactly at launch
 
-Use `Onyx.resetMetrics()` to clear captured data.
-This would allow to you to track what a specific interaction involves.
-E.g. `Onyx.resetMetrics()` perform a flow that uses Onyx then `Onyx.getMetrics()` to see timings
-and method calls
+If you wish to reset the metrics and start over use `Onyx.resetMetrics()`
 
-You can also get the data only for a particular method by calling `Onyx.getMetrics(methodName)`
-e.g. `Onyx.getMetrics('connect')` to get only data regarding `connect` invocations
+Finally, there's a `Onyx.printMetrics()` method which prints human friendly statistics information on the dev console
+You can use this method during debugging e.g. add an `Onyx.printMetrics()` line somewhere in code or call it
+through the dev console. 
+
+Sample output of `Onyx.printMetrics()`
+
+```
+Onyx Benchmark
+  Total: 135.9min
+  Average: 45.3min
+
+Onyx:get
+  total: 51.5min
+  max: 6.20sec
+  min: 26.650ms
+  avg: 4.24sec 
+  calls: 728
+
+Onyx:getAllKeys
+  total: 84.3min
+  max: 6.20sec
+  min: 8.210ms
+  avg: 3.78sec 
+  calls: 1336
+```
