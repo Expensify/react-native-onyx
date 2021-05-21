@@ -6,9 +6,8 @@ import {
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 describe('decorateWithMetrics', () => {
-    beforeEach(() => {
-        resetMetrics();
-    });
+    beforeEach(() => waitForPromisesToResolve()
+        .then(resetMetrics));
 
     it('Should collect metrics for a single method, single call', () => {
         // GIVEN an async function that resolves with an object
@@ -26,7 +25,6 @@ describe('decorateWithMetrics', () => {
                 expect(stats).toHaveLength(1);
 
                 const firstCall = stats[0];
-                expect(firstCall.result).toEqual(mockedResult);
                 expect(firstCall.startTime).toEqual(expect.any(Number));
                 expect(firstCall.endTime).toEqual(expect.any(Number));
                 expect(firstCall.args).toEqual(['mockedKey']);
@@ -101,11 +99,6 @@ describe('decorateWithMetrics', () => {
                     expect.objectContaining({args: ['mockedKey', {ids: [1, 2, 3]}]}),
                     expect.objectContaining({args: ['mockedKey', {ids: [4, 5, 6]}]}),
                 ]);
-
-                expect(stats).toEqual([
-                    expect.objectContaining({result: undefined}),
-                    expect.objectContaining({result: undefined}),
-                ]);
             });
     });
 
@@ -143,8 +136,8 @@ describe('decorateWithMetrics', () => {
                 const stats = getMetrics();
                 expect(stats).toHaveLength(2);
                 expect(stats).toEqual([
-                    expect.objectContaining({methodName: 'mockGet', args: ['mockedKey'], result: {mock: 'value'}}),
-                    expect.objectContaining({methodName: 'mockGetAllKeys', args: [], result: ['my', 'mock', 'keys']}),
+                    expect.objectContaining({methodName: 'mockGet', args: ['mockedKey']}),
+                    expect.objectContaining({methodName: 'mockGetAllKeys', args: []}),
                 ]);
             });
     });
@@ -173,14 +166,23 @@ describe('decorateWithMetrics', () => {
         return waitForPromisesToResolve()
             .then(() => {
                 // THEN stats should contain data for each function and each call under the correct function alias
-                const allStats = getMetrics();
-                expect(allStats).toHaveLength(5);
+                const stats = getMetrics();
+                expect(stats).toHaveLength(5);
 
-                const allKeysCalls = getMetrics('mockGetAllKeys');
-                expect(allKeysCalls).toHaveLength(3);
+                expect(stats).toEqual(
+                    expect.arrayContaining([
+                        expect.objectContaining({methodName: 'mockGetAllKeys', args: []}),
+                        expect.objectContaining({methodName: 'mockGetAllKeys', args: []}),
+                        expect.objectContaining({methodName: 'mockGetAllKeys', args: []}),
+                    ])
+                );
 
-                const setCalls = getMetrics('mockSetItem');
-                expect(setCalls).toHaveLength(2);
+                expect(stats).toEqual(
+                    expect.arrayContaining([
+                        expect.objectContaining({methodName: 'mockSetItem', args: ['and', 'Mock value']}),
+                        expect.objectContaining({methodName: 'mockSetItem', args: ['more', 'Mock value']}),
+                    ])
+                );
             });
     });
 
