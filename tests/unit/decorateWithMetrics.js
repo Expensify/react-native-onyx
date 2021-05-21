@@ -35,7 +35,9 @@ describe('decorateWithMetrics', () => {
 
     it('Should use function.name when alias was not provided', () => {
         // GIVEN a regular JS function
-        function mockFunc() {}
+        function mockFunc() {
+            return Promise.resolve();
+        }
 
         // WHEN decorated without passing an "alias" parameter
         // eslint-disable-next-line no-func-assign
@@ -225,29 +227,6 @@ describe('decorateWithMetrics', () => {
                 // THEN only these calls should appear in stats
                 expect(getMetrics('mockFn')).toHaveLength(1);
             });
-    });
-
-    it('Should work with non promise returning methods', () => {
-        // GIVEN a sync function
-        let mockFn = name => `Hello ${name}`;
-
-        // WHEN it is decorated and executed
-        mockFn = decorateWithMetrics(mockFn, 'mockFn');
-
-        const originalResult = mockFn('Mock');
-
-        // THEN the original result should not be affected
-        expect(originalResult).toEqual('Hello Mock');
-
-        return waitForPromisesToResolve()
-            .then(() => {
-                // THEN stats should have captured data about the function call
-                const stats = getMetrics();
-                expect(stats).toEqual([
-                    expect.objectContaining({args: ['Mock']}),
-                ]);
-            })
-            .finally(resetMetrics);
     });
 
     it('Should work with custom alias', () => {
