@@ -3,6 +3,7 @@ import {render} from '@testing-library/react-native';
 
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import ViewWithText from '../components/ViewWithText';
+import ViewWithCollections from '../components/ViewWithCollections';
 
 describe('Onyx', () => {
     describe('Cache Service', () => {
@@ -293,6 +294,9 @@ describe('Onyx', () => {
         const ONYX_KEYS = {
             TEST_KEY: 'test',
             ANOTHER_TEST: 'anotherTest',
+            COLLECTION: {
+                MOCK_COLLECTION: 'mock_collection_',
+            },
         };
 
         async function initOnyx() {
@@ -402,6 +406,45 @@ describe('Onyx', () => {
             // THEN Async storage `getItem` should be called twice
             await waitForPromisesToResolve();
             expect(AsyncStorageMock.getItem).toHaveBeenCalledTimes(2);
+        });
+
+        it('Expect multiple calls to AsyncStorage.getItem when multiple keys are used', async () => {
+            const AsyncStorageMock = require('@react-native-community/async-storage/jest/async-storage-mock');
+
+            // GIVEN two component
+            const TestComponentWithOnyx = withOnyx({
+                testObject: {
+                    key: ONYX_KEYS.TEST_KEY,
+                },
+            })(ViewWithCollections);
+
+            const AnotherTestComponentWithOnyx = withOnyx({
+                text: {
+                    key: ONYX_KEYS.ANOTHER_TEST,
+                },
+            })(ViewWithText);
+
+            // GIVEN some values exist in storage
+            AsyncStorageMock.setItem(ONYX_KEYS.TEST_KEY, JSON.stringify({ID: 15, data: 'mock object with ID'}));
+            AsyncStorageMock.setItem(ONYX_KEYS.ANOTHER_TEST, JSON.stringify('mock text'));
+            AsyncStorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY, ONYX_KEYS.ANOTHER_TEST]);
+            await initOnyx();
+
+            // WHEN the components are rendered multiple times
+            render(<TestComponentWithOnyx />);
+            render(<AnotherTestComponentWithOnyx />);
+            render(<TestComponentWithOnyx />);
+            render(<AnotherTestComponentWithOnyx />);
+            render(<AnotherTestComponentWithOnyx />);
+            render(<TestComponentWithOnyx />);
+
+            // THEN Async storage `getItem` should be called exactly two times (once for each key)
+            await waitForPromisesToResolve();
+            expect(AsyncStorageMock.getItem).toHaveBeenCalledTimes(2);
+            expect(AsyncStorageMock.getItem.mock.calls).toEqual([
+                [ONYX_KEYS.TEST_KEY],
+                [ONYX_KEYS.ANOTHER_TEST]
+            ]);
         });
     });
 });
