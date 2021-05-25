@@ -211,6 +211,16 @@ describe('Onyx', () => {
                     mock: 'mock',
                 });
             });
+
+            it('Should throw when the value parameter is not an object or array', () => {
+                // GIVEN cache with some items
+                cache.update('mockKey', 'someStringValue');
+
+                const badMergeValue = [['mockKey', 'usually we do not want to merge strings right?']];
+
+                // WHEN merge is not called with array or an object
+                expect(() => cache.merge(badMergeValue)).toThrow('The provided merge value is invalid');
+            });
         });
 
         describe('resolveTask', () => {
