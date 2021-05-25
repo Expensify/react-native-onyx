@@ -25,7 +25,7 @@ describe('withOnyx', () => {
     it('should render with the test data when using withOnyx', () => {
         let result;
 
-        Onyx.set(ONYX_KEYS.TEST_KEY, 'test1')
+        return Onyx.set(ONYX_KEYS.TEST_KEY, 'test1')
             .then(() => {
                 const TestComponentWithOnyx = withOnyx({
                     text: {
@@ -38,8 +38,7 @@ describe('withOnyx', () => {
             })
             .then(() => {
                 const textComponent = result.getByText('test1');
-                expect(textComponent).toBeTruthy();
-                expect(result).toHaveBeenCalledTimes(999);
+                expect(textComponent).not.toBeNull();
             });
     });
 
