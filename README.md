@@ -39,3 +39,51 @@ export default withOnyx({
     },
 })(ReportActionsView);
 ```
+
+### Benchmarks
+
+Provide the `captureMetrics` boolean flag to `Onyx.init` to capture call statistics
+
+```js
+Onyx.init({
+    keys: ONYXKEYS,
+    safeEvictionKeys: [ONYXKEYS.COLLECTION.REPORT_ACTIONS],
+    captureMetrics: Config.BENCHMARK_ONYX,
+});
+```
+
+At any point you can get the collected statistics using `Onyx.getMetrics()`.
+This will return an object containing `totalTime`, `averageTime` and `summaries`.
+`summaries` is a collection of statistics for each method it contains data about:
+  - method name
+  - total, max, min, average times for this method calls
+  - calls - a list of individual calls with each having: start time; end time; call duration; call arguments
+    - start/end times are relative to application launch time - 0.00 being exactly at launch
+
+If you wish to reset the metrics and start over use `Onyx.resetMetrics()`
+
+Finally, there's a `Onyx.printMetrics()` method which prints human friendly statistics information on the dev console
+You can use this method during debugging e.g. add an `Onyx.printMetrics()` line somewhere in code or call it
+through the dev console. 
+
+Sample output of `Onyx.printMetrics()`
+
+```
+Onyx Benchmark
+  Total: 135.9min
+  Average: 45.3min
+
+Onyx:get
+  total: 51.5min
+  max: 6.20sec
+  min: 26.650ms
+  avg: 4.24sec 
+  calls: 728
+
+Onyx:getAllKeys
+  total: 84.3min
+  max: 6.20sec
+  min: 8.210ms
+  avg: 3.78sec 
+  calls: 1336
+```

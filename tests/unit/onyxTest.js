@@ -264,4 +264,80 @@ describe('Onyx', () => {
             expect(error.message).toEqual(`Provided collection does not have all its data belonging to the same parent. CollectionKey: ${ONYX_KEYS.COLLECTION.TEST_KEY}, DataKey: not_my_test`);
         }
     });
+
+    describe('captureMetrics', () => {
+        // makes require calls to always return a "fresh" (undecorated) instance
+        beforeEach(() => jest.resetModules());
+
+        it('Should expose metrics methods when `captureMetrics` is true', () => {
+            // Run in isolation so the top import is unaffected
+            const IsolatedOnyx = require('../../index').default;
+
+            // WHEN Onyx is initialized with `captureMetrics: true`
+            IsolatedOnyx.init({
+                keys: ONYX_KEYS,
+                registerStorageEventListener: jest.fn(),
+                captureMetrics: true,
+            });
+
+            // THEN Onyx should have statistic related methods
+            expect(IsolatedOnyx.getMetrics).toEqual(expect.any(Function));
+            expect(IsolatedOnyx.printMetrics).toEqual(expect.any(Function));
+            expect(IsolatedOnyx.resetMetrics).toEqual(expect.any(Function));
+        });
+
+        it('Should not expose metrics methods when `captureMetrics` is false or not set', () => {
+            // Run in isolation so the top import is unaffected
+            const IsolatedOnyx = require('../../index').default;
+
+            // WHEN Onyx is initialized without setting `captureMetrics`
+            IsolatedOnyx.init({
+                keys: ONYX_KEYS,
+                registerStorageEventListener: jest.fn(),
+            });
+
+            // THEN Onyx should not have statistic related methods
+            expect(IsolatedOnyx.getMetrics).not.toBeDefined();
+            expect(IsolatedOnyx.printMetrics).not.toBeDefined();
+            expect(IsolatedOnyx.resetMetrics).not.toBeDefined();
+
+            // WHEN Onyx is initialized with `captureMetrics: false`
+            IsolatedOnyx.init({
+                keys: ONYX_KEYS,
+                registerStorageEventListener: jest.fn(),
+                captureMetrics: false,
+            });
+
+            // THEN Onyx should not have statistic related methods
+            expect(IsolatedOnyx.getMetrics).not.toBeDefined();
+            expect(IsolatedOnyx.printMetrics).not.toBeDefined();
+            expect(IsolatedOnyx.resetMetrics).not.toBeDefined();
+        });
+
+        it('Should decorate exposed methods', () => {
+            // Run in isolation so the top import is unaffected
+            const IsolatedOnyx = require('../../index').default;
+
+            // GIVEN Onyx is initialized with `captureMetrics: true`
+            IsolatedOnyx.init({
+                keys: ONYX_KEYS,
+                registerStorageEventListener: jest.fn(),
+                captureMetrics: true,
+            });
+
+            // WHEN calling decorated methods through Onyx[methodName]
+            const methods = ['set', 'multiSet', 'clear', 'merge', 'mergeCollection'];
+            methods.forEach(name => IsolatedOnyx[name]('mockKey', {mockKey: {mockValue: 'mockValue'}}));
+
+            return waitForPromisesToResolve()
+                .then(() => {
+                    // THEN metrics should have captured data for each method
+                    const summaries = IsolatedOnyx.getMetrics().summaries;
+
+                    methods.forEach((name) => {
+                        expect(summaries[`Onyx:${name}`].total).toBeGreaterThan(0);
+                    });
+                });
+        });
+    });
 });
