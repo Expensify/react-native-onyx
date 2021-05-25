@@ -285,9 +285,7 @@ describe('Onyx', () => {
             ANOTHER_TEST: 'anotherTest',
         };
 
-        // Always use a "fresh" (and undecorated) instance
-        beforeEach(() => {
-            jest.resetModules();
+        async function initOnyx() {
             const OnyxModule = require('../../index');
             Onyx = OnyxModule.default;
             withOnyx = OnyxModule.withOnyx;
@@ -296,6 +294,17 @@ describe('Onyx', () => {
                 keys: ONYX_KEYS,
                 registerStorageEventListener: jest.fn(),
             });
+
+            // Onyx init introduces some side effects e.g. calls the getAllKeys
+            // We're clearing to have a fresh mock calls history
+            await waitForPromisesToResolve();
+            jest.clearAllMocks();
+        }
+
+        // Always use a "fresh" (and undecorated) instance
+        beforeEach(() => {
+            jest.resetModules();
+            return initOnyx();
         });
 
         it('Expect a single call to AsyncStorage.getItem when multiple components use the same key', async () => {
@@ -308,9 +317,10 @@ describe('Onyx', () => {
                 },
             })(ViewWithText);
 
-            // GIVEN some data about that key exists in Onyx
-            await Onyx.set(ONYX_KEYS.TEST_KEY, 'mockValue');
-            await waitForPromisesToResolve();
+            // GIVEN some string value for that key exists in storage
+            AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
+            AsyncStorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
+            await initOnyx();
 
             // WHEN multiple components are rendered
             render(
@@ -336,9 +346,10 @@ describe('Onyx', () => {
                 },
             })(ViewWithText);
 
-            // GIVEN some data about that key exists in Onyx
-            await Onyx.set(ONYX_KEYS.TEST_KEY, 'mockValue');
-            await waitForPromisesToResolve();
+            // GIVEN some string value for that key exists in storage
+            await initOnyx();
+            AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
+            AsyncStorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
 
             // WHEN multiple components are rendered
             render(
@@ -364,9 +375,10 @@ describe('Onyx', () => {
                 },
             })(ViewWithText);
 
-            // GIVEN some data about that key exists in Onyx
-            await Onyx.set(ONYX_KEYS.TEST_KEY, 'mockValue');
-            await waitForPromisesToResolve();
+            // GIVEN some string value for that key exists in storage
+            AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
+            AsyncStorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
+            await initOnyx();
 
             // WHEN a component is rendered and unmounted and no longer available
             const result = render(<TestComponentWithOnyx />);
