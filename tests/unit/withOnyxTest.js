@@ -43,6 +43,7 @@ describe('withOnyx', () => {
     });
 
     it('should update withOnyx subscriber multiple times when merge is used', () => {
+        // Todo: ViewWithCollections does not expect a `text` prop
         const TestComponentWithOnyx = withOnyx({
             text: {
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
@@ -61,6 +62,7 @@ describe('withOnyx', () => {
     });
 
     it('should update withOnyx subscriber just once when mergeCollection is used', () => {
+        // Todo: ViewWithCollections does not expect a `text` prop
         const TestComponentWithOnyx = withOnyx({
             text: {
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
@@ -77,6 +79,7 @@ describe('withOnyx', () => {
     });
 
     it('should update withOnyx subscribing to individual key if mergeCollection is used', () => {
+        // Todo: ViewWithCollections does not expect a `text` prop
         const collectionItemID = 1;
         const TestComponentWithOnyx = withOnyx({
             text: {
@@ -94,6 +97,7 @@ describe('withOnyx', () => {
     });
 
     it('should update withOnyx subscribing to individual key with merged value if mergeCollection is used', () => {
+        // Todo: ViewWithCollections does not expect a `text` prop
         const collectionItemID = 4;
         const TestComponentWithOnyx = withOnyx({
             text: {
