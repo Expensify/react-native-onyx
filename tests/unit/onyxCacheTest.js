@@ -500,7 +500,7 @@ describe('Onyx', () => {
             return initOnyx();
         });
 
-        it('Expect a single call to AsyncStorage.getItem when multiple components use the same key', async () => {
+        it('Expect a single call to getItem when multiple components use the same key', async () => {
             const AsyncStorageMock = require('@react-native-community/async-storage/jest/async-storage-mock');
 
             // GIVEN a component connected to Onyx
@@ -529,7 +529,7 @@ describe('Onyx', () => {
             expect(AsyncStorageMock.getItem).toHaveBeenCalledTimes(1);
         });
 
-        it('Expect a single call to AsyncStorage.getAllKeys when multiple components use the same key', async () => {
+        it('Expect a single call to getAllKeys when multiple components use the same key', async () => {
             const AsyncStorageMock = require('@react-native-community/async-storage/jest/async-storage-mock');
 
             // GIVEN a component connected to Onyx
@@ -558,7 +558,7 @@ describe('Onyx', () => {
             expect(AsyncStorageMock.getAllKeys).toHaveBeenCalledTimes(1);
         });
 
-        it('Expect multiple calls to AsyncStorage.getItem when no existing component is using a key', async () => {
+        it('Expect multiple calls to getItem when no existing component is using a key', async () => {
             const AsyncStorageMock = require('@react-native-community/async-storage/jest/async-storage-mock');
 
             // GIVEN a component connected to Onyx
@@ -587,7 +587,7 @@ describe('Onyx', () => {
             expect(AsyncStorageMock.getItem).toHaveBeenCalledTimes(2);
         });
 
-        it('Expect multiple calls to AsyncStorage.getItem when multiple keys are used', async () => {
+        it('Expect multiple calls to getItem when multiple keys are used', async () => {
             const AsyncStorageMock = require('@react-native-community/async-storage/jest/async-storage-mock');
 
             // GIVEN two component
@@ -626,7 +626,7 @@ describe('Onyx', () => {
             ]);
         });
 
-        it('Expect a single call to AsyncStorage.getItem when at least one component is still subscribed to a key', async () => {
+        it('Expect a single call to getItem when at least one component is still subscribed to a key', async () => {
             const AsyncStorageMock = require('@react-native-community/async-storage/jest/async-storage-mock');
 
             // GIVEN a component connected to Onyx
