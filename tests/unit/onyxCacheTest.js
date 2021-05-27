@@ -213,14 +213,105 @@ describe('Onyx', () => {
                 });
             });
 
-            it('Should throw when the value parameter is not an object or array', () => {
-                // GIVEN cache with some items
-                cache.update('mockKey', 'someStringValue');
+            it('Should merge objects correctly', () => {
+                // GIVEN cache with existing object data
+                cache.update('mockKey', {value: 'mockValue', anotherValue: 'overwrite me'});
 
-                const badMergeValue = [['mockKey', 'usually we do not want to merge strings right?']];
+                // WHEN merge is called with an object
+                cache.merge([
+                    ['mockKey', {mockItems: [], anotherValue: 'overwritten'}],
+                ]);
 
-                // WHEN merge is not called with array or an object
-                expect(() => cache.merge(badMergeValue)).toThrow('The provided merge value is invalid');
+                // THEN the values should be merged together in cache
+                expect(cache.getValue('mockKey')).toEqual({
+                    value: 'mockValue',
+                    mockItems: [],
+                    anotherValue: 'overwritten',
+                });
+            });
+
+            it('Should merge arrays correctly', () => {
+                // GIVEN cache with existing array data
+                cache.update('mockKey', [1, 2, 3]);
+
+                // WHEN merge is called with an array
+                cache.merge([
+                    ['mockKey', [3, 4, 5]],
+                ]);
+
+                // THEN the arrays should be concatenated
+                expect(cache.getValue('mockKey')).toEqual([1, 2, 3, 3, 4, 5]);
+            });
+
+            it('Should work with primitive values', () => {
+                // GIVEN cache with existing data
+                cache.update('mockKey', {});
+
+                // WHEN merge is called with bool
+                cache.merge([['mockKey', false]]);
+
+                // THEN the object should be overwritten with a bool value
+                expect(cache.getValue('mockKey')).toEqual(false);
+
+                // WHEN merge is called with number
+                cache.merge([['mockKey', 0]]);
+
+                // THEN the value should be overwritten
+                expect(cache.getValue('mockKey')).toEqual(0);
+
+                // WHEN merge is called with string
+                cache.merge([['mockKey', '123']]);
+
+                // THEN the value should be overwritten
+                expect(cache.getValue('mockKey')).toEqual('123');
+
+                // WHEN merge is called with string again
+                cache.merge([['mockKey', '123']]);
+
+                // THEN strings should not have been concatenated
+                expect(cache.getValue('mockKey')).toEqual('123');
+
+                // WHEN merge is called with an object
+                cache.merge([['mockKey', {value: 'myMockObject'}]]);
+
+                // THEN the old primitive value should be overwritten with the object
+                expect(cache.getValue('mockKey')).toEqual({value: 'myMockObject'});
+            });
+
+            it('Should remove a key if the new value is `undefined`', () => {
+                // GIVEN cache with existing data
+                cache.update('mockKey', {});
+                cache.update('mockKey1', {});
+
+                // WHEN merge is called key value pair and the value is undefined
+                cache.merge([['mockKey', undefined]]);
+                cache.merge([['mockKey2']]);
+
+                // THEN the key should be removed from cache
+                expect(cache.hasCacheForKey('mockKey')).toBe(false);
+                expect(cache.hasCacheForKey('mockKey2')).toBe(false);
+            });
+
+            it('Should work with multiple key value pairs', () => {
+                // GIVEN cache with existing data
+                cache.update('mockKey1', {ID: 1});
+                cache.update('mockKey2', {ID: 2});
+                cache.update('mockKey3', {ID: 3});
+
+                // WHEN merge is called with multiple key value pairs
+                cache.merge([
+                    ['mockKey2', {value: 'mockValue2'}],
+                    ['mockKey4', 'Some string data'],
+                    ['mockKey3', {ID: '3'}],
+                    ['mockKey5', {ID: '3'}],
+                ]);
+
+                // THEN values new values should be added and existing values updated
+                expect(cache.getValue('mockKey1')).toEqual({ID: 1});
+                expect(cache.getValue('mockKey2')).toEqual({ID: 2, value: 'mockValue2'});
+                expect(cache.getValue('mockKey3')).toEqual({ID: '3'});
+                expect(cache.getValue('mockKey4')).toEqual('Some string data');
+                expect(cache.getValue('mockKey5')).toEqual({ID: '3'});
             });
         });
 
