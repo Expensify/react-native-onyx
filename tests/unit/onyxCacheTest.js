@@ -537,5 +537,39 @@ describe('Onyx', () => {
                 [ONYX_KEYS.ANOTHER_TEST]
             ]);
         });
+
+        it('Expect a single call to AsyncStorage.getItem when at least one component is still subscribed to a key', async () => {
+            const AsyncStorageMock = require('@react-native-community/async-storage/jest/async-storage-mock');
+
+            // GIVEN a component connected to Onyx
+            const TestComponentWithOnyx = withOnyx({
+                text: {
+                    key: ONYX_KEYS.TEST_KEY,
+                },
+            })(ViewWithText);
+
+            // GIVEN some string value for that key exists in storage
+            AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
+            AsyncStorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
+            await initOnyx();
+
+            // WHEN multiple components are rendered
+            render(<TestComponentWithOnyx />);
+            const result2 = render(<TestComponentWithOnyx />);
+            const result3 = render(<TestComponentWithOnyx />);
+            await waitForPromisesToResolve();
+
+            // WHEN components unmount but at least one remain mounted
+            result2.unmount();
+            result3.unmount();
+            await waitForPromisesToResolve();
+
+            // THEN When another component using the same storage key is rendered
+            render(<TestComponentWithOnyx />);
+
+            // THEN Async storage `getItem` should be called once
+            await waitForPromisesToResolve();
+            expect(AsyncStorageMock.getItem).toHaveBeenCalledTimes(1);
+        });
     });
 });
