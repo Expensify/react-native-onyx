@@ -17,39 +17,52 @@ describe('Onyx', () => {
         });
 
         describe('getAllKeys', () => {
-            it('Should be empty initially', () => {
-                // GIVEN empty cache
+            it('Should be empty and resolve from fallback initially', async () => {
+                // GIVEN empty cache and a fallback function
+                const mockFallback = jest.fn().mockResolvedValue(['a', 'b', 'c']);
 
                 // WHEN all keys are retrieved
-                const allKeys = cache.getAllKeys();
+                const result = await cache.getAllKeys(mockFallback);
 
-                // THEN the result should be empty
-                expect(allKeys).toEqual([]);
+                // THEN the result should be provided from the fallback
+                expect(mockFallback).toHaveBeenCalledTimes(1);
+                expect(result).toEqual(['a', 'b', 'c']);
+
+                // THEN fallback result should be stored to cache and fallback not executed
+                const cachedResult = await cache.getAllKeys(mockFallback);
+                expect(cachedResult).toEqual(['a', 'b', 'c']);
+                expect(mockFallback).toHaveBeenCalledTimes(1);
             });
 
-            it('Should keep storage keys', () => {
+            it('Should keep storage keys', async () => {
                 // GIVEN cache with some items
                 cache.update('mockKey', 'mockValue');
                 cache.update('mockKey2', 'mockValue');
                 cache.update('mockKey3', 'mockValue');
 
+                // GIVEN a fallback function
+                const mockFallback = jest.fn().mockResolvedValue(['a', 'b', 'c']);
+
                 // THEN the keys should be stored in cache
-                const allKeys = cache.getAllKeys();
+                const allKeys = await cache.getAllKeys(mockFallback);
                 expect(allKeys).toEqual(['mockKey', 'mockKey2', 'mockKey3']);
+
+                // AND the fallback should be executed
+                expect(mockFallback).not.toHaveBeenCalled();
             });
 
-            it('Should keep storage keys even when no values are provided', () => {
+            it('Should keep storage keys even when no values are provided', async () => {
                 // GIVEN cache with some items
                 cache.update('mockKey');
                 cache.update('mockKey2');
                 cache.update('mockKey3');
 
                 // THEN the keys should be stored in cache
-                const allKeys = cache.getAllKeys();
+                const allKeys = await cache.getAllKeys(jest.fn());
                 expect(allKeys).toEqual(['mockKey', 'mockKey2', 'mockKey3']);
             });
 
-            it('Should not store duplicate keys', () => {
+            it('Should not store duplicate keys', async () => {
                 // GIVEN cache with some items
                 cache.update('mockKey', 'mockValue');
                 cache.update('mockKey2', 'mockValue');
@@ -59,8 +72,26 @@ describe('Onyx', () => {
                 cache.update('mockKey2', 'new mock value');
 
                 // THEN getAllKeys should not include a duplicate value
-                const allKeys = cache.getAllKeys();
+                const allKeys = await cache.getAllKeys(jest.fn());
                 expect(allKeys).toEqual(['mockKey', 'mockKey2', 'mockKey3']);
+            });
+
+            it('Should execute the fallback only once for concurrent calls', async () => {
+                // GIVEN empty cache and a fallback function
+                const mockFallback = jest.fn().mockResolvedValue(['a', 'b', 'c']);
+
+                // WHEN all keys are retrieved in parallel
+                const promise1 = cache.getAllKeys(mockFallback);
+                const promise2 = cache.getAllKeys(mockFallback);
+                const promise3 = cache.getAllKeys(mockFallback);
+
+                const [result1, result2, result3] = await Promise.all([promise1, promise2, promise3]);
+
+                // THEN the fallback should be called only once
+                expect(mockFallback).toHaveBeenCalledTimes(1);
+                expect(result1).toEqual(['a', 'b', 'c']);
+                expect(result2).toEqual(['a', 'b', 'c']);
+                expect(result3).toEqual(['a', 'b', 'c']);
             });
         });
 
@@ -119,7 +150,7 @@ describe('Onyx', () => {
                 expect(cache.getValue('mockKey')).toEqual({value: 'mockValue'});
             });
 
-            it('Should only store the key when no value is provided', () => {
+            it('Should only store the key when no value is provided', async () => {
                 // GIVEN empty cache
 
                 // WHEN update is called with key and value
@@ -129,7 +160,8 @@ describe('Onyx', () => {
                 expect(cache.getValue('mockKey')).not.toBeDefined();
 
                 // THEN but a key should be available
-                expect(cache.getAllKeys()).toEqual(expect.arrayContaining(['mockKey']));
+                const allKeys = await cache.getAllKeys();
+                expect(allKeys).toEqual(expect.arrayContaining(['mockKey']));
             });
 
             it('Should overwrite existing cache items for the given key', () => {
@@ -146,7 +178,7 @@ describe('Onyx', () => {
         });
 
         describe('remove', () => {
-            it('Should remove the key from all keys', () => {
+            it('Should remove the key from all keys', async () => {
                 // GIVEN cache with some items
                 cache.update('mockKey', 'mockValue');
                 cache.update('mockKey2', 'mockValue');
@@ -156,7 +188,7 @@ describe('Onyx', () => {
                 cache.remove('mockKey2');
 
                 // THEN getAllKeys should not include the removed value
-                const allKeys = cache.getAllKeys();
+                const allKeys = await cache.getAllKeys();
                 expect(allKeys).toEqual(['mockKey', 'mockKey3']);
             });
 
