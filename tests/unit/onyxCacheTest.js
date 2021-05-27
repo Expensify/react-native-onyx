@@ -103,7 +103,7 @@ describe('Onyx', () => {
                 // WHEN a value is retrieved
                 const result = await cache.getValue('mockKey', mockFallback);
 
-                // THEN it should be undefined
+                // THEN the fallback should be used to retrieve the value
                 expect(result).toEqual('myResult');
                 expect(mockFallback).toHaveBeenCalledTimes(1);
             });
@@ -145,6 +145,20 @@ describe('Onyx', () => {
                 expect(results[2]).toEqual('Result for mockKey1');
                 expect(results[3]).toEqual('Result for mockKey1');
                 expect(results[4]).toEqual('Result for mockKey2');
+            });
+
+            it('Should not store cache if the fallback method failed', async () => {
+                // GIVEN empty cache and a fallback function that rejects
+                const mockFallback = jest.fn().mockRejectedValue(
+                    new Error('Unable to get item from persistent storage')
+                );
+
+                // WHEN a value is retrieved
+                return cache.getValue('mockKey', mockFallback)
+                    .catch(() => {
+                        // THEN no value should be in cache
+                        expect(cache.hasCacheForKey('mockKey')).toBe(false);
+                    });
             });
         });
 
