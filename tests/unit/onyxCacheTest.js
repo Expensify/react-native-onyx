@@ -470,6 +470,9 @@ describe('Onyx', () => {
         let Onyx;
         let withOnyx;
 
+        /** @type OnyxCache */
+        let cache;
+
         const ONYX_KEYS = {
             TEST_KEY: 'test',
             ANOTHER_TEST: 'anotherTest',
@@ -482,6 +485,7 @@ describe('Onyx', () => {
             const OnyxModule = require('../../index');
             Onyx = OnyxModule.default;
             withOnyx = OnyxModule.withOnyx;
+            cache = require('../../lib/OnyxCache').default;
 
             Onyx.init({
                 keys: ONYX_KEYS,
@@ -658,6 +662,84 @@ describe('Onyx', () => {
             // THEN Async storage `getItem` should be called once
             await waitForPromisesToResolve();
             expect(AsyncStorageMock.getItem).toHaveBeenCalledTimes(1);
+        });
+
+        it('Should remove collection items from cache when collection is disconnected', async () => {
+            const AsyncStorageMock = require('@react-native-community/async-storage/jest/async-storage-mock');
+
+            // GIVEN a component subscribing to a collection
+            const TestComponentWithOnyx = withOnyx({
+                collections: {
+                    key: ONYX_KEYS.COLLECTION.MOCK_COLLECTION,
+                },
+            })(ViewWithCollections);
+
+            // GIVEN some collection item values exist in storage
+            const keys = [`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}15`, `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}16`];
+            AsyncStorageMock.setItem(keys[0], JSON.stringify({ID: 15}));
+            AsyncStorageMock.setItem(keys[1], JSON.stringify({ID: 16}));
+            AsyncStorageMock.getAllKeys.mockResolvedValue(keys);
+            await initOnyx();
+
+            // WHEN the collection using components render
+            const result = render(<TestComponentWithOnyx />);
+            const result2 = render(<TestComponentWithOnyx />);
+            await waitForPromisesToResolve();
+
+            // THEN the collection items should be in cache
+            expect(cache.hasCacheForKey(keys[0])).toBe(true);
+            expect(cache.hasCacheForKey(keys[1])).toBe(true);
+
+            // WHEN one of the components unmounts
+            result.unmount();
+            await waitForPromisesToResolve();
+
+            // THEN the collection items should still be in cache
+            expect(cache.hasCacheForKey(keys[0])).toBe(true);
+            expect(cache.hasCacheForKey(keys[1])).toBe(true);
+
+            // WHEN the last component using the collection unmounts
+            result2.unmount();
+            await waitForPromisesToResolve();
+
+            // THEN the collection items should be removed from cache
+            expect(cache.hasCacheForKey(keys[0])).toBe(false);
+            expect(cache.hasCacheForKey(keys[1])).toBe(false);
+        });
+
+        it('Should not remove item from cache when it still used in a collection', async () => {
+            const AsyncStorageMock = require('@react-native-community/async-storage/jest/async-storage-mock');
+
+            // GIVEN component that uses a collection and a component that uses a collection item
+            const COLLECTION_ITEM_KEY = `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}10`;
+            const TestComponentWithOnyx = withOnyx({
+                collections: {
+                    key: ONYX_KEYS.COLLECTION.MOCK_COLLECTION,
+                },
+            })(ViewWithCollections);
+
+            const AnotherTestComponentWithOnyx = withOnyx({
+                testObject: {
+                    key: COLLECTION_ITEM_KEY,
+                },
+            })(ViewWithCollections);
+
+            // GIVEN some values exist in storage
+            AsyncStorageMock.setItem(COLLECTION_ITEM_KEY, JSON.stringify({ID: 10}));
+            AsyncStorageMock.getAllKeys.mockResolvedValue([COLLECTION_ITEM_KEY]);
+            await initOnyx();
+
+            // WHEN both components render
+            render(<TestComponentWithOnyx />);
+            const result = render(<AnotherTestComponentWithOnyx />);
+            await waitForPromisesToResolve();
+
+            // WHEN the component using the individual item unmounts
+            result.unmount();
+            await waitForPromisesToResolve();
+
+            // THEN The item should not be removed from cache as it's used in a collection
+            expect(cache.hasCacheForKey(COLLECTION_ITEM_KEY)).toBe(true);
         });
     });
 });
