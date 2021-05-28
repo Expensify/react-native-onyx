@@ -36,9 +36,9 @@ describe('Onyx', () => {
 
             it('Should keep storage keys', async () => {
                 // GIVEN cache with some items
-                cache.update('mockKey', 'mockValue');
-                cache.update('mockKey2', 'mockValue');
-                cache.update('mockKey3', 'mockValue');
+                cache.set('mockKey', 'mockValue');
+                cache.set('mockKey2', 'mockValue');
+                cache.set('mockKey3', 'mockValue');
 
                 // GIVEN a fallback function
                 const mockFallback = jest.fn().mockResolvedValue(['a', 'b', 'c']);
@@ -53,9 +53,9 @@ describe('Onyx', () => {
 
             it('Should keep storage keys even when no values are provided', async () => {
                 // GIVEN cache with some items
-                cache.update('mockKey');
-                cache.update('mockKey2');
-                cache.update('mockKey3');
+                cache.set('mockKey');
+                cache.set('mockKey2');
+                cache.set('mockKey3');
 
                 // THEN the keys should be stored in cache
                 const allKeys = await cache.getAllKeys(jest.fn());
@@ -64,12 +64,12 @@ describe('Onyx', () => {
 
             it('Should not store duplicate keys', async () => {
                 // GIVEN cache with some items
-                cache.update('mockKey', 'mockValue');
-                cache.update('mockKey2', 'mockValue');
-                cache.update('mockKey3', 'mockValue');
+                cache.set('mockKey', 'mockValue');
+                cache.set('mockKey2', 'mockValue');
+                cache.set('mockKey3', 'mockValue');
 
                 // WHEN an existing keys is later updated
-                cache.update('mockKey2', 'new mock value');
+                cache.set('mockKey2', 'new mock value');
 
                 // THEN getAllKeys should not include a duplicate value
                 const allKeys = await cache.getAllKeys(jest.fn());
@@ -110,7 +110,7 @@ describe('Onyx', () => {
 
             it('Should return cached value when it exists', async () => {
                 // GIVEN cache with some items
-                cache.update('mockKey', {items: ['mockValue', 'mockValue2']});
+                cache.set('mockKey', {items: ['mockValue', 'mockValue2']});
 
                 // GIVEN a fallback function
                 const mockFallback = jest.fn().mockResolvedValue('myResult');
@@ -173,8 +173,8 @@ describe('Onyx', () => {
 
             it('Should return cached value when it exists', () => {
                 // GIVEN cache with some items
-                cache.update('mockKey', {items: ['mockValue', 'mockValue2']});
-                cache.update('mockKey2', 'mockValue3');
+                cache.set('mockKey', {items: ['mockValue', 'mockValue2']});
+                cache.set('mockKey2', 'mockValue3');
 
                 // WHEN a value exists in cache
                 // THEN it should return true
@@ -183,12 +183,12 @@ describe('Onyx', () => {
             });
         });
 
-        describe('update', () => {
+        describe('set', () => {
             it('Should add data to cache when both key and value are provided', async () => {
                 // GIVEN empty cache
 
-                // WHEN update is called with key and value
-                cache.update('mockKey', {value: 'mockValue'});
+                // WHEN set is called with key and value
+                cache.set('mockKey', {value: 'mockValue'});
 
                 // THEN data should be cached
                 const data = await cache.getValue('mockKey', jest.fn());
@@ -198,8 +198,8 @@ describe('Onyx', () => {
             it('Should store only the key when no value is provided', async () => {
                 // GIVEN empty cache
 
-                // WHEN update is called with key and value
-                cache.update('mockKey');
+                // WHEN set is called with key and value
+                cache.set('mockKey');
 
                 // THEN there should be no cached value
                 expect(cache.hasCacheForKey('mockKey')).toBe(false);
@@ -211,11 +211,11 @@ describe('Onyx', () => {
 
             it('Should overwrite existing cache items for the given key', async () => {
                 // GIVEN cache with some items
-                cache.update('mockKey', {value: 'mockValue'});
-                cache.update('mockKey2', {other: 'otherMockValue'});
+                cache.set('mockKey', {value: 'mockValue'});
+                cache.set('mockKey2', {other: 'otherMockValue'});
 
-                // WHEN update is called for an existing key
-                cache.update('mockKey2', {value: []});
+                // WHEN set is called for an existing key
+                cache.set('mockKey2', {value: []});
 
                 // THEN the value should be overwritten
                 const value = await cache.getValue('mockKey2', jest.fn());
@@ -226,9 +226,9 @@ describe('Onyx', () => {
         describe('remove', () => {
             it('Should remove the key from all keys', async () => {
                 // GIVEN cache with some items
-                cache.update('mockKey', 'mockValue');
-                cache.update('mockKey2', 'mockValue');
-                cache.update('mockKey3', 'mockValue');
+                cache.set('mockKey', 'mockValue');
+                cache.set('mockKey2', 'mockValue');
+                cache.set('mockKey3', 'mockValue');
 
                 // WHEN an key is removed
                 cache.remove('mockKey2');
@@ -240,8 +240,8 @@ describe('Onyx', () => {
 
             it('Should remove the key from cache', () => {
                 // GIVEN cache with some items
-                cache.update('mockKey', {items: ['mockValue', 'mockValue2']});
-                cache.update('mockKey2', 'mockValue3');
+                cache.set('mockKey', {items: ['mockValue', 'mockValue2']});
+                cache.set('mockKey2', 'mockValue3');
 
                 // WHEN a key is removed
                 cache.remove('mockKey');
@@ -270,8 +270,8 @@ describe('Onyx', () => {
 
             it('Should merge data to existing cache value', async () => {
                 // GIVEN cache with some items
-                cache.update('mockKey', {value: 'mockValue'});
-                cache.update('mockKey2', {other: 'otherMockValue', mock: 'mock'});
+                cache.set('mockKey', {value: 'mockValue'});
+                cache.set('mockKey2', {other: 'otherMockValue', mock: 'mock'});
 
                 // WHEN merge is called with key value pairs
                 cache.merge([
@@ -296,7 +296,7 @@ describe('Onyx', () => {
 
             it('Should merge objects correctly', async () => {
                 // GIVEN cache with existing object data
-                cache.update('mockKey', {value: 'mockValue', anotherValue: 'overwrite me'});
+                cache.set('mockKey', {value: 'mockValue', anotherValue: 'overwrite me'});
 
                 // WHEN merge is called with an object
                 cache.merge([
@@ -314,7 +314,7 @@ describe('Onyx', () => {
 
             it('Should merge arrays correctly', async () => {
                 // GIVEN cache with existing array data
-                cache.update('mockKey', [1, 2, 3]);
+                cache.set('mockKey', [1, 2, 3]);
 
                 // WHEN merge is called with an array
                 cache.merge([
@@ -328,7 +328,7 @@ describe('Onyx', () => {
 
             it('Should work with primitive values', async () => {
                 // GIVEN cache with existing data
-                cache.update('mockKey', {});
+                cache.set('mockKey', {});
 
                 // WHEN merge is called with bool
                 cache.merge([['mockKey', false]]);
@@ -368,8 +368,8 @@ describe('Onyx', () => {
 
             it('Should remove a key if the new value is `undefined`', () => {
                 // GIVEN cache with existing data
-                cache.update('mockKey', {});
-                cache.update('mockKey1', {});
+                cache.set('mockKey', {});
+                cache.set('mockKey1', {});
 
                 // WHEN merge is called key value pair and the value is undefined
                 cache.merge([['mockKey', undefined]]);
@@ -382,9 +382,9 @@ describe('Onyx', () => {
 
             it('Should work with multiple key value pairs', async () => {
                 // GIVEN cache with existing data
-                cache.update('mockKey1', {ID: 1});
-                cache.update('mockKey2', {ID: 2});
-                cache.update('mockKey3', {ID: 3});
+                cache.set('mockKey1', {ID: 1});
+                cache.set('mockKey2', {ID: 2});
+                cache.set('mockKey3', {ID: 3});
 
                 // WHEN merge is called with multiple key value pairs
                 cache.merge([
