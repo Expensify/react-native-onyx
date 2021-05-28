@@ -183,6 +183,36 @@ describe('Onyx', () => {
             });
         });
 
+        describe('addKey', () => {
+            it('Should store the key so that it is returned by `getAllKeys`', async () => {
+                // GIVEN empty cache
+
+                // WHEN set is called with key and value
+                cache.addKey('mockKey');
+
+                // THEN there should be no cached value
+                expect(cache.hasCacheForKey('mockKey')).toBe(false);
+
+                // THEN but a key should be available
+                const allKeys = await cache.getAllKeys(jest.fn());
+                expect(allKeys).toEqual(expect.arrayContaining(['mockKey']));
+            });
+
+            it('Should not make duplicate keys', async () => {
+                // GIVEN empty cache
+
+                // WHEN the same item is added multiple times
+                cache.addKey('mockKey');
+                cache.addKey('mockKey');
+                cache.addKey('mockKey2');
+                cache.addKey('mockKey');
+
+                // THEN getAllKeys should not include a duplicate value
+                const allKeys = await cache.getAllKeys(jest.fn());
+                expect(allKeys).toEqual(['mockKey', 'mockKey2']);
+            });
+        });
+
         describe('set', () => {
             it('Should add data to cache when both key and value are provided', async () => {
                 // GIVEN empty cache
@@ -193,20 +223,6 @@ describe('Onyx', () => {
                 // THEN data should be cached
                 const data = await cache.getValue('mockKey', jest.fn());
                 expect(data).toEqual({value: 'mockValue'});
-            });
-
-            it('Should store only the key when no value is provided', async () => {
-                // GIVEN empty cache
-
-                // WHEN set is called with key and value
-                cache.set('mockKey');
-
-                // THEN there should be no cached value
-                expect(cache.hasCacheForKey('mockKey')).toBe(false);
-
-                // THEN but a key should be available
-                const allKeys = await cache.getAllKeys(jest.fn());
-                expect(allKeys).toEqual(expect.arrayContaining(['mockKey']));
             });
 
             it('Should overwrite existing cache items for the given key', async () => {
