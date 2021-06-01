@@ -96,7 +96,7 @@ describe('Onyx', () => {
                 expect(cache.hasCacheForKey('mockKey')).toBe(false);
             });
 
-            it('Should return cached value when it exists', () => {
+            it('Should return true when cached value exists', () => {
                 // GIVEN cache with some items
                 cache.set('mockKey', {items: ['mockValue', 'mockValue2']});
                 cache.set('mockKey2', 'mockValue3');
@@ -320,65 +320,56 @@ describe('Onyx', () => {
             });
         });
 
-        describe('resolveTask', () => {
-            it('Should start a new task when no pending task exists', () => {
-                // GIVEN empty cache and a function returning a promise
-                const task = jest.fn().mockResolvedValue({data: 'mockData'});
-
-                // WHEN resolve task is called with this task
-                cache.resolveTask('mockTask', task);
-
-                // THEN the task should be triggered
-                expect(task).toHaveBeenCalledTimes(1);
+        describe('hasPendingTask', () => {
+            it('Should return false when there is no started task', () => {
+                // GIVEN empty cache with no started tasks
+                // WHEN a task has not been started
+                // THEN it should return false
+                expect(cache.hasPendingTask('mockTask')).toBe(false);
             });
 
-            it('Should not start a task again when it is already captured and running', () => {
-                // GIVEN cache that have captured a promise for a pending task
-                const task = jest.fn().mockResolvedValue({data: 'mockData'});
-                cache.resolveTask('mockTask', task);
-                task.mockClear();
+            it('Should return true when a task is running', () => {
+                // GIVEN empty cache with no started tasks
+                // WHEN a unique task is started
+                const promise = Promise.resolve();
+                cache.captureTask('mockTask', promise);
 
-                // WHEN a function tries to run the same task
-                cache.resolveTask('mockTask', task);
-                cache.resolveTask('mockTask', task);
-                cache.resolveTask('mockTask', task);
+                // THEN `hasPendingTask` should return true
+                expect(cache.hasPendingTask('mockTask')).toBe(true);
 
-                // THEN the task should not have been called again
-                expect(task).not.toHaveBeenCalled();
-            });
-
-            it('Should start a new task when a previous task was completed and removed', async () => {
-                // GIVEN cache that have captured a promise for a pending task
-                const task = jest.fn().mockResolvedValue({data: 'mockData'});
-                cache.resolveTask('mockTask', task);
-                task.mockClear();
-
-                // WHEN the task is completed
-                await waitForPromisesToResolve();
-
-                // WHEN a function tries to run the same task
-                cache.resolveTask('mockTask', task);
-
-                // THEN a new task should be started
-                expect(task).toHaveBeenCalledTimes(1);
-            });
-
-            it('Should resolve all tasks with the same result', () => {
-                // GIVEN empty cache and a function returning a promise
-                const task = jest.fn().mockResolvedValue({data: 'mockData'});
-
-                // WHEN multiple tasks are executed at the same time
-                const promise1 = cache.resolveTask('mockTask', task);
-                const promise2 = cache.resolveTask('mockTask', task);
-                const promise3 = cache.resolveTask('mockTask', task);
-
-                // THEN they all should have the same result
-                Promise.all([promise1, promise2, promise3])
-                    .then(([result1, result2, result3]) => {
-                        expect(result1).toEqual({data: 'mockData'});
-                        expect(result2).toEqual({data: 'mockData'});
-                        expect(result3).toEqual({data: 'mockData'});
+                // WHEN the promise is completed
+                return waitForPromisesToResolve()
+                    .then(() => {
+                        // THEN `hasPendingTask` should return false
+                        expect(cache.hasPendingTask('mockTask')).toBe(false);
                     });
+            });
+        });
+
+        describe('getTaskPromise', () => {
+            it('Should return undefined when there is no stored value', () => {
+                // GIVEN empty cache with no started tasks
+
+                // WHEN a task is retrieved
+                const task = cache.getTaskPromise('mockTask');
+
+                // THEN it should be undefined
+                expect(task).not.toBeDefined();
+            });
+
+            it('Should return captured task when it exists', () => {
+                // GIVEN empty cache with no started tasks
+                // WHEN a unique task is started
+                const promise = Promise.resolve({mockResult: true});
+                cache.captureTask('mockTask', promise);
+
+                // WHEN a task is retrieved
+                const taskPromise = cache.getTaskPromise('mockTask');
+
+                // THEN it should resolve with the same result as the captured task
+                return taskPromise.then((result) => {
+                    expect(result).toEqual({mockResult: true});
+                });
             });
         });
     });
