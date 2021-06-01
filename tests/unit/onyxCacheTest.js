@@ -96,69 +96,25 @@ describe('Onyx', () => {
         });
 
         describe('getValue', () => {
-            it('Should use the fallback function when there is no stored value', async () => {
-                // GIVEN empty cache and a fallback function
-                const mockFallback = jest.fn().mockResolvedValue('myResult');
+            it('Should return undefined when there is no stored value', () => {
+                // GIVEN empty cache
 
                 // WHEN a value is retrieved
-                const result = await cache.getValue('mockKey', mockFallback);
+                const result = cache.getValue('mockKey');
 
-                // THEN the fallback should be used to retrieve the value
-                expect(result).toEqual('myResult');
-                expect(mockFallback).toHaveBeenCalledTimes(1);
+                // THEN it should be undefined
+                expect(result).not.toBeDefined();
             });
 
-            it('Should return cached value when it exists', async () => {
+            it('Should return cached value when it exists', () => {
                 // GIVEN cache with some items
                 cache.set('mockKey', {items: ['mockValue', 'mockValue2']});
-
-                // GIVEN a fallback function
-                const mockFallback = jest.fn().mockResolvedValue('myResult');
+                cache.set('mockKey2', 'mockValue3');
 
                 // WHEN a value is retrieved
-                const value = await cache.getValue('mockKey', mockFallback);
-
-                // THEN it should have the correct content
-                expect(value).toEqual({items: ['mockValue', 'mockValue2']});
-
-                // AND the fallback function should be executed
-                expect(mockFallback).not.toHaveBeenCalled();
-            });
-
-            it('Should execute the fallback only once per key for concurrent calls', async () => {
-                // GIVEN empty cache and a fallback function
-                const mockFallback = jest.fn().mockImplementation(key => Promise.resolve(`Result for ${key}`));
-
-                // WHEN keys are retrieved in parallel
-                const promise1 = cache.getValue('mockKey1', mockFallback);
-                const promise2 = cache.getValue('mockKey2', mockFallback);
-                const promise3 = cache.getValue('mockKey1', mockFallback);
-                const promise4 = cache.getValue('mockKey1', mockFallback);
-                const promise5 = cache.getValue('mockKey2', mockFallback);
-
-                const results = await Promise.all([promise1, promise2, promise3, promise4, promise5]);
-
-                // THEN the fallback should be called 2 times - once per key
-                expect(mockFallback).toHaveBeenCalledTimes(2);
-                expect(results[0]).toEqual('Result for mockKey1');
-                expect(results[1]).toEqual('Result for mockKey2');
-                expect(results[2]).toEqual('Result for mockKey1');
-                expect(results[3]).toEqual('Result for mockKey1');
-                expect(results[4]).toEqual('Result for mockKey2');
-            });
-
-            it('Should not store cache if the fallback method failed', async () => {
-                // GIVEN empty cache and a fallback function that rejects
-                const mockFallback = jest.fn().mockRejectedValue(
-                    new Error('Unable to get item from persistent storage')
-                );
-
-                // WHEN a value is retrieved
-                return cache.getValue('mockKey', mockFallback)
-                    .catch(() => {
-                        // THEN no value should be in cache
-                        expect(cache.hasCacheForKey('mockKey')).toBe(false);
-                    });
+                // THEN it should be the correct value
+                expect(cache.getValue('mockKey')).toEqual({items: ['mockValue', 'mockValue2']});
+                expect(cache.getValue('mockKey2')).toEqual('mockValue3');
             });
         });
 
@@ -214,18 +170,18 @@ describe('Onyx', () => {
         });
 
         describe('set', () => {
-            it('Should add data to cache when both key and value are provided', async () => {
+            it('Should add data to cache when both key and value are provided', () => {
                 // GIVEN empty cache
 
                 // WHEN set is called with key and value
                 cache.set('mockKey', {value: 'mockValue'});
 
                 // THEN data should be cached
-                const data = await cache.getValue('mockKey', jest.fn());
+                const data = cache.getValue('mockKey');
                 expect(data).toEqual({value: 'mockValue'});
             });
 
-            it('Should overwrite existing cache items for the given key', async () => {
+            it('Should overwrite existing cache items for the given key', () => {
                 // GIVEN cache with some items
                 cache.set('mockKey', {value: 'mockValue'});
                 cache.set('mockKey2', {other: 'otherMockValue'});
@@ -234,8 +190,7 @@ describe('Onyx', () => {
                 cache.set('mockKey2', {value: []});
 
                 // THEN the value should be overwritten
-                const value = await cache.getValue('mockKey2', jest.fn());
-                expect(value).toEqual({value: []});
+                expect(cache.getValue('mockKey2')).toEqual({value: []});
             });
         });
 
@@ -264,11 +219,12 @@ describe('Onyx', () => {
 
                 // THEN a value should not be available in cache
                 expect(cache.hasCacheForKey('mockKey')).toBe(false);
+                expect(cache.getValue('mockKey')).not.toBeDefined();
             });
         });
 
         describe('merge', () => {
-            it('Should create the value in cache when it does not exist', async () => {
+            it('Should create the value in cache when it does not exist', () => {
                 // GIVEN empty cache
 
                 // WHEN merge is called with new key value pairs
@@ -278,13 +234,11 @@ describe('Onyx', () => {
                 });
 
                 // THEN data should be created in cache
-                const value1 = await cache.getValue('mockKey', jest.fn());
-                const value2 = await cache.getValue('mockKey2', jest.fn());
-                expect(value1).toEqual({value: 'mockValue'});
-                expect(value2).toEqual({value: 'mockValue2'});
+                expect(cache.getValue('mockKey')).toEqual({value: 'mockValue'});
+                expect(cache.getValue('mockKey2')).toEqual({value: 'mockValue2'});
             });
 
-            it('Should merge data to existing cache value', async () => {
+            it('Should merge data to existing cache value', () => {
                 // GIVEN cache with some items
                 cache.set('mockKey', {value: 'mockValue'});
                 cache.set('mockKey2', {other: 'otherMockValue', mock: 'mock', items: [3, 4, 5]});
@@ -296,21 +250,19 @@ describe('Onyx', () => {
                 });
 
                 // THEN the values should be merged together in cache
-                const value1 = await cache.getValue('mockKey', jest.fn());
-                expect(value1).toEqual({
+                expect(cache.getValue('mockKey')).toEqual({
                     value: 'mockValue',
                     mockItems: [],
                 });
 
-                const value2 = await cache.getValue('mockKey2', jest.fn());
-                expect(value2).toEqual({
+                expect(cache.getValue('mockKey2')).toEqual({
                     other: 'overwrittenMockValue',
                     items: [1, 2, 5],
                     mock: 'mock',
                 });
             });
 
-            it('Should merge objects correctly', async () => {
+            it('Should merge objects correctly', () => {
                 // GIVEN cache with existing object data
                 cache.set('mockKey', {value: 'mockValue', anotherValue: 'overwrite me'});
 
@@ -320,15 +272,14 @@ describe('Onyx', () => {
                 });
 
                 // THEN the values should be merged together in cache
-                const value = await cache.getValue('mockKey', jest.fn());
-                expect(value).toEqual({
+                expect(cache.getValue('mockKey')).toEqual({
                     value: 'mockValue',
                     mockItems: [],
                     anotherValue: 'overwritten',
                 });
             });
 
-            it('Should merge arrays correctly', async () => {
+            it('Should merge arrays correctly', () => {
                 // GIVEN cache with existing array data
                 cache.set('mockKey', [{ID: 1}, {ID: 2}, {ID: 3}]);
 
@@ -338,13 +289,12 @@ describe('Onyx', () => {
                 });
 
                 // THEN the arrays should be merged as expected
-                const value = await cache.getValue('mockKey', jest.fn());
-                expect(value).toEqual([
+                expect(cache.getValue('mockKey')).toEqual([
                     {ID: 3}, {ID: 2, added: 'field'}, {ID: 3}, {ID: 1000}
                 ]);
             });
 
-            it('Should work with primitive values', async () => {
+            it('Should work with primitive values', () => {
                 // GIVEN cache with existing data
                 cache.set('mockKey', {});
 
@@ -352,51 +302,43 @@ describe('Onyx', () => {
                 cache.merge({mockKey: false});
 
                 // THEN the object should be overwritten with a bool value
-                const bool = await cache.getValue('mockKey', jest.fn());
-                expect(bool).toBe(false);
+                expect(cache.getValue('mockKey')).toEqual(false);
 
                 // WHEN merge is called with number
                 cache.merge({mockKey: 0});
 
                 // THEN the value should be overwritten
-                const number = await cache.getValue('mockKey', jest.fn());
-                expect(number).toEqual(0);
+                expect(cache.getValue('mockKey')).toEqual(0);
 
                 // WHEN merge is called with string
                 cache.merge({mockKey: '123'});
 
                 // THEN the value should be overwritten
-                const string = await cache.getValue('mockKey', jest.fn());
-                expect(string).toEqual('123');
+                expect(cache.getValue('mockKey')).toEqual('123');
 
                 // WHEN merge is called with string again
                 cache.merge({mockKey: '123'});
 
                 // THEN strings should not have been concatenated
-                const string2 = await cache.getValue('mockKey', jest.fn());
-                expect(string2).toEqual('123');
+                expect(cache.getValue('mockKey')).toEqual('123');
 
                 // WHEN merge is called with an object
                 cache.merge({mockKey: {value: 'myMockObject'}});
 
                 // THEN the old primitive value should be overwritten with the object
-                const object = await cache.getValue('mockKey', jest.fn());
-                expect(object).toEqual({value: 'myMockObject'});
+                expect(cache.getValue('mockKey')).toEqual({value: 'myMockObject'});
             });
 
-            it('Should do nothing to a key which value is `undefined`', async () => {
+            it('Should do nothing to a key which value is `undefined`', () => {
                 // GIVEN cache with existing data
                 cache.set('mockKey', {ID: 5});
 
                 // WHEN merge is called key value pair and the value is undefined
                 cache.merge({mockKey: undefined});
 
-                // THEN the key should still be in cache
+                // THEN the key should still be in cache and the value unchanged
                 expect(cache.hasCacheForKey('mockKey')).toBe(true);
-
-                // THEN and the value should be unchanged
-                const value = await cache.getValue('mockKey', jest.fn());
-                expect(value).toEqual({ID: 5});
+                expect(cache.getValue('mockKey')).toEqual({ID: 5});
             });
         });
 
