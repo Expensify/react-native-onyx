@@ -24,8 +24,8 @@ const ViewWithCollections = (props) => {
 
     return (
         <View>
-            {_.map(props.collections, collection => (
-                <Text>{collection.ID}</Text>
+            {_.map(props.collections, (collection, i) => (
+                <Text key={i}>{collection.ID}</Text>
             ))}
         </View>
     );
