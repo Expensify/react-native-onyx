@@ -318,6 +318,22 @@ describe('Onyx', () => {
                 expect(cache.hasCacheForKey('mockKey')).toBe(true);
                 expect(cache.getValue('mockKey')).toEqual({ID: 5});
             });
+
+            it('Should update storageKeys when new keys are created', () => {
+                // GIVEN cache with some items
+                cache.set('mockKey', {value: 'mockValue'});
+                cache.set('mockKey2', {other: 'otherMockValue', mock: 'mock', items: [3, 4, 5]});
+
+                // WHEN merge is called with existing key value pairs
+                cache.merge({
+                    mockKey: {mockItems: []},
+                    mockKey3: {ID: 3},
+                    mockKey4: {ID: 4},
+                });
+
+                // THEN getAllStorage keys should return updated storage keys
+                expect(cache.getAllKeys()).toEqual(['mockKey', 'mockKey2', 'mockKey3', 'mockKey4']);
+            });
         });
 
         describe('hasPendingTask', () => {
