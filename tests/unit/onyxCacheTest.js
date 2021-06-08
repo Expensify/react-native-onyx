@@ -377,6 +377,7 @@ describe('Onyx', () => {
     describe('Onyx with Cache', () => {
         let Onyx;
         let withOnyx;
+        let AsyncStorageMock;
 
         /** @type OnyxCache */
         let cache;
@@ -393,6 +394,7 @@ describe('Onyx', () => {
             const OnyxModule = require('../../index');
             Onyx = OnyxModule.default;
             withOnyx = OnyxModule.withOnyx;
+            AsyncStorageMock = require('@react-native-community/async-storage').default;
             cache = require('../../lib/OnyxCache').default;
 
             Onyx.init({
@@ -413,8 +415,6 @@ describe('Onyx', () => {
         });
 
         it('Expect a single call to getItem when multiple components use the same key', () => {
-            const AsyncStorageMock = require('@react-native-community/async-storage/jest/async-storage-mock');
-
             // GIVEN a component connected to Onyx
             const TestComponentWithOnyx = withOnyx({
                 text: {
@@ -444,8 +444,6 @@ describe('Onyx', () => {
         });
 
         it('Expect a single call to getAllKeys when multiple components use the same key', () => {
-            const AsyncStorageMock = require('@react-native-community/async-storage/jest/async-storage-mock');
-
             // GIVEN a component connected to Onyx
             const TestComponentWithOnyx = withOnyx({
                 text: {
@@ -476,8 +474,6 @@ describe('Onyx', () => {
         });
 
         it('Expect multiple calls to getItem when no existing component is using a key', () => {
-            const AsyncStorageMock = require('@react-native-community/async-storage/jest/async-storage-mock');
-
             // GIVEN a component connected to Onyx
             const TestComponentWithOnyx = withOnyx({
                 text: {
@@ -509,8 +505,6 @@ describe('Onyx', () => {
         });
 
         it('Expect multiple calls to getItem when multiple keys are used', () => {
-            const AsyncStorageMock = require('@react-native-community/async-storage/jest/async-storage-mock');
-
             // GIVEN two component
             const TestComponentWithOnyx = withOnyx({
                 testObject: {
@@ -550,8 +544,6 @@ describe('Onyx', () => {
         });
 
         it('Expect a single call to getItem when at least one component is still subscribed to a key', () => {
-            const AsyncStorageMock = require('@react-native-community/async-storage/jest/async-storage-mock');
-
             // GIVEN a component connected to Onyx
             const TestComponentWithOnyx = withOnyx({
                 text: {
@@ -589,8 +581,6 @@ describe('Onyx', () => {
         });
 
         it('Should remove collection items from cache when collection is disconnected', () => {
-            const AsyncStorageMock = require('@react-native-community/async-storage/jest/async-storage-mock');
-
             // GIVEN a component subscribing to a collection
             const TestComponentWithOnyx = withOnyx({
                 collections: {
@@ -638,8 +628,6 @@ describe('Onyx', () => {
         });
 
         it('Should not remove item from cache when it still used in a collection', () => {
-            const AsyncStorageMock = require('@react-native-community/async-storage/jest/async-storage-mock');
-
             // GIVEN component that uses a collection and a component that uses a collection item
             const COLLECTION_ITEM_KEY = `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}10`;
             const TestComponentWithOnyx = withOnyx({
