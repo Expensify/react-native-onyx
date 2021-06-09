@@ -172,19 +172,19 @@ describe('Onyx', () => {
             });
         });
 
-        describe('remove', () => {
-            it('Should remove the key from all keys', () => {
+        describe('drop', () => {
+            it('Should NOT remove the key from all keys', () => {
                 // GIVEN cache with some items
                 cache.set('mockKey', 'mockValue');
                 cache.set('mockKey2', 'mockValue');
                 cache.set('mockKey3', 'mockValue');
 
                 // WHEN an key is removed
-                cache.remove('mockKey2');
+                cache.drop('mockKey2');
 
-                // THEN getAllKeys should not include the removed value
+                // THEN getAllKeys should still include the key
                 const allKeys = cache.getAllKeys();
-                expect(allKeys).toEqual(['mockKey', 'mockKey3']);
+                expect(allKeys).toEqual(expect.arrayContaining(['mockKey2']));
             });
 
             it('Should remove the key from cache', () => {
@@ -193,7 +193,7 @@ describe('Onyx', () => {
                 cache.set('mockKey2', 'mockValue3');
 
                 // WHEN a key is removed
-                cache.remove('mockKey');
+                cache.drop('mockKey');
 
                 // THEN a value should not be available in cache
                 expect(cache.hasCacheForKey('mockKey')).toBe(false);
