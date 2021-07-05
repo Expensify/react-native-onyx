@@ -12,7 +12,7 @@
     "test": "jest"
   },
   "dependencies": {
-    "@react-native-community/async-storage": "^1.12.1",
+    "@react-native-async-storage/async-storage": "^1.15.5",
     "expensify-common": "git+https://github.com/Expensify/expensify-common.git#2e5cff552cf132da90a3fb9756e6b4fb6ae7b40c",
     "lodash": "4.17.21",
     "react": "^16.13.1",
