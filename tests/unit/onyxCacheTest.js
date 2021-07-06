@@ -410,7 +410,7 @@ describe('Onyx', () => {
             const OnyxModule = require('../../index');
             Onyx = OnyxModule.default;
             withOnyx = OnyxModule.withOnyx;
-            AsyncStorageMock = require('@react-native-community/async-storage').default;
+            AsyncStorageMock = require('@react-native-async-storage/async-storage').default;
             cache = require('../../lib/OnyxCache').default;
 
             Onyx.init({
