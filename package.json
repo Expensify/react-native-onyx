@@ -12,7 +12,6 @@
     "test": "jest"
   },
   "dependencies": {
-    "@react-native-community/async-storage": "^1.12.1",
     "expensify-common": "git+https://github.com/Expensify/expensify-common.git#2e5cff552cf132da90a3fb9756e6b4fb6ae7b40c",
     "lodash": "4.17.21",
     "react": "^16.13.1",
@@ -24,6 +23,7 @@
     "@babel/preset-env": "^7.11.0",
     "@babel/preset-react": "^7.10.4",
     "@babel/runtime": "^7.11.2",
+    "@react-native-async-storage/async-storage": "^1.15.5",
     "@react-native-community/eslint-config": "^2.0.0",
     "@testing-library/jest-native": "^3.4.2",
     "@testing-library/react-native": "^7.0.2",
@@ -40,6 +40,9 @@
     "react-native": "0.64.1",
     "react-test-renderer": "16.13.1",
     "metro-react-native-babel-preset": "^0.61.0"
+  },
+  "peerDependencies": {
+    "@react-native-async-storage/async-storage": "^1.15.5"
   },
   "jest": {
     "preset": "react-native",
