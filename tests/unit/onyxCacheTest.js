@@ -1,5 +1,6 @@
 import React from 'react';
 import {render} from '@testing-library/react-native';
+import _ from 'underscore';
 
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import ViewWithText from '../components/ViewWithText';
@@ -406,7 +407,7 @@ describe('Onyx', () => {
             },
         };
 
-        function initOnyx() {
+        function initOnyx(overrides) {
             const OnyxModule = require('../../index');
             Onyx = OnyxModule.default;
             withOnyx = OnyxModule.withOnyx;
@@ -416,6 +417,8 @@ describe('Onyx', () => {
             Onyx.init({
                 keys: ONYX_KEYS,
                 registerStorageEventListener: jest.fn(),
+                maxCachedKeysCount: 10,
+                ...overrides,
             });
 
             // Onyx init introduces some side effects e.g. calls the getAllKeys
@@ -489,6 +492,47 @@ describe('Onyx', () => {
                 });
         });
 
+        it('Should keep recently accessed items in cache even when components unmount', () => {
+            // GIVEN Storage with 10 different keys
+            AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
+            AsyncStorageMock.getAllKeys.mockResolvedValue(
+                _.range(10).map(number => `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}${number}`)
+            );
+            let connections;
+
+            // GIVEN Onyx is configured with max 5 keys in cache
+            return initOnyx({maxCachedKeysCount: 5})
+                .then(() => {
+                    // GIVEN 10 connections for different keys
+                    connections = _.range(10).map((number) => {
+                        const key = `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}${number}`;
+                        return ({
+                            key,
+                            connectionId: Onyx.connect({key}),
+                        });
+                    });
+                })
+                .then(waitForPromisesToResolve)
+                .then(() => {
+                    // WHEN they disconnect
+                    connections.forEach(entry => Onyx.disconnect(entry.connectionId, entry.key));
+                })
+                .then(waitForPromisesToResolve)
+                .then(() => {
+                    // THEN the most recent 5 keys should remain in cache
+                    _.range(5, 10).forEach((number) => {
+                        const key = connections[number].key;
+                        expect(cache.hasCacheForKey(key)).toBe(true);
+                    });
+
+                    // AND the least recent 5 should be dropped
+                    _.range(0, 5).forEach((number) => {
+                        const key = connections[number].key;
+                        expect(cache.hasCacheForKey(key)).toBe(false);
+                    });
+                });
+        });
+
         it('Expect multiple calls to getItem when no existing component is using a key', () => {
             // GIVEN a component connected to Onyx
             const TestComponentWithOnyx = withOnyx({
@@ -502,7 +546,8 @@ describe('Onyx', () => {
             AsyncStorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
             let result;
 
-            return initOnyx()
+            // GIVEN Onyx that does not use LRU
+            return initOnyx({maxCachedKeysCount: 0})
                 .then(() => {
                     // WHEN a component is rendered and unmounted and no longer available
                     result = render(<TestComponentWithOnyx />);
@@ -611,7 +656,9 @@ describe('Onyx', () => {
             AsyncStorageMock.getAllKeys.mockResolvedValue(keys);
             let result;
             let result2;
-            return initOnyx()
+
+            // GIVEN Onyx that does not use LRU
+            return initOnyx({maxCachedKeysCount: 0})
                 .then(() => {
                     // WHEN the collection using components render
                     result = render(<TestComponentWithOnyx />);
