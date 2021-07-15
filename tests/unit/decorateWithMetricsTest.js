@@ -24,7 +24,7 @@ describe('decorateWithMetrics', () => {
                 const metrics = getMetrics();
                 expect(metrics).toEqual(expect.objectContaining({
                     totalTime: expect.any(Number),
-                    averageTime: expect.any(Number),
+                    lastCompleteCall: expect.any(Object),
                     summaries: expect.objectContaining({mockFn: expect.any(Object)}),
                 }));
 
@@ -264,7 +264,7 @@ describe('decorateWithMetrics', () => {
         // THEN stats should be empty and the total time 0
         expect(result.summaries).toEqual({});
         expect(result.totalTime).toEqual(0);
-        expect(result.averageTime).toEqual(0);
+        expect(result.lastCompleteCall).not.toBeDefined();
     });
 
     it('Should calculate total and average correctly', () => {
