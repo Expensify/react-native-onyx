@@ -12,6 +12,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "ascii-table": "0.0.9",
     "expensify-common": "git+https://github.com/Expensify/expensify-common.git#2e5cff552cf132da90a3fb9756e6b4fb6ae7b40c",
     "lodash": "4.17.21",
     "underscore": "^1.13.1"
