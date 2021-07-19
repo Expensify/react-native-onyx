@@ -66,7 +66,7 @@ Finally, there's a `Onyx.printMetrics()` method which prints human statistics in
 You can use this method during debugging. For example add an `Onyx.printMetrics()` line somewhere in code or call it
 through the dev console. It supports 3 popular formats *MD* - human friendly markdown, *CSV* and *JSON*
 The default is MD if you want to print another format call `Onyx.printMetrics({ format: 'csv' })` or 
-`Onyx.printMetrics({ 'json' })`
+`Onyx.printMetrics({ format: 'json' })`
 
 Sample output of `Onyx.printMetrics()`
 
