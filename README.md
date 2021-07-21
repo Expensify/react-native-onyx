@@ -62,28 +62,36 @@ This will return an object containing `totalTime`, `averageTime` and `summaries`
 
 If you wish to reset the metrics and start over use `Onyx.resetMetrics()`
 
-Finally, there's a `Onyx.printMetrics()` method which prints human friendly statistics information on the dev console
-You can use this method during debugging e.g. add an `Onyx.printMetrics()` line somewhere in code or call it
-through the dev console. 
+Finally, there's a `Onyx.printMetrics()` method which prints human statistics information on the dev console
+You can use this method during debugging. For example add an `Onyx.printMetrics()` line somewhere in code or call it
+through the dev console. It supports 3 popular formats *MD* - human friendly markdown, *CSV* and *JSON*
+The default is MD if you want to print another format call `Onyx.printMetrics({ format: 'csv' })` or 
+`Onyx.printMetrics({ format: 'json' })`
 
 Sample output of `Onyx.printMetrics()`
 
 ```
-Onyx Benchmark
-  Total: 135.9min
-  Average: 45.3min
+### Onyx Benchmark
+  - Total: 1.5min
+  - Last call finished at: 12.55sec
 
-Onyx:get
-  total: 51.5min
-  max: 6.20sec
-  min: 26.650ms
-  avg: 4.24sec 
-  calls: 728
+|     method      | total time spent |    max    |   min    |    avg    | time last call completed | calls made |
+|-----------------|-----------------:|----------:|---------:|----------:|-------------------------:|-----------:|
+| Onyx:getAllKeys |           1.2min |   2.16sec |  0.159ms | 782.230ms |                 12.55sec |         90 |
+| Onyx:merge      |          4.73sec |   2.00sec | 74.412ms | 591.642ms |                 10.24sec |          8 |
+| Onyx:set        |          3.90sec | 846.760ms | 43.663ms | 433.056ms |                  7.47sec |          9 |
+| Onyx:get        |          8.87sec |   2.00sec |  0.063ms |  61.998ms |                 10.24sec |        143 |
 
-Onyx:getAllKeys
-  total: 84.3min
-  max: 6.20sec
-  min: 8.210ms
-  avg: 3.78sec 
-  calls: 1336
+
+|                           Onyx:set                            |
+|---------------------------------------------------------------|
+| start time | end time  | duration  |           args           |
+|-----------:|----------:|----------:|--------------------------|
+|  291.042ms | 553.079ms | 262.037ms | session, [object Object] |
+|  293.719ms | 553.316ms | 259.597ms | account, [object Object] |
+|  294.541ms | 553.651ms | 259.109ms | network, [object Object] |
+|  365.378ms | 554.246ms | 188.867ms | iou, [object Object]     |
+|    1.08sec |   2.20sec |   1.12sec | network, [object Object] |
+|    1.08sec |   2.20sec |   1.12sec | iou, [object Object]     |
+|    1.17sec |   2.20sec |   1.03sec | currentURL, /            |
 ```
