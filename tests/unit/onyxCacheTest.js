@@ -1,5 +1,6 @@
 import React from 'react';
 import {render} from '@testing-library/react-native';
+import _ from 'underscore';
 
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import ViewWithText from '../components/ViewWithText';
@@ -406,7 +407,7 @@ describe('Onyx', () => {
             },
         };
 
-        function initOnyx() {
+        function initOnyx(overrides) {
             const OnyxModule = require('../../index');
             Onyx = OnyxModule.default;
             withOnyx = OnyxModule.withOnyx;
@@ -416,6 +417,8 @@ describe('Onyx', () => {
             Onyx.init({
                 keys: ONYX_KEYS,
                 registerStorageEventListener: jest.fn(),
+                maxCachedKeysCount: 10,
+                ...overrides,
             });
 
             // Onyx init introduces some side effects e.g. calls the getAllKeys
@@ -428,6 +431,10 @@ describe('Onyx', () => {
         beforeEach(() => {
             jest.resetModules();
             return initOnyx();
+        });
+
+        afterEach(() => {
+            jest.useRealTimers();
         });
 
         it('Expect a single call to getItem when multiple components use the same key', () => {
@@ -489,7 +496,52 @@ describe('Onyx', () => {
                 });
         });
 
-        it('Expect multiple calls to getItem when no existing component is using a key', () => {
+        it('Should keep recently accessed items in cache even when components unmount', () => {
+            jest.useFakeTimers();
+
+            // GIVEN Storage with 10 different keys
+            AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
+            AsyncStorageMock.getAllKeys.mockResolvedValue(
+                _.range(10).map(number => `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}${number}`)
+            );
+            let connections;
+
+            // GIVEN Onyx is configured with max 5 keys in cache
+            return initOnyx({maxCachedKeysCount: 5})
+                .then(() => {
+                    // GIVEN 10 connections for different keys
+                    connections = _.range(10).map((number) => {
+                        const key = `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}${number}`;
+                        return ({
+                            key,
+                            connectionId: Onyx.connect({key}),
+                        });
+                    });
+                })
+                .then(waitForPromisesToResolve)
+                .then(() => {
+                    // WHEN they disconnect
+                    connections.forEach(entry => Onyx.disconnect(entry.connectionId, entry.key));
+                })
+                .then(waitForPromisesToResolve)
+                .then(() => {
+                    jest.runOnlyPendingTimers();
+
+                    // THEN the most recent 5 keys should remain in cache
+                    _.range(5, 10).forEach((number) => {
+                        const key = connections[number].key;
+                        expect(cache.hasCacheForKey(key)).toBe(true);
+                    });
+
+                    // AND the least recent 5 should be dropped
+                    _.range(0, 5).forEach((number) => {
+                        const key = connections[number].key;
+                        expect(cache.hasCacheForKey(key)).toBe(false);
+                    });
+                });
+        });
+
+        it('Expect multiple calls to getItem when value cannot be retrieved from cache', () => {
             // GIVEN a component connected to Onyx
             const TestComponentWithOnyx = withOnyx({
                 text: {
@@ -500,16 +552,17 @@ describe('Onyx', () => {
             // GIVEN some string value for that key exists in storage
             AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
             AsyncStorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
-            let result;
 
             return initOnyx()
                 .then(() => {
-                    // WHEN a component is rendered and unmounted and no longer available
-                    result = render(<TestComponentWithOnyx />);
+                    // WHEN a component is rendered
+                    render(<TestComponentWithOnyx />);
                 })
                 .then(waitForPromisesToResolve)
-                .then(() => result.unmount())
-                .then(waitForPromisesToResolve)
+                .then(() => {
+                    // WHEN the key was removed from cache
+                    cache.drop(ONYX_KEYS.TEST_KEY);
+                })
 
                 // THEN When another component using the same storage key is rendered
                 .then(() => render(<TestComponentWithOnyx />))
@@ -559,125 +612,55 @@ describe('Onyx', () => {
                 });
         });
 
-        it('Expect a single call to getItem when at least one component is still subscribed to a key', () => {
-            // GIVEN a component connected to Onyx
-            const TestComponentWithOnyx = withOnyx({
-                text: {
-                    key: ONYX_KEYS.TEST_KEY,
-                },
-            })(ViewWithText);
-
-            // GIVEN some string value for that key exists in storage
+        it('Should periodically clean cache', () => {
+            // GIVEN storage with some data
             AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
-            AsyncStorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
-            let result2;
-            let result3;
-            return initOnyx()
+            AsyncStorageMock.getAllKeys.mockResolvedValue(_.range(1, 10).map(n => `key${n}`));
+
+            jest.useFakeTimers();
+
+            // GIVEN Onyx with LRU size of 3
+            return initOnyx({maxCachedKeysCount: 3})
                 .then(() => {
-                    // WHEN multiple components are rendered
-                    render(<TestComponentWithOnyx />);
-                    result2 = render(<TestComponentWithOnyx />);
-                    result3 = render(<TestComponentWithOnyx />);
+                    // WHEN 4 connections for different keys happen
+                    Onyx.connect({key: 'key1'});
+                    Onyx.connect({key: 'key2'});
+                    Onyx.connect({key: 'key3'});
+                    Onyx.connect({key: 'key4'});
                 })
                 .then(waitForPromisesToResolve)
                 .then(() => {
-                    // WHEN components unmount but at least one remain mounted
-                    result2.unmount();
-                    result3.unmount();
+                    // WHEN enough time passes and cache cleanup is triggered
+                    jest.runOnlyPendingTimers();
+
+                    // THEN keys 2,3,4 should remain in cache
+                    expect(cache.hasCacheForKey('key2')).toBe(true);
+                    expect(cache.hasCacheForKey('key3')).toBe(true);
+                    expect(cache.hasCacheForKey('key4')).toBe(true);
+
+                    // AND key1 should not be in cache
+                    expect(cache.hasCacheForKey('key1')).toBe(false);
                 })
-                .then(waitForPromisesToResolve)
-
-                // THEN When another component using the same storage key is rendered
-                .then(() => render(<TestComponentWithOnyx />))
-                .then(waitForPromisesToResolve)
                 .then(() => {
-                    // THEN Async storage `getItem` should be called once
-                    expect(AsyncStorageMock.getItem).toHaveBeenCalledTimes(1);
-                });
-        });
-
-        it('Should remove collection items from cache when collection is disconnected', () => {
-            // GIVEN a component subscribing to a collection
-            const TestComponentWithOnyx = withOnyx({
-                collections: {
-                    key: ONYX_KEYS.COLLECTION.MOCK_COLLECTION,
-                },
-            })(ViewWithCollections);
-
-            // GIVEN some collection item values exist in storage
-            const keys = [`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}15`, `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}16`];
-            AsyncStorageMock.setItem(keys[0], JSON.stringify({ID: 15}));
-            AsyncStorageMock.setItem(keys[1], JSON.stringify({ID: 16}));
-            AsyncStorageMock.getAllKeys.mockResolvedValue(keys);
-            let result;
-            let result2;
-            return initOnyx()
-                .then(() => {
-                    // WHEN the collection using components render
-                    result = render(<TestComponentWithOnyx />);
-                    result2 = render(<TestComponentWithOnyx />);
+                    // WHEN new connections for other keys happen
+                    Onyx.connect({key: 'key4'});
+                    Onyx.connect({key: 'key5'});
+                    Onyx.connect({key: 'key6'});
                 })
                 .then(waitForPromisesToResolve)
                 .then(() => {
-                    // THEN the collection items should be in cache
-                    expect(cache.hasCacheForKey(keys[0])).toBe(true);
-                    expect(cache.hasCacheForKey(keys[1])).toBe(true);
+                    // WHEN enough time passes and cache cleanup is triggered
+                    jest.runOnlyPendingTimers();
 
-                    // WHEN one of the components unmounts
-                    result.unmount();
-                    return waitForPromisesToResolve();
-                })
-                .then(() => {
-                    // THEN the collection items should still be in cache
-                    expect(cache.hasCacheForKey(keys[0])).toBe(true);
-                    expect(cache.hasCacheForKey(keys[1])).toBe(true);
+                    // THEN keys 4,5,6 should be in cache
+                    expect(cache.hasCacheForKey('key4')).toBe(true);
+                    expect(cache.hasCacheForKey('key5')).toBe(true);
+                    expect(cache.hasCacheForKey('key6')).toBe(true);
 
-                    // WHEN the last component using the collection unmounts
-                    result2.unmount();
-                    return waitForPromisesToResolve();
-                })
-                .then(() => {
-                    // THEN the collection items should be removed from cache
-                    expect(cache.hasCacheForKey(keys[0])).toBe(false);
-                    expect(cache.hasCacheForKey(keys[1])).toBe(false);
-                });
-        });
-
-        it('Should not remove item from cache when it still used in a collection', () => {
-            // GIVEN component that uses a collection and a component that uses a collection item
-            const COLLECTION_ITEM_KEY = `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}10`;
-            const TestComponentWithOnyx = withOnyx({
-                collections: {
-                    key: ONYX_KEYS.COLLECTION.MOCK_COLLECTION,
-                },
-            })(ViewWithCollections);
-
-            const AnotherTestComponentWithOnyx = withOnyx({
-                testObject: {
-                    key: COLLECTION_ITEM_KEY,
-                },
-            })(ViewWithCollections);
-
-            // GIVEN some values exist in storage
-            AsyncStorageMock.setItem(COLLECTION_ITEM_KEY, JSON.stringify({ID: 10}));
-            AsyncStorageMock.getAllKeys.mockResolvedValue([COLLECTION_ITEM_KEY]);
-            let result;
-
-            return initOnyx()
-                .then(() => {
-                    // WHEN both components render
-                    render(<TestComponentWithOnyx />);
-                    result = render(<AnotherTestComponentWithOnyx />);
-                    return waitForPromisesToResolve();
-                })
-                .then(() => {
-                    // WHEN the component using the individual item unmounts
-                    result.unmount();
-                    return waitForPromisesToResolve();
-                })
-                .then(() => {
-                    // THEN The item should not be removed from cache as it's used in a collection
-                    expect(cache.hasCacheForKey(COLLECTION_ITEM_KEY)).toBe(true);
+                    // AND keys 1,2,3 should not be in cache
+                    expect(cache.hasCacheForKey('key1')).toBe(false);
+                    expect(cache.hasCacheForKey('key2')).toBe(false);
+                    expect(cache.hasCacheForKey('key3')).toBe(false);
                 });
         });
     });
