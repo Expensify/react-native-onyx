@@ -416,6 +416,7 @@ describe('Onyx', () => {
 
             Onyx.init({
                 keys: ONYX_KEYS,
+                safeEvictionKeys: [ONYX_KEYS.COLLECTION.MOCK_COLLECTION],
                 registerStorageEventListener: jest.fn(),
                 maxCachedKeysCount: 10,
                 ...overrides,
@@ -431,10 +432,6 @@ describe('Onyx', () => {
         beforeEach(() => {
             jest.resetModules();
             return initOnyx();
-        });
-
-        afterEach(() => {
-            jest.useRealTimers();
         });
 
         it('Expect a single call to getItem when multiple components use the same key', () => {
@@ -496,9 +493,7 @@ describe('Onyx', () => {
                 });
         });
 
-        it('Should keep recently accessed items in cache even when components unmount', () => {
-            jest.useFakeTimers();
-
+        it('Should keep recently accessed items in cache', () => {
             // GIVEN Storage with 10 different keys
             AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
             AsyncStorageMock.getAllKeys.mockResolvedValue(
@@ -520,13 +515,10 @@ describe('Onyx', () => {
                 })
                 .then(waitForPromisesToResolve)
                 .then(() => {
-                    // WHEN they disconnect
-                    connections.forEach(entry => Onyx.disconnect(entry.connectionId, entry.key));
+                    // WHEN a new connection for a safe eviction key happens
+                    Onyx.connect({key: `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}9`});
                 })
-                .then(waitForPromisesToResolve)
                 .then(() => {
-                    jest.runOnlyPendingTimers();
-
                     // THEN the most recent 5 keys should remain in cache
                     _.range(5, 10).forEach((number) => {
                         const key = connections[number].key;
@@ -612,7 +604,7 @@ describe('Onyx', () => {
                 });
         });
 
-        it('Should periodically clean cache', () => {
+        it('Should clean cache when connections to eviction keys happen', () => {
             // GIVEN storage with some data
             AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
             AsyncStorageMock.getAllKeys.mockResolvedValue(_.range(1, 10).map(n => `key${n}`));
@@ -630,37 +622,24 @@ describe('Onyx', () => {
                 })
                 .then(waitForPromisesToResolve)
                 .then(() => {
-                    // WHEN enough time passes and cache cleanup is triggered
-                    jest.runOnlyPendingTimers();
-
-                    // THEN keys 2,3,4 should remain in cache
+                    // THEN keys 1,2,3,4 should be in cache
+                    expect(cache.hasCacheForKey('key1')).toBe(true);
                     expect(cache.hasCacheForKey('key2')).toBe(true);
                     expect(cache.hasCacheForKey('key3')).toBe(true);
                     expect(cache.hasCacheForKey('key4')).toBe(true);
 
-                    // AND key1 should not be in cache
-                    expect(cache.hasCacheForKey('key1')).toBe(false);
-                })
-                .then(() => {
-                    // WHEN new connections for other keys happen
-                    Onyx.connect({key: 'key4'});
-                    Onyx.connect({key: 'key5'});
-                    Onyx.connect({key: 'key6'});
+                    // WHEN A connection for safe eviction key happens
+                    Onyx.connect({key: ONYX_KEYS.COLLECTION.MOCK_COLLECTION});
                 })
                 .then(waitForPromisesToResolve)
                 .then(() => {
-                    // WHEN enough time passes and cache cleanup is triggered
-                    jest.runOnlyPendingTimers();
-
-                    // THEN keys 4,5,6 should be in cache
-                    expect(cache.hasCacheForKey('key4')).toBe(true);
-                    expect(cache.hasCacheForKey('key5')).toBe(true);
-                    expect(cache.hasCacheForKey('key6')).toBe(true);
-
-                    // AND keys 1,2,3 should not be in cache
+                    // THEN key 1 should no longer be in cache
                     expect(cache.hasCacheForKey('key1')).toBe(false);
-                    expect(cache.hasCacheForKey('key2')).toBe(false);
-                    expect(cache.hasCacheForKey('key3')).toBe(false);
+
+                    // AND the rest of the keys should be in cache
+                    expect(cache.hasCacheForKey('key2')).toBe(true);
+                    expect(cache.hasCacheForKey('key3')).toBe(true);
+                    expect(cache.hasCacheForKey('key4')).toBe(true);
                 });
         });
     });
