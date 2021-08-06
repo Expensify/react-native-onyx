@@ -202,7 +202,7 @@ describe('Onyx', () => {
         })
             .then(() => (
 
-                // 2 key values to update and 3 new keys to add.
+                // 2 key values to update and 2 new keys to add (and one will be removed).
                 // MergeCollection will perform a mix of multiSet and multiMerge
                 Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                     test_1: {
