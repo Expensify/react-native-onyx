@@ -202,7 +202,7 @@ describe('Onyx', () => {
         })
             .then(() => (
 
-                // 2 key values to update and 2 new keys to add.
+                // 2 key values to update and 3 new keys to add.
                 // MergeCollection will perform a mix of multiSet and multiMerge
                 Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                     test_1: {
@@ -220,8 +220,40 @@ describe('Onyx', () => {
                     test_5: {
                         ID: 567,
                         value: 'one'
+                    },
+                    test_6: {
+                        ID: 678,
+                        value: 'zero'
                     }
                 })
+            ))
+            .then(() => (
+
+                // Everything is the same, but a key is missing
+                // MergeCollection will use multiMerge to reset the existing keys
+                // and will set the missing key to null, since clearRemoved is set
+                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                    test_1: {
+                        ID: 123,
+                        value: 'five'
+                    },
+                    test_2: {
+                        ID: 234,
+                        value: 'four'
+                    },
+                    test_3: {
+                        ID: 345,
+                        value: 'three'
+                    },
+                    test_4: {
+                        ID: 456,
+                        value: 'two'
+                    },
+                    test_5: {
+                        ID: 567,
+                        value: 'one'
+                    }
+                }, true)
             ))
             .then(() => {
                 // 3 items on the first mergeCollection + 4 items the next mergeCollection
