@@ -250,7 +250,7 @@ describe('Onyx', () => {
 
                 expect(valuesReceived[123]).toEqual('five');
                 expect(valuesReceived[234]).toEqual('four');
-                expect(valuesReceived[345]).toEqual(null);
+                expect(valuesReceived[345]).toEqual('three');
                 expect(valuesReceived[456]).toEqual('two');
                 expect(valuesReceived[567]).toEqual('one');
             });
