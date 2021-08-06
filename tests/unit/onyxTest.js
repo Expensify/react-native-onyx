@@ -257,7 +257,7 @@ describe('Onyx', () => {
             ))
             .then(() => {
                 // 3 items on the first mergeCollection + 4 items the next mergeCollection
-                expect(mockCallback.mock.calls.length).toBe(7);
+                expect(mockCallback.mock.calls.length).toBe(8);
 
                 expect(mockCallback.mock.calls[0][0]).toEqual({ID: 123, value: 'one'});
                 expect(mockCallback.mock.calls[0][1]).toEqual('test_1');
@@ -280,11 +280,15 @@ describe('Onyx', () => {
                 expect(mockCallback.mock.calls[6][0]).toEqual({ID: 567, value: 'one'});
                 expect(mockCallback.mock.calls[6][1]).toEqual('test_5');
 
+                expect(mockCallback.mock.calls[6][0]).toEqual({ID: 678, value: null});
+                expect(mockCallback.mock.calls[6][1]).toEqual('test_6');
+
                 expect(valuesReceived[123]).toEqual('five');
                 expect(valuesReceived[234]).toEqual('four');
                 expect(valuesReceived[345]).toEqual('three');
                 expect(valuesReceived[456]).toEqual('two');
                 expect(valuesReceived[567]).toEqual('one');
+                expect(valuesReceived[678]).toEqual(null);
             });
     });
 
