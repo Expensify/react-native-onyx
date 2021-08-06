@@ -220,38 +220,6 @@ describe('Onyx', () => {
                     test_5: {
                         ID: 567,
                         value: 'one'
-                    },
-                    test_6: {
-                        ID: 678,
-                        value: 'zero'
-                    }
-                })
-            ))
-            .then(() => (
-
-                // Everything is the same, but a key is missing
-                // MergeCollection will use multiMerge to reset the existing keys
-                // and will set the missing key to null, since clearRemoved is set
-                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
-                    test_1: {
-                        ID: 123,
-                        value: 'five'
-                    },
-                    test_2: {
-                        ID: 234,
-                        value: 'four'
-                    },
-                    test_3: {
-                        ID: 345,
-                        value: 'three'
-                    },
-                    test_4: {
-                        ID: 456,
-                        value: 'two'
-                    },
-                    test_5: {
-                        ID: 567,
-                        value: 'one'
                     }
                 }, true)
             ))
@@ -282,7 +250,7 @@ describe('Onyx', () => {
 
                 expect(valuesReceived[123]).toEqual('five');
                 expect(valuesReceived[234]).toEqual('four');
-                expect(valuesReceived[345]).toEqual('three');
+                expect(valuesReceived[345]).toEqual(null);
                 expect(valuesReceived[456]).toEqual('two');
                 expect(valuesReceived[567]).toEqual('one');
             });
