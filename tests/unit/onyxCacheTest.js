@@ -411,7 +411,7 @@ describe('Onyx', () => {
             const OnyxModule = require('../../index');
             Onyx = OnyxModule.default;
             withOnyx = OnyxModule.withOnyx;
-            StorageMock = require('../../lib/provider').default;
+            StorageMock = require('../../lib/storage').default;
             cache = require('../../lib/OnyxCache').default;
 
             Onyx.init({

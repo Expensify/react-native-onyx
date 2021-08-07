@@ -1,4 +1,4 @@
-import Storage from '../../lib/provider';
+import Storage from '../../lib/storage';
 import Onyx from '../../index';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 

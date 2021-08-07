@@ -1,1 +1,1 @@
-jest.mock('../lib/provider');
+jest.mock('../lib/storage');
