@@ -2,7 +2,7 @@ import {
     decorateWithMetrics,
     getMetrics,
     resetMetrics
-} from '../../lib/decorateWithMetrics';
+} from '../../lib/metering';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 describe('decorateWithMetrics', () => {
