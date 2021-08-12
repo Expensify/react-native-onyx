@@ -68,7 +68,7 @@ describe('withOnyx', () => {
         })(ViewWithCollections);
         const onRender = jest.fn();
         render(<TestComponentWithOnyx onRender={onRender} />);
-        waitForPromisesToResolve()
+        return waitForPromisesToResolve()
             .then(() => {
                 Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                     test_1: {ID: 123}, test_2: {ID: 234}, test_3: {ID: 345},
@@ -89,7 +89,7 @@ describe('withOnyx', () => {
         })(ViewWithCollections);
         const onRender = jest.fn();
         render(<TestComponentWithOnyx onRender={onRender} />);
-        waitForPromisesToResolve()
+        return waitForPromisesToResolve()
             .then(() => {
                 Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                     test_1: {ID: 123}, test_2: {ID: 234}, test_3: {ID: 345},
@@ -110,7 +110,7 @@ describe('withOnyx', () => {
         })(ViewWithCollections);
         const onRender = jest.fn();
         render(<TestComponentWithOnyx onRender={onRender} />);
-        waitForPromisesToResolve()
+        return waitForPromisesToResolve()
             .then(() => {
                 Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_4: {ID: 456}, test_5: {ID: 567}});
                 Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
