@@ -8,7 +8,7 @@ const propTypes = {
 
 const ViewWithText = props => (
     <View>
-        <Text>{props.text}</Text>
+        <Text testID="text-element">{props.text}</Text>
     </View>
 );
 
