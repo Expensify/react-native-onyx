@@ -126,6 +126,36 @@ describe('withOnyx', () => {
             });
     });
 
+    it('should update if a prop dependent key changes', () => {
+        let rerender;
+        let getByTestId;
+        const onRender = jest.fn();
+        const TestComponentWithOnyx = withOnyx({
+            text: {
+                key: props => `${ONYX_KEYS.COLLECTION.TEST_KEY}${props.collectionID}`,
+            },
+        })(ViewWithText);
+        Onyx.set(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`, 'test_1');
+        Onyx.set(`${ONYX_KEYS.COLLECTION.TEST_KEY}2`, 'test_2');
+        return waitForPromisesToResolve()
+            .then(() => {
+                const result = render(<TestComponentWithOnyx onRender={onRender} collectionID="1" />);
+                rerender = result.rerender;
+                getByTestId = result.getByTestId;
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                expect(getByTestId('text-element').props.children).toEqual('test_1');
+            })
+            .then(() => {
+                rerender(<TestComponentWithOnyx collectionID="2" />);
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                expect(getByTestId('text-element').props.children).toEqual('test_2');
+            });
+    });
+
     it('should pass a prop from one connected component to another', () => {
         const collectionItemID = 1;
         const onRender = jest.fn();
