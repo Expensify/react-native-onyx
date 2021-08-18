@@ -156,6 +156,25 @@ describe('withOnyx', () => {
             });
     });
 
+    it('should render the WrappedComponent if no keys are required for init', () => {
+        const INITIAL_VALUE = 'initial_value';
+        const TestComponentWithOnyx = withOnyx({
+            text: {
+                key: 'test',
+                initWithStoredValues: false,
+            },
+        })(ViewWithText);
+        TestComponentWithOnyx.defaultProps = {
+            text: INITIAL_VALUE,
+        };
+        Onyx.set('test_key', 'test_text');
+        return waitForPromisesToResolve()
+            .then(() => {
+                const {getByTestId} = render(<TestComponentWithOnyx collectionID="1" />);
+                expect(getByTestId('text-element').props.children).toEqual(INITIAL_VALUE);
+            });
+    });
+
     it('should pass a prop from one connected component to another', () => {
         const collectionItemID = 1;
         const onRender = jest.fn();
