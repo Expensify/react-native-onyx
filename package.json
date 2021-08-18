@@ -44,7 +44,13 @@
   },
   "peerDependencies": {
     "@react-native-async-storage/async-storage": "^1.15.5",
-    "react": "^17.0.2"
+    "react": "^17.0.2",
+    "react-native-performance": "^2.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react-native-performance": {
+      "optional": true
+    }
   },
   "jest": {
     "preset": "react-native",
