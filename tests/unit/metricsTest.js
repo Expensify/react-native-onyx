@@ -1,13 +1,16 @@
-import {
-    decorateWithMetrics,
-    getMetrics,
-    resetMetrics
-} from '../../lib/decorateWithMetrics';
+
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 describe('decorateWithMetrics', () => {
-    beforeEach(() => waitForPromisesToResolve()
-        .then(resetMetrics));
+    let decorateWithMetrics; let getMetrics; let resetMetrics;
+
+    beforeEach(() => {
+        jest.resetModules();
+        const metrics = require('../../lib/metrics');
+        decorateWithMetrics = metrics.decorateWithMetrics;
+        getMetrics = metrics.getMetrics;
+        resetMetrics = metrics.resetMetrics;
+    });
 
     it('Should collect metrics for a single method, single call', () => {
         // GIVEN an async function that resolves with an object
@@ -32,8 +35,7 @@ describe('decorateWithMetrics', () => {
 
                 const firstCall = metrics.summaries.mockFn.calls[0];
                 expect(firstCall.startTime).toEqual(expect.any(Number));
-                expect(firstCall.endTime).toEqual(expect.any(Number));
-                expect(firstCall.args).toEqual(['mockedKey']);
+                expect(firstCall.detail.args).toEqual(['mockedKey']);
             });
     });
 
@@ -78,9 +80,15 @@ describe('decorateWithMetrics', () => {
                 const calls = getMetrics().summaries.mockFn.calls;
                 expect(calls).toHaveLength(3);
                 expect(calls).toEqual([
-                    expect.objectContaining({args: ['mockedKey']}),
-                    expect.objectContaining({args: ['mockedKey3']}),
-                    expect.objectContaining({args: ['mockedKey2']}),
+                    expect.objectContaining({
+                        detail: expect.objectContaining({args: ['mockedKey']})
+                    }),
+                    expect.objectContaining({
+                        detail: expect.objectContaining({args: ['mockedKey3']})
+                    }),
+                    expect.objectContaining({
+                        detail: expect.objectContaining({args: ['mockedKey2']})
+                    }),
                 ]);
             });
     });
@@ -102,8 +110,12 @@ describe('decorateWithMetrics', () => {
                 const calls = getMetrics().summaries.mockFn.calls;
                 expect(calls).toHaveLength(2);
                 expect(calls).toEqual([
-                    expect.objectContaining({args: ['mockedKey', {ids: [1, 2, 3]}]}),
-                    expect.objectContaining({args: ['mockedKey', {ids: [4, 5, 6]}]}),
+                    expect.objectContaining({
+                        detail: {args: ['mockedKey', {ids: [1, 2, 3]}], alias: 'mockFn'}
+                    }),
+                    expect.objectContaining({
+                        detail: {args: ['mockedKey', {ids: [4, 5, 6]}], alias: 'mockFn'}
+                    }),
                 ]);
             });
     });

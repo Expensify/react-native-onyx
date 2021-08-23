@@ -39,12 +39,19 @@
     "prop-types": "^15.7.2",
     "react": "^17.0.2",
     "react-native": "0.64.1",
+    "react-native-performance": "^2.0.0",
     "react-test-renderer": "16.13.1",
     "metro-react-native-babel-preset": "^0.61.0"
   },
   "peerDependencies": {
     "@react-native-async-storage/async-storage": "^1.15.5",
-    "react": "^17.0.2"
+    "react": "^17.0.2",
+    "react-native-performance": "^2.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react-native-performance": {
+      "optional": true
+    }
   },
   "jest": {
     "preset": "react-native",
