@@ -1,14 +1,12 @@
-interface ProviderInterface {
+interface StorageProvider {
     getAllKeys(): Promise<string[]>,
-    getItem(key: string): Promise<string|null>,
-    multiGet(keys: string[]): Promise<Array<[string, string|null]>>,
+    getItem<T>(key: string): Promise<string|null>,
+    multiGet<T>(keys: string[]): Promise<Array<[string, T|null]>>,
     removeItem(key: string): Promise<void>,
-    setItem(key: string, value: string): Promise<void>,
-    multiSet(pairs: Array<[string, string|null]>): Promise<void>,
-    multiMerge(pairs: Array<[string, string|null]>): Promise<void>,
+    setItem<T>(key: string, value: T): Promise<void>,
+    multiSet<T>(pairs: Array<[string, T|null]>): Promise<void>,
+    multiMerge<T>(pairs: Array<[string, T|null]>): Promise<void>,
     clear(): Promise<void>,
 }
 
-declare const Storage: ProviderInterface;
-
-export = Storage;
+export = StorageProvider;
