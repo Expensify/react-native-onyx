@@ -7,7 +7,22 @@ interface StorageProvider {
     multiSet<T>(pairs: Array<[string, T|null]>): Promise<void>,
     multiMerge<T>(pairs: Array<[string, T|null]>): Promise<void>,
     clear(): Promise<void>,
-    storeFileLocally(file: any): Promise<{uri: string, type: string, name: string}|File>
+
+    /**
+     * Prepares a file so that it can be saved in Onyx.
+     * Use this method to make a File reference.
+     * Then save it as usual by Onyx.set or Onyx.merge
+     * @example
+     *
+     * Onyx.prepareFile(someFile)
+     *     .then(preparedFile => {
+     *         Onyx.merge('someKey', {
+     *             attachment: preparedFile,
+     *             hasAttachment: true,
+     *         })
+     *     })
+     */
+    prepareFile(file: any): Promise<{uri: string, type: string, name: string}|File>
 }
 
 export = StorageProvider;
