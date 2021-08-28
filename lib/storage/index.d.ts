@@ -7,6 +7,7 @@ interface StorageProvider {
     multiSet<T>(pairs: Array<[string, T|null]>): Promise<void>,
     multiMerge<T>(pairs: Array<[string, T|null]>): Promise<void>,
     clear(): Promise<void>,
+    storeFileLocally(file: any): Promise<{uri: string, type: string, name: string}|File>
 }
 
 export = StorageProvider;
