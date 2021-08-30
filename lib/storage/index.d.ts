@@ -1,3 +1,7 @@
+/**
+ * Storage interaction interface used by Onyx internally
+ * It's used to hook Onyx to different storage layers
+ */
 interface StorageProvider {
     getAllKeys(): Promise<string[]>,
     getItem<T>(key: string): Promise<string|null>,
