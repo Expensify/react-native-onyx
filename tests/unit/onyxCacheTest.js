@@ -394,7 +394,7 @@ describe('Onyx', () => {
     describe('Onyx with Cache', () => {
         let Onyx;
         let withOnyx;
-        let StorageMock;
+        let AsyncStorageMock;
 
         /** @type OnyxCache */
         let cache;
@@ -411,7 +411,7 @@ describe('Onyx', () => {
             const OnyxModule = require('../../index');
             Onyx = OnyxModule.default;
             withOnyx = OnyxModule.withOnyx;
-            StorageMock = require('../../lib/storage').default;
+            AsyncStorageMock = require('@react-native-async-storage/async-storage').default;
             cache = require('../../lib/OnyxCache').default;
 
             Onyx.init({
@@ -443,8 +443,8 @@ describe('Onyx', () => {
             })(ViewWithText);
 
             // GIVEN some string value for that key exists in storage
-            StorageMock.getItem.mockResolvedValue('"mockValue"');
-            StorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
+            AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
+            AsyncStorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
             return initOnyx()
                 .then(() => {
                     // WHEN multiple components are rendered
@@ -459,7 +459,7 @@ describe('Onyx', () => {
                 .then(waitForPromisesToResolve)
                 .then(() => {
                     // THEN Async storage `getItem` should be called only once
-                    expect(StorageMock.getItem).toHaveBeenCalledTimes(1);
+                    expect(AsyncStorageMock.getItem).toHaveBeenCalledTimes(1);
                 });
         });
 
@@ -474,8 +474,8 @@ describe('Onyx', () => {
             // GIVEN some string value for that key exists in storage
             return initOnyx()
                 .then(() => {
-                    StorageMock.getItem.mockResolvedValue('"mockValue"');
-                    StorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
+                    AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
+                    AsyncStorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
 
                     // WHEN multiple components are rendered
                     render(
@@ -489,14 +489,14 @@ describe('Onyx', () => {
                 .then(waitForPromisesToResolve)
                 .then(() => {
                     // THEN Async storage `getItem` should be called only once
-                    expect(StorageMock.getAllKeys).toHaveBeenCalledTimes(1);
+                    expect(AsyncStorageMock.getAllKeys).toHaveBeenCalledTimes(1);
                 });
         });
 
         it('Should keep recently accessed items in cache', () => {
             // GIVEN Storage with 10 different keys
-            StorageMock.getItem.mockResolvedValue('"mockValue"');
-            StorageMock.getAllKeys.mockResolvedValue(
+            AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
+            AsyncStorageMock.getAllKeys.mockResolvedValue(
                 _.range(10).map(number => `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}${number}`)
             );
             let connections;
@@ -542,8 +542,8 @@ describe('Onyx', () => {
             })(ViewWithText);
 
             // GIVEN some string value for that key exists in storage
-            StorageMock.getItem.mockResolvedValue('"mockValue"');
-            StorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
+            AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
+            AsyncStorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
 
             return initOnyx()
                 .then(() => {
@@ -561,7 +561,7 @@ describe('Onyx', () => {
                 .then(waitForPromisesToResolve)
                 .then(() => {
                     // THEN Async storage `getItem` should be called twice
-                    expect(StorageMock.getItem).toHaveBeenCalledTimes(2);
+                    expect(AsyncStorageMock.getItem).toHaveBeenCalledTimes(2);
                 });
         });
 
@@ -580,9 +580,9 @@ describe('Onyx', () => {
             })(ViewWithText);
 
             // GIVEN some values exist in storage
-            StorageMock.setItem(ONYX_KEYS.TEST_KEY, JSON.stringify({ID: 15, data: 'mock object with ID'}));
-            StorageMock.setItem(ONYX_KEYS.ANOTHER_TEST, JSON.stringify('mock text'));
-            StorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY, ONYX_KEYS.ANOTHER_TEST]);
+            AsyncStorageMock.setItem(ONYX_KEYS.TEST_KEY, JSON.stringify({ID: 15, data: 'mock object with ID'}));
+            AsyncStorageMock.setItem(ONYX_KEYS.ANOTHER_TEST, JSON.stringify('mock text'));
+            AsyncStorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY, ONYX_KEYS.ANOTHER_TEST]);
             return initOnyx()
                 .then(() => {
                     // WHEN the components are rendered multiple times
@@ -596,8 +596,8 @@ describe('Onyx', () => {
                 .then(waitForPromisesToResolve)
                 .then(() => {
                     // THEN Async storage `getItem` should be called exactly two times (once for each key)
-                    expect(StorageMock.getItem).toHaveBeenCalledTimes(2);
-                    expect(StorageMock.getItem.mock.calls).toEqual([
+                    expect(AsyncStorageMock.getItem).toHaveBeenCalledTimes(2);
+                    expect(AsyncStorageMock.getItem.mock.calls).toEqual([
                         [ONYX_KEYS.TEST_KEY],
                         [ONYX_KEYS.ANOTHER_TEST]
                     ]);
@@ -606,8 +606,8 @@ describe('Onyx', () => {
 
         it('Should clean cache when connections to eviction keys happen', () => {
             // GIVEN storage with some data
-            StorageMock.getItem.mockResolvedValue('"mockValue"');
-            StorageMock.getAllKeys.mockResolvedValue(_.range(1, 10).map(n => `key${n}`));
+            AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
+            AsyncStorageMock.getAllKeys.mockResolvedValue(_.range(1, 10).map(n => `key${n}`));
 
             jest.useFakeTimers();
 

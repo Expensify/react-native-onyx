@@ -14,7 +14,7 @@ test('Cache eviction', () => {
     const collection = {};
 
     // Given an evictable key previously set in storage
-    return Storage.setItem(`${ONYX_KEYS.COLLECTION.TEST_KEY}${RECORD_TO_EVICT}`, JSON.stringify({test: 'evict'}))
+    return Storage.setItem(`${ONYX_KEYS.COLLECTION.TEST_KEY}${RECORD_TO_EVICT}`, {test: 'evict'})
         .then(() => {
             // When we initialize Onyx and mark the set collection key as a safeEvictionKey
             Onyx.init({
