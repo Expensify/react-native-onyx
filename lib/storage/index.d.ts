@@ -8,6 +8,7 @@ interface StorageProvider {
     multiMerge<T>(pairs: Array<[string, T|null]>): Promise<void>,
     clear(): Promise<void>,
     prepareFile(file: any): {uri: string, type: string, name: string}|File
+    synchronizeInstances(config: { keyChanged: (key: string, data: any) => void }): void
 }
 
 export = StorageProvider;
