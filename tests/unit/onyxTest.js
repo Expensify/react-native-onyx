@@ -264,4 +264,29 @@ describe('Onyx', () => {
             expect(error.message).toEqual(`Provided collection does not have all its data belonging to the same parent. CollectionKey: ${ONYX_KEYS.COLLECTION.TEST_KEY}, DataKey: not_my_test`);
         }
     });
+
+    it('should allowing calling set() with a function as a value similar to React.Component.setState()', () => {
+        let testKeyValue;
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+        const errors = {otherProperty: 'test', errors: {fieldOne: true, fieldTwo: true}};
+        return Onyx.set(ONYX_KEYS.TEST_KEY, errors)
+            .then(() => Onyx.set(ONYX_KEYS.TEST_KEY, (previousValue = {}) => ({
+                ...previousValue,
+                errors: {fieldOne: true},
+            })))
+            .then(() => {
+                expect(testKeyValue).toEqual({
+                    otherProperty: 'test',
+                    errors: {
+                        fieldOne: true,
+                    }
+                });
+            });
+    });
 });
