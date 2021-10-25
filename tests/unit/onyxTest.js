@@ -277,8 +277,8 @@ describe('Onyx', () => {
         const SET_METHOD = 'set';
         const MERGE_METHOD = 'merge';
 
-        Onyx.merge(ONYX_KEYS.TEST_KEY, {methodCalled: SET_METHOD});
-        Onyx.set(ONYX_KEYS.TEST_KEY, {methodCalled: MERGE_METHOD});
+        Onyx.merge(ONYX_KEYS.TEST_KEY, {methodCalled: MERGE_METHOD});
+        Onyx.set(ONYX_KEYS.TEST_KEY, {methodCalled: SET_METHOD});
         return waitForPromisesToResolve()
             .then(() => expect(methodCalled).toBe(SET_METHOD));
     });
