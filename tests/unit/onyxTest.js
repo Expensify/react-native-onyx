@@ -264,4 +264,22 @@ describe('Onyx', () => {
             expect(error.message).toEqual(`Provided collection does not have all its data belonging to the same parent. CollectionKey: ${ONYX_KEYS.COLLECTION.TEST_KEY}, DataKey: not_my_test`);
         }
     });
+
+    it('should run set and merge in the order they are called', () => {
+        let methodCalled;
+        Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            callback: val => methodCalled = val ? val.methodCalled : null,
+        });
+
+        expect(methodCalled).not.toBeDefined();
+
+        const SET_METHOD = 'set';
+        const MERGE_METHOD = 'merge';
+
+        Onyx.merge(ONYX_KEYS.TEST_KEY, {methodCalled: SET_METHOD});
+        Onyx.set(ONYX_KEYS.TEST_KEY, {methodCalled: MERGE_METHOD});
+        return waitForPromisesToResolve()
+            .then(() => expect(methodCalled).toBe(SET_METHOD));
+    });
 });
