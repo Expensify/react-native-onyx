@@ -9,7 +9,8 @@
   "scripts": {
     "lint": "eslint .",
     "lint-tests": "eslint tests/**",
-    "test": "jest"
+    "test": "jest",
+    "build-docs": "node buildDocs.js"
   },
   "dependencies": {
     "ascii-table": "0.0.9",
@@ -36,12 +37,13 @@
     "eslint-config-expensify": "^2.0.11",
     "jest": "^26.5.2",
     "jest-cli": "^26.5.2",
+    "jsdoc-to-markdown": "^7.1.0",
+    "metro-react-native-babel-preset": "^0.61.0",
     "prop-types": "^15.7.2",
     "react": "^17.0.2",
     "react-native": "0.64.1",
     "react-native-performance": "^2.0.0",
-    "react-test-renderer": "16.13.1",
-    "metro-react-native-babel-preset": "^0.61.0"
+    "react-test-renderer": "16.13.1"
   },
   "peerDependencies": {
     "@react-native-async-storage/async-storage": "^1.15.5",
