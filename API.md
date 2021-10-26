@@ -18,8 +18,6 @@
 <dd><p>Sets multiple keys and values. Example
 Onyx.multiSet({&#39;key1&#39;: &#39;a&#39;, &#39;key2&#39;: &#39;b&#39;});</p>
 </dd>
-<dt><a href="#hasPendingMergeForKey">hasPendingMergeForKey(key)</a> ⇒ <code>Boolean</code></dt>
-<dd></dd>
 <dt><a href="#merge">merge(key, value)</a> ⇒ <code>Promise</code></dt>
 <dd><p>Merge a new value into an existing value at a key.</p>
 <p>The types of values that can be merged are <code>Object</code> and <code>Array</code>. To set another type of value use <code>Onyx.set()</code>. Merge
@@ -30,9 +28,6 @@ concatenate. See here: <a href="https://github.com/lodash/lodash/issues/2872">ht
 applied in the order they were called. Note: <code>Onyx.set()</code> calls do not work this way so use caution when mixing
 <code>Onyx.merge()</code> and <code>Onyx.set()</code>.</p>
 </dd>
-<dt><a href="#initializeWithDefaultKeyStates">initializeWithDefaultKeyStates()</a> ⇒ <code>Promise</code></dt>
-<dd><p>Merge user provided default key value pairs.</p>
-</dd>
 <dt><a href="#clear">clear()</a> ⇒ <code>Promise.&lt;void&gt;</code></dt>
 <dd><p>Clear out all the data in the store</p>
 </dd>
@@ -42,9 +37,6 @@ applied in the order they were called. Note: <code>Onyx.set()</code> calls do no
 <dt><a href="#init">init(options, registerStorageEventListener)</a></dt>
 <dd><p>Initialize the store with actions and listening for storage events</p>
 </dd>
-<dt><a href="#applyDecorators">applyDecorators()</a></dt>
-<dd><p>Apply calls statistic decorators to benchmark Onyx</p>
-</dd>
 </dl>
 
 <a name="connect"></a>
@@ -52,8 +44,8 @@ applied in the order they were called. Note: <code>Onyx.set()</code> calls do no
 ## connect(mapping) ⇒ <code>Number</code>
 Subscribes a react component's state directly to a store key
 
-**Kind**: global function
-**Returns**: <code>Number</code> - an ID to use when calling disconnect
+**Kind**: global function  
+**Returns**: <code>Number</code> - an ID to use when calling disconnect  
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -69,24 +61,24 @@ Subscribes a react component's state directly to a store key
 ## disconnect(connectionID, [keyToRemoveFromEvictionBlocklist])
 Remove the listener for a react component
 
-**Kind**: global function
+**Kind**: global function  
 
 | Param | Type |
 | --- | --- |
-| connectionID | <code>Number</code> |
-| [keyToRemoveFromEvictionBlocklist] | <code>String</code> |
+| connectionID | <code>Number</code> | 
+| [keyToRemoveFromEvictionBlocklist] | <code>String</code> | 
 
 <a name="set"></a>
 
 ## set(key, val) ⇒ <code>Promise</code>
 Write a value to our store with the given key
 
-**Kind**: global function
+**Kind**: global function  
 
 | Param | Type |
 | --- | --- |
-| key | <code>string</code> |
-| val | <code>mixed</code> |
+| key | <code>string</code> | 
+| val | <code>mixed</code> | 
 
 <a name="multiSet"></a>
 
@@ -94,20 +86,11 @@ Write a value to our store with the given key
 Sets multiple keys and values. Example
 Onyx.multiSet({'key1': 'a', 'key2': 'b'});
 
-**Kind**: global function
+**Kind**: global function  
 
 | Param | Type |
 | --- | --- |
-| data | <code>object</code> |
-
-<a name="hasPendingMergeForKey"></a>
-
-## hasPendingMergeForKey(key) ⇒ <code>Boolean</code>
-**Kind**: global function
-
-| Param | Type |
-| --- | --- |
-| key | <code>String</code> |
+| data | <code>object</code> | 
 
 <a name="merge"></a>
 
@@ -123,43 +106,37 @@ Calls to `Onyx.merge()` are batched so that any calls performed in a single tick
 applied in the order they were called. Note: `Onyx.set()` calls do not work this way so use caution when mixing
 `Onyx.merge()` and `Onyx.set()`.
 
-**Kind**: global function
+**Kind**: global function  
 
 | Param | Type |
 | --- | --- |
-| key | <code>String</code> |
-| value | <code>\*</code> |
+| key | <code>String</code> | 
+| value | <code>\*</code> | 
 
-<a name="initializeWithDefaultKeyStates"></a>
-
-## initializeWithDefaultKeyStates() ⇒ <code>Promise</code>
-Merge user provided default key value pairs.
-
-**Kind**: global function
 <a name="clear"></a>
 
 ## clear() ⇒ <code>Promise.&lt;void&gt;</code>
 Clear out all the data in the store
 
-**Kind**: global function
+**Kind**: global function  
 <a name="mergeCollection"></a>
 
 ## mergeCollection(collectionKey, collection) ⇒ <code>Promise</code>
 Merges a collection based on their keys.
 
-**Kind**: global function
+**Kind**: global function  
 
 | Param | Type |
 | --- | --- |
-| collectionKey | <code>String</code> |
-| collection | <code>Object</code> |
+| collectionKey | <code>String</code> | 
+| collection | <code>Object</code> | 
 
 <a name="init"></a>
 
 ## init(options, registerStorageEventListener)
 Initialize the store with actions and listening for storage events
 
-**Kind**: global function
+**Kind**: global function  
 
 | Param | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -171,9 +148,3 @@ Initialize the store with actions and listening for storage events
 | [options.maxCachedKeysCount] | <code>Number</code> | <code>55</code> | Sets how many recent keys should we try to keep in cache Setting this to 0 would practically mean no cache We try to free cache when we connect to a safe eviction key |
 | [options.captureMetrics] | <code>Boolean</code> |  | Enables Onyx benchmarking and exposes the get/print/reset functions |
 
-<a name="applyDecorators"></a>
-
-## applyDecorators()
-Apply calls statistic decorators to benchmark Onyx
-
-**Kind**: global function
