@@ -15,8 +15,7 @@
 <dd><p>Write a value to our store with the given key</p>
 </dd>
 <dt><a href="#multiSet">multiSet(data)</a> ⇒ <code>Promise</code></dt>
-<dd><p>Sets multiple keys and values. Example
-Onyx.multiSet({&#39;key1&#39;: &#39;a&#39;, &#39;key2&#39;: &#39;b&#39;});</p>
+<dd><p>Sets multiple keys and values</p>
 </dd>
 <dt><a href="#merge">merge(key, value)</a> ⇒ <code>Promise</code></dt>
 <dd><p>Merge a new value into an existing value at a key.</p>
@@ -34,7 +33,7 @@ applied in the order they were called. Note: <code>Onyx.set()</code> calls do no
 <dt><a href="#mergeCollection">mergeCollection(collectionKey, collection)</a> ⇒ <code>Promise</code></dt>
 <dd><p>Merges a collection based on their keys.</p>
 </dd>
-<dt><a href="#init">init(options, registerStorageEventListener)</a></dt>
+<dt><a href="#init">init(options)</a></dt>
 <dd><p>Initialize the store with actions and listening for storage events</p>
 </dd>
 </dl>
@@ -56,6 +55,13 @@ Subscribes a react component's state directly to a store key
 | [mapping.callback] | <code>Object</code> | a method that will be called with changed data      This is used by any non-React code to connect to Onyx |
 | [mapping.initWithStoredValues] | <code>Boolean</code> | If set to false, then no data will be prefilled into the  component |
 
+**Example**  
+```js
+const connectionID = Onyx.connect({
+    key: ONYXKEYS.SESSION,
+    callback: onSessionChange,
+});
+```
 <a name="disconnect"></a>
 
 ## disconnect(connectionID, [keyToRemoveFromEvictionBlocklist])
@@ -68,6 +74,10 @@ Remove the listener for a react component
 | connectionID | <code>Number</code> | 
 | [keyToRemoveFromEvictionBlocklist] | <code>String</code> | 
 
+**Example**  
+```js
+Onyx.disconnect(connectionID);
+```
 <a name="set"></a>
 
 ## set(key, val) ⇒ <code>Promise</code>
@@ -83,8 +93,7 @@ Write a value to our store with the given key
 <a name="multiSet"></a>
 
 ## multiSet(data) ⇒ <code>Promise</code>
-Sets multiple keys and values. Example
-Onyx.multiSet({'key1': 'a', 'key2': 'b'});
+Sets multiple keys and values
 
 **Kind**: global function  
 
@@ -92,6 +101,10 @@ Onyx.multiSet({'key1': 'a', 'key2': 'b'});
 | --- | --- |
 | data | <code>object</code> | 
 
+**Example**  
+```js
+Onyx.multiSet({'key1': 'a', 'key2': 'b'});
+```
 <a name="merge"></a>
 
 ## merge(key, value) ⇒ <code>Promise</code>
@@ -113,6 +126,13 @@ applied in the order they were called. Note: `Onyx.set()` calls do not work this
 | key | <code>String</code> | 
 | value | <code>\*</code> | 
 
+**Example**  
+```js
+Onyx.merge(ONYXKEYS.EMPLOYEE_LIST, ['Joe']); // -> ['Joe']
+Onyx.merge(ONYXKEYS.EMPLOYEE_LIST, ['Jack']); // -> ['Joe', 'Jack']
+Onyx.merge(ONYXKEYS.POLICY, {id: 1}); // -> {id: 1}
+Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Workspace'}
+```
 <a name="clear"></a>
 
 ## clear() ⇒ <code>Promise.&lt;void&gt;</code>
@@ -133,7 +153,7 @@ Merges a collection based on their keys.
 
 <a name="init"></a>
 
-## init(options, registerStorageEventListener)
+## init(options)
 Initialize the store with actions and listening for storage events
 
 **Kind**: global function  
@@ -144,7 +164,16 @@ Initialize the store with actions and listening for storage events
 | [options.keys] | <code>Object</code> |  |  |
 | [options.initialKeyStates] | <code>Object</code> |  |  |
 | [options.safeEvictionKeys] | <code>Array.&lt;String&gt;</code> |  | This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal. Any components subscribing to these keys must also implement a canEvict option. See the README for more info. |
-| registerStorageEventListener | <code>function</code> |  | a callback when a storage event happens. This applies to web platforms where the local storage emits storage events across all open tabs and allows Onyx to stay in sync across all open tabs. |
+| [options.registerStorageEventListener] | <code>function</code> |  | a callback when a storage event happens. This applies to web platforms where the local storage emits storage events across all open tabs and allows Onyx to stay in sync across all open tabs. |
 | [options.maxCachedKeysCount] | <code>Number</code> | <code>55</code> | Sets how many recent keys should we try to keep in cache Setting this to 0 would practically mean no cache We try to free cache when we connect to a safe eviction key |
 | [options.captureMetrics] | <code>Boolean</code> |  | Enables Onyx benchmarking and exposes the get/print/reset functions |
 
+**Example**  
+```js
+Onyx.init({
+    keys: ONYXKEYS,
+    initialKeyStates: {
+        [ONYXKEYS.SESSION]: {loading: false},
+    },
+});
+```

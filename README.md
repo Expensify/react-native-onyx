@@ -1,5 +1,7 @@
-# React-Native-Onyx
-This is a persistent storage solution wrapped in a Pub/Sub library. In general that means:
+# `react-native-onyx`
+Persistent storage solution wrapped in a Pub/Sub library.
+
+## Core Features
 
 - Onyx stores and retrieves data from persistent storage
 - Data is stored as key/value pairs, where the value can be anything from a single piece of data to a complex object
@@ -10,6 +12,120 @@ This is a persistent storage solution wrapped in a Pub/Sub library. In general t
     2. Subscribe to changes of the data for a particular key or set of keys. React components use `withOnyx()` and non-React libs use `Onyx.connect()`.
     3. Get initialized with the current value of that key from persistent storage (Onyx does this by calling `setState()` or triggering the `callback` with the values currently on disk as part of the connection process)
 - Subscribing to Onyx keys is done using a constant defined in `ONYXKEYS`. Each Onyx key represents either a collection of items or a specific entry in storage. For example, since all reports are stored as individual keys like `report_1234`, if code needs to know about all the reports (e.g. display a list of them in the nav menu), then it would subscribe to the key `ONYXKEYS.COLLECTION.REPORT`.
+
+# Getting Started
+
+## Installation
+
+At the moment, Onyx is not yet published to `npm`. To use in your project, reference the latest sha of the main branch directly in `package.json`
+
+```json
+  "dependencies": {
+    "react-native-onyx": "git+https://github.com/Expensify/react-native-onyx.git#ccb64c738b8bbe933b8997eb177f864e5139bd8d",
+    ...
+```
+
+## Initialization
+
+To initialize Onyx we call `Onyx.init()` with a configuration object like so
+
+```javascript
+import Onyx from 'react-native-onyx';
+
+const ONYXKEYS = {
+    SESSION: 'session',
+};
+
+const config = {
+    keys: ONYXKEYS,
+};
+
+Onyx.init(config);
+```
+
+## Setting data
+
+To store some data we can use the `Onyx.set()` method.
+
+```javascript
+API.Authenticate(params)
+    .then((response) => {
+        Onyx.set(ONYXKEYS.SESSION, {token: response.token});
+    });
+```
+
+The data will then be cached and stored via `AsyncStorage`.
+
+## Merging data
+
+We can also use `Onyx.merge()` to merge new `Object` or `Array` data in with existing data.
+
+For `Array` the default behavior is to concatenate new items.
+
+```javascript
+Onyx.merge(ONYXKEYS.EMPLOYEE_LIST, ['Joe']); // -> ['Joe']
+Onyx.merge(ONYXKEYS.EMPLOYEE_LIST, ['Jack']); // -> ['Joe', 'Jack']
+```
+
+For `Object` values the default behavior uses `lodash/merge` under the hood to do a deep extend of the object.
+
+```javascript
+Onyx.merge(ONYXKEYS.POLICY, {id: 1}); // -> {id: 1}
+Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Workspace'}
+```
+
+One caveat to be aware of is that `lodash/merge` [follows the behavior of jQuery's deep extend](https://github.com/lodash/lodash/issues/2872) and will not concatenate nested arrays in objects. It might seem like this code would concat these arrays, but it does not.
+
+```javascript
+Onyx.merge(ONYXKEYS.POLICY, {employeeList: ['Joe']}); // -> {employeeList: ['Joe']}
+Onyx.merge(ONYXKEYS.POLICY, {employeeList: ['Jack']}); // -> {employeeList: ['Jack']}
+```
+
+## Subscribing to data changes
+
+To set up a basic subscription for a given key use the `Onyx.connect()` method.
+
+```javascript
+let session;
+const connectionID = Onyx.connect({
+    key: ONYXKEYS.SESSION,
+    callback: (val) => session = val || {},
+});
+```
+
+To teardown the subscription call `Onyx.disconnect()` with the `connectionID` returned from `Onyx.connect()`.
+
+```javascript
+Onyx.disconnect(connectionID);
+```
+
+We can also access values inside React components via the `withOnyx()` [higher order component](https://reactjs.org/docs/higher-order-components.html). When the data changes the component will re-render.
+
+```javascript
+const App = ({session}) => (
+    <View>
+        {session.token ? <Text>Logged in</Text> : <Text>Logged out</Text> }
+    </View>
+);
+
+export default withOnyx({
+    session: {
+        key: ONYXKEYS.SESSION,
+    },
+})(App);
+```
+
+It is preferable to use the HOC over `Onyx.connect()` in React code as `withOnyx()` will delay the rendering of the wrapped component until all keys have been accessed and made available.
+
+## Clean up
+
+To clear all data from `Onyx` we can use `Onyx.clear()`.
+
+```javascript
+function signOut() {
+    Onyx.clear();
+}
+```
 
 # API Reference
 
@@ -44,7 +160,7 @@ export default withOnyx({
 })(ReportActionsView);
 ```
 
-### Benchmarks
+# Benchmarks
 
 Provide the `captureMetrics` boolean flag to `Onyx.init` to capture call statistics
 
