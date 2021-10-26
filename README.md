@@ -22,7 +22,6 @@ At the moment, Onyx is not yet published to `npm`. To use in your project, refer
 ```json
   "dependencies": {
     "react-native-onyx": "git+https://github.com/Expensify/react-native-onyx.git#ccb64c738b8bbe933b8997eb177f864e5139bd8d",
-    ...
 ```
 
 ## Initialization
@@ -102,6 +101,9 @@ Onyx.disconnect(connectionID);
 We can also access values inside React components via the `withOnyx()` [higher order component](https://reactjs.org/docs/higher-order-components.html). When the data changes the component will re-render.
 
 ```javascript
+import React from 'react';
+import {withOnyx} from 'react-native-onyx';
+
 const App = ({session}) => (
     <View>
         {session.token ? <Text>Logged in</Text> : <Text>Logged out</Text> }
