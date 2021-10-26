@@ -1,7 +1,7 @@
 # `react-native-onyx`
 Persistent storage solution wrapped in a Pub/Sub library.
 
-## Core Features
+# Features
 
 - Onyx stores and retrieves data from persistent storage
 - Data is stored as key/value pairs, where the value can be anything from a single piece of data to a complex object
@@ -53,7 +53,7 @@ API.Authenticate(params)
     });
 ```
 
-The data will then be cached and stored via `AsyncStorage`.
+The data will then be cached and stored via [`AsyncStorage`](https://github.com/react-native-async-storage/async-storage).
 
 ## Merging data
 
@@ -79,6 +79,13 @@ One caveat to be aware of is that `lodash/merge` [follows the behavior of jQuery
 Onyx.merge(ONYXKEYS.POLICY, {employeeList: ['Joe']}); // -> {employeeList: ['Joe']}
 Onyx.merge(ONYXKEYS.POLICY, {employeeList: ['Jack']}); // -> {employeeList: ['Jack']}
 ```
+
+### Should I use `merge()` or `set()` or both?
+
+- Use `merge()` if we want to merge partial data into an existing `Array` or `Object`
+- Use `set()` if we are working with simple values (`String`, `Boolean`, etc) or need to completely overwrite a complex property of an `Object`.
+
+Consecutive calls to `Onyx.merge()` with the same key are batched in a stack and processed in the order that they were called. This helps avoid race conditions where one merge possibly finishes before another. However, it's important to note that calls to `Onyx.set()` are not batched together with calls to `Onyx.merge()`. For this reason, it is usually preferable to use one or the other, but not both. Onyx is a work-in-progress so always test code to make sure assumptions are correct!
 
 ## Subscribing to data changes
 
