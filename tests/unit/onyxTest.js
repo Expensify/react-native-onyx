@@ -265,7 +265,7 @@ describe('Onyx', () => {
         }
     });
 
-    it('should allowing calling set() with a function as a value similar to React.Component.setState()', () => {
+    it('should allowing calling merge() with a function as a value similar to React.Component.setState()', () => {
         let testKeyValue;
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
@@ -276,7 +276,7 @@ describe('Onyx', () => {
         });
         const errors = {otherProperty: 'test', errors: {fieldOne: true, fieldTwo: true}};
         return Onyx.set(ONYX_KEYS.TEST_KEY, errors)
-            .then(() => Onyx.set(ONYX_KEYS.TEST_KEY, (previousValue = {}) => ({
+            .then(() => Onyx.merge(ONYX_KEYS.TEST_KEY, (previousValue = {}) => ({
                 ...previousValue,
                 errors: {fieldOne: true},
             })))
