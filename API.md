@@ -11,7 +11,7 @@
 <dt><a href="#disconnect">disconnect(connectionID, [keyToRemoveFromEvictionBlocklist])</a></dt>
 <dd><p>Remove the listener for a react component</p>
 </dd>
-<dt><a href="#set">set(key, val)</a> ⇒ <code>Promise</code></dt>
+<dt><a href="#set">set(key, value)</a> ⇒ <code>Promise</code></dt>
 <dd><p>Write a value to our store with the given key</p>
 </dd>
 <dt><a href="#multiSet">multiSet(data)</a> ⇒ <code>Promise</code></dt>
@@ -31,9 +31,9 @@ applied in the order they were called. Note: <code>Onyx.set()</code> calls do no
 <dd><p>Clear out all the data in the store</p>
 </dd>
 <dt><a href="#mergeCollection">mergeCollection(collectionKey, collection)</a> ⇒ <code>Promise</code></dt>
-<dd><p>Merges a collection based on their keys.</p>
+<dd><p>Merges a collection based on their keys</p>
 </dd>
-<dt><a href="#init">init(options)</a></dt>
+<dt><a href="#init">init([options])</a></dt>
 <dd><p>Initialize the store with actions and listening for storage events</p>
 </dd>
 </dl>
@@ -49,8 +49,8 @@ Subscribes a react component's state directly to a store key
 | Param | Type | Description |
 | --- | --- | --- |
 | mapping | <code>Object</code> | the mapping information to connect Onyx to the components state |
-| mapping.key | <code>String</code> |  |
-| mapping.statePropertyName | <code>String</code> | the name of the property in the state to connect the data to |
+| mapping.key | <code>String</code> | ONYXKEY to subscribe to |
+| [mapping.statePropertyName] | <code>String</code> | the name of the property in the state to connect the data to |
 | [mapping.withOnyxInstance] | <code>Object</code> | whose setState() method will be called with any changed data      This is used by React components to connect to Onyx |
 | [mapping.callback] | <code>Object</code> | a method that will be called with changed data      This is used by any non-React code to connect to Onyx |
 | [mapping.initWithStoredValues] | <code>Boolean</code> | If set to false, then no data will be prefilled into the  component |
@@ -69,10 +69,10 @@ Remove the listener for a react component
 
 **Kind**: global function  
 
-| Param | Type |
-| --- | --- |
-| connectionID | <code>Number</code> | 
-| [keyToRemoveFromEvictionBlocklist] | <code>String</code> | 
+| Param | Type | Description |
+| --- | --- | --- |
+| connectionID | <code>Number</code> | unique id returned by call to Onyx.connect() |
+| [keyToRemoveFromEvictionBlocklist] | <code>String</code> |  |
 
 **Example**  
 ```js
@@ -80,15 +80,15 @@ Onyx.disconnect(connectionID);
 ```
 <a name="set"></a>
 
-## set(key, val) ⇒ <code>Promise</code>
+## set(key, value) ⇒ <code>Promise</code>
 Write a value to our store with the given key
 
 **Kind**: global function  
 
-| Param | Type |
-| --- | --- |
-| key | <code>string</code> | 
-| val | <code>mixed</code> | 
+| Param | Type | Description |
+| --- | --- | --- |
+| key | <code>String</code> | ONYXKEY to set |
+| value | <code>\*</code> | value to store |
 
 <a name="multiSet"></a>
 
@@ -97,9 +97,9 @@ Sets multiple keys and values
 
 **Kind**: global function  
 
-| Param | Type |
-| --- | --- |
-| data | <code>object</code> | 
+| Param | Type | Description |
+| --- | --- | --- |
+| data | <code>Object</code> | object keyed by ONYXKEYS and the values to set |
 
 **Example**  
 ```js
@@ -121,10 +121,10 @@ applied in the order they were called. Note: `Onyx.set()` calls do not work this
 
 **Kind**: global function  
 
-| Param | Type |
-| --- | --- |
-| key | <code>String</code> | 
-| value | <code>\*</code> | 
+| Param | Type | Description |
+| --- | --- | --- |
+| key | <code>String</code> | ONYXKEYS key |
+| value | <code>Object</code> \| <code>Array</code> | Object or Array value to merge |
 
 **Example**  
 ```js
@@ -142,29 +142,36 @@ Clear out all the data in the store
 <a name="mergeCollection"></a>
 
 ## mergeCollection(collectionKey, collection) ⇒ <code>Promise</code>
-Merges a collection based on their keys.
+Merges a collection based on their keys
 
 **Kind**: global function  
 
-| Param | Type |
-| --- | --- |
-| collectionKey | <code>String</code> | 
-| collection | <code>Object</code> | 
+| Param | Type | Description |
+| --- | --- | --- |
+| collectionKey | <code>String</code> | e.g. `ONYXKEYS.COLLECTION.REPORT` |
+| collection | <code>Object</code> | Object collection keyed by individual collection member keys and values |
 
+**Example**  
+```js
+Onyx.mergeCollection(ONYXKEYS.COLLECTION.REPORT, {
+    [`${ONYXKEYS.COLLECTION.REPORT}1`]: report1,
+    [`${ONYXKEYS.COLLECTION.REPORT}2`]: report2,
+});
+```
 <a name="init"></a>
 
-## init(options)
+## init([options])
 Initialize the store with actions and listening for storage events
 
 **Kind**: global function  
 
 | Param | Type | Default | Description |
 | --- | --- | --- | --- |
-| options | <code>Object</code> |  |  |
-| [options.keys] | <code>Object</code> |  |  |
-| [options.initialKeyStates] | <code>Object</code> |  |  |
-| [options.safeEvictionKeys] | <code>Array.&lt;String&gt;</code> |  | This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal. Any components subscribing to these keys must also implement a canEvict option. See the README for more info. |
-| [options.registerStorageEventListener] | <code>function</code> |  | a callback when a storage event happens. This applies to web platforms where the local storage emits storage events across all open tabs and allows Onyx to stay in sync across all open tabs. |
+| [options] | <code>Object</code> | <code>{}</code> | config object |
+| [options.keys] | <code>Object</code> | <code>{}</code> | `ONYXKEYS` constants object |
+| [options.initialKeyStates] | <code>Object</code> | <code>{}</code> | initial data to set when `init()` and `clear()` is called |
+| [options.safeEvictionKeys] | <code>Array.&lt;String&gt;</code> | <code>[]</code> | This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal. Any components subscribing to these keys must also implement a canEvict option. See the README for more info. |
+| [options.registerStorageEventListener] | <code>function</code> | <code>() &#x3D;&gt; {}</code> | a callback when a storage event happens. This applies to web platforms where the local storage emits storage events across all open tabs and allows Onyx to stay in sync across all open tabs. |
 | [options.maxCachedKeysCount] | <code>Number</code> | <code>55</code> | Sets how many recent keys should we try to keep in cache Setting this to 0 would practically mean no cache We try to free cache when we connect to a safe eviction key |
 | [options.captureMetrics] | <code>Boolean</code> |  | Enables Onyx benchmarking and exposes the get/print/reset functions |
 
