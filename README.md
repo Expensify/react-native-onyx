@@ -21,7 +21,8 @@ At the moment, Onyx is not yet published to `npm`. To use in your project, refer
 
 ```json
   "dependencies": {
-    "react-native-onyx": "git+https://github.com/Expensify/react-native-onyx.git#ccb64c738b8bbe933b8997eb177f864e5139bd8d",
+    "react-native-onyx": "git+https://github.com/Expensify/react-native-onyx.git#ccb64c738b8bbe933b8997eb177f864e5139bd8d"
+  }
 ```
 
 ## Initialization
