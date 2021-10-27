@@ -27,7 +27,7 @@ At the moment, Onyx is not yet published to `npm`. To use in your project, refer
 
 ## Initialization
 
-To initialize Onyx we call `Onyx.init()` with a configuration object like so
+To initialize Onyx we call `Onyx.init()` with a configuration object.
 
 ```javascript
 import Onyx from 'react-native-onyx';
@@ -192,11 +192,8 @@ This will return an object containing `totalTime`, `averageTime` and `summaries`
 
 If you wish to reset the metrics and start over use `Onyx.resetMetrics()`
 
-Finally, there's a `Onyx.printMetrics()` method which prints human statistics information on the dev console
-You can use this method during debugging. For example add an `Onyx.printMetrics()` line somewhere in code or call it
-through the dev console. It supports 3 popular formats *MD* - human friendly markdown, *CSV* and *JSON*
-The default is MD if you want to print another format call `Onyx.printMetrics({ format: 'csv' })` or
-`Onyx.printMetrics({ format: 'json' })`
+Finally, there's a `Onyx.printMetrics()` method which prints human statistics information on the dev console. You can use this method during debugging. For example add an `Onyx.printMetrics()` line somewhere in code or call it through the dev console. It supports 3 popular formats *MD* - human friendly markdown, *CSV* and *JSON*. The default is MD if you want to print another format call `Onyx.printMetrics({ format: 'csv' })` or
+`Onyx.printMetrics({ format: 'json' })`.
 
 Sample output of `Onyx.printMetrics()`
 

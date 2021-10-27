@@ -52,7 +52,7 @@ Subscribes a react component's state directly to a store key
 | mapping.key | <code>String</code> | ONYXKEY to subscribe to |
 | [mapping.statePropertyName] | <code>String</code> | the name of the property in the state to connect the data to |
 | [mapping.withOnyxInstance] | <code>Object</code> | whose setState() method will be called with any changed data      This is used by React components to connect to Onyx |
-| [mapping.callback] | <code>Object</code> | a method that will be called with changed data      This is used by any non-React code to connect to Onyx |
+| [mapping.callback] | <code>function</code> | a method that will be called with changed data      This is used by any non-React code to connect to Onyx |
 | [mapping.initWithStoredValues] | <code>Boolean</code> | If set to false, then no data will be prefilled into the  component |
 
 **Example**  
