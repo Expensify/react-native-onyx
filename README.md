@@ -1,5 +1,7 @@
-# React-Native-Onyx
-This is a persistent storage solution wrapped in a Pub/Sub library. In general that means:
+# `react-native-onyx`
+Persistent storage solution wrapped in a Pub/Sub library.
+
+# Features
 
 - Onyx stores and retrieves data from persistent storage
 - Data is stored as key/value pairs, where the value can be anything from a single piece of data to a complex object
@@ -11,7 +13,135 @@ This is a persistent storage solution wrapped in a Pub/Sub library. In general t
     3. Get initialized with the current value of that key from persistent storage (Onyx does this by calling `setState()` or triggering the `callback` with the values currently on disk as part of the connection process)
 - Subscribing to Onyx keys is done using a constant defined in `ONYXKEYS`. Each Onyx key represents either a collection of items or a specific entry in storage. For example, since all reports are stored as individual keys like `report_1234`, if code needs to know about all the reports (e.g. display a list of them in the nav menu), then it would subscribe to the key `ONYXKEYS.COLLECTION.REPORT`.
 
-### Storage Eviction
+# Getting Started
+
+## Installation
+
+At the moment, Onyx is not yet published to `npm`. To use in your project, reference the latest sha of the main branch directly in `package.json`
+
+```json
+  "dependencies": {
+    "react-native-onyx": "git+https://github.com/Expensify/react-native-onyx.git#ccb64c738b8bbe933b8997eb177f864e5139bd8d"
+  }
+```
+
+## Initialization
+
+To initialize Onyx we call `Onyx.init()` with a configuration object.
+
+```javascript
+import Onyx from 'react-native-onyx';
+
+const ONYXKEYS = {
+    SESSION: 'session',
+};
+
+const config = {
+    keys: ONYXKEYS,
+};
+
+Onyx.init(config);
+```
+
+## Setting data
+
+To store some data we can use the `Onyx.set()` method.
+
+```javascript
+API.Authenticate(params)
+    .then((response) => {
+        Onyx.set(ONYXKEYS.SESSION, {token: response.token});
+    });
+```
+
+The data will then be cached and stored via [`AsyncStorage`](https://github.com/react-native-async-storage/async-storage).
+
+## Merging data
+
+We can also use `Onyx.merge()` to merge new `Object` or `Array` data in with existing data.
+
+For `Array` the default behavior is to concatenate new items.
+
+```javascript
+Onyx.merge(ONYXKEYS.EMPLOYEE_LIST, ['Joe']); // -> ['Joe']
+Onyx.merge(ONYXKEYS.EMPLOYEE_LIST, ['Jack']); // -> ['Joe', 'Jack']
+```
+
+For `Object` values the default behavior uses `lodash/merge` under the hood to do a deep extend of the object.
+
+```javascript
+Onyx.merge(ONYXKEYS.POLICY, {id: 1}); // -> {id: 1}
+Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Workspace'}
+```
+
+One caveat to be aware of is that `lodash/merge` [follows the behavior of jQuery's deep extend](https://github.com/lodash/lodash/issues/2872) and will not concatenate nested arrays in objects. It might seem like this code would concat these arrays, but it does not.
+
+```javascript
+Onyx.merge(ONYXKEYS.POLICY, {employeeList: ['Joe']}); // -> {employeeList: ['Joe']}
+Onyx.merge(ONYXKEYS.POLICY, {employeeList: ['Jack']}); // -> {employeeList: ['Jack']}
+```
+
+### Should I use `merge()` or `set()` or both?
+
+- Use `merge()` if we want to merge partial data into an existing `Array` or `Object`
+- Use `set()` if we are working with simple values (`String`, `Boolean`, etc), need to completely overwrite a complex property of an `Object`, or reset some data entirely.
+
+Consecutive calls to `Onyx.merge()` with the same key are batched in a stack and processed in the order that they were called. This helps avoid race conditions where one merge possibly finishes before another. However, it's important to note that calls to `Onyx.set()` are not batched together with calls to `Onyx.merge()`. For this reason, it is usually preferable to use one or the other, but not both. Onyx is a work-in-progress so always test code to make sure assumptions are correct!
+
+## Subscribing to data changes
+
+To set up a basic subscription for a given key use the `Onyx.connect()` method.
+
+```javascript
+let session;
+const connectionID = Onyx.connect({
+    key: ONYXKEYS.SESSION,
+    callback: (val) => session = val || {},
+});
+```
+
+To teardown the subscription call `Onyx.disconnect()` with the `connectionID` returned from `Onyx.connect()`. It's recommended to clean up subscriptions anytime you are connecting from within a function to prevent memory leaks.
+
+```javascript
+Onyx.disconnect(connectionID);
+```
+
+We can also access values inside React components via the `withOnyx()` [higher order component](https://reactjs.org/docs/higher-order-components.html). When the data changes the component will re-render.
+
+```javascript
+import React from 'react';
+import {withOnyx} from 'react-native-onyx';
+
+const App = ({session}) => (
+    <View>
+        {session.token ? <Text>Logged in</Text> : <Text>Logged out</Text> }
+    </View>
+);
+
+export default withOnyx({
+    session: {
+        key: ONYXKEYS.SESSION,
+    },
+})(App);
+```
+
+It is preferable to use the HOC over `Onyx.connect()` in React code as `withOnyx()` will delay the rendering of the wrapped component until all keys have been accessed and made available.
+
+## Clean up
+
+To clear all data from `Onyx` we can use `Onyx.clear()`.
+
+```javascript
+function signOut() {
+    Onyx.clear();
+}
+```
+
+# API Reference
+
+[Docs](./API.md)
+
+# Storage Eviction
 
 Different platforms come with varying storage capacities and Onyx has a way to gracefully fail when those storage limits are encountered. When Onyx fails to set or modify a key the following steps are taken:
 1. Onyx looks at a list of recently accessed keys (access is defined as subscribed to or modified) and locates the key that was least recently accessed
@@ -40,7 +170,7 @@ export default withOnyx({
 })(ReportActionsView);
 ```
 
-### Benchmarks
+# Benchmarks
 
 Provide the `captureMetrics` boolean flag to `Onyx.init` to capture call statistics
 
@@ -62,11 +192,8 @@ This will return an object containing `totalTime`, `averageTime` and `summaries`
 
 If you wish to reset the metrics and start over use `Onyx.resetMetrics()`
 
-Finally, there's a `Onyx.printMetrics()` method which prints human statistics information on the dev console
-You can use this method during debugging. For example add an `Onyx.printMetrics()` line somewhere in code or call it
-through the dev console. It supports 3 popular formats *MD* - human friendly markdown, *CSV* and *JSON*
-The default is MD if you want to print another format call `Onyx.printMetrics({ format: 'csv' })` or 
-`Onyx.printMetrics({ format: 'json' })`
+Finally, there's a `Onyx.printMetrics()` method which prints human statistics information on the dev console. You can use this method during debugging. For example add an `Onyx.printMetrics()` line somewhere in code or call it through the dev console. It supports 3 popular formats *MD* - human friendly markdown, *CSV* and *JSON*. The default is MD if you want to print another format call `Onyx.printMetrics({ format: 'csv' })` or
+`Onyx.printMetrics({ format: 'json' })`.
 
 Sample output of `Onyx.printMetrics()`
 
