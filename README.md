@@ -100,7 +100,7 @@ const connectionID = Onyx.connect({
 });
 ```
 
-To teardown the subscription call `Onyx.disconnect()` with the `connectionID` returned from `Onyx.connect()`.
+To teardown the subscription call `Onyx.disconnect()` with the `connectionID` returned from `Onyx.connect()`. It's recommended to clean up subscriptions anytime you are connecting from within a function to prevent memory leaks.
 
 ```javascript
 Onyx.disconnect(connectionID);
