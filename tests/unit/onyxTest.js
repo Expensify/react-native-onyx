@@ -264,4 +264,46 @@ describe('Onyx', () => {
             expect(error.message).toEqual(`Provided collection does not have all its data belonging to the same parent. CollectionKey: ${ONYX_KEYS.COLLECTION.TEST_KEY}, DataKey: not_my_test`);
         }
     });
+
+    it('should return full object to callback when calling mergeCollection()', () => {
+        const valuesReceived = {};
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (data, key) => valuesReceived[key] = data,
+        });
+
+        return Onyx.multiSet({
+            test_1: {
+                existingData: 'test',
+            },
+            test_2: {
+                existingData: 'test',
+            }
+        })
+            .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                test_1: {
+                    ID: 123,
+                    value: 'one'
+                },
+                test_2: {
+                    ID: 234,
+                    value: 'two'
+                },
+            }))
+            .then(() => {
+                expect(valuesReceived).toEqual({
+                    test_1: {
+                        ID: 123,
+                        value: 'one',
+                        existingData: 'test',
+                    },
+                    test_2: {
+                        ID: 234,
+                        value: 'two',
+                        existingData: 'test',
+                    },
+                });
+            });
+    });
 });
