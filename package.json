@@ -35,7 +35,6 @@
     "babel-plugin-transform-class-properties": "^6.24.1",
     "eslint": "^7.6.0",
     "eslint-config-expensify": "^2.0.11",
-    "expo-file-system": "^13.0.3",
     "jest": "^26.5.2",
     "jest-cli": "^26.5.2",
     "jsdoc-to-markdown": "^7.1.0",
@@ -49,7 +48,6 @@
   },
   "peerDependencies": {
     "@react-native-async-storage/async-storage": "^1.15.5",
-    "expo-file-system": "^13.0.3",
     "localforage": "^1.10.0",
     "react": "^17.0.2",
     "react-native-performance": "^2.0.0"
