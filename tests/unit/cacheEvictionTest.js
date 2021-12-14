@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import Storage from '../../lib/storage';
 import Onyx from '../../index';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
@@ -14,7 +14,7 @@ test('Cache eviction', () => {
     const collection = {};
 
     // Given an evictable key previously set in storage
-    return AsyncStorage.setItem(`${ONYX_KEYS.COLLECTION.TEST_KEY}${RECORD_TO_EVICT}`, JSON.stringify({test: 'evict'}))
+    return Storage.setItem(`${ONYX_KEYS.COLLECTION.TEST_KEY}${RECORD_TO_EVICT}`, {test: 'evict'})
         .then(() => {
             // When we initialize Onyx and mark the set collection key as a safeEvictionKey
             Onyx.init({
@@ -42,10 +42,10 @@ test('Cache eviction', () => {
             expect(collection[`${ONYX_KEYS.COLLECTION.TEST_KEY}${RECORD_TO_EVICT}`]).toStrictEqual({test: 'evict'});
 
             // When we set a new key we want to add and force the first attempt to fail
-            const originalSetItem = AsyncStorage.setItem;
+            const originalSetItem = Storage.setItem;
             const setItemMock = jest.fn(originalSetItem)
                 .mockImplementationOnce(() => new Promise((_resolve, reject) => reject()));
-            AsyncStorage.setItem = setItemMock;
+            Storage.setItem = setItemMock;
 
             return Onyx.set(`${ONYX_KEYS.COLLECTION.TEST_KEY}${RECORD_TO_ADD}`, {test: 'add'})
                 .then(() => {
