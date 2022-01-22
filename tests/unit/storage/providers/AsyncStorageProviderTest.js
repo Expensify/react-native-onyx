@@ -14,6 +14,7 @@ describe('storage/providers/AsyncStorage', () => {
         ['false', false],
         ['object', {id: 'Object', nested: {content: 'Nested object'}}],
         ['number', 100],
+        ['null', null],
     ];
 
     describe('setItem', () => {
@@ -29,6 +30,7 @@ describe('storage/providers/AsyncStorage', () => {
                 ['false', 'false'],
                 ['object', '{"id":"Object","nested":{"content":"Nested object"}}'],
                 ['number', '100'],
+                ['null', 'null'],
             ];
 
             // When sample items are saved
@@ -80,6 +82,7 @@ describe('storage/providers/AsyncStorage', () => {
                 ['false', 'false'],
                 ['object', '{"id":"Object","nested":{"content":"Nested object"}}'],
                 ['number', '100'],
+                ['null', 'null'],
             ];
 
             // When sample items are saved
