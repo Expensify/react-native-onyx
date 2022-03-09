@@ -15,17 +15,21 @@ describe('storage/providers/LocalForage', () => {
 
     // For some reason fake timers cause promises to hang
     beforeAll(() => jest.useRealTimers());
-    beforeEach(() => jest.resetAllMocks());
+    beforeEach(() => {
+        jest.resetAllMocks();
+        localforage.setItem = jest.fn(() => Promise.resolve());
+    });
 
     it('multiSet', () => {
         // Given multiple pairs to be saved in storage
         const pairs = SAMPLE_ITEMS.slice();
 
         // When they are saved
-        StorageProvider.multiSet(pairs);
-
-        // We expect a call to localForage.setItem for each pair
-        _.each(pairs, ([key, value]) => expect(localforage.setItem).toHaveBeenCalledWith(key, value));
+        return StorageProvider.multiSet(pairs)
+            .then(() => {
+                // We expect a call to localForage.setItem for each pair
+                _.each(pairs, ([key, value]) => expect(localforage.setItem).toHaveBeenCalledWith(key, value));
+            });
     });
 
     it('multiGet', () => {
