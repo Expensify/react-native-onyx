@@ -16,13 +16,11 @@ const localforageMock = {
         storageMap = data;
     },
     config: jest.fn(),
-    getItem(key) {
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                resolve(storageMap[key]);
-            }, DELAY_MS);
-        });
-    },
+    getItem: jest.fn(key => new Promise((resolve) => {
+        setTimeout(() => {
+            resolve(storageMap[key]);
+        }, DELAY_MS);
+    })),
     setItem: jest.fn((key, value) => new Promise((resolve) => {
         setTimeout(() => {
             storageMap[key] = value;

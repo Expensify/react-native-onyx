@@ -1,4 +1,3 @@
-import Onyx from '../../index';
 import OnyxCache from '../../lib/OnyxCache';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import localforageMock from '../../__mocks__/localforage';
@@ -18,16 +17,25 @@ const initialData = {
 
 localforageMock.setInitialMockData(initialData);
 
-Onyx.init({
-    keys: ONYX_KEYS,
-    registerStorageEventListener: () => {},
-    maxCachedKeysCount: 1,
-    initialKeyStates: {},
-});
-
 describe('Onyx.mergeCollection()', () => {
-    beforeEach(() => jest.useRealTimers());
+    let Onyx;
+    let Storage;
+    beforeEach(() => {
+        jest.mock('../../lib/storage');
+        Onyx = require('../../index').default;
+        Storage = require('../../lib/storage').default;
+        jest.useRealTimers();
+    });
+
     it('mergeCollection', () => {
+        expect(Storage.name).toBe('WebStorage');
+
+        Onyx.init({
+            keys: ONYX_KEYS,
+            registerStorageEventListener: () => {},
+            initialKeyStates: {},
+        });
+
         const additionalDataOne = {b: 'b', c: 'c'};
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
             test_1: additionalDataOne,
