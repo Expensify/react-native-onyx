@@ -36,6 +36,17 @@ describe('Onyx.mergeCollection() amd WebStorage', () => {
     afterEach(() => Onyx.clear());
 
     it('merges two sets of data consecutively', () => {
+        // Given initial data in storage
+        expect(localforageMock.storageMap.test_1).toEqual(initialTestObject);
+        expect(localforageMock.storageMap.test_2).toEqual(initialTestObject);
+        expect(localforageMock.storageMap.test_3).toEqual(initialTestObject);
+
+        // And an empty cache values for the collection keys
+        expect(OnyxCache.getValue('test_1')).not.toBeDefined();
+        expect(OnyxCache.getValue('test_2')).not.toBeDefined();
+        expect(OnyxCache.getValue('test_3')).not.toBeDefined();
+
+        // When we merge additional data
         const additionalDataOne = {b: 'b', c: 'c'};
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
             test_1: additionalDataOne,
@@ -43,6 +54,7 @@ describe('Onyx.mergeCollection() amd WebStorage', () => {
             test_3: additionalDataOne,
         });
 
+        // And call again consecutively with different data
         const additionalDataTwo = {d: 'd'};
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
             test_1: additionalDataTwo,
@@ -56,12 +68,72 @@ describe('Onyx.mergeCollection() amd WebStorage', () => {
                     a: 'a', b: 'b', c: 'c', d: 'd',
                 };
 
-                // Expect that our new data has merged with the existing data in the cache
+                // Then our new data should merge with the existing data in the cache
                 expect(OnyxCache.getValue('test_1')).toEqual(finalObject);
                 expect(OnyxCache.getValue('test_2')).toEqual(finalObject);
                 expect(OnyxCache.getValue('test_3')).toEqual(finalObject);
 
-                // Check the storage to make sure our data has been saved
+                // And the storage should reflect the same state
+                expect(localforageMock.storageMap.test_1).toEqual(finalObject);
+                expect(localforageMock.storageMap.test_2).toEqual(finalObject);
+                expect(localforageMock.storageMap.test_3).toEqual(finalObject);
+            });
+    });
+
+    it('cache updates correctly when accessed again if keys are removed or evicted', () => {
+        // Given empty storage
+        expect(localforageMock.storageMap.test_1).toBeFalsy();
+        expect(localforageMock.storageMap.test_2).toBeFalsy();
+        expect(localforageMock.storageMap.test_3).toBeFalsy();
+
+        // And an empty cache values for the collection keys
+        expect(OnyxCache.getValue('test_1')).toBeFalsy();
+        expect(OnyxCache.getValue('test_2')).toBeFalsy();
+        expect(OnyxCache.getValue('test_3')).toBeFalsy();
+
+        // When we merge additional data and wait for the change
+        const data = {a: 'a', b: 'b'};
+        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+            test_1: data,
+            test_2: data,
+            test_3: data,
+        });
+
+        return waitForPromisesToResolve()
+            .then(() => {
+                // Then the cache and storage should match
+                expect(OnyxCache.getValue('test_1')).toEqual(data);
+                expect(OnyxCache.getValue('test_2')).toEqual(data);
+                expect(OnyxCache.getValue('test_3')).toEqual(data);
+                expect(localforageMock.storageMap.test_1).toEqual(data);
+                expect(localforageMock.storageMap.test_2).toEqual(data);
+                expect(localforageMock.storageMap.test_3).toEqual(data);
+
+                // When we drop all the cache keys (but do not modify the underlying storage) and merge another object
+                OnyxCache.drop('test_1');
+                OnyxCache.drop('test_2');
+                OnyxCache.drop('test_3');
+
+                const additionalData = {c: 'c'};
+                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                    test_1: additionalData,
+                    test_2: additionalData,
+                    test_3: additionalData,
+                });
+
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                const finalObject = {
+                    a: 'a', b: 'b', c: 'c',
+                };
+
+                // Then our new data should merge with the existing data in the cache
+                expect(OnyxCache.getValue('test_1')).toEqual(finalObject);
+                expect(OnyxCache.getValue('test_2')).toEqual(finalObject);
+                expect(OnyxCache.getValue('test_3')).toEqual(finalObject);
+
+                // And the storage should reflect the same state
                 expect(localforageMock.storageMap.test_1).toEqual(finalObject);
                 expect(localforageMock.storageMap.test_2).toEqual(finalObject);
                 expect(localforageMock.storageMap.test_3).toEqual(finalObject);
