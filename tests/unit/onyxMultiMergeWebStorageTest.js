@@ -17,24 +17,27 @@ const initialData = {
 
 localforageMock.setInitialMockData(initialData);
 
-describe('Onyx.mergeCollection()', () => {
+describe('Onyx.mergeCollection() amd WebStorage', () => {
     let Onyx;
     let Storage;
+
     beforeAll(() => {
         jest.mock('../../lib/storage');
         Onyx = require('../../index').default;
         Storage = require('../../lib/storage').default;
         jest.useRealTimers();
-    });
-
-    it('mergeCollection', () => {
-        expect(Storage.name).toBe('WebStorage');
 
         Onyx.init({
             keys: ONYX_KEYS,
             registerStorageEventListener: () => {},
             initialKeyStates: {},
         });
+    });
+
+    afterEach(() => Onyx.clear());
+
+    it('merges two sets of data consecutively', () => {
+        expect(Storage.name).toBe('WebStorage');
 
         const additionalDataOne = {b: 'b', c: 'c'};
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
@@ -65,6 +68,36 @@ describe('Onyx.mergeCollection()', () => {
                 expect(localforageMock.storageMap.test_1).toEqual(finalObject);
                 expect(localforageMock.storageMap.test_2).toEqual(finalObject);
                 expect(localforageMock.storageMap.test_3).toEqual(finalObject);
+            });
+    });
+
+    it('setItem() and multiMerge()', () => {
+        expect(localforageMock.storageMap).toEqual({});
+
+        // Given no previous data and several calls to setItem and call to mergeCollection to update a given key
+
+        // 1st call
+        Onyx.set('test_1', {a: 'a'});
+
+        // These merges will all queue together
+        Onyx.merge('test_1', {b: 'b'});
+        Onyx.merge('test_1', {c: 'c'});
+
+        // 2nd call
+        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+            test_1: {d: 'd', e: 'e'},
+        });
+
+        // Last call
+        Onyx.merge('test_1', {f: 'f'});
+        return waitForPromisesToResolve()
+            .then(() => {
+                const finalObject = {
+                    a: 'a', b: 'b', c: 'c', f: 'f', d: 'd', e: 'e',
+                };
+
+                expect(OnyxCache.getValue('test_1')).toEqual(finalObject);
+                expect(localforageMock.storageMap.test_1).toEqual(finalObject);
             });
     });
 });

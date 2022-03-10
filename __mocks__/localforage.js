@@ -26,6 +26,12 @@ const localforageMock = {
         delete storageMap[key];
         resolve();
     })),
+    clear() {
+        return new Promise((resolve) => {
+            storageMap = {};
+            resolve();
+        });
+    },
 };
 
 export default localforageMock;

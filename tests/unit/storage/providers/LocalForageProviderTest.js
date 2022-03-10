@@ -78,32 +78,30 @@ describe('storage/providers/LocalForage', () => {
         const setItemSpy = localforage.setItem.mockImplementation(() => Promise.resolve());
 
         // When data is merged to storage
-        StorageProvider.multiMerge([
+        return StorageProvider.multiMerge([
             ['@USER_1', USER_1_DELTA],
             ['@USER_2', USER_2_DELTA]
         ])
             .then(() => {
                 // Then each existing item should be set with the merged content
-                expect(setItemSpy).toHaveBeenCalledWith(
+                expect(setItemSpy).toHaveBeenNthCalledWith(1,
                     '@USER_1', {
                         name: 'Tom',
-                        age: 30,
+                        age: 31,
                         traits: {
                             hair: 'brown',
                             eyes: 'blue'
                         }
-                    }
-                );
+                    });
 
-                expect(setItemSpy).toHaveBeenCalledWith(
+                expect(setItemSpy).toHaveBeenNthCalledWith(2,
                     '@USER_2', {
                         name: 'Sarah',
-                        age: 31,
+                        age: 26,
                         traits: {
                             hair: 'green',
                         }
-                    }
-                );
+                    });
             });
     });
 });
