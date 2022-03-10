@@ -20,7 +20,7 @@ localforageMock.setInitialMockData(initialData);
 describe('Onyx.mergeCollection()', () => {
     let Onyx;
     let Storage;
-    beforeEach(() => {
+    beforeAll(() => {
         jest.mock('../../lib/storage');
         Onyx = require('../../index').default;
         Storage = require('../../lib/storage').default;
