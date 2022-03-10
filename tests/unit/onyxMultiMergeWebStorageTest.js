@@ -21,6 +21,7 @@ describe('Onyx.mergeCollection() amd WebStorage', () => {
     let Onyx;
 
     beforeAll(() => {
+        // Force using WebStorage provider for these tests
         jest.mock('../../lib/storage');
         Onyx = require('../../index').default;
         jest.useRealTimers();
