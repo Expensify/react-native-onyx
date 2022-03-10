@@ -26,9 +26,8 @@ Onyx.init({
 });
 
 describe('Onyx.mergeCollection()', () => {
+    beforeEach(() => jest.useRealTimers());
     it('mergeCollection', () => {
-        jest.useFakeTimers();
-
         const additionalDataOne = {b: 'b', c: 'c'};
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
             test_1: additionalDataOne,
@@ -43,14 +42,21 @@ describe('Onyx.mergeCollection()', () => {
             test_3: additionalDataTwo,
         });
 
-        jest.runAllTimers();
-
         return waitForPromisesToResolve()
             .then(() => {
-                // Expect that our new data has merged with the existing data in storage
-                expect(OnyxCache.getValue('test_1')).toEqual({
+                const finalObject = {
                     a: 'a', b: 'b', c: 'c', d: 'd',
-                });
+                };
+
+                // Expect that our new data has merged with the existing data in the cache
+                expect(OnyxCache.getValue('test_1')).toEqual(finalObject);
+                expect(OnyxCache.getValue('test_2')).toEqual(finalObject);
+                expect(OnyxCache.getValue('test_3')).toEqual(finalObject);
+
+                // Check the storage to make sure our data has been saved
+                expect(localforageMock.storageMap.test_1).toEqual(finalObject);
+                expect(localforageMock.storageMap.test_2).toEqual(finalObject);
+                expect(localforageMock.storageMap.test_3).toEqual(finalObject);
             });
     });
 });

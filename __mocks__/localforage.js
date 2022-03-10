@@ -1,9 +1,12 @@
 import _ from 'underscore';
 
 let storageMap = {};
-const DELAY_MS = 500;
+const DELAY_MS = 5000;
 
 const localforageMock = {
+    get storageMap() {
+        return storageMap;
+    },
     keys() {
         return new Promise((resolve) => {
             resolve(_.keys(storageMap));
