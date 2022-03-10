@@ -19,12 +19,10 @@ localforageMock.setInitialMockData(initialData);
 
 describe('Onyx.mergeCollection() amd WebStorage', () => {
     let Onyx;
-    let Storage;
 
     beforeAll(() => {
         jest.mock('../../lib/storage');
         Onyx = require('../../index').default;
-        Storage = require('../../lib/storage').default;
         jest.useRealTimers();
 
         Onyx.init({
@@ -37,8 +35,6 @@ describe('Onyx.mergeCollection() amd WebStorage', () => {
     afterEach(() => Onyx.clear());
 
     it('merges two sets of data consecutively', () => {
-        expect(Storage.name).toBe('WebStorage');
-
         const additionalDataOne = {b: 'b', c: 'c'};
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
             test_1: additionalDataOne,
