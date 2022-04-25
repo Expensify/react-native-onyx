@@ -171,9 +171,10 @@ Initialize the store with actions and listening for storage events
 | [options.keys] | <code>Object</code> | <code>{}</code> | `ONYXKEYS` constants object |
 | [options.initialKeyStates] | <code>Object</code> | <code>{}</code> | initial data to set when `init()` and `clear()` is called |
 | [options.safeEvictionKeys] | <code>Array.&lt;String&gt;</code> | <code>[]</code> | This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal. Any components subscribing to these keys must also implement a canEvict option. See the README for more info. |
-| [options.registerStorageEventListener] | <code>function</code> | <code>() &#x3D;&gt; {}</code> | a callback when a storage event happens. This applies to web platforms where the local storage emits storage events across all open tabs and allows Onyx to stay in sync across all open tabs. |
 | [options.maxCachedKeysCount] | <code>Number</code> | <code>55</code> | Sets how many recent keys should we try to keep in cache Setting this to 0 would practically mean no cache We try to free cache when we connect to a safe eviction key |
 | [options.captureMetrics] | <code>Boolean</code> |  | Enables Onyx benchmarking and exposes the get/print/reset functions |
+| [options.shouldSyncMultipleInstances] | <code>Boolean</code> |  | Auto synchronize storage events between multiple instances of Onyx running in different tabs/windows. Defaults to true for platforms that support local storage (web/desktop) |
+| [option.keysToDisableSyncEvents] | <code>Array.&lt;String&gt;</code> | <code>[]</code> | Contains keys for which we want to disable sync event across tabs. |
 
 **Example**  
 ```js
