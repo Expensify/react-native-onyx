@@ -6,7 +6,8 @@ const ONYX_KEYS = {
     ANOTHER_TEST: 'anotherTest',
     COLLECTION: {
         TEST_KEY: 'test_',
-    }
+    },
+    DEFAULT_KEY: 'defaultKey',
 };
 
 Onyx.init({
@@ -306,4 +307,6 @@ describe('Onyx', () => {
                 });
             });
     });
+
+    
 });

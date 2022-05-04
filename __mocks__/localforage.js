@@ -1,6 +1,7 @@
 import _ from 'underscore';
 
 let storageMap = {};
+let clearDelay = null;
 
 const localforageMock = {
     get storageMap() {
@@ -27,11 +28,23 @@ const localforageMock = {
         resolve();
     })),
     clear() {
+        console.log("localforage mock clear");
         return new Promise((resolve) => {
-            storageMap = {};
-            resolve();
+            if (clearDelay) {
+                setTimeout(() => {
+                    storageMap = {};
+                    resolve();
+                }, clearDelay);
+            } else {
+                storageMap = {};
+                resolve();
+            }
         });
     },
+
+    setDelayForClear(delay) {
+        clearDelay = delay;
+    }
 };
 
 export default localforageMock;
