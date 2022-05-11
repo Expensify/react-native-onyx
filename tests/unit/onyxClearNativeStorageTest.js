@@ -6,7 +6,7 @@ const ONYX_KEYS = {
     DEFAULT_KEY: 'defaultKey',
 };
 
-
+jest.useFakeTimers();
 Storage.clear = jest.fn(() => new Promise(resolve => setTimeout(resolve, 500))
     .then(() => console.log('[Onyx test] Storage is clearing now'))
     .then(() => AsyncStorageMock.clear()));
@@ -20,8 +20,6 @@ describe('Set data while storage is clearing', () => {
 
     beforeAll(() => {
         Onyx = require('../../index').default;
-        jest.useRealTimers();
-
         Onyx.init({
             keys: ONYX_KEYS,
             registerStorageEventListener: () => {},
@@ -38,7 +36,8 @@ describe('Set data while storage is clearing', () => {
 
     afterEach(() => {
         Onyx.disconnect(connectionID);
-        return Onyx.clear();
+        Onyx.clear();
+        jest.runAllTimers();
     });
 
     it('should store merged values when calling merge on a default key after clear', () => {
@@ -59,6 +58,7 @@ describe('Set data while storage is clearing', () => {
                 .then(() => console.log('[Onyx test] Value stored from merge'))
                 .then(resolve);
         }, 0));
+        jest.runAllTimers();
         return waitForPromisesToResolve()
             .then(() => {
                 expect(defaultValue).toEqual('merged');
