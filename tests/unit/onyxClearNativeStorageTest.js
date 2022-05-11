@@ -8,7 +8,6 @@ const ONYX_KEYS = {
 
 jest.useFakeTimers();
 Storage.clear = jest.fn(() => new Promise(resolve => setTimeout(resolve, 500))
-    .then(() => console.log('[Onyx test] Storage is clearing now'))
     .then(() => AsyncStorageMock.clear()));
 
 describe('Set data while storage is clearing', () => {
@@ -47,23 +46,35 @@ describe('Set data while storage is clearing', () => {
             initWithStoredValues: false,
             callback: val => defaultValue = val,
         });
-        console.log('[Onyx test] Clearing Onyx');
-        const afterClear = Onyx.clear()
-            .then(() => console.log('[Onyx test] Done clearing Onyx'));
 
-        // Merge just after clear, on the next tick
-        const afterMerge = new Promise(resolve => setTimeout(() => {
-            console.log('[Onyx test] Calling Onyx.merge');
-            Onyx.merge(ONYX_KEYS.DEFAULT_KEY, 'merged')
-                .then(() => console.log('[Onyx test] Value stored from merge'))
-                .then(resolve);
-        }, 0));
-        jest.runAllTimers();
-        return waitForPromisesToResolve()
+        // Set one value so we know if the cache cleared
+        // by asserting that cache.set was called once while clearing.
+        Onyx.set(ONYX_KEYS.DEFAULT_KEY, 'setOneValue')
             .then(() => {
-                expect(defaultValue).toEqual('merged');
-                const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
-                expect(cachedValue).toEqual('merged');
+                // Set up spies to make sure merge is called
+                // between the cache and storage clear.
+                const clearSpy = jest.spyOn(Onyx, 'clear');
+                const cacheSetSpy = jest.spyOn(cache, 'set');
+                const storageClearSpy = jest.spyOn(Storage, 'clear');
+                Onyx.clear();
+
+                // Merge just after clear, on the next tick
+                setTimeout(() => {
+                    // Assert that Onyx.clear was called, then the cache clears,
+                    // and Storage.clear has not been called before we merge.
+                    expect(clearSpy).toHaveBeenCalled();
+                    expect(cacheSetSpy).toHaveBeenCalledWith('default');
+                    expect(storageClearSpy).not.toHaveBeenCalled();
+                    Onyx.merge(ONYX_KEYS.DEFAULT_KEY, 'merged');
+                }, 0);
+                jest.runAllTimers();
+                return waitForPromisesToResolve()
+                    .then(() => {
+                        expect(storageClearSpy).toHaveBeenCalled();
+                        expect(defaultValue).toEqual('merged');
+                        const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
+                        expect(cachedValue).toEqual('merged');
+                    });
             });
     });
 });
