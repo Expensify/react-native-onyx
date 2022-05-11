@@ -1,5 +1,6 @@
 import AsyncStorageMock from '@react-native-async-storage/async-storage';
 import Storage from '../../lib/storage';
+import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 const ONYX_KEYS = {
     DEFAULT_KEY: 'defaultKey',
@@ -58,7 +59,7 @@ describe('Set data while storage is clearing', () => {
                 .then(() => console.log('[Onyx test] Value stored from merge'))
                 .then(resolve);
         }, 0));
-        return Promise.all([afterClear, afterMerge])
+        return waitForPromisesToResolve()
             .then(() => {
                 expect(defaultValue).toEqual('merged');
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
