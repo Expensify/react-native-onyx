@@ -94,6 +94,8 @@ describe('Set data while storage is clearing', () => {
                 expect(defaultValue).toEqual('merged');
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
                 expect(cachedValue).toEqual('merged');
+                const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
+                expect(storedValue).resolves.toBe('merged');
                 Storage.clear.mockRestore();
             });
     });
