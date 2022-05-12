@@ -81,9 +81,9 @@ describe('Set data while storage is clearing', () => {
         expect.assertions(5);
         Storage.clear = jest.fn(() => {
             // Call merge between the cache and storage clearing
-            const afterMerge = Onyx.merge(ONYX_KEYS.DEFAULT_KEY, mergedValue);
-            const afterClear = AsyncStorageMock.clear();
-            return Promise.all([afterMerge, afterClear]);
+            Onyx.merge(ONYX_KEYS.DEFAULT_KEY, mergedValue);
+            AsyncStorageMock.clear();
+            return waitForPromisesToResolve();
         });
         Onyx.clear();
         return waitForPromisesToResolve()
@@ -109,9 +109,9 @@ describe('Set data while storage is clearing', () => {
         expect.assertions(5);
         Storage.clear = jest.fn(() => {
             // Call set between the cache and storage clearing
-            const afterSet = Onyx.set(ONYX_KEYS.DEFAULT_KEY, setValue);
-            const afterClear = AsyncStorageMock.clear();
-            return Promise.all([afterSet, afterClear]);
+            Onyx.set(ONYX_KEYS.DEFAULT_KEY, setValue);
+            AsyncStorageMock.clear();
+            return waitForPromisesToResolve();
         });
         Onyx.clear();
         return waitForPromisesToResolve()
