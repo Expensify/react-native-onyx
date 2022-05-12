@@ -127,4 +127,31 @@ describe('Set data while storage is clearing', () => {
                 expect(storedValue).resolves.not.toBe(setValue);
             });
     });
+
+    it('should replace the value of Onyx.set with the default key state in the cache', () => {
+        let defaultValue;
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.DEFAULT_KEY,
+            initWithStoredValues: false,
+            callback: val => defaultValue = val,
+        });
+        const setValue = 'set';
+        expect.assertions(6);
+        Onyx.set(ONYX_KEYS.DEFAULT_KEY, setValue);
+        Storage.clear = jest.fn(() => AsyncStorageMock.clear());
+        Onyx.clear();
+        return waitForPromisesToResolve()
+            .then(() => {
+                expect(storageCallResolveOrder('setItem')).toBe(1);
+                expect(storageCallResolveOrder('clear')).toBe(2);
+                expect(defaultValue).toBe('default');
+                const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
+                expect(cachedValue).toBe('default');
+                const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
+
+                // The default key state is never stored during Onyx.clear
+                expect(storedValue).resolves.not.toBe('default');
+                expect(storedValue).resolves.toBeNull();
+            });
+    });
 });
