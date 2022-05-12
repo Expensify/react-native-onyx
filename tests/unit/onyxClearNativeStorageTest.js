@@ -91,9 +91,9 @@ describe('Set data while storage is clearing', () => {
             .then(() => {
                 expect(storageCallResolveOrder('clear')).toBe(1);
                 expect(storageCallResolveOrder('setItem')).toBe(2);
-                expect(defaultValue).toEqual('merged');
+                expect(defaultValue).toBe('merged');
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
-                expect(cachedValue).toEqual('merged');
+                expect(cachedValue).toBe('merged');
                 const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
                 expect(storedValue).resolves.toBe('merged');
                 Storage.clear.mockRestore();
