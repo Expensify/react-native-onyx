@@ -100,4 +100,36 @@ describe('Set data while storage is clearing', () => {
                 Storage.clear.mockRestore();
             });
     });
+
+    it('should persist the value of Onyx.set when called between the cache and storage clearing', () => {
+        let defaultValue;
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.DEFAULT_KEY,
+            initWithStoredValues: false,
+            callback: val => defaultValue = val,
+        });
+        const setValue = 'merged';
+        Onyx.clear();
+        Storage.clear = jest.fn(() => {
+            // Call set between the cache and storage clearing
+            Onyx.set(ONYX_KEYS.DEFAULT_KEY, setValue);
+            const clearPromise = new Promise(resolve => setTimeout(resolve, 500))
+                .then(() => AsyncStorageMock.clear())
+                .then(addStorageCallResolve('clear'));
+            storageCallQueue.push(clearPromise);
+            return clearPromise;
+        });
+        jest.runAllTimers();
+        waitForPromisesToResolve()
+            .then(() => {
+                expect(storageCallResolveOrder('clear')).toBe(1);
+                expect(storageCallResolveOrder('setItem')).toBe(2);
+                expect(defaultValue).toBe(setValue);
+                const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
+                expect(cachedValue).toBe(setValue);
+                const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
+                expect(storedValue).resolves.toBe(setValue);
+                Storage.clear.mockRestore();
+            });
+    });
 });
