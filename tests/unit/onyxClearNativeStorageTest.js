@@ -76,6 +76,7 @@ describe('Set data while storage is clearing', () => {
             initWithStoredValues: false,
             callback: val => defaultValue = val,
         });
+        Onyx.clear();
         Storage.clear = jest.fn(() => {
             // Merge after the cache has cleared but before the storage actually clears
             Onyx.merge(ONYX_KEYS.DEFAULT_KEY, 'merged');
@@ -85,7 +86,6 @@ describe('Set data while storage is clearing', () => {
             storageCallQueue.push(clearPromise);
             return clearPromise;
         });
-        Onyx.clear();
         jest.runAllTimers();
         waitForPromisesToResolve()
             .then(() => {
