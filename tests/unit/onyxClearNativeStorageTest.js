@@ -8,7 +8,7 @@ const ONYX_KEYS = {
 
 jest.useFakeTimers();
 
-const storageCallResolveList = [];
+let storageCallResolveList = [];
 function addStorageCallResolve(name) {
     storageCallResolveList.push(name);
 }
@@ -17,7 +17,7 @@ function storageCallResolveOrder(methodName) {
     return storageCallResolveList.indexOf(methodName) + 1;
 }
 
-const storageCallQueue = [];
+let storageCallQueue = [];
 
 // Mock clear to wait for promises and add a delay
 Storage.clear = jest.fn(() => Promise.all(storageCallQueue)
@@ -62,6 +62,8 @@ describe('Set data while storage is clearing', () => {
     });
 
     afterEach(() => {
+        storageCallResolveList = [];
+        storageCallQueue = [];
         Onyx.disconnect(connectionID);
         Onyx.clear();
         jest.runAllTimers();
