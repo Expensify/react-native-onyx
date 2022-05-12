@@ -69,7 +69,7 @@ describe('Set data while storage is clearing', () => {
         jest.runAllTimers();
     });
 
-    it('should store merged values when calling merge on a default key after clear', () => {
+    it('should persist the value of Onyx.merge when called between the cache and storage clearing', () => {
         let defaultValue;
         connectionID = Onyx.connect({
             key: ONYX_KEYS.DEFAULT_KEY,
@@ -79,7 +79,7 @@ describe('Set data while storage is clearing', () => {
         const mergedValue = 'merged';
         Onyx.clear();
         Storage.clear = jest.fn(() => {
-            // Merge after the cache has cleared but before the storage actually clears
+            // Call merge between the cache and storage clearing
             Onyx.merge(ONYX_KEYS.DEFAULT_KEY, mergedValue);
             const clearPromise = new Promise(resolve => setTimeout(resolve, 500))
                 .then(() => AsyncStorageMock.clear())
@@ -108,7 +108,7 @@ describe('Set data while storage is clearing', () => {
             initWithStoredValues: false,
             callback: val => defaultValue = val,
         });
-        const setValue = 'merged';
+        const setValue = 'set';
         Onyx.clear();
         Storage.clear = jest.fn(() => {
             // Call set between the cache and storage clearing
