@@ -8,6 +8,36 @@ const ONYX_KEYS = {
 
 jest.useFakeTimers();
 
+const storageCallResolveList = [];
+function addStorageCallResolve(name) {
+    storageCallResolveList.push(name);
+}
+
+function storageCallResolveOrder(methodName) {
+    return storageCallResolveList.indexOf(methodName) + 1;
+}
+
+const storageCallQueue = [];
+
+// Mock clear to wait for promises and add a delay
+Storage.clear = jest.fn(() => Promise.all(storageCallQueue)
+    .then(() => {
+        const clearPromise = new Promise(resolve => setTimeout(resolve, 500))
+            .then(() => AsyncStorageMock.clear())
+            .then(addStorageCallResolve('clear'));
+        storageCallQueue.push(clearPromise);
+        return clearPromise;
+    }));
+
+// Mock setItem to wait for promises
+Storage.setItem = jest.fn(() => Promise.all(storageCallQueue)
+    .then(() => {
+        const setItemPromise = AsyncStorageMock.setItem()
+            .then(addStorageCallResolve('setItem'));
+        storageCallQueue.push(setItemPromise);
+        return setItemPromise;
+    }));
+
 describe('Set data while storage is clearing', () => {
     let connectionID;
     let Onyx;
@@ -47,13 +77,18 @@ describe('Set data while storage is clearing', () => {
         Storage.clear = jest.fn(() => {
             // Merge after the cache has cleared but before the storage actually clears
             Onyx.merge(ONYX_KEYS.DEFAULT_KEY, 'merged');
-            return new Promise(resolve => setTimeout(resolve, 500))
-                .then(() => AsyncStorageMock.clear());
+            const clearPromise = new Promise(resolve => setTimeout(resolve, 500))
+                .then(() => AsyncStorageMock.clear())
+                .then(addStorageCallResolve('clear'));
+            storageCallQueue.push(clearPromise);
+            return clearPromise;
         });
         Onyx.clear();
         jest.runAllTimers();
         waitForPromisesToResolve()
             .then(() => {
+                expect(storageCallResolveOrder('clear')).toBe(1);
+                expect(storageCallResolveOrder('setItem')).toBe(2);
                 expect(defaultValue).toEqual('merged');
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
                 expect(cachedValue).toEqual('merged');
