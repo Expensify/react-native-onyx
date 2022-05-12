@@ -76,10 +76,11 @@ describe('Set data while storage is clearing', () => {
             initWithStoredValues: false,
             callback: val => defaultValue = val,
         });
+        const mergedValue = 'merged';
         Onyx.clear();
         Storage.clear = jest.fn(() => {
             // Merge after the cache has cleared but before the storage actually clears
-            Onyx.merge(ONYX_KEYS.DEFAULT_KEY, 'merged');
+            Onyx.merge(ONYX_KEYS.DEFAULT_KEY, mergedValue);
             const clearPromise = new Promise(resolve => setTimeout(resolve, 500))
                 .then(() => AsyncStorageMock.clear())
                 .then(addStorageCallResolve('clear'));
@@ -91,11 +92,11 @@ describe('Set data while storage is clearing', () => {
             .then(() => {
                 expect(storageCallResolveOrder('clear')).toBe(1);
                 expect(storageCallResolveOrder('setItem')).toBe(2);
-                expect(defaultValue).toBe('merged');
+                expect(defaultValue).toBe(mergedValue);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
-                expect(cachedValue).toBe('merged');
+                expect(cachedValue).toBe(mergedValue);
                 const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
-                expect(storedValue).resolves.toBe('merged');
+                expect(storedValue).resolves.toBe(mergedValue);
                 Storage.clear.mockRestore();
             });
     });
