@@ -5,6 +5,9 @@ import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 const ONYX_KEYS = {
     DEFAULT_KEY: 'defaultKey',
 };
+const SET_VALUE = 'set';
+const MERGED_VALUE = 'merged';
+const DEFAULT_VALUE = 'default';
 
 let storageCallResolveList = [];
 function addStorageCallResolve(name) {
@@ -50,7 +53,7 @@ describe('Set data while storage is clearing', () => {
             keys: ONYX_KEYS,
             registerStorageEventListener: () => {},
             initialKeyStates: {
-                [ONYX_KEYS.DEFAULT_KEY]: 'default',
+                [ONYX_KEYS.DEFAULT_KEY]: DEFAULT_VALUE,
             },
         });
     });
@@ -77,11 +80,10 @@ describe('Set data while storage is clearing', () => {
             initWithStoredValues: false,
             callback: val => defaultValue = val,
         });
-        const mergedValue = 'merged';
         expect.assertions(5);
         Storage.clear = jest.fn(() => {
             // Call merge between the cache and storage clearing
-            Onyx.merge(ONYX_KEYS.DEFAULT_KEY, mergedValue);
+            Onyx.merge(ONYX_KEYS.DEFAULT_KEY, MERGED_VALUE);
             AsyncStorageMock.clear();
             return waitForPromisesToResolve();
         });
@@ -90,11 +92,11 @@ describe('Set data while storage is clearing', () => {
             .then(() => {
                 expect(storageCallResolveOrder('clear')).toBe(1);
                 expect(storageCallResolveOrder('setItem')).toBe(2);
-                expect(defaultValue).toBe(mergedValue);
+                expect(defaultValue).toBe(MERGED_VALUE);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
-                expect(cachedValue).toBe(mergedValue);
+                expect(cachedValue).toBe(MERGED_VALUE);
                 const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
-                expect(storedValue).resolves.toBe(mergedValue);
+                expect(storedValue).resolves.toBe(MERGED_VALUE);
             });
     });
 
@@ -105,11 +107,10 @@ describe('Set data while storage is clearing', () => {
             initWithStoredValues: false,
             callback: val => defaultValue = val,
         });
-        const setValue = 'set';
         expect.assertions(5);
         Storage.clear = jest.fn(() => {
             // Call set between the cache and storage clearing
-            Onyx.set(ONYX_KEYS.DEFAULT_KEY, setValue);
+            Onyx.set(ONYX_KEYS.DEFAULT_KEY, SET_VALUE);
             AsyncStorageMock.clear();
             return waitForPromisesToResolve();
         });
@@ -120,11 +121,11 @@ describe('Set data while storage is clearing', () => {
                 // AsyncStorage.setItem resolves before AsyncStorage.clear
                 expect(storageCallResolveOrder('setItem')).toBe(1);
                 expect(storageCallResolveOrder('clear')).toBe(2);
-                expect(defaultValue).toBe(setValue);
+                expect(defaultValue).toBe(SET_VALUE);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
-                expect(cachedValue).toBe(setValue);
+                expect(cachedValue).toBe(SET_VALUE);
                 const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
-                expect(storedValue).resolves.not.toBe(setValue);
+                expect(storedValue).resolves.not.toBe(SET_VALUE);
             });
     });
 
@@ -135,22 +136,21 @@ describe('Set data while storage is clearing', () => {
             initWithStoredValues: false,
             callback: val => defaultValue = val,
         });
-        const setValue = 'set';
         expect.assertions(6);
-        Onyx.set(ONYX_KEYS.DEFAULT_KEY, setValue);
+        Onyx.set(ONYX_KEYS.DEFAULT_KEY, SET_VALUE);
         Storage.clear = jest.fn(() => AsyncStorageMock.clear());
         Onyx.clear();
         return waitForPromisesToResolve()
             .then(() => {
                 expect(storageCallResolveOrder('setItem')).toBe(1);
                 expect(storageCallResolveOrder('clear')).toBe(2);
-                expect(defaultValue).toBe('default');
+                expect(defaultValue).toBe(DEFAULT_VALUE);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
-                expect(cachedValue).toBe('default');
+                expect(cachedValue).toBe(DEFAULT_VALUE);
                 const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
 
                 // The default key state is never stored during Onyx.clear
-                expect(storedValue).resolves.not.toBe('default');
+                expect(storedValue).resolves.not.toBe(DEFAULT_VALUE);
                 expect(storedValue).resolves.toBeNull();
             });
     });
