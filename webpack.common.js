@@ -1,17 +1,18 @@
-const path = require('path');
-const {CleanWebpackPlugin} = require('clean-webpack-plugin');
-
 module.exports = {
     mode: 'production',
     entry: './index.js',
-    output: {
-        filename: 'index.js',
-        path: path.resolve(__dirname, 'dist'),
-    },
     resolve: {
         extensions: ['.jsx', '.js'],
     },
-    plugins: [
-        new CleanWebpackPlugin(),
-    ],
+    module: {
+        rules: [
+            {
+                test: /\.js$/,
+                exclude: /(node_modules)/,
+                use: {
+                    loader: 'babel-loader',
+                },
+            },
+        ],
+    },
 };

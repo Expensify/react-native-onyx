@@ -6,7 +6,7 @@
   "description": "State management for React Native",
   "license": "MIT",
   "private": true,
-  "main": "dist/index.js",
+  "main": "dist/index.native.js",
   "scripts": {
     "lint": "eslint .",
     "lint-tests": "eslint tests/**",
@@ -22,9 +22,10 @@
     "underscore": "^1.13.1"
   },
   "devDependencies": {
-    "@babel/core": "^7.11.1",
-    "@babel/plugin-proposal-class-properties": "^7.12.1",
-    "@babel/preset-env": "^7.11.0",
+    "@babel/core": "^7.17.10",
+    "@babel/plugin-proposal-class-properties": "^7.16.7",
+    "@babel/preset-env": "^7.17.10",
+    "@babel/preset-flow": "^7.16.7",
     "@babel/preset-react": "^7.10.4",
     "@babel/runtime": "^7.11.2",
     "@react-native-async-storage/async-storage": "^1.15.5",
@@ -33,15 +34,16 @@
     "@testing-library/react-native": "^7.0.2",
     "babel-eslint": "^10.1.0",
     "babel-jest": "^26.2.2",
+    "babel-loader": "^8.2.5",
     "babel-plugin-module-resolver": "^4.0.0",
     "babel-plugin-react-native-web": "^0.13.5",
     "babel-plugin-transform-class-properties": "^6.24.1",
-    "clean-webpack-plugin": "^4.0.0",
     "eslint": "^7.6.0",
     "eslint-config-expensify": "^2.0.11",
     "jest": "^26.5.2",
     "jest-cli": "^26.5.2",
     "jsdoc-to-markdown": "^7.1.0",
+    "localforage": "^1.10.0",
     "metro-react-native-babel-preset": "^0.61.0",
     "prop-types": "^15.7.2",
     "react": "^17.0.2",
@@ -54,7 +56,6 @@
   },
   "peerDependencies": {
     "@react-native-async-storage/async-storage": "^1.15.5",
-    "localforage": "^1.10.0",
     "react": "^17.0.2",
     "react-native-performance": "^2.0.0"
   },
