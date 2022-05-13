@@ -6,11 +6,14 @@
   "description": "State management for React Native",
   "license": "MIT",
   "private": true,
+  "main": "dist/index.js",
   "scripts": {
     "lint": "eslint .",
     "lint-tests": "eslint tests/**",
     "test": "jest",
-    "build-docs": "node buildDocs.js"
+    "build-docs": "node buildDocs.js",
+    "build:native": "webpack --config webpack.native.js",
+    "build:web": "webpack --config webpack.web.js"
   },
   "dependencies": {
     "ascii-table": "0.0.9",
@@ -45,7 +48,8 @@
     "react-native-performance": "^2.0.0",
     "react-test-renderer": "16.13.1",
     "webpack": "^5.72.1",
-    "webpack-cli": "^4.9.2"
+    "webpack-cli": "^4.9.2",
+    "webpack-merge": "^5.8.0"
   },
   "peerDependencies": {
     "@react-native-async-storage/async-storage": "^1.15.5",
