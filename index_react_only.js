@@ -1,6 +1,6 @@
 import Onyx from './lib/Onyx';
 import withOnyx from './lib/withOnyx';
-import Storage from './lib/storage';
+import WebStorage from './lib/storage/WebStorage';
 
-export default Onyx(Storage);
+export default Onyx(WebStorage);
 export {withOnyx};
