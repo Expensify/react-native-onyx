@@ -50,6 +50,12 @@ describe('Set data while storage is clearing', () => {
 
     beforeAll(() => {
         Onyx = require('../../index').default;
+    });
+
+    // Always use a "fresh" cache instance
+    beforeEach(() => {
+        onyxValue = null;
+        cache = require('../../lib/OnyxCache').default;
         Onyx.init({
             keys: ONYX_KEYS,
             registerStorageEventListener: () => {},
@@ -57,12 +63,6 @@ describe('Set data while storage is clearing', () => {
                 [ONYX_KEYS.DEFAULT_KEY]: DEFAULT_VALUE,
             },
         });
-    });
-
-    // Always use a "fresh" cache instance
-    beforeEach(() => {
-        onyxValue = null;
-        cache = require('../../lib/OnyxCache').default;
         connectionID = Onyx.connect({
             key: ONYX_KEYS.DEFAULT_KEY,
             initWithStoredValues: false,
