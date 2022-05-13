@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "lint-tests": "eslint tests/**",
     "test": "jest",
-    "build-docs": "node buildDocs.js",
+    "build": "npm run build:native && npm run build:web",
+    "build:docs": "node buildDocs.js",
     "build:native": "webpack --config webpack.native.js",
     "build:web": "webpack --config webpack.web.js"
   },
