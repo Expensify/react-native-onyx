@@ -141,13 +141,13 @@ function signOut() {
 Onyx.get/set and the rest of the API accesses the underlying storage
 differently depending on the platform
 
-Under the hood storage access calls are delegated to a [`StorageProvider`](lib/storage/index.js)
+Under the hood storage access calls are delegated to a [`StorageProvider`](lib/storage/index.web.js)
 Some platforms (like web and desktop) might use the same storage provider
 
 If a platform needs to use a separate library (like using MMVK for react-native) it should be added in the following way:
 1. Create a `StorageProvider.js` at [lib/storage/providers](lib/storage/providers)  
    Reference an existing [StorageProvider](lib/storage/providers/AsyncStorage.js) for the interface that has to be implemented
-2. Update the factory at [lib/storage/index.js](lib/storage/index.js) to return the newly created Provider for the desired Platform(s)
+2. Update the factory at [lib/storage/index.web.js](lib/storage/index.web.js) and [lib/storage/index.native.js](lib/storage/index.native.js) to return the newly created Provider for the desired Platform(s)
 
 # API Reference
 
