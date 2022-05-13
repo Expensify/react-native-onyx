@@ -32,9 +32,9 @@ AsyncStorageMock.clear = jest.fn(() => Promise.all(storageCallQueue)
 
 // Track when AsyncStorageMock.setItem calls resolve.
 const asyncStorageMockSetItem = AsyncStorageMock.setItem;
-AsyncStorageMock.setItem = jest.fn(() => Promise.all(storageCallQueue)
+AsyncStorageMock.setItem = jest.fn((key, value) => Promise.all(storageCallQueue)
     .then(() => {
-        const setItemPromise = asyncStorageMockSetItem()
+        const setItemPromise = asyncStorageMockSetItem(key, value)
             .then(addStorageCallResolve('setItem'));
         storageCallQueue.push(setItemPromise);
         return setItemPromise;
