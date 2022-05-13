@@ -146,32 +146,15 @@ describe('Set data while storage is clearing', () => {
     });
 
     it('should replace the value of Onyx.merge with the default key state in the cache', () => {
-        let onyxValue;
-        connectionID = Onyx.connect({
-            key: ONYX_KEYS.DEFAULT_KEY,
-            initWithStoredValues: false,
-            callback: val => onyxValue = val,
-        });
         expect.assertions(6);
         Onyx.merge(ONYX_KEYS.DEFAULT_KEY, MERGED_VALUE);
         Storage.clear = jest.fn(() => AsyncStorageMock.clear());
         Onyx.clear();
         return waitForPromisesToResolve()
             .then(() => {
-                // Onnyx.merge calls Onyx.set which sets "merged" in the cache.
-                // The within Onyx.clear as the cache clears keyChanged is
-                // called with the resetValue of 'defaut' so the onyxValue is
-                // 'default' and same for the cache. Then keyChanged is called
-                // from Onyx.set and the onyxValue is 'merged'. At that point
-                // the cache is done clearing. Storage.setItem finishes setting
-                // the storage to 'merged'. Then clear finishes, setting it to
-                // null.
-                // The end result is that the cachedValue is 'default',
-                // the onyxValue is 'merged', and the storage is null.
-
                 expect(storageCallResolveOrder('setItem')).toBe(1);
                 expect(storageCallResolveOrder('clear')).toBe(2);
-                expect(onyxValue).toBe(MERGED_VALUE);
+                expect(onyxValue).toBe(DEFAULT_VALUE);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
                 expect(cachedValue).toBe(DEFAULT_VALUE);
                 const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
