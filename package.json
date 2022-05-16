@@ -9,9 +9,9 @@
   "files": [
     "dist"
   ],
+  "main": "dist/index.native.js",
   "exports": {
-    "./web": "dist/index.web.js",
-    ".": "dist/index.native.js"
+    "./web": "dist/index.web.js"
   },
   "scripts": {
     "lint": "eslint .",
