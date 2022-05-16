@@ -6,7 +6,13 @@
   "description": "State management for React Native",
   "license": "MIT",
   "private": true,
-  "main": "dist/index.native.js",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    "./web": "dist/index.web.js",
+    ".": "dist/index.native.js"
+  },
   "scripts": {
     "lint": "eslint .",
     "lint-tests": "eslint tests/**",
@@ -18,8 +24,7 @@
   },
   "dependencies": {
     "ascii-table": "0.0.9",
-    "expensify-common": "git+https://github.com/Expensify/expensify-common.git#2e5cff552cf132da90a3fb9756e6b4fb6ae7b40c",
-    "lodash": "4.17.21",
+    "lodash": "^4.17.21",
     "underscore": "^1.13.1"
   },
   "devDependencies": {
@@ -57,11 +62,19 @@
   },
   "peerDependencies": {
     "@react-native-async-storage/async-storage": "^1.15.5",
-    "react": "^17.0.2",
+    "expensify-common": ">=1",
+    "localforage": "^1.10.0",
+    "react": ">=17.0.2",
     "react-native-performance": "^2.0.0"
   },
   "peerDependenciesMeta": {
     "react-native-performance": {
+      "optional": true
+    },
+    "@react-native-async-storage/async-storage": {
+      "optional": true
+    },
+    "localforage": {
       "optional": true
     }
   },
@@ -90,5 +103,6 @@
     "setupFilesAfterEnv": [
       "@testing-library/jest-native/extend-expect"
     ]
-  }
+  },
+  "sideEffects": false
 }
