@@ -3,6 +3,7 @@ const path = require('path');
 const commonConfig = require('./webpack.common');
 
 module.exports = merge(commonConfig, {
+    mode: 'development',
     output: {
         filename: 'index.web.js',
         path: path.resolve(__dirname, 'dist'),
