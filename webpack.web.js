@@ -4,6 +4,7 @@ const commonConfig = require('./webpack.common');
 
 module.exports = merge(commonConfig, {
     mode: 'development',
+    devtool: 'inline-source-map',
     output: {
         filename: 'index.web.js',
         path: path.resolve(__dirname, 'dist'),
