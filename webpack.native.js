@@ -6,6 +6,10 @@ module.exports = merge(commonConfig, {
     output: {
         filename: 'index.native.js',
         path: path.resolve(__dirname, 'dist'),
+        library: {
+            name: 'Onyx',
+            type: 'umd',
+        },
     },
     externals: {
         'react-native': true,
