@@ -13,14 +13,14 @@
   ],
   "main": "./dist/index.native.js",
   "module": "./index.js",
-   "exports": {
+  "exports": {
     "./web": {
-      "default": "./dist/index.web.js",
-      "types": "./dist/types/index.d.ts"
+      "types": "./dist/types/index.d.ts",
+      "default": "./dist/index.web.js"
     },
     ".": {
-      "default": "./dist/index.native.js",
-      "types": "./dist/types/index.d.ts"
+      "types": "./dist/types/index.d.ts",
+      "default": "./dist/index.native.js"
     }
   },
   "types": "./dist/types/index.d.ts",
