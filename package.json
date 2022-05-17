@@ -7,9 +7,12 @@
   "license": "MIT",
   "private": true,
   "files": [
-    "dist"
+    "dist",
+    "lib",
+    "index.js"
   ],
   "main": "dist/index.native.js",
+  "module": "index.js",
   "exports": {
     "./web": "dist/index.web.js"
   },
