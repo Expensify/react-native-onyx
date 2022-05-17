@@ -4,6 +4,7 @@ const pkg = require('./package.json');
 
 module.exports = {
     mode: 'production',
+    devtool: 'source-map',
     entry: './index.js',
     resolve: {
         extensions: ['.jsx', '.js'],
