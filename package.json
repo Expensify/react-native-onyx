@@ -7,23 +7,32 @@
   "license": "MIT",
   "private": true,
   "files": [
-    "dist",
-    "lib",
+    "dist/**/*",
+    "lib/**/*",
     "index.js"
   ],
-  "main": "dist/index.native.js",
-  "module": "index.js",
-  "exports": {
-    "./web": "dist/index.web.js"
+  "main": "./dist/index.native.js",
+  "module": "./index.js",
+   "exports": {
+    "./web": {
+      "default": "./dist/index.web.js",
+      "types": "./dist/types/index.d.ts"
+    },
+    ".": {
+      "default": "./dist/index.native.js",
+      "types": "./dist/types/index.d.ts"
+    }
   },
+  "types": "./dist/types/index.d.ts",
   "scripts": {
     "lint": "eslint .",
     "lint-tests": "eslint tests/**",
     "test": "jest",
-    "build": "npm run build:native && npm run build:web",
+    "build": "npm run build:native && npm run build:web && npm run generate:typings",
     "build:docs": "node buildDocs.js",
     "build:native": "webpack --config webpack.native.js",
-    "build:web": "webpack --config webpack.web.js"
+    "build:web": "webpack --config webpack.web.js",
+    "generate:typings": "npx typescript -d --declarationDir dist/types --declarationMap --emitDeclarationOnly --allowJs index.js"
   },
   "dependencies": {
     "ascii-table": "0.0.9",
