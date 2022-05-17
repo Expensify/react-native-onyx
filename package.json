@@ -30,9 +30,6 @@
   "devDependencies": {
     "@babel/core": "^7.17.10",
     "@babel/plugin-proposal-class-properties": "^7.16.7",
-    "@babel/preset-env": "^7.17.10",
-    "@babel/preset-flow": "^7.16.7",
-    "@babel/preset-react": "^7.10.4",
     "@babel/runtime": "^7.11.2",
     "@react-native-async-storage/async-storage": "^1.15.5",
     "@react-native-community/eslint-config": "^2.0.0",
