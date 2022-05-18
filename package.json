@@ -32,7 +32,7 @@
     "build:docs": "node buildDocs.js",
     "build:native": "webpack --config webpack.native.js",
     "build:web": "webpack --config webpack.web.js",
-    "generate:typings": "npx typescript -d --declarationDir dist/types --declarationMap --emitDeclarationOnly --allowJs index.js"
+    "generate:typings": "npx typescript -d --declarationDir dist/types --emitDeclarationOnly --allowJs index.js"
   },
   "dependencies": {
     "ascii-table": "0.0.9",

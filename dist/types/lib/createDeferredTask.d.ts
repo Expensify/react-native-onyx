@@ -10,4 +10,3 @@ export default function createDeferredTask<T>(): {
     resolve: (arg0: any) => any;
     promise: Promise<void | T>;
 };
-//# sourceMappingURL=createDeferredTask.d.ts.map

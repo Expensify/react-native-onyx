@@ -16,4 +16,3 @@ export function logInfo(message: string): void;
  * @param {String} message
  */
 export function logAlert(message: string): void;
-//# sourceMappingURL=Logger.d.ts.map
