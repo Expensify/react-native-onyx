@@ -11,27 +11,26 @@
     "lib/**/*",
     "index.js"
   ],
-  "main": "./dist/index.native.js",
+  "main": "./dist/native.min.js",
   "module": "./index.js",
   "exports": {
     "./web": {
+      "development": "./dist/web.development.js",
       "types": "./dist/types/index.d.ts",
-      "default": "./dist/index.web.js"
+      "default": "./dist/web.min.js"
     },
     ".": {
+      "development": "./dist/native.development.js",
       "types": "./dist/types/index.d.ts",
-      "default": "./dist/index.native.js"
+      "default": "./dist/native.min.js"
     }
   },
-  "types": "./dist/types/index.d.ts",
   "scripts": {
     "lint": "eslint .",
     "lint-tests": "eslint tests/**",
     "test": "jest",
-    "build": "npm run build:native && npm run build:web && npm run generate:typings",
+    "build": "webpack --config webpack.config.js && npm run generate:typings",
     "build:docs": "node buildDocs.js",
-    "build:native": "webpack --config webpack.native.js",
-    "build:web": "webpack --config webpack.web.js",
     "generate:typings": "npx typescript -d --declarationDir dist/types --emitDeclarationOnly --allowJs index.js"
   },
   "dependencies": {
