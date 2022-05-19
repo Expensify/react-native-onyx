@@ -9,29 +9,21 @@
   "files": [
     "dist/**/*",
     "lib/**/*",
-    "index.js"
+    "native.js",
+    "web.js",
+    "API.md",
+    "README.md",
+    "LICENSE.md"
   ],
-  "main": "./dist/native.min.js",
-  "module": "./index.js",
-  "exports": {
-    "./web": {
-      "development": "./dist/web.development.js",
-      "types": "./dist/types/index.d.ts",
-      "default": "./dist/web.min.js"
-    },
-    ".": {
-      "development": "./dist/native.development.js",
-      "types": "./dist/types/index.d.ts",
-      "default": "./dist/native.min.js"
-    }
-  },
+  "react-native": "native.js",
+  "main": "native.js",
+  "browser": "web.js",
   "scripts": {
     "lint": "eslint .",
     "lint-tests": "eslint tests/**",
     "test": "jest",
-    "build": "webpack --config webpack.config.js && npm run generate:typings",
-    "build:docs": "node buildDocs.js",
-    "generate:typings": "npx typescript -d --declarationDir dist/types --emitDeclarationOnly --allowJs index.js"
+    "build:web": "webpack --config webpack.config.js",
+    "build:docs": "node buildDocs.js"
   },
   "dependencies": {
     "ascii-table": "0.0.9",

@@ -44,8 +44,8 @@ Onyx.init(config);
 ```
 
 ### Usage in non react-native projects
-To use Onyx in a regular React or even plain JS project it should be imported from `react-native-onyx/web`.
-The `/web` export is intended for browser environments
+Onyx can be used in non react-native projects, by leveraging the `borwser` field in `package.json`  
+Bundlers like Webpack respect that field and import code from the path resolved there
 
 ```javascript
 import Onyx, { withOnyx } from 'react-native-onyx/web';
@@ -249,13 +249,13 @@ Sample output of `Onyx.printMetrics()`
 `react-native` bundles source using the `metro` bundler. `metro` does not follow symlinks, so we can't use `npm link` to
 use a local version of Onyx during development
 
-To quickly test small changes you can directly go to `node_modules/react-native-onyx` in the parent project and tweak
-the `dist/native.development.js`, or `dist/web.development.js`, by default bundlers would resolve and load the
-`.development` sources for local development (dev servers | NODE_ENV=development)
-- _this is achieved through the package.json `exports` field_
+To quickly test small changes you can directly go to `node_modules/react-native-onyx` in the parent project and:
+- tweak original source if you're testing over a react-native project
+- tweak `dist/web.development.js` for non react-native-projects
 
-To continuously work on Onyx we have to set up a task that rebuilds `dist` and then copies content to
-the parent project `node_modules/react-native-onyx`:
+To continuously work on Onyx we have to set up a task that copies content to parent project's `node_modules/react-native-onyx`:
 1. Work on Onyx feature or a fix
-2. Save files and run `npm build`
-3. Copy `./dist` to consumer project's `node_modules/react-native-onyx/dist`
+2. Save files
+3. Optional: run `npm build:web` (if you're working or want to test on a non react-native project)
+   - `npm link` would actually work outside of `react-native` and it can be used to link Onyx locally for a web only project
+4. Copy Onyx to consumer project's `node_modules/react-native-onyx`

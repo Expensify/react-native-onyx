@@ -6,7 +6,7 @@ const pkg = require('./package.json');
 const commonConfig = {
     mode: 'production',
     devtool: 'source-map',
-    entry: './index.js',
+    entry: './lib/index.js',
     resolve: {
         extensions: ['.jsx', '.js'],
     },
@@ -60,8 +60,8 @@ const webConfig = merge(commonConfig, {
     },
 });
 
-// This config is used for the `exports.web.development` key in package.json
-// It's imported by bundlers like webpack during development (webpack-dev-server)
+// Web projects using Onyx would resolve this configuration during development (webpack-dev-server)
+// If we want to experiment with Onyx locally we can edit the `.development` script since it's not minified
 const webDevConfig = merge(webConfig, {
     mode: 'development',
     output: {
@@ -69,31 +69,7 @@ const webDevConfig = merge(webConfig, {
     },
 });
 
-const nativeConfig = merge(commonConfig, {
-    output: {
-        filename: 'native.min.js',
-        library: {
-            name: 'react-native-onyx',
-        }
-    },
-    resolve: {
-        // Resolve any native specific JS file as a normal JS file
-        extensions: ['.native.js'],
-    },
-});
-
-// This config is used for the `exports.*.development` key in package.json
-// It's imported by bundlers like metro during development (react-native start)
-const nativeDevConfig = merge(nativeConfig, {
-    mode: 'development',
-    output: {
-        filename: 'native.development.js',
-    },
-});
-
 module.exports = [
     webConfig,
     webDevConfig,
-    nativeConfig,
-    nativeDevConfig,
 ];

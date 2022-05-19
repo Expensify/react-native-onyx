@@ -3273,11 +3273,11 @@ var __webpack_exports__ = {};
 // This entry need to be wrapped in an IIFE because it need to be isolated against other modules in the chunk.
 (() => {
 var exports = __webpack_exports__;
-/*!******************!*\
-  !*** ./index.js ***!
-  \******************/
-var _interopRequireDefault = __webpack_require__(/*! @babel/runtime/helpers/interopRequireDefault */ "./node_modules/@babel/runtime/helpers/interopRequireDefault.js");Object.defineProperty(exports, "__esModule", ({ value: true }));Object.defineProperty(exports, "withOnyx", ({ enumerable: true, get: function get() {return _withOnyx.default;} }));exports["default"] = void 0;var _Onyx = _interopRequireDefault(__webpack_require__(/*! ./lib/Onyx */ "./lib/Onyx.js"));
-var _withOnyx = _interopRequireDefault(__webpack_require__(/*! ./lib/withOnyx */ "./lib/withOnyx.js"));var _default =
+/*!**********************!*\
+  !*** ./lib/index.js ***!
+  \**********************/
+var _interopRequireDefault = __webpack_require__(/*! @babel/runtime/helpers/interopRequireDefault */ "./node_modules/@babel/runtime/helpers/interopRequireDefault.js");Object.defineProperty(exports, "__esModule", ({ value: true }));Object.defineProperty(exports, "withOnyx", ({ enumerable: true, get: function get() {return _withOnyx.default;} }));exports["default"] = void 0;var _Onyx = _interopRequireDefault(__webpack_require__(/*! ./Onyx */ "./lib/Onyx.js"));
+var _withOnyx = _interopRequireDefault(__webpack_require__(/*! ./withOnyx */ "./lib/withOnyx.js"));var _default =
 
 _Onyx.default;exports["default"] = _default;
 })();
