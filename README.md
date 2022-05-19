@@ -244,7 +244,7 @@ Sample output of `Onyx.printMetrics()`
 # Development
 
 `react-native` bundles source using the `metro` bundler. `metro` does not follow symlinks, so we can't use `npm link` to
-use a local version of Onyx during development
+link a local version of Onyx during development
 
 To quickly test small changes you can directly go to `node_modules/react-native-onyx` in the parent project and:
 - tweak original source if you're testing over a react-native project
