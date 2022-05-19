@@ -43,6 +43,14 @@ const config = {
 Onyx.init(config);
 ```
 
+### Usage in non react-native projects
+To use Onyx in a regular React or even plain JS project it should be imported from `react-native-onyx/web`.
+The `/web` export is intended for browser environments
+
+```javascript
+import Onyx, { withOnyx } from 'react-native-onyx/web';
+```
+
 ## Setting data
 
 To store some data we can use the `Onyx.set()` method.
@@ -234,3 +242,20 @@ Sample output of `Onyx.printMetrics()`
 |    1.08sec |   2.20sec |   1.12sec | iou, [object Object]     |
 |    1.17sec |   2.20sec |   1.03sec | currentURL, /            |
 ```
+
+
+# Development
+
+`react-native` bundles source using the `metro` bundler. `metro` does not follow symlinks, so we can't use `npm link` to
+use a local version of Onyx during development
+
+To quickly test small changes you can directly go to `node_modules/react-native-onyx` in the parent project and tweak
+the `dist/native.development.js`, or `dist/web.development.js`, by default bundlers would resolve and load the
+`.development` sources for local development (dev servers | NODE_ENV=development)
+- _this is achieved through the package.json `exports` field_
+
+To continuously work on Onyx we have to set up a task that rebuilds `dist` and then copies content to
+the parent project `node_modules/react-native-onyx`:
+1. Work on Onyx feature or a fix
+2. Save files and run `npm build`
+3. Copy `./dist` to consumer project's `node_modules/react-native-onyx/dist`

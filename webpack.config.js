@@ -60,6 +60,8 @@ const webConfig = merge(commonConfig, {
     },
 });
 
+// This config is used for the `exports.web.development` key in package.json
+// It's imported by bundlers like webpack during development (webpack-dev-server)
 const webDevConfig = merge(webConfig, {
     mode: 'development',
     output: {
@@ -80,6 +82,8 @@ const nativeConfig = merge(commonConfig, {
     },
 });
 
+// This config is used for the `exports.*.development` key in package.json
+// It's imported by bundlers like metro during development (react-native start)
 const nativeDevConfig = merge(nativeConfig, {
     mode: 'development',
     output: {
