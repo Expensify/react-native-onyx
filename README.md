@@ -44,7 +44,7 @@ Onyx.init(config);
 ```
 
 ### Usage in non react-native projects
-Onyx can be used in non react-native projects, by leveraging the `borwser` field in `package.json`  
+Onyx can be used in non react-native projects, by leveraging the `browser` field in `package.json`  
 Bundlers like Webpack respect that field and import code from the specified path  
 We import Onyx the same way shown above - `import Onyx from 'react-native-onyx'`
 
