@@ -1,5 +1,5 @@
 import Storage from '../../lib/storage';
-import Onyx from '../../index';
+import Onyx from '../../lib';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 const ONYX_KEYS = {

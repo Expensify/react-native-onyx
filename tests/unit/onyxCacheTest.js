@@ -408,7 +408,7 @@ describe('Onyx', () => {
         };
 
         function initOnyx(overrides) {
-            const OnyxModule = require('../../index');
+            const OnyxModule = require('../../lib');
             Onyx = OnyxModule.default;
             withOnyx = OnyxModule.withOnyx;
             AsyncStorageMock = require('@react-native-async-storage/async-storage').default;

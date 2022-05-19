@@ -43,6 +43,11 @@ const config = {
 Onyx.init(config);
 ```
 
+### Usage in non react-native projects
+Onyx can be used in non react-native projects, by leveraging the `browser` field in `package.json`  
+Bundlers like Webpack respect that field and import code from the specified path  
+We import Onyx the same way shown above - `import Onyx from 'react-native-onyx'`
+
 ## Setting data
 
 To store some data we can use the `Onyx.set()` method.
@@ -141,13 +146,13 @@ function signOut() {
 Onyx.get/set and the rest of the API accesses the underlying storage
 differently depending on the platform
 
-Under the hood storage access calls are delegated to a [`StorageProvider`](lib/storage/index.js)
+Under the hood storage access calls are delegated to a [`StorageProvider`](lib/storage/index.web.js)
 Some platforms (like web and desktop) might use the same storage provider
 
 If a platform needs to use a separate library (like using MMVK for react-native) it should be added in the following way:
 1. Create a `StorageProvider.js` at [lib/storage/providers](lib/storage/providers)  
    Reference an existing [StorageProvider](lib/storage/providers/AsyncStorage.js) for the interface that has to be implemented
-2. Update the factory at [lib/storage/index.js](lib/storage/index.js) to return the newly created Provider for the desired Platform(s)
+2. Update the factory at [lib/storage/index.web.js](lib/storage/index.web.js) and [lib/storage/index.native.js](lib/storage/index.native.js) to return the newly created Provider for the desired Platform(s)
 
 # API Reference
 
@@ -234,3 +239,20 @@ Sample output of `Onyx.printMetrics()`
 |    1.08sec |   2.20sec |   1.12sec | iou, [object Object]     |
 |    1.17sec |   2.20sec |   1.03sec | currentURL, /            |
 ```
+
+
+# Development
+
+`react-native` bundles source using the `metro` bundler. `metro` does not follow symlinks, so we can't use `npm link` to
+link a local version of Onyx during development
+
+To quickly test small changes you can directly go to `node_modules/react-native-onyx` in the parent project and:
+- tweak original source if you're testing over a react-native project
+- tweak `dist/web.development.js` for non react-native-projects
+
+To continuously work on Onyx we have to set up a task that copies content to parent project's `node_modules/react-native-onyx`:
+1. Work on Onyx feature or a fix
+2. Save files
+3. Optional: run `npm build:web` (if you're working or want to test on a non react-native project)
+   - `npm link` would actually work outside of `react-native` and it can be used to link Onyx locally for a web only project
+4. Copy Onyx to consumer project's `node_modules/react-native-onyx`

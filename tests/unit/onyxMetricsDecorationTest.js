@@ -12,7 +12,7 @@ describe('Onyx', () => {
         // Always use a "fresh" (and undecorated) instance
         beforeEach(() => {
             jest.resetModules();
-            Onyx = require('../../index').default;
+            Onyx = require('../../lib').default;
         });
 
         it('Should expose metrics methods when `captureMetrics` is true', () => {
