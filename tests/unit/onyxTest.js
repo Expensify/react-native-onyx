@@ -371,7 +371,7 @@ describe('Onyx', () => {
             ]);
         } catch (error) {
             // eslint-disable-next-line max-len
-            expect(error.message).toEqual(`Invalid onyxMethod multiSet in Onyx update.`);
+            expect(error.message).toEqual('Invalid onyxMethod multiSet in Onyx update.');
         }
     });
 
@@ -390,7 +390,7 @@ describe('Onyx', () => {
             ]);
         } catch (error) {
             // eslint-disable-next-line max-len
-            expect(error.message).toEqual(`Invalid undefined key provided in Onyx update. Onyx key must be of type string.`);
+            expect(error.message).toEqual('Invalid undefined key provided in Onyx update. Onyx key must be of type string.');
         }
     });
 
@@ -409,7 +409,7 @@ describe('Onyx', () => {
             ]);
         } catch (error) {
             // eslint-disable-next-line max-len
-            expect(error.message).toEqual(`Undefined value passed to key anotherTest in Onyx update.`);
+            expect(error.message).toEqual('Undefined value passed to key anotherTest in Onyx update.');
         }
     });
 });
