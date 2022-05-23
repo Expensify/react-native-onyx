@@ -44,7 +44,7 @@ const commonConfig = {
             name: 'react-native-onyx',
             type: 'umd',
         },
-    }
+    },
 };
 
 const webConfig = merge(commonConfig, {
@@ -52,7 +52,7 @@ const webConfig = merge(commonConfig, {
         filename: 'web.min.js',
         library: {
             name: 'react-native-onyx/web',
-        }
+        },
     },
     resolve: {
         // Resolve any web specific JS file as a normal JS file

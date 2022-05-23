@@ -1,4 +1,4 @@
-
+import _ from 'underscore';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 describe('decorateWithMetrics', () => {
@@ -31,7 +31,7 @@ describe('decorateWithMetrics', () => {
                     summaries: expect.objectContaining({mockFn: expect.any(Object)}),
                 }));
 
-                expect(Object.keys(metrics.summaries)).toHaveLength(1);
+                expect(_.keys(metrics.summaries)).toHaveLength(1);
 
                 const firstCall = metrics.summaries.mockFn.calls[0];
                 expect(firstCall.startTime).toEqual(expect.any(Number));
@@ -56,7 +56,7 @@ describe('decorateWithMetrics', () => {
                 const stats = getMetrics();
                 expect(stats).toHaveLength(1);
                 expect(stats).toEqual([
-                    expect.objectContaining({methodName: 'mockFunc'})
+                    expect.objectContaining({methodName: 'mockFunc'}),
                 ]);
             });
     });
@@ -81,13 +81,13 @@ describe('decorateWithMetrics', () => {
                 expect(calls).toHaveLength(3);
                 expect(calls).toEqual([
                     expect.objectContaining({
-                        detail: expect.objectContaining({args: ['mockedKey']})
+                        detail: expect.objectContaining({args: ['mockedKey']}),
                     }),
                     expect.objectContaining({
-                        detail: expect.objectContaining({args: ['mockedKey3']})
+                        detail: expect.objectContaining({args: ['mockedKey3']}),
                     }),
                     expect.objectContaining({
-                        detail: expect.objectContaining({args: ['mockedKey2']})
+                        detail: expect.objectContaining({args: ['mockedKey2']}),
                     }),
                 ]);
             });
@@ -111,10 +111,10 @@ describe('decorateWithMetrics', () => {
                 expect(calls).toHaveLength(2);
                 expect(calls).toEqual([
                     expect.objectContaining({
-                        detail: {args: ['mockedKey', {ids: [1, 2, 3]}], alias: 'mockFn'}
+                        detail: {args: ['mockedKey', {ids: [1, 2, 3]}], alias: 'mockFn'},
                     }),
                     expect.objectContaining({
-                        detail: {args: ['mockedKey', {ids: [4, 5, 6]}], alias: 'mockFn'}
+                        detail: {args: ['mockedKey', {ids: [4, 5, 6]}], alias: 'mockFn'},
                     }),
                 ]);
             });
@@ -152,7 +152,7 @@ describe('decorateWithMetrics', () => {
             .then(() => {
                 // THEN stats should contain data for each function and each call under the correct function alias
                 const stats = getMetrics().summaries;
-                expect(Object.keys(stats)).toHaveLength(2);
+                expect(_.keys(stats)).toHaveLength(2);
 
                 expect(stats).toEqual(expect.objectContaining({
                     mockGet: expect.any(Object),
@@ -190,7 +190,7 @@ describe('decorateWithMetrics', () => {
             .then(() => {
                 // THEN stats should contain data for each function and each call under the correct function alias
                 const stats = getMetrics().summaries;
-                expect(Object.keys(stats)).toHaveLength(2);
+                expect(_.keys(stats)).toHaveLength(2);
 
                 expect(stats).toEqual(expect.objectContaining({
                     mockGetAllKeys: expect.any(Object),

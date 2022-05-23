@@ -6,7 +6,7 @@ const ONYX_KEYS = {
     ANOTHER_TEST: 'anotherTest',
     COLLECTION: {
         TEST_KEY: 'test_',
-    }
+    },
 };
 
 Onyx.init({
@@ -189,16 +189,16 @@ describe('Onyx', () => {
         return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
             test_1: {
                 ID: 123,
-                value: 'one'
+                value: 'one',
             },
             test_2: {
                 ID: 234,
-                value: 'two'
+                value: 'two',
             },
             test_3: {
                 ID: 345,
-                value: 'three'
-            }
+                value: 'three',
+            },
         })
             .then(() => (
 
@@ -207,20 +207,20 @@ describe('Onyx', () => {
                 Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                     test_1: {
                         ID: 123,
-                        value: 'five'
+                        value: 'five',
                     },
                     test_2: {
                         ID: 234,
-                        value: 'four'
+                        value: 'four',
                     },
                     test_4: {
                         ID: 456,
-                        value: 'two'
+                        value: 'two',
                     },
                     test_5: {
                         ID: 567,
-                        value: 'one'
-                    }
+                        value: 'one',
+                    },
                 })
             ))
             .then(() => {
@@ -279,16 +279,16 @@ describe('Onyx', () => {
             },
             test_2: {
                 existingData: 'test',
-            }
+            },
         })
             .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                 test_1: {
                     ID: 123,
-                    value: 'one'
+                    value: 'one',
                 },
                 test_2: {
                     ID: 234,
-                    value: 'two'
+                    value: 'two',
                 },
             }))
             .then(() => {

@@ -45,7 +45,7 @@
     "babel-plugin-react-native-web": "^0.13.5",
     "babel-plugin-transform-class-properties": "^6.24.1",
     "eslint": "^7.6.0",
-    "eslint-config-expensify": "^2.0.11",
+    "eslint-config-expensify": "^2.0.24",
     "expensify-common": "git+https://github.com/Expensify/expensify-common.git#427295da130a4eacc184d38693664280d020dffd",
     "jest": "^26.5.2",
     "jest-cli": "^26.5.2",
