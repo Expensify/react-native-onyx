@@ -342,7 +342,7 @@ describe('Onyx', () => {
                     {
                         onyxMethod: 'set',
                         key: ONYX_KEYS.TEST_KEY,
-                        value: undefined,
+                        value: 'one',
                     },
                     {
                         onyxMethod: 'merge',
