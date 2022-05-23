@@ -1,4 +1,4 @@
-name: Publish Package to npmjs
+name: Publish web package to npmjs
 on:
     push:
         branches: [main]
@@ -10,17 +10,56 @@ jobs:
 
             - uses: actions/setup-node@v3
               with:
-                  node-version: '16.x'
-                  registry-url: 'https://registry.npmjs.org'
+                node-version: '16.x'
+                registry-url: 'https://registry.npmjs.org'
 
-            - run: npm ci
+            - name: Generate branch name
+              run: echo "BRANCH_NAME=botify-bump-version-$(uuidgen)" >> $GITHUB_ENV
 
-            - run: npm version patch
+            - name: Create branch for version-bump pull request
+            run: git checkout -b ${{ env.BRANCH_NAME }}
 
-            - run: npm run build:web
+            - name: Install npm packages
+              run: npm ci
+
+            - name: Update npm version
+              run: npm version patch
+
+            - name: Set new version in GitHub ENV
+              run: echo "NEW_VERSION=$(npm info react-native-onyx version)" >> $GITHUB_ENV
+
+            - name: Build web code
+              run: npm run build:web
 
             - run: npm publish
               env:
-                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+                NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-            - run: git push --tags
+            - name: Push branch and publish tags
+              run: git push --tags
+
+            - name: Create pull request
+              id: createPullRequest
+              # Version: 2.6.2
+              uses: repo-sync/pull-request@65785d95a5a466e46a9d0708933a3bd51bbf9dde
+              with:
+                source_branch: ${{ env.BRANCH_NAME }}
+                destination_branch: main
+                github_token: ${{ secrets.BOTIFY_TOKEN }}
+                pr_title: Update version to ${{ env.NEW_VERSION }}
+                pr_body: 'Update version to ${{ env.NEW_VERSION }}'
+                pr_label: automerge
+
+            - name: Auto-approve pull request
+              # Version: 2.0.0
+              uses: hmarr/auto-approve-action@6a9ec7556f0a7fa5b49527a1eea4878b8a22d2e0
+              with:
+                github-token: ${{ secrets.GITHUB_TOKEN }}
+                pull-request-number: ${{ steps.createPullRequest.outputs.pr_number }}
+
+            - name: Auto-merge pull request
+              # Version: 0.12.0
+              uses: pascalgn/automerge-action@39d831e1bb389bd242626bc25d4060064a97181c
+              env:
+                GITHUB_TOKEN: ${{ secrets.BOTIFY_TOKEN }}
+                PULL_REQUEST: ${{ steps.createPullRequest.outputs.pr_number }}
