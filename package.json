@@ -5,7 +5,7 @@
   "homepage": "https://expensify.com",
   "description": "State management for React Native",
   "license": "MIT",
-  "private": true,
+  "private": false,
   "files": [
     "dist/**/*",
     "lib/**/*",
