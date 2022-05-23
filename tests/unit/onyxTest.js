@@ -371,6 +371,7 @@ describe('Onyx', () => {
             data[1] = {onyxMethod: 'merge', key: true, value: {test2: 'test2'}};
             Onyx.update(data);
         } catch (error) {
+            // eslint-disable-next-line max-len
             expect(error.message).toEqual('Invalid boolean key provided in Onyx update. Onyx key must be of type string.');
         }
 
