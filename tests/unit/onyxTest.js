@@ -3,7 +3,7 @@ import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
-    ANOTHER_TEST: 'anotherTest',
+    OTHER_TEST: 'otherTest',
     COLLECTION: {
         TEST_KEY: 'test_',
     },
@@ -13,7 +13,7 @@ Onyx.init({
     keys: ONYX_KEYS,
     registerStorageEventListener: () => {},
     initialKeyStates: {
-        [ONYX_KEYS.ANOTHER_TEST]: 42,
+        [ONYX_KEYS.OTHER_TEST]: 42,
     },
 });
 
@@ -75,11 +75,11 @@ describe('Onyx', () => {
             },
         });
 
-        let anotherTestValue;
-        const anotherTestConnectionID = Onyx.connect({
-            key: ONYX_KEYS.ANOTHER_TEST,
+        let otherTestValue;
+        const otherTestConnectionID = Onyx.connect({
+            key: ONYX_KEYS.OTHER_TEST,
             callback: (value) => {
-                anotherTestValue = value;
+                otherTestValue = value;
             },
         });
 
@@ -87,13 +87,13 @@ describe('Onyx', () => {
             .then(() => Onyx.set(ONYX_KEYS.TEST_KEY, 'test'))
             .then(() => {
                 expect(testKeyValue).toBe('test');
-                expect(anotherTestValue).toBe(42);
+                expect(otherTestValue).toBe(42);
                 return Onyx.clear().then(waitForPromisesToResolve);
             })
             .then(() => {
                 expect(testKeyValue).toBeNull();
-                expect(anotherTestValue).toBe(42);
-                return Onyx.disconnect(anotherTestConnectionID);
+                expect(otherTestValue).toBe(42);
+                return Onyx.disconnect(otherTestConnectionID);
             });
     });
 

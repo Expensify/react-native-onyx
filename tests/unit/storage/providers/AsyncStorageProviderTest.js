@@ -61,7 +61,7 @@ describe('storage/providers/AsyncStorage', () => {
                         callArgs,
                         ([key, parsedValue]) => StorageProvider
                             .getItem(key)
-                            .then(value => expect(value).toEqual(parsedValue))
+                            .then(value => expect(value).toEqual(parsedValue)),
                     );
 
                     return Promise.all(promises);
