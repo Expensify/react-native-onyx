@@ -306,4 +306,110 @@ describe('Onyx', () => {
                 });
             });
     });
+
+    it('should use update data object to set/merge keys', () => {
+        let testKeyValue;
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        let anotherTestKeyValue;
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.ANOTHER_TEST,
+            initWithStoredValues: false,
+            callback: (value) => {
+                anotherTestKeyValue = value;
+            },
+        });
+
+        return waitForPromisesToResolve()
+            .then(() => {
+                Onyx.set(ONYX_KEYS.TEST_KEY, true);
+                Onyx.set(ONYX_KEYS.ANOTHER_TEST, {test1: 'test1'});
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                expect(testKeyValue).toBe(true);
+                expect(anotherTestKeyValue).toEqual({test1: 'test1'});
+                Onyx.update([
+                    {
+                        onyxMethod: 'set',
+                        key: ONYX_KEYS.TEST_KEY,
+                        value: 'four',
+                    },
+                    {
+                        onyxMethod: 'merge',
+                        key: ONYX_KEYS.ANOTHER_TEST,
+                        value: {test2: 'test2'},
+                    },
+                ]);
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                expect(testKeyValue).toBe('four');
+                expect(anotherTestKeyValue).toEqual({test1: 'test1', test2: 'test2'});
+            });
+    });
+
+    it('should throw error when onyxMethod is incorrect in update method', () => {
+        try {
+            Onyx.update([
+                {
+                    onyxMethod: 'set',
+                    key: ONYX_KEYS.TEST_KEY,
+                    value: 'four',
+                },
+                {
+                    onyxMethod: 'multiSet',
+                    key: ONYX_KEYS.ANOTHER_TEST,
+                    value: {test2: 'test2'},
+                },
+            ]);
+        } catch (error) {
+            // eslint-disable-next-line max-len
+            expect(error.message).toEqual(`Invalid onyxMethod multiSet in Onyx update.`);
+        }
+    });
+
+    it('should throw error when key is missing in update method', () => {
+        try {
+            Onyx.update([
+                {
+                    onyxMethod: 'set',
+                    key: ONYX_KEYS.TEST_KEY,
+                    value: 'four',
+                },
+                {
+                    onyxMethod: 'merge',
+                    value: {test2: 'test2'},
+                },
+            ]);
+        } catch (error) {
+            // eslint-disable-next-line max-len
+            expect(error.message).toEqual(`Invalid undefined key provided in Onyx update. Onyx key must be of type string.`);
+        }
+    });
+
+    it('should throw error when value is undefined in update method', () => {
+        try {
+            Onyx.update([
+                {
+                    onyxMethod: 'set',
+                    key: ONYX_KEYS.TEST_KEY,
+                    value: 'four',
+                },
+                {
+                    onyxMethod: 'merge',
+                    key: ONYX_KEYS.ANOTHER_TEST,
+                },
+            ]);
+        } catch (error) {
+            // eslint-disable-next-line max-len
+            expect(error.message).toEqual(`Undefined value passed to key anotherTest in Onyx update.`);
+        }
+    });
 });
