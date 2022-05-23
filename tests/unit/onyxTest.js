@@ -355,58 +355,30 @@ describe('Onyx', () => {
             });
     });
 
-    it('should throw error when onyxMethod is incorrect in update method', () => {
+    it('should throw an error when the data object is incorrect in Onyx.update', () => {
+        const data = [
+            {onyxMethod: 'set', key: ONYX_KEYS.TEST_KEY, value: 'four'},
+            {onyxMethod: 'multiSet', key: ONYX_KEYS.ANOTHER_TEST, value: {test2: 'test2'}}
+        ];
+
         try {
-            Onyx.update([
-                {
-                    onyxMethod: 'set',
-                    key: ONYX_KEYS.TEST_KEY,
-                    value: 'four',
-                },
-                {
-                    onyxMethod: 'multiSet',
-                    key: ONYX_KEYS.ANOTHER_TEST,
-                    value: {test2: 'test2'},
-                },
-            ]);
+            Onyx.update(data);
         } catch (error) {
             // eslint-disable-next-line max-len
             expect(error.message).toEqual('Invalid onyxMethod multiSet in Onyx update.');
         }
-    });
 
-    it('should throw error when key is missing in update method', () => {
         try {
-            Onyx.update([
-                {
-                    onyxMethod: 'set',
-                    key: ONYX_KEYS.TEST_KEY,
-                    value: 'four',
-                },
-                {
-                    onyxMethod: 'merge',
-                    value: {test2: 'test2'},
-                },
-            ]);
+            data[1] = {onyxMethod: 'merge', key: true, value: {test2: 'test2'}};
+            Onyx.update(data);
         } catch (error) {
             // eslint-disable-next-line max-len
-            expect(error.message).toEqual('Invalid undefined key provided in Onyx update. Onyx key must be of type string.');
+            expect(error.message).toEqual('Invalid boolean key provided in Onyx update. Onyx key must be of type string.');
         }
-    });
 
-    it('should throw error when value is undefined in update method', () => {
         try {
-            Onyx.update([
-                {
-                    onyxMethod: 'set',
-                    key: ONYX_KEYS.TEST_KEY,
-                    value: 'four',
-                },
-                {
-                    onyxMethod: 'merge',
-                    key: ONYX_KEYS.ANOTHER_TEST,
-                },
-            ]);
+            data[1] = {onyxMethod: 'merge', key: ONYX_KEYS.ANOTHER_TEST};
+            Onyx.update(data);
         } catch (error) {
             // eslint-disable-next-line max-len
             expect(error.message).toEqual('Undefined value passed to key anotherTest in Onyx update.');
