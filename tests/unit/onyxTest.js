@@ -328,6 +328,7 @@ describe('Onyx', () => {
 
         return waitForPromisesToResolve()
             .then(() => {
+                // GIVEN the initial Onyx state: {test: true, anotherTest: {test1: 'test1'}}
                 Onyx.set(ONYX_KEYS.TEST_KEY, true);
                 Onyx.set(ONYX_KEYS.ANOTHER_TEST, {test1: 'test1'});
                 return waitForPromisesToResolve();
@@ -335,11 +336,13 @@ describe('Onyx', () => {
             .then(() => {
                 expect(testKeyValue).toBe(true);
                 expect(anotherTestKeyValue).toEqual({test1: 'test1'});
+
+                // WHEN we pass a data object to Onyx.update
                 Onyx.update([
                     {
                         onyxMethod: 'set',
                         key: ONYX_KEYS.TEST_KEY,
-                        value: 'four',
+                        value: 'one',
                     },
                     {
                         onyxMethod: 'merge',
@@ -350,36 +353,37 @@ describe('Onyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                expect(testKeyValue).toBe('four');
+                // THEN the final Onyx state should be {test: 'one', anotherTest: {test1: 'test1', test2: 'test2'}}
+                expect(testKeyValue).toBe('one');
                 expect(anotherTestKeyValue).toEqual({test1: 'test1', test2: 'test2'});
             });
     });
 
     it('should throw an error when the data object is incorrect in Onyx.update', () => {
+        // GIVEN the invalid data object with onyxMethod='multiSet'
         const data = [
             {onyxMethod: 'set', key: ONYX_KEYS.TEST_KEY, value: 'four'},
             {onyxMethod: 'multiSet', key: ONYX_KEYS.ANOTHER_TEST, value: {test2: 'test2'}}
         ];
 
         try {
+            // WHEN we pass it to Onyx.update
             Onyx.update(data);
         } catch (error) {
+            // THEN we should expect the error message below
             expect(error.message).toEqual('Invalid onyxMethod multiSet in Onyx update.');
         }
 
         try {
+            // GIVEN the invalid data object with key=true
             data[1] = {onyxMethod: 'merge', key: true, value: {test2: 'test2'}};
+
+            // WHEN we pass it to Onyx.update
             Onyx.update(data);
         } catch (error) {
+            // THEN we should expect the error message below
             // eslint-disable-next-line max-len
             expect(error.message).toEqual('Invalid boolean key provided in Onyx update. Onyx key must be of type string.');
-        }
-
-        try {
-            data[1] = {onyxMethod: 'merge', key: ONYX_KEYS.ANOTHER_TEST};
-            Onyx.update(data);
-        } catch (error) {
-            expect(error.message).toEqual('Undefined value passed to key anotherTest in Onyx update.');
         }
     });
 });
