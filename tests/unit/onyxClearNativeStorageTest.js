@@ -10,10 +10,6 @@ const MERGED_VALUE = 'merged';
 const DEFAULT_VALUE = 'default';
 
 let storageCallResolveList = [];
-function addStorageCallResolve(name) {
-    storageCallResolveList.push(name);
-}
-
 function storageCallResolveOrder(methodName) {
     return storageCallResolveList.indexOf(methodName) + 1;
 }
@@ -25,7 +21,7 @@ const asyncStorageMockClear = AsyncStorageMock.clear;
 AsyncStorageMock.clear = jest.fn(() => Promise.all(storageCallQueue)
     .then(() => {
         const clearPromise = asyncStorageMockClear()
-            .then(addStorageCallResolve('clear'));
+            .then(storageCallResolveList.push('clear'));
         storageCallQueue.push(clearPromise);
         return clearPromise;
     }));
@@ -35,7 +31,7 @@ const asyncStorageMockSetItem = AsyncStorageMock.setItem;
 AsyncStorageMock.setItem = jest.fn((key, value) => Promise.all(storageCallQueue)
     .then(() => {
         const setItemPromise = asyncStorageMockSetItem(key, value)
-            .then(addStorageCallResolve('setItem'));
+            .then(storageCallResolveList.push('setItem'));
         storageCallQueue.push(setItemPromise);
         return setItemPromise;
     }));
