@@ -10,7 +10,14 @@ const MERGED_VALUE = 'merged';
 const DEFAULT_VALUE = 'default';
 
 let storageCallResolveList = [];
-function storageCallResolveOrder(methodName) {
+
+/**
+ * Get the order in which the storage method call resolved so we can assert that
+ * updates to storage are made in the expected order.
+ * @param {String} methodName The name of the storage method
+ * @returns {Number}
+ */
+function getStorageCallResolveOrder(methodName) {
     return storageCallResolveList.indexOf(methodName) + 1;
 }
 
@@ -88,8 +95,8 @@ describe('Set data while storage is clearing', () => {
         Onyx.clear();
         return waitForPromisesToResolve()
             .then(() => {
-                expect(storageCallResolveOrder('clear')).toBe(1);
-                expect(storageCallResolveOrder('setItem')).toBe(2);
+                expect(getStorageCallResolveOrder('clear')).toBe(1);
+                expect(getStorageCallResolveOrder('setItem')).toBe(2);
                 expect(onyxValue).toBe(MERGED_VALUE);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
                 expect(cachedValue).toBe(MERGED_VALUE);
@@ -111,8 +118,8 @@ describe('Set data while storage is clearing', () => {
             .then(() => {
                 // Onyx.set is faster than merge.
                 // AsyncStorage.setItem resolves before AsyncStorage.clear
-                expect(storageCallResolveOrder('setItem')).toBe(1);
-                expect(storageCallResolveOrder('clear')).toBe(2);
+                expect(getStorageCallResolveOrder('setItem')).toBe(1);
+                expect(getStorageCallResolveOrder('clear')).toBe(2);
                 expect(onyxValue).toBe(SET_VALUE);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
                 expect(cachedValue).toBe(SET_VALUE);
@@ -128,8 +135,8 @@ describe('Set data while storage is clearing', () => {
         Onyx.clear();
         return waitForPromisesToResolve()
             .then(() => {
-                expect(storageCallResolveOrder('setItem')).toBe(1);
-                expect(storageCallResolveOrder('clear')).toBe(2);
+                expect(getStorageCallResolveOrder('setItem')).toBe(1);
+                expect(getStorageCallResolveOrder('clear')).toBe(2);
                 expect(onyxValue).toBe(DEFAULT_VALUE);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
                 expect(cachedValue).toBe(DEFAULT_VALUE);
@@ -147,8 +154,8 @@ describe('Set data while storage is clearing', () => {
         Onyx.clear();
         return waitForPromisesToResolve()
             .then(() => {
-                expect(storageCallResolveOrder('setItem')).toBe(1);
-                expect(storageCallResolveOrder('clear')).toBe(2);
+                expect(getStorageCallResolveOrder('setItem')).toBe(1);
+                expect(getStorageCallResolveOrder('clear')).toBe(2);
                 expect(onyxValue).toBe(DEFAULT_VALUE);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
                 expect(cachedValue).toBe(DEFAULT_VALUE);
