@@ -1,4 +1,4 @@
-name: Publish web package to npmjs
+name: Publish package to npmjs
 
 # This workflow runs when code is pushed to `main` (i.e: when a pull request is merged)
 on:
