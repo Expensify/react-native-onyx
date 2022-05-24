@@ -106,29 +106,6 @@ describe('Set data while storage is clearing', () => {
             });
     });
 
-    it('should cache the value of Onyx.set when called between the cache and storage clearing', () => {
-        expect.assertions(5);
-        Storage.clear = jest.fn(() => {
-            // Call set between the cache and storage clearing
-            Onyx.set(ONYX_KEYS.DEFAULT_KEY, SET_VALUE);
-            AsyncStorageMock.clear();
-            return waitForPromisesToResolve();
-        });
-        Onyx.clear();
-        return waitForPromisesToResolve()
-            .then(() => {
-                // Onyx.set is faster than merge.
-                // AsyncStorage.setItem resolves before AsyncStorage.clear
-                expect(getStorageCallResolveOrder('setItem')).toBe(1);
-                expect(getStorageCallResolveOrder('clear')).toBe(2);
-                expect(onyxValue).toBe(SET_VALUE);
-                const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
-                expect(cachedValue).toBe(SET_VALUE);
-                const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
-                return expect(storedValue).resolves.toBe(SET_VALUE);
-            });
-    });
-
     it('should replace the value of Onyx.set with the default key state in the cache', () => {
         expect.assertions(5);
         Onyx.set(ONYX_KEYS.DEFAULT_KEY, SET_VALUE);
