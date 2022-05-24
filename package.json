@@ -30,7 +30,7 @@
     "lint": "eslint .",
     "lint-tests": "eslint tests/**",
     "test": "jest",
-    "build:web": "webpack --config webpack.config.js",
+    "build": "webpack --config webpack.config.js",
     "build:docs": "node buildDocs.js"
   },
   "dependencies": {

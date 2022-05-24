@@ -39,8 +39,8 @@ jobs:
             - name: Set new version in GitHub ENV
               run: echo "NEW_VERSION=$(npm info react-native-onyx version)" >> $GITHUB_ENV
 
-            - name: Build web code
-              run: npm run build:web
+            - name: Build package
+              run: npm run build
 
             - run: npm publish
               env:
