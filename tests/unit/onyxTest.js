@@ -316,25 +316,25 @@ describe('Onyx', () => {
             },
         });
 
-        let anotherTestKeyValue;
+        let otherTestKeyValue;
         connectionID = Onyx.connect({
-            key: ONYX_KEYS.ANOTHER_TEST,
+            key: ONYX_KEYS.OTHER_TEST,
             initWithStoredValues: false,
             callback: (value) => {
-                anotherTestKeyValue = value;
+                otherTestKeyValue = value;
             },
         });
 
         return waitForPromisesToResolve()
             .then(() => {
-                // GIVEN the initial Onyx state: {test: true, anotherTest: {test1: 'test1'}}
+                // GIVEN the initial Onyx state: {test: true, otherTest: {test1: 'test1'}}
                 Onyx.set(ONYX_KEYS.TEST_KEY, true);
-                Onyx.set(ONYX_KEYS.ANOTHER_TEST, {test1: 'test1'});
+                Onyx.set(ONYX_KEYS.OTHER_TEST, {test1: 'test1'});
                 return waitForPromisesToResolve();
             })
             .then(() => {
                 expect(testKeyValue).toBe(true);
-                expect(anotherTestKeyValue).toEqual({test1: 'test1'});
+                expect(otherTestKeyValue).toEqual({test1: 'test1'});
 
                 // WHEN we pass a data object to Onyx.update
                 Onyx.update([
@@ -345,16 +345,16 @@ describe('Onyx', () => {
                     },
                     {
                         onyxMethod: 'merge',
-                        key: ONYX_KEYS.ANOTHER_TEST,
+                        key: ONYX_KEYS.OTHER_TEST,
                         value: {test2: 'test2'},
                     },
                 ]);
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                // THEN the final Onyx state should be {test: 'one', anotherTest: {test1: 'test1', test2: 'test2'}}
+                // THEN the final Onyx state should be {test: 'one', otherTest: {test1: 'test1', test2: 'test2'}}
                 expect(testKeyValue).toBe('one');
-                expect(anotherTestKeyValue).toEqual({test1: 'test1', test2: 'test2'});
+                expect(otherTestKeyValue).toEqual({test1: 'test1', test2: 'test2'});
             });
     });
 
@@ -362,7 +362,7 @@ describe('Onyx', () => {
         // GIVEN the invalid data object with onyxMethod='multiSet'
         const data = [
             {onyxMethod: 'set', key: ONYX_KEYS.TEST_KEY, value: 'four'},
-            {onyxMethod: 'multiSet', key: ONYX_KEYS.ANOTHER_TEST, value: {test2: 'test2'}}
+            {onyxMethod: 'multiSet', key: ONYX_KEYS.OTHER_TEST, value: {test2: 'test2'}},
         ];
 
         try {
