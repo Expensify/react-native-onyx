@@ -83,6 +83,7 @@ describe('Set data while storage is clearing', () => {
     it('should persist the value of Onyx.merge when called between the cache and storage clearing', () => {
         expect.assertions(5);
 
+        // GIVEN that Onyx is completely clear
         // WHEN Onyx.clear() is called
         Storage.clear = jest.fn(() => {
             // WHEN merge is called between the cache and storage clearing, on a key with a default key state
