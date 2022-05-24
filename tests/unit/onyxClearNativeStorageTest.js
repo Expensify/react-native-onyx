@@ -22,6 +22,7 @@ function getStorageCallResolveOrder(methodName) {
     return storageCallResolveList.indexOf(methodName) + 1;
 }
 
+// Add all storage calls to a queue and make them wait for each other to match the real implementation.
 let storageCallQueue = [];
 
 // Track when AsyncStorageMock.clear calls resolve.
