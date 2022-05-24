@@ -1,6 +1,7 @@
 import AsyncStorageMock from '../../__mocks__/@react-native-async-storage/async-storage';
 import Storage from '../../lib/storage';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
+import Onyx from '../../lib/Onyx';
 
 const ONYX_KEYS = {
     DEFAULT_KEY: 'defaultKey',
@@ -45,15 +46,10 @@ AsyncStorageMock.setItem = jest.fn((key, value) => Promise.all(storageCallQueue)
 
 describe('Set data while storage is clearing', () => {
     let connectionID;
-    let Onyx;
     let onyxValue;
 
     /** @type OnyxCache */
     let cache;
-
-    beforeAll(() => {
-        Onyx = require('../../index').default;
-    });
 
     // Always use a "fresh" cache instance
     beforeEach(() => {
