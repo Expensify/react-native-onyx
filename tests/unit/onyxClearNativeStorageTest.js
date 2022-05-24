@@ -1,4 +1,4 @@
-import AsyncStorageMock from '@react-native-async-storage/async-storage';
+import AsyncStorageMock from '../../__mocks__/@react-native-async-storage/async-storage';
 import Storage from '../../lib/storage';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
