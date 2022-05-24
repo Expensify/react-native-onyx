@@ -381,7 +381,6 @@ describe('Onyx', () => {
             Onyx.update(data);
         } catch (error) {
             // THEN we should expect the error message below
-            // eslint-disable-next-line max-len
             expect(error.message).toEqual('Invalid boolean key provided in Onyx update. Onyx key must be of type string.');
         }
     });
