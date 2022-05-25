@@ -8,6 +8,10 @@ on:
 jobs:
     version:
         runs-on: ubuntu-latest
+
+        # botify will update the version on `main`, so this check is important to prevent an infinite loop
+        if: ${{ github.actor != 'botify' }}
+
         steps:
             # Running this action ensures that only one instance of this job will run at a time.
             # This is important to prevent race conditions when multiple pull requests are merged in quick succession
@@ -16,6 +20,21 @@ jobs:
                   poll-interval-seconds: 10
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Decrypt & Import Botify GPG key
+              run: |
+                cd .github
+                gpg --quiet --batch --yes --decrypt --passphrase="$LARGE_SECRET_PASSPHRASE" --output Botify-private-key.asc Botify-private-key.asc.gpg
+                gpg --import --batch Botify-private-key.asc
+              env:
+                LARGE_SECRET_PASSPHRASE: ${{ secrets.LARGE_SECRET_PASSPHRASE }}
+
+            - name: Set up git for Botify
+              run: |
+                git config --global user.signingkey F34C92C6A7FB2652
+                git config --global commit.gpgsign true
+                git config --global user.name botify
+                git config --global user.email infra+botify@expensify.com
 
             - uses: actions/checkout@v3
 
