@@ -217,31 +217,25 @@ describe('withOnyx', () => {
         return waitForPromisesToResolve()
             .then(() => {
                 // WHEN three components subscribe to each of the items in that collection
-                const TestComponentWithOnyx1 = compose(
-                    withOnyx({
-                        testObject: {
-                            key: `${ONYX_KEYS.COLLECTION.TEST_KEY}1`,
-                        },
-                    }),
-                )(ViewWithCollections);
+                const TestComponentWithOnyx1 = withOnyx({
+                    testObject: {
+                        key: `${ONYX_KEYS.COLLECTION.TEST_KEY}1`,
+                    },
+                })(ViewWithCollections);
                 render(<TestComponentWithOnyx1 onRender={onRender1} />);
 
-                const TestComponentWithOnyx2 = compose(
-                    withOnyx({
-                        testObject: {
-                            key: `${ONYX_KEYS.COLLECTION.TEST_KEY}2`,
-                        },
-                    }),
-                )(ViewWithCollections);
+                const TestComponentWithOnyx2 = withOnyx({
+                    testObject: {
+                        key: `${ONYX_KEYS.COLLECTION.TEST_KEY}2`,
+                    },
+                })(ViewWithCollections);
                 render(<TestComponentWithOnyx2 onRender={onRender2} />);
 
-                const TestComponentWithOnyx3 = compose(
-                    withOnyx({
-                        testObject: {
-                            key: `${ONYX_KEYS.COLLECTION.TEST_KEY}3`,
-                        },
-                    }),
-                )(ViewWithCollections);
+                const TestComponentWithOnyx3 = withOnyx({
+                    testObject: {
+                        key: `${ONYX_KEYS.COLLECTION.TEST_KEY}3`,
+                    },
+                })(ViewWithCollections);
                 render(<TestComponentWithOnyx3 onRender={onRender3} />);
 
                 return waitForPromisesToResolve();
@@ -281,13 +275,11 @@ describe('withOnyx', () => {
         return waitForPromisesToResolve()
             .then(() => {
                 // WHEN a component subscribes to the one item in that collection
-                const TestComponentWithOnyx = compose(
-                    withOnyx({
-                        testObject: {
-                            key: `${ONYX_KEYS.COLLECTION.TEST_KEY}1`,
-                        },
-                    }),
-                )(ViewWithCollections);
+                const TestComponentWithOnyx = withOnyx({
+                    testObject: {
+                        key: `${ONYX_KEYS.COLLECTION.TEST_KEY}1`,
+                    },
+                })(ViewWithCollections);
                 render(<TestComponentWithOnyx onRender={onRender} />);
 
                 return waitForPromisesToResolve();

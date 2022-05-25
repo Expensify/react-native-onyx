@@ -80,7 +80,7 @@ describe('storage/providers/LocalForage', () => {
         // When data is merged to storage
         return StorageProvider.multiMerge([
             ['@USER_1', USER_1_DELTA],
-            ['@USER_2', USER_2_DELTA]
+            ['@USER_2', USER_2_DELTA],
         ])
             .then(() => {
                 // Then each existing item should be set with the merged content
@@ -90,8 +90,8 @@ describe('storage/providers/LocalForage', () => {
                         age: 31,
                         traits: {
                             hair: 'brown',
-                            eyes: 'blue'
-                        }
+                            eyes: 'blue',
+                        },
                     });
 
                 expect(setItemSpy).toHaveBeenNthCalledWith(2,
@@ -100,7 +100,7 @@ describe('storage/providers/LocalForage', () => {
                         age: 26,
                         traits: {
                             hair: 'green',
-                        }
+                        },
                     });
             });
     });

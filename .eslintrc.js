@@ -10,9 +10,9 @@ module.exports = {
     settings: {
         'import/resolver': {
             node: {
-                extensions: ['.js', '.native.js', '.web.js']
-            }
-        }
+                extensions: ['.js', '.native.js', '.web.js'],
+            },
+        },
     },
     ignorePatterns: 'dist',
 };

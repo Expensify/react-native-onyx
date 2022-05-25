@@ -6,7 +6,7 @@ describe('Onyx', () => {
 
         const ONYX_KEYS = {
             TEST_KEY: 'test',
-            ANOTHER_TEST: 'anotherTest',
+            OTHER_TEST: 'otherTest',
         };
 
         // Always use a "fresh" (and undecorated) instance

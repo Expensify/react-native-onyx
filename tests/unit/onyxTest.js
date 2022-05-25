@@ -3,17 +3,17 @@ import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
-    ANOTHER_TEST: 'anotherTest',
+    OTHER_TEST: 'otherTest',
     COLLECTION: {
         TEST_KEY: 'test_',
-    }
+    },
 };
 
 Onyx.init({
     keys: ONYX_KEYS,
     registerStorageEventListener: () => {},
     initialKeyStates: {
-        [ONYX_KEYS.ANOTHER_TEST]: 42,
+        [ONYX_KEYS.OTHER_TEST]: 42,
     },
 });
 
@@ -75,11 +75,11 @@ describe('Onyx', () => {
             },
         });
 
-        let anotherTestValue;
-        const anotherTestConnectionID = Onyx.connect({
-            key: ONYX_KEYS.ANOTHER_TEST,
+        let otherTestValue;
+        const otherTestConnectionID = Onyx.connect({
+            key: ONYX_KEYS.OTHER_TEST,
             callback: (value) => {
-                anotherTestValue = value;
+                otherTestValue = value;
             },
         });
 
@@ -87,13 +87,13 @@ describe('Onyx', () => {
             .then(() => Onyx.set(ONYX_KEYS.TEST_KEY, 'test'))
             .then(() => {
                 expect(testKeyValue).toBe('test');
-                expect(anotherTestValue).toBe(42);
+                expect(otherTestValue).toBe(42);
                 return Onyx.clear().then(waitForPromisesToResolve);
             })
             .then(() => {
                 expect(testKeyValue).toBeNull();
-                expect(anotherTestValue).toBe(42);
-                return Onyx.disconnect(anotherTestConnectionID);
+                expect(otherTestValue).toBe(42);
+                return Onyx.disconnect(otherTestConnectionID);
             });
     });
 
@@ -189,16 +189,16 @@ describe('Onyx', () => {
         return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
             test_1: {
                 ID: 123,
-                value: 'one'
+                value: 'one',
             },
             test_2: {
                 ID: 234,
-                value: 'two'
+                value: 'two',
             },
             test_3: {
                 ID: 345,
-                value: 'three'
-            }
+                value: 'three',
+            },
         })
             .then(() => (
 
@@ -207,20 +207,20 @@ describe('Onyx', () => {
                 Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                     test_1: {
                         ID: 123,
-                        value: 'five'
+                        value: 'five',
                     },
                     test_2: {
                         ID: 234,
-                        value: 'four'
+                        value: 'four',
                     },
                     test_4: {
                         ID: 456,
-                        value: 'two'
+                        value: 'two',
                     },
                     test_5: {
                         ID: 567,
-                        value: 'one'
-                    }
+                        value: 'one',
+                    },
                 })
             ))
             .then(() => {
@@ -258,10 +258,9 @@ describe('Onyx', () => {
 
     it('should throw error when a key not belonging to collection key is present in mergeCollection', () => {
         try {
-            Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, not_my_test: {beep: 'boop'}});
+            Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, notMyTest: {beep: 'boop'}});
         } catch (error) {
-            // eslint-disable-next-line max-len
-            expect(error.message).toEqual(`Provided collection does not have all its data belonging to the same parent. CollectionKey: ${ONYX_KEYS.COLLECTION.TEST_KEY}, DataKey: not_my_test`);
+            expect(error.message).toEqual(`Provided collection doesn't have all its data belonging to the same parent. CollectionKey: ${ONYX_KEYS.COLLECTION.TEST_KEY}, DataKey: notMyTest`);
         }
     });
 
@@ -279,16 +278,16 @@ describe('Onyx', () => {
             },
             test_2: {
                 existingData: 'test',
-            }
+            },
         })
             .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                 test_1: {
                     ID: 123,
-                    value: 'one'
+                    value: 'one',
                 },
                 test_2: {
                     ID: 234,
-                    value: 'two'
+                    value: 'two',
                 },
             }))
             .then(() => {
@@ -317,25 +316,25 @@ describe('Onyx', () => {
             },
         });
 
-        let anotherTestKeyValue;
+        let otherTestKeyValue;
         connectionID = Onyx.connect({
-            key: ONYX_KEYS.ANOTHER_TEST,
+            key: ONYX_KEYS.OTHER_TEST,
             initWithStoredValues: false,
             callback: (value) => {
-                anotherTestKeyValue = value;
+                otherTestKeyValue = value;
             },
         });
 
         return waitForPromisesToResolve()
             .then(() => {
-                // GIVEN the initial Onyx state: {test: true, anotherTest: {test1: 'test1'}}
+                // GIVEN the initial Onyx state: {test: true, otherTest: {test1: 'test1'}}
                 Onyx.set(ONYX_KEYS.TEST_KEY, true);
-                Onyx.set(ONYX_KEYS.ANOTHER_TEST, {test1: 'test1'});
+                Onyx.set(ONYX_KEYS.OTHER_TEST, {test1: 'test1'});
                 return waitForPromisesToResolve();
             })
             .then(() => {
                 expect(testKeyValue).toBe(true);
-                expect(anotherTestKeyValue).toEqual({test1: 'test1'});
+                expect(otherTestKeyValue).toEqual({test1: 'test1'});
 
                 // WHEN we pass a data object to Onyx.update
                 Onyx.update([
@@ -346,16 +345,16 @@ describe('Onyx', () => {
                     },
                     {
                         onyxMethod: 'merge',
-                        key: ONYX_KEYS.ANOTHER_TEST,
+                        key: ONYX_KEYS.OTHER_TEST,
                         value: {test2: 'test2'},
                     },
                 ]);
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                // THEN the final Onyx state should be {test: 'one', anotherTest: {test1: 'test1', test2: 'test2'}}
+                // THEN the final Onyx state should be {test: 'one', otherTest: {test1: 'test1', test2: 'test2'}}
                 expect(testKeyValue).toBe('one');
-                expect(anotherTestKeyValue).toEqual({test1: 'test1', test2: 'test2'});
+                expect(otherTestKeyValue).toEqual({test1: 'test1', test2: 'test2'});
             });
     });
 
@@ -363,7 +362,7 @@ describe('Onyx', () => {
         // GIVEN the invalid data object with onyxMethod='multiSet'
         const data = [
             {onyxMethod: 'set', key: ONYX_KEYS.TEST_KEY, value: 'four'},
-            {onyxMethod: 'multiSet', key: ONYX_KEYS.ANOTHER_TEST, value: {test2: 'test2'}}
+            {onyxMethod: 'multiSet', key: ONYX_KEYS.OTHER_TEST, value: {test2: 'test2'}},
         ];
 
         try {
@@ -382,7 +381,6 @@ describe('Onyx', () => {
             Onyx.update(data);
         } catch (error) {
             // THEN we should expect the error message below
-            // eslint-disable-next-line max-len
             expect(error.message).toEqual('Invalid boolean key provided in Onyx update. Onyx key must be of type string.');
         }
     });

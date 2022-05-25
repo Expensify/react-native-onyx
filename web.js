@@ -6,7 +6,7 @@
  */
 
 if (process.env.NODE_ENV === 'production') {
-    module.exports = require('./dist/web.min.js');
+    module.exports = require('./dist/web.min');
 } else {
-    module.exports = require('./dist/web.development.js');
+    module.exports = require('./dist/web.development');
 }

@@ -209,7 +209,7 @@ describe('Onyx', () => {
                 // WHEN merge is called with new key value pairs
                 cache.merge({
                     mockKey: {value: 'mockValue'},
-                    mockKey2: {value: 'mockValue2'}
+                    mockKey2: {value: 'mockValue2'},
                 });
 
                 // THEN data should be created in cache
@@ -225,7 +225,7 @@ describe('Onyx', () => {
                 // WHEN merge is called with existing key value pairs
                 cache.merge({
                     mockKey: {mockItems: []},
-                    mockKey2: {items: [1, 2], other: 'overwrittenMockValue'}
+                    mockKey2: {items: [1, 2], other: 'overwrittenMockValue'},
                 });
 
                 // THEN the values should be merged together in cache
@@ -243,18 +243,18 @@ describe('Onyx', () => {
 
             it('Should merge objects correctly', () => {
                 // GIVEN cache with existing object data
-                cache.set('mockKey', {value: 'mockValue', anotherValue: 'overwrite me'});
+                cache.set('mockKey', {value: 'mockValue', otherValue: 'overwrite me'});
 
                 // WHEN merge is called for a key with object value
                 cache.merge({
-                    mockKey: {mockItems: [], anotherValue: 'overwritten'}
+                    mockKey: {mockItems: [], otherValue: 'overwritten'},
                 });
 
                 // THEN the values should be merged together in cache
                 expect(cache.getValue('mockKey')).toEqual({
                     value: 'mockValue',
                     mockItems: [],
-                    anotherValue: 'overwritten',
+                    otherValue: 'overwritten',
                 });
             });
 
@@ -264,12 +264,12 @@ describe('Onyx', () => {
 
                 // WHEN merge is called with an array
                 cache.merge({
-                    mockKey: [{ID: 3}, {added: 'field'}, {}, {ID: 1000}]
+                    mockKey: [{ID: 3}, {added: 'field'}, {}, {ID: 1000}],
                 });
 
                 // THEN the arrays should be merged as expected
                 expect(cache.getValue('mockKey')).toEqual([
-                    {ID: 3}, {ID: 2, added: 'field'}, {ID: 3}, {ID: 1000}
+                    {ID: 3}, {ID: 2, added: 'field'}, {ID: 3}, {ID: 1000},
                 ]);
             });
 
@@ -401,7 +401,7 @@ describe('Onyx', () => {
 
         const ONYX_KEYS = {
             TEST_KEY: 'test',
-            ANOTHER_TEST: 'anotherTest',
+            OTHER_TEST: 'otherTest',
             COLLECTION: {
                 MOCK_COLLECTION: 'mock_collection_',
             },
@@ -453,7 +453,7 @@ describe('Onyx', () => {
                             <TestComponentWithOnyx />
                             <TestComponentWithOnyx />
                             <TestComponentWithOnyx />
-                        </>
+                        </>,
                     );
                 })
                 .then(waitForPromisesToResolve)
@@ -483,7 +483,7 @@ describe('Onyx', () => {
                             <TestComponentWithOnyx />
                             <TestComponentWithOnyx />
                             <TestComponentWithOnyx />
-                        </>
+                        </>,
                     );
                 })
                 .then(waitForPromisesToResolve)
@@ -496,16 +496,19 @@ describe('Onyx', () => {
         it('Should keep recently accessed items in cache', () => {
             // GIVEN Storage with 10 different keys
             AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
+            const range = _.range(10);
             AsyncStorageMock.getAllKeys.mockResolvedValue(
-                _.range(10).map(number => `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}${number}`)
+                _.map(range, number => `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}${number}`),
             );
             let connections;
 
             // GIVEN Onyx is configured with max 5 keys in cache
-            return initOnyx({maxCachedKeysCount: 5})
+            return initOnyx({
+                maxCachedKeysCount: 5,
+            })
                 .then(() => {
                     // GIVEN 10 connections for different keys
-                    connections = _.range(10).map((number) => {
+                    connections = _.map(range, (number) => {
                         const key = `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}${number}`;
                         return ({
                             key,
@@ -573,24 +576,24 @@ describe('Onyx', () => {
                 },
             })(ViewWithCollections);
 
-            const AnotherTestComponentWithOnyx = withOnyx({
+            const OtherTestComponentWithOnyx = withOnyx({
                 text: {
-                    key: ONYX_KEYS.ANOTHER_TEST,
+                    key: ONYX_KEYS.OTHER_TEST,
                 },
             })(ViewWithText);
 
             // GIVEN some values exist in storage
             AsyncStorageMock.setItem(ONYX_KEYS.TEST_KEY, JSON.stringify({ID: 15, data: 'mock object with ID'}));
-            AsyncStorageMock.setItem(ONYX_KEYS.ANOTHER_TEST, JSON.stringify('mock text'));
-            AsyncStorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY, ONYX_KEYS.ANOTHER_TEST]);
+            AsyncStorageMock.setItem(ONYX_KEYS.OTHER_TEST, JSON.stringify('mock text'));
+            AsyncStorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY, ONYX_KEYS.OTHER_TEST]);
             return initOnyx()
                 .then(() => {
                     // WHEN the components are rendered multiple times
                     render(<TestComponentWithOnyx />);
-                    render(<AnotherTestComponentWithOnyx />);
+                    render(<OtherTestComponentWithOnyx />);
                     render(<TestComponentWithOnyx />);
-                    render(<AnotherTestComponentWithOnyx />);
-                    render(<AnotherTestComponentWithOnyx />);
+                    render(<OtherTestComponentWithOnyx />);
+                    render(<OtherTestComponentWithOnyx />);
                     render(<TestComponentWithOnyx />);
                 })
                 .then(waitForPromisesToResolve)
@@ -599,7 +602,7 @@ describe('Onyx', () => {
                     expect(AsyncStorageMock.getItem).toHaveBeenCalledTimes(2);
                     expect(AsyncStorageMock.getItem.mock.calls).toEqual([
                         [ONYX_KEYS.TEST_KEY],
-                        [ONYX_KEYS.ANOTHER_TEST]
+                        [ONYX_KEYS.OTHER_TEST],
                     ]);
                 });
         });
@@ -607,7 +610,8 @@ describe('Onyx', () => {
         it('Should clean cache when connections to eviction keys happen', () => {
             // GIVEN storage with some data
             AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
-            AsyncStorageMock.getAllKeys.mockResolvedValue(_.range(1, 10).map(n => `key${n}`));
+            const range = _.range(1, 10);
+            AsyncStorageMock.getAllKeys.mockResolvedValue(_.map(range, n => `key${n}`));
 
             jest.useFakeTimers();
 
