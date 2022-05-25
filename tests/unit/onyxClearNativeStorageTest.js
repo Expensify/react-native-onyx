@@ -1,5 +1,4 @@
-import AsyncStorageMock from '../../__mocks__/@react-native-async-storage/async-storage';
-import Storage from '../../lib/storage';
+import Storage from '../../__mocks__/@react-native-async-storage/async-storage';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import Onyx from '../../lib/Onyx';
 
@@ -38,7 +37,6 @@ describe('Set data while storage is clearing', () => {
 
     afterEach(() => {
         Onyx.disconnect(connectionID);
-        Storage.clear.mockReset();
         return Onyx.clear();
     });
 
@@ -47,13 +45,10 @@ describe('Set data while storage is clearing', () => {
 
         // GIVEN that Onyx is completely clear
         // WHEN Onyx.clear() is called
-        Storage.clear = jest.fn(() => {
-            // WHEN merge is called between the cache and storage clearing, on a key with a default key state
-            Onyx.merge(ONYX_KEYS.DEFAULT_KEY, MERGED_VALUE);
-            AsyncStorageMock.clear();
-            return waitForPromisesToResolve();
-        });
         Onyx.clear();
+
+        // WHEN merge is called between the cache and storage clearing, on a key with a default key state
+        Onyx.merge(ONYX_KEYS.DEFAULT_KEY, MERGED_VALUE);
         return waitForPromisesToResolve()
             .then(() => {
                 // THEN the value in Onyx, the cache, and the storage is the merged value
@@ -71,7 +66,6 @@ describe('Set data while storage is clearing', () => {
         // GIVEN that Onyx is completely clear
         // WHEN set then clear is called on a key with a default key state
         Onyx.set(ONYX_KEYS.DEFAULT_KEY, SET_VALUE);
-        Storage.clear = jest.fn(() => AsyncStorageMock.clear());
         Onyx.clear();
         return waitForPromisesToResolve()
             .then(() => {
@@ -93,7 +87,6 @@ describe('Set data while storage is clearing', () => {
         // GIVEN that Onyx is completely clear
         // WHEN merge then clear is called on a key with a default key state
         Onyx.merge(ONYX_KEYS.DEFAULT_KEY, MERGED_VALUE);
-        Storage.clear = jest.fn(() => AsyncStorageMock.clear());
         Onyx.clear();
         return waitForPromisesToResolve()
             .then(() => {
