@@ -10,41 +10,6 @@ const SET_VALUE = 'set';
 const MERGED_VALUE = 'merged';
 const DEFAULT_VALUE = 'default';
 
-let storageCallResolveList = [];
-
-/**
- * Get the order in which the storage method call resolved so we can assert that
- * updates to storage are made in the expected order.
- * @param {String} methodName The name of the storage method
- * @returns {Number}
- */
-function getStorageCallResolveOrder(methodName) {
-    return storageCallResolveList.indexOf(methodName) + 1;
-}
-
-// Add all storage calls to a queue and make them wait for each other to match the real implementation.
-let storageCallQueue = [];
-
-// Track when AsyncStorageMock.clear calls resolve.
-const asyncStorageMockClear = AsyncStorageMock.clear;
-AsyncStorageMock.clear = jest.fn(() => Promise.all(storageCallQueue)
-    .then(() => {
-        const clearPromise = asyncStorageMockClear()
-            .then(storageCallResolveList.push('clear'));
-        storageCallQueue.push(clearPromise);
-        return clearPromise;
-    }));
-
-// Track when AsyncStorageMock.setItem calls resolve.
-const asyncStorageMockSetItem = AsyncStorageMock.setItem;
-AsyncStorageMock.setItem = jest.fn((key, value) => Promise.all(storageCallQueue)
-    .then(() => {
-        const setItemPromise = asyncStorageMockSetItem(key, value)
-            .then(storageCallResolveList.push('setItem'));
-        storageCallQueue.push(setItemPromise);
-        return setItemPromise;
-    }));
-
 describe('Set data while storage is clearing', () => {
     let connectionID;
     let onyxValue;
@@ -74,15 +39,11 @@ describe('Set data while storage is clearing', () => {
     afterEach(() => {
         Onyx.disconnect(connectionID);
         Storage.clear.mockReset();
-        return Onyx.clear()
-            .then(() => {
-                storageCallResolveList = [];
-                storageCallQueue = [];
-            });
+        return Onyx.clear();
     });
 
     it('should persist the value of Onyx.merge when called between the cache and storage clearing', () => {
-        expect.assertions(5);
+        expect.assertions(3);
 
         // GIVEN that Onyx is completely clear
         // WHEN Onyx.clear() is called
@@ -95,10 +56,6 @@ describe('Set data while storage is clearing', () => {
         Onyx.clear();
         return waitForPromisesToResolve()
             .then(() => {
-                // THEN the storage finishes clearing before Storage.setItem finishes for the merged value
-                expect(getStorageCallResolveOrder('clear')).toBe(1);
-                expect(getStorageCallResolveOrder('setItem')).toBe(2);
-
                 // THEN the value in Onyx, the cache, and the storage is the merged value
                 expect(onyxValue).toBe(MERGED_VALUE);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
@@ -109,7 +66,7 @@ describe('Set data while storage is clearing', () => {
     });
 
     it('should replace the value of Onyx.set with the default key state in the cache', () => {
-        expect.assertions(5);
+        expect.assertions(3);
 
         // GIVEN that Onyx is completely clear
         // WHEN set then clear is called on a key with a default key state
@@ -118,10 +75,6 @@ describe('Set data while storage is clearing', () => {
         Onyx.clear();
         return waitForPromisesToResolve()
             .then(() => {
-                // THEN the Storage.setItem finishes for the set value before the storage finishes clearing
-                expect(getStorageCallResolveOrder('setItem')).toBe(1);
-                expect(getStorageCallResolveOrder('clear')).toBe(2);
-
                 // THEN the value in Onyx and the cache is the default key state
                 expect(onyxValue).toBe(DEFAULT_VALUE);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
@@ -135,7 +88,7 @@ describe('Set data while storage is clearing', () => {
     });
 
     it('should replace the value of Onyx.merge with the default key state in the cache', () => {
-        expect.assertions(5);
+        expect.assertions(3);
 
         // GIVEN that Onyx is completely clear
         // WHEN merge then clear is called on a key with a default key state
@@ -144,10 +97,6 @@ describe('Set data while storage is clearing', () => {
         Onyx.clear();
         return waitForPromisesToResolve()
             .then(() => {
-                // THEN the Storage.setItem finishes for the merged value before the storage finishes clearing
-                expect(getStorageCallResolveOrder('setItem')).toBe(1);
-                expect(getStorageCallResolveOrder('clear')).toBe(2);
-
                 // THEN the value in Onyx and the cache is the default key state
                 expect(onyxValue).toBe(DEFAULT_VALUE);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
