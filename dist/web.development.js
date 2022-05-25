@@ -1272,6 +1272,36 @@ function mergeCollection(collectionKey, collection) {
 }
 
 /**
+ * Insert API responses and lifecycle data into Onyx
+ *
+ * @param {Array} data An array of objects with shape {onyxMethod: oneOf('set', 'merge'), key: string, value: *}
+ */
+function update(data) {
+  // First, validate the Onyx object is in the format we expect
+  _underscore.default.each(data, function (_ref4) {var onyxMethod = _ref4.onyxMethod,key = _ref4.key;
+    if (!_underscore.default.contains(['set', 'merge'], onyxMethod)) {
+      throw new Error("Invalid onyxMethod " + onyxMethod + " in Onyx update.");
+    }
+    if (!_underscore.default.isString(key)) {
+      throw new Error("Invalid " + typeof key + " key provided in Onyx update. Onyx key must be of type string.");
+    }
+  });
+
+  _underscore.default.each(data, function (_ref5) {var onyxMethod = _ref5.onyxMethod,key = _ref5.key,value = _ref5.value;
+    switch (onyxMethod) {
+      case 'set':
+        set(key, value);
+        break;
+      case 'merge':
+        merge(key, value);
+        break;
+      default:
+        break;}
+
+  });
+}
+
+/**
  * Initialize the store with actions and listening for storage events
  *
  * @param {Object} [options={}] config object
@@ -1305,7 +1335,7 @@ function init()
 
 
 
-{var _ref4 = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {},_ref4$keys = _ref4.keys,keys = _ref4$keys === void 0 ? {} : _ref4$keys,_ref4$initialKeyState = _ref4.initialKeyStates,initialKeyStates = _ref4$initialKeyState === void 0 ? {} : _ref4$initialKeyState,_ref4$safeEvictionKey = _ref4.safeEvictionKeys,safeEvictionKeys = _ref4$safeEvictionKey === void 0 ? [] : _ref4$safeEvictionKey,_ref4$maxCachedKeysCo = _ref4.maxCachedKeysCount,maxCachedKeysCount = _ref4$maxCachedKeysCo === void 0 ? 1000 : _ref4$maxCachedKeysCo,_ref4$captureMetrics = _ref4.captureMetrics,captureMetrics = _ref4$captureMetrics === void 0 ? false : _ref4$captureMetrics,_ref4$shouldSyncMulti = _ref4.shouldSyncMultipleInstances,shouldSyncMultipleInstances = _ref4$shouldSyncMulti === void 0 ? Boolean(__webpack_require__.g.localStorage) : _ref4$shouldSyncMulti,_ref4$keysToDisableSy = _ref4.keysToDisableSyncEvents,keysToDisableSyncEvents = _ref4$keysToDisableSy === void 0 ? [] : _ref4$keysToDisableSy;
+{var _ref6 = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {},_ref6$keys = _ref6.keys,keys = _ref6$keys === void 0 ? {} : _ref6$keys,_ref6$initialKeyState = _ref6.initialKeyStates,initialKeyStates = _ref6$initialKeyState === void 0 ? {} : _ref6$initialKeyState,_ref6$safeEvictionKey = _ref6.safeEvictionKeys,safeEvictionKeys = _ref6$safeEvictionKey === void 0 ? [] : _ref6$safeEvictionKey,_ref6$maxCachedKeysCo = _ref6.maxCachedKeysCount,maxCachedKeysCount = _ref6$maxCachedKeysCo === void 0 ? 1000 : _ref6$maxCachedKeysCo,_ref6$captureMetrics = _ref6.captureMetrics,captureMetrics = _ref6$captureMetrics === void 0 ? false : _ref6$captureMetrics,_ref6$shouldSyncMulti = _ref6.shouldSyncMultipleInstances,shouldSyncMultipleInstances = _ref6$shouldSyncMulti === void 0 ? Boolean(__webpack_require__.g.localStorage) : _ref6$shouldSyncMulti,_ref6$keysToDisableSy = _ref6.keysToDisableSyncEvents,keysToDisableSyncEvents = _ref6$keysToDisableSy === void 0 ? [] : _ref6$keysToDisableSy;
   if (captureMetrics) {
     // The code here is only bundled and applied when the captureMetrics is set
     // eslint-disable-next-line no-use-before-define
@@ -1347,6 +1377,7 @@ var Onyx = {
   multiSet: multiSet,
   merge: merge,
   mergeCollection: mergeCollection,
+  update: update,
   clear: clear,
   init: init,
   registerLogger: _Logger.registerLogger,
@@ -1374,6 +1405,7 @@ function applyDecorators() {
   mergeCollection = decorate.decorateWithMetrics(mergeCollection, 'Onyx:mergeCollection');
   getAllKeys = decorate.decorateWithMetrics(getAllKeys, 'Onyx:getAllKeys');
   initializeWithDefaultKeyStates = decorate.decorateWithMetrics(initializeWithDefaultKeyStates, 'Onyx:defaults');
+  update = decorate.decorateWithMetrics(update, 'Onyx:update');
   /* eslint-enable */
 
   // Re-expose decorated methods
@@ -1382,6 +1414,7 @@ function applyDecorators() {
   Onyx.clear = clear;
   Onyx.merge = merge;
   Onyx.mergeCollection = mergeCollection;
+  Onyx.update = update;
 
   // Expose stats methods on Onyx
   Onyx.getMetrics = decorate.getMetrics;
@@ -1908,7 +1941,7 @@ var _react = _interopRequireDefault(__webpack_require__(/*! react */ "react"));
 var _underscore = _interopRequireDefault(__webpack_require__(/*! underscore */ "underscore"));
 var _propTypes = _interopRequireDefault(__webpack_require__(/*! prop-types */ "./node_modules/prop-types/index.js"));
 var _str = _interopRequireDefault(__webpack_require__(/*! expensify-common/lib/str */ "expensify-common/lib/str"));
-var _Onyx = _interopRequireDefault(__webpack_require__(/*! ./Onyx */ "./lib/Onyx.js"));var _jsxFileName = "D:\\Freelance\\Expensify.react-native-onyx\\lib\\withOnyx.js";function _createSuper(Derived) {var hasNativeReflectConstruct = _isNativeReflectConstruct();return function _createSuperInternal() {var Super = (0, _getPrototypeOf2.default)(Derived),result;if (hasNativeReflectConstruct) {var NewTarget = (0, _getPrototypeOf2.default)(this).constructor;result = Reflect.construct(Super, arguments, NewTarget);} else {result = Super.apply(this, arguments);}return (0, _possibleConstructorReturn2.default)(this, result);};}function _isNativeReflectConstruct() {if (typeof Reflect === "undefined" || !Reflect.construct) return false;if (Reflect.construct.sham) return false;if (typeof Proxy === "function") return true;try {Boolean.prototype.valueOf.call(Reflect.construct(Boolean, [], function () {}));return true;} catch (e) {return false;}}
+var _Onyx = _interopRequireDefault(__webpack_require__(/*! ./Onyx */ "./lib/Onyx.js"));var _jsxFileName = "/Users/carlosmartins/Expensidev/react-native-onyx/lib/withOnyx.js";function _createSuper(Derived) {var hasNativeReflectConstruct = _isNativeReflectConstruct();return function _createSuperInternal() {var Super = (0, _getPrototypeOf2.default)(Derived),result;if (hasNativeReflectConstruct) {var NewTarget = (0, _getPrototypeOf2.default)(this).constructor;result = Reflect.construct(Super, arguments, NewTarget);} else {result = Super.apply(this, arguments);}return (0, _possibleConstructorReturn2.default)(this, result);};}function _isNativeReflectConstruct() {if (typeof Reflect === "undefined" || !Reflect.construct) return false;if (Reflect.construct.sham) return false;if (typeof Proxy === "function") return true;try {Boolean.prototype.valueOf.call(Reflect.construct(Boolean, [], function () {}));return true;} catch (e) {return false;}}
 
 /**
  * Returns the display name of a component

@@ -33,6 +33,9 @@ applied in the order they were called. Note: <code>Onyx.set()</code> calls do no
 <dt><a href="#mergeCollection">mergeCollection(collectionKey, collection)</a> ⇒ <code>Promise</code></dt>
 <dd><p>Merges a collection based on their keys</p>
 </dd>
+<dt><a href="#update">update(data)</a></dt>
+<dd><p>Insert API responses and lifecycle data into Onyx</p>
+</dd>
 <dt><a href="#init">init([options])</a></dt>
 <dd><p>Initialize the store with actions and listening for storage events</p>
 </dd>
@@ -158,6 +161,17 @@ Onyx.mergeCollection(ONYXKEYS.COLLECTION.REPORT, {
     [`${ONYXKEYS.COLLECTION.REPORT}2`]: report2,
 });
 ```
+<a name="update"></a>
+
+## update(data)
+Insert API responses and lifecycle data into Onyx
+
+**Kind**: global function  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| data | <code>Array</code> | An array of objects with shape {onyxMethod: oneOf('set', 'merge'), key: string, value: *} |
+
 <a name="init"></a>
 
 ## init([options])
