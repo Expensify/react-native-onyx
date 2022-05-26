@@ -21,6 +21,8 @@ jobs:
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+            - uses: actions/checkout@v3
+
             - name: Decrypt & Import Botify GPG key
               run: |
                 cd .github
@@ -35,8 +37,6 @@ jobs:
                 git config --global commit.gpgsign true
                 git config --global user.name botify
                 git config --global user.email infra+botify@expensify.com
-
-            - uses: actions/checkout@v3
 
             - uses: actions/setup-node@v3
               with:
