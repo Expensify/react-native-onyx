@@ -17,12 +17,10 @@ Persistent storage solution wrapped in a Pub/Sub library.
 
 ## Installation
 
-At the moment, Onyx is not yet published to `npm`. To use in your project, reference the latest sha of the main branch directly in `package.json`
+Onyx is published to [`npm`](https://www.npmjs.com/package/react-native-onyx)
 
-```json
-  "dependencies": {
-    "react-native-onyx": "git+https://github.com/Expensify/react-native-onyx.git#ccb64c738b8bbe933b8997eb177f864e5139bd8d"
-  }
+```shell
+npm install react-native-onyx --save 
 ```
 
 ## Initialization
@@ -253,6 +251,6 @@ To quickly test small changes you can directly go to `node_modules/react-native-
 To continuously work on Onyx we have to set up a task that copies content to parent project's `node_modules/react-native-onyx`:
 1. Work on Onyx feature or a fix
 2. Save files
-3. Optional: run `npm build:web` (if you're working or want to test on a non react-native project)
+3. Optional: run `npm build` (if you're working or want to test on a non react-native project)
    - `npm link` would actually work outside of `react-native` and it can be used to link Onyx locally for a web only project
 4. Copy Onyx to consumer project's `node_modules/react-native-onyx`

@@ -1,11 +1,19 @@
 {
   "name": "react-native-onyx",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "Expensify, Inc.",
   "homepage": "https://expensify.com",
   "description": "State management for React Native",
   "license": "MIT",
-  "private": true,
+  "private": false,
+  "keywords": ["React Native", "React", "Persistant storage", "Pub/Sub"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Expensify/react-native-onyx.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Expensify/react-native-onyx/issues"
+  },
   "files": [
     "dist/**/*",
     "lib/**/*",
@@ -22,7 +30,7 @@
     "lint": "eslint .",
     "lint-tests": "eslint tests/**",
     "test": "jest",
-    "build:web": "webpack --config webpack.config.js",
+    "build": "webpack --config webpack.config.js",
     "build:docs": "node buildDocs.js"
   },
   "dependencies": {
