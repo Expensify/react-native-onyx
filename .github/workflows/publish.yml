@@ -76,30 +76,13 @@ jobs:
                 sleep 5
               env:
                 GITHUB_TOKEN: ${{ secrets.BOTIFY_TOKEN }}
-              id: createPullRequest
-              # Version: 2.6.2
-              uses: repo-sync/pull-request@65785d95a5a466e46a9d0708933a3bd51bbf9dde
-              with:
-                source_branch: ${{ env.BRANCH_NAME }}
-                destination_branch: main
-                github_token: ${{ secrets.BOTIFY_TOKEN }}
-                pr_title: Update version to ${{ env.NEW_VERSION }}
-                pr_body: 'Update version to ${{ env.NEW_VERSION }}'
-                pr_label: automerge
 
             - name: Auto-approve pull request
-              # Version: 2.0.0
-              uses: hmarr/auto-approve-action@6a9ec7556f0a7fa5b49527a1eea4878b8a22d2e0
-              with:
-                github-token: ${{ secrets.GITHUB_TOKEN }}
-                pull-request-number: ${{ steps.createPullRequest.outputs.pr_number }}
+              run: gh pr review --approve
+              env:
+                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Auto-merge pull request
               run: gh pr merge --merge --delete-branch
               env:
-                GITHUB_TOKEN: ${{ secrets.BOTIFY_TOKEN }}
-              # Version: 0.12.0
-              uses: pascalgn/automerge-action@39d831e1bb389bd242626bc25d4060064a97181c
-              env:
-                GITHUB_TOKEN: ${{ secrets.BOTIFY_TOKEN }}
-                PULL_REQUEST: ${{ steps.createPullRequest.outputs.pr_number }}
+                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
