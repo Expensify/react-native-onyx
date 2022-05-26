@@ -95,6 +95,9 @@ jobs:
                 pull-request-number: ${{ steps.createPullRequest.outputs.pr_number }}
 
             - name: Auto-merge pull request
+              run: gh pr merge --merge --delete-branch
+              env:
+                GITHUB_TOKEN: ${{ secrets.BOTIFY_TOKEN }}
               # Version: 0.12.0
               uses: pascalgn/automerge-action@39d831e1bb389bd242626bc25d4060064a97181c
               env:
