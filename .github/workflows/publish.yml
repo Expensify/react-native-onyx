@@ -78,11 +78,11 @@ jobs:
                 GITHUB_TOKEN: ${{ secrets.BOTIFY_TOKEN }}
 
             - name: Auto-approve pull request
-              run: gh pr review --approve
+              run: gh pr review --approve ${{ env.BRANCH_NAME }}
               env:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Auto-merge pull request
-              run: gh pr merge --merge --delete-branch
+              run: gh pr merge --merge --delete-branch ${{ env.BRANCH_NAME }}
               env:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
