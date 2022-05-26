@@ -1,5 +1,4 @@
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
-import Onyx from '../../lib/Onyx';
 import Storage from '../../__mocks__/localforage';
 
 const ONYX_KEYS = {
@@ -10,11 +9,18 @@ const MERGED_VALUE = 'merged';
 const DEFAULT_VALUE = 'default';
 
 describe('Set data while storage is clearing', () => {
+    let Onyx;
     let connectionID;
     let onyxValue;
 
     /** @type OnyxCache */
     let cache;
+
+    beforeAll(() => {
+        // Force using WebStorage provider for these tests
+        jest.mock('../../lib/storage');
+        Onyx = require('../../lib/Onyx').default;
+    });
 
     // Always use a "fresh" cache instance
     beforeEach(() => {
