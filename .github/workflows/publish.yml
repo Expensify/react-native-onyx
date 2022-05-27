@@ -71,8 +71,8 @@ jobs:
             - name: Create pull request
               run: |
                 gh pr create \
-                  --title "Update version to ${{ env.NEW_VERSION }} \
-                  --body "Update version to ${{ env.NEW_VERSION }}
+                  --title "Update version to ${{ env.NEW_VERSION }}" \
+                  --body "Update version to ${{ env.NEW_VERSION }}"
                 sleep 5
               env:
                 GITHUB_TOKEN: ${{ secrets.OS_BOTIFY_TOKEN }}
