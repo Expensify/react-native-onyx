@@ -58,13 +58,6 @@ jobs:
             - name: Set new version in GitHub ENV
               run: echo "NEW_VERSION=$(jq '.version' package.json)" >> $GITHUB_ENV
 
-            - name: Build package
-              run: npm run build
-
-            - run: npm publish
-              env:
-                NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
             - name: Push branch and publish tags
               run: git push --tags
 
@@ -86,3 +79,11 @@ jobs:
               run: gh pr merge --merge --delete-branch ${{ env.BRANCH_NAME }}
               env:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Build package
+              run: npm run build
+
+            - name: Publish to npm
+              run: npm publish
+              env:
+                NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
