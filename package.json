@@ -1,12 +1,17 @@
 {
   "name": "react-native-onyx",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "author": "Expensify, Inc.",
   "homepage": "https://expensify.com",
   "description": "State management for React Native",
   "license": "MIT",
   "private": false,
-  "keywords": ["React Native", "React", "Persistant storage", "Pub/Sub"],
+  "keywords": [
+    "React Native",
+    "React",
+    "Persistant storage",
+    "Pub/Sub"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/Expensify/react-native-onyx.git"
