@@ -26,17 +26,17 @@ jobs:
             - name: Decrypt & Import Botify GPG key
               run: |
                 cd .github
-                gpg --quiet --batch --yes --decrypt --passphrase="$LARGE_SECRET_PASSPHRASE" --output Botify-private-key.asc Botify-private-key.asc.gpg
-                gpg --import --batch Botify-private-key.asc
+                gpg --quiet --batch --yes --decrypt --passphrase="$LARGE_SECRET_PASSPHRASE" --output OSBotify-private-key.asc OSBotify-private-key.asc.gpg
+                gpg --import OSBotify-private-key.asc
               env:
                 LARGE_SECRET_PASSPHRASE: ${{ secrets.LARGE_SECRET_PASSPHRASE }}
 
             - name: Set up git for Botify
               run: |
-                git config --global user.signingkey F34C92C6A7FB2652
-                git config --global commit.gpgsign true
-                git config --global user.name botify
-                git config --global user.email infra+botify@expensify.com
+                git config user.signingkey 367811D53E34168C
+                git config commit.gpgsign true
+                git config user.name OSBotify
+                git config user.email infra+osbotify@expensify.com
 
             - uses: actions/setup-node@v3
               with:
