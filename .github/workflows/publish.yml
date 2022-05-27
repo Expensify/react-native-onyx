@@ -9,7 +9,7 @@ jobs:
     version:
         runs-on: ubuntu-latest
 
-        # botify will update the version on `main`, so this check is important to prevent an infinite loop
+        # OSBotify will update the version on `main`, so this check is important to prevent an infinite loop
         if: ${{ github.actor != 'OSBotify' }}
 
         steps:
@@ -23,7 +23,7 @@ jobs:
 
             - uses: actions/checkout@v3
 
-            - name: Decrypt & Import Botify GPG key
+            - name: Decrypt & Import OSBotify GPG key
               run: |
                 cd .github
                 gpg --quiet --batch --yes --decrypt --passphrase="$LARGE_SECRET_PASSPHRASE" --output OSBotify-private-key.asc OSBotify-private-key.asc.gpg
@@ -44,7 +44,7 @@ jobs:
                 registry-url: 'https://registry.npmjs.org'
 
             - name: Generate branch name
-              run: echo "BRANCH_NAME=botify-bump-version-$(uuidgen)" >> $GITHUB_ENV
+              run: echo "BRANCH_NAME=OSBotify-bump-version-$(uuidgen)" >> $GITHUB_ENV
 
             - name: Create branch for version-bump pull request
               run: git checkout -b ${{ env.BRANCH_NAME }}
