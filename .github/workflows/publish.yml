@@ -59,7 +59,7 @@ jobs:
               run: echo "NEW_VERSION=$(jq '.version' package.json)" >> $GITHUB_ENV
 
             - name: Push branch and publish tags
-              run: git push --tags
+              run: git push && git push --tags
 
             - name: Create pull request
               run: |
