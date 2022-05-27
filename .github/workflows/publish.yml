@@ -31,7 +31,7 @@ jobs:
               env:
                 LARGE_SECRET_PASSPHRASE: ${{ secrets.LARGE_SECRET_PASSPHRASE }}
 
-            - name: Set up git for Botify
+            - name: Set up git for OSBotify
               run: |
                 git config --global user.signingkey 367811D53E34168C
                 git config --global commit.gpgsign true
