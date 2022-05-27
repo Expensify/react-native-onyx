@@ -5,9 +5,11 @@ import Onyx from '../../lib/Onyx';
 const ONYX_KEYS = {
     DEFAULT_KEY: 'defaultKey',
 };
-const SET_VALUE = 'set';
-const MERGED_VALUE = 'merged';
-const DEFAULT_VALUE = 'default';
+
+// Store integers because the async storage mock adds escape characters to strings
+const SET_VALUE = 2;
+const MERGED_VALUE = 1;
+const DEFAULT_VALUE = 0;
 
 describe('Set data while storage is clearing', () => {
     let connectionID;
@@ -55,8 +57,10 @@ describe('Set data while storage is clearing', () => {
                 expect(onyxValue).toBe(MERGED_VALUE);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
                 expect(cachedValue).toBe(MERGED_VALUE);
-                const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
-                return expect(storedValue).resolves.toBe(MERGED_VALUE);
+
+                // Use parseInt to convert the string value from the storage mock back to an integer
+                return Storage.getItem(ONYX_KEYS.DEFAULT_KEY)
+                    .then(storedValue => expect(parseInt(storedValue, 10)).toBe(MERGED_VALUE));
             });
     });
 
