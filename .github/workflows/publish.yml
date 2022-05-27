@@ -10,7 +10,7 @@ jobs:
         runs-on: ubuntu-latest
 
         # botify will update the version on `main`, so this check is important to prevent an infinite loop
-        if: ${{ github.actor != 'botify' }}
+        if: ${{ github.actor != 'OSBotify' }}
 
         steps:
             # Running this action ensures that only one instance of this job will run at a time.
