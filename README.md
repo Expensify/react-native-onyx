@@ -20,7 +20,7 @@ Persistent storage solution wrapped in a Pub/Sub library.
 Onyx is published to [`npm`](https://www.npmjs.com/package/react-native-onyx)
 
 ```shell
-npm install react-native-onyx --save 
+npm install react-native-onyx --save
 ```
 
 ## Initialization
@@ -42,8 +42,8 @@ Onyx.init(config);
 ```
 
 ### Usage in non react-native projects
-Onyx can be used in non react-native projects, by leveraging the `browser` field in `package.json`  
-Bundlers like Webpack respect that field and import code from the specified path  
+Onyx can be used in non react-native projects, by leveraging the `browser` field in `package.json`
+Bundlers like Webpack respect that field and import code from the specified path
 We import Onyx the same way shown above - `import Onyx from 'react-native-onyx'`
 
 ## Setting data
@@ -148,7 +148,7 @@ Under the hood storage access calls are delegated to a [`StorageProvider`](lib/s
 Some platforms (like web and desktop) might use the same storage provider
 
 If a platform needs to use a separate library (like using MMVK for react-native) it should be added in the following way:
-1. Create a `StorageProvider.js` at [lib/storage/providers](lib/storage/providers)  
+1. Create a `StorageProvider.js` at [lib/storage/providers](lib/storage/providers)
    Reference an existing [StorageProvider](lib/storage/providers/AsyncStorage.js) for the interface that has to be implemented
 2. Update the factory at [lib/storage/index.web.js](lib/storage/index.web.js) and [lib/storage/index.native.js](lib/storage/index.native.js) to return the newly created Provider for the desired Platform(s)
 
