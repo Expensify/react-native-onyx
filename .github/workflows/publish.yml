@@ -61,6 +61,12 @@ jobs:
             - name: Push branch and publish tags
               run: git push --set-upstream origin ${{ env.BRANCH_NAME }} && git push --tags
 
+            - name: Git Status Debug
+              run: git status
+
+            - name: Git Diff Debug
+              run: git diff
+
             - name: Create pull request
               run: |
                 gh pr create \
