@@ -64,9 +64,6 @@ jobs:
             - name: Git Status Debug
               run: git status
 
-            - name: Git Diff Debug
-              run: git diff
-
             - name: Create pull request
               run: |
                 gh pr create \
