@@ -325,16 +325,39 @@ describe('Onyx', () => {
             },
         });
 
+        let valuesReceived = {};
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (data, key) => valuesReceived[key] = data,
+        });
+
         return waitForPromisesToResolve()
             .then(() => {
                 // GIVEN the initial Onyx state: {test: true, otherTest: {test1: 'test1'}}
                 Onyx.set(ONYX_KEYS.TEST_KEY, true);
                 Onyx.set(ONYX_KEYS.OTHER_TEST, {test1: 'test1'});
+                Onyx.multiSet({
+                    test_1: {
+                        existingData: 'test',
+                    },
+                    test_2: {
+                        existingData: 'test',
+                    },
+                });
                 return waitForPromisesToResolve();
             })
             .then(() => {
                 expect(testKeyValue).toBe(true);
                 expect(otherTestKeyValue).toEqual({test1: 'test1'});
+                expect(valuesReceived).toEqual({
+                    test_1: {
+                        existingData: 'test',
+                    },
+                    test_2: {
+                        existingData: 'test',
+                    },
+                });
 
                 // WHEN we pass a data object to Onyx.update
                 Onyx.update([
@@ -348,6 +371,20 @@ describe('Onyx', () => {
                         key: ONYX_KEYS.OTHER_TEST,
                         value: {test2: 'test2'},
                     },
+                    {
+                        onyxMethod: 'mergeCollection',
+                        key: ONYX_KEYS.OTHER_TEST,
+                        value: {
+                            test_1: {
+                                ID: 123,
+                                value: 'one',
+                            },
+                            test_2: {
+                                ID: 234,
+                                value: 'two',
+                            },
+                        },
+                    },
                 ]);
                 return waitForPromisesToResolve();
             })
@@ -355,6 +392,16 @@ describe('Onyx', () => {
                 // THEN the final Onyx state should be {test: 'one', otherTest: {test1: 'test1', test2: 'test2'}}
                 expect(testKeyValue).toBe('one');
                 expect(otherTestKeyValue).toEqual({test1: 'test1', test2: 'test2'});
+                expect(valuesReceived).toEqual({
+                    test_1: {
+                        ID: 123,
+                        value: 'one',
+                    },
+                    test_2: {
+                        ID: 234,
+                        value: 'two',
+                    },
+                });
             });
     });
 
