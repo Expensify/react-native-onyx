@@ -325,7 +325,7 @@ describe('Onyx', () => {
             },
         });
 
-        let valuesReceived = {};
+        const valuesReceived = {};
         connectionID = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
             initWithStoredValues: false,
