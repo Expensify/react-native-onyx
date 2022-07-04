@@ -358,6 +358,89 @@ describe('Onyx', () => {
             });
     });
 
+    it('should use update data object to merge a collection of keys', () => {
+        const valuesReceived = {};
+        const mockCallback = jest.fn(data => valuesReceived[data.ID] = data.value);
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            initWithStoredValues: false,
+            callback: mockCallback,
+        });
+
+        return waitForPromisesToResolve()
+            .then(() => {
+                // GIVEN the initial Onyx state: {test_1: {existingData: 'test',},test_2: {existingData: 'test',}}
+                Onyx.multiSet({
+                    test_1: {
+                        existingData: 'test',
+                    },
+                    test_2: {
+                        existingData: 'test',
+                    },
+                });
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                expect(mockCallback.mock.calls[0][0]).toEqual({existingData: 'test'});
+                expect(mockCallback.mock.calls[0][1]).toEqual('test_1');
+
+                expect(mockCallback.mock.calls[1][0]).toEqual({existingData: 'test'});
+                expect(mockCallback.mock.calls[1][1]).toEqual('test_2');
+
+                // WHEN we pass a mergeCollection data object to Onyx.update
+                Onyx.update([
+                    {
+                        onyxMethod: 'mergeCollection',
+                        key: ONYX_KEYS.COLLECTION.TEST_KEY,
+                        value: {
+                            test_1: {
+                                ID: 123,
+                                value: 'one',
+                            },
+                            test_2: {
+                                ID: 234,
+                                value: 'two',
+                            },
+                            test_3: {
+                                ID: 345,
+                                value: 'three',
+                            },
+                        },
+                    },
+                ]);
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                /* THEN the final Onyx state should be:
+                    {
+                        test_1: {
+                            existingData: 'test'
+                            ID: 123,
+                            value: 'one',
+                        },
+                        test_2: {
+                            existingData: 'test'
+                            ID: 234,
+                            value: 'two',
+                        },
+                        test_3: {
+                            ID: 345,
+                            value: 'three',
+                        },
+                    }
+                */
+
+                expect(mockCallback.mock.calls[2][0]).toEqual({ID: 123, value: 'one', existingData: 'test'});
+                expect(mockCallback.mock.calls[2][1]).toEqual('test_1');
+
+                expect(mockCallback.mock.calls[3][0]).toEqual({ID: 234, value: 'two', existingData: 'test'});
+                expect(mockCallback.mock.calls[3][1]).toEqual('test_2');
+
+                expect(mockCallback.mock.calls[4][0]).toEqual({ID: 345, value: 'three'});
+                expect(mockCallback.mock.calls[4][1]).toEqual('test_3');
+            });
+    });
+
     it('should throw an error when the data object is incorrect in Onyx.update', () => {
         // GIVEN the invalid data object with onyxMethod='multiSet'
         const data = [
