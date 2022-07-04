@@ -369,7 +369,7 @@ describe('Onyx', () => {
 
         return waitForPromisesToResolve()
             .then(() => {
-                // GIVEN the initial Onyx state: {test_1: {existingData: 'test',},test_2: {existingData: 'test',}}
+                // GIVEN the initial Onyx state: {test_1: {existingData: 'test',}, test_2: {existingData: 'test',}}
                 Onyx.multiSet({
                     test_1: {
                         existingData: 'test',
