@@ -220,7 +220,7 @@ Insert API responses and lifecycle data into Onyx
 
 | Param | Type | Description |
 | --- | --- | --- |
-| data | <code>Array</code> | An array of objects with shape {onyxMethod: oneOf('set', 'merge'), key: string, value: *} |
+| data | <code>Array</code> | An array of objects with shape {onyxMethod: oneOf('set', 'merge', 'mergeCollection'), key: string, value: *} |
 
 <a name="init"></a>
 
