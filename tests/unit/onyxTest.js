@@ -390,7 +390,7 @@ describe('Onyx', () => {
                 // WHEN we pass a mergeCollection data object to Onyx.update
                 Onyx.update([
                     {
-                        onyxMethod: 'mergeCollection',
+                        onyxMethod: 'mergecollection',
                         key: ONYX_KEYS.COLLECTION.TEST_KEY,
                         value: {
                             test_1: {
