@@ -6,6 +6,7 @@ const ONYX_KEYS = {
     OTHER_TEST: 'otherTest',
     COLLECTION: {
         TEST_KEY: 'test_',
+        TEST_CONNECT_COLLECTION: 'test_connect_collection_',
     },
 };
 
@@ -466,5 +467,44 @@ describe('Onyx', () => {
             // THEN we should expect the error message below
             expect(error.message).toEqual('Invalid boolean key provided in Onyx update. Onyx key must be of type string.');
         }
+    });
+
+    it('should return all collection keys as a single object when waitForCollectionCallback = true', () => {
+        const valuesReceived = {};
+        const mockCallback = jest.fn(data => valuesReceived[data.ID] = data.value);
+
+        // GIVEN some collection data
+        const collectionData = {
+            test_connect_collection_1: {
+                ID: 123,
+                value: 'one',
+            },
+            test_connect_collection_2: {
+                ID: 234,
+                value: 'two',
+            },
+            test_connect_collection_3: {
+                ID: 345,
+                value: 'three',
+            },
+        };
+        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION, collectionData);
+        return waitForPromisesToResolve()
+            .then(() => {
+                // WHEN we call Onyx.connect with the waitForCollectionCallback = true param
+                connectionID = Onyx.connect({
+                    key: ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION,
+                    waitForCollectionCallback: true,
+                    callback: mockCallback,
+                });
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                // THEN the callback should be triggered only once
+                expect(mockCallback.mock.calls.length).toBe(1);
+
+                // AND all the collection data should be returned as a single object
+                expect(mockCallback.mock.calls[0][0]).toEqual(collectionData);
+            });
     });
 });
