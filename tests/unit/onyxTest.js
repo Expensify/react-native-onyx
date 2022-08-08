@@ -7,6 +7,7 @@ const ONYX_KEYS = {
     COLLECTION: {
         TEST_KEY: 'test_',
         TEST_CONNECT_COLLECTION: 'test_connect_collection_',
+        TEST_POLICY: 'test_policy_',
     },
 };
 
@@ -470,8 +471,7 @@ describe('Onyx', () => {
     });
 
     it('should return all collection keys as a single object when waitForCollectionCallback = true', () => {
-        const valuesReceived = {};
-        const mockCallback = jest.fn(data => valuesReceived[data.ID] = data.value);
+        const mockCallback = jest.fn();
 
         // GIVEN some initial collection data
         const initialCollectionData = {
@@ -493,7 +493,7 @@ describe('Onyx', () => {
         return waitForPromisesToResolve()
             .then(() => {
                 // WHEN we connect to that collection with waitForCollectionCallback = true
-                Onyx.connect({
+                connectionID = Onyx.connect({
                     key: ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION,
                     waitForCollectionCallback: true,
                     callback: mockCallback,
@@ -508,29 +508,32 @@ describe('Onyx', () => {
     });
 
     it('should return all collection keys as a single object when updating a collection key with waitForCollectionCallback = true', () => {
-        const valuesReceived = {};
-        const mockCallback = jest.fn(data => valuesReceived[data.ID] = data.value);
+        const mockCallback = jest.fn();
         const collectionUpdate = {
-            test_connect_collection_3: {ID: 234, value: 'three'},
-            test_connect_collection_4: {ID: 123, value: 'four'},
+            test_policy_1: {ID: 234, value: 'one'},
+            test_policy_2: {ID: 123, value: 'two'},
         };
 
         // GIVEN an Onyx.connect call with waitForCollectionCallback=true
-        Onyx.connect({
-            key: ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION,
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_POLICY,
             waitForCollectionCallback: true,
             callback: mockCallback,
         });
         return waitForPromisesToResolve()
             .then(() => {
                 // WHEN we update the collection, e.g. the API returns a response
-                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION, collectionUpdate);
+                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_POLICY, collectionUpdate);
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                // THEN we expect the callback to have called twice (once for the initial connect call and once for the collection update)
-                // AND the value should be equal to collectionUpdate
+                // THEN we expect the callback to have called twice, once for the initial connect call + once for the collection update
                 expect(mockCallback.mock.calls.length).toBe(2);
+
+                // AND the value for the first call should be null since the collection was not initialized at that point
+                expect(mockCallback.mock.calls[0][0]).toBe(null);
+
+                // AND the value for the second call should be collectionUpdate since the collection was updated
                 expect(mockCallback.mock.calls[1][0]).toEqual(collectionUpdate);
             });
     });
