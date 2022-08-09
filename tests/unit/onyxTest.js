@@ -522,7 +522,7 @@ describe('Onyx', () => {
         });
         return waitForPromisesToResolve()
             .then(() => {
-                // WHEN we update the collection, e.g. the API returns a response
+                // WHEN mergeCollection is called with an updated collection
                 Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_POLICY, collectionUpdate);
                 return waitForPromisesToResolve();
             })
