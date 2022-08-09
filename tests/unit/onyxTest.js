@@ -7,6 +7,7 @@ const ONYX_KEYS = {
     COLLECTION: {
         TEST_KEY: 'test_',
         TEST_CONNECT_COLLECTION: 'test_connect_collection_',
+        TEST_POLICY: 'test_policy_',
     },
 };
 
@@ -470,11 +471,10 @@ describe('Onyx', () => {
     });
 
     it('should return all collection keys as a single object when waitForCollectionCallback = true', () => {
-        const valuesReceived = {};
-        const mockCallback = jest.fn(data => valuesReceived[data.ID] = data.value);
+        const mockCallback = jest.fn();
 
-        // GIVEN some collection data
-        const collectionData = {
+        // GIVEN some initial collection data
+        const initialCollectionData = {
             test_connect_collection_1: {
                 ID: 123,
                 value: 'one',
@@ -488,10 +488,11 @@ describe('Onyx', () => {
                 value: 'three',
             },
         };
-        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION, collectionData);
+
+        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION, initialCollectionData);
         return waitForPromisesToResolve()
             .then(() => {
-                // WHEN we call Onyx.connect with the waitForCollectionCallback = true param
+                // WHEN we connect to that collection with waitForCollectionCallback = true
                 connectionID = Onyx.connect({
                     key: ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION,
                     waitForCollectionCallback: true,
@@ -500,11 +501,40 @@ describe('Onyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                // THEN the callback should be triggered only once
+                // THEN we expect the callback to be called only once and the initial stored value to be initialCollectionData
                 expect(mockCallback.mock.calls.length).toBe(1);
+                expect(mockCallback.mock.calls[0][0]).toEqual(initialCollectionData);
+            });
+    });
 
-                // AND all the collection data should be returned as a single object
-                expect(mockCallback.mock.calls[0][0]).toEqual(collectionData);
+    it('should return all collection keys as a single object when updating a collection key with waitForCollectionCallback = true', () => {
+        const mockCallback = jest.fn();
+        const collectionUpdate = {
+            test_policy_1: {ID: 234, value: 'one'},
+            test_policy_2: {ID: 123, value: 'two'},
+        };
+
+        // GIVEN an Onyx.connect call with waitForCollectionCallback=true
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_POLICY,
+            waitForCollectionCallback: true,
+            callback: mockCallback,
+        });
+        return waitForPromisesToResolve()
+            .then(() => {
+                // WHEN mergeCollection is called with an updated collection
+                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_POLICY, collectionUpdate);
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                // THEN we expect the callback to have called twice, once for the initial connect call + once for the collection update
+                expect(mockCallback.mock.calls.length).toBe(2);
+
+                // AND the value for the first call should be null since the collection was not initialized at that point
+                expect(mockCallback.mock.calls[0][0]).toBe(null);
+
+                // AND the value for the second call should be collectionUpdate since the collection was updated
+                expect(mockCallback.mock.calls[1][0]).toEqual(collectionUpdate);
             });
     });
 });
