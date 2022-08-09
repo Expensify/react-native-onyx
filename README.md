@@ -87,8 +87,8 @@ Onyx.merge(ONYXKEYS.POLICY, {employeeList: ['Jack']}); // -> {employeeList: ['Ja
 ### Should I use `merge()` or `set()` or both?
 
 - Use `merge()` when creating a new object
-- Use `merge()` to merge partial data into an existing `Array` or `Object`
-- Use `merge()` when storing simple values (`String`, `Boolean`, etc)
+- Use `merge()` to merge partial data into an existing object
+- Use `merge()` when storing simple values (`String`, `Boolean`, `Number`)
 - Use `set()` when you need to delete an Onyx key completely from storage
 - Use `set()` when you need to completely reset an object or array of data
 
