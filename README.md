@@ -139,12 +139,12 @@ It is preferable to use the HOC over `Onyx.connect()` in React code as `withOnyx
 
 ## Collections
 
-Collections allow keys with similar value types to be subscribed together by subscribing to the collection key. To define one, it must be included in the `ONYXKEYS.COLLECTION` object and it must be suffixed with an underscore. Member keys should use a unique identifier or index after the collection key prefix (e.g. `chat_42`).
+Collections allow keys with similar value types to be subscribed together by subscribing to the collection key. To define one, it must be included in the `ONYXKEYS.COLLECTION` object and it must be suffixed with an underscore. Member keys should use a unique identifier or index after the collection key prefix (e.g. `report_42`).
 
 ```javascript
 const ONYXKEYS = {
     COLLECTION: {
-        CHAT: 'chat_',
+        REPORT: 'report_',
     },
 };
 ```
@@ -154,16 +154,16 @@ const ONYXKEYS = {
 To save a new collection key we can either do:
 
 ```js
-Onyx.merge(`${ONYXKEYS.COLLECTION.CHAT}${chat1.id}`, chat1);
+Onyx.merge(`${ONYXKEYS.COLLECTION.REPORT}${report1.reportID}`, report1);
 ```
 
 or we can set many at once with `mergeCollection()`:
 
 ```js
-Onyx.mergeCollection(ONYXKEYS.COLLECTION.CHAT, {
-    [`${ONYXKEYS.COLLECTION.CHAT}${chat1.id}`]: chat1,
-    [`${ONYXKEYS.COLLECTION.CHAT}${chat2.id}`]: chat2,
-    [`${ONYXKEYS.COLLECTION.CHAT}${chat3.id}`]: chat3,
+Onyx.mergeCollection(ONYXKEYS.COLLECTION.REPORT, {
+    [`${ONYXKEYS.COLLECTION.REPORT}${report1.reportID}`]: report1,
+    [`${ONYXKEYS.COLLECTION.REPORT}${report2.reportID}`]: report2,
+    [`${ONYXKEYS.COLLECTION.REPORT}${report3.reportID}`]: report3,
 });
 ```
 
@@ -173,23 +173,23 @@ There are several ways to subscribe to these keys:
 
 ```javascript
 withOnyx({
-    allChats: {key: ONYXKEYS.COLLECTION.CHAT},
+    allReports: {key: ONYXKEYS.COLLECTION.REPORT},
 })(MyComponent);
 ```
 
 This will return the initial collection as an object of collection member key/values. Changes to the individual member keys will modify the entire object and new props will be passed with each individual key update.
 
 ```js
-Onyx.connect({key: ONYXKEYS.COLLECTION.CHAT}, callback: (memberValue, memberKey) => {...}});
+Onyx.connect({key: ONYXKEYS.COLLECTION.REPORT}, callback: (memberValue, memberKey) => {...}});
 ```
 
-This will fire the callback `n` times depending on how many collection member keys have been stored. Changes to those keys after the initial callbacks fire will occur when each individual key is updated.
+This will fire the callback once per member key depending on how many collection member keys are currently stored. Changes to those keys after the initial callbacks fire will occur when each individual key is updated.
 
 ```js
 Onyx.connect({
-    key: ONYXKEYS.COLLECTION.CHAT,
+    key: ONYXKEYS.COLLECTION.REPORT,
     waitForCollectionCallback: true,
-    callback: (allChats) => {...}},
+    callback: (allReports) => {...}},
 });
 ```
 
@@ -199,7 +199,17 @@ This final option forces `Onyx.connect()` to behave more like `withOnyx()` and o
 
 Be cautious when using collections as things can get out of hand if you have a subscriber hooked up to a collection key that has large numbers of individual keys. If this is the case, it is critical to use `mergeCollection()` over `merge()`.
 
-Remember, `mergeCollection()` will notify a subscriber only *once* with the total collected values whereas each call to `Onyx.merge()` would re-render a connected component `n` times per key that you call it on.
+Remember, `mergeCollection()` will notify a subscriber only *once* with the total collected values whereas each call to `merge()` would re-render a connected component *each time it is called*. Consider this example where `reports` is an array of reports that we want to index and save.
+
+```js
+// Bad
+_.each(reports, report => Onyx.merge(`${ONYXKEYS.COLLECTION.REPORT}${report.reportID}`, report)); // -> Connected component will update on each iteration
+
+// Good
+const values = {};
+_.each(reports, report => values[`${ONYXKEYS.COLLECTION.REPORT}${report.reportID}`] = report);
+Onyx.mergeCollection(ONYXKEYS.COLLECTION.REPORT, values); // -> Connected component will update just once
+```
 
 ## Clean up
 
