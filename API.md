@@ -76,6 +76,7 @@ Subscribes a react component's state directly to a store key
 | [mapping.withOnyxInstance] | <code>Object</code> | whose setState() method will be called with any changed data      This is used by React components to connect to Onyx |
 | [mapping.callback] | <code>function</code> | a method that will be called with changed data      This is used by any non-React code to connect to Onyx |
 | [mapping.initWithStoredValues] | <code>Boolean</code> | If set to false, then no data will be prefilled into the  component |
+| [mapping.waitForCollectionCallback] | <code>Boolean</code> | If set to true, it will return the entire collection to the callback as a single object |
 
 **Example**
 ```js

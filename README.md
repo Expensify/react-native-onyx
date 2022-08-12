@@ -137,6 +137,80 @@ export default withOnyx({
 
 It is preferable to use the HOC over `Onyx.connect()` in React code as `withOnyx()` will delay the rendering of the wrapped component until all keys have been accessed and made available.
 
+## Collections
+
+Collections allow keys with similar value types to be subscribed together by subscribing to the collection key. To define one, it must be included in the `ONYXKEYS.COLLECTION` object and it must be suffixed with an underscore. Member keys should use a unique identifier or index after the collection key prefix (e.g. `report_42`).
+
+```javascript
+const ONYXKEYS = {
+    COLLECTION: {
+        REPORT: 'report_',
+    },
+};
+```
+
+### Setting Collection Values
+
+To save a new collection key we can either do:
+
+```js
+Onyx.merge(`${ONYXKEYS.COLLECTION.REPORT}${report1.reportID}`, report1);
+```
+
+or we can set many at once with `mergeCollection()` (see below for guidance on best practices):
+
+```js
+Onyx.mergeCollection(ONYXKEYS.COLLECTION.REPORT, {
+    [`${ONYXKEYS.COLLECTION.REPORT}${report1.reportID}`]: report1,
+    [`${ONYXKEYS.COLLECTION.REPORT}${report2.reportID}`]: report2,
+    [`${ONYXKEYS.COLLECTION.REPORT}${report3.reportID}`]: report3,
+});
+```
+
+### Subscribing to Collections
+
+There are several ways to subscribe to these keys:
+
+```javascript
+withOnyx({
+    allReports: {key: ONYXKEYS.COLLECTION.REPORT},
+})(MyComponent);
+```
+
+This will add a prop to the component called `allReports` which is an object of collection member key/values. Changes to the individual member keys will modify the entire object and new props will be passed with each individual key update. The prop doesn't update on the initial rendering of the component until the entire collection has been read out of Onyx.
+
+```js
+Onyx.connect({key: ONYXKEYS.COLLECTION.REPORT}, callback: (memberValue, memberKey) => {...}});
+```
+
+This will fire the callback once per member key depending on how many collection member keys are currently stored. Changes to those keys after the initial callbacks fire will occur when each individual key is updated.
+
+```js
+Onyx.connect({
+    key: ONYXKEYS.COLLECTION.REPORT,
+    waitForCollectionCallback: true,
+    callback: (allReports) => {...}},
+});
+```
+
+This final option forces `Onyx.connect()` to behave more like `withOnyx()` and only update the callback once with the entire collection initially and later with an updated version of the collection when individual keys update.
+
+### Performance Considerations When Using Collections
+
+Be cautious when using collections as things can get out of hand if you have a subscriber hooked up to a collection key that has large numbers of individual keys. If this is the case, it is critical to use `mergeCollection()` over `merge()`.
+
+Remember, `mergeCollection()` will notify a subscriber only *once* with the total collected values whereas each call to `merge()` would re-render a connected component *each time it is called*. Consider this example where `reports` is an array of reports that we want to index and save.
+
+```js
+// Bad
+_.each(reports, report => Onyx.merge(`${ONYXKEYS.COLLECTION.REPORT}${report.reportID}`, report)); // -> A component using withOnyx() will have it's state updated with each iteration
+
+// Good
+const values = {};
+_.each(reports, report => values[`${ONYXKEYS.COLLECTION.REPORT}${report.reportID}`] = report);
+Onyx.mergeCollection(ONYXKEYS.COLLECTION.REPORT, values); // -> A component using withOnyx() will only have it's state updated once
+```
+
 ## Clean up
 
 To clear all data from `Onyx` we can use `Onyx.clear()`.
