@@ -157,7 +157,7 @@ To save a new collection key we can either do:
 Onyx.merge(`${ONYXKEYS.COLLECTION.REPORT}${report1.reportID}`, report1);
 ```
 
-or we can set many at once with `mergeCollection()`:
+or we can set many at once with `mergeCollection()` (see below for guidance on best practices):
 
 ```js
 Onyx.mergeCollection(ONYXKEYS.COLLECTION.REPORT, {
@@ -177,7 +177,7 @@ withOnyx({
 })(MyComponent);
 ```
 
-This will return the initial collection as an object of collection member key/values. Changes to the individual member keys will modify the entire object and new props will be passed with each individual key update.
+This will add a prop to the component called `allReports` which is an object of collection member key/values. Changes to the individual member keys will modify the entire object and new props will be passed with each individual key update. The prop doesn't update on the initial rendering of the component until the entire collection has been read out of Onyx.
 
 ```js
 Onyx.connect({key: ONYXKEYS.COLLECTION.REPORT}, callback: (memberValue, memberKey) => {...}});
@@ -203,12 +203,12 @@ Remember, `mergeCollection()` will notify a subscriber only *once* with the tota
 
 ```js
 // Bad
-_.each(reports, report => Onyx.merge(`${ONYXKEYS.COLLECTION.REPORT}${report.reportID}`, report)); // -> Connected component will update on each iteration
+_.each(reports, report => Onyx.merge(`${ONYXKEYS.COLLECTION.REPORT}${report.reportID}`, report)); // -> A component using withOnyx() will have it's state updated with each iteration
 
 // Good
 const values = {};
 _.each(reports, report => values[`${ONYXKEYS.COLLECTION.REPORT}${report.reportID}`] = report);
-Onyx.mergeCollection(ONYXKEYS.COLLECTION.REPORT, values); // -> Connected component will update just once
+Onyx.mergeCollection(ONYXKEYS.COLLECTION.REPORT, values); // -> A component using withOnyx() will only have it's state updated once
 ```
 
 ## Clean up
