@@ -63,7 +63,7 @@ The data will then be cached and stored via [`AsyncStorage`](https://github.com/
 
 We can also use `Onyx.merge()` to merge new `Object` or `Array` data in with existing data.
 
-For `Array` the default behavior is to concatenate new items.
+For `Array` the default behavior is to concatenate replace it fully, effectively making it equivalent to set:
 
 ```javascript
 Onyx.merge(ONYXKEYS.EMPLOYEE_LIST, ['Joe']); // -> ['Joe']
@@ -77,10 +77,10 @@ Onyx.merge(ONYXKEYS.POLICY, {id: 1}); // -> {id: 1}
 Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Workspace'}
 ```
 
-One caveat to be aware of is that `lodash/merge` [follows the behavior of jQuery's deep extend](https://github.com/lodash/lodash/issues/2872) and will not concatenate nested arrays in objects. It might seem like this code would concat these arrays, but it does not.
+Arrays inside objects will NOT be concatenated and instead will be replaced fully, same as arrays not inside objects:
 
 ```javascript
-Onyx.merge(ONYXKEYS.POLICY, {employeeList: ['Joe']}); // -> {employeeList: ['Joe']}
+Onyx.merge(ONYXKEYS.POLICY, {employeeList: ['Joe', 'Jack']}); // -> {employeeList: ['Joe', 'Jack']}
 Onyx.merge(ONYXKEYS.POLICY, {employeeList: ['Jack']}); // -> {employeeList: ['Jack']}
 ```
 

@@ -236,7 +236,7 @@ describe('Onyx', () => {
 
                 expect(cache.getValue('mockKey2')).toEqual({
                     other: 'overwrittenMockValue',
-                    items: [1, 2, 5],
+                    items: [1, 2],
                     mock: 'mock',
                 });
             });
@@ -267,10 +267,23 @@ describe('Onyx', () => {
                     mockKey: [{ID: 3}, {added: 'field'}, {}, {ID: 1000}],
                 });
 
-                // THEN the arrays should be merged as expected
+                // THEN the arrays should be replaced as expected
                 expect(cache.getValue('mockKey')).toEqual([
-                    {ID: 3}, {ID: 2, added: 'field'}, {ID: 3}, {ID: 1000},
+                    {ID: 3}, {added: 'field'}, {}, {ID: 1000},
                 ]);
+            });
+
+            it('Should merge arrays inside objects correctly', () => {
+                // GIVEN cache with existing array data
+                cache.set('mockKey', {ID: [1]});
+
+                // WHEN merge is called with an array
+                cache.merge({
+                    mockKey: {ID: [2]},
+                });
+
+                // THEN the arrays should be merged as expected
+                expect(cache.getValue('mockKey')).toEqual({ID: [2]});
             });
 
             it('Should work with primitive values', () => {
