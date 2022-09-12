@@ -196,7 +196,7 @@ describe('Onyx', () => {
             });
     });
 
-    it('should overwrite an array key nested inside an object when using mergeCollection', () => {
+    it('should overwrite an array key nested inside an object when using merge', () => {
         let testKeyValue;
         connectionID = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
