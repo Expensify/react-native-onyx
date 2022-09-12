@@ -178,6 +178,42 @@ describe('Onyx', () => {
             });
     });
 
+    it('should overwrite an array key nested inside an object', () => {
+        let testKeyValue;
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        Onyx.merge(ONYX_KEYS.TEST_KEY, {something: [1, 2, 3]});
+        Onyx.merge(ONYX_KEYS.TEST_KEY, {something: [4]});
+        return waitForPromisesToResolve()
+            .then(() => {
+                expect(testKeyValue).toEqual({something: [4]});
+            });
+    });
+
+    it('should overwrite an array key nested inside an object when using mergeCollection', () => {
+        let testKeyValue;
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        Onyx.merge(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {something: [1, 2, 3]}});
+        Onyx.merge(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {something: [4]}});
+        return waitForPromisesToResolve()
+            .then(() => {
+                expect(testKeyValue).toEqual({test_1: {something: [4]}});
+            });
+    });
+
     it('should properly set and merge when using mergeCollection', () => {
         const valuesReceived = {};
         const mockCallback = jest.fn(data => valuesReceived[data.ID] = data.value);

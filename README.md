@@ -77,10 +77,10 @@ Onyx.merge(ONYXKEYS.POLICY, {id: 1}); // -> {id: 1}
 Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Workspace'}
 ```
 
-One caveat to be aware of is that `lodash/merge` [follows the behavior of jQuery's deep extend](https://github.com/lodash/lodash/issues/2872) and will not concatenate nested arrays in objects. It might seem like this code would concat these arrays, but it does not.
+Arrays inside objects will be replaced fully:
 
 ```javascript
-Onyx.merge(ONYXKEYS.POLICY, {employeeList: ['Joe']}); // -> {employeeList: ['Joe']}
+Onyx.merge(ONYXKEYS.POLICY, {employeeList: ['Joe', 'Jack']}); // -> {employeeList: ['Joe', 'Jack']}
 Onyx.merge(ONYXKEYS.POLICY, {employeeList: ['Jack']}); // -> {employeeList: ['Jack']}
 ```
 
