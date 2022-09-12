@@ -101,6 +101,34 @@ describe('withOnyx', () => {
             });
     });
 
+    it('should replace arrays inside objects with withOnyx subscribing to individual key if mergeCollection is used', () => {
+        const collectionItemID = 1;
+        const TestComponentWithOnyx = withOnyx({
+            text: {
+                key: `${ONYX_KEYS.COLLECTION.TEST_KEY}${collectionItemID}`,
+            },
+        })(ViewWithCollections);
+        const onRender = jest.fn();
+        render(<TestComponentWithOnyx onRender={onRender} />);
+        return waitForPromisesToResolve()
+            .then(() => {
+                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                    test_1: {list: [1, 2]},
+                });
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                    test_1: {list: [7]},
+                });
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                expect(onRender.mock.calls.length).toBe(3);
+                expect(onRender.mock.instances[2].text).toEqual({list: [7]});
+            });
+    });
+
     it('should update withOnyx subscribing to individual key with merged value if mergeCollection is used', () => {
         const collectionItemID = 4;
         const TestComponentWithOnyx = withOnyx({
