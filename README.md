@@ -77,7 +77,7 @@ Onyx.merge(ONYXKEYS.POLICY, {id: 1}); // -> {id: 1}
 Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Workspace'}
 ```
 
-Arrays inside objects will be replaced fully:
+Arrays inside objects will NOT be concatenated and instead will be replaced fully:
 
 ```javascript
 Onyx.merge(ONYXKEYS.POLICY, {employeeList: ['Joe', 'Jack']}); // -> {employeeList: ['Joe', 'Jack']}
