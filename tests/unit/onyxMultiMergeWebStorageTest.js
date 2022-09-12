@@ -47,7 +47,7 @@ describe('Onyx.mergeCollection() amd WebStorage', () => {
         expect(OnyxCache.getValue('test_3')).not.toBeDefined();
 
         // When we merge additional data
-        const additionalDataOne = {b: 'b', c: 'c'};
+        const additionalDataOne = {b: 'b', c: 'c', e: [1, 2]};
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
             test_1: additionalDataOne,
             test_2: additionalDataOne,
@@ -55,7 +55,7 @@ describe('Onyx.mergeCollection() amd WebStorage', () => {
         });
 
         // And call again consecutively with different data
-        const additionalDataTwo = {d: 'd'};
+        const additionalDataTwo = {d: 'd', e: [2]};
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
             test_1: additionalDataTwo,
             test_2: additionalDataTwo,
@@ -65,7 +65,7 @@ describe('Onyx.mergeCollection() amd WebStorage', () => {
         return waitForPromisesToResolve()
             .then(() => {
                 const finalObject = {
-                    a: 'a', b: 'b', c: 'c', d: 'd',
+                    a: 'a', b: 'b', c: 'c', d: 'd', e: [2],
                 };
 
                 // Then our new data should merge with the existing data in the cache
