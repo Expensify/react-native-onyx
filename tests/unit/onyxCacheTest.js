@@ -267,9 +267,9 @@ describe('Onyx', () => {
                     mockKey: [{ID: 3}, {added: 'field'}, {}, {ID: 1000}],
                 });
 
-                // THEN the arrays should be merged as expected
+                // THEN the arrays should be replaced as expected
                 expect(cache.getValue('mockKey')).toEqual([
-                    {ID: 3}, {ID: 2, added: 'field'}, {ID: 3}, {ID: 1000},
+                    {ID: 3}, {added: 'field'}, {}, {ID: 1000},
                 ]);
             });
 
