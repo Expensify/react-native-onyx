@@ -63,7 +63,7 @@ The data will then be cached and stored via [`AsyncStorage`](https://github.com/
 
 We can also use `Onyx.merge()` to merge new `Object` or `Array` data in with existing data.
 
-For `Array` the default behavior is to concatenate replace it fully, effectively making it equivalent to set:
+For `Array` the default behavior is to replace it fully, effectively making it equivalent to set:
 
 ```javascript
 Onyx.merge(ONYXKEYS.EMPLOYEE_LIST, ['Joe']); // -> ['Joe']
