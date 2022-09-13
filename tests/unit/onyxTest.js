@@ -196,7 +196,7 @@ describe('Onyx', () => {
             });
     });
 
-    it('should overwrite an array key nested inside an object when using merge', () => {
+    it('should overwrite an array key nested inside an object when using merge on a collection', () => {
         let testKeyValue;
         connectionID = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
@@ -365,7 +365,7 @@ describe('Onyx', () => {
 
         return waitForPromisesToResolve()
             .then(() => {
-                // GIVEN the initial Onyx state: {test: true, otherTest: {test1: 'test1'}}
+                // Given the initial Onyx state: {test: true, otherTest: {test1: 'test1'}}
                 Onyx.set(ONYX_KEYS.TEST_KEY, true);
                 Onyx.set(ONYX_KEYS.OTHER_TEST, {test1: 'test1'});
                 return waitForPromisesToResolve();
@@ -390,7 +390,7 @@ describe('Onyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                // THEN the final Onyx state should be {test: 'one', otherTest: {test1: 'test1', test2: 'test2'}}
+                // Then the final Onyx state should be {test: 'one', otherTest: {test1: 'test1', test2: 'test2'}}
                 expect(testKeyValue).toBe('one');
                 expect(otherTestKeyValue).toEqual({test1: 'test1', test2: 'test2'});
             });
@@ -407,7 +407,7 @@ describe('Onyx', () => {
 
         return waitForPromisesToResolve()
             .then(() => {
-                // GIVEN the initial Onyx state: {test_1: {existingData: 'test',}, test_2: {existingData: 'test',}}
+                // Given the initial Onyx state: {test_1: {existingData: 'test',}, test_2: {existingData: 'test',}}
                 Onyx.multiSet({
                     test_1: {
                         existingData: 'test',
@@ -449,7 +449,7 @@ describe('Onyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                /* THEN the final Onyx state should be:
+                /* Then the final Onyx state should be:
                     {
                         test_1: {
                             existingData: 'test'
@@ -480,7 +480,7 @@ describe('Onyx', () => {
     });
 
     it('should throw an error when the data object is incorrect in Onyx.update', () => {
-        // GIVEN the invalid data object with onyxMethod='multiSet'
+        // Given the invalid data object with onyxMethod='multiSet'
         const data = [
             {onyxMethod: 'set', key: ONYX_KEYS.TEST_KEY, value: 'four'},
             {onyxMethod: 'multiSet', key: ONYX_KEYS.OTHER_TEST, value: {test2: 'test2'}},
@@ -490,18 +490,18 @@ describe('Onyx', () => {
             // WHEN we pass it to Onyx.update
             Onyx.update(data);
         } catch (error) {
-            // THEN we should expect the error message below
+            // Then we should expect the error message below
             expect(error.message).toEqual('Invalid onyxMethod multiSet in Onyx update.');
         }
 
         try {
-            // GIVEN the invalid data object with key=true
+            // Given the invalid data object with key=true
             data[1] = {onyxMethod: 'merge', key: true, value: {test2: 'test2'}};
 
             // WHEN we pass it to Onyx.update
             Onyx.update(data);
         } catch (error) {
-            // THEN we should expect the error message below
+            // Then we should expect the error message below
             expect(error.message).toEqual('Invalid boolean key provided in Onyx update. Onyx key must be of type string.');
         }
     });
@@ -509,7 +509,7 @@ describe('Onyx', () => {
     it('should return all collection keys as a single object when waitForCollectionCallback = true', () => {
         const mockCallback = jest.fn();
 
-        // GIVEN some initial collection data
+        // Given some initial collection data
         const initialCollectionData = {
             test_connect_collection_1: {
                 ID: 123,
@@ -537,7 +537,7 @@ describe('Onyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                // THEN we expect the callback to be called only once and the initial stored value to be initialCollectionData
+                // Then we expect the callback to be called only once and the initial stored value to be initialCollectionData
                 expect(mockCallback.mock.calls.length).toBe(1);
                 expect(mockCallback.mock.calls[0][0]).toEqual(initialCollectionData);
             });
@@ -550,7 +550,7 @@ describe('Onyx', () => {
             test_policy_2: {ID: 123, value: 'two'},
         };
 
-        // GIVEN an Onyx.connect call with waitForCollectionCallback=true
+        // Given an Onyx.connect call with waitForCollectionCallback=true
         connectionID = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_POLICY,
             waitForCollectionCallback: true,
@@ -563,7 +563,7 @@ describe('Onyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                // THEN we expect the callback to have called twice, once for the initial connect call + once for the collection update
+                // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
                 expect(mockCallback.mock.calls.length).toBe(2);
 
                 // AND the value for the first call should be null since the collection was not initialized at that point
