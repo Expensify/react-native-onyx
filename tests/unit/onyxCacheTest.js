@@ -525,14 +525,14 @@ describe('Onyx', () => {
                         const key = `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}${number}`;
                         return ({
                             key,
-                            connectionId: Onyx.connect({key}),
+                            connectionId: Onyx.connect({key, callback: jest.fn()}),
                         });
                     });
                 })
                 .then(waitForPromisesToResolve)
                 .then(() => {
                     // WHEN a new connection for a safe eviction key happens
-                    Onyx.connect({key: `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}9`});
+                    Onyx.connect({key: `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}9`, callback: jest.fn()});
                 })
                 .then(() => {
                     // Then the most recent 5 keys should remain in cache
@@ -632,10 +632,10 @@ describe('Onyx', () => {
             return initOnyx({maxCachedKeysCount: 3})
                 .then(() => {
                     // WHEN 4 connections for different keys happen
-                    Onyx.connect({key: 'key1'});
-                    Onyx.connect({key: 'key2'});
-                    Onyx.connect({key: 'key3'});
-                    Onyx.connect({key: 'key4'});
+                    Onyx.connect({key: 'key1', callback: jest.fn()});
+                    Onyx.connect({key: 'key2', callback: jest.fn()});
+                    Onyx.connect({key: 'key3', callback: jest.fn()});
+                    Onyx.connect({key: 'key4', callback: jest.fn()});
                 })
                 .then(waitForPromisesToResolve)
                 .then(() => {
@@ -646,7 +646,7 @@ describe('Onyx', () => {
                     expect(cache.hasCacheForKey('key4')).toBe(true);
 
                     // WHEN A connection for safe eviction key happens
-                    Onyx.connect({key: ONYX_KEYS.COLLECTION.MOCK_COLLECTION});
+                    Onyx.connect({key: ONYX_KEYS.COLLECTION.MOCK_COLLECTION, callback: jest.fn()});
                 })
                 .then(waitForPromisesToResolve)
                 .then(() => {

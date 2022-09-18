@@ -5,6 +5,8 @@
 ## Functions
 
 <dl>
+<dt><a href="#isCollectionMemberKey">isCollectionMemberKey(collectionKey, key)</a> ⇒ <code>Boolean</code></dt>
+<dd></dd>
 <dt><a href="#connect">connect(mapping)</a> ⇒ <code>Number</code></dt>
 <dd><p>Subscribes a react component&#39;s state directly to a store key</p>
 </dd>
@@ -59,6 +61,16 @@ value will be saved to storage after the default value.</p>
 <dd><p>Initialize the store with actions and listening for storage events</p>
 </dd>
 </dl>
+
+<a name="isCollectionMemberKey"></a>
+
+## isCollectionMemberKey(collectionKey, key) ⇒ <code>Boolean</code>
+**Kind**: global function
+
+| Param | Type |
+| --- | --- |
+| collectionKey | <code>String</code> |
+| key | <code>String</code> |
 
 <a name="connect"></a>
 
