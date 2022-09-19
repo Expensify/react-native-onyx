@@ -5,7 +5,7 @@ import StorageProvider from '../../../../lib/storage/providers/AsyncStorage';
 
 describe('storage/providers/AsyncStorage', () => {
     // Start each test with empty storage
-    beforeEach(() => StorageProvider.clear());
+    beforeEach(() => AsyncStorageMock.clear());
 
     const SAMPLE_ITEMS = [
         ['string', 'Plain String'],
