@@ -319,6 +319,9 @@ Sample output of `Onyx.printMetrics()`
 |    1.17sec |   2.20sec |   1.03sec | currentURL, /            |
 ```
 
+# Debug mode
+
+It can be useful to log why Onyx is calling `setState()` on a particular React component so that we can understand which key changed, what changed about the value, and the connected component that ultimately rendered as a result. When used correctly this can help isolate problem areas and unnecessary renders in the code. To enable this feature, pass `debugSetState: true` to the config and grep JS console logs for `[Onyx-Debug]`.
 
 # Development
 
