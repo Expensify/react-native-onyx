@@ -40,6 +40,7 @@
   },
   "dependencies": {
     "ascii-table": "0.0.9",
+    "dequal": "^2.0.3",
     "lodash": "^4.17.21",
     "underscore": "^1.13.1"
   },
