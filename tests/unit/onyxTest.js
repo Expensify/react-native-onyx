@@ -538,7 +538,7 @@ describe('Onyx', () => {
             })
             .then(() => {
                 // Then we expect the callback to be called only once and the initial stored value to be initialCollectionData
-                expect(mockCallback.mock.calls.length).toBe(1);
+                expect(mockCallback).toHaveBeenCalledTimes(1);
                 expect(mockCallback.mock.calls[0][0]).toEqual(initialCollectionData);
             });
     });
