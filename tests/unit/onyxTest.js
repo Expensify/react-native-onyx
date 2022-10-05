@@ -1,3 +1,4 @@
+import _ from 'underscore';
 import Onyx from '../../lib';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
@@ -628,6 +629,51 @@ describe('Onyx', () => {
 
                 // AND the value for the second call should be collectionUpdate
                 expect(mockCallback.mock.calls[1][0]).toEqual(collectionUpdate);
+            });
+    });
+
+    it('should not update a subscriber if the value in the cache has not changed at all', () => {
+        const mockCallback = jest.fn();
+        const collectionUpdate = {
+            test_policy_1: {ID: 234, value: 'one'},
+        };
+
+        // Given an Onyx.connect call with waitForCollectionCallback=true
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_POLICY,
+            waitForCollectionCallback: true,
+            callback: mockCallback,
+        });
+        return waitForPromisesToResolve()
+            .then(() => {
+                // When merge is called with an updated collection
+                Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.test_policy_1);
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
+                expect(mockCallback.mock.calls.length).toBe(2);
+
+                // And the value for the second call should be collectionUpdate
+                expect(mockCallback.mock.calls[1][0]).toEqual(collectionUpdate);
+            })
+            .then(() => {
+                // When merge is called again with the same collection not modified
+                Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.test_policy_1);
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                // Then we should not expect another invocation of the callback
+                expect(mockCallback.mock.calls.length).toBe(2);
+            })
+            .then(() => {
+                // WHEN merge is called again with an object of equivalent value but not the same reference
+                Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, _.clone(collectionUpdate.test_policy_1));
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                // Then we should not expect another invocation of the callback
+                expect(mockCallback.mock.calls.length).toBe(2);
             });
     });
 });
