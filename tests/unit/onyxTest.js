@@ -604,6 +604,16 @@ describe('Onyx', () => {
             });
     });
 
+    it('should return a promise when set() called with the same value and there is no change', () => {
+        const promiseOne = Onyx.set('test', 'pizza');
+        expect(promiseOne).toBeInstanceOf(Promise);
+        return promiseOne
+            .then(() => {
+                const promiseTwo = Onyx.set('test', 'pizza');
+                expect(promiseTwo).toBeInstanceOf(Promise);
+            });
+    });
+
     it('should not update a subscriber if the value in the cache has not changed at all', () => {
         const mockCallback = jest.fn();
         const collectionUpdate = {
