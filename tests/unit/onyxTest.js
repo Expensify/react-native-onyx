@@ -60,8 +60,7 @@ describe('Onyx', () => {
         return Onyx.set(ONYX_KEYS.TEST_KEY, {test1: 'test1'})
             .then(() => {
                 expect(testKeyValue).toEqual({test1: 'test1'});
-                Onyx.merge(ONYX_KEYS.TEST_KEY, {test2: 'test2'});
-                return waitForPromisesToResolve();
+                return Onyx.merge(ONYX_KEYS.TEST_KEY, {test2: 'test2'});
             })
             .then(() => {
                 expect(testKeyValue).toEqual({test1: 'test1', test2: 'test2'});
@@ -135,8 +134,7 @@ describe('Onyx', () => {
         return Onyx.set(ONYX_KEYS.TEST_KEY, ['test1'])
             .then(() => {
                 expect(testKeyValue).toStrictEqual(['test1']);
-                Onyx.merge(ONYX_KEYS.TEST_KEY, ['test2', 'test3', 'test4']);
-                return waitForPromisesToResolve();
+                return Onyx.merge(ONYX_KEYS.TEST_KEY, ['test2', 'test3', 'test4']);
             })
             .then(() => {
                 expect(testKeyValue).toStrictEqual(['test1', 'test2', 'test3', 'test4']);
@@ -535,11 +533,9 @@ describe('Onyx', () => {
             callback: mockCallback,
         });
         return waitForPromisesToResolve()
-            .then(() => {
-                // WHEN mergeCollection is called with an updated collection
-                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_POLICY, collectionUpdate);
-                return waitForPromisesToResolve();
-            })
+
+            // WHEN mergeCollection is called with an updated collection
+            .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_POLICY, collectionUpdate))
             .then(() => {
                 // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
                 expect(mockCallback).toHaveBeenCalledTimes(2);
@@ -565,8 +561,9 @@ describe('Onyx', () => {
             callback: mockCallback,
         });
         return waitForPromisesToResolve()
+
+            // WHEN mergeCollection is called with an updated collection
             .then(() => {
-                // WHEN mergeCollection is called with an updated collection
                 Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_POLICY, collectionUpdate);
                 return waitForPromisesToResolve();
             })
@@ -620,11 +617,9 @@ describe('Onyx', () => {
             callback: mockCallback,
         });
         return waitForPromisesToResolve()
-            .then(() => {
-                // When merge is called with an updated collection
-                Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.test_policy_1);
-                return waitForPromisesToResolve();
-            })
+
+            // When merge is called with an updated collection
+            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.test_policy_1))
             .then(() => {
                 // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
                 expect(mockCallback).toHaveBeenCalledTimes(2);
@@ -632,20 +627,16 @@ describe('Onyx', () => {
                 // And the value for the second call should be collectionUpdate
                 expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate);
             })
-            .then(() => {
-                // When merge is called again with the same collection not modified
-                Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.test_policy_1);
-                return waitForPromisesToResolve();
-            })
+
+            // When merge is called again with the same collection not modified
+            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.test_policy_1))
             .then(() => {
                 // Then we should not expect another invocation of the callback
                 expect(mockCallback).toHaveBeenCalledTimes(2);
             })
-            .then(() => {
-                // WHEN merge is called again with an object of equivalent value but not the same reference
-                Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, _.clone(collectionUpdate.test_policy_1));
-                return waitForPromisesToResolve();
-            })
+
+            // WHEN merge is called again with an object of equivalent value but not the same reference
+            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, _.clone(collectionUpdate.test_policy_1)))
             .then(() => {
                 // Then we should not expect another invocation of the callback
                 expect(mockCallback).toHaveBeenCalledTimes(2);
@@ -666,11 +657,9 @@ describe('Onyx', () => {
             initWithStoredValues: false,
         });
         return waitForPromisesToResolve()
-            .then(() => {
-                // When merge is called with an updated collection
-                Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.test_policy_1);
-                return waitForPromisesToResolve();
-            })
+
+            // When merge is called with an updated collection
+            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.test_policy_1))
             .then(() => {
                 // Then we expect the callback to have called once. 0 times the initial connect call + 1 time for the merge()
                 expect(mockCallback).toHaveBeenCalledTimes(1);
@@ -678,20 +667,16 @@ describe('Onyx', () => {
                 // And the value for the second call should be collectionUpdate
                 expect(mockCallback).toHaveBeenNthCalledWith(1, collectionUpdate);
             })
-            .then(() => {
-                // When merge is called again with the same collection not modified
-                Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.test_policy_1);
-                return waitForPromisesToResolve();
-            })
+
+            // When merge is called again with the same collection not modified
+            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.test_policy_1))
             .then(() => {
                 // Then we should expect another invocation of the callback because initWithStoredValues = false
                 expect(mockCallback).toHaveBeenCalledTimes(2);
             })
-            .then(() => {
-                // WHEN merge is called again with an object of equivalent value but not the same reference
-                Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, _.clone(collectionUpdate.test_policy_1));
-                return waitForPromisesToResolve();
-            })
+
+            // WHEN merge is called again with an object of equivalent value but not the same reference
+            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, _.clone(collectionUpdate.test_policy_1)))
             .then(() => {
                 // Then we should expect another invocation of the callback because initWithStoredValues = false
                 expect(mockCallback).toHaveBeenCalledTimes(3);
