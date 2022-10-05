@@ -13,7 +13,7 @@
 <dt><a href="#disconnect">disconnect(connectionID, [keyToRemoveFromEvictionBlocklist])</a></dt>
 <dd><p>Remove the listener for a react component</p>
 </dd>
-<dt><a href="#notifySubscribersOnNextTick">notifySubscribersOnNextTick(key, value)</a></dt>
+<dt><a href="#notifySubscribersOnNextTick">notifySubscribersOnNextTick(key, value, [canUpdateSubscriber])</a></dt>
 <dd><p>This method mostly exists for historical reasons as this library was initially designed without a memory cache and one was added later.
 For this reason, Onyx works more similar to what you might expect from a native AsyncStorage with reads, writes, etc all becoming
 available async. Since we have code in our main applications that might expect things to work this way it&#39;s not safe to change this
@@ -115,7 +115,7 @@ Onyx.disconnect(connectionID);
 ```
 <a name="notifySubscribersOnNextTick"></a>
 
-## notifySubscribersOnNextTick(key, value)
+## notifySubscribersOnNextTick(key, value, [canUpdateSubscriber])
 This method mostly exists for historical reasons as this library was initially designed without a memory cache and one was added later.
 For this reason, Onyx works more similar to what you might expect from a native AsyncStorage with reads, writes, etc all becoming
 available async. Since we have code in our main applications that might expect things to work this way it's not safe to change this
@@ -123,10 +123,11 @@ behavior just yet.
 
 **Kind**: global function
 
-| Param | Type |
-| --- | --- |
-| key | <code>String</code> |
-| value | <code>\*</code> |
+| Param | Type | Description |
+| --- | --- | --- |
+| key | <code>String</code> |  |
+| value | <code>\*</code> |  |
+| [canUpdateSubscriber] | <code>function</code> | only subscribers that pass this truth test will be updated |
 
 <a name="set"></a>
 
