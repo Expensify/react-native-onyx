@@ -56,7 +56,7 @@ describe('withOnyx', () => {
         Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}3`, {ID: 345});
         return waitForPromisesToResolve()
             .then(() => {
-                expect(onRender.mock.calls.length).toBe(4);
+                expect(onRender).toHaveBeenCalledTimes(4);
             });
     });
 
@@ -76,7 +76,7 @@ describe('withOnyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                expect(onRender.mock.calls.length).toBe(2);
+                expect(onRender).toHaveBeenCalledTimes(2);
             });
     });
 
@@ -97,7 +97,7 @@ describe('withOnyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                expect(onRender.mock.calls.length).toBe(2);
+                expect(onRender).toHaveBeenCalledTimes(2);
             });
     });
 
@@ -124,8 +124,10 @@ describe('withOnyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                expect(onRender.mock.calls.length).toBe(3);
-                expect(onRender.mock.instances[2].text).toEqual({list: [7]});
+                expect(onRender).toHaveBeenCalledTimes(3);
+                expect(onRender).toHaveBeenLastCalledWith({
+                    collections: {}, onRender, testObject: {isDefaultProp: true}, text: {list: [7]},
+                });
             });
     });
 
@@ -149,8 +151,10 @@ describe('withOnyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                expect(onRender.mock.calls.length).toBe(3);
-                expect(onRender.mock.instances[2].text).toEqual({ID: 456, Name: 'Test4'});
+                expect(onRender).toHaveBeenCalledTimes(3);
+                expect(onRender).toHaveBeenLastCalledWith({
+                    collections: {}, onRender, testObject: {isDefaultProp: true}, text: {ID: 456, Name: 'Test4'},
+                });
             });
     });
 
@@ -226,7 +230,9 @@ describe('withOnyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                expect(onRender.mock.instances[0].testThing).toBe('Test');
+                expect(onRender).toHaveBeenLastCalledWith({
+                    collections: {}, onRender, testObject: {id: 1}, testThing: 'Test',
+                });
             });
     });
 
@@ -281,14 +287,14 @@ describe('withOnyx', () => {
                 // Note: each component is rendered twice. Once when it is initially rendered, and then again
                 // when the collection is updated. That's why there are two checks here for each component.
                 expect(onRender1).toHaveBeenCalledTimes(2);
-                expect(onRender1.mock.calls[0][0].testObject).toStrictEqual({ID: 1});
-                expect(onRender1.mock.calls[1][0].testObject).toStrictEqual({ID: 1, newProperty: 'yay'});
+                expect(onRender1).toHaveBeenNthCalledWith(1, {collections: {}, onRender: onRender1, testObject: {ID: 1}});
+                expect(onRender1).toHaveBeenNthCalledWith(2, {collections: {}, onRender: onRender1, testObject: {ID: 1, newProperty: 'yay'}});
 
                 expect(onRender2).toHaveBeenCalledTimes(1);
-                expect(onRender2.mock.calls[0][0].testObject).toStrictEqual({ID: 2});
+                expect(onRender2).toHaveBeenNthCalledWith(1, {collections: {}, onRender: onRender2, testObject: {ID: 2}});
 
                 expect(onRender3).toHaveBeenCalledTimes(1);
-                expect(onRender3.mock.calls[0][0].testObject).toStrictEqual({ID: 3});
+                expect(onRender3).toHaveBeenNthCalledWith(1, {collections: {}, onRender: onRender3, testObject: {ID: 3}});
             });
     });
 
@@ -324,8 +330,8 @@ describe('withOnyx', () => {
                 // The first time it will render with number === 1
                 // The second time it will render with number === 2
                 expect(onRender).toHaveBeenCalledTimes(2);
-                expect(onRender.mock.calls[0][0].testObject).toStrictEqual({ID: 1, number: 1});
-                expect(onRender.mock.calls[1][0].testObject).toStrictEqual({ID: 1, number: 2});
+                expect(onRender).toHaveBeenNthCalledWith(1, {collections: {}, onRender, testObject: {ID: 1, number: 1}});
+                expect(onRender).toHaveBeenNthCalledWith(2, {collections: {}, onRender, testObject: {ID: 1, number: 2}});
             });
     });
 });

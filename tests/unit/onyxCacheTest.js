@@ -613,10 +613,8 @@ describe('Onyx', () => {
                 .then(() => {
                     // Then Async storage `getItem` should be called exactly two times (once for each key)
                     expect(AsyncStorageMock.getItem).toHaveBeenCalledTimes(2);
-                    expect(AsyncStorageMock.getItem.mock.calls).toEqual([
-                        [ONYX_KEYS.TEST_KEY],
-                        [ONYX_KEYS.OTHER_TEST],
-                    ]);
+                    expect(AsyncStorageMock.getItem).toHaveBeenNthCalledWith(1, ONYX_KEYS.TEST_KEY);
+                    expect(AsyncStorageMock.getItem).toHaveBeenNthCalledWith(2, ONYX_KEYS.OTHER_TEST);
                 });
         });
 

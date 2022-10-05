@@ -264,29 +264,14 @@ describe('Onyx', () => {
             ))
             .then(() => {
                 // 3 items on the first mergeCollection + 4 items the next mergeCollection
-                expect(mockCallback.mock.calls.length).toBe(7);
-
-                expect(mockCallback.mock.calls[0][0]).toEqual({ID: 123, value: 'one'});
-                expect(mockCallback.mock.calls[0][1]).toEqual('test_1');
-
-                expect(mockCallback.mock.calls[1][0]).toEqual({ID: 234, value: 'two'});
-                expect(mockCallback.mock.calls[1][1]).toEqual('test_2');
-
-                expect(mockCallback.mock.calls[2][0]).toEqual({ID: 345, value: 'three'});
-                expect(mockCallback.mock.calls[2][1]).toEqual('test_3');
-
-                expect(mockCallback.mock.calls[3][0]).toEqual({ID: 123, value: 'five'});
-                expect(mockCallback.mock.calls[3][1]).toEqual('test_1');
-
-                expect(mockCallback.mock.calls[4][0]).toEqual({ID: 234, value: 'four'});
-                expect(mockCallback.mock.calls[4][1]).toEqual('test_2');
-
-                expect(mockCallback.mock.calls[5][0]).toEqual({ID: 456, value: 'two'});
-                expect(mockCallback.mock.calls[5][1]).toEqual('test_4');
-
-                expect(mockCallback.mock.calls[6][0]).toEqual({ID: 567, value: 'one'});
-                expect(mockCallback.mock.calls[6][1]).toEqual('test_5');
-
+                expect(mockCallback).toHaveBeenCalledTimes(7);
+                expect(mockCallback).toHaveBeenNthCalledWith(1, {ID: 123, value: 'one'}, 'test_1');
+                expect(mockCallback).toHaveBeenNthCalledWith(2, {ID: 234, value: 'two'}, 'test_2');
+                expect(mockCallback).toHaveBeenNthCalledWith(3, {ID: 345, value: 'three'}, 'test_3');
+                expect(mockCallback).toHaveBeenNthCalledWith(4, {ID: 123, value: 'five'}, 'test_1');
+                expect(mockCallback).toHaveBeenNthCalledWith(5, {ID: 234, value: 'four'}, 'test_2');
+                expect(mockCallback).toHaveBeenNthCalledWith(6, {ID: 456, value: 'two'}, 'test_4');
+                expect(mockCallback).toHaveBeenNthCalledWith(7, {ID: 567, value: 'one'}, 'test_5');
                 expect(valuesReceived[123]).toEqual('five');
                 expect(valuesReceived[234]).toEqual('four');
                 expect(valuesReceived[345]).toEqual('three');
@@ -420,11 +405,8 @@ describe('Onyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                expect(mockCallback.mock.calls[0][0]).toEqual({existingData: 'test'});
-                expect(mockCallback.mock.calls[0][1]).toEqual('test_1');
-
-                expect(mockCallback.mock.calls[1][0]).toEqual({existingData: 'test'});
-                expect(mockCallback.mock.calls[1][1]).toEqual('test_2');
+                expect(mockCallback).toHaveBeenNthCalledWith(1, {existingData: 'test'}, 'test_1');
+                expect(mockCallback).toHaveBeenNthCalledWith(2, {existingData: 'test'}, 'test_2');
 
                 // WHEN we pass a mergeCollection data object to Onyx.update
                 Onyx.update([
@@ -469,14 +451,9 @@ describe('Onyx', () => {
                     }
                 */
 
-                expect(mockCallback.mock.calls[2][0]).toEqual({ID: 123, value: 'one', existingData: 'test'});
-                expect(mockCallback.mock.calls[2][1]).toEqual('test_1');
-
-                expect(mockCallback.mock.calls[3][0]).toEqual({ID: 234, value: 'two', existingData: 'test'});
-                expect(mockCallback.mock.calls[3][1]).toEqual('test_2');
-
-                expect(mockCallback.mock.calls[4][0]).toEqual({ID: 345, value: 'three'});
-                expect(mockCallback.mock.calls[4][1]).toEqual('test_3');
+                expect(mockCallback).toHaveBeenNthCalledWith(3, {ID: 123, value: 'one', existingData: 'test'}, 'test_1');
+                expect(mockCallback).toHaveBeenNthCalledWith(4, {ID: 234, value: 'two', existingData: 'test'}, 'test_2');
+                expect(mockCallback).toHaveBeenNthCalledWith(5, {ID: 345, value: 'three'}, 'test_3');
             });
     });
 
@@ -539,8 +516,8 @@ describe('Onyx', () => {
             })
             .then(() => {
                 // Then we expect the callback to be called only once and the initial stored value to be initialCollectionData
-                expect(mockCallback.mock.calls.length).toBe(1);
-                expect(mockCallback.mock.calls[0][0]).toEqual(initialCollectionData);
+                expect(mockCallback).toHaveBeenCalledTimes(1);
+                expect(mockCallback).toHaveBeenCalledWith(initialCollectionData, undefined);
             });
     });
 
@@ -565,13 +542,13 @@ describe('Onyx', () => {
             })
             .then(() => {
                 // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
-                expect(mockCallback.mock.calls.length).toBe(2);
+                expect(mockCallback).toHaveBeenCalledTimes(2);
 
                 // AND the value for the first call should be null since the collection was not initialized at that point
-                expect(mockCallback.mock.calls[0][0]).toBe(null);
+                expect(mockCallback).toHaveBeenNthCalledWith(1, null, undefined);
 
                 // AND the value for the second call should be collectionUpdate since the collection was updated
-                expect(mockCallback.mock.calls[1][0]).toEqual(collectionUpdate);
+                expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate);
             });
     });
 
@@ -595,13 +572,13 @@ describe('Onyx', () => {
             })
             .then(() => {
                 // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
-                expect(mockCallback.mock.calls.length).toBe(2);
+                expect(mockCallback).toHaveBeenCalledTimes(2);
 
                 // AND the value for the first call should be null since the collection was not initialized at that point
-                expect(mockCallback.mock.calls[0][0]).toBe(null);
+                expect(mockCallback).toHaveBeenNthCalledWith(1, null, 'test_policy_1');
 
                 // AND the value for the second call should be collectionUpdate since the collection was updated
-                expect(mockCallback.mock.calls[1][0]).toEqual(collectionUpdate.test_policy_1);
+                expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate.test_policy_1, 'test_policy_1');
             });
     });
 
@@ -618,17 +595,15 @@ describe('Onyx', () => {
             callback: mockCallback,
         });
         return waitForPromisesToResolve()
-            .then(() => {
-                // WHEN mergeCollection is called with an updated collection
-                Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.test_policy_1);
-                return waitForPromisesToResolve();
-            })
+
+            // WHEN mergeCollection is called with an updated collection
+            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.test_policy_1))
             .then(() => {
                 // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
-                expect(mockCallback.mock.calls.length).toBe(2);
+                expect(mockCallback).toHaveBeenCalledTimes(2);
 
                 // AND the value for the second call should be collectionUpdate
-                expect(mockCallback.mock.calls[1][0]).toEqual(collectionUpdate);
+                expect(mockCallback).toHaveBeenLastCalledWith(collectionUpdate);
             });
     });
 
@@ -652,10 +627,10 @@ describe('Onyx', () => {
             })
             .then(() => {
                 // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
-                expect(mockCallback.mock.calls.length).toBe(2);
+                expect(mockCallback).toHaveBeenCalledTimes(2);
 
                 // And the value for the second call should be collectionUpdate
-                expect(mockCallback.mock.calls[1][0]).toEqual(collectionUpdate);
+                expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate);
             })
             .then(() => {
                 // When merge is called again with the same collection not modified
@@ -664,7 +639,7 @@ describe('Onyx', () => {
             })
             .then(() => {
                 // Then we should not expect another invocation of the callback
-                expect(mockCallback.mock.calls.length).toBe(2);
+                expect(mockCallback).toHaveBeenCalledTimes(2);
             })
             .then(() => {
                 // WHEN merge is called again with an object of equivalent value but not the same reference
@@ -673,7 +648,7 @@ describe('Onyx', () => {
             })
             .then(() => {
                 // Then we should not expect another invocation of the callback
-                expect(mockCallback.mock.calls.length).toBe(2);
+                expect(mockCallback).toHaveBeenCalledTimes(2);
             });
     });
 
@@ -698,10 +673,10 @@ describe('Onyx', () => {
             })
             .then(() => {
                 // Then we expect the callback to have called once. 0 times the initial connect call + 1 time for the merge()
-                expect(mockCallback.mock.calls.length).toBe(1);
+                expect(mockCallback).toHaveBeenCalledTimes(1);
 
                 // And the value for the second call should be collectionUpdate
-                expect(mockCallback.mock.calls[0][0]).toEqual(collectionUpdate);
+                expect(mockCallback).toHaveBeenNthCalledWith(1, collectionUpdate);
             })
             .then(() => {
                 // When merge is called again with the same collection not modified
@@ -710,7 +685,7 @@ describe('Onyx', () => {
             })
             .then(() => {
                 // Then we should expect another invocation of the callback because initWithStoredValues = false
-                expect(mockCallback.mock.calls.length).toBe(2);
+                expect(mockCallback).toHaveBeenCalledTimes(2);
             })
             .then(() => {
                 // WHEN merge is called again with an object of equivalent value but not the same reference
@@ -719,7 +694,7 @@ describe('Onyx', () => {
             })
             .then(() => {
                 // Then we should expect another invocation of the callback because initWithStoredValues = false
-                expect(mockCallback.mock.calls.length).toBe(3);
+                expect(mockCallback).toHaveBeenCalledTimes(3);
             });
     });
 });
