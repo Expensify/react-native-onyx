@@ -36,9 +36,10 @@ describe('Onyx property subscribers', () => {
             .then(() => {
                 connectionID = Onyx.connect({
                     key: ONYX_KEYS.TEST_KEY,
-                    selector: '.a',
+                    selector: 'a',
                     callback: connectionCallbackMock,
                 });
+                return waitForPromisesToResolve();
             })
 
             .then(() => {
@@ -46,7 +47,7 @@ describe('Onyx property subscribers', () => {
                 expect(connectionCallbackMock).toHaveBeenCalledTimes(1);
 
                 // with the value of just the .a value
-                expect(connectionCallbackMock).toHaveBeenCalledWith('one');
+                expect(connectionCallbackMock).toHaveBeenCalledWith('one', ONYX_KEYS.TEST_KEY);
             })
 
             // When the .a property changes
@@ -56,14 +57,14 @@ describe('Onyx property subscribers', () => {
                 expect(connectionCallbackMock).toHaveBeenCalledTimes(2);
 
                 // Then the callback should be called with the value of just the .a value
-                expect(connectionCallbackMock).toHaveBeenCalledWith('two');
+                expect(connectionCallbackMock).toHaveBeenCalledWith('two', ONYX_KEYS.TEST_KEY);
             })
 
             // When the .b property, which we aren't listening to, changes
             .then(() => Onyx.merge(ONYX_KEYS.TEST_KEY, {b: 'three'}))
             .then(() => {
                 // Then the callback should still only have been called once
-                expect(connectionCallbackMock).toHaveBeenCalledTimes(1);
+                expect(connectionCallbackMock).toHaveBeenCalledTimes(2);
             });
     });
 });
