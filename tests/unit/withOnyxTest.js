@@ -12,6 +12,7 @@ const ONYX_KEYS = {
         TEST_KEY: 'test_',
         RELATED_KEY: 'related_',
     },
+    SIMPLE_KEY: 'simple',
 };
 
 Onyx.init({
@@ -332,6 +333,45 @@ describe('withOnyx', () => {
                 expect(onRender).toHaveBeenCalledTimes(2);
                 expect(onRender).toHaveBeenNthCalledWith(1, {collections: {}, onRender, testObject: {ID: 1, number: 1}});
                 expect(onRender).toHaveBeenNthCalledWith(2, {collections: {}, onRender, testObject: {ID: 1, number: 2}});
+            });
+    });
+
+    it('merge with a simple value should not update a connected component unless the data has changed', () => {
+        const onRender = jest.fn();
+
+        // Given there is a simple key that is not an array or object value
+        Onyx.merge(ONYX_KEYS.SIMPLE_KEY, 'string');
+
+        return waitForPromisesToResolve()
+            .then(() => {
+                // When a component subscribes to the simple key
+                const TestComponentWithOnyx = withOnyx({
+                    simple: {
+                        key: ONYX_KEYS.SIMPLE_KEY,
+                    },
+                })(ViewWithCollections);
+                render(<TestComponentWithOnyx onRender={onRender} />);
+
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                // And we set the value to the same value it was before
+                Onyx.merge(ONYX_KEYS.SIMPLE_KEY, 'string');
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                // THEN the component subscribed to the modified item should only render once
+                expect(onRender).toHaveBeenCalledTimes(1);
+                expect(onRender.mock.calls[0][0].simple).toBe('string');
+
+                // If we change the value to something new
+                Onyx.merge(ONYX_KEYS.SIMPLE_KEY, 'long_string');
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                // THEN the component subscribed to the modified item should only render once
+                expect(onRender).toHaveBeenCalledTimes(2);
+                expect(onRender.mock.calls[1][0].simple).toBe('long_string');
             });
     });
 });
