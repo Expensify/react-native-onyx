@@ -242,7 +242,7 @@ describe('withOnyx', () => {
         const onRender2 = jest.fn();
         const onRender3 = jest.fn();
 
-        // GIVEN there is a collection with three simple items in it
+        // Given there is a collection with three simple items in it
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
             test_1: {ID: 1},
             test_2: {ID: 2},
@@ -251,7 +251,7 @@ describe('withOnyx', () => {
 
         return waitForPromisesToResolve()
             .then(() => {
-                // WHEN three components subscribe to each of the items in that collection
+                // When three components subscribe to each of the items in that collection
                 const TestComponentWithOnyx1 = withOnyx({
                     testObject: {
                         key: `${ONYX_KEYS.COLLECTION.TEST_KEY}1`,
@@ -276,14 +276,14 @@ describe('withOnyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                // WHEN a single item in the collection is updated with mergeCollect()
+                // When a single item in the collection is updated with mergeCollect()
                 Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                     test_1: {ID: 1, newProperty: 'yay'},
                 });
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                // THEN the component subscribed to the modified item should have the new version of the item
+                // Then the component subscribed to the modified item should have the new version of the item
                 // and all other components should be unchanged.
                 // Note: each component is rendered twice. Once when it is initially rendered, and then again
                 // when the collection is updated. That's why there are two checks here for each component.
@@ -302,14 +302,14 @@ describe('withOnyx', () => {
     it('mergeCollection should merge previous props correctly to the new state', () => {
         const onRender = jest.fn();
 
-        // GIVEN there is a collection with a simple item in it that has a `number` property set to 1
+        // Given there is a collection with a simple item in it that has a `number` property set to 1
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
             test_1: {ID: 1, number: 1},
         });
 
         return waitForPromisesToResolve()
             .then(() => {
-                // WHEN a component subscribes to the one item in that collection
+                // When a component subscribes to the one item in that collection
                 const TestComponentWithOnyx = withOnyx({
                     testObject: {
                         key: `${ONYX_KEYS.COLLECTION.TEST_KEY}1`,
@@ -320,14 +320,14 @@ describe('withOnyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                // WHEN the `number` property is updated using mergeCollection to be 2
+                // When the `number` property is updated using mergeCollection to be 2
                 Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                     test_1: {number: 2},
                 });
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                // THEN the component subscribed to the modified item should be rendered twice.
+                // Then the component subscribed to the modified item should be rendered twice.
                 // The first time it will render with number === 1
                 // The second time it will render with number === 2
                 expect(onRender).toHaveBeenCalledTimes(2);
@@ -360,7 +360,7 @@ describe('withOnyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                // THEN the component subscribed to the modified item should only render once
+                // Then the component subscribed to the modified item should only render once
                 expect(onRender).toHaveBeenCalledTimes(1);
                 expect(onRender.mock.calls[0][0].simple).toBe('string');
 
@@ -369,7 +369,7 @@ describe('withOnyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                // THEN the component subscribed to the modified item should only render once
+                // Then the component subscribed to the modified item should only render once
                 expect(onRender).toHaveBeenCalledTimes(2);
                 expect(onRender.mock.calls[1][0].simple).toBe('long_string');
             });

@@ -129,6 +129,10 @@ behavior just yet.
 | value | <code>\*</code> |  |
 | [canUpdateSubscriber] | <code>function</code> | only subscribers that pass this truth test will be updated |
 
+**Example**
+```js
+notifySubscribersOnNextTick(key, value, subscriber => subscriber.initWithStoredValues === false)
+```
 <a name="set"></a>
 
 ## set(key, value) ⇒ <code>Promise</code>
@@ -253,6 +257,7 @@ Initialize the store with actions and listening for storage events
 | [options.captureMetrics] | <code>Boolean</code> |  | Enables Onyx benchmarking and exposes the get/print/reset functions |
 | [options.shouldSyncMultipleInstances] | <code>Boolean</code> |  | Auto synchronize storage events between multiple instances of Onyx running in different tabs/windows. Defaults to true for platforms that support local storage (web/desktop) |
 | [option.keysToDisableSyncEvents] | <code>Array.&lt;String&gt;</code> | <code>[]</code> | Contains keys for which we want to disable sync event across tabs. |
+| [options.debugSetState] | <code>Boolean</code> |  | Enables debugging setState() calls to connected components. |
 
 **Example**
 ```js
