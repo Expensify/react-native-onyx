@@ -80,7 +80,7 @@ describe('Onyx property subscribers', () => {
         it('should only be updated with the props containing the specific property', () => {
             // Given a component is using withOnyx and subscribing to the property "a" of the object in Onyx
             const TestComponentWithOnyx = withOnyx({
-                data: {
+                propertyA: {
                     key: ONYX_KEYS.TEST_KEY,
                     selector: 'a',
                 },
@@ -88,6 +88,7 @@ describe('Onyx property subscribers', () => {
             let renderedComponent = render(<TestComponentWithOnyx />);
 
             return waitForPromisesToResolve()
+
                 // When Onyx is updated with an object that has multiple properties
                 .then(() => Onyx.merge(ONYX_KEYS.TEST_KEY, {a: 'one', b: 'two'}))
                 .then(() => {
@@ -97,7 +98,31 @@ describe('Onyx property subscribers', () => {
 
                 // Then the props passed to the component should only include the property "a" that was specified
                 .then(() => {
-                    expect(renderedComponent.getByTestId('text-element').props.children).toEqual('{"data":{"a":"one"}}');
+                    expect(renderedComponent.getByTestId('text-element').props.children).toEqual('{"propertyA":"one"}');
+                })
+
+                // When Onyx is updated with a change to property a
+                .then(() => Onyx.merge(ONYX_KEYS.TEST_KEY, {a: 'two', b: 'two'}))
+                .then(() => {
+                    renderedComponent = render(<TestComponentWithOnyx />);
+                    return waitForPromisesToResolve();
+                })
+
+                // Then the props passed should have the new value of property "a"
+                .then(() => {
+                    expect(renderedComponent.getByTestId('text-element').props.children).toEqual('{"propertyA":"two"}');
+                })
+
+                // When Onyx is updated with a change to property b
+                .then(() => Onyx.merge(ONYX_KEYS.TEST_KEY, {a: 'two', b: 'two'}))
+                .then(() => {
+                    renderedComponent = render(<TestComponentWithOnyx />);
+                    return waitForPromisesToResolve();
+                })
+
+                // Then the props passed should not have changed
+                .then(() => {
+                    expect(renderedComponent.getByTestId('text-element').props.children).toEqual('{"propertyA":"two"}');
                 });
         });
     });
