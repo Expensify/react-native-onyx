@@ -25,48 +25,70 @@ describe('Onyx property subscribers', () => {
             return Onyx.clear();
         });
 
-        it('callback is only called when the specific property changes', () => {
+        const runAssertionsWithMapping = (mapping, connectionCallbackMock) => waitForPromisesToResolve()
+
+            // When that mapping is connected to Onyx
+            .then(() => {
+                connectionID = Onyx.connect(mapping);
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                // Then the callback should be called once
+                expect(connectionCallbackMock).toHaveBeenCalledTimes(1);
+
+                // With no values (since nothing is set in Onyx yet)
+                expect(connectionCallbackMock).toHaveBeenCalledWith(undefined, undefined);
+            })
+
+            // When Onyx is updated to contain an object with two properties
+            .then(() => Onyx.set(ONYX_KEYS.TEST_KEY, {a: 'one', b: 'two'}))
+
+            .then(() => {
+                // Then the callback should be called once more
+                expect(connectionCallbackMock).toHaveBeenCalledTimes(2);
+
+                // with the value of just the .a value
+                expect(connectionCallbackMock).toHaveBeenCalledWith('one', ONYX_KEYS.TEST_KEY);
+            })
+
+            // When the .a property changes
+            .then(() => Onyx.merge(ONYX_KEYS.TEST_KEY, {a: 'two'}))
+            .then(() => {
+                // Then the callback should be called one more time
+                expect(connectionCallbackMock).toHaveBeenCalledTimes(3);
+
+                // Then the callback should be called with the value of just the .a value
+                expect(connectionCallbackMock).toHaveBeenCalledWith('two', ONYX_KEYS.TEST_KEY);
+            })
+
+            // When the .b property, which we aren't listening to, changes
+            .then(() => Onyx.merge(ONYX_KEYS.TEST_KEY, {b: 'three'}))
+            .then(() => {
+                // Then the callback should still only have been called once
+                expect(connectionCallbackMock).toHaveBeenCalledTimes(3);
+            });
+
+        it('when using a selector, callback is only called when the specific property changes', () => {
+            // Given an onyx connection with a mocked callback and using a selector
             const connectionCallbackMock = jest.fn();
+            const connectionMapping = {
+                key: ONYX_KEYS.TEST_KEY,
+                selector: 'a',
+                callback: connectionCallbackMock,
+            };
 
-            return waitForPromisesToResolve()
+            runAssertionsWithMapping(connectionMapping, connectionCallbackMock);
+        });
 
-                // Given that onyx contains an object with two properties
-                .then(() => Onyx.set(ONYX_KEYS.TEST_KEY, {a: 'one', b: 'two'}))
+        it('when using a reducer, callback is only called when the specific property changes', () => {
+            const connectionCallbackMock = jest.fn();
+            const connectionMapping = {
+                key: ONYX_KEYS.TEST_KEY,
+                reducer: obj => obj.a,
+                callback: connectionCallbackMock,
+            };
 
-                // When we connect to that key and specific a selector path
-                .then(() => {
-                    connectionID = Onyx.connect({
-                        key: ONYX_KEYS.TEST_KEY,
-                        selector: 'a',
-                        callback: connectionCallbackMock,
-                    });
-                    return waitForPromisesToResolve();
-                })
-
-                .then(() => {
-                    // Then the callback should be called once
-                    expect(connectionCallbackMock).toHaveBeenCalledTimes(1);
-
-                    // with the value of just the .a value
-                    expect(connectionCallbackMock).toHaveBeenCalledWith('one', ONYX_KEYS.TEST_KEY);
-                })
-
-                // When the .a property changes
-                .then(() => Onyx.merge(ONYX_KEYS.TEST_KEY, {a: 'two'}))
-                .then(() => {
-                    // Then the callback should be called one more time
-                    expect(connectionCallbackMock).toHaveBeenCalledTimes(2);
-
-                    // Then the callback should be called with the value of just the .a value
-                    expect(connectionCallbackMock).toHaveBeenCalledWith('two', ONYX_KEYS.TEST_KEY);
-                })
-
-                // When the .b property, which we aren't listening to, changes
-                .then(() => Onyx.merge(ONYX_KEYS.TEST_KEY, {b: 'three'}))
-                .then(() => {
-                    // Then the callback should still only have been called once
-                    expect(connectionCallbackMock).toHaveBeenCalledTimes(2);
-                });
+            runAssertionsWithMapping(connectionMapping, connectionCallbackMock);
         });
     });
 
@@ -77,16 +99,8 @@ describe('Onyx property subscribers', () => {
             Onyx.clear();
         });
 
-        it('should only be updated with the props containing the specific property', () => {
-            // Given a component is using withOnyx and subscribing to the property "a" of the object in Onyx
-            const TestComponentWithOnyx = withOnyx({
-                propertyA: {
-                    key: ONYX_KEYS.TEST_KEY,
-                    selector: 'a',
-                },
-            })(ViewWithObject);
+        const runAssertionsWithComponent = (TestComponentWithOnyx) => {
             let renderedComponent = render(<TestComponentWithOnyx />);
-
             return waitForPromisesToResolve()
 
                 // When Onyx is updated with an object that has multiple properties
@@ -124,6 +138,28 @@ describe('Onyx property subscribers', () => {
                 .then(() => {
                     expect(renderedComponent.getByTestId('text-element').props.children).toEqual('{"propertyA":"two"}');
                 });
+        };
+
+        it('when using a selector, should only be updated with the props containing the specific property', () => {
+            // Given a component is using withOnyx and subscribing to the property "a" of the object in Onyx
+            const TestComponentWithOnyx = withOnyx({
+                propertyA: {
+                    key: ONYX_KEYS.TEST_KEY,
+                    selector: 'a',
+                },
+            })(ViewWithObject);
+            return runAssertionsWithComponent(TestComponentWithOnyx);
+        });
+
+        it('when using a reducer, should only be updated with the props containing the specific property', () => {
+            // Given a component is using withOnyx and subscribing to the property "a" of the object in Onyx
+            const TestComponentWithOnyx = withOnyx({
+                propertyA: {
+                    key: ONYX_KEYS.TEST_KEY,
+                    reducer: obj => obj.a,
+                },
+            })(ViewWithObject);
+            return runAssertionsWithComponent(TestComponentWithOnyx);
         });
     });
 });
