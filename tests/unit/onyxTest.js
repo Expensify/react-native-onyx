@@ -692,4 +692,11 @@ describe('Onyx', () => {
                 expect(mockCallback).toHaveBeenCalledTimes(3);
             });
     });
+
+    it('should throw an error if a non-collection key is passed to mergeCollection()', () => {
+        const collectionMemberKey = `${ONYX_KEYS.COLLECTION.TEST_KEY}${1}`;
+        expect(() => {
+            Onyx.mergeCollection(collectionMemberKey, {[collectionMemberKey]: 'testValue'});
+        }).toThrow();
+    });
 });

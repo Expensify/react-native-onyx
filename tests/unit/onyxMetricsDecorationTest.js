@@ -7,6 +7,9 @@ describe('Onyx', () => {
         const ONYX_KEYS = {
             TEST_KEY: 'test',
             OTHER_TEST: 'otherTest',
+            COLLECTION: {
+                COLLECTION_KEY: 'collection_',
+            },
         };
 
         // Always use a "fresh" (and undecorated) instance
@@ -63,9 +66,10 @@ describe('Onyx', () => {
             });
 
             // When calling decorated methods through Onyx[methodName]
-            const methods = ['set', 'multiSet', 'clear', 'merge', 'mergeCollection'];
-            methods.forEach(name => Onyx[name]('mockKey', {mockKey: {mockValue: 'mockValue'}}));
-
+            const methods = ['set', 'multiSet', 'clear', 'merge'];
+            const value = {mockKey: {mockValue: 'mockValue'}};
+            methods.forEach(name => Onyx[name]('mockKey', value));
+            Onyx.mergeCollection(ONYX_KEYS.COLLECTION.COLLECTION_KEY, {[`${ONYX_KEYS.COLLECTION.COLLECTION_KEY}${1}`]: value});
             return waitForPromisesToResolve()
                 .then(() => {
                 // Then metrics should have captured data for each method
