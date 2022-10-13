@@ -25,6 +25,12 @@ describe('Onyx property subscribers', () => {
             return Onyx.clear();
         });
 
+        /**
+         * Runs all the assertions needed for Onyx.connect() callbacks
+         * @param {Object} mapping
+         * @param {Function} connectionCallbackMock
+         * @returns {Promise}
+         */
         const runAssertionsWithMapping = (mapping, connectionCallbackMock) => waitForPromisesToResolve()
 
             // When that mapping is connected to Onyx
@@ -91,6 +97,12 @@ describe('Onyx property subscribers', () => {
             runAssertionsWithMapping(connectionMapping, connectionCallbackMock);
         });
 
+        /**
+         * Runs all the assertions needed for Onyx.connect() callbacks when using collections
+         * @param {Object} mapping
+         * @param {Function} connectionCallbackMock
+         * @returns {Promise}
+         */
         const runCollectionAssertionsWithMapping = (mapping, connectionCallbackMock) => waitForPromisesToResolve()
 
             // When that mapping is connected to Onyx
@@ -143,6 +155,12 @@ describe('Onyx property subscribers', () => {
             return runCollectionAssertionsWithMapping(connectionMapping, connectionCallbackMock);
         });
 
+        /**
+         * Runs all the assertions needed for Onyx.connect() callbacks when using collections and waitForCollectionCallback: true
+         * @param {Object} mapping
+         * @param {Function} connectionCallbackMock
+         * @returns {Promise}
+         */
         const runCollectionAssertionsWithMappingAndWaitForCollection = (mapping, connectionCallbackMock) => waitForPromisesToResolve()
 
             // When that mapping is connected to Onyx
@@ -151,7 +169,7 @@ describe('Onyx property subscribers', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                // Then the callback should not be called yet because there is no data in Onyx
+                // Then the callback should not be called once
                 expect(connectionCallbackMock).toHaveBeenCalledTimes(1);
             })
 
