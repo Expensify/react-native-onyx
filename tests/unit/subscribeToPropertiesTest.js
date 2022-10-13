@@ -314,6 +314,10 @@ describe('Onyx property subscribers', () => {
                     });
                     return waitForPromisesToResolve();
                 })
+                .then(() => {
+                    renderedComponent = render(<TestComponentWithOnyx />);
+                    return waitForPromisesToResolve();
+                })
 
                 // Then the props passed to the component should only include the property "a" that was specified
                 .then(() => {
