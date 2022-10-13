@@ -324,11 +324,11 @@ describe('Onyx property subscribers', () => {
                     expect(renderedComponent.getByTestId('text-element').props.children).toEqual('{"collectionWithPropertyA":{"test_1":"one"}}');
                 })
 
-                // When Onyx is updated with a change to property a
+                // When Onyx is updated with a change to property a using merge()
+                // This uses merge() just to make sure that everything works as expected when mixing merge()
+                // and mergeCollection()
                 .then(() => {
-                    Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
-                        [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {a: 'two', b: 'two'},
-                    });
+                    Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`, {a: 'two'});
                     return waitForPromisesToResolve();
                 })
 
@@ -337,7 +337,7 @@ describe('Onyx property subscribers', () => {
                     expect(renderedComponent.getByTestId('text-element').props.children).toEqual('{"collectionWithPropertyA":{"test_1":"two"}}');
                 })
 
-                // When Onyx is updated with a change to property b
+                // When Onyx is updated with a change to property b using mergeCollection()
                 .then(() => {
                     Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                         [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {a: 'two', b: 'three'},
