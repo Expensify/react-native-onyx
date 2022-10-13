@@ -13,7 +13,7 @@
 <dt><a href="#disconnect">disconnect(connectionID, [keyToRemoveFromEvictionBlocklist])</a></dt>
 <dd><p>Remove the listener for a react component</p>
 </dd>
-<dt><a href="#notifySubscribersOnNextTick">notifySubscribersOnNextTick(key, value)</a></dt>
+<dt><a href="#notifySubscribersOnNextTick">notifySubscribersOnNextTick(key, value, [canUpdateSubscriber])</a></dt>
 <dd><p>This method mostly exists for historical reasons as this library was initially designed without a memory cache and one was added later.
 For this reason, Onyx works more similar to what you might expect from a native AsyncStorage with reads, writes, etc all becoming
 available async. Since we have code in our main applications that might expect things to work this way it&#39;s not safe to change this
@@ -65,20 +65,20 @@ value will be saved to storage after the default value.</p>
 <a name="isCollectionMemberKey"></a>
 
 ## isCollectionMemberKey(collectionKey, key) ⇒ <code>Boolean</code>
-**Kind**: global function  
+**Kind**: global function
 
 | Param | Type |
 | --- | --- |
-| collectionKey | <code>String</code> | 
-| key | <code>String</code> | 
+| collectionKey | <code>String</code> |
+| key | <code>String</code> |
 
 <a name="connect"></a>
 
 ## connect(mapping) ⇒ <code>Number</code>
 Subscribes a react component's state directly to a store key
 
-**Kind**: global function  
-**Returns**: <code>Number</code> - an ID to use when calling disconnect  
+**Kind**: global function
+**Returns**: <code>Number</code> - an ID to use when calling disconnect
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -90,7 +90,7 @@ Subscribes a react component's state directly to a store key
 | [mapping.initWithStoredValues] | <code>Boolean</code> | If set to false, then no data will be prefilled into the  component |
 | [mapping.waitForCollectionCallback] | <code>Boolean</code> | If set to true, it will return the entire collection to the callback as a single object |
 
-**Example**  
+**Example**
 ```js
 const connectionID = Onyx.connect({
     key: ONYXKEYS.SESSION,
@@ -102,38 +102,43 @@ const connectionID = Onyx.connect({
 ## disconnect(connectionID, [keyToRemoveFromEvictionBlocklist])
 Remove the listener for a react component
 
-**Kind**: global function  
+**Kind**: global function
 
 | Param | Type | Description |
 | --- | --- | --- |
 | connectionID | <code>Number</code> | unique id returned by call to Onyx.connect() |
 | [keyToRemoveFromEvictionBlocklist] | <code>String</code> |  |
 
-**Example**  
+**Example**
 ```js
 Onyx.disconnect(connectionID);
 ```
 <a name="notifySubscribersOnNextTick"></a>
 
-## notifySubscribersOnNextTick(key, value)
+## notifySubscribersOnNextTick(key, value, [canUpdateSubscriber])
 This method mostly exists for historical reasons as this library was initially designed without a memory cache and one was added later.
 For this reason, Onyx works more similar to what you might expect from a native AsyncStorage with reads, writes, etc all becoming
 available async. Since we have code in our main applications that might expect things to work this way it's not safe to change this
 behavior just yet.
 
-**Kind**: global function  
+**Kind**: global function
 
-| Param | Type |
-| --- | --- |
-| key | <code>String</code> | 
-| value | <code>\*</code> | 
+| Param | Type | Description |
+| --- | --- | --- |
+| key | <code>String</code> |  |
+| value | <code>\*</code> |  |
+| [canUpdateSubscriber] | <code>function</code> | only subscribers that pass this truth test will be updated |
 
+**Example**
+```js
+notifySubscribersOnNextTick(key, value, subscriber => subscriber.initWithStoredValues === false)
+```
 <a name="set"></a>
 
 ## set(key, value) ⇒ <code>Promise</code>
 Write a value to our store with the given key
 
-**Kind**: global function  
+**Kind**: global function
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -145,13 +150,13 @@ Write a value to our store with the given key
 ## multiSet(data) ⇒ <code>Promise</code>
 Sets multiple keys and values
 
-**Kind**: global function  
+**Kind**: global function
 
 | Param | Type | Description |
 | --- | --- | --- |
 | data | <code>Object</code> | object keyed by ONYXKEYS and the values to set |
 
-**Example**  
+**Example**
 ```js
 Onyx.multiSet({'key1': 'a', 'key2': 'b'});
 ```
@@ -169,14 +174,14 @@ Calls to `Onyx.merge()` are batched so that any calls performed in a single tick
 applied in the order they were called. Note: `Onyx.set()` calls do not work this way so use caution when mixing
 `Onyx.merge()` and `Onyx.set()`.
 
-**Kind**: global function  
+**Kind**: global function
 
 | Param | Type | Description |
 | --- | --- | --- |
 | key | <code>String</code> | ONYXKEYS key |
 | value | <code>Object</code> \| <code>Array</code> | Object or Array value to merge |
 
-**Example**  
+**Example**
 ```js
 Onyx.merge(ONYXKEYS.EMPLOYEE_LIST, ['Joe']); // -> ['Joe']
 Onyx.merge(ONYXKEYS.EMPLOYEE_LIST, ['Jack']); // -> ['Joe', 'Jack']
@@ -204,20 +209,20 @@ Onyx.get(key) before calling Storage.setItem() via Onyx.set().
 Storage.setItem() from Onyx.clear() will have already finished and the merged
 value will be saved to storage after the default value.
 
-**Kind**: global function  
+**Kind**: global function
 <a name="mergeCollection"></a>
 
 ## mergeCollection(collectionKey, collection) ⇒ <code>Promise</code>
 Merges a collection based on their keys
 
-**Kind**: global function  
+**Kind**: global function
 
 | Param | Type | Description |
 | --- | --- | --- |
 | collectionKey | <code>String</code> | e.g. `ONYXKEYS.COLLECTION.REPORT` |
 | collection | <code>Object</code> | Object collection keyed by individual collection member keys and values |
 
-**Example**  
+**Example**
 ```js
 Onyx.mergeCollection(ONYXKEYS.COLLECTION.REPORT, {
     [`${ONYXKEYS.COLLECTION.REPORT}1`]: report1,
@@ -229,7 +234,7 @@ Onyx.mergeCollection(ONYXKEYS.COLLECTION.REPORT, {
 ## update(data)
 Insert API responses and lifecycle data into Onyx
 
-**Kind**: global function  
+**Kind**: global function
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -240,7 +245,7 @@ Insert API responses and lifecycle data into Onyx
 ## init([options])
 Initialize the store with actions and listening for storage events
 
-**Kind**: global function  
+**Kind**: global function
 
 | Param | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -251,8 +256,9 @@ Initialize the store with actions and listening for storage events
 | [options.maxCachedKeysCount] | <code>Number</code> | <code>55</code> | Sets how many recent keys should we try to keep in cache Setting this to 0 would practically mean no cache We try to free cache when we connect to a safe eviction key |
 | [options.captureMetrics] | <code>Boolean</code> |  | Enables Onyx benchmarking and exposes the get/print/reset functions |
 | [options.shouldSyncMultipleInstances] | <code>Boolean</code> |  | Auto synchronize storage events between multiple instances of Onyx running in different tabs/windows. Defaults to true for platforms that support local storage (web/desktop) |
+| [options.debugSetState] | <code>Boolean</code> |  | Enables debugging setState() calls to connected components. |
 
-**Example**  
+**Example**
 ```js
 Onyx.init({
     keys: ONYXKEYS,
