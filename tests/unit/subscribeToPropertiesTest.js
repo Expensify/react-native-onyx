@@ -91,6 +91,34 @@ describe('Onyx property subscribers', () => {
             runAssertionsWithMapping(connectionMapping, connectionCallbackMock);
         });
 
+        const runCollectionAssertionsWithMapping = (mapping, connectionCallbackMock) => waitForPromisesToResolve()
+
+            // When that mapping is connected to Onyx
+            .then(() => {
+                connectionID = Onyx.connect(mapping);
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                // Then the callback should not be called yet because there is no data in Onyx
+                expect(connectionCallbackMock).toHaveBeenCalledTimes(0);
+            })
+
+            // When Onyx is updated with a collection that has two objects, all with different keys
+            .then(() => {
+                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                    [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {a: 'one', b: 'two'},
+                    [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {c: 'three', d: 'four'},
+                });
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                // Then the callback should be called once more
+                expect(connectionCallbackMock).toHaveBeenCalledTimes(1);
+
+                // With a collection that only contains the single object with the ".a" property and it only contains that property
+                expect(connectionCallbackMock).toHaveBeenCalledWith('one', `${ONYX_KEYS.COLLECTION.TEST_KEY}1`);
+            });
+
         it('when connecting to a collection with a selector', () => {
             // Given an onyx connection for a collection with a mocked callback and a selector that is only interested in the ".a" property
             const connectionCallbackMock = jest.fn();
@@ -100,33 +128,7 @@ describe('Onyx property subscribers', () => {
                 callback: connectionCallbackMock,
             };
 
-            return waitForPromisesToResolve()
-
-                // When that mapping is connected to Onyx
-                .then(() => {
-                    connectionID = Onyx.connect(connectionMapping);
-                    return waitForPromisesToResolve();
-                })
-                .then(() => {
-                    // Then the callback should be called once
-                    expect(connectionCallbackMock).toHaveBeenCalledTimes(1);
-
-                    // With no values (since nothing is set in Onyx yet)
-                    expect(connectionCallbackMock).toHaveBeenCalledWith(undefined, undefined);
-                })
-
-                // When Onyx is updated with a collection that has two objects, all with different keys
-                .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
-                    [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {a: 'one', b: 'two'},
-                    [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {c: 'three', d: 'four'},
-                }))
-                .then(() => {
-                    // Then the callback should be called once more
-                    expect(connectionCallbackMock).toHaveBeenCalledTimes(2);
-
-                    // With a collection that only contains the single object with the ".a" property and it only contains that property
-                    expect(connectionCallbackMock).toHaveBeenCalledWith('one', `${ONYX_KEYS.COLLECTION.TEST_KEY}1`);
-                });
+            return runCollectionAssertionsWithMapping(connectionMapping, connectionCallbackMock);
         });
 
         it('when connecting to a collection with a reducer', () => {
@@ -138,37 +140,36 @@ describe('Onyx property subscribers', () => {
                 callback: connectionCallbackMock,
             };
 
-            return waitForPromisesToResolve()
-
-                // When that mapping is connected to Onyx
-                .then(() => {
-                    connectionID = Onyx.connect(connectionMapping);
-                    return waitForPromisesToResolve();
-                })
-                .then(() => {
-                    // Then the callback should be called once
-                    expect(connectionCallbackMock).toHaveBeenCalledTimes(0);
-
-                    // With no values (since nothing is set in Onyx yet)
-                    // expect(connectionCallbackMock).toHaveBeenCalledWith(null, undefined);
-                })
-
-                // When Onyx is updated with a collection that has two objects, all with different keys
-                .then(() => {
-                    Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
-                        [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {a: 'one', b: 'two'},
-                        [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {c: 'three', d: 'four'},
-                    });
-                    return waitForPromisesToResolve();
-                })
-                .then(() => {
-                    // Then the callback should be called once more
-                    expect(connectionCallbackMock).toHaveBeenCalledTimes(1);
-
-                    // With a collection that only contains the single object with the ".a" property and it only contains that property
-                    expect(connectionCallbackMock).toHaveBeenCalledWith('one', `${ONYX_KEYS.COLLECTION.TEST_KEY}1`);
-                });
+            return runCollectionAssertionsWithMapping(connectionMapping, connectionCallbackMock);
         });
+
+        const runCollectionAssertionsWithMappingAndWaitForCollection = (mapping, connectionCallbackMock) => waitForPromisesToResolve()
+
+            // When that mapping is connected to Onyx
+            .then(() => {
+                connectionID = Onyx.connect(mapping);
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                // Then the callback should not be called yet because there is no data in Onyx
+                expect(connectionCallbackMock).toHaveBeenCalledTimes(1);
+            })
+
+            // When Onyx is updated with a collection that has two objects, all with different keys
+            .then(() => {
+                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                    [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {a: 'one', b: 'two'},
+                    [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {c: 'three', d: 'four'},
+                });
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                // Then the callback should be called once more
+                expect(connectionCallbackMock).toHaveBeenCalledTimes(2);
+
+                // With a collection that only contains the single object with the ".a" property and it only contains that property
+                expect(connectionCallbackMock).toHaveBeenCalledWith({[`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: 'one'});
+            });
 
         it('when connecting to a collection with a selector and waitForCollectionCallback = true', () => {
             // Given an onyx connection for a collection with a mocked callback and a selector that is only interested in the ".a" property
@@ -180,36 +181,7 @@ describe('Onyx property subscribers', () => {
                 callback: connectionCallbackMock,
             };
 
-            return waitForPromisesToResolve()
-
-                // When that mapping is connected to Onyx
-                .then(() => {
-                    connectionID = Onyx.connect(connectionMapping);
-                    return waitForPromisesToResolve();
-                })
-                .then(() => {
-                    // Then the callback should be called once
-                    expect(connectionCallbackMock).toHaveBeenCalledTimes(1);
-
-                    // With no values (since nothing is set in Onyx yet)
-                    expect(connectionCallbackMock).toHaveBeenCalledWith(undefined, undefined);
-                })
-
-                // When Onyx is updated with a collection that has two objects, all with different keys
-                .then(() => {
-                    Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
-                        [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {a: 'one', b: 'two'},
-                        [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {c: 'three', d: 'four'},
-                    });
-                    return waitForPromisesToResolve();
-                })
-                .then(() => {
-                    // Then the callback should be called once more
-                    expect(connectionCallbackMock).toHaveBeenCalledTimes(2);
-
-                    // With a collection that only contains the single object with the ".a" property and it only contains that property
-                    expect(connectionCallbackMock).toHaveBeenNthCalledWith(2, {test_1: 'one'});
-                });
+            return runCollectionAssertionsWithMappingAndWaitForCollection(connectionMapping, connectionCallbackMock);
         });
 
         it('when connecting to a collection with a reducer and waitForCollectionCallback = true', () => {
@@ -222,36 +194,7 @@ describe('Onyx property subscribers', () => {
                 callback: connectionCallbackMock,
             };
 
-            return waitForPromisesToResolve()
-
-                // When that mapping is connected to Onyx
-                .then(() => {
-                    connectionID = Onyx.connect(connectionMapping);
-                    return waitForPromisesToResolve();
-                })
-                .then(() => {
-                    // Then the callback should be called once
-                    expect(connectionCallbackMock).toHaveBeenCalledTimes(1);
-
-                    // With no values (since nothing is set in Onyx yet)
-                    expect(connectionCallbackMock).toHaveBeenCalledWith(undefined, undefined);
-                })
-
-                // When Onyx is updated with a collection that has two objects, all with different keys
-                .then(() => {
-                    Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
-                        [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {a: 'one', b: 'two'},
-                        [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {c: 'three', d: 'four'},
-                    });
-                    return waitForPromisesToResolve();
-                })
-                .then(() => {
-                    // Then the callback should be called once more
-                    expect(connectionCallbackMock).toHaveBeenCalledTimes(2);
-
-                    // With a collection that only contains the single object with the ".a" property and it only contains that property
-                    expect(connectionCallbackMock).toHaveBeenNthCalledWith(2, {test_1: 'one'});
-                });
+            return runCollectionAssertionsWithMappingAndWaitForCollection(connectionMapping, connectionCallbackMock);
         });
     });
 
