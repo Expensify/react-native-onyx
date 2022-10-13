@@ -321,9 +321,10 @@ describe('Onyx property subscribers', () => {
                 })
 
                 // When Onyx is updated with a change to property a
-                .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`, {a: 'two', b: 'two'}))
                 .then(() => {
-                    renderedComponent = render(<TestComponentWithOnyx />);
+                    Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                        [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {a: 'two', b: 'two'},
+                    });
                     return waitForPromisesToResolve();
                 })
 
@@ -333,9 +334,10 @@ describe('Onyx property subscribers', () => {
                 })
 
                 // When Onyx is updated with a change to property b
-                .then(() => Onyx.merge(ONYX_KEYS.TEST_KEY, {a: 'two', b: 'two'}))
                 .then(() => {
-                    renderedComponent = render(<TestComponentWithOnyx />);
+                    Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                        [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {a: 'two', b: 'three'},
+                    });
                     return waitForPromisesToResolve();
                 })
 
@@ -347,6 +349,7 @@ describe('Onyx property subscribers', () => {
 
         it('when connecting to a collection with a selector', () => {
             // Given a component is using withOnyx and subscribing to the property "a" of the object in Onyx
+            // by using a selector
             const TestComponentWithOnyx = withOnyx({
                 collectionWithPropertyA: {
                     key: ONYX_KEYS.COLLECTION.TEST_KEY,
@@ -355,10 +358,19 @@ describe('Onyx property subscribers', () => {
             })(ViewWithObject);
             return runAllAssertionsForCollection(TestComponentWithOnyx);
         });
-        // it('when connecting to a collection with a reducer', (TestComponentWithOnyx) => {
-        //     return runAllAssertionsForCollection();
-        // });
-        //
+
+        it('when connecting to a collection with a reducer', () => {
+            // Given a component is using withOnyx and subscribing to the property "a" of the object in Onyx
+            // by using a reducer
+            const TestComponentWithOnyx = withOnyx({
+                collectionWithPropertyA: {
+                    key: ONYX_KEYS.COLLECTION.TEST_KEY,
+                    reducer: obj => obj.a,
+                },
+            })(ViewWithObject);
+            return runAllAssertionsForCollection(TestComponentWithOnyx);
+        });
+
         // const runAllAssertionsForCollectionAndWaitForCallback = () => {
         //     return waitForPromisesToResolve();
         // };
