@@ -150,7 +150,7 @@ describe('Onyx property subscribers', () => {
                     expect(connectionCallbackMock).toHaveBeenCalledTimes(1);
 
                     // With no values (since nothing is set in Onyx yet)
-                    expect(connectionCallbackMock).toHaveBeenCalledWith(undefined, undefined);
+                    expect(connectionCallbackMock).toHaveBeenCalledWith(null, undefined);
                 })
 
                 // When Onyx is updated with a collection that has two objects, all with different keys
