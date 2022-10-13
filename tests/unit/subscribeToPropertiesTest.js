@@ -28,7 +28,7 @@ describe('Onyx property subscribers', () => {
         /**
          * Runs all the assertions needed for Onyx.connect() callbacks
          * @param {Object} mapping
-         * @param {Function} connectionCallbackMock
+         * @param {jest.Mock} connectionCallbackMock
          * @returns {Promise}
          */
         const runAssertionsWithMapping = (mapping, connectionCallbackMock) => waitForPromisesToResolve()
@@ -100,7 +100,7 @@ describe('Onyx property subscribers', () => {
         /**
          * Runs all the assertions needed for Onyx.connect() callbacks when using collections
          * @param {Object} mapping
-         * @param {Function} connectionCallbackMock
+         * @param {jest.Mock} connectionCallbackMock
          * @returns {Promise}
          */
         const runCollectionAssertionsWithMapping = (mapping, connectionCallbackMock) => waitForPromisesToResolve()
@@ -127,12 +127,14 @@ describe('Onyx property subscribers', () => {
                 // Then the callback should be called once more
                 expect(connectionCallbackMock).toHaveBeenCalledTimes(1);
 
-                // With a collection that only contains the single object with the ".a" property and it only contains that property
+                // With a collection that only contains the single object with the ".a" property and it only contains
+                // that property
                 expect(connectionCallbackMock).toHaveBeenCalledWith('one', `${ONYX_KEYS.COLLECTION.TEST_KEY}1`);
             });
 
         it('when connecting to a collection with a selector', () => {
-            // Given an onyx connection for a collection with a mocked callback and a selector that is only interested in the ".a" property
+            // Given an onyx connection for a collection with a mocked callback and a selector that is only interested
+            // in the ".a" property
             const connectionCallbackMock = jest.fn();
             const connectionMapping = {
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
@@ -144,7 +146,8 @@ describe('Onyx property subscribers', () => {
         });
 
         it('when connecting to a collection with a reducer', () => {
-            // Given an onyx connection for a collection with a mocked callback and a selector that is only interested in the ".a" property
+            // Given an onyx connection for a collection with a mocked callback and a selector that is only interested
+            // in the ".a" property
             const connectionCallbackMock = jest.fn();
             const connectionMapping = {
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
@@ -156,11 +159,13 @@ describe('Onyx property subscribers', () => {
         });
 
         /**
-         * Runs all the assertions needed for Onyx.connect() callbacks when using collections and waitForCollectionCallback: true
+         * Runs all the assertions needed for Onyx.connect() callbacks when using collections and
+         * waitForCollectionCallback: true
          * @param {Object} mapping
-         * @param {Function} connectionCallbackMock
+         * @param {jest.Mock} connectionCallbackMock
          * @returns {Promise}
          */
+        // eslint-disable-next-line max-len
         const runCollectionAssertionsWithMappingAndWaitForCollection = (mapping, connectionCallbackMock) => waitForPromisesToResolve()
 
             // When that mapping is connected to Onyx
@@ -185,12 +190,14 @@ describe('Onyx property subscribers', () => {
                 // Then the callback should be called once more
                 expect(connectionCallbackMock).toHaveBeenCalledTimes(2);
 
-                // With a collection that only contains the single object with the ".a" property and it only contains that property
+                // With a collection that only contains the single object with the ".a" property and it only contains
+                // that property
                 expect(connectionCallbackMock).toHaveBeenCalledWith({[`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: 'one'});
             });
 
         it('when connecting to a collection with a selector and waitForCollectionCallback = true', () => {
-            // Given an onyx connection for a collection with a mocked callback and a selector that is only interested in the ".a" property
+            // Given an onyx connection for a collection with a mocked callback and a selector that is only interested
+            // in the ".a" property
             const connectionCallbackMock = jest.fn();
             const connectionMapping = {
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
@@ -203,7 +210,8 @@ describe('Onyx property subscribers', () => {
         });
 
         it('when connecting to a collection with a reducer and waitForCollectionCallback = true', () => {
-            // Given an onyx connection for a collection with a mocked callback and a selector that is only interested in the ".a" property
+            // Given an onyx connection for a collection with a mocked callback and a selector that is only interested
+            // in the ".a" property
             const connectionCallbackMock = jest.fn();
             const connectionMapping = {
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
@@ -217,12 +225,18 @@ describe('Onyx property subscribers', () => {
     });
 
     describe('withOnyx()', () => {
-        // Cleanup (ie. unmount) all rendered components and clear out Onyx after each test so that each test starts with a clean slate
+        // Cleanup (ie. unmount) all rendered components and clear out Onyx after each test so that each test starts
+        // with a clean slate
         afterEach(() => {
             cleanup();
             Onyx.clear();
         });
 
+        /**
+         * Runs all the assertions needed for withOnyx and using single keys in Onyx
+         * @param {Object} TestComponentWithOnyx
+         * @returns {Promise}
+         */
         const runAssertionsWithComponent = (TestComponentWithOnyx) => {
             let renderedComponent = render(<TestComponentWithOnyx />);
             return waitForPromisesToResolve()
@@ -266,6 +280,7 @@ describe('Onyx property subscribers', () => {
 
         it('when using a selector, should only be updated with the props containing the specific property', () => {
             // Given a component is using withOnyx and subscribing to the property "a" of the object in Onyx
+            // by using a selector
             const TestComponentWithOnyx = withOnyx({
                 propertyA: {
                     key: ONYX_KEYS.TEST_KEY,
@@ -277,6 +292,7 @@ describe('Onyx property subscribers', () => {
 
         it('when using a reducer, should only be updated with the props containing the specific property', () => {
             // Given a component is using withOnyx and subscribing to the property "a" of the object in Onyx
+            // by using a reducer
             const TestComponentWithOnyx = withOnyx({
                 propertyA: {
                     key: ONYX_KEYS.TEST_KEY,
@@ -285,5 +301,72 @@ describe('Onyx property subscribers', () => {
             })(ViewWithObject);
             return runAssertionsWithComponent(TestComponentWithOnyx);
         });
+
+        const runAllAssertionsForCollection = (TestComponentWithOnyx) => {
+            let renderedComponent = render(<TestComponentWithOnyx />);
+            return waitForPromisesToResolve()
+
+                // When Onyx is updated with an object that has multiple properties
+                .then(() => {
+                    Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                        [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {a: 'one', b: 'two'},
+                        [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {c: 'three', d: 'four'},
+                    });
+                    return waitForPromisesToResolve();
+                })
+
+                // Then the props passed to the component should only include the property "a" that was specified
+                .then(() => {
+                    expect(renderedComponent.getByTestId('text-element').props.children).toEqual('{"collectionWithPropertyA":{"test_1":"one"}}');
+                })
+
+                // When Onyx is updated with a change to property a
+                .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`, {a: 'two', b: 'two'}))
+                .then(() => {
+                    renderedComponent = render(<TestComponentWithOnyx />);
+                    return waitForPromisesToResolve();
+                })
+
+                // Then the props passed should have the new value of property "a"
+                .then(() => {
+                    expect(renderedComponent.getByTestId('text-element').props.children).toEqual('{"collectionWithPropertyA":{"test_1":"two"}}');
+                })
+
+                // When Onyx is updated with a change to property b
+                .then(() => Onyx.merge(ONYX_KEYS.TEST_KEY, {a: 'two', b: 'two'}))
+                .then(() => {
+                    renderedComponent = render(<TestComponentWithOnyx />);
+                    return waitForPromisesToResolve();
+                })
+
+                // Then the props passed should not have changed
+                .then(() => {
+                    expect(renderedComponent.getByTestId('text-element').props.children).toEqual('{"collectionWithPropertyA":{"test_1":"two"}}');
+                });
+        };
+
+        it('when connecting to a collection with a selector', () => {
+            // Given a component is using withOnyx and subscribing to the property "a" of the object in Onyx
+            const TestComponentWithOnyx = withOnyx({
+                collectionWithPropertyA: {
+                    key: ONYX_KEYS.COLLECTION.TEST_KEY,
+                    selector: 'a',
+                },
+            })(ViewWithObject);
+            return runAllAssertionsForCollection(TestComponentWithOnyx);
+        });
+        // it('when connecting to a collection with a reducer', (TestComponentWithOnyx) => {
+        //     return runAllAssertionsForCollection();
+        // });
+        //
+        // const runAllAssertionsForCollectionAndWaitForCallback = () => {
+        //     return waitForPromisesToResolve();
+        // };
+        // it('when connecting to a collection with a selector and waitForCallback = true', () => {
+        //     return runAllAssertionsForCollectionAndWaitForCallback();
+        // });
+        // it('when connecting to a collection with a reducer and waitForCallback = true', () => {
+        //     return runAllAssertionsForCollectionAndWaitForCallback();
+        // });
     });
 });
