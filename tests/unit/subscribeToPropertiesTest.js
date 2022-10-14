@@ -16,8 +16,8 @@ Onyx.init({
     registerStorageEventListener: () => {},
 });
 
-describe('Onyx property subscribers', () => {
-    describe('Onyx.connect()', () => {
+describe('Only the specific property changes when', () => {
+    describe('using Onyx.connect() and ', () => {
         let connectionID;
 
         afterEach(() => {
@@ -74,7 +74,7 @@ describe('Onyx property subscribers', () => {
                 expect(connectionCallbackMock).toHaveBeenCalledTimes(3);
             });
 
-        it('when using a selector, callback is only called when the specific property changes', () => {
+        it('connecting to a single non-collection key with a selector', () => {
             // Given an onyx connection with a mocked callback and using a selector
             const connectionCallbackMock = jest.fn();
             const connectionMapping = {
@@ -86,7 +86,7 @@ describe('Onyx property subscribers', () => {
             runAssertionsWithMapping(connectionMapping, connectionCallbackMock);
         });
 
-        it('when using a reducer, callback is only called when the specific property changes', () => {
+        it('connecting to a single non-collection key with a reducer', () => {
             const connectionCallbackMock = jest.fn();
             const connectionMapping = {
                 key: ONYX_KEYS.TEST_KEY,
@@ -132,7 +132,7 @@ describe('Onyx property subscribers', () => {
                 expect(connectionCallbackMock).toHaveBeenCalledWith('one', `${ONYX_KEYS.COLLECTION.TEST_KEY}1`);
             });
 
-        it('when connecting to a collection with a selector', () => {
+        it('connecting to a collection with a selector', () => {
             // Given an onyx connection for a collection with a mocked callback and a selector that is only interested
             // in the ".a" property
             const connectionCallbackMock = jest.fn();
@@ -145,7 +145,7 @@ describe('Onyx property subscribers', () => {
             return runCollectionAssertionsWithMapping(connectionMapping, connectionCallbackMock);
         });
 
-        it('when connecting to a collection with a reducer', () => {
+        it('connecting to a collection with a reducer', () => {
             // Given an onyx connection for a collection with a mocked callback and a selector that is only interested
             // in the ".a" property
             const connectionCallbackMock = jest.fn();
@@ -195,7 +195,7 @@ describe('Onyx property subscribers', () => {
                 expect(connectionCallbackMock).toHaveBeenCalledWith({[`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: 'one'});
             });
 
-        it('when connecting to a collection with a selector and waitForCollectionCallback = true', () => {
+        it('connecting to a collection with a selector and waitForCollectionCallback = true', () => {
             // Given an onyx connection for a collection with a mocked callback and a selector that is only interested
             // in the ".a" property
             const connectionCallbackMock = jest.fn();
@@ -209,7 +209,7 @@ describe('Onyx property subscribers', () => {
             return runCollectionAssertionsWithMappingAndWaitForCollection(connectionMapping, connectionCallbackMock);
         });
 
-        it('when connecting to a collection with a reducer and waitForCollectionCallback = true', () => {
+        it('connecting to a collection with a reducer and waitForCollectionCallback = true', () => {
             // Given an onyx connection for a collection with a mocked callback and a selector that is only interested
             // in the ".a" property
             const connectionCallbackMock = jest.fn();
@@ -259,7 +259,7 @@ describe('Onyx property subscribers', () => {
                 expect(connectionCallbackMock).toHaveBeenCalledWith('one', 'test_1');
             });
 
-        it('when connecting to a collection member with a selector', () => {
+        it('connecting to a collection member with a selector', () => {
             // Given an onyx connection for a collection with a mocked callback and a selector that is only interested
             // in the ".a" property
             const connectionCallbackMock = jest.fn();
@@ -272,7 +272,7 @@ describe('Onyx property subscribers', () => {
             return runCollectionMemberAssertions(connectionMapping, connectionCallbackMock);
         });
 
-        it('when connecting to a collection member with a reducer', () => {
+        it('connecting to a collection member with a reducer', () => {
             // Given an onyx connection for a collection with a mocked callback and a reducer that is only interested
             // in the ".a" property
             const connectionCallbackMock = jest.fn();
@@ -286,7 +286,7 @@ describe('Onyx property subscribers', () => {
         });
     });
 
-    describe('withOnyx()', () => {
+    describe('using withOnyx() and ', () => {
         // Cleanup (ie. unmount) all rendered components and clear out Onyx after each test so that each test starts
         // with a clean slate
         afterEach(() => {
@@ -340,7 +340,7 @@ describe('Onyx property subscribers', () => {
                 });
         };
 
-        it('when using a selector, should only be updated with the props containing the specific property', () => {
+        it('connecting to a single non-collection key with a selector', () => {
             // Given a component is using withOnyx and subscribing to the property "a" of the object in Onyx
             // by using a selector
             const TestComponentWithOnyx = withOnyx({
@@ -352,7 +352,7 @@ describe('Onyx property subscribers', () => {
             return runAssertionsWithComponent(TestComponentWithOnyx);
         });
 
-        it('when using a reducer, should only be updated with the props containing the specific property', () => {
+        it('connecting to a single non-collection key with a reducer', () => {
             // Given a component is using withOnyx and subscribing to the property "a" of the object in Onyx
             // by using a reducer
             const TestComponentWithOnyx = withOnyx({
@@ -419,7 +419,7 @@ describe('Onyx property subscribers', () => {
                 });
         };
 
-        it('when connecting to a collection with a selector', () => {
+        it('connecting to a collection with a selector', () => {
             // Given a component is using withOnyx and subscribing to the property "a" of the object in Onyx
             // by using a selector
             const TestComponentWithOnyx = withOnyx({
@@ -431,7 +431,7 @@ describe('Onyx property subscribers', () => {
             return runAllAssertionsForCollection(TestComponentWithOnyx);
         });
 
-        it('when connecting to a collection with a reducer', () => {
+        it('connecting to a collection with a reducer', () => {
             // Given a component is using withOnyx and subscribing to the property "a" of the object in Onyx
             // by using a reducer
             const TestComponentWithOnyx = withOnyx({
@@ -498,7 +498,7 @@ describe('Onyx property subscribers', () => {
                 });
         };
 
-        it('when connecting to a collection member with a selector', () => {
+        it('connecting to a collection member with a selector', () => {
             // Given a component is using withOnyx and subscribing to a single record in a collection
             // and using a selector to only get the "a" property of the object
             const TestComponentWithOnyx = withOnyx({
@@ -510,7 +510,7 @@ describe('Onyx property subscribers', () => {
             return runAllAssertionsForCollectionKey(TestComponentWithOnyx);
         });
 
-        it('when connecting to a collection member with a reducer', () => {
+        it('connecting to a collection member with a reducer', () => {
             // Given a component is using withOnyx and subscribing to a single record in a collection
             // and using a reducer to only get the "a" property of the object
             const TestComponentWithOnyx = withOnyx({
