@@ -256,7 +256,6 @@ Initialize the store with actions and listening for storage events
 | [options.maxCachedKeysCount] | <code>Number</code> | <code>55</code> | Sets how many recent keys should we try to keep in cache Setting this to 0 would practically mean no cache We try to free cache when we connect to a safe eviction key |
 | [options.captureMetrics] | <code>Boolean</code> |  | Enables Onyx benchmarking and exposes the get/print/reset functions |
 | [options.shouldSyncMultipleInstances] | <code>Boolean</code> |  | Auto synchronize storage events between multiple instances of Onyx running in different tabs/windows. Defaults to true for platforms that support local storage (web/desktop) |
-| [option.keysToDisableSyncEvents] | <code>Array.&lt;String&gt;</code> | <code>[]</code> | Contains keys for which we want to disable sync event across tabs. |
 | [options.debugSetState] | <code>Boolean</code> |  | Enables debugging setState() calls to connected components. |
 
 **Example**
