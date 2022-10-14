@@ -302,6 +302,12 @@ describe('Onyx property subscribers', () => {
             return runAssertionsWithComponent(TestComponentWithOnyx);
         });
 
+        /**
+         * Runs all the assertions for connecting to a full collection
+         *
+         * @param {Object} TestComponentWithOnyx
+         * @returns {Promise}
+         */
         const runAllAssertionsForCollection = (TestComponentWithOnyx) => {
             let renderedComponent = render(<TestComponentWithOnyx />);
             return waitForPromisesToResolve()
@@ -375,14 +381,18 @@ describe('Onyx property subscribers', () => {
             return runAllAssertionsForCollection(TestComponentWithOnyx);
         });
 
-        // const runAllAssertionsForCollectionAndWaitForCallback = () => {
-        //     return waitForPromisesToResolve();
-        // };
-        // it('when connecting to a collection with a selector and waitForCallback = true', () => {
-        //     return runAllAssertionsForCollectionAndWaitForCallback();
-        // });
-        // it('when connecting to a collection with a reducer and waitForCallback = true', () => {
-        //     return runAllAssertionsForCollectionAndWaitForCallback();
-        // });
+        /**
+         * Runs all the assertions when connecting to a key that is part of a collection
+         * @returns {*}
+         */
+        const runAllAssertionsForCollectionKey = () => {
+            return waitForPromisesToResolve();
+        };
+        it('when connecting to a single collection key with a selector', () => {
+            return runAllAssertionsForCollectionKey();
+        });
+        it('when connecting to a single collection key with a reducer', () => {
+            return runAllAssertionsForCollectionKey();
+        });
     });
 });
