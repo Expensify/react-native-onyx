@@ -1,4 +1,5 @@
 import React from 'react';
+// eslint-disable-next-line no-restricted-imports
 import {Text, View} from 'react-native';
 
 const ViewWithObject = props => (
