@@ -80,15 +80,16 @@ Subscribes a react component's state directly to a store key
 **Kind**: global function
 **Returns**: <code>Number</code> - an ID to use when calling disconnect
 
-| Param | Type | Description |
-| --- | --- | --- |
-| mapping | <code>Object</code> | the mapping information to connect Onyx to the components state |
-| mapping.key | <code>String</code> | ONYXKEY to subscribe to |
-| [mapping.statePropertyName] | <code>String</code> | the name of the property in the state to connect the data to |
-| [mapping.withOnyxInstance] | <code>Object</code> | whose setState() method will be called with any changed data      This is used by React components to connect to Onyx |
-| [mapping.callback] | <code>function</code> | a method that will be called with changed data      This is used by any non-React code to connect to Onyx |
-| [mapping.initWithStoredValues] | <code>Boolean</code> | If set to false, then no data will be prefilled into the  component |
-| [mapping.waitForCollectionCallback] | <code>Boolean</code> | If set to true, it will return the entire collection to the callback as a single object |
+| Param                               | Type                            | Description                                                                                                                                                             |
+|-------------------------------------|---------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| mapping                             | <code>Object</code>             | the mapping information to connect Onyx to the components state                                                                                                         |
+| mapping.key                         | <code>String</code>             | ONYXKEY to subscribe to                                                                                                                                                 |
+| [mapping.statePropertyName]         | <code>String</code>             | the name of the property in the state to connect the data to                                                                                                            |
+| [mapping.withOnyxInstance]          | <code>Object</code>             | whose setState() method will be called with any changed data      This is used by React components to connect to Onyx                                                   |
+| [mapping.callback]                  | <code>Function</code>           | a method that will be called with changed data      This is used by any non-React code to connect to Onyx                                                               |
+| [mapping.initWithStoredValues]      | <code>Boolean</code>            | If set to false, then no data will be prefilled into the  component                                                                                                     |
+| [mapping.waitForCollectionCallback] | <code>Boolean</code>            | If set to true, it will return the entire collection to the callback as a single object                                                                                 |
+| [mapping.selector]                  | <code>String or Function</code> | If included, this will be used to subscribe to a subset of an object's properties. If it's a string, the selector will be passed to lodashGet. If it's a function, the function will be called and is expected to return a simplified version of the object |
 
 **Example**
 ```js
