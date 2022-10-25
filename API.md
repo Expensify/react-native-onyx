@@ -89,7 +89,7 @@ Subscribes a react component's state directly to a store key
 | [mapping.callback]                  | <code>Function</code>           | a method that will be called with changed data      This is used by any non-React code to connect to Onyx                                                               |
 | [mapping.initWithStoredValues]      | <code>Boolean</code>            | If set to false, then no data will be prefilled into the  component                                                                                                     |
 | [mapping.waitForCollectionCallback] | <code>Boolean</code>            | If set to true, it will return the entire collection to the callback as a single object                                                                                 |
-| [mapping.selector]                  | <code>String or Function</code> | If included, this will be used to subscribe to a subset of an object's properties. If it's a string, the selector will be passed to lodashGet. If it's a function, the function will be called and is expected to return a simplified version of the object |
+| [mapping.selector]                  | <code>String or Function</code> | If included, this will be used to subscribe to a subset of an object's properties. If it's a string, the selector is passed to lodashGet on the sourceObject. If it's a function, it is passed the sourceObject and it should return the simplified object |
 
 **Example**
 ```js
