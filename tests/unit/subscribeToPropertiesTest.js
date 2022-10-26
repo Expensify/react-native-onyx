@@ -159,7 +159,7 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
         const TestComponentWithOnyx = withOnyx({
             collectionWithPropertyA: {
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
-                selector: obj => obj.a,
+                selector: obj => obj && obj.a,
             },
         })(ViewWithObject);
         return runAllAssertionsForCollection(TestComponentWithOnyx);
