@@ -348,6 +348,13 @@ describe('Onyx', () => {
                 // Then getAllStorage keys should return updated storage keys
                 expect(cache.getAllKeys()).toEqual(['mockKey', 'mockKey2', 'mockKey3', 'mockKey4']);
             });
+
+            it('Should throw if called with anything that is not an object', () => {
+                expect(() => cache.merge([])).toThrow();
+                expect(() => cache.merge('')).toThrow();
+                expect(() => cache.merge(0)).toThrow();
+                expect(() => cache.merge({})).not.toThrow();
+            });
         });
 
         describe('hasPendingTask', () => {
