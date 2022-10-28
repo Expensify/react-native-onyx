@@ -16,6 +16,23 @@ Onyx.init({
     registerStorageEventListener: () => {},
 });
 
+class ErrorBoundary extends React.Component {
+    // Error boundaries have to implement this method. It's for providing a fallback UI, but
+    // we don't need that for unit testing, so this is basically a no-op.
+    static getDerivedStateFromError(error) {
+        return {error};
+    }
+
+    componentDidCatch(error, errorInfo) {
+        console.error(error, errorInfo);
+    }
+
+    render() {
+        // eslint-disable-next-line react/prop-types
+        return this.props.children;
+    }
+}
+
 describe('Only the specific property changes when using withOnyx() and ', () => {
     // Cleanup (ie. unmount) all rendered components and clear out Onyx after each test so that each test starts
     // with a clean slate
@@ -30,13 +47,13 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
      * @returns {Promise}
      */
     const runAssertionsWithComponent = (TestComponentWithOnyx) => {
-        let renderedComponent = render(<TestComponentWithOnyx />);
+        let renderedComponent = render(<ErrorBoundary><TestComponentWithOnyx /></ErrorBoundary>);
         return waitForPromisesToResolve()
 
             // When Onyx is updated with an object that has multiple properties
             .then(() => Onyx.merge(ONYX_KEYS.TEST_KEY, {a: 'one', b: 'two'}))
             .then(() => {
-                renderedComponent = render(<TestComponentWithOnyx />);
+                renderedComponent = render(<ErrorBoundary><TestComponentWithOnyx /></ErrorBoundary>);
                 return waitForPromisesToResolve();
             })
 
@@ -48,7 +65,7 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
             // When Onyx is updated with a change to property a
             .then(() => Onyx.merge(ONYX_KEYS.TEST_KEY, {a: 'two'}))
             .then(() => {
-                renderedComponent = render(<TestComponentWithOnyx />);
+                renderedComponent = render(<ErrorBoundary><TestComponentWithOnyx /></ErrorBoundary>);
                 return waitForPromisesToResolve();
             })
 
@@ -60,7 +77,7 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
             // When Onyx is updated with a change to property b
             .then(() => Onyx.merge(ONYX_KEYS.TEST_KEY, {b: 'two'}))
             .then(() => {
-                renderedComponent = render(<TestComponentWithOnyx />);
+                renderedComponent = render(<ErrorBoundary><TestComponentWithOnyx /></ErrorBoundary>);
                 return waitForPromisesToResolve();
             })
 
@@ -84,7 +101,7 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
         const TestComponentWithOnyx = withOnyx({
             propertyA: {
                 key: ONYX_KEYS.TEST_KEY,
-                selector: obj => obj.a,
+                selector: obj => obj && obj.a,
             },
         })(ViewWithObject);
         return runAssertionsWithComponent(TestComponentWithOnyx);
@@ -97,7 +114,7 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
      * @returns {Promise}
      */
     const runAllAssertionsForCollection = (TestComponentWithOnyx) => {
-        let renderedComponent = render(<TestComponentWithOnyx />);
+        let renderedComponent = render(<ErrorBoundary><TestComponentWithOnyx /></ErrorBoundary>);
         return waitForPromisesToResolve()
 
             // When Onyx is updated with an object that has multiple properties
@@ -109,7 +126,7 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                renderedComponent = render(<TestComponentWithOnyx />);
+                renderedComponent = render(<ErrorBoundary><TestComponentWithOnyx /></ErrorBoundary>);
                 return waitForPromisesToResolve();
             })
 
@@ -172,7 +189,7 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
      * @returns {Promise}
      */
     const runAllAssertionsForCollectionKey = (TestComponentWithOnyx) => {
-        let renderedComponent = render(<TestComponentWithOnyx />);
+        let renderedComponent = render(<ErrorBoundary><TestComponentWithOnyx /></ErrorBoundary>);
         return waitForPromisesToResolve()
 
             // When Onyx is updated with an object that has multiple properties
@@ -184,7 +201,7 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                renderedComponent = render(<TestComponentWithOnyx />);
+                renderedComponent = render(<ErrorBoundary><TestComponentWithOnyx /></ErrorBoundary>);
                 return waitForPromisesToResolve();
             })
 
@@ -234,7 +251,7 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
         const TestComponentWithOnyx = withOnyx({
             itemWithPropertyA: {
                 key: `${ONYX_KEYS.COLLECTION.TEST_KEY}1`,
-                selector: obj => obj.a,
+                selector: obj => obj && obj.a,
             },
         })(ViewWithObject);
         return runAllAssertionsForCollectionKey(TestComponentWithOnyx);
