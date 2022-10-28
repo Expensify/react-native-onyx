@@ -111,7 +111,7 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
             .then(() => {
                 // This checks to make sure a bug doesn't occur where the entire state object was being passed to
                 // the selector
-                expect(mockedSelector).not.toHaveBeenCalledWith({ loading: false, propertyA: null });
+                expect(mockedSelector).not.toHaveBeenCalledWith({loading: false, propertyA: null});
             });
     });
 
