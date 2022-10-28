@@ -16,6 +16,8 @@ Onyx.init({
     registerStorageEventListener: () => {},
 });
 
+// The error boundary is here so that it will catch errors thrown in the selector methods (like syntax errors).
+// Normally, those errors get swallowed up by Jest and are not displayed so there was no indication that a test failed
 class ErrorBoundary extends React.Component {
     // Error boundaries have to implement this method. It's for providing a fallback UI, but
     // we don't need that for unit testing, so this is basically a no-op.
@@ -107,7 +109,8 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
         })(ViewWithObject);
         return runAssertionsWithComponent(TestComponentWithOnyx)
             .then(() => {
-                // This checks for a bug where the entire state object was being passed to the selector
+                // This checks to make sure a bug doesn't occur where the entire state object was being passed to
+                // the selector
                 expect(mockedSelector).not.toHaveBeenCalledWith({ loading: false, propertyA: null });
             });
     });
