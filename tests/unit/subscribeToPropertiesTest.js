@@ -98,13 +98,18 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
     });
 
     it('connecting to a single non-collection key with a selector function', () => {
+        const mockedSelector = jest.fn(obj => obj && obj.a);
         const TestComponentWithOnyx = withOnyx({
             propertyA: {
                 key: ONYX_KEYS.TEST_KEY,
-                selector: obj => obj && obj.a,
+                selector: mockedSelector,
             },
         })(ViewWithObject);
-        return runAssertionsWithComponent(TestComponentWithOnyx);
+        return runAssertionsWithComponent(TestComponentWithOnyx)
+            .then(() => {
+                // This checks for a bug where the entire state object was being passed to the selector
+                expect(mockedSelector).not.toHaveBeenCalledWith({ loading: false, propertyA: null });
+            });
     });
 
     /**
@@ -188,7 +193,7 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
      * @param {Object} TestComponentWithOnyx
      * @returns {Promise}
      */
-    const runAllAssertionsForCollectionKey = (TestComponentWithOnyx) => {
+    const runAllAssertionsForCollectionMemberKey = (TestComponentWithOnyx) => {
         let renderedComponent = render(<ErrorBoundary><TestComponentWithOnyx /></ErrorBoundary>);
         return waitForPromisesToResolve()
 
@@ -244,7 +249,7 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
                 selector: 'a',
             },
         })(ViewWithObject);
-        return runAllAssertionsForCollectionKey(TestComponentWithOnyx);
+        return runAllAssertionsForCollectionMemberKey(TestComponentWithOnyx);
     });
 
     it('connecting to a collection member with a selector function', () => {
@@ -254,6 +259,6 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
                 selector: obj => obj && obj.a,
             },
         })(ViewWithObject);
-        return runAllAssertionsForCollectionKey(TestComponentWithOnyx);
+        return runAllAssertionsForCollectionMemberKey(TestComponentWithOnyx);
     });
 });
