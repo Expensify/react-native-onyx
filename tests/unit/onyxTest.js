@@ -7,8 +7,9 @@ const ONYX_KEYS = {
     OTHER_TEST: 'otherTest',
     COLLECTION: {
         TEST_KEY: 'test_',
-        TEST_CONNECT_COLLECTION: 'test_connect_collection_',
-        TEST_POLICY: 'test_policy_',
+        TEST_CONNECT_COLLECTION: 'testConnectCollection_',
+        TEST_POLICY: 'testPolicy_',
+        TEST_UPDATE: 'testUpdate_',
     },
 };
 
@@ -487,15 +488,15 @@ describe('Onyx', () => {
 
         // Given some initial collection data
         const initialCollectionData = {
-            test_connect_collection_1: {
+            testConnectCollection_1: {
                 ID: 123,
                 value: 'one',
             },
-            test_connect_collection_2: {
+            testConnectCollection_2: {
                 ID: 234,
                 value: 'two',
             },
-            test_connect_collection_3: {
+            testConnectCollection_3: {
                 ID: 345,
                 value: 'three',
             },
@@ -522,8 +523,8 @@ describe('Onyx', () => {
     it('should return all collection keys as a single object when updating a collection key with waitForCollectionCallback = true', () => {
         const mockCallback = jest.fn();
         const collectionUpdate = {
-            test_policy_1: {ID: 234, value: 'one'},
-            test_policy_2: {ID: 123, value: 'two'},
+            testPolicy_1: {ID: 234, value: 'one'},
+            testPolicy_2: {ID: 123, value: 'two'},
         };
 
         // Given an Onyx.connect call with waitForCollectionCallback=true
@@ -551,8 +552,8 @@ describe('Onyx', () => {
     it('should send a value to Onyx.connect() when subscribing to a specific collection member key and keysChanged() is called', () => {
         const mockCallback = jest.fn();
         const collectionUpdate = {
-            test_policy_1: {ID: 234, value: 'one'},
-            test_policy_2: {ID: 123, value: 'two'},
+            testPolicy_1: {ID: 234, value: 'one'},
+            testPolicy_2: {ID: 123, value: 'two'},
         };
 
         // Given an Onyx.connect call with waitForCollectionCallback=true
@@ -572,17 +573,17 @@ describe('Onyx', () => {
                 expect(mockCallback).toHaveBeenCalledTimes(2);
 
                 // AND the value for the first call should be null since the collection was not initialized at that point
-                expect(mockCallback).toHaveBeenNthCalledWith(1, null, 'test_policy_1');
+                expect(mockCallback).toHaveBeenNthCalledWith(1, null, 'testPolicy_1');
 
                 // AND the value for the second call should be collectionUpdate since the collection was updated
-                expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate.test_policy_1, 'test_policy_1');
+                expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate.testPolicy_1, 'testPolicy_1');
             });
     });
 
     it('should return all collection keys as a single object for subscriber using waitForCollectionCallback when a single collection member key is updated', () => {
         const mockCallback = jest.fn();
         const collectionUpdate = {
-            test_policy_1: {ID: 234, value: 'one'},
+            testPolicy_1: {ID: 234, value: 'one'},
         };
 
         // Given an Onyx.connect call with waitForCollectionCallback=true
@@ -594,7 +595,7 @@ describe('Onyx', () => {
         return waitForPromisesToResolve()
 
             // When mergeCollection is called with an updated collection
-            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.test_policy_1))
+            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.testPolicy_1))
             .then(() => {
                 // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
                 expect(mockCallback).toHaveBeenCalledTimes(2);
@@ -617,7 +618,7 @@ describe('Onyx', () => {
     it('should not update a subscriber if the value in the cache has not changed at all', () => {
         const mockCallback = jest.fn();
         const collectionUpdate = {
-            test_policy_1: {ID: 234, value: 'one'},
+            testPolicy_1: {ID: 234, value: 'one'},
         };
 
         // Given an Onyx.connect call with waitForCollectionCallback=true
@@ -629,7 +630,7 @@ describe('Onyx', () => {
         return waitForPromisesToResolve()
 
             // When merge is called with an updated collection
-            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.test_policy_1))
+            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.testPolicy_1))
             .then(() => {
                 // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
                 expect(mockCallback).toHaveBeenCalledTimes(2);
@@ -639,14 +640,14 @@ describe('Onyx', () => {
             })
 
             // When merge is called again with the same collection not modified
-            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.test_policy_1))
+            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.testPolicy_1))
             .then(() => {
                 // Then we should not expect another invocation of the callback
                 expect(mockCallback).toHaveBeenCalledTimes(2);
             })
 
             // When merge is called again with an object of equivalent value but not the same reference
-            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, _.clone(collectionUpdate.test_policy_1)))
+            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, _.clone(collectionUpdate.testPolicy_1)))
             .then(() => {
                 // Then we should not expect another invocation of the callback
                 expect(mockCallback).toHaveBeenCalledTimes(2);
@@ -656,7 +657,7 @@ describe('Onyx', () => {
     it('should update subscriber if the value in the cache has not changed at all but initWithStoredValues === false', () => {
         const mockCallback = jest.fn();
         const collectionUpdate = {
-            test_policy_1: {ID: 234, value: 'one'},
+            testPolicy_1: {ID: 234, value: 'one'},
         };
 
         // Given an Onyx.connect call with waitForCollectionCallback=true
@@ -669,7 +670,7 @@ describe('Onyx', () => {
         return waitForPromisesToResolve()
 
             // When merge is called with an updated collection
-            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.test_policy_1))
+            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.testPolicy_1))
             .then(() => {
                 // Then we expect the callback to have called once. 0 times the initial connect call + 1 time for the merge()
                 expect(mockCallback).toHaveBeenCalledTimes(1);
@@ -679,17 +680,41 @@ describe('Onyx', () => {
             })
 
             // When merge is called again with the same collection not modified
-            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.test_policy_1))
+            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.testPolicy_1))
             .then(() => {
                 // Then we should expect another invocation of the callback because initWithStoredValues = false
                 expect(mockCallback).toHaveBeenCalledTimes(2);
             })
 
             // When merge is called again with an object of equivalent value but not the same reference
-            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, _.clone(collectionUpdate.test_policy_1)))
+            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, _.clone(collectionUpdate.testPolicy_1)))
             .then(() => {
                 // Then we should expect another invocation of the callback because initWithStoredValues = false
                 expect(mockCallback).toHaveBeenCalledTimes(3);
+            });
+    });
+
+    it('should return a promise that completes when all update() operations are done', () => {
+        const connectionIDs = [];
+
+        const testCallback = jest.fn();
+        const otherTestCallback = jest.fn();
+        const collectionCallback = jest.fn();
+        const itemKey = `${ONYX_KEYS.COLLECTION.TEST_UPDATE}1`;
+
+        connectionIDs.push(Onyx.connect({key: ONYX_KEYS.TEST_KEY, callback: testCallback}));
+        connectionIDs.push(Onyx.connect({key: ONYX_KEYS.OTHER_TEST, callback: otherTestCallback}));
+        connectionIDs.push(Onyx.connect({key: ONYX_KEYS.COLLECTION.TEST_UPDATE, callback: collectionCallback, waitForCollectionCallback: true}));
+        return Onyx.update([
+            {onyxMethod: Onyx.METHOD.SET, key: ONYX_KEYS.TEST_KEY, value: 'taco'},
+            {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.OTHER_TEST, value: 'pizza'},
+            {onyxMethod: Onyx.METHOD.MERGE_COLLECTION, key: ONYX_KEYS.COLLECTION.TEST_UPDATE, value: {[itemKey]: {a: 'a'}}},
+        ])
+            .then(() => {
+                expect(collectionCallback).toHaveBeenNthCalledWith(1, {[itemKey]: {a: 'a'}});
+                expect(testCallback).toHaveBeenNthCalledWith(1, 'taco', ONYX_KEYS.TEST_KEY);
+                expect(otherTestCallback).toHaveBeenNthCalledWith(1, 'pizza', ONYX_KEYS.OTHER_TEST);
+                Onyx.disconnect(connectionIDs);
             });
     });
 });
