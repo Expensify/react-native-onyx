@@ -70,6 +70,7 @@
     "react": "^17.0.2",
     "react-native": "0.64.1",
     "react-native-performance": "^2.0.0",
+    "react-native-quick-sqlite": "^5.0.3",
     "react-test-renderer": "16.13.1",
     "webpack": "^5.72.1",
     "webpack-cli": "^4.9.2",
@@ -77,6 +78,7 @@
   },
   "peerDependencies": {
     "@react-native-async-storage/async-storage": "^1.15.5",
+    "react-native-quick-sqlite": "^5.0.3",
     "expensify-common": ">=1",
     "localforage": "^1.10.0",
     "react": ">=17.0.2",
@@ -87,6 +89,9 @@
       "optional": true
     },
     "@react-native-async-storage/async-storage": {
+      "optional": true
+    },
+    "react-native-quick-sqlite": {
       "optional": true
     },
     "localforage": {
