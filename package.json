@@ -60,6 +60,8 @@
     "babel-plugin-transform-class-properties": "^6.24.1",
     "eslint": "^7.6.0",
     "eslint-config-expensify": "^2.0.24",
+    "eslint-plugin-jsx-a11y": "^6.6.1",
+    "eslint-plugin-react": "^7.31.10",
     "expensify-common": "git+https://github.com/Expensify/expensify-common.git#427295da130a4eacc184d38693664280d020dffd",
     "jest": "^26.5.2",
     "jest-cli": "^26.5.2",
@@ -78,11 +80,11 @@
   },
   "peerDependencies": {
     "@react-native-async-storage/async-storage": "^1.17.11",
-    "react-native-quick-sqlite": "^5.0.3",
     "expensify-common": ">=1",
     "localforage": "^1.10.0",
     "react": ">=18.1.0",
-    "react-native-performance": "^4.0.0"
+    "react-native-performance": "^4.0.0",
+    "react-native-quick-sqlite": "^5.0.3"
   },
   "peerDependenciesMeta": {
     "react-native-performance": {
