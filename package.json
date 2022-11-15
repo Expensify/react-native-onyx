@@ -48,7 +48,7 @@
     "@babel/core": "^7.17.10",
     "@babel/plugin-proposal-class-properties": "^7.16.7",
     "@babel/runtime": "^7.11.2",
-    "@react-native-async-storage/async-storage": "^1.15.5",
+    "@react-native-async-storage/async-storage": "^1.17.11",
     "@react-native-community/eslint-config": "^2.0.0",
     "@testing-library/jest-native": "^3.4.2",
     "@testing-library/react-native": "^7.0.2",
@@ -65,24 +65,24 @@
     "jest-cli": "^26.5.2",
     "jsdoc-to-markdown": "^7.1.0",
     "localforage": "^1.10.0",
-    "metro-react-native-babel-preset": "^0.61.0",
+    "metro-react-native-babel-preset": "^0.72.3",
     "prop-types": "^15.7.2",
-    "react": "^17.0.2",
-    "react-native": "0.64.1",
-    "react-native-performance": "^2.0.0",
+    "react": "18.1.0",
+    "react-native": "0.70.0",
+    "react-native-performance": "^4.0.0",
     "react-native-quick-sqlite": "^5.0.3",
-    "react-test-renderer": "16.13.1",
+    "react-test-renderer": "18.1.0",
     "webpack": "^5.72.1",
     "webpack-cli": "^4.9.2",
     "webpack-merge": "^5.8.0"
   },
   "peerDependencies": {
-    "@react-native-async-storage/async-storage": "^1.15.5",
+    "@react-native-async-storage/async-storage": "^1.17.11",
     "react-native-quick-sqlite": "^5.0.3",
     "expensify-common": ">=1",
     "localforage": "^1.10.0",
-    "react": ">=17.0.2",
-    "react-native-performance": "^2.0.0"
+    "react": ">=18.1.0",
+    "react-native-performance": "^4.0.0"
   },
   "peerDependenciesMeta": {
     "react-native-performance": {
@@ -121,7 +121,8 @@
     "timers": "fake",
     "testEnvironment": "jsdom",
     "setupFilesAfterEnv": [
-      "@testing-library/jest-native/extend-expect"
+      "@testing-library/jest-native/extend-expect",
+      "./jestSetup.js"
     ]
   },
   "sideEffects": false
