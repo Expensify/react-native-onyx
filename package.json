@@ -71,7 +71,7 @@
     "prop-types": "^15.7.2",
     "react": "18.1.0",
     "react-native": "0.70.0",
-    "react-native-performance": "^4.0.0",
+    "react-native-performance": "^2.0.0",
     "react-native-quick-sqlite": "^5.0.3",
     "react-test-renderer": "18.1.0",
     "webpack": "^5.72.1",
@@ -99,6 +99,10 @@
     "localforage": {
       "optional": true
     }
+  },
+  "engines": {
+    "node": "16.15.1",
+    "npm": "8.11.0"
   },
   "jest": {
     "preset": "react-native",
