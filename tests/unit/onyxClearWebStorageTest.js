@@ -123,9 +123,7 @@ describe('Set data while storage is clearing', () => {
         });
 
         // When clear is called with an additional default value
-        Onyx.clear({
-            [ONYX_KEYS.REGULAR_KEY]: ADDITIONAL_DEFAULT_VALUE,
-        });
+        Onyx.clear([ONYX_KEYS.REGULAR_KEY]);
         return waitForPromisesToResolve()
             .then(() => {
                 // Then the value in Onyx and the cache is the default key state
@@ -139,9 +137,9 @@ describe('Set data while storage is clearing', () => {
                 expect(storedValue).resolves.toBeNull();
 
                 // Then the value we preserved is also still set
-                expect(valueToKeep).toBe(ADDITIONAL_DEFAULT_VALUE);
+                expect(valueToKeep).toBe(SET_VALUE);
                 const regularKeyCachedValue = cache.getValue(ONYX_KEYS.REGULAR_KEY);
-                expect(regularKeyCachedValue).toBe(ADDITIONAL_DEFAULT_VALUE);
+                expect(regularKeyCachedValue).toBe(SET_VALUE);
                 const regularKeyStoredValue = Storage.getItem(ONYX_KEYS.REGULAR_KEY);
 
                 // Then the value in Storage is null
