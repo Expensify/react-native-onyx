@@ -142,7 +142,7 @@ describe('Set data while storage is clearing', () => {
                 expect(valueToKeep).toBe(ADDITIONAL_DEFAULT_VALUE);
                 const regularKeyCachedValue = cache.getValue(ONYX_KEYS.REGULAR_KEY);
                 expect(regularKeyCachedValue).toBe(ADDITIONAL_DEFAULT_VALUE);
-                const regularKeyStoredValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
+                const regularKeyStoredValue = Storage.getItem(ONYX_KEYS.REGULAR_KEY);
 
                 // Then the value in Storage is null
                 // An additional passed in default, much like any other default key state, is never stored during Onyx.clear
