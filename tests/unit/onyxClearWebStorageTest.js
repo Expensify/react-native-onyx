@@ -5,7 +5,6 @@ const ONYX_KEYS = {
     DEFAULT_KEY: 'defaultKey',
     REGULAR_KEY: 'regularKey',
 };
-const ADDITIONAL_DEFAULT_VALUE = 'additionalDefaultValue';
 const SET_VALUE = 'set';
 const MERGED_VALUE = 'merged';
 const DEFAULT_VALUE = 'default';
@@ -110,10 +109,10 @@ describe('Set data while storage is clearing', () => {
             });
     });
 
-    it('should preserve the value of any additional defaults passed in', () => {
+    it('should preserve the value of any keyStatesToPreserve passed in', () => {
         expect.assertions(6);
 
-        // Given that Onyx has a value and we have a variable listening to that value
+        // Given that Onyx has a value, and we have a variable listening to that value
         Onyx.set(ONYX_KEYS.REGULAR_KEY, SET_VALUE);
         let valueToKeep;
         Onyx.connect({
@@ -122,11 +121,11 @@ describe('Set data while storage is clearing', () => {
             callback: val => valueToKeep = val,
         });
 
-        // When clear is called with an additional default value
+        // When clear is called with a key to preserve
         Onyx.clear([ONYX_KEYS.REGULAR_KEY]);
         return waitForPromisesToResolve()
             .then(() => {
-                // Then the value in Onyx and the cache is the default key state
+                // Then the value in Onyx and the cache for the default key is the default key state
                 expect(onyxValue).toBe(DEFAULT_VALUE);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
                 expect(cachedValue).toBe(DEFAULT_VALUE);
@@ -136,14 +135,14 @@ describe('Set data while storage is clearing', () => {
                 // The default key state is never stored during Onyx.clear
                 expect(storedValue).resolves.toBeNull();
 
-                // Then the value we preserved is also still set
+                // Then the value of the preserved key is also still set
                 expect(valueToKeep).toBe(SET_VALUE);
                 const regularKeyCachedValue = cache.getValue(ONYX_KEYS.REGULAR_KEY);
                 expect(regularKeyCachedValue).toBe(SET_VALUE);
                 const regularKeyStoredValue = Storage.getItem(ONYX_KEYS.REGULAR_KEY);
 
                 // Then the value in Storage is null
-                // An additional passed in default, much like any other default key state, is never stored during Onyx.clear
+                // A preserved key state, much like any other default key state, is never stored during Onyx.clear
                 return expect(regularKeyStoredValue).resolves.toBeUndefined();
             });
     });
