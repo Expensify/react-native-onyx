@@ -111,13 +111,13 @@ describe('Set data while storage is clearing', () => {
         expect.assertions(6);
 
         // Given that Onyx has a value, and we have a variable listening to that value
-        Onyx.set(ONYX_KEYS.REGULAR_KEY, SET_VALUE);
         let valueToKeep;
         Onyx.connect({
             key: ONYX_KEYS.REGULAR_KEY,
             initWithStoredValues: false,
             callback: val => valueToKeep = val,
         });
+        Onyx.set(ONYX_KEYS.REGULAR_KEY, SET_VALUE);
 
         // When clear is called with a key to preserve
         Onyx.clear([ONYX_KEYS.REGULAR_KEY]);
@@ -132,15 +132,12 @@ describe('Set data while storage is clearing', () => {
                 // Then the value in Storage is null
                 expect(defaultKeyStoredValue).resolves.toBeNull();
 
-                // Then the value of the preserved key is also still set
+                // Then the value of the preserved key is also still set in both the cache and storage
                 expect(valueToKeep).toBe(SET_VALUE);
                 const regularKeyCachedValue = cache.getValue(ONYX_KEYS.REGULAR_KEY);
                 expect(regularKeyCachedValue).toBe(SET_VALUE);
-                const regularKeyStoredValue = Storage.getItem(ONYX_KEYS.REGULAR_KEY);
-
-                // Then the value in Storage is null
-                // A preserved key state, much like any other default key state, is never stored during Onyx.clear
-                return expect(regularKeyStoredValue).resolves.toBeNull();
+                return Storage.getItem(ONYX_KEYS.REGULAR_KEY)
+                    .then(storedValue => expect(parseInt(storedValue, 10)).toBe(SET_VALUE));
             });
     });
 });
