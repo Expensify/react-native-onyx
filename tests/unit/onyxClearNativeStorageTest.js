@@ -74,15 +74,12 @@ describe('Set data while storage is clearing', () => {
         Onyx.clear();
         return waitForPromisesToResolve()
             .then(() => {
-                // Then the value in Onyx and the cache is the default key state
+                // Then the value in Onyx, the cache, and Storage is the default key state
                 expect(onyxValue).toBe(DEFAULT_VALUE);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
                 expect(cachedValue).toBe(DEFAULT_VALUE);
-
-                // Then the value in Storage is null
-                // The default key state is never stored during Onyx.clear
                 const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
-                return expect(storedValue).resolves.toBeNull();
+                return expect(storedValue).resolves.toBe(DEFAULT_VALUE);
             });
     });
 
@@ -95,15 +92,12 @@ describe('Set data while storage is clearing', () => {
         Onyx.clear();
         return waitForPromisesToResolve()
             .then(() => {
-                // Then the value in Onyx and the cache is the default key state
+                // Then the value in Onyx, the cache, and Storage is the default key state
                 expect(onyxValue).toBe(DEFAULT_VALUE);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
                 expect(cachedValue).toBe(DEFAULT_VALUE);
                 const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
-
-                // Then the value in Storage is null
-                // The default key state is never stored during Onyx.clear
-                return expect(storedValue).resolves.toBeNull();
+                return expect(storedValue).resolves.toBe(DEFAULT_VALUE);
             });
     });
 
