@@ -101,7 +101,7 @@ describe('Set data while storage is clearing', () => {
             });
     });
 
-    it('should preserve the value of any keyStatesToPreserve passed in', () => {
+    it('should preserve the value of any keysToPreserve passed in', () => {
         expect.assertions(6);
 
         // Given that Onyx has a value, and we have a variable listening to that value
@@ -131,6 +131,30 @@ describe('Set data while storage is clearing', () => {
                 const regularKeyCachedValue = cache.getValue(ONYX_KEYS.REGULAR_KEY);
                 expect(regularKeyCachedValue).toBe(SET_VALUE);
                 return Storage.getItem(ONYX_KEYS.REGULAR_KEY)
+                    .then(storedValue => expect(parseInt(storedValue, 10)).toBe(SET_VALUE));
+            });
+    });
+
+    it('should preserve the value of any keysToPreserve over any default key states', () => {
+        expect.assertions(3);
+
+        // Given that Onyx has a value for a key with a default, and we have a variable listening to that value
+        Onyx.connect({
+            key: ONYX_KEYS.DEFAULT_KEY,
+            initWithStoredValues: false,
+            callback: val => onyxValue = val,
+        });
+        Onyx.set(ONYX_KEYS.DEFAULT_KEY, SET_VALUE);
+
+        // When clear is called with the default key to preserve
+        Onyx.clear([ONYX_KEYS.DEFAULT_KEY]);
+        return waitForPromisesToResolve()
+            .then(() => {
+                // Then the value in Onyx, the cache, and Storage is the default key state
+                expect(onyxValue).toBe(SET_VALUE);
+                const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
+                expect(cachedValue).toBe(SET_VALUE);
+                return Storage.getItem(ONYX_KEYS.DEFAULT_KEY)
                     .then(storedValue => expect(parseInt(storedValue, 10)).toBe(SET_VALUE));
             });
     });
