@@ -141,7 +141,11 @@ describe('Onyx.mergeCollection() amd WebStorage', () => {
     });
 
     it('setItem() and multiMerge()', () => {
-        expect(localforageMock.storageMap).toEqual({});
+        expect(localforageMock.storageMap).toEqual({
+            test_1: null,
+            test_2: null,
+            test_3: null,
+        });
 
         // Given no previous data and several calls to setItem and call to mergeCollection to update a given key
 

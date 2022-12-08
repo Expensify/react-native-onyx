@@ -78,8 +78,8 @@ describe('Set data while storage is clearing', () => {
                 expect(onyxValue).toBe(DEFAULT_VALUE);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
                 expect(cachedValue).toBe(DEFAULT_VALUE);
-                const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
-                return expect(storedValue).resolves.toBe(DEFAULT_VALUE);
+                return Storage.getItem(ONYX_KEYS.DEFAULT_KEY)
+                    .then(storedValue => expect(parseInt(storedValue, 10)).toBe(DEFAULT_VALUE));
             });
     });
 
@@ -96,8 +96,8 @@ describe('Set data while storage is clearing', () => {
                 expect(onyxValue).toBe(DEFAULT_VALUE);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
                 expect(cachedValue).toBe(DEFAULT_VALUE);
-                const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
-                return expect(storedValue).resolves.toBe(DEFAULT_VALUE);
+                return Storage.getItem(ONYX_KEYS.DEFAULT_KEY)
+                    .then(storedValue => expect(parseInt(storedValue, 10)).toBe(DEFAULT_VALUE));
             });
     });
 
