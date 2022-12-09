@@ -4,6 +4,7 @@ import Onyx from '../../lib/Onyx';
 
 const ONYX_KEYS = {
     DEFAULT_KEY: 'defaultKey',
+    REGULAR_KEY: 'regularKey',
 };
 
 // Store integers because the async storage mock adds escape characters to strings
@@ -73,15 +74,12 @@ describe('Set data while storage is clearing', () => {
         Onyx.clear();
         return waitForPromisesToResolve()
             .then(() => {
-                // Then the value in Onyx and the cache is the default key state
+                // Then the value in Onyx, the cache, and Storage is the default key state
                 expect(onyxValue).toBe(DEFAULT_VALUE);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
                 expect(cachedValue).toBe(DEFAULT_VALUE);
-
-                // Then the value in Storage is null
-                // The default key state is never stored during Onyx.clear
-                const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
-                return expect(storedValue).resolves.toBeNull();
+                return Storage.getItem(ONYX_KEYS.DEFAULT_KEY)
+                    .then(storedValue => expect(parseInt(storedValue, 10)).toBe(DEFAULT_VALUE));
             });
     });
 
@@ -94,15 +92,58 @@ describe('Set data while storage is clearing', () => {
         Onyx.clear();
         return waitForPromisesToResolve()
             .then(() => {
-                // Then the value in Onyx and the cache is the default key state
+                // Then the value in Onyx, the cache, and Storage is the default key state
                 expect(onyxValue).toBe(DEFAULT_VALUE);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
                 expect(cachedValue).toBe(DEFAULT_VALUE);
-                const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
+                return Storage.getItem(ONYX_KEYS.DEFAULT_KEY)
+                    .then(storedValue => expect(parseInt(storedValue, 10)).toBe(DEFAULT_VALUE));
+            });
+    });
 
-                // Then the value in Storage is null
-                // The default key state is never stored during Onyx.clear
-                return expect(storedValue).resolves.toBeNull();
+    it('should preserve the value of any keysToPreserve passed in', () => {
+        expect.assertions(3);
+
+        // Given that Onyx has a value, and we have a variable listening to that value
+        let regularKeyOnyxValue;
+        Onyx.connect({
+            key: ONYX_KEYS.REGULAR_KEY,
+            initWithStoredValues: false,
+            callback: val => regularKeyOnyxValue = val,
+        });
+        Onyx.set(ONYX_KEYS.REGULAR_KEY, SET_VALUE).then(() => {
+            // When clear is called with a key to preserve
+            Onyx.clear([ONYX_KEYS.REGULAR_KEY]);
+        });
+
+        return waitForPromisesToResolve()
+            .then(() => {
+                // Then the value of the preserved key is also still set in both the cache and storage
+                expect(regularKeyOnyxValue).toBe(SET_VALUE);
+                const regularKeyCachedValue = cache.getValue(ONYX_KEYS.REGULAR_KEY);
+                expect(regularKeyCachedValue).toBe(SET_VALUE);
+                return Storage.getItem(ONYX_KEYS.REGULAR_KEY)
+                    .then(storedValue => expect(parseInt(storedValue, 10)).toBe(SET_VALUE));
+            });
+    });
+
+    it('should preserve the value of any keysToPreserve over any default key states', () => {
+        expect.assertions(3);
+
+        // Given that Onyx has a value for a key with a default, and we have a variable listening to that value
+        Onyx.set(ONYX_KEYS.DEFAULT_KEY, SET_VALUE).then(() => {
+            // When clear is called with the default key to preserve
+            Onyx.clear([ONYX_KEYS.DEFAULT_KEY]);
+        });
+
+        return waitForPromisesToResolve()
+            .then(() => {
+                // Then the value in Onyx, the cache, and Storage is the set value
+                expect(onyxValue).toBe(SET_VALUE);
+                const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
+                expect(cachedValue).toBe(SET_VALUE);
+                return Storage.getItem(ONYX_KEYS.DEFAULT_KEY)
+                    .then(storedValue => expect(parseInt(storedValue, 10)).toBe(SET_VALUE));
             });
     });
 });

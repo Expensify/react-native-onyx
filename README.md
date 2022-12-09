@@ -335,6 +335,6 @@ To quickly test small changes you can directly go to `node_modules/react-native-
 To continuously work on Onyx we have to set up a task that copies content to parent project's `node_modules/react-native-onyx`:
 1. Work on Onyx feature or a fix
 2. Save files
-3. Optional: run `npm build` (if you're working or want to test on a non react-native project)
+3. Optional: run `npm run build` (if you're working or want to test on a non react-native project)
    - `npm link` would actually work outside of `react-native` and it can be used to link Onyx locally for a web only project
 4. Copy Onyx to consumer project's `node_modules/react-native-onyx`
