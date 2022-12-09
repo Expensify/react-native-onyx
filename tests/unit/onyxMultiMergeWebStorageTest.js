@@ -141,7 +141,7 @@ describe('Onyx.mergeCollection() amd WebStorage', () => {
     });
 
     it('setItem() and multiMerge()', () => {
-        // The keys are still preserved after clearing Onyx from the previous test. They just have no values.
+        // When Onyx is cleared, since it uses multiSet() to clear out all the values, the keys will remain with null for all the values
         expect(localforageMock.storageMap).toEqual({
             test_1: null,
             test_2: null,
