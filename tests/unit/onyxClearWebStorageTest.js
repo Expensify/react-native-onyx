@@ -4,6 +4,9 @@ import Storage from '../../__mocks__/localforage';
 const ONYX_KEYS = {
     DEFAULT_KEY: 'defaultKey',
     REGULAR_KEY: 'regularKey',
+    COLLECTION: {
+        TEST: 'test_',
+    },
 };
 const SET_VALUE = 'set';
 const MERGED_VALUE = 'merged';
@@ -146,6 +149,34 @@ describe('Set data while storage is clearing', () => {
                 expect(cachedValue).toBe(SET_VALUE);
                 const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
                 return expect(storedValue).resolves.toBe(SET_VALUE);
+            });
+    });
+
+    it('should only trigger the connection callback once when using wait for collection callback', () => {
+        expect.assertions(1);
+
+        // Given a mocked callback function and a collection with four items in it
+        const collectionCallback = jest.fn();
+        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST, {
+            [`${ONYX_KEYS.COLLECTION.TEST}1`]: 1,
+            [`${ONYX_KEYS.COLLECTION.TEST}2`]: 2,
+            [`${ONYX_KEYS.COLLECTION.TEST}3`]: 3,
+            [`${ONYX_KEYS.COLLECTION.TEST}4`]: 4,
+        });
+        return waitForPromisesToResolve()
+            .then(() => {
+                connectionID = Onyx.connect({
+                    key: ONYX_KEYS.COLLECTION.TEST,
+                    waitForCollectionCallback: true,
+                    callback: collectionCallback,
+                });
+            })
+
+            // When onyx is cleared
+            .then(Onyx.clear)
+            .then(() => {
+                // Then the collection callback should only have been called once
+                expect(collectionCallback).toHaveBeenCalledTimes(1);
             });
     });
 });
