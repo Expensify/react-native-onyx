@@ -156,7 +156,7 @@ describe('Set data while storage is clearing', () => {
         expect.assertions(2);
 
         // Given a mocked callback function and a collection with four items in it
-        const collectionCallback = jest.fn();
+        const collectionCallback = jest.fn(console.log);
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST, {
             [`${ONYX_KEYS.COLLECTION.TEST}1`]: 1,
             [`${ONYX_KEYS.COLLECTION.TEST}2`]: 2,
