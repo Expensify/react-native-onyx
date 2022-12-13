@@ -153,7 +153,7 @@ describe('Set data while storage is clearing', () => {
     });
 
     it('should only trigger the connection callback once when using wait for collection callback', () => {
-        expect.assertions(1);
+        expect.assertions(2);
 
         // Given a mocked callback function and a collection with four items in it
         const collectionCallback = jest.fn();
@@ -177,6 +177,14 @@ describe('Set data while storage is clearing', () => {
             .then(() => {
                 // Then the collection callback should only have been called once
                 expect(collectionCallback).toHaveBeenCalledTimes(1);
+
+                // And it should be called with the full collection with the values set to null
+                expect(collectionCallback).toHaveBeenCalledWith({
+                    test_1: null,
+                    test_2: null,
+                    test_3: null,
+                    test_4: null,
+                }, undefined);
             });
     });
 });
