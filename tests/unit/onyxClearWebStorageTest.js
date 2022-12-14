@@ -4,6 +4,9 @@ import Storage from '../../__mocks__/localforage';
 const ONYX_KEYS = {
     DEFAULT_KEY: 'defaultKey',
     REGULAR_KEY: 'regularKey',
+    COLLECTION: {
+        TEST: 'test_',
+    },
 };
 const SET_VALUE = 'set';
 const MERGED_VALUE = 'merged';
@@ -146,6 +149,48 @@ describe('Set data while storage is clearing', () => {
                 expect(cachedValue).toBe(SET_VALUE);
                 const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
                 return expect(storedValue).resolves.toBe(SET_VALUE);
+            });
+    });
+
+    it('should only trigger the connection callback once when using wait for collection callback', () => {
+        expect.assertions(4);
+
+        // Given a mocked callback function and a collection with four items in it
+        const collectionCallback = jest.fn();
+        const testConnectionID = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST,
+            waitForCollectionCallback: true,
+            callback: collectionCallback,
+        });
+        return waitForPromisesToResolve()
+            .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST, {
+                [`${ONYX_KEYS.COLLECTION.TEST}1`]: 1,
+                [`${ONYX_KEYS.COLLECTION.TEST}2`]: 2,
+                [`${ONYX_KEYS.COLLECTION.TEST}3`]: 3,
+                [`${ONYX_KEYS.COLLECTION.TEST}4`]: 4,
+            }))
+
+            // When onyx is cleared
+            .then(Onyx.clear)
+            .then(() => {
+                Onyx.disconnect(testConnectionID);
+            })
+            .then(() => {
+                // Then the collection callback should only have been called three times:
+                // 1. connect()
+                // 2. merge()
+                // 3. clear()
+                expect(collectionCallback).toHaveBeenCalledTimes(3);
+
+                // And it should be called with the expected parameters each time
+                expect(collectionCallback).toHaveBeenNthCalledWith(1, null, undefined);
+                expect(collectionCallback).toHaveBeenNthCalledWith(2, {
+                    test_1: 1,
+                    test_2: 2,
+                    test_3: 3,
+                    test_4: 4,
+                });
+                expect(collectionCallback).toHaveBeenLastCalledWith({});
             });
     });
 });
