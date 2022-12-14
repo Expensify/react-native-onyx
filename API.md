@@ -27,6 +27,11 @@ For this reason, Onyx works more similar to what you might expect from a native 
 available async. Since we have code in our main applications that might expect things to work this way it&#39;s not safe to change this
 behavior just yet.</p>
 </dd>
+<dt><a href="#notifyCollectionSubscribersOnNextTick">notifyCollectionSubscribersOnNextTick(key, value)</a></dt>
+<dd><p>This method is similar to notifySubscribersOnNextTick but it is built for working specifically with collections
+so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
+subscriber callbacks receive the data in a different format than they normally expect and it breaks code.</p>
+</dd>
 <dt><a href="#set">set(key, value)</a> ⇒ <code>Promise</code></dt>
 <dd><p>Write a value to our store with the given key</p>
 </dd>
@@ -43,7 +48,7 @@ concatenate. See here: <a href="https://github.com/lodash/lodash/issues/2872">ht
 applied in the order they were called. Note: <code>Onyx.set()</code> calls do not work this way so use caution when mixing
 <code>Onyx.merge()</code> and <code>Onyx.set()</code>.</p>
 </dd>
-<dt><a href="#clear">clear()</a> ⇒ <code>Promise.&lt;void&gt;</code></dt>
+<dt><a href="#clear">clear(keysToPreserve)</a> ⇒ <code>Promise.&lt;void&gt;</code></dt>
 <dd><p>Clear out all the data in the store</p>
 <p>Note that calling Onyx.clear() and then Onyx.set() on a key with a default
 key state may store an unexpected value in Storage.</p>
@@ -62,7 +67,7 @@ value will be saved to storage after the default value.</p>
 <dt><a href="#mergeCollection">mergeCollection(collectionKey, collection)</a> ⇒ <code>Promise</code></dt>
 <dd><p>Merges a collection based on their keys</p>
 </dd>
-<dt><a href="#update">update(data)</a></dt>
+<dt><a href="#update">update(data)</a> ⇒ <code>Promise</code></dt>
 <dd><p>Insert API responses and lifecycle data into Onyx</p>
 </dd>
 <dt><a href="#init">init([options])</a></dt>
@@ -123,7 +128,7 @@ Subscribes a react component's state directly to a store key
 | [mapping.callback] | <code>function</code> | a method that will be called with changed data      This is used by any non-React code to connect to Onyx |
 | [mapping.initWithStoredValues] | <code>Boolean</code> | If set to false, then no data will be prefilled into the  component |
 | [mapping.waitForCollectionCallback] | <code>Boolean</code> | If set to true, it will return the entire collection to the callback as a single object |
-| [mapping.selector] | <code>String</code> \| <code>function</code> | THIS PARAM IS ONLY USED WITH withOnyx(). If included, this will be used to subscribe to a subset of an Onyx key's data. If the selector is a string, the selector is passed to lodashGet on the sourceData. If the selector is a function, the sourceData is passed to the selector and should return the simplified data. Using this setting on `withOnyx` can have very positive performance benefits because the component will only re-render when the subset of data changes. Otherwise, any change of data on any property would normally cause the component to re-render (and that can be expensive from a performance standpoint). |
+| [mapping.selector] | <code>String</code> \| <code>function</code> | THIS PARAM IS ONLY USED WITH withOnyx(). If included, this will be used to subscribe to a subset of an Onyx key's data.       If the selector is a string, the selector is passed to lodashGet on the sourceData. If the selector is a function, the sourceData is passed to the selector and should return the       simplified data. Using this setting on `withOnyx` can have very positive performance benefits because the component will only re-render when the subset of data changes.       Otherwise, any change of data on any property would normally cause the component to re-render (and that can be expensive from a performance standpoint). |
 
 **Example**  
 ```js
@@ -168,6 +173,20 @@ behavior just yet.
 ```js
 notifySubscribersOnNextTick(key, value, subscriber => subscriber.initWithStoredValues === false)
 ```
+<a name="notifyCollectionSubscribersOnNextTick"></a>
+
+## notifyCollectionSubscribersOnNextTick(key, value)
+This method is similar to notifySubscribersOnNextTick but it is built for working specifically with collections
+so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
+subscriber callbacks receive the data in a different format than they normally expect and it breaks code.
+
+**Kind**: global function  
+
+| Param | Type |
+| --- | --- |
+| key | <code>String</code> | 
+| value | <code>\*</code> | 
+
 <a name="set"></a>
 
 ## set(key, value) ⇒ <code>Promise</code>
@@ -225,7 +244,7 @@ Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Wor
 ```
 <a name="clear"></a>
 
-## clear() ⇒ <code>Promise.&lt;void&gt;</code>
+## clear(keysToPreserve) ⇒ <code>Promise.&lt;void&gt;</code>
 Clear out all the data in the store
 
 Note that calling Onyx.clear() and then Onyx.set() on a key with a default
@@ -245,6 +264,11 @@ Storage.setItem() from Onyx.clear() will have already finished and the merged
 value will be saved to storage after the default value.
 
 **Kind**: global function  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| keysToPreserve | <code>Array</code> | is a list of ONYXKEYS that should not be cleared with the rest of the data |
+
 <a name="mergeCollection"></a>
 
 ## mergeCollection(collectionKey, collection) ⇒ <code>Promise</code>
@@ -266,10 +290,11 @@ Onyx.mergeCollection(ONYXKEYS.COLLECTION.REPORT, {
 ```
 <a name="update"></a>
 
-## update(data)
+## update(data) ⇒ <code>Promise</code>
 Insert API responses and lifecycle data into Onyx
 
 **Kind**: global function  
+**Returns**: <code>Promise</code> - resolves when all operations are complete  
 
 | Param | Type | Description |
 | --- | --- | --- |
