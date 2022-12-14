@@ -153,25 +153,22 @@ describe('Set data while storage is clearing', () => {
     });
 
     it('should only trigger the connection callback once when using wait for collection callback', () => {
-        expect.assertions(2);
+        expect.assertions(4);
 
         // Given a mocked callback function and a collection with four items in it
-        const collectionCallback = jest.fn(console.log);
-        let testConnectionID;
-        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST, {
-            [`${ONYX_KEYS.COLLECTION.TEST}1`]: 1,
-            [`${ONYX_KEYS.COLLECTION.TEST}2`]: 2,
-            [`${ONYX_KEYS.COLLECTION.TEST}3`]: 3,
-            [`${ONYX_KEYS.COLLECTION.TEST}4`]: 4,
+        const collectionCallback = jest.fn();
+        const testConnectionID = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST,
+            waitForCollectionCallback: true,
+            callback: collectionCallback,
         });
         return waitForPromisesToResolve()
-            .then(() => {
-                testConnectionID = Onyx.connect({
-                    key: ONYX_KEYS.COLLECTION.TEST,
-                    waitForCollectionCallback: true,
-                    callback: collectionCallback,
-                });
-            })
+            .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST, {
+                [`${ONYX_KEYS.COLLECTION.TEST}1`]: 1,
+                [`${ONYX_KEYS.COLLECTION.TEST}2`]: 2,
+                [`${ONYX_KEYS.COLLECTION.TEST}3`]: 3,
+                [`${ONYX_KEYS.COLLECTION.TEST}4`]: 4,
+            }))
 
             // When onyx is cleared
             .then(Onyx.clear)
@@ -179,17 +176,21 @@ describe('Set data while storage is clearing', () => {
                 Onyx.disconnect(testConnectionID);
             })
             .then(() => {
-                // Then the collection callback should only have been called twice:
-                // one for connect() and one for clear()
-                expect(collectionCallback).toHaveBeenCalledTimes(2);
+                // Then the collection callback should only have been called three times:
+                // 1. connect()
+                // 2. merge()
+                // 3. clear()
+                expect(collectionCallback).toHaveBeenCalledTimes(3);
 
-                // And it should be called with the full collection with the values set to null
-                expect(collectionCallback).toHaveBeenCalledWith({
-                    test_1: null,
-                    test_2: null,
-                    test_3: null,
-                    test_4: null,
-                }, undefined);
+                // And it should be called with the expected parameters each time
+                expect(collectionCallback).toHaveBeenNthCalledWith(1, null, undefined);
+                expect(collectionCallback).toHaveBeenNthCalledWith(2, {
+                    test_1: 1,
+                    test_2: 2,
+                    test_3: 3,
+                    test_4: 4,
+                });
+                expect(collectionCallback).toHaveBeenLastCalledWith({});
             });
     });
 });
