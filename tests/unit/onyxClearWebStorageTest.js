@@ -157,6 +157,7 @@ describe('Set data while storage is clearing', () => {
 
         // Given a mocked callback function and a collection with four items in it
         const collectionCallback = jest.fn(console.log);
+        let testConnectionID;
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST, {
             [`${ONYX_KEYS.COLLECTION.TEST}1`]: 1,
             [`${ONYX_KEYS.COLLECTION.TEST}2`]: 2,
@@ -165,7 +166,7 @@ describe('Set data while storage is clearing', () => {
         });
         return waitForPromisesToResolve()
             .then(() => {
-                connectionID = Onyx.connect({
+                testConnectionID = Onyx.connect({
                     key: ONYX_KEYS.COLLECTION.TEST,
                     waitForCollectionCallback: true,
                     callback: collectionCallback,
@@ -175,8 +176,12 @@ describe('Set data while storage is clearing', () => {
             // When onyx is cleared
             .then(Onyx.clear)
             .then(() => {
-                // Then the collection callback should only have been called once
-                expect(collectionCallback).toHaveBeenCalledTimes(1);
+                Onyx.disconnect(testConnectionID);
+            })
+            .then(() => {
+                // Then the collection callback should only have been called twice:
+                // one for connect() and one for clear()
+                expect(collectionCallback).toHaveBeenCalledTimes(2);
 
                 // And it should be called with the full collection with the values set to null
                 expect(collectionCallback).toHaveBeenCalledWith({
