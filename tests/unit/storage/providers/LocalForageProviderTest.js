@@ -104,4 +104,17 @@ describe('storage/providers/LocalForage', () => {
                     });
             });
     });
+
+    it('multiRemove', () => {
+        // Given multiple pairs to be saved in storage
+        const pairs = SAMPLE_ITEMS.slice();
+        const keys = _.map(pairs, pair => pair[0]);
+
+        // When they are saved
+        return StorageProvider.multiRemove(keys)
+            .then(() => {
+                // We expect a call to localForage.removeItem for each pair
+                _.each(keys, key => expect(localforage.removeItem).toHaveBeenCalledWith(key));
+            });
+    });
 });
