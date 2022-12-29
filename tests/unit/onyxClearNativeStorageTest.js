@@ -79,7 +79,10 @@ describe('Set data while storage is clearing', () => {
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
                 expect(cachedValue).toBe(DEFAULT_VALUE);
                 return Storage.getItem(ONYX_KEYS.DEFAULT_KEY)
-                    .then(storedValue => expect(parseInt(storedValue, 10)).toBe(DEFAULT_VALUE));
+                    .then(storedValue => {
+                        console.log(storedValue)
+                        expect(parseInt(storedValue, 10)).toBe(DEFAULT_VALUE)
+                    });
             });
     });
 
