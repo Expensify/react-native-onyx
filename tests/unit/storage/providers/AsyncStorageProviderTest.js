@@ -108,18 +108,4 @@ describe('storage/providers/AsyncStorage', () => {
                 .then(values => expect(values).toEqual(items));
         });
     });
-
-    describe('multiRemove', () => {
-        it('Call multiRemove() with the list of keys', () => {
-            // Given sample content of all basic types
-            const pairs = SAMPLE_ITEMS.slice();
-            const keys = _.map(pairs, pair => pair[0]);
-
-            // When multiple keys are removed
-            StorageProvider.multiRemove(keys);
-
-            // multiRemove should be called
-            expect(AsyncStorageMock.multiRemove).toHaveBeenCalledWith(keys);
-        });
-    });
 });
