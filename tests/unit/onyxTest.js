@@ -122,7 +122,7 @@ describe('Onyx', () => {
             });
     });
 
-    it('should merge arrays by appending new items to the end of a value', () => {
+    it('should merge arrays by replacing previous value with new value', () => {
         let testKeyValue;
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
@@ -138,7 +138,7 @@ describe('Onyx', () => {
                 return Onyx.merge(ONYX_KEYS.TEST_KEY, ['test2', 'test3', 'test4']);
             })
             .then(() => {
-                expect(testKeyValue).toStrictEqual(['test1', 'test2', 'test3', 'test4']);
+                expect(testKeyValue).toStrictEqual(['test2', 'test3', 'test4']);
             });
     });
 
@@ -174,7 +174,7 @@ describe('Onyx', () => {
         Onyx.merge(ONYX_KEYS.TEST_KEY, ['test2']);
         return waitForPromisesToResolve()
             .then(() => {
-                expect(testKeyValue).toEqual(['test1', 'test2']);
+                expect(testKeyValue).toEqual(['test2']);
             });
     });
 
