@@ -110,10 +110,7 @@ describe('storage/providers/LocalForage', () => {
         jest.useFakeTimers();
 
         // Given an implementation of setItem that resolves after 1000ms
-        const setItemTimedOut = setTimeout(() => {
-            Promise.resolve();
-        }, 1000);
-        localforage.setItem = jest.fn(setItemTimedOut);
+        localforage.setItem = jest.fn(() => new Promise(resolve => setTimeout(resolve, 1000)));
 
         // When we call setItem 5 times, but then call clear after only 1000ms
         for (let i = 0; i < 5; i++) {
