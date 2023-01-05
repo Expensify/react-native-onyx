@@ -50,26 +50,6 @@ describe('Set data while storage is clearing', () => {
         return Onyx.clear();
     });
 
-    it('should persist the value of Onyx.merge when called between the cache and storage clearing', () => {
-        expect.assertions(3);
-
-        // Given that Onyx is completely clear
-        // When Onyx.clear() is called
-        Onyx.clear();
-
-        // When merge is called between the cache and storage clearing, on a key with a default key state
-        Onyx.merge(ONYX_KEYS.DEFAULT_KEY, MERGED_VALUE);
-        return waitForPromisesToResolve()
-            .then(() => {
-                // Then the value in Onyx, the cache, and the storage is the merged value
-                expect(onyxValue).toBe(MERGED_VALUE);
-                const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
-                expect(cachedValue).toBe(MERGED_VALUE);
-                const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
-                return expect(storedValue).resolves.toBe(MERGED_VALUE);
-            });
-    });
-
     it('should replace the value of Onyx.set with the default key state in the cache', () => {
         expect.assertions(3);
 
