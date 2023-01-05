@@ -104,4 +104,26 @@ describe('storage/providers/LocalForage', () => {
                     });
             });
     });
+
+    it('clear', () => {
+        // Use fake timers, so we can manipulate time at our will for this test.
+        jest.useFakeTimers();
+
+        // Given an implementation of setItem that resolves after 1000ms
+        const setItemTimedOut = setTimeout(() => {
+            Promise.resolve();
+        }, 1000);
+        localforage.setItem = jest.fn(setItemTimedOut);
+
+        // When we call setItem 5 times, but then call clear after only 1000ms
+        for (let i = 0; i < 5; i++) {
+            StorageProvider.setItem(`key${i}`, `value${i}`);
+        }
+        jest.advanceTimersByTime(1000);
+        StorageProvider.clear();
+        jest.advanceTimersByTime(4000);
+
+        // Then setItem should only have been called once since all other calls were aborted when we called clear()
+        expect(localforage.setItem).toHaveBeenCalledTimes(1);
+    });
 });
