@@ -120,8 +120,7 @@ describe('Set data while storage is clearing', () => {
             .then(() => {
                 // Then the value of the preserved key is also still set in both the cache and storage
                 expect(regularKeyOnyxValue).toBe(SET_VALUE);
-                const regularKeyCachedValue = cache.getValue(ONYX_KEYS.REGULAR_KEY);
-                expect(regularKeyCachedValue).toBe(SET_VALUE);
+                expect(cache.getValue(ONYX_KEYS.REGULAR_KEY)).toBe(SET_VALUE);
                 return Storage.getItem(ONYX_KEYS.REGULAR_KEY)
                     .then(storedValue => expect(parseInt(storedValue, 10)).toBe(SET_VALUE));
             });
