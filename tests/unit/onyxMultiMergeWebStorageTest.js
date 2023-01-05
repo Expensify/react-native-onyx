@@ -141,7 +141,7 @@ describe('Onyx.mergeCollection() amd WebStorage', () => {
     });
 
     it('setItem() and multiMerge()', () => {
-        // When Onyx is cleared, since it uses multiSet() to clear out all the values, the keys will remain with null for all the values
+        // Onyx should be empty after clear() is called
         expect(localforageMock.storageMap).toEqual({});
 
         // Given no previous data and several calls to setItem and call to mergeCollection to update a given key
