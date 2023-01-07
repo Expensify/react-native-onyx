@@ -1,3 +1,4 @@
+/* eslint-disable arrow-body-style */
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 describe('Onyx', () => {
@@ -6,7 +7,12 @@ describe('Onyx', () => {
 
         const ONYX_KEYS = {
             TEST_KEY: 'test',
+            TEST_KEY_A: 'testA',
+            TEST_KEY_B: 'testB',
             OTHER_TEST: 'otherTest',
+            COLLECTION: {
+                TESTING_STUFF: 'testingStuff_',
+            },
         };
 
         // Always use a "fresh" (and undecorated) instance
@@ -64,11 +70,15 @@ describe('Onyx', () => {
 
             // When calling decorated methods through Onyx[methodName]
             const methods = ['set', 'multiSet', 'clear', 'merge', 'mergeCollection'];
-            methods.forEach(name => Onyx[name]('mockKey', {mockKey: {mockValue: 'mockValue'}}));
+            Onyx.set(ONYX_KEYS.TEST_KEY, '1');
+            Onyx.multiSet({[ONYX_KEYS.TEST_KEY_A]: 'a', [ONYX_KEYS.TEST_KEY_B]: 'b'});
+            Onyx.clear();
+            Onyx.merge(ONYX_KEYS.OTHER_TEST, {one: 1});
+            Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TESTING_STUFF, {testingStuff_1: {one: 1}});
 
             return waitForPromisesToResolve()
                 .then(() => {
-                // Then metrics should have captured data for each method
+                    // Then metrics should have captured data for each method
                     const summaries = Onyx.getMetrics().summaries;
 
                     methods.forEach((name) => {

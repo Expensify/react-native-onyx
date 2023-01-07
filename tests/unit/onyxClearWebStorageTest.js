@@ -1,5 +1,5 @@
+import localforage from 'localforage'; // Note: This is mocked as IndexedDB does not exist in the node environment.
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
-import Storage from '../../__mocks__/localforage';
 
 const ONYX_KEYS = {
     DEFAULT_KEY: 'defaultKey',
@@ -22,7 +22,7 @@ describe('Set data while storage is clearing', () => {
 
     beforeAll(() => {
         // Force using WebStorage provider for these tests
-        jest.mock('../../lib/storage');
+        jest.mock('../../lib/storage', () => require('../../lib/storage/index.web'));
         Onyx = require('../../lib/Onyx').default;
     });
 
@@ -65,7 +65,7 @@ describe('Set data while storage is clearing', () => {
                 expect(onyxValue).toBe(MERGED_VALUE);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
                 expect(cachedValue).toBe(MERGED_VALUE);
-                const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
+                const storedValue = localforage.getItem(ONYX_KEYS.DEFAULT_KEY);
                 return expect(storedValue).resolves.toBe(MERGED_VALUE);
             });
     });
@@ -83,7 +83,7 @@ describe('Set data while storage is clearing', () => {
                 expect(onyxValue).toBe(DEFAULT_VALUE);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
                 expect(cachedValue).toBe(DEFAULT_VALUE);
-                const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
+                const storedValue = localforage.getItem(ONYX_KEYS.DEFAULT_KEY);
                 return expect(storedValue).resolves.toBe(DEFAULT_VALUE);
             });
     });
@@ -101,7 +101,7 @@ describe('Set data while storage is clearing', () => {
                 expect(onyxValue).toBe(DEFAULT_VALUE);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
                 expect(cachedValue).toBe(DEFAULT_VALUE);
-                const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
+                const storedValue = localforage.getItem(ONYX_KEYS.DEFAULT_KEY);
                 return expect(storedValue).resolves.toBe(DEFAULT_VALUE);
             });
     });
@@ -127,7 +127,7 @@ describe('Set data while storage is clearing', () => {
                 expect(regularKeyOnyxValue).toBe(SET_VALUE);
                 const regularKeyCachedValue = cache.getValue(ONYX_KEYS.REGULAR_KEY);
                 expect(regularKeyCachedValue).toBe(SET_VALUE);
-                const regularKeyStoredValue = Storage.getItem(ONYX_KEYS.REGULAR_KEY);
+                const regularKeyStoredValue = localforage.getItem(ONYX_KEYS.REGULAR_KEY);
                 return expect(regularKeyStoredValue).resolves.toBe(SET_VALUE);
             });
     });
@@ -147,7 +147,7 @@ describe('Set data while storage is clearing', () => {
                 expect(onyxValue).toBe(SET_VALUE);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
                 expect(cachedValue).toBe(SET_VALUE);
-                const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
+                const storedValue = localforage.getItem(ONYX_KEYS.DEFAULT_KEY);
                 return expect(storedValue).resolves.toBe(SET_VALUE);
             });
     });

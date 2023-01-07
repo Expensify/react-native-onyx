@@ -414,7 +414,7 @@ describe('Onyx', () => {
     describe('Onyx with Cache', () => {
         let Onyx;
         let withOnyx;
-        let AsyncStorageMock;
+        let Storage;
 
         /** @type OnyxCache */
         let cache;
@@ -431,7 +431,7 @@ describe('Onyx', () => {
             const OnyxModule = require('../../lib');
             Onyx = OnyxModule.default;
             withOnyx = OnyxModule.withOnyx;
-            AsyncStorageMock = require('@react-native-async-storage/async-storage').default;
+            Storage = require('../../lib/storage/NativeStorage').default;
             cache = require('../../lib/OnyxCache').default;
 
             Onyx.init({
@@ -463,8 +463,8 @@ describe('Onyx', () => {
             })(ViewWithText);
 
             // Given some string value for that key exists in storage
-            AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
-            AsyncStorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
+            Storage.setItem(ONYX_KEYS.TEST_KEY, 'mockValue');
+            const getItemSpy = jest.spyOn(Storage, 'getItem');
             return initOnyx()
                 .then(() => {
                     // When multiple components are rendered
@@ -479,7 +479,7 @@ describe('Onyx', () => {
                 .then(waitForPromisesToResolve)
                 .then(() => {
                     // Then Async storage `getItem` should be called only once
-                    expect(AsyncStorageMock.getItem).toHaveBeenCalledTimes(1);
+                    expect(getItemSpy).toHaveBeenCalledTimes(1);
                 });
         });
 
@@ -491,11 +491,12 @@ describe('Onyx', () => {
                 },
             })(ViewWithText);
 
+            const getAllKeysSpy = jest.spyOn(Storage, 'getAllKeys');
+
             // Given some string value for that key exists in storage
             return initOnyx()
                 .then(() => {
-                    AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
-                    AsyncStorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
+                    Storage.setItem(ONYX_KEYS.TEST_KEY, 'mockValue');
 
                     // When multiple components are rendered
                     render(
@@ -509,17 +510,17 @@ describe('Onyx', () => {
                 .then(waitForPromisesToResolve)
                 .then(() => {
                     // Then Async storage `getItem` should be called only once
-                    expect(AsyncStorageMock.getAllKeys).toHaveBeenCalledTimes(1);
+                    expect(getAllKeysSpy).toHaveBeenCalledTimes(1);
                 });
         });
 
         it('Should keep recently accessed items in cache', () => {
             // Given Storage with 10 different keys
-            AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
             const range = _.range(10);
-            AsyncStorageMock.getAllKeys.mockResolvedValue(
-                _.map(range, number => `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}${number}`),
-            );
+            _.each(range, (number) => {
+                Storage.setItem(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}${number}`, 'mockValue');
+            });
+
             let connections;
 
             // Given Onyx is configured with max 5 keys in cache
@@ -565,8 +566,8 @@ describe('Onyx', () => {
             })(ViewWithText);
 
             // Given some string value for that key exists in storage
-            AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
-            AsyncStorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
+            Storage.setItem(ONYX_KEYS.TEST_KEY, 'mockValue');
+            const getItemSpy = jest.spyOn(Storage, 'getItem');
 
             return initOnyx()
                 .then(() => {
@@ -584,7 +585,7 @@ describe('Onyx', () => {
                 .then(waitForPromisesToResolve)
                 .then(() => {
                     // Then Async storage `getItem` should be called twice
-                    expect(AsyncStorageMock.getItem).toHaveBeenCalledTimes(2);
+                    expect(getItemSpy).toHaveBeenCalledTimes(2);
                 });
         });
 
@@ -603,9 +604,10 @@ describe('Onyx', () => {
             })(ViewWithText);
 
             // Given some values exist in storage
-            AsyncStorageMock.setItem(ONYX_KEYS.TEST_KEY, JSON.stringify({ID: 15, data: 'mock object with ID'}));
-            AsyncStorageMock.setItem(ONYX_KEYS.OTHER_TEST, JSON.stringify('mock text'));
-            AsyncStorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY, ONYX_KEYS.OTHER_TEST]);
+            Storage.setItem(ONYX_KEYS.TEST_KEY, {ID: 15, data: 'mock object with ID'});
+            Storage.setItem(ONYX_KEYS.OTHER_TEST, 'mock text');
+            const getItemSpy = jest.spyOn(Storage, 'getItem');
+
             return initOnyx()
                 .then(() => {
                     // When the components are rendered multiple times
@@ -619,17 +621,18 @@ describe('Onyx', () => {
                 .then(waitForPromisesToResolve)
                 .then(() => {
                     // Then Async storage `getItem` should be called exactly two times (once for each key)
-                    expect(AsyncStorageMock.getItem).toHaveBeenCalledTimes(2);
-                    expect(AsyncStorageMock.getItem).toHaveBeenNthCalledWith(1, ONYX_KEYS.TEST_KEY);
-                    expect(AsyncStorageMock.getItem).toHaveBeenNthCalledWith(2, ONYX_KEYS.OTHER_TEST);
+                    expect(getItemSpy).toHaveBeenCalledTimes(2);
+                    expect(getItemSpy).toHaveBeenNthCalledWith(1, ONYX_KEYS.TEST_KEY);
+                    expect(getItemSpy).toHaveBeenNthCalledWith(2, ONYX_KEYS.OTHER_TEST);
                 });
         });
 
         it('Should clean cache when connections to eviction keys happen', () => {
             // Given storage with some data
-            AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
             const range = _.range(1, 10);
-            AsyncStorageMock.getAllKeys.mockResolvedValue(_.map(range, n => `key${n}`));
+            _.each(range, (number) => {
+                Storage.setItem(`key${number}`, 'mockValue');
+            });
 
             jest.useFakeTimers();
 

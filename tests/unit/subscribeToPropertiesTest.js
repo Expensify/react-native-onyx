@@ -11,10 +11,10 @@ const ONYX_KEYS = {
     },
 };
 
-Onyx.init({
+beforeAll(() => Onyx.init({
     keys: ONYX_KEYS,
     registerStorageEventListener: () => {},
-});
+}));
 
 // The error boundary is here so that it will catch errors thrown in the selector methods (like syntax errors).
 // Normally, those errors get swallowed up by Jest and are not displayed so there was no indication that a test failed

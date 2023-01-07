@@ -1,13 +1,12 @@
-import Storage from '../../__mocks__/@react-native-async-storage/async-storage';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
-import Onyx from '../../lib/Onyx';
+import Storage from '../../lib/storage/providers/SQLiteStorage';
+import Onyx from '../../lib';
 
 const ONYX_KEYS = {
     DEFAULT_KEY: 'defaultKey',
     REGULAR_KEY: 'regularKey',
 };
 
-// Store integers because the async storage mock adds escape characters to strings
 const SET_VALUE = 2;
 const MERGED_VALUE = 1;
 const DEFAULT_VALUE = 0;

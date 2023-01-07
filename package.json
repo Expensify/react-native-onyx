@@ -48,7 +48,6 @@
     "@babel/core": "^7.17.10",
     "@babel/plugin-proposal-class-properties": "^7.16.7",
     "@babel/runtime": "^7.11.2",
-    "@react-native-async-storage/async-storage": "^1.17.11",
     "@react-native-community/eslint-config": "^2.0.0",
     "@testing-library/jest-native": "^3.4.2",
     "@testing-library/react-native": "^7.0.2",
@@ -58,6 +57,7 @@
     "babel-plugin-module-resolver": "^4.0.0",
     "babel-plugin-react-native-web": "^0.13.5",
     "babel-plugin-transform-class-properties": "^6.24.1",
+    "better-sqlite3": "^8.0.1",
     "eslint": "^7.6.0",
     "eslint-config-expensify": "^2.0.24",
     "eslint-plugin-jsx-a11y": "^6.6.1",
@@ -127,8 +127,7 @@
     "timers": "fake",
     "testEnvironment": "jsdom",
     "setupFilesAfterEnv": [
-      "@testing-library/jest-native/extend-expect",
-      "./jestSetup.js"
+      "@testing-library/jest-native/extend-expect"
     ]
   },
   "sideEffects": false
