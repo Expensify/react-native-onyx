@@ -51,7 +51,6 @@ describe('Onyx', () => {
         })
         .then((keys) => {
             expect(keys.includes(ONYX_KEYS.OTHER_TEST)).toBe(false);
-            return Onyx.set(ONYX_KEYS.OTHER_TEST, 42);
         }));
 
     it('should set a simple key', () => {
