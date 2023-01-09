@@ -2,6 +2,8 @@ import localforage from 'localforage';
 import _ from 'underscore';
 
 import StorageProvider from '../../../../lib/storage/providers/LocalForage';
+import createDeferredTask from '../../../../lib/createDeferredTask';
+import waitForPromisesToResolve from '../../../utils/waitForPromisesToResolve';
 
 describe('storage/providers/LocalForage', () => {
     const SAMPLE_ITEMS = [
@@ -106,21 +108,33 @@ describe('storage/providers/LocalForage', () => {
     });
 
     it('clear', () => {
-        // Use fake timers, so we can manipulate time at our will for this test.
-        jest.useFakeTimers();
+        // We're creating a Promise which we programatically control when to resolve.
+        const task = createDeferredTask();
 
-        // Given an implementation of setItem that resolves after 1000ms
-        localforage.setItem = jest.fn(() => new Promise(resolve => setTimeout(resolve, 1000)));
+        // We configure localforage.setItem to return this promise the first time it's called and to otherwise return resolved promises
+        localforage.setItem = jest.fn()
+            . mockReturnValue(Promise.resolve()) // Default behavior
+            . mockReturnValueOnce(task.promise); // First call behavior
 
-        // When we call setItem 5 times, but then call clear after only 1000ms
+        // Make 5 StorageProvider.setItem calls - this adds 5 items to the queue and starts executing the first localForage.setItem
         for (let i = 0; i < 5; i++) {
             StorageProvider.setItem(`key${i}`, `value${i}`);
         }
-        jest.advanceTimersByTime(1000);
-        StorageProvider.clear();
-        jest.advanceTimersByTime(4000);
 
-        // Then setItem should only have been called once since all other calls were aborted when we called clear()
-        expect(localforage.setItem).toHaveBeenCalledTimes(1);
+        // At this point,`localForage.setItem` should have been called once, but we control when it resolves, and we'll keep it unresolved.
+        // This simulates the 1st localForage.setItem taking a random time.
+        // We then call StorageProvider.clear() while the first localForage.setItem isn't completed yet.
+        StorageProvider.clear();
+
+        // Any calls that follow this would have been queued - so we don't expect more than 1 `localForage.setItem` call after the
+        // first one resolves.
+        task.resolve();
+
+        // waitForPromisesToResolve() makes jest wait for any promises (even promises returned as the result of a promise) to resolve.
+        // If StorageProvider.clear() does not abort the queue, more localForage.setItem calls would be executed because they would
+        // be sitting in the setItemQueue
+        return waitForPromisesToResolve().then(() => {
+            expect(localforage.setItem).toHaveBeenCalledTimes(1);
+        });
     });
 });
