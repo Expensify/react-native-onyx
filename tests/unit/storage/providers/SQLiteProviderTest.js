@@ -93,5 +93,12 @@ describe('SQLiteStorage', () => {
                 expect(keys).toEqual(['object2']);
             });
     });
+
+    it('can merge a single item via multiMerge()', () => {
+        return SQLiteStorage.setItem('testKey', {one: 1})
+            .then(() => SQLiteStorage.mergeItem('testKey', {two: 2}))
+            .then(() => SQLiteStorage.getItem('testKey'))
+            .then(value => expect(value).toEqual({one: 1, two: 2}));
+    });
 });
 
