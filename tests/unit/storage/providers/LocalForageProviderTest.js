@@ -2,6 +2,8 @@ import localforage from 'localforage';
 import _ from 'underscore';
 
 import StorageProvider from '../../../../lib/storage/providers/LocalForage';
+import createDeferredTask from '../../../../lib/createDeferredTask';
+import waitForPromisesToResolve from '../../../utils/waitForPromisesToResolve';
 
 describe('storage/providers/LocalForage', () => {
     const SAMPLE_ITEMS = [
@@ -103,5 +105,36 @@ describe('storage/providers/LocalForage', () => {
                         },
                     });
             });
+    });
+
+    it('clear', () => {
+        // We're creating a Promise which we programatically control when to resolve.
+        const task = createDeferredTask();
+
+        // We configure localforage.setItem to return this promise the first time it's called and to otherwise return resolved promises
+        localforage.setItem = jest.fn()
+            . mockReturnValue(Promise.resolve()) // Default behavior
+            . mockReturnValueOnce(task.promise); // First call behavior
+
+        // Make 5 StorageProvider.setItem calls - this adds 5 items to the queue and starts executing the first localForage.setItem
+        for (let i = 0; i < 5; i++) {
+            StorageProvider.setItem(`key${i}`, `value${i}`);
+        }
+
+        // At this point,`localForage.setItem` should have been called once, but we control when it resolves, and we'll keep it unresolved.
+        // This simulates the 1st localForage.setItem taking a random time.
+        // We then call StorageProvider.clear() while the first localForage.setItem isn't completed yet.
+        StorageProvider.clear();
+
+        // Any calls that follow this would have been queued - so we don't expect more than 1 `localForage.setItem` call after the
+        // first one resolves.
+        task.resolve();
+
+        // waitForPromisesToResolve() makes jest wait for any promises (even promises returned as the result of a promise) to resolve.
+        // If StorageProvider.clear() does not abort the queue, more localForage.setItem calls would be executed because they would
+        // be sitting in the setItemQueue
+        return waitForPromisesToResolve().then(() => {
+            expect(localforage.setItem).toHaveBeenCalledTimes(1);
+        });
     });
 });
