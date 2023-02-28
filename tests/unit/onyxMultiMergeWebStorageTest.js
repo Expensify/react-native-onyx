@@ -17,7 +17,7 @@ const initialData = {
 
 localforageMock.setInitialMockData(initialData);
 
-describe('Onyx.mergeCollection() amd WebStorage', () => {
+describe('Onyx.mergeCollection() and WebStorage', () => {
     let Onyx;
 
     beforeAll(() => {
