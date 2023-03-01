@@ -41,6 +41,7 @@
   "dependencies": {
     "ascii-table": "0.0.9",
     "fast-equals": "^4.0.3",
+    "localforage-removeitems": "^1.4.0",
     "lodash": "^4.17.21",
     "underscore": "^1.13.1"
   },
