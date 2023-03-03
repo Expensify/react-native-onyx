@@ -41,7 +41,6 @@
   "dependencies": {
     "ascii-table": "0.0.9",
     "fast-equals": "^4.0.3",
-    "localforage-removeitems": "^1.4.0",
     "lodash": "^4.17.21",
     "underscore": "^1.13.1"
   },
@@ -80,6 +79,7 @@
     "@react-native-async-storage/async-storage": "^1.17.11",
     "expensify-common": ">=1",
     "localforage": "^1.10.0",
+    "localforage-removeitems": "^1.4.0",
     "react": ">=18.1.0",
     "react-native-performance": "^4.0.0",
     "react-native-quick-sqlite": "^8.0.0-beta.2"
@@ -95,6 +95,9 @@
       "optional": true
     },
     "localforage": {
+      "optional": true
+    },
+    "localforage-removeitems": {
       "optional": true
     }
   },
