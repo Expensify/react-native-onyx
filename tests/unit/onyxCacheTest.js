@@ -1,7 +1,6 @@
 import React from 'react';
 import {render} from '@testing-library/react-native';
 import _ from 'underscore';
-import LocalForageMock from '../../__mocks__/localforage';
 
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import ViewWithText from '../components/ViewWithText';
@@ -401,6 +400,7 @@ describe('Onyx', () => {
 
     describe('Onyx with Cache', () => {
         let Onyx;
+        let LocalForageMock;
         let withOnyx;
 
         /** @type OnyxCache */
@@ -417,8 +417,9 @@ describe('Onyx', () => {
         function initOnyx(overrides) {
             const OnyxModule = require('../../lib');
             Onyx = OnyxModule.default;
-            withOnyx = OnyxModule.withOnyx;
+            LocalForageMock = require('../../__mocks__/localforage').default;
             cache = require('../../lib/OnyxCache').default;
+            withOnyx = OnyxModule.withOnyx;
 
             Onyx.init({
                 keys: ONYX_KEYS,
