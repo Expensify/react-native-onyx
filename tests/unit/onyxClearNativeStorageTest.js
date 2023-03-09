@@ -1,5 +1,5 @@
-import Storage from '../../__mocks__/@react-native-async-storage/async-storage';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
+import Storage from '../../lib/storage';
 import Onyx from '../../lib/Onyx';
 
 const ONYX_KEYS = {

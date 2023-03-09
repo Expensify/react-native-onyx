@@ -401,7 +401,7 @@ describe('Onyx', () => {
     describe('Onyx with Cache', () => {
         let Onyx;
         let withOnyx;
-        let AsyncStorageMock;
+        let LocalForageMock;
 
         /** @type OnyxCache */
         let cache;
@@ -418,7 +418,7 @@ describe('Onyx', () => {
             const OnyxModule = require('../../lib');
             Onyx = OnyxModule.default;
             withOnyx = OnyxModule.withOnyx;
-            AsyncStorageMock = require('@react-native-async-storage/async-storage').default;
+            LocalForageMock = require('localforage').default;
             cache = require('../../lib/OnyxCache').default;
 
             Onyx.init({
@@ -450,8 +450,8 @@ describe('Onyx', () => {
             })(ViewWithText);
 
             // Given some string value for that key exists in storage
-            AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
-            AsyncStorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
+            LocalForageMock.getItem.mockResolvedValue('"mockValue"');
+            LocalForageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
             return initOnyx()
                 .then(() => {
                     // When multiple components are rendered
@@ -466,7 +466,7 @@ describe('Onyx', () => {
                 .then(waitForPromisesToResolve)
                 .then(() => {
                     // Then Async storage `getItem` should be called only once
-                    expect(AsyncStorageMock.getItem).toHaveBeenCalledTimes(1);
+                    expect(LocalForageMock.getItem).toHaveBeenCalledTimes(1);
                 });
         });
 
@@ -481,8 +481,8 @@ describe('Onyx', () => {
             // Given some string value for that key exists in storage
             return initOnyx()
                 .then(() => {
-                    AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
-                    AsyncStorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
+                    LocalForageMock.getItem.mockResolvedValue('"mockValue"');
+                    LocalForageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
 
                     // When multiple components are rendered
                     render(
@@ -496,15 +496,15 @@ describe('Onyx', () => {
                 .then(waitForPromisesToResolve)
                 .then(() => {
                     // Then Async storage `getItem` should be called only once
-                    expect(AsyncStorageMock.getAllKeys).toHaveBeenCalledTimes(1);
+                    expect(LocalForageMock.getAllKeys).toHaveBeenCalledTimes(1);
                 });
         });
 
         it('Should keep recently accessed items in cache', () => {
             // Given Storage with 10 different keys
-            AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
+            LocalForageMock.getItem.mockResolvedValue('"mockValue"');
             const range = _.range(10);
-            AsyncStorageMock.getAllKeys.mockResolvedValue(
+            LocalForageMock.getAllKeys.mockResolvedValue(
                 _.map(range, number => `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}${number}`),
             );
             let connections;
@@ -552,8 +552,8 @@ describe('Onyx', () => {
             })(ViewWithText);
 
             // Given some string value for that key exists in storage
-            AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
-            AsyncStorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
+            LocalForageMock.getItem.mockResolvedValue('"mockValue"');
+            LocalForageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
 
             return initOnyx()
                 .then(() => {
@@ -571,7 +571,7 @@ describe('Onyx', () => {
                 .then(waitForPromisesToResolve)
                 .then(() => {
                     // Then Async storage `getItem` should be called twice
-                    expect(AsyncStorageMock.getItem).toHaveBeenCalledTimes(2);
+                    expect(LocalForageMock.getItem).toHaveBeenCalledTimes(2);
                 });
         });
 
@@ -590,9 +590,9 @@ describe('Onyx', () => {
             })(ViewWithText);
 
             // Given some values exist in storage
-            AsyncStorageMock.setItem(ONYX_KEYS.TEST_KEY, JSON.stringify({ID: 15, data: 'mock object with ID'}));
-            AsyncStorageMock.setItem(ONYX_KEYS.OTHER_TEST, JSON.stringify('mock text'));
-            AsyncStorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY, ONYX_KEYS.OTHER_TEST]);
+            LocalForageMock.setItem(ONYX_KEYS.TEST_KEY, JSON.stringify({ID: 15, data: 'mock object with ID'}));
+            LocalForageMock.setItem(ONYX_KEYS.OTHER_TEST, JSON.stringify('mock text'));
+            LocalForageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY, ONYX_KEYS.OTHER_TEST]);
             return initOnyx()
                 .then(() => {
                     // When the components are rendered multiple times
@@ -606,17 +606,17 @@ describe('Onyx', () => {
                 .then(waitForPromisesToResolve)
                 .then(() => {
                     // Then Async storage `getItem` should be called exactly two times (once for each key)
-                    expect(AsyncStorageMock.getItem).toHaveBeenCalledTimes(2);
-                    expect(AsyncStorageMock.getItem).toHaveBeenNthCalledWith(1, ONYX_KEYS.TEST_KEY);
-                    expect(AsyncStorageMock.getItem).toHaveBeenNthCalledWith(2, ONYX_KEYS.OTHER_TEST);
+                    expect(LocalForageMock.getItem).toHaveBeenCalledTimes(2);
+                    expect(LocalForageMock.getItem).toHaveBeenNthCalledWith(1, ONYX_KEYS.TEST_KEY);
+                    expect(LocalForageMock.getItem).toHaveBeenNthCalledWith(2, ONYX_KEYS.OTHER_TEST);
                 });
         });
 
         it('Should clean cache when connections to eviction keys happen', () => {
             // Given storage with some data
-            AsyncStorageMock.getItem.mockResolvedValue('"mockValue"');
+            LocalForageMock.getItem.mockResolvedValue('"mockValue"');
             const range = _.range(1, 10);
-            AsyncStorageMock.getAllKeys.mockResolvedValue(_.map(range, n => `key${n}`));
+            LocalForageMock.getAllKeys.mockResolvedValue(_.map(range, n => `key${n}`));
 
             jest.useFakeTimers();
 
