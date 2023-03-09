@@ -590,8 +590,8 @@ describe('Onyx', () => {
             })(ViewWithText);
 
             // Given some values exist in storage
-            LocalForageMock.setItem(ONYX_KEYS.TEST_KEY, JSON.stringify({ID: 15, data: 'mock object with ID'}));
-            LocalForageMock.setItem(ONYX_KEYS.OTHER_TEST, JSON.stringify('mock text'));
+            LocalForageMock.setItem(ONYX_KEYS.TEST_KEY, {ID: 15, data: 'mock object with ID'});
+            LocalForageMock.setItem(ONYX_KEYS.OTHER_TEST, 'mock text');
             LocalForageMock.keys.mockResolvedValue([ONYX_KEYS.TEST_KEY, ONYX_KEYS.OTHER_TEST]);
             return initOnyx()
                 .then(() => {
