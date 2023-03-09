@@ -1,6 +1,7 @@
 import React from 'react';
 import {render} from '@testing-library/react-native';
 import _ from 'underscore';
+import LocalForageMock from '../../__mocks__/localforage';
 
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import ViewWithText from '../components/ViewWithText';
@@ -401,7 +402,6 @@ describe('Onyx', () => {
     describe('Onyx with Cache', () => {
         let Onyx;
         let withOnyx;
-        let LocalForageMock;
 
         /** @type OnyxCache */
         let cache;
@@ -418,7 +418,6 @@ describe('Onyx', () => {
             const OnyxModule = require('../../lib');
             Onyx = OnyxModule.default;
             withOnyx = OnyxModule.withOnyx;
-            LocalForageMock = require('localforage').default;
             cache = require('../../lib/OnyxCache').default;
 
             Onyx.init({
@@ -451,7 +450,7 @@ describe('Onyx', () => {
 
             // Given some string value for that key exists in storage
             LocalForageMock.getItem.mockResolvedValue('"mockValue"');
-            LocalForageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
+            LocalForageMock.keys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
             return initOnyx()
                 .then(() => {
                     // When multiple components are rendered
@@ -482,7 +481,7 @@ describe('Onyx', () => {
             return initOnyx()
                 .then(() => {
                     LocalForageMock.getItem.mockResolvedValue('"mockValue"');
-                    LocalForageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
+                    LocalForageMock.keys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
 
                     // When multiple components are rendered
                     render(
@@ -496,7 +495,7 @@ describe('Onyx', () => {
                 .then(waitForPromisesToResolve)
                 .then(() => {
                     // Then Async storage `getItem` should be called only once
-                    expect(LocalForageMock.getAllKeys).toHaveBeenCalledTimes(1);
+                    expect(LocalForageMock.keys).toHaveBeenCalledTimes(1);
                 });
         });
 
@@ -504,7 +503,7 @@ describe('Onyx', () => {
             // Given Storage with 10 different keys
             LocalForageMock.getItem.mockResolvedValue('"mockValue"');
             const range = _.range(10);
-            LocalForageMock.getAllKeys.mockResolvedValue(
+            LocalForageMock.keys.mockResolvedValue(
                 _.map(range, number => `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}${number}`),
             );
             let connections;
@@ -553,7 +552,7 @@ describe('Onyx', () => {
 
             // Given some string value for that key exists in storage
             LocalForageMock.getItem.mockResolvedValue('"mockValue"');
-            LocalForageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
+            LocalForageMock.keys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
 
             return initOnyx()
                 .then(() => {
@@ -592,7 +591,7 @@ describe('Onyx', () => {
             // Given some values exist in storage
             LocalForageMock.setItem(ONYX_KEYS.TEST_KEY, JSON.stringify({ID: 15, data: 'mock object with ID'}));
             LocalForageMock.setItem(ONYX_KEYS.OTHER_TEST, JSON.stringify('mock text'));
-            LocalForageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY, ONYX_KEYS.OTHER_TEST]);
+            LocalForageMock.keys.mockResolvedValue([ONYX_KEYS.TEST_KEY, ONYX_KEYS.OTHER_TEST]);
             return initOnyx()
                 .then(() => {
                     // When the components are rendered multiple times
@@ -616,7 +615,7 @@ describe('Onyx', () => {
             // Given storage with some data
             LocalForageMock.getItem.mockResolvedValue('"mockValue"');
             const range = _.range(1, 10);
-            LocalForageMock.getAllKeys.mockResolvedValue(_.map(range, n => `key${n}`));
+            LocalForageMock.keys.mockResolvedValue(_.map(range, n => `key${n}`));
 
             jest.useFakeTimers();
 

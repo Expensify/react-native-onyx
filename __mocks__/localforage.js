@@ -6,11 +6,9 @@ const localforageMock = {
     get storageMap() {
         return storageMap;
     },
-    keys() {
-        return new Promise((resolve) => {
-            resolve(_.keys(storageMap));
-        });
-    },
+    keys: jest.fn(() => new Promise((resolve) => {
+        resolve(_.keys(storageMap));
+    })),
     setInitialMockData: (data) => {
         storageMap = data;
     },
