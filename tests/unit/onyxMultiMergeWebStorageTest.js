@@ -1,6 +1,6 @@
 import OnyxCache from '../../lib/OnyxCache';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
-import localforageMock from '../../__mocks__/localforage';
+import StorageMock from '../../lib/storage';
 
 const ONYX_KEYS = {
     COLLECTION: {
@@ -15,7 +15,7 @@ const initialData = {
     test_3: initialTestObject,
 };
 
-localforageMock.setInitialMockData(initialData);
+StorageMock.setInitialMockData(initialData);
 
 describe('Onyx.mergeCollection() amd WebStorage', () => {
     let Onyx;
@@ -35,9 +35,9 @@ describe('Onyx.mergeCollection() amd WebStorage', () => {
 
     it('merges two sets of data consecutively', () => {
         // Given initial data in storage
-        expect(localforageMock.storageMap.test_1).toEqual(initialTestObject);
-        expect(localforageMock.storageMap.test_2).toEqual(initialTestObject);
-        expect(localforageMock.storageMap.test_3).toEqual(initialTestObject);
+        expect(StorageMock.storageMap.test_1).toEqual(initialTestObject);
+        expect(StorageMock.storageMap.test_2).toEqual(initialTestObject);
+        expect(StorageMock.storageMap.test_3).toEqual(initialTestObject);
 
         // And an empty cache values for the collection keys
         expect(OnyxCache.getValue('test_1')).not.toBeDefined();
@@ -72,17 +72,17 @@ describe('Onyx.mergeCollection() amd WebStorage', () => {
                 expect(OnyxCache.getValue('test_3')).toEqual(finalObject);
 
                 // And the storage should reflect the same state
-                expect(localforageMock.storageMap.test_1).toEqual(finalObject);
-                expect(localforageMock.storageMap.test_2).toEqual(finalObject);
-                expect(localforageMock.storageMap.test_3).toEqual(finalObject);
+                expect(StorageMock.storageMap.test_1).toEqual(finalObject);
+                expect(StorageMock.storageMap.test_2).toEqual(finalObject);
+                expect(StorageMock.storageMap.test_3).toEqual(finalObject);
             });
     });
 
     it('cache updates correctly when accessed again if keys are removed or evicted', () => {
         // Given empty storage
-        expect(localforageMock.storageMap.test_1).toBeFalsy();
-        expect(localforageMock.storageMap.test_2).toBeFalsy();
-        expect(localforageMock.storageMap.test_3).toBeFalsy();
+        expect(StorageMock.storageMap.test_1).toBeFalsy();
+        expect(StorageMock.storageMap.test_2).toBeFalsy();
+        expect(StorageMock.storageMap.test_3).toBeFalsy();
 
         // And an empty cache values for the collection keys
         expect(OnyxCache.getValue('test_1')).toBeFalsy();
@@ -103,9 +103,9 @@ describe('Onyx.mergeCollection() amd WebStorage', () => {
                 expect(OnyxCache.getValue('test_1')).toEqual(data);
                 expect(OnyxCache.getValue('test_2')).toEqual(data);
                 expect(OnyxCache.getValue('test_3')).toEqual(data);
-                expect(localforageMock.storageMap.test_1).toEqual(data);
-                expect(localforageMock.storageMap.test_2).toEqual(data);
-                expect(localforageMock.storageMap.test_3).toEqual(data);
+                expect(StorageMock.storageMap.test_1).toEqual(data);
+                expect(StorageMock.storageMap.test_2).toEqual(data);
+                expect(StorageMock.storageMap.test_3).toEqual(data);
 
                 // When we drop all the cache keys (but do not modify the underlying storage) and merge another object
                 OnyxCache.drop('test_1');
@@ -132,15 +132,15 @@ describe('Onyx.mergeCollection() amd WebStorage', () => {
                 expect(OnyxCache.getValue('test_3')).toEqual(finalObject);
 
                 // And the storage should reflect the same state
-                expect(localforageMock.storageMap.test_1).toEqual(finalObject);
-                expect(localforageMock.storageMap.test_2).toEqual(finalObject);
-                expect(localforageMock.storageMap.test_3).toEqual(finalObject);
+                expect(StorageMock.storageMap.test_1).toEqual(finalObject);
+                expect(StorageMock.storageMap.test_2).toEqual(finalObject);
+                expect(StorageMock.storageMap.test_3).toEqual(finalObject);
             });
     });
 
     it('setItem() and multiMerge()', () => {
         // Onyx should be empty after clear() is called
-        expect(localforageMock.storageMap).toEqual({});
+        expect(StorageMock.storageMap).toEqual({});
 
         // Given no previous data and several calls to setItem and call to mergeCollection to update a given key
 
@@ -165,7 +165,7 @@ describe('Onyx.mergeCollection() amd WebStorage', () => {
                 };
 
                 expect(OnyxCache.getValue('test_1')).toEqual(finalObject);
-                expect(localforageMock.storageMap.test_1).toEqual(finalObject);
+                expect(StorageMock.storageMap.test_1).toEqual(finalObject);
             });
     });
 });
