@@ -15,9 +15,7 @@ const initialData = {
     test_3: initialTestObject,
 };
 
-StorageMock.setInitialMockData(initialData);
-
-describe('Onyx.mergeCollection() amd WebStorage', () => {
+describe('Onyx.mergeCollection() and WebStorage', () => {
     let Onyx;
 
     beforeAll(() => {
@@ -34,6 +32,8 @@ describe('Onyx.mergeCollection() amd WebStorage', () => {
     afterEach(() => Onyx.clear());
 
     it('merges two sets of data consecutively', () => {
+        StorageMock.setInitialMockData(initialData);
+
         // Given initial data in storage
         expect(StorageMock.storageMap.test_1).toEqual(initialTestObject);
         expect(StorageMock.storageMap.test_2).toEqual(initialTestObject);
