@@ -5,17 +5,17 @@
 ## Functions
 
 <dl>
-<dt><a href="#getSubsetOfData">getSubsetOfData(sourceData, selector)</a> ⇒ <code>Mixed</code></dt>
+<dt><a href="#getSubsetOfData">getSubsetOfData(sourceData, selector)</a> ⇒ <code><a href="#JSONValue">JSONValue</a></code></dt>
 <dd><p>Uses a selector string or function to return a simplified version of sourceData</p>
 </dd>
-<dt><a href="#reduceCollectionWithSelector">reduceCollectionWithSelector(collection, selector)</a> ⇒ <code>Object</code></dt>
+<dt><a href="#reduceCollectionWithSelector">reduceCollectionWithSelector(collection, selector)</a> ⇒ <code>object</code></dt>
 <dd><p>Takes a collection of items (eg. {testKey_1:{a:&#39;a&#39;}, testKey_2:{b:&#39;b&#39;}})
 and runs it through a reducer function to return a subset of the data according to a selector.
 The resulting collection will only contain items that are returned by the selector.</p>
 </dd>
-<dt><a href="#isCollectionMemberKey">isCollectionMemberKey(collectionKey, key)</a> ⇒ <code>Boolean</code></dt>
+<dt><a href="#isCollectionMemberKey">isCollectionMemberKey(collectionKey, key)</a> ⇒ <code>boolean</code></dt>
 <dd></dd>
-<dt><a href="#connect">connect(mapping)</a> ⇒ <code>Number</code></dt>
+<dt><a href="#connect">connect(mapping)</a> ⇒ <code>number</code></dt>
 <dd><p>Subscribes a react component&#39;s state directly to a store key</p>
 </dd>
 <dt><a href="#disconnect">disconnect(connectionID, [keyToRemoveFromEvictionBlocklist])</a></dt>
@@ -48,7 +48,7 @@ concatenate. See here: <a href="https://github.com/lodash/lodash/issues/2872">ht
 applied in the order they were called. Note: <code>Onyx.set()</code> calls do not work this way so use caution when mixing
 <code>Onyx.merge()</code> and <code>Onyx.set()</code>.</p>
 </dd>
-<dt><a href="#clear">clear(keysToPreserve)</a> ⇒ <code>Promise.&lt;void&gt;</code></dt>
+<dt><a href="#clear">clear(keysToPreserve)</a> ⇒ <code>Promise</code></dt>
 <dd><p>Clear out all the data in the store</p>
 <p>Note that calling Onyx.clear() and then Onyx.set() on a key with a default
 key state may store an unexpected value in Storage.</p>
@@ -75,21 +75,36 @@ value will be saved to storage after the default value.</p>
 </dd>
 </dl>
 
+## Typedefs
+
+<dl>
+<dt><a href="#JSONValue">JSONValue</a> : <code>null</code> | <code>undefined</code> | <code>string</code> | <code>boolean</code> | <code>object</code> | <code>number</code></dt>
+<dd></dd>
+<dt><a href="#Mapping">Mapping</a> : <code>object</code></dt>
+<dd></dd>
+<dt><a href="#KeyValuePairArray">KeyValuePairArray</a> : <code>Array.&lt;Array.&lt;string, JSONValue&gt;&gt;</code></dt>
+<dd></dd>
+<dt><a href="#OnyxUpdate">OnyxUpdate</a> : <code>object</code></dt>
+<dd></dd>
+<dt><a href="#OnyxConfig">OnyxConfig</a> : <code>object</code></dt>
+<dd></dd>
+</dl>
+
 <a name="getSubsetOfData"></a>
 
-## getSubsetOfData(sourceData, selector) ⇒ <code>Mixed</code>
+## getSubsetOfData(sourceData, selector) ⇒ [<code>JSONValue</code>](#JSONValue)
 Uses a selector string or function to return a simplified version of sourceData
 
 **Kind**: global function  
 
 | Param | Type | Description |
 | --- | --- | --- |
-| sourceData | <code>Mixed</code> |  |
-| selector | <code>String</code> \| <code>function</code> | If it's a string, the selector is passed to lodashGet on the sourceData      If it's a function, it is passed the sourceData and it should return the simplified data |
+| sourceData | <code>object</code> |  |
+| selector | <code>string</code> \| <code>function</code> | If it's a string, the selector is passed to lodashGet on the sourceData      If it's a function, it is passed the sourceData and it should return the simplified data |
 
 <a name="reduceCollectionWithSelector"></a>
 
-## reduceCollectionWithSelector(collection, selector) ⇒ <code>Object</code>
+## reduceCollectionWithSelector(collection, selector) ⇒ <code>object</code>
 Takes a collection of items (eg. {testKey_1:{a:'a'}, testKey_2:{b:'b'}})
 and runs it through a reducer function to return a subset of the data according to a selector.
 The resulting collection will only contain items that are returned by the selector.
@@ -98,37 +113,30 @@ The resulting collection will only contain items that are returned by the select
 
 | Param | Type | Description |
 | --- | --- | --- |
-| collection | <code>Object</code> |  |
-| selector | <code>String</code> \| <code>function</code> | (see method docs for getSubsetOfData() for full details) |
+| collection | <code>object</code> |  |
+| selector | <code>string</code> \| <code>function</code> | (see method docs for getSubsetOfData() for full details) |
 
 <a name="isCollectionMemberKey"></a>
 
-## isCollectionMemberKey(collectionKey, key) ⇒ <code>Boolean</code>
+## isCollectionMemberKey(collectionKey, key) ⇒ <code>boolean</code>
 **Kind**: global function  
 
 | Param | Type |
 | --- | --- |
-| collectionKey | <code>String</code> | 
-| key | <code>String</code> | 
+| collectionKey | <code>string</code> | 
+| key | <code>string</code> | 
 
 <a name="connect"></a>
 
-## connect(mapping) ⇒ <code>Number</code>
+## connect(mapping) ⇒ <code>number</code>
 Subscribes a react component's state directly to a store key
 
 **Kind**: global function  
-**Returns**: <code>Number</code> - an ID to use when calling disconnect  
+**Returns**: <code>number</code> - an ID to use when calling disconnect  
 
 | Param | Type | Description |
 | --- | --- | --- |
-| mapping | <code>Object</code> | the mapping information to connect Onyx to the components state |
-| mapping.key | <code>String</code> | ONYXKEY to subscribe to |
-| [mapping.statePropertyName] | <code>String</code> | the name of the property in the state to connect the data to |
-| [mapping.withOnyxInstance] | <code>Object</code> | whose setState() method will be called with any changed data      This is used by React components to connect to Onyx |
-| [mapping.callback] | <code>function</code> | a method that will be called with changed data      This is used by any non-React code to connect to Onyx |
-| [mapping.initWithStoredValues] | <code>Boolean</code> | If set to false, then no data will be prefilled into the  component |
-| [mapping.waitForCollectionCallback] | <code>Boolean</code> | If set to true, it will return the entire collection to the callback as a single object |
-| [mapping.selector] | <code>String</code> \| <code>function</code> | THIS PARAM IS ONLY USED WITH withOnyx(). If included, this will be used to subscribe to a subset of an Onyx key's data.       If the selector is a string, the selector is passed to lodashGet on the sourceData. If the selector is a function, the sourceData is passed to the selector and should return the       simplified data. Using this setting on `withOnyx` can have very positive performance benefits because the component will only re-render when the subset of data changes.       Otherwise, any change of data on any property would normally cause the component to re-render (and that can be expensive from a performance standpoint). |
+| mapping | [<code>Mapping</code>](#Mapping) | the mapping information to connect Onyx to the components state |
 
 **Example**  
 ```js
@@ -146,8 +154,8 @@ Remove the listener for a react component
 
 | Param | Type | Description |
 | --- | --- | --- |
-| connectionID | <code>Number</code> | unique id returned by call to Onyx.connect() |
-| [keyToRemoveFromEvictionBlocklist] | <code>String</code> |  |
+| connectionID | <code>number</code> | unique id returned by call to Onyx.connect() |
+| [keyToRemoveFromEvictionBlocklist] | <code>string</code> |  |
 
 **Example**  
 ```js
@@ -165,8 +173,8 @@ behavior just yet.
 
 | Param | Type | Description |
 | --- | --- | --- |
-| key | <code>String</code> |  |
-| value | <code>\*</code> |  |
+| key | <code>string</code> |  |
+| value | [<code>JSONValue</code>](#JSONValue) |  |
 | [canUpdateSubscriber] | <code>function</code> | only subscribers that pass this truth test will be updated |
 
 **Example**  
@@ -185,7 +193,7 @@ subscriber callbacks receive the data in a different format than they normally e
 | Param | Type |
 | --- | --- |
 | key | <code>String</code> | 
-| value | <code>\*</code> | 
+| value | <code>any</code> | 
 
 <a name="set"></a>
 
@@ -196,8 +204,8 @@ Write a value to our store with the given key
 
 | Param | Type | Description |
 | --- | --- | --- |
-| key | <code>String</code> | ONYXKEY to set |
-| value | <code>\*</code> | value to store |
+| key | <code>string</code> | ONYXKEY to set |
+| value | [<code>JSONValue</code>](#JSONValue) | value to store |
 
 <a name="multiSet"></a>
 
@@ -208,7 +216,7 @@ Sets multiple keys and values
 
 | Param | Type | Description |
 | --- | --- | --- |
-| data | <code>Object</code> | object keyed by ONYXKEYS and the values to set |
+| data | <code>object</code> | object keyed by ONYXKEYS and the values to set |
 
 **Example**  
 ```js
@@ -232,8 +240,8 @@ applied in the order they were called. Note: `Onyx.set()` calls do not work this
 
 | Param | Type | Description |
 | --- | --- | --- |
-| key | <code>String</code> | ONYXKEYS key |
-| value | <code>Object</code> \| <code>Array</code> | Object or Array value to merge |
+| key | <code>string</code> | ONYXKEYS key |
+| value | <code>object</code> \| <code>array</code> | Object or Array value to merge |
 
 **Example**  
 ```js
@@ -244,7 +252,7 @@ Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Wor
 ```
 <a name="clear"></a>
 
-## clear(keysToPreserve) ⇒ <code>Promise.&lt;void&gt;</code>
+## clear(keysToPreserve) ⇒ <code>Promise</code>
 Clear out all the data in the store
 
 Note that calling Onyx.clear() and then Onyx.set() on a key with a default
@@ -267,7 +275,7 @@ value will be saved to storage after the default value.
 
 | Param | Type | Description |
 | --- | --- | --- |
-| keysToPreserve | <code>Array</code> | is a list of ONYXKEYS that should not be cleared with the rest of the data |
+| keysToPreserve | <code>Array.&lt;string&gt;</code> | is a list of ONYXKEYS that should not be cleared with the rest of the data |
 
 <a name="mergeCollection"></a>
 
@@ -278,8 +286,8 @@ Merges a collection based on their keys
 
 | Param | Type | Description |
 | --- | --- | --- |
-| collectionKey | <code>String</code> | e.g. `ONYXKEYS.COLLECTION.REPORT` |
-| collection | <code>Object</code> | Object collection keyed by individual collection member keys and values |
+| collectionKey | <code>string</code> | e.g. `ONYXKEYS.COLLECTION.REPORT` |
+| collection | <code>object</code> | Object collection keyed by individual collection member keys and values |
 
 **Example**  
 ```js
@@ -294,11 +302,10 @@ Onyx.mergeCollection(ONYXKEYS.COLLECTION.REPORT, {
 Insert API responses and lifecycle data into Onyx
 
 **Kind**: global function  
-**Returns**: <code>Promise</code> - resolves when all operations are complete  
 
-| Param | Type | Description |
-| --- | --- | --- |
-| data | <code>Array</code> | An array of objects with shape {onyxMethod: oneOf('set', 'merge', 'mergeCollection'), key: string, value: *} |
+| Param | Type |
+| --- | --- |
+| data | [<code>Array.&lt;OnyxUpdate&gt;</code>](#OnyxUpdate) | 
 
 <a name="init"></a>
 
@@ -309,14 +316,7 @@ Initialize the store with actions and listening for storage events
 
 | Param | Type | Default | Description |
 | --- | --- | --- | --- |
-| [options] | <code>Object</code> | <code>{}</code> | config object |
-| [options.keys] | <code>Object</code> | <code>{}</code> | `ONYXKEYS` constants object |
-| [options.initialKeyStates] | <code>Object</code> | <code>{}</code> | initial data to set when `init()` and `clear()` is called |
-| [options.safeEvictionKeys] | <code>Array.&lt;String&gt;</code> | <code>[]</code> | This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal. Any components subscribing to these keys must also implement a canEvict option. See the README for more info. |
-| [options.maxCachedKeysCount] | <code>Number</code> | <code>55</code> | Sets how many recent keys should we try to keep in cache Setting this to 0 would practically mean no cache We try to free cache when we connect to a safe eviction key |
-| [options.captureMetrics] | <code>Boolean</code> |  | Enables Onyx benchmarking and exposes the get/print/reset functions |
-| [options.shouldSyncMultipleInstances] | <code>Boolean</code> |  | Auto synchronize storage events between multiple instances of Onyx running in different tabs/windows. Defaults to true for platforms that support local storage (web/desktop) |
-| [options.debugSetState] | <code>Boolean</code> |  | Enables debugging setState() calls to connected components. |
+| [options] | [<code>OnyxConfig</code>](#OnyxConfig) | <code>{}</code> | config object |
 
 **Example**  
 ```js
@@ -327,3 +327,53 @@ Onyx.init({
     },
 });
 ```
+<a name="JSONValue"></a>
+
+## JSONValue : <code>null</code> \| <code>undefined</code> \| <code>string</code> \| <code>boolean</code> \| <code>object</code> \| <code>number</code>
+**Kind**: global typedef  
+<a name="Mapping"></a>
+
+## Mapping : <code>object</code>
+**Kind**: global typedef  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| key | <code>string</code> | ONYXKEY to subscribe to |
+| connectionID | <code>number</code> |  |
+| [statePropertyName] | <code>string</code> | the name of the property in the state to connect the data to |
+| [withOnyxInstance] | <code>object</code> | whose setState() method will be called with any changed data      This is used by React components to connect to Onyx |
+| [callback] | <code>function</code> | a method that will be called with changed data      This is used by any non-React code to connect to Onyx |
+| [initWithStoredValues] | <code>boolean</code> | If set to false, then no data will be prefilled into the  component |
+| [waitForCollectionCallback] | <code>boolean</code> | If set to true, it will return the entire collection to the callback as a single object |
+| [selector] | <code>string</code> \| <code>function</code> | THIS PARAM IS ONLY USED WITH withOnyx(). If included, this will be used to subscribe to a subset of an Onyx key's data.       If the selector is a string, the selector is passed to lodashGet on the sourceData. If the selector is a function, the sourceData is passed to the selector and should return the       simplified data. Using this setting on `withOnyx` can have very positive performance benefits because the component will only re-render when the subset of data changes.       Otherwise, any change of data on any property would normally cause the component to re-render (and that can be expensive from a performance standpoint). |
+
+<a name="KeyValuePairArray"></a>
+
+## KeyValuePairArray : <code>Array.&lt;Array.&lt;string, JSONValue&gt;&gt;</code>
+**Kind**: global typedef  
+<a name="OnyxUpdate"></a>
+
+## OnyxUpdate : <code>object</code>
+**Kind**: global typedef  
+
+| Param | Type |
+| --- | --- |
+| onyxMethod | <code>&#x27;set&#x27;</code> \| <code>&#x27;merge&#x27;</code> \| <code>&#x27;mergecollection&#x27;</code> \| <code>&#x27;clear&#x27;</code> | 
+| key | <code>string</code> | 
+| value | [<code>JSONValue</code>](#JSONValue) | 
+
+<a name="OnyxConfig"></a>
+
+## OnyxConfig : <code>object</code>
+**Kind**: global typedef  
+
+| Param | Type | Default | Description |
+| --- | --- | --- | --- |
+| [keys] | <code>object</code> | <code>{}</code> | `ONYXKEYS` constants object |
+| [initialKeyStates] | <code>object</code> | <code>{}</code> | initial data to set when `init()` and `clear()` is called |
+| [safeEvictionKeys] | <code>Array.&lt;string&gt;</code> | <code>[]</code> | This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal. Any components subscribing to these keys must also implement a canEvict option. See the README for more info. |
+| [maxCachedKeysCount] | <code>number</code> | <code>55</code> | Sets how many recent keys should we try to keep in cache Setting this to 0 would practically mean no cache We try to free cache when we connect to a safe eviction key |
+| [captureMetrics] | <code>boolean</code> | <code>false</code> | Enables Onyx benchmarking and exposes the get/print/reset functions |
+| [shouldSyncMultipleInstances] | <code>boolean</code> |  | Auto synchronize storage events between multiple instances of Onyx running in different tabs/windows. Defaults to true for platforms that support local storage (web/desktop) |
+| [debugSetState] | <code>boolean</code> | <code>false</code> | Enables debugging setState() calls to connected components. |
+
