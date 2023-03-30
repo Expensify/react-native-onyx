@@ -1,6 +1,6 @@
 import _ from 'underscore';
 
-import StorageProvider, {set} from '../../../../lib/storage/providers/LocalForage';
+import LocalForageProviderMock from '../../../../lib/storage/providers/LocalForage';
 import createDeferredTask from '../../../../lib/createDeferredTask';
 import waitForPromisesToResolve from '../../../utils/waitForPromisesToResolve';
 
@@ -18,8 +18,8 @@ describe('storage/providers/LocalForage', () => {
     beforeAll(() => jest.useRealTimers());
     beforeEach(() => {
         jest.clearAllMocks();
-        StorageProvider.clear();
-        StorageProvider.clear.mockClear();
+        LocalForageProviderMock.clear();
+        LocalForageProviderMock.clear.mockClear();
     });
 
     it('multiSet', () => {
@@ -27,20 +27,20 @@ describe('storage/providers/LocalForage', () => {
         const pairs = SAMPLE_ITEMS.slice();
 
         // When they are saved
-        return StorageProvider.multiSet(pairs).then(() => {
+        return LocalForageProviderMock.multiSet(pairs).then(() => {
             // We expect a call to localForage.setItem for each pair
-            _.each(pairs, ([key, value]) => expect(StorageProvider.setItem).toHaveBeenCalledWith(key, value));
+            _.each(pairs, ([key, value]) => expect(LocalForageProviderMock.setItem).toHaveBeenCalledWith(key, value));
         });
     });
 
     it('multiGet', () => {
         // Given we have some data in storage
-        StorageProvider.multiSet(SAMPLE_ITEMS);
+        LocalForageProviderMock.multiSet(SAMPLE_ITEMS);
 
         return waitForPromisesToResolve().then(() => {
         // Then multi get should retrieve them
             const keys = _.map(SAMPLE_ITEMS, _.head);
-            return StorageProvider.multiGet(keys)
+            return LocalForageProviderMock.multiGet(keys)
                 .then(pairs => expect(pairs).toEqual(expect.arrayContaining(SAMPLE_ITEMS)));
         });
     });
@@ -59,10 +59,10 @@ describe('storage/providers/LocalForage', () => {
             traits: {hair: 'black'},
         };
 
-        StorageProvider.multiSet([['@USER_1', USER_1], ['@USER_2', USER_2]]);
+        LocalForageProviderMock.multiSet([['@USER_1', USER_1], ['@USER_2', USER_2]]);
 
         return waitForPromisesToResolve().then(() => {
-            StorageProvider.localForageSet.mockClear();
+            LocalForageProviderMock.localForageSet.mockClear();
 
             // Given deltas matching existing structure
             const USER_1_DELTA = {
@@ -76,12 +76,12 @@ describe('storage/providers/LocalForage', () => {
             };
 
             // When data is merged to storage
-            return StorageProvider.multiMerge([
+            return LocalForageProviderMock.multiMerge([
                 ['@USER_1', USER_1_DELTA],
                 ['@USER_2', USER_2_DELTA],
             ]).then(() => {
                 // Then each existing item should be set with the merged content
-                expect(StorageProvider.localForageSet).toHaveBeenNthCalledWith(1,
+                expect(LocalForageProviderMock.localForageSet).toHaveBeenNthCalledWith(1,
                     '@USER_1', {
                         name: 'Tom',
                         age: 31,
@@ -91,7 +91,7 @@ describe('storage/providers/LocalForage', () => {
                         },
                     });
 
-                expect(StorageProvider.localForageSet).toHaveBeenNthCalledWith(2,
+                expect(LocalForageProviderMock.localForageSet).toHaveBeenNthCalledWith(2,
                     '@USER_2', {
                         name: 'Sarah',
                         age: 26,
@@ -108,19 +108,19 @@ describe('storage/providers/LocalForage', () => {
         const task = createDeferredTask();
 
         // We configure localforage.setItem to return this promise the first time it's called and to otherwise return resolved promises
-        StorageProvider.setItem = jest.fn()
+        LocalForageProviderMock.setItem = jest.fn()
             .mockReturnValue(Promise.resolve()) // Default behavior
             .mockReturnValueOnce(task.promise); // First call behavior
 
         // Make 5 StorageProvider.setItem calls - this adds 5 items to the queue and starts executing the first localForage.setItem
         for (let i = 0; i < 5; i++) {
-            StorageProvider.setItem(`key${i}`, `value${i}`);
+            LocalForageProviderMock.setItem(`key${i}`, `value${i}`);
         }
 
         // At this point,`localForage.setItem` should have been called once, but we control when it resolves, and we'll keep it unresolved.
         // This simulates the 1st localForage.setItem taking a random time.
         // We then call StorageProvider.clear() while the first localForage.setItem isn't completed yet.
-        StorageProvider.clear();
+        LocalForageProviderMock.clear();
 
         // Any calls that follow this would have been queued - so we don't expect more than 1 `localForage.setItem` call after the
         // first one resolves.
@@ -130,8 +130,8 @@ describe('storage/providers/LocalForage', () => {
         // If StorageProvider.clear() does not abort the queue, more localForage.setItem calls would be executed because they would
         // be sitting in the setItemQueue
         return waitForPromisesToResolve().then(() => {
-            expect(StorageProvider.localForageSet).toHaveBeenCalledTimes(0);
-            expect(StorageProvider.clear).toHaveBeenCalledTimes(1);
+            expect(LocalForageProviderMock.localForageSet).toHaveBeenCalledTimes(0);
+            expect(LocalForageProviderMock.clear).toHaveBeenCalledTimes(1);
         });
     });
 });
