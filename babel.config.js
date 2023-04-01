@@ -5,7 +5,7 @@ module.exports = (api) => {
             // Default browser list is a reasonable preset covering a wide list of non-dead browsers
             // https://github.com/browserslist/browserslist#best-practices
             targets: 'defaults',
-            presets: ['@babel/preset-env', '@babel/preset-react'],
+            presets: ['@babel/preset-env', '@babel/preset-react', '@babel/preset-typescript'],
         };
     }
 

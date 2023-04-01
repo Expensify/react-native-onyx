@@ -5,13 +5,18 @@ const pkg = require('./package.json');
 
 const commonConfig = {
     mode: 'production',
-    devtool: 'source-map',
-    entry: './lib/index.js',
+    devtool: 'inline-source-map',
+    entry: './lib/index.ts',
     resolve: {
-        extensions: ['.jsx', '.js'],
+        extensions: ['.jsx', '.js', '.ts', '.tsx'],
     },
     module: {
         rules: [
+            {
+                test: /\.tsx?$/,
+                use: 'ts-loader',
+                exclude: /node_modules/,
+            },
             {
                 test: /\.js$/,
                 exclude: /(node_modules)/,

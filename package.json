@@ -48,6 +48,7 @@
     "@babel/core": "7.20.12",
     "@babel/preset-env": "^7.20.2",
     "@babel/preset-react": "^7.18.6",
+    "@babel/preset-typescript": "^7.21.4",
     "@react-native-async-storage/async-storage": "^1.17.11",
     "@react-native-community/eslint-config": "^2.0.0",
     "@testing-library/jest-native": "^3.4.2",
@@ -71,6 +72,8 @@
     "react-native-performance": "^2.0.0",
     "react-native-quick-sqlite": "^8.0.0-beta.2",
     "react-test-renderer": "18.1.0",
+    "ts-loader": "^9.4.2",
+    "typescript": "^5.0.3",
     "webpack": "^5.72.1",
     "webpack-cli": "^4.9.2",
     "webpack-merge": "^5.8.0"
