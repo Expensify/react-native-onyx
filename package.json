@@ -1,6 +1,6 @@
 {
   "name": "react-native-onyx",
-  "version": "1.0.38",
+  "version": "1.0.40",
   "author": "Expensify, Inc.",
   "homepage": "https://expensify.com",
   "description": "State management for React Native",
@@ -77,6 +77,7 @@
   "peerDependencies": {
     "expensify-common": ">=1",
     "localforage": "^1.10.0",
+    "localforage-removeitems": "^1.4.0",
     "react": ">=18.1.0",
     "react-native-performance": "^4.0.0",
     "react-native-quick-sqlite": "^8.0.0-beta.2"
@@ -89,6 +90,9 @@
       "optional": true
     },
     "localforage": {
+      "optional": true
+    },
+    "localforage-removeitems": {
       "optional": true
     }
   },

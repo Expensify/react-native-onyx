@@ -114,12 +114,11 @@ describe('Onyx', () => {
             .then(() => Onyx.set(ONYX_KEYS.TEST_KEY, 'test'))
             .then(() => {
                 expect(testKeyValue).toBe('test');
-                expect(otherTestValue).toBe(42);
                 return Onyx.clear().then(waitForPromisesToResolve);
             })
             .then(() => {
                 expect(testKeyValue).toBeNull();
-                expect(otherTestValue).toBe(42);
+                expect(otherTestValue).toBe(null);
                 return Onyx.disconnect(otherTestConnectionID);
             });
     });
