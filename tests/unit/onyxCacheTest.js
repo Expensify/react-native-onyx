@@ -415,12 +415,6 @@ describe('Onyx', () => {
         };
 
         function initOnyx(overrides) {
-            const OnyxModule = require('../../lib');
-            Onyx = OnyxModule.default;
-            withOnyx = OnyxModule.withOnyx;
-            StorageMock = require('../../lib/storage').default;
-            cache = require('../../lib/OnyxCache').default;
-
             Onyx.init({
                 keys: ONYX_KEYS,
                 safeEvictionKeys: [ONYX_KEYS.COLLECTION.MOCK_COLLECTION],
@@ -435,10 +429,15 @@ describe('Onyx', () => {
                 .then(() => jest.clearAllMocks());
         }
 
-        // Always use a "fresh" instance
+        // Initialize clean modules before each test
+        // This reset top level static variables (in Onyx.js, OnyxCache.js, etc.)
         beforeEach(() => {
             jest.resetModules();
-            return initOnyx();
+            const OnyxModule = require('../../lib');
+            Onyx = OnyxModule.default;
+            withOnyx = OnyxModule.withOnyx;
+            StorageMock = require('../../lib/storage').default;
+            cache = require('../../lib/OnyxCache').default;
         });
 
         it('Expect a single call to getItem when multiple components use the same key', () => {
