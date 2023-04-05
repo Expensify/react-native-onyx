@@ -1,5 +1,6 @@
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
-import Storage from '../../__mocks__/localforage';
+import StorageMock from '../../lib/storage';
+import Onyx from '../../lib/Onyx';
 
 const ONYX_KEYS = {
     DEFAULT_KEY: 'defaultKey',
@@ -13,18 +14,11 @@ const MERGED_VALUE = 'merged';
 const DEFAULT_VALUE = 'default';
 
 describe('Set data while storage is clearing', () => {
-    let Onyx;
     let connectionID;
     let onyxValue;
 
     /** @type OnyxCache */
     let cache;
-
-    beforeAll(() => {
-        // Force using WebStorage provider for these tests
-        jest.mock('../../lib/storage');
-        Onyx = require('../../lib/Onyx').default;
-    });
 
     // Always use a "fresh" cache instance
     beforeEach(() => {
@@ -63,7 +57,7 @@ describe('Set data while storage is clearing', () => {
                 expect(onyxValue).toBe(DEFAULT_VALUE);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
                 expect(cachedValue).toBe(DEFAULT_VALUE);
-                const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
+                const storedValue = StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY);
                 return expect(storedValue).resolves.toBe(DEFAULT_VALUE);
             });
     });
@@ -81,7 +75,7 @@ describe('Set data while storage is clearing', () => {
                 expect(onyxValue).toBe(DEFAULT_VALUE);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
                 expect(cachedValue).toBe(DEFAULT_VALUE);
-                const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
+                const storedValue = StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY);
                 return expect(storedValue).resolves.toBe(DEFAULT_VALUE);
             });
     });
@@ -107,7 +101,7 @@ describe('Set data while storage is clearing', () => {
                 expect(regularKeyOnyxValue).toBe(SET_VALUE);
                 const regularKeyCachedValue = cache.getValue(ONYX_KEYS.REGULAR_KEY);
                 expect(regularKeyCachedValue).toBe(SET_VALUE);
-                const regularKeyStoredValue = Storage.getItem(ONYX_KEYS.REGULAR_KEY);
+                const regularKeyStoredValue = StorageMock.getItem(ONYX_KEYS.REGULAR_KEY);
                 return expect(regularKeyStoredValue).resolves.toBe(SET_VALUE);
             });
     });
@@ -127,7 +121,7 @@ describe('Set data while storage is clearing', () => {
                 expect(onyxValue).toBe(SET_VALUE);
                 const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
                 expect(cachedValue).toBe(SET_VALUE);
-                const storedValue = Storage.getItem(ONYX_KEYS.DEFAULT_KEY);
+                const storedValue = StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY);
                 return expect(storedValue).resolves.toBe(SET_VALUE);
             });
     });
