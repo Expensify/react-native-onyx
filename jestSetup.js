@@ -5,4 +5,5 @@ jest.mock('./lib/storage/providers/LocalForage', () => require('./lib/storage/__
 
 // Jest doesn't recognize native file extensions such as `.web.js` or `.native.js`.
 // This is why we need to default to the web implementation for tests
-jest.mock('./lib/OnyxMerge', () => require('./lib/__mocks__/OnyxMerge'));
+jest.mock('./lib/OnyxMerge', () => require('./lib/OnyxMerge.web'));
+jest.mock('./lib/metrics', () => require('./lib/metrics/index.native'));
