@@ -117,8 +117,12 @@ describe('Onyx', () => {
                 return Onyx.clear().then(waitForPromisesToResolve);
             })
             .then(() => {
+                // Test key should be cleared
                 expect(testKeyValue).toBeNull();
-                expect(otherTestValue).toBe(null);
+
+                // Other test key should be returned to its default state
+                expect(otherTestValue).toBe(42);
+
                 return Onyx.disconnect(otherTestConnectionID);
             });
     });
@@ -596,7 +600,7 @@ describe('Onyx', () => {
                 expect(mockCallback).toHaveBeenCalledTimes(2);
 
                 // AND the value for the first call should be null since the collection was not initialized at that point
-                expect(mockCallback).toHaveBeenNthCalledWith(1, null, 'testPolicy_1');
+                expect(mockCallback).toHaveBeenNthCalledWith(1, null, undefined);
 
                 // AND the value for the second call should be collectionUpdate since the collection was updated
                 expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate.testPolicy_1, 'testPolicy_1');
