@@ -49,7 +49,7 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
      * @returns {Promise}
      */
     const runAssertionsWithComponent = (TestComponentWithOnyx) => {
-        let renderedComponent = render(<ErrorBoundary><TestComponentWithOnyx /></ErrorBoundary>);
+        let renderedComponent = render(<ErrorBoundary><TestComponentWithOnyx testProp="test" /></ErrorBoundary>);
         return waitForPromisesToResolve()
 
             // When Onyx is updated with an object that has multiple properties
@@ -108,6 +108,10 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
             },
         })(ViewWithObject);
         return runAssertionsWithComponent(TestComponentWithOnyx)
+            .then(() => {
+                // Check to make sure that the instance props were passed to the selector
+                expect(mockedSelector).toHaveBeenNthCalledWith(3, {a: 'one', b: 'two'}, {forwardedRef: null, testProp: 'test'});
+            })
             .then(() => {
                 // This checks to make sure a bug doesn't occur where the entire state object was being passed to
                 // the selector
