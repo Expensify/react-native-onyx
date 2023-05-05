@@ -189,11 +189,10 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
             },
         })(ViewWithObject);
         return runAllAssertionsForCollection(TestComponentWithOnyx)
-        .then(() => {
-            console.log(mockedSelector.mock.calls)
-            // Check to make sure that the selector was called with the props that are passed to the rendered component
-            expect(mockedSelector).toHaveBeenNthCalledWith(5, {a: 'two', b: 'two'}, {loading: false, collectionWithPropertyA: {test_1: 'one', test_2: undefined}});
-        });
+            .then(() => {
+                // Check to make sure that the selector was called with the props that are passed to the rendered component
+                expect(mockedSelector).toHaveBeenNthCalledWith(5, {a: 'two', b: 'two'}, {loading: false, collectionWithPropertyA: {test_1: 'one', test_2: undefined}});
+            });
     });
 
     /**
