@@ -109,10 +109,6 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
         })(ViewWithObject);
         return runAssertionsWithComponent(TestComponentWithOnyx)
             .then(() => {
-                // Check to make sure that the instance props were passed to the selector
-                // expect(mockedSelector).toHaveBeenCalledWith({a: 'one', b: 'two'}, {loading: false, propertyA: 'one'});
-            })
-            .then(() => {
                 // This checks to make sure a bug doesn't occur where the entire state object was being passed to
                 // the selector
                 expect(mockedSelector).not.toHaveBeenCalledWith({loading: false, propertyA: null});
