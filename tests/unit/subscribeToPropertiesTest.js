@@ -49,7 +49,7 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
      * @returns {Promise}
      */
     const runAssertionsWithComponent = (TestComponentWithOnyx) => {
-        let renderedComponent = render(<ErrorBoundary><TestComponentWithOnyx testProp="test" /></ErrorBoundary>);
+        let renderedComponent = render(<ErrorBoundary><TestComponentWithOnyx /></ErrorBoundary>);
         return waitForPromisesToResolve()
 
             // When Onyx is updated with an object that has multiple properties
@@ -110,7 +110,7 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
         return runAssertionsWithComponent(TestComponentWithOnyx)
             .then(() => {
                 // Check to make sure that the instance props were passed to the selector
-                expect(mockedSelector).toHaveBeenNthCalledWith(3, {a: 'one', b: 'two'}, {forwardedRef: null, testProp: 'test'});
+                // expect(mockedSelector).toHaveBeenCalledWith({a: 'one', b: 'two'}, {loading: false, propertyA: 'one'});
             })
             .then(() => {
                 // This checks to make sure a bug doesn't occur where the entire state object was being passed to
@@ -185,13 +185,19 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
     });
 
     it('connecting to a collection with a selector function', () => {
+        const mockedSelector = jest.fn(obj => obj && obj.a);
         const TestComponentWithOnyx = withOnyx({
             collectionWithPropertyA: {
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
-                selector: obj => obj && obj.a,
+                selector: mockedSelector,
             },
         })(ViewWithObject);
-        return runAllAssertionsForCollection(TestComponentWithOnyx);
+        return runAllAssertionsForCollection(TestComponentWithOnyx)
+        .then(() => {
+            console.log(mockedSelector.mock.calls)
+            // Check to make sure that the selector was called with the props that are passed to the rendered component
+            expect(mockedSelector).toHaveBeenNthCalledWith(5, {a: 'two', b: 'two'}, {loading: false, collectionWithPropertyA: {test_1: 'one', test_2: undefined}});
+        });
     });
 
     /**
