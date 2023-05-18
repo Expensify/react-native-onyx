@@ -5,10 +5,10 @@
 ## Functions
 
 <dl>
-<dt><a href="#getSubsetOfData">getSubsetOfData(sourceData, selector)</a> ⇒ <code>Mixed</code></dt>
+<dt><a href="#getSubsetOfData">getSubsetOfData(sourceData, selector, [withOnyxInstanceState])</a> ⇒ <code>Mixed</code></dt>
 <dd><p>Uses a selector string or function to return a simplified version of sourceData</p>
 </dd>
-<dt><a href="#reduceCollectionWithSelector">reduceCollectionWithSelector(collection, selector)</a> ⇒ <code>Object</code></dt>
+<dt><a href="#reduceCollectionWithSelector">reduceCollectionWithSelector(collection, selector, [withOnyxInstanceState])</a> ⇒ <code>Object</code></dt>
 <dd><p>Takes a collection of items (eg. {testKey_1:{a:&#39;a&#39;}, testKey_2:{b:&#39;b&#39;}})
 and runs it through a reducer function to return a subset of the data according to a selector.
 The resulting collection will only contain items that are returned by the selector.</p>
@@ -77,7 +77,7 @@ value will be saved to storage after the default value.</p>
 
 <a name="getSubsetOfData"></a>
 
-## getSubsetOfData(sourceData, selector) ⇒ <code>Mixed</code>
+## getSubsetOfData(sourceData, selector, [withOnyxInstanceState]) ⇒ <code>Mixed</code>
 Uses a selector string or function to return a simplified version of sourceData
 
 **Kind**: global function  
@@ -85,11 +85,12 @@ Uses a selector string or function to return a simplified version of sourceData
 | Param | Type | Description |
 | --- | --- | --- |
 | sourceData | <code>Mixed</code> |  |
-| selector | <code>String</code> \| <code>function</code> | If it's a string, the selector is passed to lodashGet on the sourceData      If it's a function, it is passed the sourceData and it should return the simplified data |
+| selector | <code>String</code> \| <code>function</code> |  |
+| [withOnyxInstanceState] | <code>Object</code> | If it's a string, the selector is passed to lodashGet on the sourceData      If it's a function, it is passed the sourceData and it should return the simplified data |
 
 <a name="reduceCollectionWithSelector"></a>
 
-## reduceCollectionWithSelector(collection, selector) ⇒ <code>Object</code>
+## reduceCollectionWithSelector(collection, selector, [withOnyxInstanceState]) ⇒ <code>Object</code>
 Takes a collection of items (eg. {testKey_1:{a:'a'}, testKey_2:{b:'b'}})
 and runs it through a reducer function to return a subset of the data according to a selector.
 The resulting collection will only contain items that are returned by the selector.
@@ -100,6 +101,7 @@ The resulting collection will only contain items that are returned by the select
 | --- | --- | --- |
 | collection | <code>Object</code> |  |
 | selector | <code>String</code> \| <code>function</code> | (see method docs for getSubsetOfData() for full details) |
+| [withOnyxInstanceState] | <code>Object</code> |  |
 
 <a name="isCollectionMemberKey"></a>
 
@@ -128,7 +130,7 @@ Subscribes a react component's state directly to a store key
 | [mapping.callback] | <code>function</code> | a method that will be called with changed data      This is used by any non-React code to connect to Onyx |
 | [mapping.initWithStoredValues] | <code>Boolean</code> | If set to false, then no data will be prefilled into the  component |
 | [mapping.waitForCollectionCallback] | <code>Boolean</code> | If set to true, it will return the entire collection to the callback as a single object |
-| [mapping.selector] | <code>String</code> \| <code>function</code> | THIS PARAM IS ONLY USED WITH withOnyx(). If included, this will be used to subscribe to a subset of an Onyx key's data.       If the selector is a string, the selector is passed to lodashGet on the sourceData. If the selector is a function, the sourceData is passed to the selector and should return the       simplified data. Using this setting on `withOnyx` can have very positive performance benefits because the component will only re-render when the subset of data changes.       Otherwise, any change of data on any property would normally cause the component to re-render (and that can be expensive from a performance standpoint). |
+| [mapping.selector] | <code>String</code> \| <code>function</code> | THIS PARAM IS ONLY USED WITH withOnyx(). If included, this will be used to subscribe to a subset of an Onyx key's data.       If the selector is a string, the selector is passed to lodashGet on the sourceData. If the selector is a function, the sourceData and withOnyx state are       passed to the selector and should return the simplified data. Using this setting on `withOnyx` can have very positive performance benefits because the component       will only re-render when the subset of data changes. Otherwise, any change of data on any property would normally cause the component to re-render (and that can       be expensive from a performance standpoint). |
 
 **Example**  
 ```js

@@ -181,13 +181,18 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
     });
 
     it('connecting to a collection with a selector function', () => {
+        const mockedSelector = jest.fn(obj => obj && obj.a);
         const TestComponentWithOnyx = withOnyx({
             collectionWithPropertyA: {
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
-                selector: obj => obj && obj.a,
+                selector: mockedSelector,
             },
         })(ViewWithObject);
-        return runAllAssertionsForCollection(TestComponentWithOnyx);
+        return runAllAssertionsForCollection(TestComponentWithOnyx)
+            .then(() => {
+                // Check to make sure that the selector was called with the props that are passed to the rendered component
+                expect(mockedSelector).toHaveBeenNthCalledWith(5, {a: 'two', b: 'two'}, {loading: false, collectionWithPropertyA: {test_1: 'one', test_2: undefined}});
+            });
     });
 
     /**
