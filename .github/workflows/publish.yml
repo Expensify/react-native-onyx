@@ -5,6 +5,10 @@ on:
     push:
         branches: [main]
 
+# Ensure that only once instance of this workflow executes at a time.
+# If multiple PRs are merged in quick succession, there will only ever be one running publish job and one pending.
+concurrency: ${{ github.workflow }}
+
 jobs:
     version:
         runs-on: ubuntu-latest
@@ -13,14 +17,6 @@ jobs:
         if: ${{ github.actor != 'OSBotify' }}
 
         steps:
-            # Running this action ensures that only one instance of this job will run at a time.
-            # This is important to prevent race conditions when multiple pull requests are merged in quick succession
-            - uses: softprops/turnstyle@8db075d65b19bf94e6e8687b504db69938dc3c65
-              with:
-                  poll-interval-seconds: 10
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
             - uses: actions/checkout@v3
 
             - name: Decrypt & Import OSBotify GPG key
