@@ -1,5 +1,5 @@
 # `react-native-onyx`
-Persistent storage solution wrapped in a Pub/Sub library.
+Awesome persistent storage solution wrapped in a Pub/Sub library.
 
 # Features
 
