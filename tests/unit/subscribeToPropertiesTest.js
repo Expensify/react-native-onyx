@@ -190,6 +190,14 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
         })(ViewWithObject);
         return runAllAssertionsForCollection(TestComponentWithOnyx)
             .then(() => {
+                // Expect that the selector always gets called with the full object
+                // from the onyx state, and not with the selector result value (string in this case).
+                for (let i = 0; i < mockedSelector.mock.calls.length; i++) {
+                    const firstArg = mockedSelector.mock.calls[i][0];
+                    expect(firstArg).toBeDefined();
+                    expect(firstArg).toBeInstanceOf(Object);
+                }
+
                 // Check to make sure that the selector was called with the props that are passed to the rendered component
                 expect(mockedSelector).toHaveBeenNthCalledWith(5, {a: 'two', b: 'two'}, {loading: false, collectionWithPropertyA: {test_1: 'one', test_2: undefined}});
             });
