@@ -58,7 +58,6 @@
     "eslint-config-expensify": "^2.0.24",
     "eslint-plugin-jsx-a11y": "^6.6.1",
     "eslint-plugin-react": "^7.31.10",
-    "expensify-common": "git+https://github.com/Expensify/expensify-common.git#427295da130a4eacc184d38693664280d020dffd",
     "jest": "^26.5.2",
     "jest-cli": "^26.5.2",
     "jsdoc-to-markdown": "^7.1.0",
@@ -75,7 +74,6 @@
     "webpack-merge": "^5.8.0"
   },
   "peerDependencies": {
-    "expensify-common": ">=1",
     "localforage": "^1.10.0",
     "localforage-removeitems": "^1.4.0",
     "react": ">=18.1.0",
