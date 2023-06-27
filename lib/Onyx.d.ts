@@ -1,36 +1,52 @@
 import * as Logger from './Logger';
+
+declare type InitConfig = {
+    keys?: {};
+    initialKeyStates?: {};
+    safeEvictionKeys?: string[];
+    maxCachedKeysCount?: number;
+    captureMetrics?: boolean;
+    shouldSyncMultipleInstances?: boolean;
+    debugSetState?: boolean;
+};
+
+declare const METHOD: {
+    readonly SET: string;
+    readonly MERGE: string;
+    readonly MERGE_COLLECTION: string;
+    readonly CLEAR: string;
+};
+
 /**
  * Returns current key names stored in persisted storage
- * @private
- * @returns {Promise<string[]>}
  */
-declare function getAllKeys(): any;
+declare function getAllKeys(): Promise<string[]>;
+
 /**
  * Checks to see if this key has been flagged as
  * safe for removal.
  *
- * @private
- * @param {String} testKey
- * @returns {Boolean}
+ * @param testKey
  */
-declare function isSafeEvictionKey(testKey: any): any;
+declare function isSafeEvictionKey(testKey: string): boolean;
+
 /**
  * Removes a key previously added to this list
  * which will enable it to be deleted again.
  *
- * @private
- * @param {String} key
- * @param {Number} connectionID
+ * @param key
+ * @param connectionID
  */
-declare function removeFromEvictionBlockList(key: any, connectionID: any): void;
+declare function removeFromEvictionBlockList(key: string, connectionID: number): void;
+
 /**
  * Keys added to this list can never be deleted.
  *
- * @private
- * @param {String} key
- * @param {Number} connectionID
+ * @param key
+ * @param connectionID
  */
-declare function addToEvictionBlockList(key: any, connectionID: any): void;
+declare function addToEvictionBlockList(key: string, connectionID: number): void;
+
 /**
  * Subscribes a react component's state directly to a store key
  *
@@ -58,15 +74,17 @@ declare function addToEvictionBlockList(key: any, connectionID: any): void;
  * @returns {Number} an ID to use when calling disconnect
  */
 declare function connect(mapping: any): number;
+
 /**
  * Remove the listener for a react component
  * @example
  * Onyx.disconnect(connectionID);
  *
- * @param {Number} connectionID unique id returned by call to Onyx.connect()
- * @param {String} [keyToRemoveFromEvictionBlocklist]
+ * @param connectionID unique id returned by call to Onyx.connect()
+ * @param [keyToRemoveFromEvictionBlocklist]
  */
-declare function disconnect(connectionID: any, keyToRemoveFromEvictionBlocklist: any): void;
+declare function disconnect(connectionID: number, keyToRemoveFromEvictionBlocklist?: string): void;
+
 /**
  * Write a value to our store with the given key
  *
@@ -76,6 +94,7 @@ declare function disconnect(connectionID: any, keyToRemoveFromEvictionBlocklist:
  * @returns {Promise}
  */
 declare function set(key: any, value: any): any;
+
 /**
  * Sets multiple keys and values
  *
@@ -85,6 +104,7 @@ declare function set(key: any, value: any): any;
  * @returns {Promise}
  */
 declare function multiSet(data: any): any;
+
 /**
  * Merge a new value into an existing value at a key.
  *
@@ -108,6 +128,7 @@ declare function multiSet(data: any): any;
  * @returns {Promise}
  */
 declare function merge(key: any, value: any): any;
+
 /**
  * Clear out all the data in the store
  *
@@ -127,10 +148,10 @@ declare function merge(key: any, value: any): any;
  * Storage.setItem() from Onyx.clear() will have already finished and the merged
  * value will be saved to storage after the default value.
  *
- * @param {Array} keysToPreserve is a list of ONYXKEYS that should not be cleared with the rest of the data
- * @returns {Promise<void>}
+ * @param keysToPreserve is a list of ONYXKEYS that should not be cleared with the rest of the data
  */
-declare function clear(keysToPreserve?: any[]): any;
+declare function clear(keysToPreserve?: string[]): Promise<void>;
+
 /**
  * Merges a collection based on their keys
  *
@@ -146,6 +167,7 @@ declare function clear(keysToPreserve?: any[]): any;
  * @returns {Promise}
  */
 declare function mergeCollection(collectionKey: any, collection: any): any;
+
 /**
  * Insert API responses and lifecycle data into Onyx
  *
@@ -153,23 +175,24 @@ declare function mergeCollection(collectionKey: any, collection: any): any;
  * @returns {Promise} resolves when all operations are complete
  */
 declare function update(data: any): Promise<any>;
+
 /**
  * Initialize the store with actions and listening for storage events
  *
- * @param {Object} [options={}] config object
+ * @param [options={}] config object
  * @param {Object} [options.keys={}] `ONYXKEYS` constants object
  * @param {Object} [options.initialKeyStates={}] initial data to set when `init()` and `clear()` is called
- * @param {String[]} [options.safeEvictionKeys=[]] This is an array of keys
+ * @param [options.safeEvictionKeys=[]] This is an array of keys
  * (individual or collection patterns) that when provided to Onyx are flagged
  * as "safe" for removal. Any components subscribing to these keys must also
  * implement a canEvict option. See the README for more info.
- * @param {Number} [options.maxCachedKeysCount=55] Sets how many recent keys should we try to keep in cache
+ * @param [options.maxCachedKeysCount=55] Sets how many recent keys should we try to keep in cache
  * Setting this to 0 would practically mean no cache
  * We try to free cache when we connect to a safe eviction key
- * @param {Boolean} [options.captureMetrics] Enables Onyx benchmarking and exposes the get/print/reset functions
- * @param {Boolean} [options.shouldSyncMultipleInstances] Auto synchronize storage events between multiple instances
+ * @param [options.captureMetrics] Enables Onyx benchmarking and exposes the get/print/reset functions
+ * @param [options.shouldSyncMultipleInstances] Auto synchronize storage events between multiple instances
  * of Onyx running in different tabs/windows. Defaults to true for platforms that support local storage (web/desktop)
- * @param {Boolean} [options.debugSetState] Enables debugging setState() calls to connected components.
+ * @param [options.debugSetState] Enables debugging setState() calls to connected components.
  * @example
  * Onyx.init({
  *     keys: ONYXKEYS,
@@ -178,15 +201,8 @@ declare function update(data: any): Promise<any>;
  *     },
  * });
  */
-declare function init({ keys, initialKeyStates, safeEvictionKeys, maxCachedKeysCount, captureMetrics, shouldSyncMultipleInstances, debugSetState, }?: {
-    keys?: {};
-    initialKeyStates?: {};
-    safeEvictionKeys?: any[];
-    maxCachedKeysCount?: number;
-    captureMetrics?: boolean;
-    shouldSyncMultipleInstances?: boolean;
-    debugSetState?: boolean;
-}): void;
+declare function init(config?: InitConfig): void;
+
 declare const Onyx: {
     connect: typeof connect;
     disconnect: typeof disconnect;
@@ -202,12 +218,7 @@ declare const Onyx: {
     addToEvictionBlockList: typeof addToEvictionBlockList;
     removeFromEvictionBlockList: typeof removeFromEvictionBlockList;
     isSafeEvictionKey: typeof isSafeEvictionKey;
-    METHOD: {
-        SET: string;
-        MERGE: string;
-        MERGE_COLLECTION: string;
-        CLEAR: string;
-    };
+    METHOD: typeof METHOD;
 };
+
 export default Onyx;
-//# sourceMappingURL=Onyx.d.ts.map
