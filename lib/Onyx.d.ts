@@ -1,7 +1,10 @@
+import {Keys} from '.';
 import * as Logger from './Logger';
 
+type KeyList = keyof Keys;
+
 declare type InitConfig = {
-    keys?: {};
+    keys?: Record<string, string>;
     initialKeyStates?: {};
     safeEvictionKeys?: string[];
     maxCachedKeysCount?: number;
@@ -28,7 +31,7 @@ declare function getAllKeys(): Promise<string[]>;
  *
  * @param testKey
  */
-declare function isSafeEvictionKey(testKey: string): boolean;
+declare function isSafeEvictionKey(testKey: KeyList): boolean;
 
 /**
  * Removes a key previously added to this list
@@ -37,7 +40,7 @@ declare function isSafeEvictionKey(testKey: string): boolean;
  * @param key
  * @param connectionID
  */
-declare function removeFromEvictionBlockList(key: string, connectionID: number): void;
+declare function removeFromEvictionBlockList(key: KeyList, connectionID: number): void;
 
 /**
  * Keys added to this list can never be deleted.
@@ -45,7 +48,7 @@ declare function removeFromEvictionBlockList(key: string, connectionID: number):
  * @param key
  * @param connectionID
  */
-declare function addToEvictionBlockList(key: string, connectionID: number): void;
+declare function addToEvictionBlockList(key: KeyList, connectionID: number): void;
 
 /**
  * Subscribes a react component's state directly to a store key
@@ -93,7 +96,7 @@ declare function disconnect(connectionID: number, keyToRemoveFromEvictionBlockli
  *
  * @returns {Promise}
  */
-declare function set(key: any, value: any): any;
+declare function set(key: KeyList, value: any): any;
 
 /**
  * Sets multiple keys and values
@@ -127,7 +130,7 @@ declare function multiSet(data: any): any;
  * @param {(Object|Array)} value Object or Array value to merge
  * @returns {Promise}
  */
-declare function merge(key: any, value: any): any;
+declare function merge(key: KeyList, value: any): any;
 
 /**
  * Clear out all the data in the store
@@ -166,7 +169,7 @@ declare function clear(keysToPreserve?: string[]): Promise<void>;
  * @param {Object} collection Object collection keyed by individual collection member keys and values
  * @returns {Promise}
  */
-declare function mergeCollection(collectionKey: any, collection: any): any;
+declare function mergeCollection(collectionKey: KeyList, collection: any): any;
 
 /**
  * Insert API responses and lifecycle data into Onyx
