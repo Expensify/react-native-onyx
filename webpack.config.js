@@ -33,7 +33,6 @@ const commonConfig = {
     },
     externals: [
         'react-native',
-        /^expensify-common\/.+$/,
         /^lodash\/.+$/,
         ..._.keys(pkg.peerDependencies),
         ..._.keys(pkg.dependencies),
