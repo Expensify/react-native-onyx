@@ -1,12 +1,28 @@
-import {Keys} from '.';
+import {Keys, Values} from '.';
 import * as Logger from './Logger';
 
 type KeyList = keyof Keys;
 
-declare type InitConfig = {
-    keys?: Record<string, string>;
-    initialKeyStates?: {};
-    safeEvictionKeys?: string[];
+declare type ConnectOptions<K extends KeyList> = {
+    key: K;
+    statePropertyName?: string;
+    withOnyxInstance?: any; // TODO: Type this.
+    callback?: (value: Values[K] | undefined) => void;
+    initWithStoredValues?: boolean;
+    waitForCollectionCallback?: boolean;
+    selector?: any; // TODO: Type this.
+};
+
+declare type UpdateOperation<K extends KeyList> = {
+    onyxMethod: 'set' | 'merge' | 'mergeCollection';
+    key: K;
+    value: Values[K];
+};
+
+declare type InitOptions = {
+    keys?: Record<string, unknown>;
+    initialKeyStates?: Partial<Record<KeyList, Values[KeyList]>>;
+    safeEvictionKeys?: KeyList[];
     maxCachedKeysCount?: number;
     captureMetrics?: boolean;
     shouldSyncMultipleInstances?: boolean;
@@ -23,7 +39,7 @@ declare const METHOD: {
 /**
  * Returns current key names stored in persisted storage
  */
-declare function getAllKeys(): Promise<string[]>;
+declare function getAllKeys<K extends KeyList>(): Promise<K[]>;
 
 /**
  * Checks to see if this key has been flagged as
@@ -31,7 +47,7 @@ declare function getAllKeys(): Promise<string[]>;
  *
  * @param testKey
  */
-declare function isSafeEvictionKey(testKey: KeyList): boolean;
+declare function isSafeEvictionKey<K extends KeyList>(testKey: K): boolean;
 
 /**
  * Removes a key previously added to this list
@@ -40,7 +56,7 @@ declare function isSafeEvictionKey(testKey: KeyList): boolean;
  * @param key
  * @param connectionID
  */
-declare function removeFromEvictionBlockList(key: KeyList, connectionID: number): void;
+declare function removeFromEvictionBlockList<K extends KeyList>(key: K, connectionID: number): void;
 
 /**
  * Keys added to this list can never be deleted.
@@ -48,7 +64,7 @@ declare function removeFromEvictionBlockList(key: KeyList, connectionID: number)
  * @param key
  * @param connectionID
  */
-declare function addToEvictionBlockList(key: KeyList, connectionID: number): void;
+declare function addToEvictionBlockList<K extends KeyList>(key: K, connectionID: number): void;
 
 /**
  * Subscribes a react component's state directly to a store key
@@ -76,7 +92,7 @@ declare function addToEvictionBlockList(key: KeyList, connectionID: number): voi
  *       be expensive from a performance standpoint).
  * @returns {Number} an ID to use when calling disconnect
  */
-declare function connect(mapping: any): number;
+declare function connect<K extends KeyList>(mapping: ConnectOptions<K>): number;
 
 /**
  * Remove the listener for a react component
@@ -86,7 +102,7 @@ declare function connect(mapping: any): number;
  * @param connectionID unique id returned by call to Onyx.connect()
  * @param [keyToRemoveFromEvictionBlocklist]
  */
-declare function disconnect(connectionID: number, keyToRemoveFromEvictionBlocklist?: string): void;
+declare function disconnect<K extends KeyList>(connectionID: number, keyToRemoveFromEvictionBlocklist?: K): void;
 
 /**
  * Write a value to our store with the given key
@@ -96,7 +112,7 @@ declare function disconnect(connectionID: number, keyToRemoveFromEvictionBlockli
  *
  * @returns {Promise}
  */
-declare function set(key: KeyList, value: any): any;
+declare function set<K extends KeyList>(key: K, value: Values[K]): Promise<void>;
 
 /**
  * Sets multiple keys and values
@@ -106,7 +122,7 @@ declare function set(key: KeyList, value: any): any;
  * @param {Object} data object keyed by ONYXKEYS and the values to set
  * @returns {Promise}
  */
-declare function multiSet(data: any): any;
+declare function multiSet<K extends KeyList>(data: Record<K, Values[K]>): Promise<void>;
 
 /**
  * Merge a new value into an existing value at a key.
@@ -130,7 +146,7 @@ declare function multiSet(data: any): any;
  * @param {(Object|Array)} value Object or Array value to merge
  * @returns {Promise}
  */
-declare function merge(key: KeyList, value: any): any;
+declare function merge<K extends KeyList>(key: K, value: Partial<Values[K]>): Promise<void>;
 
 /**
  * Clear out all the data in the store
@@ -153,7 +169,7 @@ declare function merge(key: KeyList, value: any): any;
  *
  * @param keysToPreserve is a list of ONYXKEYS that should not be cleared with the rest of the data
  */
-declare function clear(keysToPreserve?: string[]): Promise<void>;
+declare function clear<K extends KeyList>(keysToPreserve?: K[]): Promise<void>;
 
 /**
  * Merges a collection based on their keys
@@ -169,7 +185,7 @@ declare function clear(keysToPreserve?: string[]): Promise<void>;
  * @param {Object} collection Object collection keyed by individual collection member keys and values
  * @returns {Promise}
  */
-declare function mergeCollection(collectionKey: KeyList, collection: any): any;
+declare function mergeCollection<K extends KeyList>(collectionKey: K, collection: Record<K, Values[K]>): Promise<void>;
 
 /**
  * Insert API responses and lifecycle data into Onyx
@@ -177,7 +193,7 @@ declare function mergeCollection(collectionKey: KeyList, collection: any): any;
  * @param {Array} data An array of objects with shape {onyxMethod: oneOf('set', 'merge', 'mergeCollection'), key: string, value: *}
  * @returns {Promise} resolves when all operations are complete
  */
-declare function update(data: any): Promise<any>;
+declare function update<K extends KeyList>(data: UpdateOperation<K>[]): Promise<void>;
 
 /**
  * Initialize the store with actions and listening for storage events
@@ -204,7 +220,7 @@ declare function update(data: any): Promise<any>;
  *     },
  * });
  */
-declare function init(config?: InitConfig): void;
+declare function init(config?: InitOptions): void;
 
 declare const Onyx: {
     connect: typeof connect;
