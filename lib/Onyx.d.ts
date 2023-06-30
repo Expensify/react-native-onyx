@@ -1,28 +1,39 @@
-import {Keys, Values} from '.';
+import {CustomTypeOptions} from '.';
 import * as Logger from './Logger';
 
-type KeyList = keyof Keys;
+type MergeBy<T, K> = Omit<T, keyof K> & K;
 
-declare type ConnectOptions<K extends KeyList> = {
+type TypeOptions = MergeBy<
+    {
+        keys: string;
+        values: Record<string, unknown>;
+    },
+    CustomTypeOptions
+>;
+
+type Key = TypeOptions['keys'];
+type Value = TypeOptions['values'];
+
+declare type ConnectOptions<K extends Key> = {
     key: K;
     statePropertyName?: string;
     withOnyxInstance?: any; // TODO: Type this.
-    callback?: (value: Values[K] | undefined) => void;
+    callback?: (value: Value[K] | undefined) => void;
     initWithStoredValues?: boolean;
     waitForCollectionCallback?: boolean;
     selector?: any; // TODO: Type this.
 };
 
-declare type UpdateOperation<K extends KeyList> = {
+declare type UpdateOperation<K extends Key> = {
     onyxMethod: 'set' | 'merge' | 'mergeCollection';
     key: K;
-    value: Values[K];
+    value: Value[K];
 };
 
 declare type InitOptions = {
     keys?: Record<string, unknown>;
-    initialKeyStates?: Partial<Record<KeyList, Values[KeyList]>>;
-    safeEvictionKeys?: KeyList[];
+    initialKeyStates?: Partial<Record<Key, Value[Key]>>;
+    safeEvictionKeys?: Key[];
     maxCachedKeysCount?: number;
     captureMetrics?: boolean;
     shouldSyncMultipleInstances?: boolean;
@@ -39,7 +50,7 @@ declare const METHOD: {
 /**
  * Returns current key names stored in persisted storage
  */
-declare function getAllKeys<K extends KeyList>(): Promise<K[]>;
+declare function getAllKeys<K extends Key>(): Promise<K[]>;
 
 /**
  * Checks to see if this key has been flagged as
@@ -47,7 +58,7 @@ declare function getAllKeys<K extends KeyList>(): Promise<K[]>;
  *
  * @param testKey
  */
-declare function isSafeEvictionKey<K extends KeyList>(testKey: K): boolean;
+declare function isSafeEvictionKey<K extends Key>(testKey: K): boolean;
 
 /**
  * Removes a key previously added to this list
@@ -56,7 +67,7 @@ declare function isSafeEvictionKey<K extends KeyList>(testKey: K): boolean;
  * @param key
  * @param connectionID
  */
-declare function removeFromEvictionBlockList<K extends KeyList>(key: K, connectionID: number): void;
+declare function removeFromEvictionBlockList<K extends Key>(key: K, connectionID: number): void;
 
 /**
  * Keys added to this list can never be deleted.
@@ -64,7 +75,7 @@ declare function removeFromEvictionBlockList<K extends KeyList>(key: K, connecti
  * @param key
  * @param connectionID
  */
-declare function addToEvictionBlockList<K extends KeyList>(key: K, connectionID: number): void;
+declare function addToEvictionBlockList<K extends Key>(key: K, connectionID: number): void;
 
 /**
  * Subscribes a react component's state directly to a store key
@@ -92,7 +103,7 @@ declare function addToEvictionBlockList<K extends KeyList>(key: K, connectionID:
  *       be expensive from a performance standpoint).
  * @returns {Number} an ID to use when calling disconnect
  */
-declare function connect<K extends KeyList>(mapping: ConnectOptions<K>): number;
+declare function connect<K extends Key>(mapping: ConnectOptions<K>): number;
 
 /**
  * Remove the listener for a react component
@@ -102,7 +113,7 @@ declare function connect<K extends KeyList>(mapping: ConnectOptions<K>): number;
  * @param connectionID unique id returned by call to Onyx.connect()
  * @param [keyToRemoveFromEvictionBlocklist]
  */
-declare function disconnect<K extends KeyList>(connectionID: number, keyToRemoveFromEvictionBlocklist?: K): void;
+declare function disconnect<K extends Key>(connectionID: number, keyToRemoveFromEvictionBlocklist?: K): void;
 
 /**
  * Write a value to our store with the given key
@@ -112,7 +123,7 @@ declare function disconnect<K extends KeyList>(connectionID: number, keyToRemove
  *
  * @returns {Promise}
  */
-declare function set<K extends KeyList>(key: K, value: Values[K]): Promise<void>;
+declare function set<K extends Key>(key: K, value: Value[K]): Promise<void>;
 
 /**
  * Sets multiple keys and values
@@ -122,7 +133,7 @@ declare function set<K extends KeyList>(key: K, value: Values[K]): Promise<void>
  * @param {Object} data object keyed by ONYXKEYS and the values to set
  * @returns {Promise}
  */
-declare function multiSet<K extends KeyList>(data: Record<K, Values[K]>): Promise<void>;
+declare function multiSet<K extends Key>(data: Record<K, Value[K]>): Promise<void>;
 
 /**
  * Merge a new value into an existing value at a key.
@@ -146,7 +157,7 @@ declare function multiSet<K extends KeyList>(data: Record<K, Values[K]>): Promis
  * @param {(Object|Array)} value Object or Array value to merge
  * @returns {Promise}
  */
-declare function merge<K extends KeyList>(key: K, value: Partial<Values[K]>): Promise<void>;
+declare function merge<K extends Key>(key: K, value: Partial<Value[K]>): Promise<void>;
 
 /**
  * Clear out all the data in the store
@@ -169,7 +180,7 @@ declare function merge<K extends KeyList>(key: K, value: Partial<Values[K]>): Pr
  *
  * @param keysToPreserve is a list of ONYXKEYS that should not be cleared with the rest of the data
  */
-declare function clear<K extends KeyList>(keysToPreserve?: K[]): Promise<void>;
+declare function clear<K extends Key>(keysToPreserve?: K[]): Promise<void>;
 
 /**
  * Merges a collection based on their keys
@@ -185,7 +196,7 @@ declare function clear<K extends KeyList>(keysToPreserve?: K[]): Promise<void>;
  * @param {Object} collection Object collection keyed by individual collection member keys and values
  * @returns {Promise}
  */
-declare function mergeCollection<K extends KeyList>(collectionKey: K, collection: Record<K, Values[K]>): Promise<void>;
+declare function mergeCollection<K extends Key>(collectionKey: K, collection: Record<K, Value[K]>): Promise<void>;
 
 /**
  * Insert API responses and lifecycle data into Onyx
@@ -193,7 +204,7 @@ declare function mergeCollection<K extends KeyList>(collectionKey: K, collection
  * @param {Array} data An array of objects with shape {onyxMethod: oneOf('set', 'merge', 'mergeCollection'), key: string, value: *}
  * @returns {Promise} resolves when all operations are complete
  */
-declare function update<K extends KeyList>(data: UpdateOperation<K>[]): Promise<void>;
+declare function update<K extends Key>(data: UpdateOperation<K>[]): Promise<void>;
 
 /**
  * Initialize the store with actions and listening for storage events

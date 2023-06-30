@@ -1,8 +1,7 @@
 import Onyx from './Onyx';
 import withOnyx from './withOnyx';
 
-interface Keys {}
-interface Values {}
+interface CustomTypeOptions {}
 
 export default Onyx;
-export {withOnyx, Keys, Values};
+export {CustomTypeOptions, withOnyx};
