@@ -1,6 +1,7 @@
 import {CustomTypeOptions} from '.';
 import * as Logger from './Logger';
 
+type ValueOf<T, U extends keyof T = keyof T> = T[U];
 type MergeBy<T, K> = Omit<T, keyof K> & K;
 
 type TypeOptions = MergeBy<
@@ -14,6 +15,10 @@ type TypeOptions = MergeBy<
 type Key = TypeOptions['keys'];
 type Value = TypeOptions['values'];
 
+type KeyValueMap = {
+    [K in Key]: Value[K];
+};
+
 declare type ConnectOptions<K extends Key> = {
     key: K;
     statePropertyName?: string;
@@ -21,7 +26,7 @@ declare type ConnectOptions<K extends Key> = {
     callback?: (value: Value[K] | undefined) => void;
     initWithStoredValues?: boolean;
     waitForCollectionCallback?: boolean;
-    selector?: any; // TODO: Type this.
+    selector?: (value: Value[K] | undefined) => Value[K] | undefined; // TODO: add option for `string` selector.
 };
 
 declare type UpdateOperation<K extends Key> = {
@@ -30,9 +35,13 @@ declare type UpdateOperation<K extends Key> = {
     value: Value[K];
 };
 
+declare type UpdateOperations<KList extends Key[]> = {
+    [K in keyof KList]: UpdateOperation<KList[K]>;
+};
+
 declare type InitOptions = {
     keys?: Record<string, unknown>;
-    initialKeyStates?: Partial<Record<Key, Value[Key]>>;
+    initialKeyStates?: Partial<KeyValueMap>;
     safeEvictionKeys?: Key[];
     maxCachedKeysCount?: number;
     captureMetrics?: boolean;
@@ -86,22 +95,22 @@ declare function addToEvictionBlockList<K extends Key>(key: K, connectionID: num
  *     callback: onSessionChange,
  * });
  *
- * @param {Object} mapping the mapping information to connect Onyx to the components state
- * @param {String} mapping.key ONYXKEY to subscribe to
- * @param {String} [mapping.statePropertyName] the name of the property in the state to connect the data to
+ * @param mapping the mapping information to connect Onyx to the components state
+ * @param mapping.key ONYXKEY to subscribe to
+ * @param [mapping.statePropertyName] the name of the property in the state to connect the data to
  * @param {Object} [mapping.withOnyxInstance] whose setState() method will be called with any changed data
  *      This is used by React components to connect to Onyx
- * @param {Function} [mapping.callback] a method that will be called with changed data
+ * @param [mapping.callback] a method that will be called with changed data
  *      This is used by any non-React code to connect to Onyx
- * @param {Boolean} [mapping.initWithStoredValues] If set to false, then no data will be prefilled into the
+ * @param [mapping.initWithStoredValues] If set to false, then no data will be prefilled into the
  *  component
- * @param {Boolean} [mapping.waitForCollectionCallback] If set to true, it will return the entire collection to the callback as a single object
+ * @param [mapping.waitForCollectionCallback] If set to true, it will return the entire collection to the callback as a single object
  * @param {String|Function} [mapping.selector] THIS PARAM IS ONLY USED WITH withOnyx(). If included, this will be used to subscribe to a subset of an Onyx key's data.
  *       If the selector is a string, the selector is passed to lodashGet on the sourceData. If the selector is a function, the sourceData and withOnyx state are
  *       passed to the selector and should return the simplified data. Using this setting on `withOnyx` can have very positive performance benefits because the component
  *       will only re-render when the subset of data changes. Otherwise, any change of data on any property would normally cause the component to re-render (and that can
  *       be expensive from a performance standpoint).
- * @returns {Number} an ID to use when calling disconnect
+ * @returns an ID to use when calling disconnect
  */
 declare function connect<K extends Key>(mapping: ConnectOptions<K>): number;
 
@@ -118,10 +127,8 @@ declare function disconnect<K extends Key>(connectionID: number, keyToRemoveFrom
 /**
  * Write a value to our store with the given key
  *
- * @param {String} key ONYXKEY to set
- * @param {*} value value to store
- *
- * @returns {Promise}
+ * @param key ONYXKEY to set
+ * @param value value to store
  */
 declare function set<K extends Key>(key: K, value: Value[K]): Promise<void>;
 
@@ -130,10 +137,9 @@ declare function set<K extends Key>(key: K, value: Value[K]): Promise<void>;
  *
  * @example Onyx.multiSet({'key1': 'a', 'key2': 'b'});
  *
- * @param {Object} data object keyed by ONYXKEYS and the values to set
- * @returns {Promise}
+ * @param data object keyed by ONYXKEYS and the values to set
  */
-declare function multiSet<K extends Key>(data: Record<K, Value[K]>): Promise<void>;
+declare function multiSet(data: Partial<KeyValueMap>): Promise<void>;
 
 /**
  * Merge a new value into an existing value at a key.
@@ -153,9 +159,8 @@ declare function multiSet<K extends Key>(data: Record<K, Value[K]>): Promise<voi
  * Onyx.merge(ONYXKEYS.POLICY, {id: 1}); // -> {id: 1}
  * Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Workspace'}
  *
- * @param {String} key ONYXKEYS key
- * @param {(Object|Array)} value Object or Array value to merge
- * @returns {Promise}
+ * @param key ONYXKEYS key
+ * @param value Object or Array value to merge
  */
 declare function merge<K extends Key>(key: K, value: Partial<Value[K]>): Promise<void>;
 
@@ -180,7 +185,7 @@ declare function merge<K extends Key>(key: K, value: Partial<Value[K]>): Promise
  *
  * @param keysToPreserve is a list of ONYXKEYS that should not be cleared with the rest of the data
  */
-declare function clear<K extends Key>(keysToPreserve?: K[]): Promise<void>;
+declare function clear(keysToPreserve?: Key[]): Promise<void>;
 
 /**
  * Merges a collection based on their keys
@@ -192,26 +197,25 @@ declare function clear<K extends Key>(keysToPreserve?: K[]): Promise<void>;
  *     [`${ONYXKEYS.COLLECTION.REPORT}2`]: report2,
  * });
  *
- * @param {String} collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
- * @param {Object} collection Object collection keyed by individual collection member keys and values
- * @returns {Promise}
+ * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
+ * @param collection Object collection keyed by individual collection member keys and values
  */
 declare function mergeCollection<K extends Key>(collectionKey: K, collection: Record<K, Value[K]>): Promise<void>;
 
 /**
  * Insert API responses and lifecycle data into Onyx
  *
- * @param {Array} data An array of objects with shape {onyxMethod: oneOf('set', 'merge', 'mergeCollection'), key: string, value: *}
- * @returns {Promise} resolves when all operations are complete
+ * @param data An array of objects with shape {onyxMethod: oneOf('set', 'merge', 'mergeCollection'), key: string, value: *}
+ * @returns resolves when all operations are complete
  */
-declare function update<K extends Key>(data: UpdateOperation<K>[]): Promise<void>;
+declare function update<KList extends Key[]>(data: UpdateOperations<[...KList]>): Promise<void>;
 
 /**
  * Initialize the store with actions and listening for storage events
  *
  * @param [options={}] config object
- * @param {Object} [options.keys={}] `ONYXKEYS` constants object
- * @param {Object} [options.initialKeyStates={}] initial data to set when `init()` and `clear()` is called
+ * @param [options.keys={}] `ONYXKEYS` constants object
+ * @param [options.initialKeyStates={}] initial data to set when `init()` and `clear()` is called
  * @param [options.safeEvictionKeys=[]] This is an array of keys
  * (individual or collection patterns) that when provided to Onyx are flagged
  * as "safe" for removal. Any components subscribing to these keys must also
