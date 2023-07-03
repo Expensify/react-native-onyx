@@ -6,7 +6,7 @@ declare type LogData = {
 /**
  * Register the logging callback
  *
- * @param {Function} callback
+ * @param callback
  */
 declare function registerLogger(callback: (data: LogData) => void): void;
 

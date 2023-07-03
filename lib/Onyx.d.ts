@@ -3,6 +3,7 @@ import * as Logger from './Logger';
 
 type ValueOf<T, U extends keyof T = keyof T> = T[U];
 type MergeBy<T, K> = Omit<T, keyof K> & K;
+type DeepRecord<K extends string | number | symbol, T> = {[key: string]: T | DeepRecord<K, T>};
 
 type TypeOptions = MergeBy<
     {
@@ -23,10 +24,10 @@ declare type ConnectOptions<K extends Key> = {
     key: K;
     statePropertyName?: string;
     withOnyxInstance?: any; // TODO: Type this.
-    callback?: (value: Value[K] | undefined) => void;
+    callback?: (value: Value[K] | null) => void;
     initWithStoredValues?: boolean;
     waitForCollectionCallback?: boolean;
-    selector?: (value: Value[K] | undefined) => Value[K] | undefined; // TODO: add option for `string` selector.
+    selector?: (value: Value[K] | null) => Value[K] | null; // TODO: add option for `string` selector.
 };
 
 declare type UpdateOperation<K extends Key> = {
@@ -40,7 +41,7 @@ declare type UpdateOperations<KList extends Key[]> = {
 };
 
 declare type InitOptions = {
-    keys?: Record<string, unknown>;
+    keys?: DeepRecord<string, string>;
     initialKeyStates?: Partial<KeyValueMap>;
     safeEvictionKeys?: Key[];
     maxCachedKeysCount?: number;
@@ -130,7 +131,7 @@ declare function disconnect<K extends Key>(connectionID: number, keyToRemoveFrom
  * @param key ONYXKEY to set
  * @param value value to store
  */
-declare function set<K extends Key>(key: K, value: Value[K]): Promise<void>;
+declare function set<K extends Key>(key: K, value: Value[K] | null): Promise<void>;
 
 /**
  * Sets multiple keys and values
