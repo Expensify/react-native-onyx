@@ -1,5 +1,6 @@
-import {CustomTypeOptions} from '.';
+import {Component} from 'react';
 import {PartialDeep} from 'type-fest';
+import {CustomTypeOptions} from '.';
 import * as Logger from './Logger';
 
 type MergeBy<T, K> = Omit<T, keyof K> & K;
@@ -23,7 +24,7 @@ type KeyValueMap = {
 declare type ConnectOptions<K extends Key> = {
     key: K;
     statePropertyName?: string;
-    withOnyxInstance?: any; // TODO: Type this.
+    withOnyxInstance?: Component;
     callback?: (value: Value[K] | null) => void; // TODO: fix this.
     initWithStoredValues?: boolean;
     waitForCollectionCallback?: boolean; // TODO: callback value must be different when this is true.
