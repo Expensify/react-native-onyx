@@ -30,6 +30,14 @@ declare type ConnectOptions<K extends Key> = {
     selector?: (value: Value[K] | null) => Value[K] | null; // TODO: add option for `string` selector. Consider removing this property.
 };
 
+declare type MergeCollection<K extends Key, Map, Value> = {
+    [MapK in keyof Map]: MapK extends `${K}${string}`
+        ? MapK extends `${K}`
+            ? never // forbids empty id
+            : Value
+        : never;
+};
+
 declare type UpdateOperation<K extends Key> =
     | {
           onyxMethod: 'set';
@@ -212,7 +220,7 @@ declare function clear(keysToPreserve?: Key[]): Promise<void>;
  * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
  * @param collection Object collection keyed by individual collection member keys and values
  */
-declare function mergeCollection<K extends Key>(collectionKey: K, collection: Record<K, Value[K]>): Promise<void>;
+declare function mergeCollection<K extends Key, T>(collectionKey: K, collection: MergeCollection<K, T, PartialDeep<Value[K]>>): Promise<void>;
 
 /**
  * Insert API responses and lifecycle data into Onyx
