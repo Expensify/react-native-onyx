@@ -21,15 +21,25 @@ type KeyValueMap = {
     [K in Key]: Value[K];
 };
 
-declare type ConnectOptions<K extends Key> = {
-    key: K;
-    statePropertyName?: string;
-    withOnyxInstance?: Component;
-    callback?: (value: Value[K] | null) => void; // TODO: fix this.
-    initWithStoredValues?: boolean;
-    waitForCollectionCallback?: boolean; // TODO: callback value must be different when this is true.
-    selector?: (value: Value[K] | null) => Value[K] | null; // TODO: add option for `string` selector. Consider removing this property.
-};
+declare type ConnectOptions<K extends Key> =
+    | {
+          key: K;
+          statePropertyName?: string;
+          withOnyxInstance?: Component;
+          callback?: (value: Record<string, Value[K]> | null, key?: K) => void;
+          initWithStoredValues?: boolean;
+          waitForCollectionCallback: true;
+          selector?: (value: Value[K] | null) => Value[K] | null; // TODO: add option for `string` selector. Consider removing this property.
+      }
+    | {
+          key: K;
+          statePropertyName?: string;
+          withOnyxInstance?: Component;
+          callback?: (value: Value[K] | null, key?: K) => void;
+          initWithStoredValues?: boolean;
+          waitForCollectionCallback?: false;
+          selector?: (value: Value[K] | null) => Value[K] | null; // TODO: add option for `string` selector. Consider removing this property.
+      };
 
 declare type MergeCollection<K extends Key, Map, Value> = {
     [MapK in keyof Map]: MapK extends `${K}${string}`
