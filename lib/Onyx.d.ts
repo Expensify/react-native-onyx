@@ -1,7 +1,7 @@
 import {CustomTypeOptions} from '.';
+import {PartialDeep} from 'type-fest';
 import * as Logger from './Logger';
 
-type ValueOf<T, U extends keyof T = keyof T> = T[U];
 type MergeBy<T, K> = Omit<T, keyof K> & K;
 type DeepRecord<K extends string | number | symbol, T> = {[key: string]: T | DeepRecord<K, T>};
 
@@ -24,17 +24,28 @@ declare type ConnectOptions<K extends Key> = {
     key: K;
     statePropertyName?: string;
     withOnyxInstance?: any; // TODO: Type this.
-    callback?: (value: Value[K] | null) => void;
+    callback?: (value: Value[K] | null) => void; // TODO: fix this.
     initWithStoredValues?: boolean;
-    waitForCollectionCallback?: boolean;
-    selector?: (value: Value[K] | null) => Value[K] | null; // TODO: add option for `string` selector.
+    waitForCollectionCallback?: boolean; // TODO: callback value must be different when this is true.
+    selector?: (value: Value[K] | null) => Value[K] | null; // TODO: add option for `string` selector. Consider removing this property.
 };
 
-declare type UpdateOperation<K extends Key> = {
-    onyxMethod: 'set' | 'merge' | 'mergeCollection';
-    key: K;
-    value: Value[K];
-};
+declare type UpdateOperation<K extends Key> =
+    | {
+          onyxMethod: 'set';
+          key: K;
+          value: Value[K];
+      }
+    | {
+          onyxMethod: 'merge';
+          key: K;
+          value: PartialDeep<Value[K]>;
+      }
+    | {
+          onyxMethod: 'mergeCollection'; // TODO: Finish this.
+          key: K;
+          value: PartialDeep<Value[K]>;
+      };
 
 declare type UpdateOperations<KList extends Key[]> = {
     [K in keyof KList]: UpdateOperation<KList[K]>;
@@ -163,7 +174,7 @@ declare function multiSet(data: Partial<KeyValueMap>): Promise<void>;
  * @param key ONYXKEYS key
  * @param value Object or Array value to merge
  */
-declare function merge<K extends Key>(key: K, value: Partial<Value[K]>): Promise<void>;
+declare function merge<K extends Key>(key: K, value: PartialDeep<Value[K]>): Promise<void>;
 
 /**
  * Clear out all the data in the store
