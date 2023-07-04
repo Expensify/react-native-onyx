@@ -1,5 +1,5 @@
 # `react-native-onyx`
-Persistent storage solution wrapped in a Pub/Sub library.
+Awesome persistent storage solution wrapped in a Pub/Sub library.
 
 # Features
 
@@ -222,7 +222,7 @@ function signOut() {
 ```
 
 ## Storage Providers
-Onyx.get/set and the rest of the API accesses the underlying storage
+`Onyx.get`, `Onyx.set`, and the rest of the API accesses the underlying storage
 differently depending on the platform
 
 Under the hood storage access calls are delegated to a [`StorageProvider`](lib/storage/index.web.js)
