@@ -1,23 +1,7 @@
 import {Component} from 'react';
 import {PartialDeep} from 'type-fest';
-import {CustomTypeOptions} from '.';
 import * as Logger from './Logger';
-
-type MergeBy<T, K> = Omit<T, keyof K> & K;
-type DeepRecord<K extends string | number | symbol, T> = {[key: string]: T | DeepRecord<K, T>};
-type DeepKeyOf<T> = T extends object
-    ? {
-          [K in keyof T & (string | number)]: T[K] extends Record<string, unknown> ? `${K}.${DeepKeyOf<T[K]>}` | K : K;
-      }[keyof T & (string | number)]
-    : T;
-
-type TypeOptions = MergeBy<
-    {
-        keys: string;
-        values: Record<string, unknown>;
-    },
-    CustomTypeOptions
->;
+import {DeepKeyOf, DeepRecord, TypeOptions} from './types';
 
 type Key = TypeOptions['keys'];
 type Value = TypeOptions['values'];
@@ -31,7 +15,7 @@ type BaseConnectOptions<K extends Key> = {
     statePropertyName?: string;
     withOnyxInstance?: Component;
     initWithStoredValues?: boolean;
-    selector?: Value[K] extends object ? ((value: Value[K] | null) => PartialDeep<Value[K]> | null) | DeepKeyOf<Value[K]> : never;
+    selector?: Value[K] extends object | string | number | boolean ? ((value: Value[K] | null) => Value[K] | null) | DeepKeyOf<Value[K]> : never;
 };
 
 declare type ConnectOptions<K extends Key> = BaseConnectOptions<K> &
