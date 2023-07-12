@@ -306,12 +306,18 @@ describe('Onyx', () => {
             });
     });
 
-    it('should throw error when a key not belonging to collection key is present in mergeCollection', () => {
-        try {
-            Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, notMyTest: {beep: 'boop'}});
-        } catch (error) {
-            expect(error.message).toEqual(`Provided collection doesn't have all its data belonging to the same parent. CollectionKey: ${ONYX_KEYS.COLLECTION.TEST_KEY}, DataKey: notMyTest`);
-        }
+    it('should skip the update when a key not belonging to collection key is present in mergeCollection', () => {
+        const valuesReceived = {};
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (data, key) => valuesReceived[key] = data,
+        });
+
+        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, notMyTest: {beep: 'boop'}})
+            .then(() => {
+                expect(valuesReceived).toEqual({});
+            });
     });
 
     it('should return full object to callback when calling mergeCollection()', () => {
