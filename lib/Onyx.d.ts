@@ -1,62 +1,59 @@
 import {Component} from 'react';
 import {PartialDeep} from 'type-fest';
 import * as Logger from './Logger';
-import {DeepKeyOf, DeepRecord, TypeOptions} from './types';
-
-type Key = TypeOptions['keys'];
-type Value = TypeOptions['values'];
+import {DeepRecord, Key, Selector, Value} from './types';
 
 type KeyValueMap = {
-    [K in Key]: Value[K];
+    [TKey in Key]: Value[TKey];
 };
 
-type BaseConnectOptions<K extends Key> = {
-    key: K;
+type BaseConnectOptions<TKey extends Key> = {
+    key: TKey;
     statePropertyName?: string;
     withOnyxInstance?: Component;
     initWithStoredValues?: boolean;
-    selector?: Value[K] extends object | string | number | boolean ? ((value: Value[K] | null) => Value[K] | null) | DeepKeyOf<Value[K]> : never;
+    selector?: Selector<TKey>;
 };
 
-declare type ConnectOptions<K extends Key> = BaseConnectOptions<K> &
+declare type ConnectOptions<TKey extends Key> = BaseConnectOptions<TKey> &
     (
         | {
-              callback?: (value: Record<string, Value[K]> | null, key?: K) => void;
+              callback?: (value: Record<string, Value[TKey]> | null, key?: TKey) => void;
               waitForCollectionCallback: true;
           }
         | {
-              callback?: (value: Value[K] | null, key?: K) => void;
+              callback?: (value: Value[TKey] | null, key?: TKey) => void;
               waitForCollectionCallback?: false;
           }
     );
 
-declare type MergeCollection<K extends Key, Map, Value> = {
-    [MapK in keyof Map]: MapK extends `${K}${string}`
-        ? MapK extends `${K}`
+declare type MergeCollection<TKey extends Key, TMap, TValue> = {
+    [MapK in keyof TMap]: MapK extends `${TKey}${string}`
+        ? MapK extends `${TKey}`
             ? never // forbids empty id
-            : Value
+            : TValue
         : never;
 };
 
-declare type UpdateOperation<K extends Key> =
+declare type UpdateOperation<TKey extends Key> =
     | {
           onyxMethod: 'set';
-          key: K;
-          value: Value[K];
+          key: TKey;
+          value: Value[TKey];
       }
     | {
           onyxMethod: 'merge';
-          key: K;
-          value: PartialDeep<Value[K]>;
+          key: TKey;
+          value: PartialDeep<Value[TKey]>;
       }
     | {
           onyxMethod: 'mergeCollection'; // TODO: Finish this.
-          key: K;
-          value: PartialDeep<Value[K]>;
+          key: TKey;
+          value: PartialDeep<Value[TKey]>;
       };
 
-declare type UpdateOperations<KList extends Key[]> = {
-    [K in keyof KList]: UpdateOperation<KList[K]>;
+declare type UpdateOperations<TKeyList extends Key[]> = {
+    [TKey in keyof TKeyList]: UpdateOperation<TKeyList[TKey]>;
 };
 
 declare type InitOptions = {
@@ -79,7 +76,7 @@ declare const METHOD: {
 /**
  * Returns current key names stored in persisted storage
  */
-declare function getAllKeys<K extends Key>(): Promise<K[]>;
+declare function getAllKeys<TKey extends Key>(): Promise<TKey[]>;
 
 /**
  * Checks to see if this key has been flagged as
@@ -87,7 +84,7 @@ declare function getAllKeys<K extends Key>(): Promise<K[]>;
  *
  * @param testKey
  */
-declare function isSafeEvictionKey<K extends Key>(testKey: K): boolean;
+declare function isSafeEvictionKey<TKey extends Key>(testKey: TKey): boolean;
 
 /**
  * Removes a key previously added to this list
@@ -96,7 +93,7 @@ declare function isSafeEvictionKey<K extends Key>(testKey: K): boolean;
  * @param key
  * @param connectionID
  */
-declare function removeFromEvictionBlockList<K extends Key>(key: K, connectionID: number): void;
+declare function removeFromEvictionBlockList<TKey extends Key>(key: TKey, connectionID: number): void;
 
 /**
  * Keys added to this list can never be deleted.
@@ -104,7 +101,7 @@ declare function removeFromEvictionBlockList<K extends Key>(key: K, connectionID
  * @param key
  * @param connectionID
  */
-declare function addToEvictionBlockList<K extends Key>(key: K, connectionID: number): void;
+declare function addToEvictionBlockList<TKey extends Key>(key: TKey, connectionID: number): void;
 
 /**
  * Subscribes a react component's state directly to a store key
@@ -132,7 +129,7 @@ declare function addToEvictionBlockList<K extends Key>(key: K, connectionID: num
  *       be expensive from a performance standpoint).
  * @returns an ID to use when calling disconnect
  */
-declare function connect<K extends Key>(mapping: ConnectOptions<K>): number;
+declare function connect<TKey extends Key>(mapping: ConnectOptions<TKey>): number;
 
 /**
  * Remove the listener for a react component
@@ -142,7 +139,7 @@ declare function connect<K extends Key>(mapping: ConnectOptions<K>): number;
  * @param connectionID unique id returned by call to Onyx.connect()
  * @param [keyToRemoveFromEvictionBlocklist]
  */
-declare function disconnect<K extends Key>(connectionID: number, keyToRemoveFromEvictionBlocklist?: K): void;
+declare function disconnect<TKey extends Key>(connectionID: number, keyToRemoveFromEvictionBlocklist?: TKey): void;
 
 /**
  * Write a value to our store with the given key
@@ -150,7 +147,7 @@ declare function disconnect<K extends Key>(connectionID: number, keyToRemoveFrom
  * @param key ONYXKEY to set
  * @param value value to store
  */
-declare function set<K extends Key>(key: K, value: Value[K] | null): Promise<void>;
+declare function set<TKey extends Key>(key: TKey, value: Value[TKey] | null): Promise<void>;
 
 /**
  * Sets multiple keys and values
@@ -182,7 +179,7 @@ declare function multiSet(data: Partial<KeyValueMap>): Promise<void>;
  * @param key ONYXKEYS key
  * @param value Object or Array value to merge
  */
-declare function merge<K extends Key>(key: K, value: PartialDeep<Value[K]>): Promise<void>;
+declare function merge<TKey extends Key>(key: TKey, value: PartialDeep<Value[TKey]>): Promise<void>;
 
 /**
  * Clear out all the data in the store
@@ -220,7 +217,7 @@ declare function clear(keysToPreserve?: Key[]): Promise<void>;
  * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
  * @param collection Object collection keyed by individual collection member keys and values
  */
-declare function mergeCollection<K extends Key, T>(collectionKey: K, collection: MergeCollection<K, T, PartialDeep<Value[K]>>): Promise<void>;
+declare function mergeCollection<TKey extends Key, TMap>(collectionKey: TKey, collection: MergeCollection<TKey, TMap, PartialDeep<Value[TKey]>>): Promise<void>;
 
 /**
  * Insert API responses and lifecycle data into Onyx
@@ -228,7 +225,7 @@ declare function mergeCollection<K extends Key, T>(collectionKey: K, collection:
  * @param data An array of objects with shape {onyxMethod: oneOf('set', 'merge', 'mergeCollection'), key: string, value: *}
  * @returns resolves when all operations are complete
  */
-declare function update<KList extends Key[]>(data: UpdateOperations<[...KList]>): Promise<void>;
+declare function update<TKeyList extends Key[]>(data: UpdateOperations<[...TKeyList]>): Promise<void>;
 
 /**
  * Initialize the store with actions and listening for storage events

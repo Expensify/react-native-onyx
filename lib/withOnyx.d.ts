@@ -1,16 +1,12 @@
 import {IsEqual} from 'type-fest';
-import {DeepKeyOf, TypeOptions} from './types';
-
-type Key = TypeOptions['keys'];
-type Value = TypeOptions['values'];
+import {Key, Selector, Value} from './types';
 
 type Mapping<TComponentProps, TOnyxProps, TMappingKey extends keyof TOnyxProps, TOnyxKey extends Key> = IsEqual<Value[TOnyxKey] | null, TOnyxProps[TMappingKey]> extends true
     ? {
-          // key: TOnyxKey | ((props: Omit<TComponentProps, keyof TOnyxProps>) => TOnyxKey); // FIXME: Breaks the key/value inference.
-          key: TOnyxKey;
+          key: TOnyxKey | ((props: Omit<TComponentProps, keyof TOnyxProps>) => TOnyxKey);
           canEvict?: boolean | ((props: Omit<TComponentProps, keyof TOnyxProps>) => boolean);
           initWithStoredValues?: boolean;
-          selector?: Value[TOnyxKey] extends object | string | number | boolean ? ((value: Value[TOnyxKey] | null) => TOnyxProps[TMappingKey]) | DeepKeyOf<Value[TOnyxKey]> : never;
+          selector?: Selector<TOnyxKey>;
       }
     : never;
 

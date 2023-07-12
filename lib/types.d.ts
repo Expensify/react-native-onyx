@@ -1,12 +1,12 @@
-type MergeBy<T, K> = Omit<T, keyof K> & K;
+type MergeBy<TObject, TOtherObject> = Omit<TObject, keyof TOtherObject> & TOtherObject;
 
-type DeepRecord<K extends string | number | symbol, T> = {[key: string]: T | DeepRecord<K, T>};
+type DeepRecord<TKey extends string | number | symbol, TValue> = {[key: string]: TValue | DeepRecord<TKey, TValue>};
 
-type DeepKeyOf<T> = T extends object
+type DeepKeyOf<TObject> = TObject extends object
     ? {
-          [K in keyof T & (string | number)]: T[K] extends Record<string, unknown> ? `${K}.${DeepKeyOf<T[K]>}` | K : K;
-      }[keyof T & (string | number)]
-    : T;
+          [TKey in keyof TObject & (string | number)]: TObject[TKey] extends Record<string, unknown> ? `${TKey}.${DeepKeyOf<TObject[TKey]>}` | TKey : TKey;
+      }[keyof TObject & (string | number)]
+    : TObject;
 
 type TypeOptions = MergeBy<
     {
@@ -18,4 +18,9 @@ type TypeOptions = MergeBy<
 
 interface CustomTypeOptions {}
 
-export {MergeBy, DeepRecord, DeepKeyOf, TypeOptions, CustomTypeOptions};
+type Key = TypeOptions['keys'];
+type Value = TypeOptions['values'];
+
+type Selector<TKey extends Key> = Value[TKey] extends object | string | number | boolean ? ((value: Value[TKey] | null) => Value[TKey] | null) | DeepKeyOf<Value[TKey]> : never;
+
+export {MergeBy, DeepRecord, DeepKeyOf, TypeOptions, CustomTypeOptions, Key, Value, Selector};
