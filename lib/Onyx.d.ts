@@ -8,7 +8,6 @@ type KeyValueMap = {
 };
 
 type BaseConnectOptions<TKey extends Key | CollectionKey> = {
-    key: TKey;
     statePropertyName?: string;
     withOnyxInstance?: Component;
     initWithStoredValues?: boolean;
@@ -18,10 +17,12 @@ type BaseConnectOptions<TKey extends Key | CollectionKey> = {
 type ConnectOptions<TKey extends Key | CollectionKey> = BaseConnectOptions<TKey> &
     (
         | {
+              key: TKey extends CollectionKey ? TKey : never;
               callback?: (value: Record<string, Value[TKey]> | null, key?: TKey) => void;
               waitForCollectionCallback: true;
           }
         | {
+              key: TKey;
               callback?: (value: Value[TKey] | null, key?: TKey) => void;
               waitForCollectionCallback?: false;
           }
