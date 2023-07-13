@@ -15,7 +15,7 @@ type BaseConnectOptions<TKey extends Key | CollectionKey> = {
     selector?: Selector<TKey>;
 };
 
-declare type ConnectOptions<TKey extends Key | CollectionKey> = BaseConnectOptions<TKey> &
+type ConnectOptions<TKey extends Key | CollectionKey> = BaseConnectOptions<TKey> &
     (
         | {
               callback?: (value: Record<string, Value[TKey]> | null, key?: TKey) => void;
@@ -27,7 +27,7 @@ declare type ConnectOptions<TKey extends Key | CollectionKey> = BaseConnectOptio
           }
     );
 
-declare type MergeCollection<TKey extends Key, TMap, TValue> = {
+type MergeCollection<TKey extends Key, TMap, TValue> = {
     [MapK in keyof TMap]: MapK extends `${TKey}${string}`
         ? MapK extends `${TKey}`
             ? never // forbids empty id
@@ -35,7 +35,7 @@ declare type MergeCollection<TKey extends Key, TMap, TValue> = {
         : never;
 };
 
-declare type UpdateOperation<TKey extends Key | CollectionKey> =
+type UpdateOperation<TKey extends Key | CollectionKey> =
     | {
           onyxMethod: 'set';
           key: TKey;
@@ -47,16 +47,18 @@ declare type UpdateOperation<TKey extends Key | CollectionKey> =
           value: PartialDeep<Value[TKey]>;
       }
     | {
-          onyxMethod: 'mergeCollection'; // TODO: Finish this.
-          key: TKey;
-          value: PartialDeep<Value[TKey]>;
-      };
+          [TKey in CollectionKey]: {
+              onyxMethod: 'mergeCollection';
+              key: TKey;
+              value: Record<`${TKey}${string}`, PartialDeep<Value[TKey]>>;
+          };
+      }[CollectionKey];
 
-declare type UpdateOperations<TKeyList extends (Key | CollectionKey)[]> = {
+type UpdateOperations<TKeyList extends (Key | CollectionKey)[]> = {
     [TKey in keyof TKeyList]: UpdateOperation<TKeyList[TKey]>;
 };
 
-declare type InitOptions = {
+type InitOptions = {
     keys?: DeepRecord<string, string>;
     initialKeyStates?: Partial<KeyValueMap>;
     safeEvictionKeys?: Key[];
