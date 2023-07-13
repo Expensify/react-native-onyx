@@ -11,6 +11,7 @@ type DeepKeyOf<TObject> = TObject extends object
 type TypeOptions = MergeBy<
     {
         keys: string;
+        collectionKeys: string;
         values: Record<string, unknown>;
     },
     CustomTypeOptions
@@ -19,8 +20,11 @@ type TypeOptions = MergeBy<
 interface CustomTypeOptions {}
 
 type Key = TypeOptions['keys'];
+type CollectionKey = TypeOptions['collectionKeys'];
 type Value = TypeOptions['values'];
 
-type Selector<TKey extends Key> = Value[TKey] extends object | string | number | boolean ? ((value: Value[TKey] | null) => Value[TKey] | null) | DeepKeyOf<Value[TKey]> : never;
+type Selector<TKey extends Key | CollectionKey> = Value[TKey] extends object | string | number | boolean
+    ? ((value: Value[TKey] | null) => Value[TKey] | null) | DeepKeyOf<Value[TKey]>
+    : never;
 
-export {MergeBy, DeepRecord, DeepKeyOf, TypeOptions, CustomTypeOptions, Key, Value, Selector};
+export {MergeBy, DeepRecord, DeepKeyOf, TypeOptions, CustomTypeOptions, Key, CollectionKey, Value, Selector};

@@ -1,7 +1,7 @@
 import {IsEqual} from 'type-fest';
-import {Key, Selector, Value} from './types';
+import {Key, CollectionKey, Selector, Value} from './types';
 
-type Mapping<TComponentProps, TOnyxProps, TMappingKey extends keyof TOnyxProps, TOnyxKey extends Key> = IsEqual<Value[TOnyxKey] | null, TOnyxProps[TMappingKey]> extends true
+type Mapping<TComponentProps, TOnyxProps, TMappingKey extends keyof TOnyxProps, TOnyxKey extends Key | CollectionKey> = IsEqual<Value[TOnyxKey] | null, TOnyxProps[TMappingKey]> extends true
     ? {
           key: TOnyxKey | ((props: Omit<TComponentProps, keyof TOnyxProps>) => TOnyxKey);
           canEvict?: boolean | ((props: Omit<TComponentProps, keyof TOnyxProps>) => boolean);
@@ -11,8 +11,8 @@ type Mapping<TComponentProps, TOnyxProps, TMappingKey extends keyof TOnyxProps, 
     : never;
 
 type KeyValueMapping<TComponentProps, TOnyxProps, TMappingKey extends keyof TOnyxProps> = {
-    [TOnyxKey in Key]: Mapping<TComponentProps, TOnyxProps, TMappingKey, TOnyxKey>;
-}[Key];
+    [TOnyxKey in Key | CollectionKey]: Mapping<TComponentProps, TOnyxProps, TMappingKey, TOnyxKey>;
+}[Key | CollectionKey];
 
 declare function withOnyx<TComponentProps, TOnyxProps>(
     mapping: {

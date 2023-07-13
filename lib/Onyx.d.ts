@@ -1,13 +1,13 @@
 import {Component} from 'react';
 import {PartialDeep} from 'type-fest';
 import * as Logger from './Logger';
-import {DeepRecord, Key, Selector, Value} from './types';
+import {DeepRecord, Key, CollectionKey, Selector, Value} from './types';
 
 type KeyValueMap = {
-    [TKey in Key]: Value[TKey];
+    [TKey in Key | CollectionKey]: Value[TKey];
 };
 
-type BaseConnectOptions<TKey extends Key> = {
+type BaseConnectOptions<TKey extends Key | CollectionKey> = {
     key: TKey;
     statePropertyName?: string;
     withOnyxInstance?: Component;
@@ -15,7 +15,7 @@ type BaseConnectOptions<TKey extends Key> = {
     selector?: Selector<TKey>;
 };
 
-declare type ConnectOptions<TKey extends Key> = BaseConnectOptions<TKey> &
+declare type ConnectOptions<TKey extends Key | CollectionKey> = BaseConnectOptions<TKey> &
     (
         | {
               callback?: (value: Record<string, Value[TKey]> | null, key?: TKey) => void;
@@ -35,7 +35,7 @@ declare type MergeCollection<TKey extends Key, TMap, TValue> = {
         : never;
 };
 
-declare type UpdateOperation<TKey extends Key> =
+declare type UpdateOperation<TKey extends Key | CollectionKey> =
     | {
           onyxMethod: 'set';
           key: TKey;
@@ -52,7 +52,7 @@ declare type UpdateOperation<TKey extends Key> =
           value: PartialDeep<Value[TKey]>;
       };
 
-declare type UpdateOperations<TKeyList extends Key[]> = {
+declare type UpdateOperations<TKeyList extends (Key | CollectionKey)[]> = {
     [TKey in keyof TKeyList]: UpdateOperation<TKeyList[TKey]>;
 };
 
@@ -84,7 +84,7 @@ declare function getAllKeys<TKey extends Key>(): Promise<TKey[]>;
  *
  * @param testKey
  */
-declare function isSafeEvictionKey<TKey extends Key>(testKey: TKey): boolean;
+declare function isSafeEvictionKey<TKey extends Key | CollectionKey>(testKey: TKey): boolean;
 
 /**
  * Removes a key previously added to this list
@@ -93,7 +93,7 @@ declare function isSafeEvictionKey<TKey extends Key>(testKey: TKey): boolean;
  * @param key
  * @param connectionID
  */
-declare function removeFromEvictionBlockList<TKey extends Key>(key: TKey, connectionID: number): void;
+declare function removeFromEvictionBlockList<TKey extends Key | CollectionKey>(key: TKey, connectionID: number): void;
 
 /**
  * Keys added to this list can never be deleted.
@@ -101,7 +101,7 @@ declare function removeFromEvictionBlockList<TKey extends Key>(key: TKey, connec
  * @param key
  * @param connectionID
  */
-declare function addToEvictionBlockList<TKey extends Key>(key: TKey, connectionID: number): void;
+declare function addToEvictionBlockList<TKey extends Key | CollectionKey>(key: TKey, connectionID: number): void;
 
 /**
  * Subscribes a react component's state directly to a store key
@@ -129,7 +129,7 @@ declare function addToEvictionBlockList<TKey extends Key>(key: TKey, connectionI
  *       be expensive from a performance standpoint).
  * @returns an ID to use when calling disconnect
  */
-declare function connect<TKey extends Key>(mapping: ConnectOptions<TKey>): number;
+declare function connect<TKey extends Key | CollectionKey>(mapping: ConnectOptions<TKey>): number;
 
 /**
  * Remove the listener for a react component
@@ -139,7 +139,7 @@ declare function connect<TKey extends Key>(mapping: ConnectOptions<TKey>): numbe
  * @param connectionID unique id returned by call to Onyx.connect()
  * @param [keyToRemoveFromEvictionBlocklist]
  */
-declare function disconnect<TKey extends Key>(connectionID: number, keyToRemoveFromEvictionBlocklist?: TKey): void;
+declare function disconnect<TKey extends Key | CollectionKey>(connectionID: number, keyToRemoveFromEvictionBlocklist?: TKey): void;
 
 /**
  * Write a value to our store with the given key
@@ -147,7 +147,7 @@ declare function disconnect<TKey extends Key>(connectionID: number, keyToRemoveF
  * @param key ONYXKEY to set
  * @param value value to store
  */
-declare function set<TKey extends Key>(key: TKey, value: Value[TKey] | null): Promise<void>;
+declare function set<TKey extends Key | CollectionKey>(key: TKey, value: Value[TKey] | null): Promise<void>;
 
 /**
  * Sets multiple keys and values
@@ -179,7 +179,7 @@ declare function multiSet(data: Partial<KeyValueMap>): Promise<void>;
  * @param key ONYXKEYS key
  * @param value Object or Array value to merge
  */
-declare function merge<TKey extends Key>(key: TKey, value: PartialDeep<Value[TKey]>): Promise<void>;
+declare function merge<TKey extends Key | CollectionKey>(key: TKey, value: PartialDeep<Value[TKey]>): Promise<void>;
 
 /**
  * Clear out all the data in the store
@@ -202,7 +202,7 @@ declare function merge<TKey extends Key>(key: TKey, value: PartialDeep<Value[TKe
  *
  * @param keysToPreserve is a list of ONYXKEYS that should not be cleared with the rest of the data
  */
-declare function clear(keysToPreserve?: Key[]): Promise<void>;
+declare function clear(keysToPreserve?: (Key | CollectionKey)[]): Promise<void>;
 
 /**
  * Merges a collection based on their keys
@@ -217,7 +217,7 @@ declare function clear(keysToPreserve?: Key[]): Promise<void>;
  * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
  * @param collection Object collection keyed by individual collection member keys and values
  */
-declare function mergeCollection<TKey extends Key, TMap>(collectionKey: TKey, collection: MergeCollection<TKey, TMap, PartialDeep<Value[TKey]>>): Promise<void>;
+declare function mergeCollection<TKey extends CollectionKey, TMap>(collectionKey: TKey, collection: MergeCollection<TKey, TMap, PartialDeep<Value[TKey]>>): Promise<void>;
 
 /**
  * Insert API responses and lifecycle data into Onyx
@@ -225,7 +225,7 @@ declare function mergeCollection<TKey extends Key, TMap>(collectionKey: TKey, co
  * @param data An array of objects with shape {onyxMethod: oneOf('set', 'merge', 'mergeCollection'), key: string, value: *}
  * @returns resolves when all operations are complete
  */
-declare function update<TKeyList extends Key[]>(data: UpdateOperations<[...TKeyList]>): Promise<void>;
+declare function update<TKeyList extends (Key | CollectionKey)[]>(data: UpdateOperations<[...TKeyList]>): Promise<void>;
 
 /**
  * Initialize the store with actions and listening for storage events
