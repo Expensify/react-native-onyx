@@ -23,10 +23,13 @@ Onyx.init({
 beforeEach(() => Onyx.clear());
 
 describe('withOnyx', () => {
-    it('should render with the test data when using withOnyx', () => {
-        let result;
-
-        return Onyx.set(ONYX_KEYS.TEST_KEY, 'test1')
+    it('should render immediately with the test data when using withOnyx', () => {
+        // Note: earlier, after rendering a component we had to do another
+        // waitForPromisesToResolve() to wait for Onyx's next tick updating
+        // the component from {loading: true} to {loading:false, ...data}.
+        // We now changed the architecture, so that when a key can be retrieved
+        // synchronously from cache, we expect the component to be rendered immediately.
+        Onyx.set(ONYX_KEYS.TEST_KEY, 'test1')
             .then(() => {
                 const TestComponentWithOnyx = withOnyx({
                     text: {
@@ -34,10 +37,7 @@ describe('withOnyx', () => {
                     },
                 })(ViewWithText);
 
-                result = render(<TestComponentWithOnyx />);
-                return waitForPromisesToResolve();
-            })
-            .then(() => {
+                const result = render(<TestComponentWithOnyx />);
                 const textComponent = result.getByText('test1');
                 expect(textComponent).not.toBeNull();
             });
