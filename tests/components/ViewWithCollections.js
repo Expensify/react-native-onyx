@@ -20,7 +20,7 @@ const defaultProps = {
     onRender: () => {},
 };
 
-const ViewWithCollections = (props) => {
+function ViewWithCollections(props) {
     props.onRender(props);
 
     return (
@@ -30,7 +30,7 @@ const ViewWithCollections = (props) => {
             ))}
         </View>
     );
-};
+}
 
 ViewWithCollections.propTypes = propTypes;
 ViewWithCollections.defaultProps = defaultProps;
