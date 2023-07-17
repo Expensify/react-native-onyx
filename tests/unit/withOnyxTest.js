@@ -163,11 +163,17 @@ describe('withOnyx', () => {
                 const result = render(<TestComponentWithOnyx collectionID="1" />);
                 rerender = result.rerender;
                 getByTestId = result.getByTestId;
-
+            })
+            .then(() => {
                 expect(getByTestId('text-element').props.children).toEqual('test_1');
-
+            })
+            .then(() => {
                 rerender(<TestComponentWithOnyx collectionID="2" />);
 
+                // Note, when we change the prop, we need to wait for the next tick:
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
                 expect(getByTestId('text-element').props.children).toEqual('test_2');
             });
     });
