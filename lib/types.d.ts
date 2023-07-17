@@ -23,10 +23,10 @@ type Key = TypeOptions['keys'];
 type CollectionKey = TypeOptions['collectionKeys'];
 type Value = TypeOptions['values'];
 
-type Selector<TKey extends Key | CollectionKey> = Value[TKey] extends object | string | number | boolean
-    ? ((value: Value[TKey] | null) => Value[TKey] | null) | DeepKeyOf<Value[TKey]>
+type Selector<TKey extends Key | CollectionKey, TReturnType> = Value[TKey] extends object | string | number | boolean
+    ? ((value: Value[TKey] | null) => TReturnType) | string
     : Value[TKey] extends unknown
     ? ((value: unknown) => unknown) | string
     : never;
 
-export {MergeBy, DeepRecord, DeepKeyOf, TypeOptions, CustomTypeOptions, Key, CollectionKey, Value, Selector};
+export {CollectionKey, CustomTypeOptions, DeepKeyOf, DeepRecord, Key, MergeBy, Selector, TypeOptions, Value};

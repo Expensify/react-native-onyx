@@ -11,7 +11,7 @@ type BaseConnectOptions<TKey extends Key | CollectionKey> = {
     statePropertyName?: string;
     withOnyxInstance?: Component;
     initWithStoredValues?: boolean;
-    selector?: Selector<TKey>;
+    selector?: Selector<TKey, Value[TKey] | null>;
 };
 
 type ConnectOptions<TKey extends Key | CollectionKey> = BaseConnectOptions<TKey> &
