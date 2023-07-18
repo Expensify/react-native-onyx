@@ -7,11 +7,13 @@ const propTypes = {
     text: PropTypes.string.isRequired,
 };
 
-const ViewWithText = props => (
-    <View>
-        <Text testID="text-element">{props.text}</Text>
-    </View>
-);
+function ViewWithText(props) {
+    return (
+        <View>
+            <Text testID="text-element">{props.text}</Text>
+        </View>
+    );
+}
 
 ViewWithText.propTypes = propTypes;
 export default ViewWithText;
