@@ -55,7 +55,7 @@
     "babel-jest": "^26.2.2",
     "babel-loader": "^8.2.5",
     "eslint": "^7.6.0",
-    "eslint-config-expensify": "^2.0.24",
+    "eslint-config-expensify": "^2.0.38",
     "eslint-plugin-jsx-a11y": "^6.6.1",
     "eslint-plugin-react": "^7.31.10",
     "jest": "^26.5.2",

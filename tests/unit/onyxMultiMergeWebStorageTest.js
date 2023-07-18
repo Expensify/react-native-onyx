@@ -161,7 +161,7 @@ describe('Onyx.mergeCollection() and WebStorage', () => {
         return waitForPromisesToResolve()
             .then(() => {
                 const finalObject = {
-                    a: 'a', b: 'b', c: 'c', f: 'f', d: 'd', e: 'e',
+                    a: 'a', b: 'b', c: 'c', d: 'd', e: 'e', f: 'f',
                 };
 
                 expect(OnyxCache.getValue('test_1')).toEqual(finalObject);
