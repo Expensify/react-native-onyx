@@ -79,7 +79,7 @@ declare const METHOD: {
 /**
  * Returns current key names stored in persisted storage
  */
-declare function getAllKeys<TKey extends Key>(): Promise<TKey[]>;
+declare function getAllKeys<TKey extends Key | CollectionKey>(): Promise<TKey[]>;
 
 /**
  * Checks to see if this key has been flagged as
