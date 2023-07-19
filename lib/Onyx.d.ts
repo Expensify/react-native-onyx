@@ -38,18 +38,18 @@ type MergeCollection<TKey extends Key, TMap, TValue> = {
 
 type UpdateOperation<TKey extends Key | CollectionKey> =
     | {
-          onyxMethod: 'set';
+          onyxMethod: typeof METHOD.SET;
           key: TKey;
           value: Value[TKey];
       }
     | {
-          onyxMethod: 'merge';
+          onyxMethod: typeof METHOD.MERGE;
           key: TKey;
           value: PartialDeep<Value[TKey]>;
       }
     | {
           [TKey in CollectionKey]: {
-              onyxMethod: 'mergeCollection';
+              onyxMethod: typeof METHOD.MERGE_COLLECTION;
               key: TKey;
               value: Record<`${TKey}${string}`, PartialDeep<Value[TKey]>>;
           };
@@ -70,16 +70,16 @@ type InitOptions = {
 };
 
 declare const METHOD: {
-    readonly SET: string;
-    readonly MERGE: string;
-    readonly MERGE_COLLECTION: string;
-    readonly CLEAR: string;
+    readonly SET: 'set';
+    readonly MERGE: 'merge';
+    readonly MERGE_COLLECTION: 'mergecollection';
+    readonly CLEAR: 'clear';
 };
 
 /**
  * Returns current key names stored in persisted storage
  */
-declare function getAllKeys<TKey extends Key | CollectionKey>(): Promise<TKey[]>;
+declare function getAllKeys(): Promise<Array<Key | CollectionKey>>;
 
 /**
  * Checks to see if this key has been flagged as
@@ -87,7 +87,7 @@ declare function getAllKeys<TKey extends Key | CollectionKey>(): Promise<TKey[]>
  *
  * @param testKey
  */
-declare function isSafeEvictionKey<TKey extends Key | CollectionKey>(testKey: TKey): boolean;
+declare function isSafeEvictionKey(testKey: Key | CollectionKey): boolean;
 
 /**
  * Removes a key previously added to this list
@@ -96,7 +96,7 @@ declare function isSafeEvictionKey<TKey extends Key | CollectionKey>(testKey: TK
  * @param key
  * @param connectionID
  */
-declare function removeFromEvictionBlockList<TKey extends Key | CollectionKey>(key: TKey, connectionID: number): void;
+declare function removeFromEvictionBlockList(key: Key | CollectionKey, connectionID: number): void;
 
 /**
  * Keys added to this list can never be deleted.
@@ -104,7 +104,7 @@ declare function removeFromEvictionBlockList<TKey extends Key | CollectionKey>(k
  * @param key
  * @param connectionID
  */
-declare function addToEvictionBlockList<TKey extends Key | CollectionKey>(key: TKey, connectionID: number): void;
+declare function addToEvictionBlockList(key: Key | CollectionKey, connectionID: number): void;
 
 /**
  * Subscribes a react component's state directly to a store key
@@ -118,14 +118,14 @@ declare function addToEvictionBlockList<TKey extends Key | CollectionKey>(key: T
  * @param mapping the mapping information to connect Onyx to the components state
  * @param mapping.key ONYXKEY to subscribe to
  * @param [mapping.statePropertyName] the name of the property in the state to connect the data to
- * @param {Object} [mapping.withOnyxInstance] whose setState() method will be called with any changed data
+ * @param [mapping.withOnyxInstance] whose setState() method will be called with any changed data
  *      This is used by React components to connect to Onyx
  * @param [mapping.callback] a method that will be called with changed data
  *      This is used by any non-React code to connect to Onyx
  * @param [mapping.initWithStoredValues] If set to false, then no data will be prefilled into the
  *  component
  * @param [mapping.waitForCollectionCallback] If set to true, it will return the entire collection to the callback as a single object
- * @param {String|Function} [mapping.selector] THIS PARAM IS ONLY USED WITH withOnyx(). If included, this will be used to subscribe to a subset of an Onyx key's data.
+ * @param [mapping.selector] THIS PARAM IS ONLY USED WITH withOnyx(). If included, this will be used to subscribe to a subset of an Onyx key's data.
  *       If the selector is a string, the selector is passed to lodashGet on the sourceData. If the selector is a function, the sourceData and withOnyx state are
  *       passed to the selector and should return the simplified data. Using this setting on `withOnyx` can have very positive performance benefits because the component
  *       will only re-render when the subset of data changes. Otherwise, any change of data on any property would normally cause the component to re-render (and that can
@@ -142,7 +142,7 @@ declare function connect<TKey extends Key | CollectionKey>(mapping: ConnectOptio
  * @param connectionID unique id returned by call to Onyx.connect()
  * @param [keyToRemoveFromEvictionBlocklist]
  */
-declare function disconnect<TKey extends Key | CollectionKey>(connectionID: number, keyToRemoveFromEvictionBlocklist?: TKey): void;
+declare function disconnect(connectionID: number, keyToRemoveFromEvictionBlocklist?: Key | CollectionKey): void;
 
 /**
  * Write a value to our store with the given key
