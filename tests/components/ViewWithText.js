@@ -12,7 +12,7 @@ const defaultProps = {
     onRender: () => {},
 };
 
-const ViewWithText = (props) => {
+function ViewWithText(props) {
     props.onRender();
 
     return (
@@ -20,7 +20,7 @@ const ViewWithText = (props) => {
             <Text testID="text-element">{props.text}</Text>
         </View>
     );
-};
+}
 
 ViewWithText.propTypes = propTypes;
 ViewWithText.defaultProps = defaultProps;
