@@ -2,12 +2,6 @@ type MergeBy<TObject, TOtherObject> = Omit<TObject, keyof TOtherObject> & TOther
 
 type DeepRecord<TKey extends string | number | symbol, TValue> = {[key: string]: TValue | DeepRecord<TKey, TValue>};
 
-type DeepKeyOf<TObject> = TObject extends object
-    ? {
-          [TKey in keyof TObject & (string | number)]: TObject[TKey] extends Record<string, unknown> ? `${TKey}.${DeepKeyOf<TObject[TKey]>}` | TKey : TKey;
-      }[keyof TObject & (string | number)]
-    : TObject;
-
 type TypeOptions = MergeBy<
     {
         keys: string;
@@ -21,12 +15,14 @@ interface CustomTypeOptions {}
 
 type Key = TypeOptions['keys'];
 type CollectionKey = TypeOptions['collectionKeys'];
-type Value = TypeOptions['values'];
 
-type Selector<TKey extends Key | CollectionKey, TReturnType> = Value[TKey] extends object | string | number | boolean
-    ? ((value: Value[TKey] | null) => TReturnType) | string
-    : Value[TKey] extends unknown
+type OnyxKey = Key | CollectionKey;
+type KeyValueMapping = TypeOptions['values'];
+
+type Selector<TKey extends OnyxKey, TReturnType> = KeyValueMapping[TKey] extends object | string | number | boolean
+    ? ((value: KeyValueMapping[TKey] | null) => TReturnType) | string
+    : KeyValueMapping[TKey] extends unknown
     ? ((value: unknown) => unknown) | string
     : never;
 
-export {CollectionKey, CustomTypeOptions, DeepKeyOf, DeepRecord, Key, MergeBy, Selector, TypeOptions, Value};
+export {CollectionKey, CustomTypeOptions, DeepRecord, Key, MergeBy, OnyxKey, KeyValueMapping, Selector, TypeOptions};

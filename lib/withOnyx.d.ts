@@ -1,14 +1,14 @@
 import {IsEqual} from 'type-fest';
-import {Key, CollectionKey, Selector, Value} from './types';
+import {OnyxKey, KeyValueMapping, Selector} from './types';
 
 type BaseMapping<TComponentProps, TOnyxProps> = {
     canEvict?: boolean | ((props: Omit<TComponentProps, keyof TOnyxProps>) => boolean);
     initWithStoredValues?: boolean;
 };
 
-type Mapping<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TOnyxKey extends Key | CollectionKey> = BaseMapping<TComponentProps, TOnyxProps> &
+type Mapping<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TOnyxKey extends OnyxKey> = BaseMapping<TComponentProps, TOnyxProps> &
     (
-        | (IsEqual<Value[TOnyxKey] | null, TOnyxProps[TOnyxProp]> extends true
+        | (IsEqual<KeyValueMapping[TOnyxKey] | null, TOnyxProps[TOnyxProp]> extends true
               ? {
                     key: TOnyxKey | ((props: Omit<TComponentProps, keyof TOnyxProps>) => TOnyxKey);
                 }
@@ -23,12 +23,9 @@ type Mapping<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TO
           }
     );
 
-// TODO: Missing implementation.
-declare function createOnyxSelector<TOnyxKey extends Key | CollectionKey, TResultData>(selector: Selector<TOnyxKey, TResultData>): Selector<TOnyxKey, TResultData>;
-
 type OnyxPropMapping<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps> = {
-    [TOnyxKey in Key | CollectionKey]: Mapping<TComponentProps, TOnyxProps, TOnyxProp, TOnyxKey>;
-}[Key | CollectionKey];
+    [TOnyxKey in OnyxKey]: Mapping<TComponentProps, TOnyxProps, TOnyxProp, TOnyxKey>;
+}[OnyxKey];
 
 declare function withOnyx<TComponentProps, TOnyxProps>(
     mapping: {
@@ -37,4 +34,3 @@ declare function withOnyx<TComponentProps, TOnyxProps>(
 ): (component: React.ComponentType<TComponentProps>) => React.ComponentType<Omit<TComponentProps, keyof TOnyxProps>>;
 
 export default withOnyx;
-export {createOnyxSelector};
