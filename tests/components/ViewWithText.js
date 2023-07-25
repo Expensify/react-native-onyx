@@ -5,13 +5,23 @@ import {View, Text} from 'react-native';
 
 const propTypes = {
     text: PropTypes.string.isRequired,
+    onRender: PropTypes.func,
 };
 
-const ViewWithText = props => (
-    <View>
-        <Text testID="text-element">{props.text}</Text>
-    </View>
-);
+const defaultProps = {
+    onRender: () => {},
+};
+
+const ViewWithText = (props) => {
+    props.onRender();
+
+    return (
+        <View>
+            <Text testID="text-element">{props.text}</Text>
+        </View>
+    );
+};
 
 ViewWithText.propTypes = propTypes;
+ViewWithText.defaultProps = defaultProps;
 export default ViewWithText;

@@ -24,6 +24,8 @@ beforeEach(() => Onyx.clear());
 
 describe('withOnyx', () => {
     it('should render immediately with the test data when using withOnyx', () => {
+        const onRender = jest.fn();
+
         // Note: earlier, after rendering a component we had to do another
         // waitForPromisesToResolve() to wait for Onyx's next tick updating
         // the component from {loading: true} to {loading:false, ...data}.
@@ -37,9 +39,19 @@ describe('withOnyx', () => {
                     },
                 })(ViewWithText);
 
-                const result = render(<TestComponentWithOnyx />);
+                const result = render(<TestComponentWithOnyx onRender={onRender} />);
                 const textComponent = result.getByText('test1');
                 expect(textComponent).not.toBeNull();
+
+                jest.runAllTimers();
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                // As the component immediately rendered from cache, we want to make
+                // sure it wasn't updated a second time with the same value (the connect
+                // calls gets the data another time and tries to forward it to the component,
+                // which could cause a re-render if the right checks aren't in place):
+                expect(onRender).toHaveBeenCalledTimes(1);
             });
     });
 
