@@ -274,7 +274,7 @@ describe('withOnyx', () => {
                 render(<TestComponentWithOnyx3 onRender={onRender3} />);
             })
 
-            // When a single item in the collection is updated with mergeCollect()
+            // When a single item in the collection is updated with mergeCollection()
             .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                 test_1: {ID: 1, newProperty: 'yay'},
             }))
