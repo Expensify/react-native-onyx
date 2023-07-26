@@ -257,6 +257,18 @@ declare function update<TKeyList extends OnyxKey[]>(data: OnyxUpdates<[...TKeyLi
  */
 declare function init(config?: InitOptions): void;
 
+/**
+ * @private
+ * @param key
+ */
+declare function hasPendingMergeForKey(key: OnyxKey): boolean;
+
+/**
+ * When set these keys will not be persisted to storage
+ * @param keyList
+ */
+declare function setMemoryOnlyKeys(keyList: OnyxKey[]): void;
+
 declare const Onyx: {
     connect: typeof connect;
     disconnect: typeof disconnect;
@@ -264,6 +276,7 @@ declare const Onyx: {
     multiSet: typeof multiSet;
     merge: typeof merge;
     mergeCollection: typeof mergeCollection;
+    hasPendingMergeForKey: typeof hasPendingMergeForKey;
     update: typeof update;
     clear: typeof clear;
     getAllKeys: typeof getAllKeys;
@@ -273,6 +286,7 @@ declare const Onyx: {
     removeFromEvictionBlockList: typeof removeFromEvictionBlockList;
     isSafeEvictionKey: typeof isSafeEvictionKey;
     METHOD: typeof METHOD;
+    setMemoryOnlyKeys: typeof setMemoryOnlyKeys;
 };
 
 export default Onyx;
