@@ -22,6 +22,7 @@ type CollectionKey = `${CollectionKeyBase}${string}`;
 type OnyxKey = Key | CollectionKey;
 type KeyValueMapping = TypeOptions['values'];
 
+// TODO: Still being worked on.
 type GetOnyxValue<K extends Key | `${CollectionKeyBase}${string}`> = K extends Key
     ? KeyValueMapping[K]
     : K extends `${CollectionKeyBase}`
@@ -34,7 +35,9 @@ type GetOnyxValue<K extends Key | `${CollectionKeyBase}${string}`> = K extends K
 //     ? (value: unknown) => unknown
 //     : never;
 
-// type Selector<TKey extends OnyxKey, TReturnType> = IsEqual<KeyValueMapping[TKey], unknown> extends true ? (value: unknown) => unknown : (value: KeyValueMapping[TKey] | null) => TReturnType;
-type Selector<TKey extends OnyxKey, TReturnType> = IsEqual<GetOnyxValue<TKey>, unknown> extends true ? (value: unknown) => unknown : (value: GetOnyxValue<TKey> | null) => TReturnType;
+// TODO: Still being worked on.
+type Selector<TKey extends OnyxKey, TReturnType> = IsEqual<KeyValueMapping[TKey], unknown> extends true ? (value: unknown) => unknown : (value: KeyValueMapping[TKey] | null) => TReturnType;
+
+// type Selector<TKey extends OnyxKey, TReturnType> = IsEqual<GetOnyxValue<TKey>, unknown> extends true ? (value: unknown) => unknown : (value: GetOnyxValue<TKey> | null) => TReturnType;
 
 export {CollectionKey, CustomTypeOptions, DeepRecord, Key, MergeBy, OnyxKey, KeyValueMapping, Selector, GetOnyxValue, TypeOptions};
