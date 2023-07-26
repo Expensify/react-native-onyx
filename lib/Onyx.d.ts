@@ -62,7 +62,7 @@ type OnyxUpdates<TKeyList extends OnyxKey[]> = {
 type InitOptions = {
     keys?: DeepRecord<string, string>;
     initialKeyStates?: Partial<NullableKeyValueMapping>;
-    safeEvictionKeys?: Key[];
+    safeEvictionKeys?: OnyxKey[];
     maxCachedKeysCount?: number;
     captureMetrics?: boolean;
     shouldSyncMultipleInstances?: boolean;
