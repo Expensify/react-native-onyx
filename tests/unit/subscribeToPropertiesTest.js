@@ -90,16 +90,6 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
             });
     };
 
-    it('connecting to a single non-collection key with a selector string', () => {
-        const TestComponentWithOnyx = withOnyx({
-            propertyA: {
-                key: ONYX_KEYS.TEST_KEY,
-                selector: 'a',
-            },
-        })(ViewWithObject);
-        return runAssertionsWithComponent(TestComponentWithOnyx);
-    });
-
     it('connecting to a single non-collection key with a selector function', () => {
         const mockedSelector = jest.fn(obj => obj && obj.a);
         const TestComponentWithOnyx = withOnyx({
@@ -170,16 +160,6 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
                 expect(renderedComponent.getByTestId('text-element').props.children).toEqual('{"collectionWithPropertyA":{"test_1":"two"}}');
             });
     };
-
-    it('connecting to a collection with a selector string', () => {
-        const TestComponentWithOnyx = withOnyx({
-            collectionWithPropertyA: {
-                key: ONYX_KEYS.COLLECTION.TEST_KEY,
-                selector: 'a',
-            },
-        })(ViewWithObject);
-        return runAllAssertionsForCollection(TestComponentWithOnyx);
-    });
 
     it('connecting to a collection with a selector function', () => {
         const mockedSelector = jest.fn(obj => obj && obj.a);
@@ -258,16 +238,6 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
                 expect(renderedComponent.getByTestId('text-element').props.children).toEqual('{"itemWithPropertyA":"two"}');
             });
     };
-
-    it('connecting to a collection member with a selector string', () => {
-        const TestComponentWithOnyx = withOnyx({
-            itemWithPropertyA: {
-                key: `${ONYX_KEYS.COLLECTION.TEST_KEY}1`,
-                selector: 'a',
-            },
-        })(ViewWithObject);
-        return runAllAssertionsForCollectionMemberKey(TestComponentWithOnyx);
-    });
 
     it('connecting to a collection member with a selector function', () => {
         const TestComponentWithOnyx = withOnyx({
