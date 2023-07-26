@@ -1,5 +1,5 @@
 import {IsEqual} from 'type-fest';
-import {OnyxKey, KeyValueMapping, Selector} from './types';
+import {GetOnyxValue, OnyxKey, Selector} from './types';
 
 type BaseMapping<TComponentProps, TOnyxProps> = {
     canEvict?: boolean | ((props: Omit<TComponentProps, keyof TOnyxProps>) => boolean);
@@ -8,7 +8,7 @@ type BaseMapping<TComponentProps, TOnyxProps> = {
 
 type Mapping<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TOnyxKey extends OnyxKey> = BaseMapping<TComponentProps, TOnyxProps> &
     (
-        | (IsEqual<KeyValueMapping[TOnyxKey] | null, TOnyxProps[TOnyxProp]> extends true
+        | (IsEqual<GetOnyxValue<TOnyxKey> | null, TOnyxProps[TOnyxProp]> extends true
               ? {
                     key: TOnyxKey | ((props: Omit<TComponentProps, keyof TOnyxProps>) => TOnyxKey);
                 }
