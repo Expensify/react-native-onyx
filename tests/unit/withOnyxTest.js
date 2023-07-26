@@ -1,3 +1,4 @@
+/* eslint-disable rulesdir/onyx-props-must-have-default */
 import React from 'react';
 import {render} from '@testing-library/react-native';
 import Onyx, {withOnyx} from '../../lib';

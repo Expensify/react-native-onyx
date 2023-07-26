@@ -149,7 +149,7 @@ describe('Onyx', () => {
             });
     });
 
-    it('should merge arrays by appending new items to the end of a value', () => {
+    it('should merge arrays by replacing previous value with new value', () => {
         let testKeyValue;
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
@@ -164,8 +164,9 @@ describe('Onyx', () => {
                 expect(testKeyValue).toStrictEqual(['test1']);
                 return Onyx.merge(ONYX_KEYS.TEST_KEY, ['test2', 'test3', 'test4']);
             })
+            .then(waitForPromisesToResolve)
             .then(() => {
-                expect(testKeyValue).toStrictEqual(['test1', 'test2', 'test3', 'test4']);
+                expect(testKeyValue).toStrictEqual(['test2', 'test3', 'test4']);
             });
     });
 
@@ -201,7 +202,7 @@ describe('Onyx', () => {
         Onyx.merge(ONYX_KEYS.TEST_KEY, ['test2']);
         return waitForPromisesToResolve()
             .then(() => {
-                expect(testKeyValue).toEqual(['test1', 'test2']);
+                expect(testKeyValue).toEqual(['test2']);
             });
     });
 
@@ -306,12 +307,18 @@ describe('Onyx', () => {
             });
     });
 
-    it('should throw error when a key not belonging to collection key is present in mergeCollection', () => {
-        try {
-            Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, notMyTest: {beep: 'boop'}});
-        } catch (error) {
-            expect(error.message).toEqual(`Provided collection doesn't have all its data belonging to the same parent. CollectionKey: ${ONYX_KEYS.COLLECTION.TEST_KEY}, DataKey: notMyTest`);
-        }
+    it('should skip the update when a key not belonging to collection key is present in mergeCollection', () => {
+        const valuesReceived = {};
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (data, key) => valuesReceived[key] = data,
+        });
+
+        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, notMyTest: {beep: 'boop'}})
+            .then(() => {
+                expect(valuesReceived).toEqual({});
+            });
     });
 
     it('should return full object to callback when calling mergeCollection()', () => {
