@@ -1,33 +1,64 @@
 import {Component} from 'react';
 import {PartialDeep} from 'type-fest';
 import * as Logger from './Logger';
-import {CollectionKey, DeepRecord, Key, OnyxKey, KeyValueMapping, Selector} from './types';
+import {
+    CollectionKey,
+    DeepRecord,
+    Key,
+    OnyxKey,
+    KeyValueMapping,
+    Selector,
+    OnyxRecord,
+    OnyxCollectionRecords,
+} from './types';
 
+/**
+ * Represents a mapping object where each `OnyxKey` maps to either a value of its corresponding type in `KeyValueMapping` or `null`.
+ *
+ * It's very similar to `KeyValueMapping` but this type accepts using `null` as well.
+ */
 type NullableKeyValueMapping = {
-    [TKey in OnyxKey]: KeyValueMapping[TKey] | null;
+    [TKey in OnyxKey]: OnyxRecord<KeyValueMapping[TKey]>;
 };
 
+/**
+ * Represents the base options used in `Onyx.connect()` method.
+ */
 type BaseConnectOptions<TKey extends OnyxKey> = {
     statePropertyName?: string;
     withOnyxInstance?: Component;
     initWithStoredValues?: boolean;
-    selector?: Selector<TKey, KeyValueMapping[TKey] | null>;
+    selector?: Selector<TKey, OnyxRecord<KeyValueMapping[TKey]>>;
 };
 
+/**
+ * Represents the options used in `Onyx.connect()` method.
+ * The type is built from `BaseConnectOptions` and extended to handle key/callback related options.
+ * It includes two different forms, depending on whether we are waiting for a collection callback or not.
+ *
+ * If `waitForCollectionCallback` is `true`, it expects `key` to be a Onyx collection key and `callback` will pass `value` as an `OnyxCollectionRecords`.
+ *
+ * If `waitForCollectionCallback` is `false` or not specified, the `key` can be any Onyx key and `callback` will pass `value` as an `OnyxRecord`.
+ */
 type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions<TKey> &
     (
         | {
               key: TKey extends CollectionKey ? TKey : never;
-              callback?: (value: Record<string, KeyValueMapping[TKey] | null> | null, key?: TKey) => void;
+              callback?: (value: OnyxCollectionRecords<KeyValueMapping[TKey]>, key?: TKey) => void;
               waitForCollectionCallback: true;
           }
         | {
               key: TKey;
-              callback?: (value: KeyValueMapping[TKey] | null, key?: TKey) => void;
+              callback?: (value: OnyxRecord<KeyValueMapping[TKey]>, key?: TKey) => void;
               waitForCollectionCallback?: false;
           }
     );
 
+/**
+ * Represents a mapping between Onyx collection keys and their respective values.
+ * It helps to enforce that a Onyx collection key should not be without suffix (e.g. should always be of the form `${TKey}${string}`),
+ * and to map each Onyx collection key with suffix to a value of type `TValue`.
+ */
 type Collection<TKey extends Key, TMap, TValue> = {
     [MapK in keyof TMap]: MapK extends `${TKey}${string}`
         ? MapK extends `${TKey}`
@@ -36,11 +67,15 @@ type Collection<TKey extends Key, TMap, TValue> = {
         : never;
 };
 
+/**
+ * Represents different kinds of updates that can be passed to `Onyx.update()` method. It is a discriminated union of
+ * different update methods (`SET`, `MERGE`, `MERGE_COLLECTION`), each with their own key and value structure.
+ */
 type OnyxUpdate<TKey extends OnyxKey> =
     | {
           onyxMethod: typeof METHOD.SET;
           key: TKey;
-          value: KeyValueMapping[TKey] | null;
+          value: OnyxRecord<KeyValueMapping[TKey]>;
       }
     | {
           onyxMethod: typeof METHOD.MERGE;
@@ -55,10 +90,17 @@ type OnyxUpdate<TKey extends OnyxKey> =
           };
       }[CollectionKey];
 
+/**
+ * Represents a record of `OnyxUpdate`s to be passed to `Onyx.update()` method, indexed by keys of type `OnyxKey`.
+ * Each `OnyxUpdate` will be associated with its respective Onyx key, ensuring different type-safety for each object.
+ */
 type OnyxUpdates<TKeyList extends OnyxKey[]> = {
     [TKey in keyof TKeyList]: OnyxUpdate<TKeyList[TKey]>;
 };
 
+/**
+ * Represents the options used in `Onyx.init()` method.
+ */
 type InitOptions = {
     keys?: DeepRecord<string, string>;
     initialKeyStates?: Partial<NullableKeyValueMapping>;
@@ -150,7 +192,7 @@ declare function disconnect(connectionID: number, keyToRemoveFromEvictionBlockli
  * @param key ONYXKEY to set
  * @param value value to store
  */
-declare function set<TKey extends OnyxKey>(key: TKey, value: KeyValueMapping[TKey] | null): Promise<void>;
+declare function set<TKey extends OnyxKey>(key: TKey, value: OnyxRecord<KeyValueMapping[TKey]>): Promise<void>;
 
 /**
  * Sets multiple keys and values
@@ -220,7 +262,10 @@ declare function clear(keysToPreserve?: OnyxKey[]): Promise<void>;
  * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
  * @param collection Object collection keyed by individual collection member keys and values
  */
-declare function mergeCollection<TKey extends CollectionKey, TMap>(collectionKey: TKey, collection: Collection<TKey, TMap, PartialDeep<KeyValueMapping[TKey]>>): Promise<void>;
+declare function mergeCollection<TKey extends CollectionKey, TMap>(
+    collectionKey: TKey,
+    collection: Collection<TKey, TMap, PartialDeep<KeyValueMapping[TKey]>>,
+): Promise<void>;
 
 /**
  * Insert API responses and lifecycle data into Onyx

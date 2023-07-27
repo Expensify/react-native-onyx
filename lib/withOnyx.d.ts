@@ -1,5 +1,15 @@
 import {IsEqual} from 'type-fest';
-import {CollectionKey, CollectionKeyBase, GetOnyxValue, Key, KeyValueMapping, OnyxKey, Selector} from './types';
+import {
+    CollectionKey,
+    CollectionKeyBase,
+    GetOnyxValue,
+    Key,
+    KeyValueMapping,
+    OnyxCollectionRecords,
+    OnyxKey,
+    OnyxRecord,
+    Selector,
+} from './types';
 
 type BaseMapping<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TOnyxKey extends OnyxKey> = {
     canEvict?: boolean | ((props: Omit<TComponentProps, keyof TOnyxProps>) => boolean);
@@ -9,50 +19,60 @@ type BaseMapping<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps
 };
 
 // TODO: Still being worked on.
-type Mapping<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TOnyxKey extends Key> = BaseMapping<TComponentProps, TOnyxProps, TOnyxProp, TOnyxKey> &
-    (
-        | (IsEqual<KeyValueMapping[TOnyxKey] | null, TOnyxProps[TOnyxProp]> extends true
-              ? {
-                    key: TOnyxKey | ((props: Omit<TComponentProps, keyof TOnyxProps>) => TOnyxKey);
-                }
-              : never)
-        | {
-              key: TOnyxKey;
-              selector: Selector<TOnyxKey, TOnyxProps[TOnyxProp]>;
-          }
-        | {
-              key: (props: Omit<TComponentProps, keyof TOnyxProps>) => TOnyxKey;
-              selector: Selector<TOnyxKey, TOnyxProps[TOnyxProp]>;
-          }
-    );
-
-// TODO: Still being worked on.
-type CollectionMapping<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TOnyxKey extends CollectionKeyBase> = BaseMapping<TComponentProps, TOnyxProps, TOnyxProp, TOnyxKey> &
-    (
-        | (IsEqual<Record<string, KeyValueMapping[TOnyxKey] | null> | null, TOnyxProps[TOnyxProp]> extends true
-              ? {
-                    key: TOnyxKey | ((props: Omit<TComponentProps, keyof TOnyxProps>) => TOnyxKey);
-                }
-              : never)
-        | {
-              key: TOnyxKey;
-              selector: Selector<TOnyxKey, TOnyxProps[TOnyxProp]>;
-          }
-        | {
-              key: (props: Omit<TComponentProps, keyof TOnyxProps>) => TOnyxKey;
-              selector: Selector<TOnyxKey, TOnyxProps[TOnyxProp]>;
-          }
-    );
-
-// TODO: Still being worked on.
-type CollectionRecordMapping<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TOnyxKey extends CollectionKey> = BaseMapping<
+type Mapping<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TOnyxKey extends Key> = BaseMapping<
     TComponentProps,
     TOnyxProps,
     TOnyxProp,
     TOnyxKey
 > &
     (
-        | (IsEqual<KeyValueMapping[TOnyxKey] | null, TOnyxProps[TOnyxProp]> extends true
+        | (IsEqual<OnyxRecord<KeyValueMapping[TOnyxKey]>, TOnyxProps[TOnyxProp]> extends true
+              ? {
+                    key: TOnyxKey | ((props: Omit<TComponentProps, keyof TOnyxProps>) => TOnyxKey);
+                }
+              : never)
+        | {
+              key: TOnyxKey;
+              selector: Selector<TOnyxKey, TOnyxProps[TOnyxProp]>;
+          }
+        | {
+              key: (props: Omit<TComponentProps, keyof TOnyxProps>) => TOnyxKey;
+              selector: Selector<TOnyxKey, TOnyxProps[TOnyxProp]>;
+          }
+    );
+
+// TODO: Still being worked on.
+type CollectionMapping<
+    TComponentProps,
+    TOnyxProps,
+    TOnyxProp extends keyof TOnyxProps,
+    TOnyxKey extends CollectionKeyBase
+> = BaseMapping<TComponentProps, TOnyxProps, TOnyxProp, TOnyxKey> &
+    (
+        | (IsEqual<OnyxCollectionRecords<KeyValueMapping[TOnyxKey]>, TOnyxProps[TOnyxProp]> extends true
+              ? {
+                    key: TOnyxKey | ((props: Omit<TComponentProps, keyof TOnyxProps>) => TOnyxKey);
+                }
+              : never)
+        | {
+              key: TOnyxKey;
+              selector: Selector<TOnyxKey, TOnyxProps[TOnyxProp]>;
+          }
+        | {
+              key: (props: Omit<TComponentProps, keyof TOnyxProps>) => TOnyxKey;
+              selector: Selector<TOnyxKey, TOnyxProps[TOnyxProp]>;
+          }
+    );
+
+// TODO: Still being worked on.
+type CollectionRecordMapping<
+    TComponentProps,
+    TOnyxProps,
+    TOnyxProp extends keyof TOnyxProps,
+    TOnyxKey extends CollectionKey
+> = BaseMapping<TComponentProps, TOnyxProps, TOnyxProp, TOnyxKey> &
+    (
+        | (IsEqual<OnyxRecord<KeyValueMapping[TOnyxKey]>, TOnyxProps[TOnyxProp]> extends true
               ? {
                     key: TOnyxKey | ((props: Omit<TComponentProps, keyof TOnyxProps>) => TOnyxKey);
                 }
@@ -92,4 +112,4 @@ declare function withOnyx<TComponentProps, TOnyxProps>(
 ): (component: React.ComponentType<TComponentProps>) => React.ComponentType<Omit<TComponentProps, keyof TOnyxProps>>;
 
 export default withOnyx;
-export {Mapping, CollectionMapping, CollectionRecordMapping, OnyxPropMapping, GetOnyxValue, Selector};
+export {CollectionMapping, CollectionRecordMapping, GetOnyxValue, Mapping, OnyxPropMapping, Selector};
