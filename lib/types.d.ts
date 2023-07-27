@@ -40,4 +40,4 @@ type Selector<TKey extends OnyxKey, TReturnType> = IsEqual<KeyValueMapping[TKey]
 
 // type Selector<TKey extends OnyxKey, TReturnType> = IsEqual<GetOnyxValue<TKey>, unknown> extends true ? (value: unknown) => unknown : (value: GetOnyxValue<TKey> | null) => TReturnType;
 
-export {CollectionKey, CustomTypeOptions, DeepRecord, Key, MergeBy, OnyxKey, KeyValueMapping, Selector, GetOnyxValue, TypeOptions};
+export {CollectionKey, CollectionKeyBase, CustomTypeOptions, DeepRecord, Key, MergeBy, OnyxKey, KeyValueMapping, Selector, GetOnyxValue, TypeOptions};
