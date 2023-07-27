@@ -24,10 +24,15 @@ Onyx.init({
 beforeEach(() => Onyx.clear());
 
 describe('withOnyx', () => {
-    it('should render with the test data when using withOnyx', () => {
-        let result;
+    it('should render immediately with the test data when using withOnyx', () => {
+        const onRender = jest.fn();
 
-        return Onyx.set(ONYX_KEYS.TEST_KEY, 'test1')
+        // Note: earlier, after rendering a component we had to do another
+        // waitForPromisesToResolve() to wait for Onyx's next tick updating
+        // the component from {loading: true} to {loading:false, ...data}.
+        // We now changed the architecture, so that when a key can be retrieved
+        // synchronously from cache, we expect the component to be rendered immediately.
+        Onyx.set(ONYX_KEYS.TEST_KEY, 'test1')
             .then(() => {
                 const TestComponentWithOnyx = withOnyx({
                     text: {
@@ -35,12 +40,19 @@ describe('withOnyx', () => {
                     },
                 })(ViewWithText);
 
-                result = render(<TestComponentWithOnyx />);
+                const result = render(<TestComponentWithOnyx onRender={onRender} />);
+                const textComponent = result.getByText('test1');
+                expect(textComponent).not.toBeNull();
+
+                jest.runAllTimers();
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                const textComponent = result.getByText('test1');
-                expect(textComponent).not.toBeNull();
+                // As the component immediately rendered from cache, we want to make
+                // sure it wasn't updated a second time with the same value (the connect
+                // calls gets the data another time and tries to forward it to the component,
+                // which could cause a re-render if the right checks aren't in place):
+                expect(onRender).toHaveBeenCalledTimes(1);
             });
     });
 
@@ -57,9 +69,8 @@ describe('withOnyx', () => {
             .then(() => {
                 Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`, {ID: 123});
                 Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}2`, {ID: 234});
-                Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}3`, {ID: 345});
+                return Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}3`, {ID: 345});
             })
-            .then(waitForPromisesToResolve)
             .then(() => {
                 expect(onRender).toHaveBeenCalledTimes(4);
             });
@@ -74,12 +85,9 @@ describe('withOnyx', () => {
         const onRender = jest.fn();
         render(<TestComponentWithOnyx onRender={onRender} />);
         return waitForPromisesToResolve()
-            .then(() => {
-                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
-                    test_1: {ID: 123}, test_2: {ID: 234}, test_3: {ID: 345},
-                });
-                return waitForPromisesToResolve();
-            })
+            .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                test_1: {ID: 123}, test_2: {ID: 234}, test_3: {ID: 345},
+            }))
             .then(() => {
                 expect(onRender).toHaveBeenCalledTimes(2);
             });
@@ -95,12 +103,9 @@ describe('withOnyx', () => {
         const onRender = jest.fn();
         render(<TestComponentWithOnyx onRender={onRender} />);
         return waitForPromisesToResolve()
-            .then(() => {
-                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
-                    test_1: {ID: 123}, test_2: {ID: 234}, test_3: {ID: 345},
-                });
-                return waitForPromisesToResolve();
-            })
+            .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                test_1: {ID: 123}, test_2: {ID: 234}, test_3: {ID: 345},
+            }))
             .then(() => {
                 expect(onRender).toHaveBeenCalledTimes(2);
             });
@@ -116,18 +121,12 @@ describe('withOnyx', () => {
         const onRender = jest.fn();
         render(<TestComponentWithOnyx onRender={onRender} />);
         return waitForPromisesToResolve()
-            .then(() => {
-                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
-                    test_1: {list: [1, 2]},
-                });
-                return waitForPromisesToResolve();
-            })
-            .then(() => {
-                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
-                    test_1: {list: [7]},
-                });
-                return waitForPromisesToResolve();
-            })
+            .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                test_1: {list: [1, 2]},
+            }))
+            .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                test_1: {list: [7]},
+            }))
             .then(() => {
                 expect(onRender).toHaveBeenCalledTimes(3);
                 expect(onRender).toHaveBeenLastCalledWith({
@@ -148,12 +147,11 @@ describe('withOnyx', () => {
         return waitForPromisesToResolve()
             .then(() => {
                 Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_4: {ID: 456}, test_5: {ID: 567}});
-                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                     test_4: {Name: 'Test4'},
                     test_5: {Name: 'Test5'},
                     test_6: {ID: 678, Name: 'Test6'},
                 });
-                return waitForPromisesToResolve();
             })
             .then(() => {
                 expect(onRender).toHaveBeenCalledTimes(3);
@@ -166,7 +164,6 @@ describe('withOnyx', () => {
     it('should update if a prop dependent key changes', () => {
         let rerender;
         let getByTestId;
-        const onRender = jest.fn();
         const TestComponentWithOnyx = withOnyx({
             text: {
                 key: props => `${ONYX_KEYS.COLLECTION.TEST_KEY}${props.collectionID}`,
@@ -176,16 +173,17 @@ describe('withOnyx', () => {
         Onyx.set(`${ONYX_KEYS.COLLECTION.TEST_KEY}2`, 'test_2');
         return waitForPromisesToResolve()
             .then(() => {
-                const result = render(<TestComponentWithOnyx onRender={onRender} collectionID="1" />);
+                const result = render(<TestComponentWithOnyx collectionID="1" />);
                 rerender = result.rerender;
                 getByTestId = result.getByTestId;
-                return waitForPromisesToResolve();
             })
             .then(() => {
                 expect(getByTestId('text-element').props.children).toEqual('test_1');
             })
             .then(() => {
                 rerender(<TestComponentWithOnyx collectionID="2" />);
+
+                // Note, when we change the prop, we need to wait for the next tick:
                 return waitForPromisesToResolve();
             })
             .then(() => {
@@ -232,7 +230,6 @@ describe('withOnyx', () => {
                     }),
                 )(ViewWithCollections);
                 render(<TestComponentWithOnyx onRender={onRender} />);
-                return waitForPromisesToResolve();
             })
             .then(() => {
                 expect(onRender).toHaveBeenLastCalledWith({
@@ -276,16 +273,12 @@ describe('withOnyx', () => {
                     },
                 })(ViewWithCollections);
                 render(<TestComponentWithOnyx3 onRender={onRender3} />);
+            })
 
-                return waitForPromisesToResolve();
-            })
-            .then(() => {
-                // When a single item in the collection is updated with mergeCollect()
-                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
-                    test_1: {ID: 1, newProperty: 'yay'},
-                });
-                return waitForPromisesToResolve();
-            })
+            // When a single item in the collection is updated with mergeCollection()
+            .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                test_1: {ID: 1, newProperty: 'yay'},
+            }))
             .then(() => {
                 // Then the component subscribed to the modified item should have the new version of the item
                 // and all other components should be unchanged.
@@ -320,16 +313,12 @@ describe('withOnyx', () => {
                     },
                 })(ViewWithCollections);
                 render(<TestComponentWithOnyx onRender={onRender} />);
+            })
 
-                return waitForPromisesToResolve();
-            })
-            .then(() => {
-                // When the `number` property is updated using mergeCollection to be 2
-                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
-                    test_1: {number: 2},
-                });
-                return waitForPromisesToResolve();
-            })
+            // When the `number` property is updated using mergeCollection to be 2
+            .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                test_1: {number: 2},
+            }))
             .then(() => {
                 // Then the component subscribed to the modified item should be rendered twice.
                 // The first time it will render with number === 1
@@ -355,22 +344,17 @@ describe('withOnyx', () => {
                     },
                 })(ViewWithCollections);
                 render(<TestComponentWithOnyx onRender={onRender} />);
+            })
 
-                return waitForPromisesToResolve();
-            })
-            .then(() => {
-                // And we set the value to the same value it was before
-                Onyx.merge(ONYX_KEYS.SIMPLE_KEY, 'string');
-                return waitForPromisesToResolve();
-            })
+            // And we set the value to the same value it was before
+            .then(() => Onyx.merge(ONYX_KEYS.SIMPLE_KEY, 'string'))
             .then(() => {
                 // Then the component subscribed to the modified item should only render once
                 expect(onRender).toHaveBeenCalledTimes(1);
                 expect(onRender.mock.calls[0][0].simple).toBe('string');
 
                 // If we change the value to something new
-                Onyx.merge(ONYX_KEYS.SIMPLE_KEY, 'long_string');
-                return waitForPromisesToResolve();
+                return Onyx.merge(ONYX_KEYS.SIMPLE_KEY, 'long_string');
             })
             .then(() => {
                 // Then the component subscribed to the modified item should only render once
