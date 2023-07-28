@@ -106,7 +106,6 @@ type OnyxKey = Key | CollectionKey;
  */
 type KeyValueMapping = TypeOptions['values'];
 
-// TODO: Still being worked on.
 /**
  * Represents a selector function type which operates based on the provided `TKey` and `ReturnType`.
  *
@@ -136,27 +135,11 @@ type OnyxRecord<TOnyxValue> = TOnyxValue | null;
  */
 type OnyxCollectionRecords<TOnyxValue> = Record<string, TOnyxValue | null> | null;
 
-// TODO: Still being worked on.
-type GetOnyxValue<K extends Key | `${CollectionKeyBase}${string}`> = K extends Key
-    ? KeyValueMapping[K]
-    : K extends `${CollectionKeyBase}`
-    ? Record<string, KeyValueMapping[K] | null>
-    : KeyValueMapping[K];
-
-// type Selector<TKey extends OnyxKey, TReturnType> = KeyValueMapping[TKey] extends object | string | number | boolean
-//     ? (value: KeyValueMapping[TKey] | null) => TReturnType
-//     : KeyValueMapping[TKey] extends unknown
-//     ? (value: unknown) => unknown
-//     : never;
-
-// type Selector<TKey extends OnyxKey, TReturnType> = IsEqual<GetOnyxValue<TKey>, unknown> extends true ? (value: unknown) => unknown : (value: GetOnyxValue<TKey> | null) => TReturnType;
-
 export {
     CollectionKey,
     CollectionKeyBase,
     CustomTypeOptions,
     DeepRecord,
-    GetOnyxValue,
     Key,
     KeyValueMapping,
     MergeBy,
