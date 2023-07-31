@@ -3,13 +3,13 @@ import {PartialDeep} from 'type-fest';
 import * as Logger from './Logger';
 import {
     CollectionKey,
+    CollectionKeyBase,
     DeepRecord,
     Key,
-    OnyxKey,
     KeyValueMapping,
-    Selector,
-    OnyxRecord,
     OnyxCollectionRecords,
+    OnyxKey,
+    OnyxRecord,
 } from './types';
 
 /**
@@ -28,7 +28,6 @@ type BaseConnectOptions<TKey extends OnyxKey> = {
     statePropertyName?: string;
     withOnyxInstance?: Component;
     initWithStoredValues?: boolean;
-    selector?: Selector<TKey, OnyxRecord<KeyValueMapping[TKey]>>;
 };
 
 /**
@@ -59,7 +58,7 @@ type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions<TKey> &
  * It helps to enforce that a Onyx collection key should not be without suffix (e.g. should always be of the form `${TKey}${string}`),
  * and to map each Onyx collection key with suffix to a value of type `TValue`.
  */
-type Collection<TKey extends Key, TMap, TValue> = {
+type Collection<TKey extends CollectionKeyBase, TMap, TValue> = {
     [MapK in keyof TMap]: MapK extends `${TKey}${string}`
         ? MapK extends `${TKey}`
             ? never // forbids empty id
@@ -83,12 +82,12 @@ type OnyxUpdate<TKey extends OnyxKey> =
           value: PartialDeep<KeyValueMapping[TKey]>;
       }
     | {
-          [TKey in CollectionKey]: {
+          [TKey in CollectionKeyBase]: {
               onyxMethod: typeof METHOD.MERGE_COLLECTION;
               key: TKey;
               value: Record<`${TKey}${string}`, PartialDeep<KeyValueMapping[TKey]>>;
           };
-      }[CollectionKey];
+      }[CollectionKeyBase];
 
 /**
  * Represents a record of `OnyxUpdate`s to be passed to `Onyx.update()` method, indexed by keys of type `OnyxKey`.
@@ -167,11 +166,6 @@ declare function addToEvictionBlockList(key: OnyxKey, connectionID: number): voi
  * @param [mapping.initWithStoredValues] If set to false, then no data will be prefilled into the
  *  component
  * @param [mapping.waitForCollectionCallback] If set to true, it will return the entire collection to the callback as a single object
- * @param [mapping.selector] THIS PARAM IS ONLY USED WITH withOnyx(). If included, this will be used to subscribe to a subset of an Onyx key's data.
- *       If the selector is a string, the selector is passed to lodashGet on the sourceData. If the selector is a function, the sourceData and withOnyx state are
- *       passed to the selector and should return the simplified data. Using this setting on `withOnyx` can have very positive performance benefits because the component
- *       will only re-render when the subset of data changes. Otherwise, any change of data on any property would normally cause the component to re-render (and that can
- *       be expensive from a performance standpoint).
  * @returns an ID to use when calling disconnect
  */
 declare function connect<TKey extends OnyxKey>(mapping: ConnectOptions<TKey>): number;
@@ -262,7 +256,7 @@ declare function clear(keysToPreserve?: OnyxKey[]): Promise<void>;
  * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
  * @param collection Object collection keyed by individual collection member keys and values
  */
-declare function mergeCollection<TKey extends CollectionKey, TMap>(
+declare function mergeCollection<TKey extends CollectionKeyBase, TMap>(
     collectionKey: TKey,
     collection: Collection<TKey, TMap, PartialDeep<KeyValueMapping[TKey]>>,
 ): Promise<void>;

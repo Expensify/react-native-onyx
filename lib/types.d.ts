@@ -133,7 +133,7 @@ type OnyxRecord<TOnyxValue> = TOnyxValue | null;
 /**
  * Represents an Onyx collection of records, that can be either a record of `TOnyxValue`s or `null` if it is empty or doesn't exist.
  */
-type OnyxCollectionRecords<TOnyxValue> = Record<string, TOnyxValue | null> | null;
+type OnyxCollectionRecords<TOnyxValue> = OnyxRecord<Record<string, TOnyxValue | null>>;
 
 export {
     CollectionKey,
