@@ -7,9 +7,9 @@ import {
     DeepRecord,
     Key,
     KeyValueMapping,
-    OnyxCollectionRecords,
+    OnyxCollectionEntries,
     OnyxKey,
-    OnyxRecord,
+    OnyxEntry,
 } from './types';
 
 /**
@@ -18,7 +18,7 @@ import {
  * It's very similar to `KeyValueMapping` but this type accepts using `null` as well.
  */
 type NullableKeyValueMapping = {
-    [TKey in OnyxKey]: OnyxRecord<KeyValueMapping[TKey]>;
+    [TKey in OnyxKey]: OnyxEntry<KeyValueMapping[TKey]>;
 };
 
 /**
@@ -35,20 +35,20 @@ type BaseConnectOptions<TKey extends OnyxKey> = {
  * The type is built from `BaseConnectOptions` and extended to handle key/callback related options.
  * It includes two different forms, depending on whether we are waiting for a collection callback or not.
  *
- * If `waitForCollectionCallback` is `true`, it expects `key` to be a Onyx collection key and `callback` will pass `value` as an `OnyxCollectionRecords`.
+ * If `waitForCollectionCallback` is `true`, it expects `key` to be a Onyx collection key and `callback` will pass `value` as an `OnyxCollectionEntries`.
  *
- * If `waitForCollectionCallback` is `false` or not specified, the `key` can be any Onyx key and `callback` will pass `value` as an `OnyxRecord`.
+ * If `waitForCollectionCallback` is `false` or not specified, the `key` can be any Onyx key and `callback` will pass `value` as an `OnyxEntry`.
  */
 type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions<TKey> &
     (
         | {
               key: TKey extends CollectionKey ? TKey : never;
-              callback?: (value: OnyxCollectionRecords<KeyValueMapping[TKey]>, key?: TKey) => void;
+              callback?: (value: OnyxCollectionEntries<KeyValueMapping[TKey]>, key?: TKey) => void;
               waitForCollectionCallback: true;
           }
         | {
               key: TKey;
-              callback?: (value: OnyxRecord<KeyValueMapping[TKey]>, key?: TKey) => void;
+              callback?: (value: OnyxEntry<KeyValueMapping[TKey]>, key?: TKey) => void;
               waitForCollectionCallback?: false;
           }
     );
@@ -74,7 +74,7 @@ type OnyxUpdate<TKey extends OnyxKey> =
     | {
           onyxMethod: typeof METHOD.SET;
           key: TKey;
-          value: OnyxRecord<KeyValueMapping[TKey]>;
+          value: OnyxEntry<KeyValueMapping[TKey]>;
       }
     | {
           onyxMethod: typeof METHOD.MERGE;
@@ -125,25 +125,17 @@ declare function getAllKeys(): Promise<Array<OnyxKey>>;
 /**
  * Checks to see if this key has been flagged as
  * safe for removal.
- *
- * @param testKey
  */
 declare function isSafeEvictionKey(testKey: OnyxKey): boolean;
 
 /**
  * Removes a key previously added to this list
  * which will enable it to be deleted again.
- *
- * @param key
- * @param connectionID
  */
 declare function removeFromEvictionBlockList(key: OnyxKey, connectionID: number): void;
 
 /**
  * Keys added to this list can never be deleted.
- *
- * @param key
- * @param connectionID
  */
 declare function addToEvictionBlockList(key: OnyxKey, connectionID: number): void;
 
@@ -176,7 +168,6 @@ declare function connect<TKey extends OnyxKey>(mapping: ConnectOptions<TKey>): n
  * Onyx.disconnect(connectionID);
  *
  * @param connectionID unique id returned by call to Onyx.connect()
- * @param [keyToRemoveFromEvictionBlocklist]
  */
 declare function disconnect(connectionID: number, keyToRemoveFromEvictionBlocklist?: OnyxKey): void;
 
@@ -186,7 +177,7 @@ declare function disconnect(connectionID: number, keyToRemoveFromEvictionBlockli
  * @param key ONYXKEY to set
  * @param value value to store
  */
-declare function set<TKey extends OnyxKey>(key: TKey, value: OnyxRecord<KeyValueMapping[TKey]>): Promise<void>;
+declare function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[TKey]>): Promise<void>;
 
 /**
  * Sets multiple keys and values
@@ -298,13 +289,11 @@ declare function init(config?: InitOptions): void;
 
 /**
  * @private
- * @param key
  */
 declare function hasPendingMergeForKey(key: OnyxKey): boolean;
 
 /**
  * When set these keys will not be persisted to storage
- * @param keyList
  */
 declare function setMemoryOnlyKeys(keyList: OnyxKey[]): void;
 

@@ -119,21 +119,21 @@ type KeyValueMapping = TypeOptions['values'];
  * that takes any value and returns an `unknown` value.
  *
  * If `KeyValueMapping[TKey]` is not 'unknown', the `Selector` type represents a function that
- * takes either the value of type `OnyxRecord<KeyValueMapping[TKey]>`, and returns a value of `TReturnType`.
+ * takes either the value of type `OnyxEntry<KeyValueMapping[TKey]>`, and returns a value of `TReturnType`.
  */
 type Selector<TKey extends OnyxKey, TReturnType> = IsEqual<KeyValueMapping[TKey], unknown> extends true
     ? (value: unknown) => unknown
-    : (value: OnyxRecord<KeyValueMapping[TKey]>) => TReturnType;
+    : (value: OnyxEntry<KeyValueMapping[TKey]>) => TReturnType;
 
 /**
- * Represents a single Onyx record, that can be either `TOnyxValue` or `null` if it doesn't exist.
+ * Represents a single Onyx entry, that can be either `TOnyxValue` or `null` if it doesn't exist.
  */
-type OnyxRecord<TOnyxValue> = TOnyxValue | null;
+type OnyxEntry<TOnyxValue> = TOnyxValue | null;
 
 /**
- * Represents an Onyx collection of records, that can be either a record of `TOnyxValue`s or `null` if it is empty or doesn't exist.
+ * Represents an Onyx collection of entries, that can be either a record of `TOnyxValue`s or `null` if it is empty or doesn't exist.
  */
-type OnyxCollectionRecords<TOnyxValue> = OnyxRecord<Record<string, TOnyxValue | null>>;
+type OnyxCollectionEntries<TOnyxValue> = OnyxEntry<Record<string, TOnyxValue | null>>;
 
 export {
     CollectionKey,
@@ -146,6 +146,6 @@ export {
     OnyxKey,
     Selector,
     TypeOptions,
-    OnyxRecord,
-    OnyxCollectionRecords,
+    OnyxEntry,
+    OnyxCollectionEntries,
 };

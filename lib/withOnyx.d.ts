@@ -1,5 +1,5 @@
 import {IsEqual} from 'type-fest';
-import {CollectionKeyBase, KeyValueMapping, OnyxCollectionRecords, OnyxKey, OnyxRecord, Selector} from './types';
+import {CollectionKeyBase, KeyValueMapping, OnyxCollectionEntries, OnyxEntry, OnyxKey, Selector} from './types';
 
 /**
  * Represents the base mapping options between an Onyx key and the component's prop.
@@ -101,7 +101,7 @@ type Mapping<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TO
     TOnyxProps
 > &
     (
-        | BaseMappingKey<TComponentProps, TOnyxProps, TOnyxProp, TOnyxKey, OnyxRecord<KeyValueMapping[TOnyxKey]>>
+        | BaseMappingKey<TComponentProps, TOnyxProps, TOnyxProp, TOnyxKey, OnyxEntry<KeyValueMapping[TOnyxKey]>>
         | BaseMappingStringKeyAndSelector<TComponentProps, TOnyxProps, TOnyxProp, TOnyxKey>
         | BaseMappingFunctionKeyAndSelector<TComponentProps, TOnyxProps, TOnyxProp, TOnyxKey>
     );
@@ -121,7 +121,7 @@ type CollectionMapping<
               TOnyxProps,
               TOnyxProp,
               TOnyxKey,
-              OnyxCollectionRecords<KeyValueMapping[TOnyxKey]>
+              OnyxCollectionEntries<KeyValueMapping[TOnyxKey]>
           >
         | BaseMappingStringKeyAndSelector<TComponentProps, TOnyxProps, TOnyxProp, TOnyxKey>
         | BaseMappingFunctionKeyAndSelector<TComponentProps, TOnyxProps, TOnyxProp, TOnyxKey>
