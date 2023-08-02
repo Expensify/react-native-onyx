@@ -97,9 +97,19 @@ type CollectionKey = `${CollectionKeyBase}${string}`;
 type OnyxKey = Key | CollectionKey;
 
 /**
- * Represents a Record where each key is an Onyx key and each value is its corresponding Onyx value type.
+ * Represents a mapping of Onyx keys to values, where keys are either normal or collection Onyx keys
+ * and values are the corresponding values in Onyx's state.
+ *
+ * For collection keys, `KeyValueMapping` allows any string to be appended
+ * to the key (e.g., 'report_some-id', 'download_some-id').
+ *
+ * The mapping is derived from the `values` property of the `TypeOptions` type.
  */
-type KeyValueMapping = TypeOptions['values'];
+type KeyValueMapping = {
+    [TKey in keyof TypeOptions['values'] as TKey extends CollectionKeyBase
+        ? `${TKey}${string}`
+        : TKey]: TypeOptions['values'][TKey];
+};
 
 /**
  * Represents a selector function type which operates based on the provided `TKey` and `ReturnType`.
