@@ -1,10 +1,4 @@
-import {IsEqual} from 'type-fest';
-
-/**
- * Represents a merged object between `TObject` and `TOtherObject`.
- * If both objects have a property with the same name, the type from `TOtherObject` is used.
- */
-type MergeBy<TObject, TOtherObject> = Omit<TObject, keyof TOtherObject> & TOtherObject;
+import {IsEqual, Merge} from 'type-fest';
 
 /**
  * Represents a deeply nested record. It maps keys to values,
@@ -24,7 +18,7 @@ type DeepRecord<TKey extends string | number | symbol, TValue> = {[key: string]:
  * The user-defined options (CustomTypeOptions) are merged into these predefined options.
  * In case of conflicting properties, the ones from CustomTypeOptions are prioritized.
  */
-type TypeOptions = MergeBy<
+type TypeOptions = Merge<
     {
         keys: string;
         collectionKeys: string;
@@ -42,6 +36,7 @@ type TypeOptions = MergeBy<
  * ```ts
  * // ONYXKEYS.ts
  * import {ValueOf} from 'type-fest';
+ * import { Account, Report } from './types';
  *
  * const ONYXKEYS = {
  *     ACCOUNT: 'account',
@@ -142,10 +137,8 @@ export {
     DeepRecord,
     Key,
     KeyValueMapping,
-    MergeBy,
+    OnyxCollectionEntries,
+    OnyxEntry,
     OnyxKey,
     Selector,
-    TypeOptions,
-    OnyxEntry,
-    OnyxCollectionEntries,
 };
