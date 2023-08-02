@@ -122,11 +122,61 @@ type Selector<TKey extends OnyxKey, TReturnType> = IsEqual<KeyValueMapping[TKey]
 
 /**
  * Represents a single Onyx entry, that can be either `TOnyxValue` or `null` if it doesn't exist.
+ *
+ * It can be used to specify data retrieved from Onyx e.g. `withOnyx` HOC mappings.
+ *
+ * @example
+ * ```ts
+ * import Onyx, {OnyxEntry, withOnyx} from 'react-native-onyx';
+ *
+ * type OnyxProps = {
+ *     userAccount: OnyxEntry<Account>;
+ * };
+ *
+ * type Props = OnyxProps & {
+ *     prop1: string;
+ * };
+ *
+ * function Component({prop1, userAccount}: Props) {
+ *     // ...
+ * }
+ *
+ * export default withOnyx<Props, OnyxProps>({
+ *     userAccount: {
+ *         key: ONYXKEYS.ACCOUNT,
+ *     },
+ * })(Component);
+ * ```
  */
 type OnyxEntry<TOnyxValue> = TOnyxValue | null;
 
 /**
  * Represents an Onyx collection of entries, that can be either a record of `TOnyxValue`s or `null` if it is empty or doesn't exist.
+ *
+ * It can be used to specify collection data retrieved from Onyx e.g. `withOnyx` HOC mappings.
+ *
+ * @example
+ * ```ts
+ * import Onyx, {OnyxCollectionEntries, withOnyx} from 'react-native-onyx';
+ *
+ * type OnyxProps = {
+ *     reports: OnyxCollectionEntries<Report>;
+ * };
+ *
+ * type Props = OnyxProps & {
+ *     prop1: string;
+ * };
+ *
+ * function Component({prop1, reports}: Props) {
+ *     // ...
+ * }
+ *
+ * export default withOnyx<Props, OnyxProps>({
+ *     reports: {
+ *         key: ONYXKEYS.COLLECTION.REPORT,
+ *     },
+ * })(Component);
+ * ```
  */
 type OnyxCollectionEntries<TOnyxValue> = OnyxEntry<Record<string, TOnyxValue | null>>;
 
