@@ -118,7 +118,7 @@ describe('Onyx', () => {
             })
             .then(() => {
                 // Test key should be cleared
-                expect(testKeyValue).toBeNull();
+                expect(testKeyValue).toBeUndefined();
 
                 // Other test key should be returned to its default state
                 expect(otherTestValue).toBe(42);
