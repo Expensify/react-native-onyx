@@ -5,11 +5,10 @@ import {
     CollectionKey,
     CollectionKeyBase,
     DeepRecord,
-    Key,
     KeyValueMapping,
-    OnyxCollectionEntries,
-    OnyxKey,
+    OnyxCollection,
     OnyxEntry,
+    OnyxKey,
 } from './types';
 
 /**
@@ -35,7 +34,7 @@ type BaseConnectOptions<TKey extends OnyxKey> = {
  * The type is built from `BaseConnectOptions` and extended to handle key/callback related options.
  * It includes two different forms, depending on whether we are waiting for a collection callback or not.
  *
- * If `waitForCollectionCallback` is `true`, it expects `key` to be a Onyx collection key and `callback` will pass `value` as an `OnyxCollectionEntries`.
+ * If `waitForCollectionCallback` is `true`, it expects `key` to be a Onyx collection key and `callback` will pass `value` as an `OnyxCollection`.
  *
  * If `waitForCollectionCallback` is `false` or not specified, the `key` can be any Onyx key and `callback` will pass `value` as an `OnyxEntry`.
  */
@@ -43,7 +42,7 @@ type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions<TKey> &
     (
         | {
               key: TKey extends CollectionKey ? TKey : never;
-              callback?: (value: OnyxCollectionEntries<KeyValueMapping[TKey]>, key?: TKey) => void;
+              callback?: (value: OnyxCollection<KeyValueMapping[TKey]>, key?: TKey) => void;
               waitForCollectionCallback: true;
           }
         | {

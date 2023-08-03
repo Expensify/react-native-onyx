@@ -55,7 +55,7 @@ type TypeOptions = Merge<
  * type OnyxValues = {
  *     [ONYXKEYS.ACCOUNT]: Account;
  *     [ONYXKEYS.IS_SIDEBAR_LOADED]: boolean;
- *     [report: `${typeof ONYXKEYS.COLLECTION.REPORT}${string}`]: Report;
+ *     [ONYXKEYS.COLLECTION.REPORT]: Report;
  * };
  *
  * export default ONYXKEYS;
@@ -167,10 +167,10 @@ type OnyxEntry<TOnyxValue> = TOnyxValue | null;
  *
  * @example
  * ```ts
- * import Onyx, {OnyxCollectionEntries, withOnyx} from 'react-native-onyx';
+ * import Onyx, {OnyxCollection, withOnyx} from 'react-native-onyx';
  *
  * type OnyxProps = {
- *     reports: OnyxCollectionEntries<Report>;
+ *     reports: OnyxCollection<Report>;
  * };
  *
  * type Props = OnyxProps & {
@@ -188,7 +188,7 @@ type OnyxEntry<TOnyxValue> = TOnyxValue | null;
  * })(Component);
  * ```
  */
-type OnyxCollectionEntries<TOnyxValue> = OnyxEntry<Record<string, TOnyxValue | null>>;
+type OnyxCollection<TOnyxValue> = OnyxEntry<Record<string, TOnyxValue | null>>;
 
 export {
     CollectionKey,
@@ -197,7 +197,7 @@ export {
     DeepRecord,
     Key,
     KeyValueMapping,
-    OnyxCollectionEntries,
+    OnyxCollection,
     OnyxEntry,
     OnyxKey,
     Selector,
