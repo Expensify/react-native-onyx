@@ -312,3 +312,4 @@ declare const Onyx: {
 };
 
 export default Onyx;
+export {OnyxUpdate};
