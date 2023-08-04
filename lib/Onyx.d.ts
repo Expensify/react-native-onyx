@@ -69,17 +69,38 @@ type Collection<TKey extends CollectionKeyBase, TMap, TValue> = {
  * Represents different kinds of updates that can be passed to `Onyx.update()` method. It is a discriminated union of
  * different update methods (`SET`, `MERGE`, `MERGE_COLLECTION`), each with their own key and value structure.
  */
-type OnyxUpdate<TKey extends OnyxKey> =
+// type OnyxUpdate<TKey extends OnyxKey> =
+//     | {
+//           onyxMethod: typeof METHOD.SET;
+//           key: TKey;
+//           value: OnyxEntry<KeyValueMapping[TKey]>;
+//       }
+//     | {
+//           onyxMethod: typeof METHOD.MERGE;
+//           key: TKey;
+//           value: PartialDeep<KeyValueMapping[TKey]>;
+//       }
+//     | {
+//           [TKey in CollectionKeyBase]: {
+//               onyxMethod: typeof METHOD.MERGE_COLLECTION;
+//               key: TKey;
+//               value: Record<`${TKey}${string}`, PartialDeep<KeyValueMapping[TKey]>>;
+//           };
+//       }[CollectionKeyBase];
+type OnyxUpdate =
     | {
-          onyxMethod: typeof METHOD.SET;
-          key: TKey;
-          value: OnyxEntry<KeyValueMapping[TKey]>;
-      }
-    | {
-          onyxMethod: typeof METHOD.MERGE;
-          key: TKey;
-          value: PartialDeep<KeyValueMapping[TKey]>;
-      }
+          [TKey in OnyxKey]:
+              | {
+                    onyxMethod: typeof METHOD.SET;
+                    key: TKey;
+                    value: OnyxEntry<KeyValueMapping[TKey]>;
+                }
+              | {
+                    onyxMethod: typeof METHOD.MERGE;
+                    key: TKey;
+                    value: PartialDeep<KeyValueMapping[TKey]>;
+                };
+      }[OnyxKey]
     | {
           [TKey in CollectionKeyBase]: {
               onyxMethod: typeof METHOD.MERGE_COLLECTION;
@@ -88,13 +109,13 @@ type OnyxUpdate<TKey extends OnyxKey> =
           };
       }[CollectionKeyBase];
 
-/**
- * Represents a record of `OnyxUpdate`s to be passed to `Onyx.update()` method, indexed by keys of type `OnyxKey`.
- * Each `OnyxUpdate` will be associated with its respective Onyx key, ensuring different type-safety for each object.
- */
-type OnyxUpdates<TKeyList extends OnyxKey[]> = {
-    [TKey in keyof TKeyList]: OnyxUpdate<TKeyList[TKey]>;
-};
+// /**
+//  * Represents a record of `OnyxUpdate`s to be passed to `Onyx.update()` method, indexed by keys of type `OnyxKey`.
+//  * Each `OnyxUpdate` will be associated with its respective Onyx key, ensuring different type-safety for each object.
+//  */
+// type OnyxUpdates<TKeyList extends OnyxKey[]> = {
+//     [TKey in keyof TKeyList]: OnyxUpdate<TKeyList[TKey]>;
+// };
 
 /**
  * Represents the options used in `Onyx.init()` method.
@@ -257,7 +278,8 @@ declare function mergeCollection<TKey extends CollectionKeyBase, TMap>(
  * @param data An array of objects with shape {onyxMethod: oneOf('set', 'merge', 'mergeCollection'), key: string, value: *}
  * @returns resolves when all operations are complete
  */
-declare function update<TKeyList extends OnyxKey[]>(data: OnyxUpdates<[...TKeyList]>): Promise<void>;
+// declare function update<TKeyList extends OnyxKey[]>(data: OnyxUpdates<[...TKeyList]>): Promise<void>;
+declare function update(data: OnyxUpdate[]): Promise<void>;
 
 /**
  * Initialize the store with actions and listening for storage events
