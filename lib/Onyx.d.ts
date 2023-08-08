@@ -34,9 +34,12 @@ type BaseConnectOptions = {
  * The type is built from `BaseConnectOptions` and extended to handle key/callback related options.
  * It includes two different forms, depending on whether we are waiting for a collection callback or not.
  *
- * If `waitForCollectionCallback` is `true`, it expects `key` to be a Onyx collection key and `callback` will pass `value` as an `OnyxCollection`.
+ * If `waitForCollectionCallback` is `true`, it expects `key` to be a Onyx collection key and `callback` will be triggered with the whole collection
+ * and will pass `value` as an `OnyxCollection`.
  *
- * If `waitForCollectionCallback` is `false` or not specified, the `key` can be any Onyx key and `callback` will pass `value` as an `OnyxEntry`.
+ *
+ * If `waitForCollectionCallback` is `false` or not specified, the `key` can be any Onyx key and `callback` will be triggered with updates of each collection item
+ * and will pass `value` as an `OnyxEntry`.
  */
 type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions &
     (
@@ -54,8 +57,12 @@ type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions &
 
 /**
  * Represents a mapping between Onyx collection keys and their respective values.
+ *
  * It helps to enforce that a Onyx collection key should not be without suffix (e.g. should always be of the form `${TKey}${string}`),
  * and to map each Onyx collection key with suffix to a value of type `TValue`.
+ *
+ * Also, the `TMap` type is inferred automatically in `mergeCollection()` method and represents
+ * the object of collection keys/values specified in the second parameter of the method.
  */
 type Collection<TKey extends CollectionKeyBase, TMap, TValue> = {
     [MapK in keyof TMap]: MapK extends `${TKey}${string}`
@@ -95,7 +102,7 @@ type OnyxUpdate =
  * Represents the options used in `Onyx.init()` method.
  */
 type InitOptions = {
-    keys?: DeepRecord<string, string>;
+    keys?: DeepRecord<string, OnyxKey>;
     initialKeyStates?: Partial<NullableKeyValueMapping>;
     safeEvictionKeys?: OnyxKey[];
     maxCachedKeysCount?: number;
@@ -231,6 +238,10 @@ declare function clear(keysToPreserve?: OnyxKey[]): Promise<void>;
 /**
  * Merges a collection based on their keys
  *
+ * Note that both `TKey` and `TMap` types are inferred automatically, `TKey` being the
+ * collection key specified in the first parameter and `TMap` being the object of
+ * collection keys/values specified in the second parameter.
+ *
  * @example
  *
  * Onyx.mergeCollection(ONYXKEYS.COLLECTION.REPORT, {
@@ -249,7 +260,7 @@ declare function mergeCollection<TKey extends CollectionKeyBase, TMap>(
 /**
  * Insert API responses and lifecycle data into Onyx
  *
- * @param data An array of objects with shape {onyxMethod: oneOf('set', 'merge', 'mergeCollection'), key: string, value: *}
+ * @param data An array of update objects
  * @returns resolves when all operations are complete
  */
 declare function update(data: OnyxUpdate[]): Promise<void>;

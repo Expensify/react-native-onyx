@@ -119,16 +119,8 @@ type KeyValueMapping = {
  *
  * The type `TKey` extends `OnyxKey` and it is the key used to access a value in `KeyValueMapping`.
  * `TReturnType` is the type of the returned value from the selector function.
- *
- * If `KeyValueMapping[TKey]` is equal to 'unknown', the `Selector` type represents a function
- * that takes any value and returns an `unknown` value.
- *
- * If `KeyValueMapping[TKey]` is not 'unknown', the `Selector` type represents a function that
- * takes either the value of type `OnyxEntry<KeyValueMapping[TKey]>`, and returns a value of `TReturnType`.
  */
-type Selector<TKey extends OnyxKey, TReturnType> = IsEqual<KeyValueMapping[TKey], unknown> extends true
-    ? (value: unknown) => unknown
-    : (value: OnyxEntry<KeyValueMapping[TKey]>) => TReturnType;
+type Selector<TKey extends OnyxKey, TReturnType> = (value: OnyxEntry<KeyValueMapping[TKey]>) => TReturnType;
 
 /**
  * Represents a single Onyx entry, that can be either `TOnyxValue` or `null` if it doesn't exist.
