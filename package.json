@@ -1,6 +1,6 @@
 {
   "name": "react-native-onyx",
-  "version": "1.0.61",
+  "version": "1.0.63",
   "author": "Expensify, Inc.",
   "homepage": "https://expensify.com",
   "description": "State management for React Native",
@@ -59,10 +59,10 @@
     "eslint-config-expensify": "^2.0.38",
     "eslint-plugin-jsx-a11y": "^6.6.1",
     "eslint-plugin-react": "^7.31.10",
+    "idb-keyval": "^6.2.1",
     "jest": "^26.5.2",
     "jest-cli": "^26.5.2",
     "jsdoc-to-markdown": "^7.1.0",
-    "localforage": "^1.10.0",
     "metro-react-native-babel-preset": "^0.72.3",
     "prop-types": "^15.7.2",
     "react": "18.2.0",
@@ -77,24 +77,20 @@
     "webpack-merge": "^5.8.0"
   },
   "peerDependencies": {
-    "localforage": "^1.10.0",
-    "localforage-removeitems": "^1.4.0",
+    "idb-keyval": "^6.2.1",
     "react": ">=18.1.0",
     "react-native-performance": "^4.0.0",
     "react-native-quick-sqlite": "^8.0.0-beta.2",
     "react-native-device-info": "^10.3.0"
   },
   "peerDependenciesMeta": {
+    "idb-keyval": {
+      "optional": true
+    },
     "react-native-performance": {
       "optional": true
     },
     "react-native-quick-sqlite": {
-      "optional": true
-    },
-    "localforage": {
-      "optional": true
-    },
-    "localforage-removeitems": {
       "optional": true
     },
     "react-native-device-info": {
