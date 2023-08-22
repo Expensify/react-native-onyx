@@ -53,6 +53,22 @@ describe('Onyx', () => {
             expect(keys.includes(ONYX_KEYS.OTHER_TEST)).toBe(false);
         }));
 
+    it('should not provide null values to subscriber callback when set is called with null value', () => {
+        const subscriberCallback = jest.fn();
+        Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION,
+            waitForCollectionCallback: true,
+            callback: subscriberCallback,
+        });
+        const itemID = 'abcd';
+        const testKey = `${ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION}${itemID}`;
+        return Onyx.set(testKey, 42)
+            .then(() => expect(subscriberCallback).toHaveBeenCalledWith({[testKey]: 42}))
+            .then(() => Onyx.set(testKey, null))
+            .then(() => expect(subscriberCallback).toHaveBeenCalledWith({}))
+            .then(() => expect(subscriberCallback).toHaveBeenCalledTimes(2));
+    });
+
     it('should set a simple key', () => {
         let testKeyValue;
 
