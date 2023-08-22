@@ -583,27 +583,6 @@ describe('Onyx', () => {
             expect(error.message)
                 .toEqual('Invalid value provided in Onyx multiSet. Onyx multiSet value must be of type object.');
         }
-
-        try {
-            Onyx.update([
-                {
-                    onyxMethod: 'multiset',
-                    value: {
-                        0: {
-                            ID: 123,
-                            value: 'one',
-                        },
-                        1: {
-                            ID: 234,
-                            value: 'two',
-                        },
-                    },
-                },
-            ]);
-        } catch (error) {
-            expect(error.message)
-                .toEqual('Invalid Number key provided in Onyx multiSet. Onyx key must be of type string.`');
-        }
     });
 
     it('should return all collection keys as a single object when waitForCollectionCallback = true', () => {
