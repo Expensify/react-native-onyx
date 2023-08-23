@@ -494,7 +494,7 @@ describe('Onyx', () => {
         // Given the invalid data object with onyxMethod='multiSet'
         const data = [
             {onyxMethod: 'set', key: ONYX_KEYS.TEST_KEY, value: 'four'},
-            {onyxMethod: 'multiSet', key: ONYX_KEYS.OTHER_TEST, value: {test2: 'test2'}},
+            {onyxMethod: 'murge', key: ONYX_KEYS.OTHER_TEST, value: {test2: 'test2'}},
         ];
 
         try {
@@ -502,7 +502,7 @@ describe('Onyx', () => {
             Onyx.update(data);
         } catch (error) {
             // Then we should expect the error message below
-            expect(error.message).toEqual('Invalid onyxMethod multiSet in Onyx update.');
+            expect(error.message).toEqual('Invalid onyxMethod murge in Onyx update.');
         }
 
         try {
@@ -514,6 +514,74 @@ describe('Onyx', () => {
         } catch (error) {
             // Then we should expect the error message below
             expect(error.message).toEqual('Invalid boolean key provided in Onyx update. Onyx key must be of type string.');
+        }
+    });
+
+    it('should properly set all keys provided in a multiSet called via update', () => {
+        const valuesReceived = {};
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (data, key) => valuesReceived[key] = data,
+        });
+
+        return Onyx.multiSet({
+            test_1: {
+                existingData: 'test',
+            },
+            test_2: {
+                existingData: 'test',
+            },
+        })
+            .then(() => Onyx.update([
+                {
+                    onyxMethod: 'multiset',
+                    value: {
+                        test_1: {
+                            ID: 123,
+                            value: 'one',
+                        },
+                        test_2: {
+                            ID: 234,
+                            value: 'two',
+                        },
+                    },
+                },
+            ]))
+            .then(() => {
+                expect(valuesReceived).toEqual({
+                    test_1: {
+                        ID: 123,
+                        value: 'one',
+                    },
+                    test_2: {
+                        ID: 234,
+                        value: 'two',
+                    },
+                });
+            });
+    });
+
+    it('should reject an improperly formatted multiset operation called via update', () => {
+        try {
+            Onyx.update([
+                {
+                    onyxMethod: 'multiset',
+                    value: [
+                        {
+                            ID: 123,
+                            value: 'one',
+                        },
+                        {
+                            ID: 234,
+                            value: 'two',
+                        },
+                    ],
+                },
+            ]);
+        } catch (error) {
+            expect(error.message)
+                .toEqual('Invalid value provided in Onyx multiSet. Onyx multiSet value must be of type object.');
         }
     });
 
