@@ -7,6 +7,7 @@ import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import ViewWithText from '../components/ViewWithText';
 import ViewWithCollections from '../components/ViewWithCollections';
 
+jest.useRealTimers();
 describe('Onyx', () => {
     describe('Cache Service', () => {
         /** @type OnyxCache */
@@ -617,8 +618,6 @@ describe('Onyx', () => {
             StorageMock.getItem.mockResolvedValue('"mockValue"');
             const range = _.range(1, 10);
             StorageMock.getAllKeys.mockResolvedValue(_.map(range, n => `key${n}`));
-
-            jest.useFakeTimers();
 
             // Given Onyx with LRU size of 3
             return initOnyx({maxCachedKeysCount: 3})
