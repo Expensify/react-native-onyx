@@ -145,14 +145,12 @@ describe('withOnyx', () => {
         const onRender = jest.fn();
         render(<TestComponentWithOnyx onRender={onRender} />);
         return waitForPromisesToResolve()
-            .then(() => {
-                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_4: {ID: 456}, test_5: {ID: 567}});
-                return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
-                    test_4: {Name: 'Test4'},
-                    test_5: {Name: 'Test5'},
-                    test_6: {ID: 678, Name: 'Test6'},
-                });
-            })
+            .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_4: {ID: 456}, test_5: {ID: 567}}))
+            .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                test_4: {Name: 'Test4'},
+                test_5: {Name: 'Test5'},
+                test_6: {ID: 678, Name: 'Test6'},
+            }))
             .then(() => {
                 expect(onRender).toHaveBeenCalledTimes(3);
                 expect(onRender).toHaveBeenLastCalledWith({
