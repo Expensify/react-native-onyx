@@ -21,7 +21,6 @@ Onyx.init({
     },
 });
 
-jest.useRealTimers();
 describe('Onyx', () => {
     let connectionID;
 

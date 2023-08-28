@@ -1,7 +1,6 @@
 import _ from 'underscore';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
-jest.useRealTimers();
 describe('decorateWithMetrics', () => {
     let decorateWithMetrics; let getMetrics; let resetMetrics;
 

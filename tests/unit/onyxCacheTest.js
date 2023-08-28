@@ -7,7 +7,6 @@ import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import ViewWithText from '../components/ViewWithText';
 import ViewWithCollections from '../components/ViewWithCollections';
 
-jest.useRealTimers();
 describe('Onyx', () => {
     describe('Cache Service', () => {
         /** @type OnyxCache */
