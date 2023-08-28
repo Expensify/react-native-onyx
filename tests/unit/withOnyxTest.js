@@ -32,7 +32,7 @@ describe('withOnyx', () => {
         // the component from {loading: true} to {loading:false, ...data}.
         // We now changed the architecture, so that when a key can be retrieved
         // synchronously from cache, we expect the component to be rendered immediately.
-        Onyx.set(ONYX_KEYS.TEST_KEY, 'test1')
+        return Onyx.set(ONYX_KEYS.TEST_KEY, 'test1')
             .then(() => {
                 const TestComponentWithOnyx = withOnyx({
                     text: {
