@@ -44,7 +44,6 @@ describe('withOnyx', () => {
                 const textComponent = result.getByText('test1');
                 expect(textComponent).not.toBeNull();
 
-                jest.runAllTimers();
                 return waitForPromisesToResolve();
             })
             .then(() => {
