@@ -1,6 +1,7 @@
 import _ from 'underscore';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
+jest.useRealTimers();
 describe('decorateWithMetrics', () => {
     let decorateWithMetrics; let getMetrics; let resetMetrics;
 
@@ -50,14 +51,15 @@ describe('decorateWithMetrics', () => {
         mockFunc = decorateWithMetrics(mockFunc);
         mockFunc();
 
-        waitForPromisesToResolve()
+        return waitForPromisesToResolve()
             .then(() => {
                 // Then the alias should be inferred from the function name
                 const stats = getMetrics();
-                expect(stats).toHaveLength(1);
-                expect(stats).toEqual([
+                const result = stats.summaries.mockFunc;
+                expect(result).not.toBeUndefined();
+                expect(result).toEqual(
                     expect.objectContaining({methodName: 'mockFunc'}),
-                ]);
+                );
             });
     });
 
