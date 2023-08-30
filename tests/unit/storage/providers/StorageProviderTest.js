@@ -1,8 +1,4 @@
 /* eslint-disable import/first */
-jest.mock('react-native-quick-sqlite', () => ({
-    open: () => ({execute: () => {}}),
-}));
-jest.mock('react-native-device-info', () => ({getFreeDiskStorage: () => {}}));
 jest.unmock('../../../../lib/storage/NativeStorage');
 jest.unmock('../../../../lib/storage/WebStorage');
 jest.unmock('../../../../lib/storage/providers/IDBKeyVal');
