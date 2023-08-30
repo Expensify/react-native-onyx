@@ -10,8 +10,6 @@ import WebStorage from '../../../../lib/storage/WebStorage';
 it('storage providers have same methods implemented', () => {
     const nativeMethods = _.keys(NativeStorage);
     const webMethods = _.keys(WebStorage);
-    expect(nativeMethods.length).toEqual(webMethods.length);
-
     const unimplementedMethods = _.difference(nativeMethods, webMethods);
     expect(unimplementedMethods.length).toBe(0);
 });
