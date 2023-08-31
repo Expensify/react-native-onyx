@@ -2,13 +2,12 @@ import {Component} from 'react';
 import {PartialDeep} from 'type-fest';
 import * as Logger from './Logger';
 import {
-    CollectionKey,
     CollectionKeyBase,
     DeepRecord,
     KeyValueMapping,
-    OnyxCollection,
     OnyxEntry,
     OnyxKey,
+    ConnectOptions
 } from './types';
 
 /**
@@ -19,41 +18,6 @@ import {
 type NullableKeyValueMapping = {
     [TKey in OnyxKey]: OnyxEntry<KeyValueMapping[TKey]>;
 };
-
-/**
- * Represents the base options used in `Onyx.connect()` method.
- */
-type BaseConnectOptions = {
-    statePropertyName?: string;
-    withOnyxInstance?: Component;
-    initWithStoredValues?: boolean;
-};
-
-/**
- * Represents the options used in `Onyx.connect()` method.
- * The type is built from `BaseConnectOptions` and extended to handle key/callback related options.
- * It includes two different forms, depending on whether we are waiting for a collection callback or not.
- *
- * If `waitForCollectionCallback` is `true`, it expects `key` to be a Onyx collection key and `callback` will be triggered with the whole collection
- * and will pass `value` as an `OnyxCollection`.
- *
- *
- * If `waitForCollectionCallback` is `false` or not specified, the `key` can be any Onyx key and `callback` will be triggered with updates of each collection item
- * and will pass `value` as an `OnyxEntry`.
- */
-type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions &
-    (
-        | {
-              key: TKey extends CollectionKey ? TKey : never;
-              callback?: (value: OnyxCollection<KeyValueMapping[TKey]>) => void;
-              waitForCollectionCallback: true;
-          }
-        | {
-              key: TKey;
-              callback?: (value: OnyxEntry<KeyValueMapping[TKey]>, key: TKey) => void;
-              waitForCollectionCallback?: false;
-          }
-    );
 
 /**
  * Represents a mapping between Onyx collection keys and their respective values.
