@@ -36,24 +36,37 @@ describe('Onyx', () => {
         return Onyx.clear();
     });
 
-    it('should remove key value from OnyxCache/Storage when set is called with null value', () => Onyx.set(ONYX_KEYS.OTHER_TEST, 42)
-        .then(() => Onyx.getAllKeys())
-        .then((keys) => {
-            expect(keys.includes(ONYX_KEYS.OTHER_TEST)).toBe(true);
-            return Onyx.set(ONYX_KEYS.OTHER_TEST, null);
-        })
-        .then(() => {
-            // Checks if cache value is removed.
-            expect(cache.getAllKeys().length).toBe(0);
+    it('should remove key value from OnyxCache/Storage when set is called with null value', async () => {
+        const subscriberCallback = jest.fn();
+        Onyx.connect({
+            key: ONYX_KEYS.OTHER_TEST,
+            callback: subscriberCallback,
+        });
 
-            // When cache keys length is 0, we fetch the keys from storage.
-            return Onyx.getAllKeys();
-        })
-        .then((keys) => {
-            expect(keys.includes(ONYX_KEYS.OTHER_TEST)).toBe(false);
-        }));
+        // The subscriber callback should immediately be called with the value set in initialKeyStates
+        await waitForPromisesToResolve();
+        expect(subscriberCallback).toHaveBeenCalledWith(42, ONYX_KEYS.OTHER_TEST);
+        expect(subscriberCallback).toHaveBeenCalledTimes(1);
+        expect(cache.getAllKeys().length).toBe(1);
 
-    it('should not provide null values to subscriber callback when set is called with null value', () => {
+        // When we change the value, the same key should be updated in cache and storage, and the subscriber should be notified
+        await Onyx.set(ONYX_KEYS.OTHER_TEST, 43);
+        expect(cache.getAllKeys().length).toBe(1);
+        let storedKeys = await Onyx.getAllKeys();
+        expect(storedKeys.includes(ONYX_KEYS.OTHER_TEST)).toBe(true);
+        expect(subscriberCallback).toHaveBeenCalledWith(43, ONYX_KEYS.OTHER_TEST);
+        expect(subscriberCallback).toHaveBeenCalledTimes(2);
+
+        // When we set the value to null, the key should be removed from cache and storage and the subscriber should be notified
+        await Onyx.set(ONYX_KEYS.OTHER_TEST, null);
+        expect(cache.getAllKeys().length).toBe(0);
+        storedKeys = await Onyx.getAllKeys();
+        expect(storedKeys.length).toBe(0);
+        expect(subscriberCallback).toHaveBeenCalledWith(null, ONYX_KEYS.OTHER_TEST);
+        expect(subscriberCallback).toHaveBeenCalledTimes(3);
+    });
+
+    it('should not provide null values to subscriber callback using waitForCollectionCallback when set is called with null value', () => {
         const subscriberCallback = jest.fn();
         Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION,
