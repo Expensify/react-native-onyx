@@ -54,7 +54,7 @@ describe('Onyx', () => {
         expect(cache.getAllKeys().length).toBe(1);
         let storedKeys = await Onyx.getAllKeys();
         expect(storedKeys.includes(ONYX_KEYS.OTHER_TEST)).toBe(true);
-        expect(subscriberCallback).toHaveBeenCalledWith(43, ONYX_KEYS.OTHER_TEST);
+        expect(subscriberCallback).toHaveBeenLastCalledWith(43, ONYX_KEYS.OTHER_TEST);
         expect(subscriberCallback).toHaveBeenCalledTimes(2);
 
         // When we set the value to null, the key should be removed from cache and storage and the subscriber should be notified
@@ -62,8 +62,54 @@ describe('Onyx', () => {
         expect(cache.getAllKeys().length).toBe(0);
         storedKeys = await Onyx.getAllKeys();
         expect(storedKeys.length).toBe(0);
-        expect(subscriberCallback).toHaveBeenCalledWith(null, ONYX_KEYS.OTHER_TEST);
+        expect(subscriberCallback).toHaveBeenLastCalledWith(null, ONYX_KEYS.OTHER_TEST);
         expect(subscriberCallback).toHaveBeenCalledTimes(3);
+    });
+
+    it('should remove key value from cache + storage when merge is called with null value', async () => {
+        const subscriberCallback = jest.fn();
+        Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            callback: subscriberCallback,
+        });
+
+        await waitForPromisesToResolve();
+        expect(subscriberCallback).toHaveBeenCalledTimes(0);
+
+        await Onyx.set(ONYX_KEYS.TEST_KEY, {
+            a: 42,
+            b: 43,
+        });
+        expect(cache.getAllKeys().includes(ONYX_KEYS.TEST_KEY)).toBe(true);
+        let storedKeys = await Onyx.getAllKeys();
+        expect(storedKeys.includes(ONYX_KEYS.TEST_KEY)).toBe(true);
+        expect(subscriberCallback).toHaveBeenCalledWith({
+            a: 42,
+            b: 43,
+        }, ONYX_KEYS.TEST_KEY);
+        expect(subscriberCallback).toHaveBeenCalledTimes(1);
+
+        await Onyx.merge(ONYX_KEYS.TEST_KEY, {a: null});
+        await waitForPromisesToResolve();
+        expect(cache.getAllKeys().includes(ONYX_KEYS.TEST_KEY)).toBe(true);
+        storedKeys = await Onyx.getAllKeys();
+        expect(storedKeys.includes(ONYX_KEYS.TEST_KEY)).toBe(true);
+        expect(subscriberCallback).toHaveBeenLastCalledWith({b: 43}, ONYX_KEYS.TEST_KEY);
+        expect(subscriberCallback).toHaveBeenCalledTimes(2);
+
+        await Onyx.merge(ONYX_KEYS.TEST_KEY, {b: null});
+        await waitForPromisesToResolve();
+        expect(cache.getAllKeys().includes(ONYX_KEYS.TEST_KEY)).toBe(true);
+        expect(subscriberCallback).toHaveBeenLastCalledWith({}, ONYX_KEYS.TEST_KEY);
+        expect(subscriberCallback).toHaveBeenCalledTimes(3);
+
+        await Onyx.merge(ONYX_KEYS.TEST_KEY, null);
+        await waitForPromisesToResolve();
+        expect(cache.getAllKeys().includes(ONYX_KEYS.TEST_KEY)).toBe(false);
+        storedKeys = await Onyx.getAllKeys();
+        expect(storedKeys.includes(ONYX_KEYS.TEST_KEY)).toBe(false);
+        expect(subscriberCallback).toHaveBeenLastCalledWith(null, ONYX_KEYS.TEST_KEY);
+        expect(subscriberCallback).toHaveBeenCalledTimes(4);
     });
 
     it('should not provide null values to subscriber callback using waitForCollectionCallback when set is called with null value', () => {
