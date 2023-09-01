@@ -6,6 +6,7 @@ import ViewWithText from '../components/ViewWithText';
 import ViewWithCollections from '../components/ViewWithCollections';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import compose from '../../lib/compose';
+import ViewWithObject from '../components/ViewWithObject';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
@@ -14,6 +15,7 @@ const ONYX_KEYS = {
         RELATED_KEY: 'related_',
     },
     SIMPLE_KEY: 'simple',
+    SIMPLE_KEY_2: 'simple2',
 };
 
 Onyx.init({
@@ -72,6 +74,36 @@ describe('withOnyx', () => {
             })
             .then(() => {
                 expect(onRender).toHaveBeenCalledTimes(4);
+            });
+    });
+
+    it('should batch correctly together little khachapuris', async () => {
+        await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {[`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {ID: 999}});
+        await Onyx.merge(ONYX_KEYS.SIMPLE_KEY, 'prev_string');
+        await Onyx.merge(ONYX_KEYS.SIMPLE_KEY_2, 'prev_string2');
+
+        const TestComponentWithOnyx = withOnyx({
+            testKey: {
+                key: `${ONYX_KEYS.COLLECTION.TEST_KEY}1`,
+            },
+            simpleKey: {
+                key: ONYX_KEYS.SIMPLE_KEY,
+            },
+            simpleKey2: {
+                key: ONYX_KEYS.SIMPLE_KEY_2,
+            },
+        })(ViewWithObject);
+        const onRender = jest.fn();
+        render(<TestComponentWithOnyx onRender={onRender} />);
+
+        return waitForPromisesToResolve()
+            .then(() => {
+                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}});
+                Onyx.merge(ONYX_KEYS.SIMPLE_KEY, 'string');
+                return Onyx.merge(ONYX_KEYS.SIMPLE_KEY_2, 'string2');
+            })
+            .then(() => {
+                expect(onRender).toHaveBeenCalledTimes(2);
             });
     });
 
