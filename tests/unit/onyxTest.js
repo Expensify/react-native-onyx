@@ -112,7 +112,7 @@ describe('Onyx', () => {
         expect(subscriberCallback).toHaveBeenCalledTimes(4);
     });
 
-    it('should not provide null values to subscriber callback using waitForCollectionCallback when set is called with null value', () => {
+    it('should not provide null values to subscriber callback using waitForCollectionCallback when set is called with null value', async () => {
         const subscriberCallback = jest.fn();
         Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION,
@@ -121,11 +121,67 @@ describe('Onyx', () => {
         });
         const itemID = 'abcd';
         const testKey = `${ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION}${itemID}`;
-        return Onyx.set(testKey, 42)
-            .then(() => expect(subscriberCallback).toHaveBeenCalledWith({[testKey]: 42}))
-            .then(() => Onyx.set(testKey, null))
-            .then(() => expect(subscriberCallback).toHaveBeenCalledWith({}))
-            .then(() => expect(subscriberCallback).toHaveBeenCalledTimes(2));
+
+        await Onyx.set(testKey, 42);
+        expect(subscriberCallback).toHaveBeenCalledWith({[testKey]: 42});
+        expect(subscriberCallback).toHaveBeenCalledTimes(1);
+
+        await Onyx.set(testKey, null);
+        expect(subscriberCallback).toHaveBeenLastCalledWith({});
+        expect(subscriberCallback).toHaveBeenCalledTimes(2);
+    });
+
+    it('should not provide null values to subscriber callback using waitForCollectionCallback when mergeCollection is called with null value', async () => {
+        const itemID1 = 'abc';
+        const testKey1 = `${ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION}${itemID1}`;
+        const itemID2 = 'def';
+        const testKey2 = `${ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION}${itemID2}`;
+
+        const subscriberCallback = jest.fn();
+        Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION,
+            waitForCollectionCallback: true,
+            callback: subscriberCallback,
+        });
+        expect(subscriberCallback).toHaveBeenCalledTimes(0);
+
+        await Onyx.multiSet({
+            [testKey1]: {a: 42},
+            [testKey2]: {b: 43},
+        });
+        await waitForPromisesToResolve();
+
+        // Note: the callback will be called three times – once for each key that's updated and once for the full collection
+        expect(subscriberCallback).toHaveBeenCalledTimes(3);
+        expect(subscriberCallback).toHaveBeenCalledWith({
+            [testKey1]: {a: 42},
+            [testKey2]: {b: 43},
+        });
+        expect(cache.getAllKeys()).toContain(testKey1);
+        expect(cache.getAllKeys()).toContain(testKey2);
+        let storedKeys = await Onyx.getAllKeys();
+        expect(storedKeys).toContain(testKey1);
+        expect(storedKeys).toContain(testKey2);
+
+        await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION, {[testKey1]: null});
+        expect(subscriberCallback).toHaveBeenLastCalledWith({
+            [testKey2]: {b: 43},
+        });
+        expect(subscriberCallback).toHaveBeenCalledTimes(4);
+        expect(cache.getAllKeys()).not.toContain(testKey1);
+        expect(cache.getAllKeys()).toContain(testKey2);
+        storedKeys = await Onyx.getAllKeys();
+        expect(storedKeys).not.toContain(testKey1);
+        expect(storedKeys).toContain(testKey2);
+
+        await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION, {[`${ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION}${itemID2}`]: null});
+        expect(subscriberCallback).toHaveBeenLastCalledWith({});
+        expect(subscriberCallback).toHaveBeenCalledTimes(5);
+        expect(cache.getAllKeys()).not.toContain(testKey1);
+        expect(cache.getAllKeys()).not.toContain(testKey2);
+        storedKeys = await Onyx.getAllKeys();
+        expect(storedKeys).not.toContain(testKey1);
+        expect(storedKeys).not.toContain(testKey2);
     });
 
     it('should set a simple key', () => {
