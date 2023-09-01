@@ -746,14 +746,11 @@ describe('Onyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
-                expect(mockCallback).toHaveBeenCalledTimes(2);
+                // Then we expect the callback to have been called once for the collection update
+                expect(mockCallback).toHaveBeenCalledTimes(1);
 
-                // AND the value for the first call should be null since the collection was not initialized at that point
-                expect(mockCallback).toHaveBeenNthCalledWith(1, null, undefined);
-
-                // AND the value for the second call should be collectionUpdate since the collection was updated
-                expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate.testPolicy_1, 'testPolicy_1');
+                // The value for the call should be collectionUpdate since the collection was updated
+                expect(mockCallback).toHaveBeenCalledWith(collectionUpdate.testPolicy_1, 'testPolicy_1');
             });
     });
 
