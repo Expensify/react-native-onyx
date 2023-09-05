@@ -9,3 +9,7 @@ jest.mock('react-native-quick-sqlite', () => ({
 }));
 
 jest.useRealTimers();
+
+const unstable_batchedUpdates_jest = require('react-test-renderer').unstable_batchedUpdates;
+require('./lib/batch.native').default = unstable_batchedUpdates_jest;
+

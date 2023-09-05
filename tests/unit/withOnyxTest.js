@@ -25,7 +25,7 @@ Onyx.init({
 
 beforeEach(() => Onyx.clear());
 
-describe('withOnyx', () => {
+describe('withOnyxTest', () => {
     it('should render immediately with the test data when using withOnyx', () => {
         const onRender = jest.fn();
 
