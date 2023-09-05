@@ -101,6 +101,8 @@ describe('withOnyxTest', () => {
                 return Onyx.merge(ONYX_KEYS.SIMPLE_KEY_2, 'string2');
             })
             .then(() => {
+                // We expect it to be 2 as we first is initial render and second are 3 Onyx merges batched together.
+                // As you see onyx merges on the top of the function doesn't account they are done earlier
                 expect(onRender).toHaveBeenCalledTimes(2);
             });
     }));
