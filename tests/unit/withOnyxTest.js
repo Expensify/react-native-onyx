@@ -73,7 +73,7 @@ describe('withOnyxTest', () => {
                 return Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}3`, {ID: 345});
             })
             .then(() => {
-                expect(onRender).toHaveBeenCalledTimes(4);
+                expect(onRender).toHaveBeenCalledTimes(2);
             });
     });
 
