@@ -77,11 +77,9 @@ describe('withOnyx', () => {
             });
     });
 
-    it('should batch correctly together little khachapuris', async () => {
-        await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {[`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {ID: 999}});
-        await Onyx.merge(ONYX_KEYS.SIMPLE_KEY, 'prev_string');
-        await Onyx.merge(ONYX_KEYS.SIMPLE_KEY_2, 'prev_string2');
-
+    it('should batch correctly together little khachapuris', () => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+        [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {ID: 999},
+    }).then(() => Onyx.merge(ONYX_KEYS.SIMPLE_KEY, 'prev_string')).then(() => Onyx.merge(ONYX_KEYS.SIMPLE_KEY_2, 'prev_string2')).then(() => {
         const TestComponentWithOnyx = withOnyx({
             testKey: {
                 key: `${ONYX_KEYS.COLLECTION.TEST_KEY}1`,
@@ -105,7 +103,7 @@ describe('withOnyx', () => {
             .then(() => {
                 expect(onRender).toHaveBeenCalledTimes(2);
             });
-    });
+    }));
 
     it('should update withOnyx subscriber just once when mergeCollection is used', () => {
         const TestComponentWithOnyx = withOnyx({
