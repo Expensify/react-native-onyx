@@ -135,7 +135,35 @@ export default withOnyx({
 })(App);
 ```
 
-It is preferable to use the HOC over `Onyx.connect()` in React code as `withOnyx()` will delay the rendering of the wrapped component until all keys have been accessed and made available.
+It is preferable to use the HOC over `Onyx.connect()` in React code as `withOnyx()` will delay the rendering of the wrapped component until all keys/entities have been fetched and passed to the component. This however, can really delay your application if many entities are connected to the same component, you can pass an `initialValue` to each key to allow Onyx to eagerly render your component with this value.
+
+```javascript
+export default withOnyx({
+    session: {
+        key: ONYXKEYS.SESSION,
+        initialValue: {}
+    },
+})(App);
+```
+
+Additionally, if your component has many keys/entities you might also trigger frequent re-renders on the initial mounting. You can workaround this by passing an additional object with the `delayUpdates` property set to true. Onyx will then put all the updates in a queue until you decide when then should be applied, the component will receive a function `markReadyForHydration`. A good place to call this function is on the `onLayout` method, which gets triggered after your component has been rendered.
+
+```javascript
+const App = ({session, markReadyForHydration}) => (
+    <View onLayout={() => markReadyForHydration()}>
+        {session.token ? <Text>Logged in</Text> : <Text>Logged out</Text> }
+    </View>
+);
+
+export default withOnyx({
+    session: {
+        key: ONYXKEYS.SESSION,
+        initialValue: {}
+    },
+}, {
+    delayUpdates: true
+})(App);
+```
 
 ## Collections
 
