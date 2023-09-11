@@ -319,6 +319,7 @@ Initialize the store with actions and listening for storage events
 | [options.captureMetrics] | <code>Boolean</code> |  | Enables Onyx benchmarking and exposes the get/print/reset functions |
 | [options.shouldSyncMultipleInstances] | <code>Boolean</code> |  | Auto synchronize storage events between multiple instances of Onyx running in different tabs/windows. Defaults to true for platforms that support local storage (web/desktop) |
 | [options.debugSetState] | <code>Boolean</code> |  | Enables debugging setState() calls to connected components. |
+| [options.enableDevTools] | <code>Boolean</code> |  | Enables debugging using Redux DevTools extension. |
 
 **Example**  
 ```js

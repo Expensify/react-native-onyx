@@ -63,15 +63,36 @@ describe('Onyx', () => {
             });
 
             // When calling decorated methods through Onyx[methodName]
-            const methods = ['set', 'multiSet', 'clear', 'merge', 'mergeCollection'];
-            methods.forEach(name => Onyx[name]('mockKey', {mockKey: {mockValue: 'mockValue'}}));
+            const methods = [
+                {
+                    name: 'set',
+                    params: ['mockKey', {mockValue: 'mockValue'}],
+                },
+                {
+                    name: 'multiSet',
+                    params: [{mockKey: {mockValue: 'mockValue'}}],
+                },
+                {
+                    name: 'clear',
+                    params: [[]],
+                },
+                {
+                    name: 'merge',
+                    params: ['mockKey', {mockKey: {mockValue: 'mockValue'}}],
+                },
+                {
+                    name: 'mergeCollection',
+                    params: ['mockKey', {mockKey: {mockValue: 'mockValue'}}],
+                },
+            ];
+            methods.forEach(({name, params}) => Onyx[name](...params));
 
             return waitForPromisesToResolve()
                 .then(() => {
                 // Then metrics should have captured data for each method
                     const summaries = Onyx.getMetrics().summaries;
 
-                    methods.forEach((name) => {
+                    methods.forEach(({name}) => {
                         expect(summaries[`Onyx:${name}`].total).toBeGreaterThan(0);
                     });
                 });
