@@ -135,7 +135,7 @@ export default withOnyx({
 })(App);
 ```
 
-It is preferable to use the HOC over `Onyx.connect()` in React code as `withOnyx()` will delay the rendering of the wrapped component until all keys/entities have been fetched and passed to the component. This however, can really delay your application if many entities are connected to the same component, you can pass an `initialValue` to each key to allow Onyx to eagerly render your component with this value.
+While `Onyx.connect()` gives you more control on how your component reacts as data is fetched from disk, `withOnyx()` will delay the rendering of the wrapped component until all keys/entities have been fetched and passed to the component, this can be convenient for simple cases. This however, can really delay your application if many entities are connected to the same component, you can pass an `initialValue` to each key to allow Onyx to eagerly render your component with this value.
 
 ```javascript
 export default withOnyx({
@@ -146,7 +146,7 @@ export default withOnyx({
 })(App);
 ```
 
-Additionally, if your component has many keys/entities you might also trigger frequent re-renders on the initial mounting. You can workaround this by passing an additional object with the `delayUpdates` property set to true. Onyx will then put all the updates in a queue until you decide when then should be applied, the component will receive a function `markReadyForHydration`. A good place to call this function is on the `onLayout` method, which gets triggered after your component has been rendered.
+Additionally, if your component has many keys/entities when your component will mount but will receive many updates as data is fetched from DB and passed down to it, as every key that gets fetched will trigger a `setState` on the `withOnyx` HOC. This might cause re-renders on the initial mounting, preventing the component from mounting/rendering in reasonable time, making your app feel slow and even delaying animations. You can workaround this by passing an additional object with the `shouldDelayUpdates` property set to true. Onyx will then put all the updates in a queue until you decide when then should be applied, the component will receive a function `markReadyForHydration`. A good place to call this function is on the `onLayout` method, which gets triggered after your component has been rendered.
 
 ```javascript
 const App = ({session, markReadyForHydration}) => (
