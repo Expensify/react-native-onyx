@@ -321,17 +321,7 @@ Sample output of `Onyx.printMetrics()`
 
 # Debug mode
 
-## Using debugSetState
-
 It can be useful to log why Onyx is calling `setState()` on a particular React component so that we can understand which key changed, what changed about the value, and the connected component that ultimately rendered as a result. When used correctly this can help isolate problem areas and unnecessary renders in the code. To enable this feature, pass `debugSetState: true` to the config and grep JS console logs for `[Onyx-Debug]`.
-
-## Using Redux DevTools extension
-
-It can be useful to check the order of writes to the storage and it's state at a specific point in time.
-
-First, install Redux DevTools through your favorite browser ([Edge](https://microsoftedge.microsoft.com/addons/detail/redux-devtools/nnkgneoiohoecpdiaponcejilbhhikei), [Chrome](https://chrome.google.com/webstore/detail/redux-devtools/lmhkpmbekcpmknklioeibfkpmmfibljd), [Firefox](https://addons.mozilla.org/en-US/firefox/addon/reduxdevtools/))
-
-Then, you can enable this type of debugging by passing `enableDevTools: true` to `Onyx.init({...})`.
 
 # Development
 
