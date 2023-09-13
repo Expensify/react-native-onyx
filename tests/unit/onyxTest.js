@@ -819,4 +819,34 @@ describe('Onyx', () => {
                 Onyx.disconnect(connectionIDs);
             });
     });
+
+    it('should merge an object with a batch of objects and undefined', () => {
+        let testKeyValue;
+
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        return Onyx.set(ONYX_KEYS.TEST_KEY, {test1: 'test1'})
+            .then(() => {
+                expect(testKeyValue).toEqual({test1: 'test1'});
+                Onyx.merge(ONYX_KEYS.TEST_KEY, {test2: 'test2'});
+                Onyx.merge(ONYX_KEYS.TEST_KEY, {test3: 'test3'});
+                Onyx.merge(ONYX_KEYS.TEST_KEY, undefined);
+                Onyx.merge(ONYX_KEYS.TEST_KEY, {test4: 'test4'});
+                Onyx.merge(ONYX_KEYS.TEST_KEY, undefined);
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                console.log({testKeyValue});
+
+                expect(testKeyValue).toEqual({
+                    test1: 'test1', test2: 'test2', test3: 'test3', test4: 'test4',
+                });
+            });
+    });
 });
