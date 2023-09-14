@@ -425,9 +425,7 @@ describe('withOnyx', () => {
                         initialValue: 'initialValue',
                     },
                 },
-                {
-                    shouldDelayUpdates: true,
-                })(ViewWithCollections);
+                true)(ViewWithCollections);
 
                 render(<TestComponentWithOnyx onRender={onRender} ref={ref} />);
             })

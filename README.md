@@ -155,14 +155,13 @@ const App = ({session, markReadyForHydration}) => (
     </View>
 );
 
+// Second argument to funciton is `shouldDelayUpdates`
 export default withOnyx({
     session: {
         key: ONYXKEYS.SESSION,
         initialValue: {}
     },
-}, {
-    shouldDelayUpdates: true
-})(App);
+}, true)(App);
 ```
 
 ## Collections
