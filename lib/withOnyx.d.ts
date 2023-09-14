@@ -148,6 +148,9 @@ declare function withOnyx<TComponentProps, TOnyxProps>(
             | OnyxPropMapping<TComponentProps, TOnyxProps, TOnyxProp>
             | OnyxPropCollectionMapping<TComponentProps, TOnyxProps, TOnyxProp>;
     },
+    options?: {
+        shouldDelayUpdates?: true;
+    }
 ): (component: React.ComponentType<TComponentProps>) => React.ComponentType<Omit<TComponentProps, keyof TOnyxProps>>;
 
 export default withOnyx;

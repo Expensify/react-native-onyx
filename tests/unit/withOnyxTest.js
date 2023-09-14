@@ -119,7 +119,8 @@ describe('withOnyx', () => {
             },
         })(ViewWithCollections);
         const onRender = jest.fn();
-        render(<TestComponentWithOnyx onRender={onRender} />);
+        const markReadyForHydration = jest.fn();
+        render(<TestComponentWithOnyx onRender={onRender} markReadyForHydration={markReadyForHydration} />);
         return waitForPromisesToResolve()
             .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                 test_1: {list: [1, 2]},
@@ -130,7 +131,7 @@ describe('withOnyx', () => {
             .then(() => {
                 expect(onRender).toHaveBeenCalledTimes(3);
                 expect(onRender).toHaveBeenLastCalledWith({
-                    collections: {}, onRender, testObject: {isDefaultProp: true}, text: {list: [7]},
+                    collections: {}, markReadyForHydration, onRender, testObject: {isDefaultProp: true}, text: {list: [7]},
                 });
             });
     });
@@ -143,7 +144,8 @@ describe('withOnyx', () => {
             },
         })(ViewWithCollections);
         const onRender = jest.fn();
-        render(<TestComponentWithOnyx onRender={onRender} />);
+        const markReadyForHydration = jest.fn();
+        render(<TestComponentWithOnyx markReadyForHydration={markReadyForHydration} onRender={onRender} />);
         return waitForPromisesToResolve()
             .then(() => {
                 Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_4: {ID: 456}, test_5: {ID: 567}});
@@ -156,7 +158,7 @@ describe('withOnyx', () => {
             .then(() => {
                 expect(onRender).toHaveBeenCalledTimes(3);
                 expect(onRender).toHaveBeenLastCalledWith({
-                    collections: {}, onRender, testObject: {isDefaultProp: true}, text: {ID: 456, Name: 'Test4'},
+                    collections: {}, markReadyForHydration, onRender, testObject: {isDefaultProp: true}, text: {ID: 456, Name: 'Test4'},
                 });
             });
     });
@@ -213,6 +215,7 @@ describe('withOnyx', () => {
     it('should pass a prop from one connected component to another', () => {
         const collectionItemID = 1;
         const onRender = jest.fn();
+        const markReadyForHydration = jest.fn();
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {id: 1}});
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.RELATED_KEY, {related_1: 'Test'});
         return waitForPromisesToResolve()
@@ -229,11 +232,11 @@ describe('withOnyx', () => {
                         },
                     }),
                 )(ViewWithCollections);
-                render(<TestComponentWithOnyx onRender={onRender} />);
+                render(<TestComponentWithOnyx markReadyForHydration={markReadyForHydration} onRender={onRender} />);
             })
             .then(() => {
                 expect(onRender).toHaveBeenLastCalledWith({
-                    collections: {}, onRender, testObject: {id: 1}, testThing: 'Test',
+                    collections: {}, markReadyForHydration, onRender, testObject: {id: 1}, testThing: 'Test',
                 });
             });
     });
@@ -242,6 +245,9 @@ describe('withOnyx', () => {
         const onRender1 = jest.fn();
         const onRender2 = jest.fn();
         const onRender3 = jest.fn();
+        const markReadyForHydration1 = jest.fn();
+        const markReadyForHydration2 = jest.fn();
+        const markReadyForHydration3 = jest.fn();
 
         // Given there is a collection with three simple items in it
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
@@ -258,21 +264,21 @@ describe('withOnyx', () => {
                         key: `${ONYX_KEYS.COLLECTION.TEST_KEY}1`,
                     },
                 })(ViewWithCollections);
-                render(<TestComponentWithOnyx1 onRender={onRender1} />);
+                render(<TestComponentWithOnyx1 markReadyForHydration={markReadyForHydration1} onRender={onRender1} />);
 
                 const TestComponentWithOnyx2 = withOnyx({
                     testObject: {
                         key: `${ONYX_KEYS.COLLECTION.TEST_KEY}2`,
                     },
                 })(ViewWithCollections);
-                render(<TestComponentWithOnyx2 onRender={onRender2} />);
+                render(<TestComponentWithOnyx2 markReadyForHydration={markReadyForHydration2} onRender={onRender2} />);
 
                 const TestComponentWithOnyx3 = withOnyx({
                     testObject: {
                         key: `${ONYX_KEYS.COLLECTION.TEST_KEY}3`,
                     },
                 })(ViewWithCollections);
-                render(<TestComponentWithOnyx3 onRender={onRender3} />);
+                render(<TestComponentWithOnyx3 markReadyForHydration={markReadyForHydration3} onRender={onRender3} />);
             })
 
             // When a single item in the collection is updated with mergeCollection()
@@ -285,19 +291,28 @@ describe('withOnyx', () => {
                 // Note: each component is rendered twice. Once when it is initially rendered, and then again
                 // when the collection is updated. That's why there are two checks here for each component.
                 expect(onRender1).toHaveBeenCalledTimes(2);
-                expect(onRender1).toHaveBeenNthCalledWith(1, {collections: {}, onRender: onRender1, testObject: {ID: 1}});
-                expect(onRender1).toHaveBeenNthCalledWith(2, {collections: {}, onRender: onRender1, testObject: {ID: 1, newProperty: 'yay'}});
+                expect(onRender1).toHaveBeenNthCalledWith(1, {
+                    collections: {}, markReadyForHydration: markReadyForHydration1, onRender: onRender1, testObject: {ID: 1},
+                });
+                expect(onRender1).toHaveBeenNthCalledWith(2, {
+                    collections: {}, markReadyForHydration: markReadyForHydration1, onRender: onRender1, testObject: {ID: 1, newProperty: 'yay'},
+                });
 
                 expect(onRender2).toHaveBeenCalledTimes(1);
-                expect(onRender2).toHaveBeenNthCalledWith(1, {collections: {}, onRender: onRender2, testObject: {ID: 2}});
+                expect(onRender2).toHaveBeenNthCalledWith(1, {
+                    collections: {}, markReadyForHydration: markReadyForHydration2, onRender: onRender2, testObject: {ID: 2},
+                });
 
                 expect(onRender3).toHaveBeenCalledTimes(1);
-                expect(onRender3).toHaveBeenNthCalledWith(1, {collections: {}, onRender: onRender3, testObject: {ID: 3}});
+                expect(onRender3).toHaveBeenNthCalledWith(1, {
+                    collections: {}, markReadyForHydration: markReadyForHydration3, onRender: onRender3, testObject: {ID: 3},
+                });
             });
     });
 
     it('mergeCollection should merge previous props correctly to the new state', () => {
         const onRender = jest.fn();
+        const markReadyForHydration = jest.fn();
 
         // Given there is a collection with a simple item in it that has a `number` property set to 1
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
@@ -312,7 +327,7 @@ describe('withOnyx', () => {
                         key: `${ONYX_KEYS.COLLECTION.TEST_KEY}1`,
                     },
                 })(ViewWithCollections);
-                render(<TestComponentWithOnyx onRender={onRender} />);
+                render(<TestComponentWithOnyx markReadyForHydration={markReadyForHydration} onRender={onRender} />);
             })
 
             // When the `number` property is updated using mergeCollection to be 2
@@ -324,8 +339,12 @@ describe('withOnyx', () => {
                 // The first time it will render with number === 1
                 // The second time it will render with number === 2
                 expect(onRender).toHaveBeenCalledTimes(2);
-                expect(onRender).toHaveBeenNthCalledWith(1, {collections: {}, onRender, testObject: {ID: 1, number: 1}});
-                expect(onRender).toHaveBeenNthCalledWith(2, {collections: {}, onRender, testObject: {ID: 1, number: 2}});
+                expect(onRender).toHaveBeenNthCalledWith(1, {
+                    collections: {}, markReadyForHydration, onRender, testObject: {ID: 1, number: 1},
+                });
+                expect(onRender).toHaveBeenNthCalledWith(2, {
+                    collections: {}, markReadyForHydration, onRender, testObject: {ID: 1, number: 2},
+                });
             });
     });
 
@@ -360,6 +379,81 @@ describe('withOnyx', () => {
                 // Then the component subscribed to the modified item should only render once
                 expect(onRender).toHaveBeenCalledTimes(2);
                 expect(onRender.mock.calls[1][0].simple).toBe('long_string');
+            });
+    });
+
+    it('initialValue should be feed into component', () => {
+        const onRender = jest.fn();
+        const markReadyForHydration = jest.fn();
+
+        // Given there is a simple key that is not an array or object value
+        // Onyx.merge(ONYX_KEYS.SIMPLE_KEY, 'string');
+
+        return waitForPromisesToResolve()
+            .then(() => {
+                // When a component subscribes to the simple key
+                const TestComponentWithOnyx = withOnyx({
+                    simple: {
+                        key: ONYX_KEYS.SIMPLE_KEY,
+                        initialValue: 'initialValue',
+                    },
+                })(ViewWithCollections);
+                render(<TestComponentWithOnyx markReadyForHydration={markReadyForHydration} onRender={onRender} />);
+            })
+
+            // And we set the value to the same value it was before
+            // .then(() => Onyx.merge(ONYX_KEYS.SIMPLE_KEY, 'string'))
+            .then(() => {
+                // Then the component subscribed to the modified item should only render once
+                expect(onRender).toHaveBeenCalledTimes(1);
+                expect(onRender).toHaveBeenLastCalledWith({
+                    collections: {}, markReadyForHydration, onRender, testObject: {isDefaultProp: true}, simple: 'initialValue',
+                });
+            });
+    });
+
+    it('shouldDelayUpdates + initialValue does not feed data into component until marked ready', () => {
+        const onRender = jest.fn();
+        const ref = React.createRef();
+
+        return waitForPromisesToResolve()
+            .then(() => {
+                // When a component subscribes to the simple key
+                const TestComponentWithOnyx = withOnyx({
+                    simple: {
+                        key: ONYX_KEYS.SIMPLE_KEY,
+                        initialValue: 'initialValue',
+                    },
+                },
+                {
+                    shouldDelayUpdates: true,
+                })(ViewWithCollections);
+
+                render(<TestComponentWithOnyx onRender={onRender} ref={ref} />);
+            })
+
+            // component mounted with the initial value, while updates are queueing
+            .then(() => Onyx.merge(ONYX_KEYS.SIMPLE_KEY, 'string'))
+            .then(() => {
+                expect(onRender).toHaveBeenCalledTimes(1);
+                expect(onRender.mock.calls[0][0].simple).toBe('initialValue');
+
+                // just to test we change the value
+                return Onyx.merge(ONYX_KEYS.SIMPLE_KEY, 'long_string');
+            })
+            .then(() => {
+                // Component still has not updated
+                expect(onRender).toHaveBeenCalledTimes(1);
+
+                // We can now tell component to update
+                // console.log(componentInstance);
+
+                ref.current.markReadyForHydration();
+            })
+            .then(() => {
+                // Component still has not updated
+                expect(onRender).toHaveBeenCalledTimes(4);
+                expect(onRender.mock.calls[3][0].simple).toBe('long_string');
             });
     });
 });
