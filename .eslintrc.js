@@ -15,4 +15,13 @@ module.exports = {
         },
     },
     ignorePatterns: 'dist',
+    overrides: [
+        {
+            files: ['tests/**/*.{js,jsx,ts,tsx}'],
+            rules: {
+                '@lwc/lwc/no-async-await': 'off',
+                'no-await-in-loop': 'off',
+            },
+        },
+    ],
 };
