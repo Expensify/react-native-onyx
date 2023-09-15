@@ -161,7 +161,7 @@ Background info:
 1. The component mounts with a `reportID={1234}` prop
 2. `withOnyx` evaluates the mapping
 3. `withOnyx` connects to the key `reports_1234` because of the prop passed to the component
-3. `withOnyx` connects to the key `policices_undefined` because `report` doesn't exist in the props yet, so the `policyID` defaults to `undefined`. * (see note below)
+3. `withOnyx` connects to the key `policies_undefined` because `report` doesn't exist in the props yet, so the `policyID` defaults to `undefined`. * (see note below)
 4. Onyx reads the data and updates the state of `withOnyx` with:
     - `report={{reportID: 1234, policyID: 1, ... the rest of the object ...}}`
     - `policy={undefined}` (since there is no policy with ID `undefined`)
