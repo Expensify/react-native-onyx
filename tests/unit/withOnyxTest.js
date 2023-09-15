@@ -382,7 +382,7 @@ describe('withOnyx', () => {
             });
     });
 
-    it('initialValue should be feed into component', () => {
+    it('initialValue should be fed into component', () => {
         const onRender = jest.fn();
         const markReadyForHydration = jest.fn();
 
