@@ -25,18 +25,21 @@ If the requested key is a collection, it will return an object with all the coll
 <dt><a href="#disconnect">disconnect(connectionID, [keyToRemoveFromEvictionBlocklist])</a></dt>
 <dd><p>Remove the listener for a react component</p>
 </dd>
-<dt><a href="#notifySubscribersOnNextTick">notifySubscribersOnNextTick(key, value, [canUpdateSubscriber])</a></dt>
-<dd><p>This method mostly exists for historical reasons as this library was initially designed without a memory cache and one was added later.
-For this reason, Onyx works more similar to what you might expect from a native AsyncStorage with reads, writes, etc all becoming
-available async. Since we have code in our main applications that might expect things to work this way it&#39;s not safe to change this
-behavior just yet.</p>
+<dt><a href="#maybeFlushBatchUpdates">maybeFlushBatchUpdates()</a> ⇒ <code>Promise</code></dt>
+<dd><p>We are batching together onyx updates. This helps with use cases where we schedule onyx updates after each other.
+This happens for example in the Onyx.update function, where we process API responses that might contain a lot of
+update operations. Instead of calling the subscribers for each update operation, we batch them together which will
+cause react to schedule the updates at once instead of after each other. This is mainly a performance optimization.</p>
 </dd>
-<dt><a href="#notifyCollectionSubscribersOnNextTick">notifyCollectionSubscribersOnNextTick(key, value)</a></dt>
+<dt><a href="#scheduleSubscriberUpdate">scheduleSubscriberUpdate(key, value, [canUpdateSubscriber])</a> ⇒ <code>Promise</code></dt>
+<dd><p>Schedules an update that will be appended to the macro task queue (so it doesn&#39;t update the subscribers immediately).</p>
+</dd>
+<dt><a href="#scheduleNotifyCollectionSubscribers">scheduleNotifyCollectionSubscribers(key, value)</a> ⇒ <code>Promise</code></dt>
 <dd><p>This method is similar to notifySubscribersOnNextTick but it is built for working specifically with collections
 so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
 subscriber callbacks receive the data in a different format than they normally expect and it breaks code.</p>
 </dd>
-<dt><a href="#broadcastUpdate">broadcastUpdate(key, value, hasChanged, method)</a></dt>
+<dt><a href="#broadcastUpdate">broadcastUpdate(key, value, hasChanged, method)</a> ⇒ <code>Promise</code></dt>
 <dd><p>Notifys subscribers and writes current value to cache</p>
 </dd>
 <dt><a href="#hasPendingMergeForKey">hasPendingMergeForKey(key)</a> ⇒ <code>Boolean</code></dt>
@@ -179,13 +182,19 @@ Remove the listener for a react component
 ```js
 Onyx.disconnect(connectionID);
 ```
-<a name="notifySubscribersOnNextTick"></a>
+<a name="maybeFlushBatchUpdates"></a>
 
-## notifySubscribersOnNextTick(key, value, [canUpdateSubscriber])
-This method mostly exists for historical reasons as this library was initially designed without a memory cache and one was added later.
-For this reason, Onyx works more similar to what you might expect from a native AsyncStorage with reads, writes, etc all becoming
-available async. Since we have code in our main applications that might expect things to work this way it's not safe to change this
-behavior just yet.
+## maybeFlushBatchUpdates() ⇒ <code>Promise</code>
+We are batching together onyx updates. This helps with use cases where we schedule onyx updates after each other.
+This happens for example in the Onyx.update function, where we process API responses that might contain a lot of
+update operations. Instead of calling the subscribers for each update operation, we batch them together which will
+cause react to schedule the updates at once instead of after each other. This is mainly a performance optimization.
+
+**Kind**: global function  
+<a name="scheduleSubscriberUpdate"></a>
+
+## scheduleSubscriberUpdate(key, value, [canUpdateSubscriber]) ⇒ <code>Promise</code>
+Schedules an update that will be appended to the macro task queue (so it doesn't update the subscribers immediately).
 
 **Kind**: global function  
 
@@ -197,11 +206,11 @@ behavior just yet.
 
 **Example**  
 ```js
-notifySubscribersOnNextTick(key, value, subscriber => subscriber.initWithStoredValues === false)
+scheduleSubscriberUpdate(key, value, subscriber => subscriber.initWithStoredValues === false)
 ```
-<a name="notifyCollectionSubscribersOnNextTick"></a>
+<a name="scheduleNotifyCollectionSubscribers"></a>
 
-## notifyCollectionSubscribersOnNextTick(key, value)
+## scheduleNotifyCollectionSubscribers(key, value) ⇒ <code>Promise</code>
 This method is similar to notifySubscribersOnNextTick but it is built for working specifically with collections
 so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
 subscriber callbacks receive the data in a different format than they normally expect and it breaks code.
@@ -215,7 +224,7 @@ subscriber callbacks receive the data in a different format than they normally e
 
 <a name="broadcastUpdate"></a>
 
-## broadcastUpdate(key, value, hasChanged, method)
+## broadcastUpdate(key, value, hasChanged, method) ⇒ <code>Promise</code>
 Notifys subscribers and writes current value to cache
 
 **Kind**: global function  
