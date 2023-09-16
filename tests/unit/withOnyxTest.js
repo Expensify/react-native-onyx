@@ -6,6 +6,7 @@ import ViewWithText from '../components/ViewWithText';
 import ViewWithCollections from '../components/ViewWithCollections';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import compose from '../../lib/compose';
+import ViewWithObject from '../components/ViewWithObject';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
@@ -14,6 +15,7 @@ const ONYX_KEYS = {
         RELATED_KEY: 'related_',
     },
     SIMPLE_KEY: 'simple',
+    SIMPLE_KEY_2: 'simple2',
 };
 
 Onyx.init({
@@ -23,7 +25,7 @@ Onyx.init({
 
 beforeEach(() => Onyx.clear());
 
-describe('withOnyx', () => {
+describe('withOnyxTest', () => {
     it('should render immediately with the test data when using withOnyx', () => {
         const onRender = jest.fn();
 
@@ -32,7 +34,7 @@ describe('withOnyx', () => {
         // the component from {loading: true} to {loading:false, ...data}.
         // We now changed the architecture, so that when a key can be retrieved
         // synchronously from cache, we expect the component to be rendered immediately.
-        Onyx.set(ONYX_KEYS.TEST_KEY, 'test1')
+        return Onyx.set(ONYX_KEYS.TEST_KEY, 'test1')
             .then(() => {
                 const TestComponentWithOnyx = withOnyx({
                     text: {
@@ -44,7 +46,6 @@ describe('withOnyx', () => {
                 const textComponent = result.getByText('test1');
                 expect(textComponent).not.toBeNull();
 
-                jest.runAllTimers();
                 return waitForPromisesToResolve();
             })
             .then(() => {
@@ -72,9 +73,40 @@ describe('withOnyx', () => {
                 return Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}3`, {ID: 345});
             })
             .then(() => {
-                expect(onRender).toHaveBeenCalledTimes(4);
+                // We expect 2 due to batching
+                expect(onRender).toHaveBeenCalledTimes(2);
             });
     });
+
+    it('should batch correctly together little khachapuris', () => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+        [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {ID: 999},
+    }).then(() => Onyx.merge(ONYX_KEYS.SIMPLE_KEY, 'prev_string')).then(() => Onyx.merge(ONYX_KEYS.SIMPLE_KEY_2, 'prev_string2')).then(() => {
+        const TestComponentWithOnyx = withOnyx({
+            testKey: {
+                key: `${ONYX_KEYS.COLLECTION.TEST_KEY}1`,
+            },
+            simpleKey: {
+                key: ONYX_KEYS.SIMPLE_KEY,
+            },
+            simpleKey2: {
+                key: ONYX_KEYS.SIMPLE_KEY_2,
+            },
+        })(ViewWithObject);
+        const onRender = jest.fn();
+        render(<TestComponentWithOnyx onRender={onRender} />);
+
+        return waitForPromisesToResolve()
+            .then(() => {
+                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}});
+                Onyx.merge(ONYX_KEYS.SIMPLE_KEY, 'string');
+                return Onyx.merge(ONYX_KEYS.SIMPLE_KEY_2, 'string2');
+            })
+            .then(() => {
+                // We expect it to be 2 as we first is initial render and second are 3 Onyx merges batched together.
+                // As you see onyx merges on the top of the function doesn't account they are done earlier
+                expect(onRender).toHaveBeenCalledTimes(2);
+            });
+    }));
 
     it('should update withOnyx subscriber just once when mergeCollection is used', () => {
         const TestComponentWithOnyx = withOnyx({
@@ -145,14 +177,12 @@ describe('withOnyx', () => {
         const onRender = jest.fn();
         render(<TestComponentWithOnyx onRender={onRender} />);
         return waitForPromisesToResolve()
-            .then(() => {
-                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_4: {ID: 456}, test_5: {ID: 567}});
-                return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
-                    test_4: {Name: 'Test4'},
-                    test_5: {Name: 'Test5'},
-                    test_6: {ID: 678, Name: 'Test6'},
-                });
-            })
+            .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_4: {ID: 456}, test_5: {ID: 567}}))
+            .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                test_4: {Name: 'Test4'},
+                test_5: {Name: 'Test5'},
+                test_6: {ID: 678, Name: 'Test6'},
+            }))
             .then(() => {
                 expect(onRender).toHaveBeenCalledTimes(3);
                 expect(onRender).toHaveBeenLastCalledWith({
