@@ -386,9 +386,6 @@ describe('withOnyx', () => {
         const onRender = jest.fn();
         const markReadyForHydration = jest.fn();
 
-        // Given there is a simple key that is not an array or object value
-        // Onyx.merge(ONYX_KEYS.SIMPLE_KEY, 'string');
-
         return waitForPromisesToResolve()
             .then(() => {
                 // When a component subscribes to the simple key
@@ -400,9 +397,6 @@ describe('withOnyx', () => {
                 })(ViewWithCollections);
                 render(<TestComponentWithOnyx markReadyForHydration={markReadyForHydration} onRender={onRender} />);
             })
-
-            // And we set the value to the same value it was before
-            // .then(() => Onyx.merge(ONYX_KEYS.SIMPLE_KEY, 'string'))
             .then(() => {
                 // Then the component subscribed to the modified item should only render once
                 expect(onRender).toHaveBeenCalledTimes(1);
@@ -444,8 +438,6 @@ describe('withOnyx', () => {
                 expect(onRender).toHaveBeenCalledTimes(1);
 
                 // We can now tell component to update
-                // console.log(componentInstance);
-
                 ref.current.markReadyForHydration();
             })
             .then(() => {
