@@ -190,4 +190,16 @@ type NullableProperties<T> = {
     [P in keyof T]: T[P] | null;
 };
 
-export {CollectionKey, CollectionKeyBase, CustomTypeOptions, DeepRecord, Key, KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey, Selector, NullableProperties as Nullable};
+export {
+    CollectionKey,
+    CollectionKeyBase,
+    CustomTypeOptions,
+    DeepRecord,
+    Key,
+    KeyValueMapping,
+    OnyxCollection,
+    OnyxEntry,
+    OnyxKey,
+    Selector,
+    NullableProperties,
+};
