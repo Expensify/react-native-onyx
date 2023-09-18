@@ -164,6 +164,46 @@ export default withOnyx({
 }, true)(App);
 ```
 
+### Dependent Onyx Keys and withOnyx()
+Some components need to subscribe to multiple Onyx keys at once and sometimes, one key might rely on the data from another key. This is similar to a JOIN in SQL.
+
+Example: To get the policy of a report, the `policy` key depends on the `report` key.
+
+```javascript
+export default withOnyx({
+    report: {
+        key: ({reportID) => `${ONYXKEYS.COLLECTION.REPORT}${reportID}`,
+    },
+    policy: {
+        key: ({report}) => `${ONYXKEYS.COLLECTION.POLICY}${report.policyID}`,
+    },
+})(App);
+```
+
+Background info:
+- The `key` value can be a function that returns the key that Onyx subscribes to
+- The first argument to the `key` function is the `props` from the component
+
+**Detailed explanation of how this is handled and rendered:**
+1. The component mounts with a `reportID={1234}` prop
+2. `withOnyx` evaluates the mapping
+3. `withOnyx` connects to the key `reports_1234` because of the prop passed to the component
+3. `withOnyx` connects to the key `policies_undefined` because `report` doesn't exist in the props yet, so the `policyID` defaults to `undefined`. * (see note below)
+4. Onyx reads the data and updates the state of `withOnyx` with:
+    - `report={{reportID: 1234, policyID: 1, ... the rest of the object ...}}`
+    - `policy={undefined}` (since there is no policy with ID `undefined`)
+5. There is still an `undefined` key in the mapping, so Onyx reads the data again
+6. This time `withOnyx` connects to the key `policies_1` because the `report` object exists in the component's state and it has a `policyID: 1`
+7. Onyx reads the data and updates the state of withOnyx with:
+    - `policy={{policyID: 1, ... the rest of the object ...}`
+8. Now all mappings have values that are defined (not undefined) and the component is rendered with all necessary data
+  
+* It is VERY important to NOT use empty string default values like `report.policyID || ''`. This results in the key returned to `withOnyx` as `policies_` which subscribes to the ENTIRE POLICY COLLECTION and is most assuredly not what you were intending. You can use a default of `0` (as long as you are reasonably sure that there is never a policyID=0). This allows Onyx to return `undefined` as the value of the policy key, which is handled by `withOnyx` appropriately.
+
+DO NOT use more than one `withOnyx` component at a time. It adds overhead and prevents some optimizations like batched rendering from working to its full potential.
+
+It's also beneficial to use a [selector](https://github.com/Expensify/react-native-onyx/blob/main/API.md#connectmapping--number) with the mapping in case you need to grab a single item in a collection (like a single report action).
+
 ## Collections
 
 Collections allow keys with similar value types to be subscribed together by subscribing to the collection key. To define one, it must be included in the `ONYXKEYS.COLLECTION` object and it must be suffixed with an underscore. Member keys should use a unique identifier or index after the collection key prefix (e.g. `report_42`).

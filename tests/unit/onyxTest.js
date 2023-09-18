@@ -202,6 +202,48 @@ describe('Onyx', () => {
         });
     });
 
+    it('should merge an object with undefined', () => {
+        let testKeyValue;
+
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        return Onyx.set(ONYX_KEYS.TEST_KEY, {test1: 'test1'})
+            .then(() => {
+                expect(testKeyValue).toEqual({test1: 'test1'});
+                return Onyx.merge(ONYX_KEYS.TEST_KEY, undefined);
+            })
+            .then(() => {
+                expect(testKeyValue).toEqual(undefined);
+            });
+    });
+
+    it('should remove top-level keys that are set to null/undefined when merging', () => {
+        let testKeyValue;
+
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        return Onyx.set(ONYX_KEYS.TEST_KEY, {test1: 'test1', test2: 'test2'})
+            .then(() => {
+                expect(testKeyValue).toEqual({test1: 'test1', test2: 'test2'});
+                return Onyx.merge(ONYX_KEYS.TEST_KEY, {test1: null});
+            })
+            .then(() => {
+                expect(testKeyValue).toEqual({test2: 'test2'});
+            });
+    });
+
     it('should overwrite an array key nested inside an object', () => {
         let testKeyValue;
         connectionID = Onyx.connect({
