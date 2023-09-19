@@ -6,7 +6,7 @@
 
 <dl>
 <dt><a href="#getSubsetOfData">getSubsetOfData(sourceData, selector, [withOnyxInstanceState])</a> ⇒ <code>Mixed</code></dt>
-<dd><p>Uses a selector string or function to return a simplified version of sourceData</p>
+<dd><p>Uses a selector function to return a simplified version of sourceData</p>
 </dd>
 <dt><a href="#reduceCollectionWithSelector">reduceCollectionWithSelector(collection, selector, [withOnyxInstanceState])</a> ⇒ <code>Object</code></dt>
 <dd><p>Takes a collection of items (eg. {testKey_1:{a:&#39;a&#39;}, testKey_2:{b:&#39;b&#39;}})
@@ -15,35 +15,45 @@ The resulting collection will only contain items that are returned by the select
 </dd>
 <dt><a href="#isCollectionMemberKey">isCollectionMemberKey(collectionKey, key)</a> ⇒ <code>Boolean</code></dt>
 <dd></dd>
+<dt><a href="#tryGetCachedValue">tryGetCachedValue(key, mapping)</a> ⇒ <code>Mixed</code></dt>
+<dd><p>Tries to get a value from the cache. If the value is not present in cache it will return the default value or undefined.
+If the requested key is a collection, it will return an object with all the collection members.</p>
+</dd>
 <dt><a href="#connect">connect(mapping)</a> ⇒ <code>Number</code></dt>
 <dd><p>Subscribes a react component&#39;s state directly to a store key</p>
 </dd>
 <dt><a href="#disconnect">disconnect(connectionID, [keyToRemoveFromEvictionBlocklist])</a></dt>
 <dd><p>Remove the listener for a react component</p>
 </dd>
-<dt><a href="#notifySubscribersOnNextTick">notifySubscribersOnNextTick(key, value, [canUpdateSubscriber])</a></dt>
-<dd><p>This method mostly exists for historical reasons as this library was initially designed without a memory cache and one was added later.
-For this reason, Onyx works more similar to what you might expect from a native AsyncStorage with reads, writes, etc all becoming
-available async. Since we have code in our main applications that might expect things to work this way it&#39;s not safe to change this
-behavior just yet.</p>
+<dt><a href="#maybeFlushBatchUpdates">maybeFlushBatchUpdates()</a> ⇒ <code>Promise</code></dt>
+<dd><p>We are batching together onyx updates. This helps with use cases where we schedule onyx updates after each other.
+This happens for example in the Onyx.update function, where we process API responses that might contain a lot of
+update operations. Instead of calling the subscribers for each update operation, we batch them together which will
+cause react to schedule the updates at once instead of after each other. This is mainly a performance optimization.</p>
 </dd>
-<dt><a href="#notifyCollectionSubscribersOnNextTick">notifyCollectionSubscribersOnNextTick(key, value)</a></dt>
+<dt><a href="#scheduleSubscriberUpdate">scheduleSubscriberUpdate(key, value, [canUpdateSubscriber])</a> ⇒ <code>Promise</code></dt>
+<dd><p>Schedules an update that will be appended to the macro task queue (so it doesn&#39;t update the subscribers immediately).</p>
+</dd>
+<dt><a href="#scheduleNotifyCollectionSubscribers">scheduleNotifyCollectionSubscribers(key, value)</a> ⇒ <code>Promise</code></dt>
 <dd><p>This method is similar to notifySubscribersOnNextTick but it is built for working specifically with collections
 so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
 subscriber callbacks receive the data in a different format than they normally expect and it breaks code.</p>
 </dd>
+<dt><a href="#broadcastUpdate">broadcastUpdate(key, value, hasChanged, method)</a> ⇒ <code>Promise</code></dt>
+<dd><p>Notifys subscribers and writes current value to cache</p>
+</dd>
+<dt><a href="#hasPendingMergeForKey">hasPendingMergeForKey(key)</a> ⇒ <code>Boolean</code></dt>
+<dd></dd>
 <dt><a href="#set">set(key, value)</a> ⇒ <code>Promise</code></dt>
 <dd><p>Write a value to our store with the given key</p>
 </dd>
 <dt><a href="#multiSet">multiSet(data)</a> ⇒ <code>Promise</code></dt>
 <dd><p>Sets multiple keys and values</p>
 </dd>
-<dt><a href="#merge">merge(key, value)</a> ⇒ <code>Promise</code></dt>
+<dt><a href="#merge">merge(key, changes)</a> ⇒ <code>Promise</code></dt>
 <dd><p>Merge a new value into an existing value at a key.</p>
-<p>The types of values that can be merged are <code>Object</code> and <code>Array</code>. To set another type of value use <code>Onyx.set()</code>. Merge
-behavior uses lodash/merge under the hood for <code>Object</code> and simple concatenation for <code>Array</code>. However, it&#39;s important
-to note that if you have an array value property on an <code>Object</code> that the default behavior of lodash/merge is not to
-concatenate. See here: <a href="https://github.com/lodash/lodash/issues/2872">https://github.com/lodash/lodash/issues/2872</a></p>
+<p>The types of values that can be merged are <code>Object</code> and <code>Array</code>. To set another type of value use <code>Onyx.set()</code>.
+Values of type <code>Object</code> get merged with the old value, whilst for <code>Array</code>&#39;s we simply replace the current value with the new one.</p>
 <p>Calls to <code>Onyx.merge()</code> are batched so that any calls performed in a single tick will stack in a queue and get
 applied in the order they were called. Note: <code>Onyx.set()</code> calls do not work this way so use caution when mixing
 <code>Onyx.merge()</code> and <code>Onyx.set()</code>.</p>
@@ -70,6 +80,9 @@ value will be saved to storage after the default value.</p>
 <dt><a href="#update">update(data)</a> ⇒ <code>Promise</code></dt>
 <dd><p>Insert API responses and lifecycle data into Onyx</p>
 </dd>
+<dt><a href="#setMemoryOnlyKeys">setMemoryOnlyKeys(keyList)</a></dt>
+<dd><p>When set these keys will not be persisted to storage</p>
+</dd>
 <dt><a href="#init">init([options])</a></dt>
 <dd><p>Initialize the store with actions and listening for storage events</p>
 </dd>
@@ -78,15 +91,15 @@ value will be saved to storage after the default value.</p>
 <a name="getSubsetOfData"></a>
 
 ## getSubsetOfData(sourceData, selector, [withOnyxInstanceState]) ⇒ <code>Mixed</code>
-Uses a selector string or function to return a simplified version of sourceData
+Uses a selector function to return a simplified version of sourceData
 
 **Kind**: global function  
 
 | Param | Type | Description |
 | --- | --- | --- |
 | sourceData | <code>Mixed</code> |  |
-| selector | <code>String</code> \| <code>function</code> |  |
-| [withOnyxInstanceState] | <code>Object</code> | If it's a string, the selector is passed to lodashGet on the sourceData      If it's a function, it is passed the sourceData and it should return the simplified data |
+| selector | <code>function</code> | Function that takes sourceData and returns a simplified version of it |
+| [withOnyxInstanceState] | <code>Object</code> |  |
 
 <a name="reduceCollectionWithSelector"></a>
 
@@ -113,6 +126,19 @@ The resulting collection will only contain items that are returned by the select
 | collectionKey | <code>String</code> | 
 | key | <code>String</code> | 
 
+<a name="tryGetCachedValue"></a>
+
+## tryGetCachedValue(key, mapping) ⇒ <code>Mixed</code>
+Tries to get a value from the cache. If the value is not present in cache it will return the default value or undefined.
+If the requested key is a collection, it will return an object with all the collection members.
+
+**Kind**: global function  
+
+| Param | Type |
+| --- | --- |
+| key | <code>String</code> | 
+| mapping | <code>Object</code> | 
+
 <a name="connect"></a>
 
 ## connect(mapping) ⇒ <code>Number</code>
@@ -130,7 +156,8 @@ Subscribes a react component's state directly to a store key
 | [mapping.callback] | <code>function</code> | a method that will be called with changed data      This is used by any non-React code to connect to Onyx |
 | [mapping.initWithStoredValues] | <code>Boolean</code> | If set to false, then no data will be prefilled into the  component |
 | [mapping.waitForCollectionCallback] | <code>Boolean</code> | If set to true, it will return the entire collection to the callback as a single object |
-| [mapping.selector] | <code>String</code> \| <code>function</code> | THIS PARAM IS ONLY USED WITH withOnyx(). If included, this will be used to subscribe to a subset of an Onyx key's data.       If the selector is a string, the selector is passed to lodashGet on the sourceData. If the selector is a function, the sourceData and withOnyx state are       passed to the selector and should return the simplified data. Using this setting on `withOnyx` can have very positive performance benefits because the component       will only re-render when the subset of data changes. Otherwise, any change of data on any property would normally cause the component to re-render (and that can       be expensive from a performance standpoint). |
+| [mapping.selector] | <code>function</code> | THIS PARAM IS ONLY USED WITH withOnyx(). If included, this will be used to subscribe to a subset of an Onyx key's data.       The sourceData and withOnyx state are passed to the selector and should return the simplified data. Using this setting on `withOnyx` can have very positive       performance benefits because the component will only re-render when the subset of data changes. Otherwise, any change of data on any property would normally       cause the component to re-render (and that can be expensive from a performance standpoint). |
+| [mapping.initialValue] | <code>String</code> \| <code>Number</code> \| <code>Boolean</code> \| <code>Object</code> | THIS PARAM IS ONLY USED WITH withOnyx(). If included, this will be passed to the component so that something can be rendered while data is being fetched from the DB. Note that it will not cause the component to have the loading prop set to true. | |
 
 **Example**  
 ```js
@@ -155,13 +182,19 @@ Remove the listener for a react component
 ```js
 Onyx.disconnect(connectionID);
 ```
-<a name="notifySubscribersOnNextTick"></a>
+<a name="maybeFlushBatchUpdates"></a>
 
-## notifySubscribersOnNextTick(key, value, [canUpdateSubscriber])
-This method mostly exists for historical reasons as this library was initially designed without a memory cache and one was added later.
-For this reason, Onyx works more similar to what you might expect from a native AsyncStorage with reads, writes, etc all becoming
-available async. Since we have code in our main applications that might expect things to work this way it's not safe to change this
-behavior just yet.
+## maybeFlushBatchUpdates() ⇒ <code>Promise</code>
+We are batching together onyx updates. This helps with use cases where we schedule onyx updates after each other.
+This happens for example in the Onyx.update function, where we process API responses that might contain a lot of
+update operations. Instead of calling the subscribers for each update operation, we batch them together which will
+cause react to schedule the updates at once instead of after each other. This is mainly a performance optimization.
+
+**Kind**: global function  
+<a name="scheduleSubscriberUpdate"></a>
+
+## scheduleSubscriberUpdate(key, value, [canUpdateSubscriber]) ⇒ <code>Promise</code>
+Schedules an update that will be appended to the macro task queue (so it doesn't update the subscribers immediately).
 
 **Kind**: global function  
 
@@ -173,11 +206,11 @@ behavior just yet.
 
 **Example**  
 ```js
-notifySubscribersOnNextTick(key, value, subscriber => subscriber.initWithStoredValues === false)
+scheduleSubscriberUpdate(key, value, subscriber => subscriber.initWithStoredValues === false)
 ```
-<a name="notifyCollectionSubscribersOnNextTick"></a>
+<a name="scheduleNotifyCollectionSubscribers"></a>
 
-## notifyCollectionSubscribersOnNextTick(key, value)
+## scheduleNotifyCollectionSubscribers(key, value) ⇒ <code>Promise</code>
 This method is similar to notifySubscribersOnNextTick but it is built for working specifically with collections
 so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
 subscriber callbacks receive the data in a different format than they normally expect and it breaks code.
@@ -188,6 +221,29 @@ subscriber callbacks receive the data in a different format than they normally e
 | --- | --- |
 | key | <code>String</code> | 
 | value | <code>\*</code> | 
+
+<a name="broadcastUpdate"></a>
+
+## broadcastUpdate(key, value, hasChanged, method) ⇒ <code>Promise</code>
+Notifys subscribers and writes current value to cache
+
+**Kind**: global function  
+
+| Param | Type |
+| --- | --- |
+| key | <code>String</code> | 
+| value | <code>\*</code> | 
+| hasChanged | <code>Boolean</code> | 
+| method | <code>String</code> | 
+
+<a name="hasPendingMergeForKey"></a>
+
+## hasPendingMergeForKey(key) ⇒ <code>Boolean</code>
+**Kind**: global function  
+
+| Param | Type |
+| --- | --- |
+| key | <code>String</code> | 
 
 <a name="set"></a>
 
@@ -218,13 +274,11 @@ Onyx.multiSet({'key1': 'a', 'key2': 'b'});
 ```
 <a name="merge"></a>
 
-## merge(key, value) ⇒ <code>Promise</code>
+## merge(key, changes) ⇒ <code>Promise</code>
 Merge a new value into an existing value at a key.
 
-The types of values that can be merged are `Object` and `Array`. To set another type of value use `Onyx.set()`. Merge
-behavior uses lodash/merge under the hood for `Object` and simple concatenation for `Array`. However, it's important
-to note that if you have an array value property on an `Object` that the default behavior of lodash/merge is not to
-concatenate. See here: https://github.com/lodash/lodash/issues/2872
+The types of values that can be merged are `Object` and `Array`. To set another type of value use `Onyx.set()`.
+Values of type `Object` get merged with the old value, whilst for `Array`'s we simply replace the current value with the new one.
 
 Calls to `Onyx.merge()` are batched so that any calls performed in a single tick will stack in a queue and get
 applied in the order they were called. Note: `Onyx.set()` calls do not work this way so use caution when mixing
@@ -235,7 +289,7 @@ applied in the order they were called. Note: `Onyx.set()` calls do not work this
 | Param | Type | Description |
 | --- | --- | --- |
 | key | <code>String</code> | ONYXKEYS key |
-| value | <code>Object</code> \| <code>Array</code> | Object or Array value to merge |
+| changes | <code>Object</code> \| <code>Array</code> | Object or Array value to merge |
 
 **Example**  
 ```js
@@ -300,7 +354,18 @@ Insert API responses and lifecycle data into Onyx
 
 | Param | Type | Description |
 | --- | --- | --- |
-| data | <code>Array</code> | An array of objects with shape {onyxMethod: oneOf('set', 'merge', 'mergeCollection'), key: string, value: *} |
+| data | <code>Array</code> | An array of objects with shape {onyxMethod: oneOf('set', 'merge', 'mergeCollection', 'multiSet', 'clear'), key: string, value: *} |
+
+<a name="setMemoryOnlyKeys"></a>
+
+## setMemoryOnlyKeys(keyList)
+When set these keys will not be persisted to storage
+
+**Kind**: global function  
+
+| Param | Type |
+| --- | --- |
+| keyList | <code>Array.&lt;string&gt;</code> | 
 
 <a name="init"></a>
 
