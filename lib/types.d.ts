@@ -1,4 +1,4 @@
-import {IsEqual, Merge} from 'type-fest';
+import {Merge} from 'type-fest';
 
 /**
  * Represents a deeply nested record. It maps keys to values,
@@ -106,9 +106,7 @@ type OnyxKey = Key | CollectionKey;
  * The mapping is derived from the `values` property of the `TypeOptions` type.
  */
 type KeyValueMapping = {
-    [TKey in keyof TypeOptions['values'] as TKey extends CollectionKeyBase
-        ? `${TKey}${string}`
-        : TKey]: TypeOptions['values'][TKey];
+    [TKey in keyof TypeOptions['values'] as TKey extends CollectionKeyBase ? `${TKey}${string}` : TKey]: TypeOptions['values'][TKey];
 };
 
 /**
@@ -182,6 +180,16 @@ type OnyxEntry<TOnyxValue> = TOnyxValue | null;
  */
 type OnyxCollection<TOnyxValue> = OnyxEntry<Record<string, TOnyxValue | null>>;
 
+/**
+ * The `NullableProperties<T>` sets the values of all properties in `T` to be nullable (i.e., `| null`).
+ * It doesn't recurse into nested property values, this means it applies the nullability only to the top-level properties.
+ *
+ * @template T The type of the properties to convert to nullable properties.
+ */
+type NullableProperties<T> = {
+    [P in keyof T]: T[P] | null;
+};
+
 export {
     CollectionKey,
     CollectionKeyBase,
@@ -193,4 +201,5 @@ export {
     OnyxEntry,
     OnyxKey,
     Selector,
+    NullableProperties,
 };
