@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useImperativeHandle} from 'react';
 import PropTypes from 'prop-types';
 // eslint-disable-next-line no-restricted-imports
 import {View, Text} from 'react-native';
@@ -12,15 +12,21 @@ const propTypes = {
         ID: PropTypes.number,
     }),
     onRender: PropTypes.func,
+    markReadyForHydration: PropTypes.func,
 };
 
 const defaultProps = {
     collections: {},
     testObject: {isDefaultProp: true},
     onRender: () => {},
+    markReadyForHydration: () => {},
 };
 
-function ViewWithCollections(props) {
+const ViewWithCollections = React.forwardRef((props, ref) => {
+    useImperativeHandle(ref, () => ({
+        markReadyForHydration: props.markReadyForHydration,
+    }));
+
     props.onRender(props);
 
     return (
@@ -30,7 +36,7 @@ function ViewWithCollections(props) {
             ))}
         </View>
     );
-}
+});
 
 ViewWithCollections.propTypes = propTypes;
 ViewWithCollections.defaultProps = defaultProps;
