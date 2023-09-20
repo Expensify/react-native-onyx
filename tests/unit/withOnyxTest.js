@@ -5,7 +5,6 @@ import Onyx, {withOnyx} from '../../lib';
 import ViewWithText from '../components/ViewWithText';
 import ViewWithCollections from '../components/ViewWithCollections';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
-import compose from '../../lib/compose';
 import ViewWithObject from '../components/ViewWithObject';
 
 const ONYX_KEYS = {
