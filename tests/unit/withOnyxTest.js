@@ -250,18 +250,14 @@ describe('withOnyxTest', () => {
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.RELATED_KEY, {related_1: 'Test'});
         return waitForPromisesToResolve()
             .then(() => {
-                const TestComponentWithOnyx = compose(
-                    withOnyx({
-                        testObject: {
-                            key: `${ONYX_KEYS.COLLECTION.TEST_KEY}${collectionItemID}`,
-                        },
-                    }),
-                    withOnyx({
-                        testThing: {
-                            key: ({testObject}) => `${ONYX_KEYS.COLLECTION.RELATED_KEY}${testObject.id}`,
-                        },
-                    }),
-                )(ViewWithCollections);
+                const TestComponentWithOnyx = withOnyx({
+                    testObject: {
+                        key: `${ONYX_KEYS.COLLECTION.TEST_KEY}${collectionItemID}`,
+                    },
+                    testThing: {
+                        key: ({testObject}) => `${ONYX_KEYS.COLLECTION.RELATED_KEY}${testObject.id}`,
+                    },
+                })(ViewWithCollections);
                 render(<TestComponentWithOnyx markReadyForHydration={markReadyForHydration} onRender={onRender} />);
             })
             .then(() => {
