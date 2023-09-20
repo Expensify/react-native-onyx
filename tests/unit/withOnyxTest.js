@@ -255,10 +255,11 @@ describe('withOnyxTest', () => {
                         key: `${ONYX_KEYS.COLLECTION.TEST_KEY}${collectionItemID}`,
                     },
                     testThing: {
-                        key: ({testObject}) => `${ONYX_KEYS.COLLECTION.RELATED_KEY}${testObject.id}`,
+                        key: ({testObject}) => `${ONYX_KEYS.COLLECTION.RELATED_KEY}${(testObject && testObject.id) || 0}`,
                     },
                 })(ViewWithCollections);
                 render(<TestComponentWithOnyx markReadyForHydration={markReadyForHydration} onRender={onRender} />);
+                return waitForPromisesToResolve();
             })
             .then(() => {
                 expect(onRender).toHaveBeenLastCalledWith({

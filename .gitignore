@@ -11,6 +11,7 @@ dist/
 
 # IDEs
 .idea
+.vscode
 
 # Decrypted private key we do not want to commit
 .github/OSBotify-private-key.asc
