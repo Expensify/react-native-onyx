@@ -893,11 +893,13 @@ describe('Onyx', () => {
                 expect(testKeyValue).toEqual({test1: 'test1'});
                 Onyx.merge(ONYX_KEYS.TEST_KEY, null);
                 Onyx.merge(ONYX_KEYS.TEST_KEY, {test2: 'test2'});
+                Onyx.merge(ONYX_KEYS.TEST_KEY, {test3: 'test3'});
                 return waitForPromisesToResolve();
             })
             .then(() => {
                 expect(testKeyValue).toEqual({
                     test2: 'test2',
+                    test3: 'test3',
                 });
             });
     });
