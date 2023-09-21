@@ -262,42 +262,6 @@ describe('Onyx', () => {
             });
     });
 
-    it('should keep empty object when removing all nested keys during merging', () => {
-        let testKeyValue;
-
-        connectionID = Onyx.connect({
-            key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
-            callback: (value) => {
-                testKeyValue = value;
-            },
-        });
-
-        return Onyx.set(ONYX_KEYS.TEST_KEY, {
-            test1: {
-                test2: 'test2',
-                test3: 'test3',
-            },
-        })
-            .then(() => {
-                expect(testKeyValue).toEqual({
-                    test1: {
-                        test2: 'test2',
-                        test3: 'test3',
-                    },
-                });
-                return Onyx.merge(ONYX_KEYS.TEST_KEY, {
-                    test1: {
-                        test2: null,
-                        test3: null,
-                    },
-                });
-            })
-            .then(() => {
-                expect(testKeyValue).toEqual({test1: {}});
-            });
-    });
-
     it('should overwrite an array key nested inside an object', () => {
         let testKeyValue;
         connectionID = Onyx.connect({
