@@ -309,7 +309,7 @@ describe('Onyx', () => {
                 expect(cache.getValue('mockKey')).toEqual({value: 'myMockObject'});
             });
 
-            it('Should do nothing to a key which value is `undefined`', () => {
+            it('Should merge a key with `undefined`', () => {
                 // Given cache with existing data
                 cache.set('mockKey', {ID: 5});
 
@@ -317,8 +317,7 @@ describe('Onyx', () => {
                 cache.merge({mockKey: undefined});
 
                 // Then the key should still be in cache and the value unchanged
-                expect(cache.hasCacheForKey('mockKey')).toBe(true);
-                expect(cache.getValue('mockKey')).toEqual({ID: 5});
+                expect(cache.getValue('mockKey')).toEqual(undefined);
             });
 
             it('Should update storageKeys when new keys are created', () => {
