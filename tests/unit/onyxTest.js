@@ -202,7 +202,7 @@ describe('Onyx', () => {
         });
     });
 
-    it('should merge an object with undefined', () => {
+    it('should ignore top-level undefined values', () => {
         let testKeyValue;
 
         connectionID = Onyx.connect({
@@ -219,7 +219,7 @@ describe('Onyx', () => {
                 return Onyx.merge(ONYX_KEYS.TEST_KEY, undefined);
             })
             .then(() => {
-                expect(testKeyValue).toEqual(undefined);
+                expect(testKeyValue).toEqual({test1: 'test1'});
             });
     });
 
