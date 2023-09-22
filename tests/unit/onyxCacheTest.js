@@ -647,6 +647,9 @@ describe('Onyx', () => {
                     expect(cache.hasCacheForKey('key2')).toBe(true);
                     expect(cache.hasCacheForKey('key3')).toBe(true);
                     expect(cache.hasCacheForKey('key4')).toBe(true);
+
+                    // getAllKeys should still return all keys since they exist in storage.
+                    expect(cache.getAllKeys().length).toEqual(9);
                 });
         });
     });
