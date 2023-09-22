@@ -265,6 +265,7 @@ describe('withOnyxTest', () => {
                 )(ViewWithCollections);
                 render(<TestComponentWithOnyx markReadyForHydration={markReadyForHydration} onRender={onRender} />);
             })
+            .then(waitForPromisesToResolve)
             .then(() => {
                 expect(onRender).toHaveBeenLastCalledWith({
                     collections: {}, markReadyForHydration, onRender, testObject: {id: 1}, testThing: 'Test',
