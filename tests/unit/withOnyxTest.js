@@ -215,8 +215,9 @@ describe('withOnyxTest', () => {
             .then(() => {
                 rerender(<TestComponentWithOnyx collectionID="2" />);
 
-                // Note, when we change the prop, we need to wait for the next tick:
-                return waitForPromisesToResolve();
+                // Note, when we change the prop, we need to wait for one tick for the
+                // component to update and one tick for batching.
+                return waitForPromisesToResolve().then(waitForPromisesToResolve);
             })
             .then(() => {
                 expect(getByTestId('text-element').props.children).toEqual('test_2');
@@ -264,6 +265,7 @@ describe('withOnyxTest', () => {
                 )(ViewWithCollections);
                 render(<TestComponentWithOnyx markReadyForHydration={markReadyForHydration} onRender={onRender} />);
             })
+            .then(waitForPromisesToResolve)
             .then(() => {
                 expect(onRender).toHaveBeenLastCalledWith({
                     collections: {}, markReadyForHydration, onRender, testObject: {id: 1}, testThing: 'Test',
