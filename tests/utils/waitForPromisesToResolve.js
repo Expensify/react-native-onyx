@@ -1,1 +1,1 @@
-export default () => new Promise(setImmediate);
+export default () => new Promise(resolve => setTimeout(resolve, 0));

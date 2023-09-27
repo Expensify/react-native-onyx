@@ -135,7 +135,74 @@ export default withOnyx({
 })(App);
 ```
 
-It is preferable to use the HOC over `Onyx.connect()` in React code as `withOnyx()` will delay the rendering of the wrapped component until all keys have been accessed and made available.
+While `Onyx.connect()` gives you more control on how your component reacts as data is fetched from disk, `withOnyx()` will delay the rendering of the wrapped component until all keys/entities have been fetched and passed to the component, this can be convenient for simple cases. This however, can really delay your application if many entities are connected to the same component, you can pass an `initialValue` to each key to allow Onyx to eagerly render your component with this value.
+
+```javascript
+export default withOnyx({
+    session: {
+        key: ONYXKEYS.SESSION,
+        initialValue: {}
+    },
+})(App);
+```
+
+Additionally, if your component has many keys/entities when your component will mount but will receive many updates as data is fetched from DB and passed down to it, as every key that gets fetched will trigger a `setState` on the `withOnyx` HOC. This might cause re-renders on the initial mounting, preventing the component from mounting/rendering in reasonable time, making your app feel slow and even delaying animations. You can workaround this by passing an additional object with the `shouldDelayUpdates` property set to true. Onyx will then put all the updates in a queue until you decide when then should be applied, the component will receive a function `markReadyForHydration`. A good place to call this function is on the `onLayout` method, which gets triggered after your component has been rendered.
+
+```javascript
+const App = ({session, markReadyForHydration}) => (
+    <View onLayout={() => markReadyForHydration()}>
+        {session.token ? <Text>Logged in</Text> : <Text>Logged out</Text> }
+    </View>
+);
+
+// Second argument to funciton is `shouldDelayUpdates`
+export default withOnyx({
+    session: {
+        key: ONYXKEYS.SESSION,
+        initialValue: {}
+    },
+}, true)(App);
+```
+
+### Dependent Onyx Keys and withOnyx()
+Some components need to subscribe to multiple Onyx keys at once and sometimes, one key might rely on the data from another key. This is similar to a JOIN in SQL.
+
+Example: To get the policy of a report, the `policy` key depends on the `report` key.
+
+```javascript
+export default withOnyx({
+    report: {
+        key: ({reportID) => `${ONYXKEYS.COLLECTION.REPORT}${reportID}`,
+    },
+    policy: {
+        key: ({report}) => `${ONYXKEYS.COLLECTION.POLICY}${report.policyID}`,
+    },
+})(App);
+```
+
+Background info:
+- The `key` value can be a function that returns the key that Onyx subscribes to
+- The first argument to the `key` function is the `props` from the component
+
+**Detailed explanation of how this is handled and rendered:**
+1. The component mounts with a `reportID={1234}` prop
+2. `withOnyx` evaluates the mapping
+3. `withOnyx` connects to the key `reports_1234` because of the prop passed to the component
+3. `withOnyx` connects to the key `policies_undefined` because `report` doesn't exist in the props yet, so the `policyID` defaults to `undefined`. * (see note below)
+4. Onyx reads the data and updates the state of `withOnyx` with:
+    - `report={{reportID: 1234, policyID: 1, ... the rest of the object ...}}`
+    - `policy={undefined}` (since there is no policy with ID `undefined`)
+5. There is still an `undefined` key in the mapping, so Onyx reads the data again
+6. This time `withOnyx` connects to the key `policies_1` because the `report` object exists in the component's state and it has a `policyID: 1`
+7. Onyx reads the data and updates the state of withOnyx with:
+    - `policy={{policyID: 1, ... the rest of the object ...}`
+8. Now all mappings have values that are defined (not undefined) and the component is rendered with all necessary data
+  
+* It is VERY important to NOT use empty string default values like `report.policyID || ''`. This results in the key returned to `withOnyx` as `policies_` which subscribes to the ENTIRE POLICY COLLECTION and is most assuredly not what you were intending. You can use a default of `0` (as long as you are reasonably sure that there is never a policyID=0). This allows Onyx to return `undefined` as the value of the policy key, which is handled by `withOnyx` appropriately.
+
+DO NOT use more than one `withOnyx` component at a time. It adds overhead and prevents some optimizations like batched rendering from working to its full potential.
+
+It's also beneficial to use a [selector](https://github.com/Expensify/react-native-onyx/blob/main/API.md#connectmapping--number) with the mapping in case you need to grab a single item in a collection (like a single report action).
 
 ## Collections
 

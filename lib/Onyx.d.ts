@@ -2,15 +2,7 @@ import {Component} from 'react';
 import {PartialDeep} from 'type-fest';
 import * as Logger from './Logger';
 import * as ActiveClientManager from './ActiveClientManager';
-import {
-    CollectionKey,
-    CollectionKeyBase,
-    DeepRecord,
-    KeyValueMapping,
-    OnyxCollection,
-    OnyxEntry,
-    OnyxKey,
-} from './types';
+import {CollectionKey, CollectionKeyBase, DeepRecord, KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey, NullableProperties} from './types';
 
 /**
  * Represents a mapping object where each `OnyxKey` maps to either a value of its corresponding type in `KeyValueMapping` or `null`.
@@ -211,7 +203,7 @@ declare function multiSet(data: Partial<NullableKeyValueMapping>): Promise<void>
  * @param key ONYXKEYS key
  * @param value Object or Array value to merge
  */
-declare function merge<TKey extends OnyxKey>(key: TKey, value: PartialDeep<KeyValueMapping[TKey]>): Promise<void>;
+declare function merge<TKey extends OnyxKey>(key: TKey, value: NullableProperties<PartialDeep<KeyValueMapping[TKey]>>): Promise<void>;
 
 /**
  * Clear out all the data in the store
