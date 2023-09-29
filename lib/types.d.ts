@@ -1,10 +1,13 @@
 import {Merge} from 'type-fest';
+import {BuiltIns} from 'type-fest/source/internal';
 
 /**
  * Represents a deeply nested record. It maps keys to values,
  * and those values can either be of type `TValue` or further nested `DeepRecord` instances.
  */
-type DeepRecord<TKey extends string | number | symbol, TValue> = {[key: string]: TValue | DeepRecord<TKey, TValue>};
+type DeepRecord<TKey extends string | number | symbol, TValue> = {
+    [key: string]: TValue | DeepRecord<TKey, TValue>;
+};
 
 /**
  * Represents type options to configure all Onyx methods.
@@ -180,26 +183,42 @@ type OnyxEntry<TOnyxValue> = TOnyxValue | null;
  */
 type OnyxCollection<TOnyxValue> = OnyxEntry<Record<string, TOnyxValue | null>>;
 
+type NonTransformableTypes =
+    | BuiltIns
+    | ((...args: any[]) => unknown)
+    | Map<unknown, unknown>
+    | Set<unknown>
+    | ReadonlyMap<unknown, unknown>
+    | ReadonlySet<unknown>
+    | unknown[]
+    | readonly unknown[];
+
 /**
- * The `NullableProperties<T>` sets the values of all properties in `T` to be nullable (i.e., `| null`).
- * It doesn't recurse into nested property values, this means it applies the nullability only to the top-level properties.
+ * Create a type from another type with all keys and nested keys set to optional or null.
  *
- * @template T The type of the properties to convert to nullable properties.
+ * @example
+ * const settings: Settings = {
+ *	 textEditor: {
+ *	 	fontSize: 14;
+ *	 	fontColor: '#000000';
+ *	 	fontWeight: 400;
+ *	 }
+ *	 autosave: true;
+ * };
+ *
+ * const applySavedSettings = (savedSettings: NullishDeep<Settings>) => {
+ * 	 return {...settings, ...savedSettings};
+ * }
+ *
+ * settings = applySavedSettings({textEditor: {fontWeight: 500, fontColor: null}});
  */
-type NullableProperties<T> = {
-    [P in keyof T]: T[P] | null;
+type NullishDeep<T> = T extends NonTransformableTypes ? T : T extends object ? NullishObjectDeep<T> : unknown;
+
+/**
+Same as `NullishDeep`, but accepts only `object`s as inputs. Internal helper for `NullishDeep`.
+*/
+type NullishObjectDeep<ObjectType extends object> = {
+    [KeyType in keyof ObjectType]?: NullishDeep<ObjectType[KeyType]> | null;
 };
 
-export {
-    CollectionKey,
-    CollectionKeyBase,
-    CustomTypeOptions,
-    DeepRecord,
-    Key,
-    KeyValueMapping,
-    OnyxCollection,
-    OnyxEntry,
-    OnyxKey,
-    Selector,
-    NullableProperties,
-};
+export {CollectionKey, CollectionKeyBase, CustomTypeOptions, DeepRecord, Key, KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey, Selector, NullishDeep};
