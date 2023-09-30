@@ -262,7 +262,7 @@ describe('Onyx', () => {
             });
     });
 
-    it('should note remove keys that are set to undefined when merging', () => {
+    it('should ignore `undefined` values when merging', () => {
         let testKeyValue;
 
         connectionID = Onyx.connect({
@@ -293,11 +293,11 @@ describe('Onyx', () => {
                 });
             })
             .then(() => {
-                expect(testKeyValue).toEqual({test1: {test2: undefined, test3: 'test3'}});
+                expect(testKeyValue).toEqual({test1: {test2: 'test2', test3: 'test3'}});
                 return Onyx.merge(ONYX_KEYS.TEST_KEY, {test1: undefined});
             })
             .then(() => {
-                expect(testKeyValue).toEqual({test1: undefined});
+                expect(testKeyValue).toEqual({test1: {test2: 'test2', test3: 'test3'}});
             });
     });
 

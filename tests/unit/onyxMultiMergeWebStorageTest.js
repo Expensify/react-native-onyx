@@ -138,14 +138,15 @@ describe('Onyx.mergeCollection() and WebStorage', () => {
             });
     });
 
-    it('setItem() and multiMerge()', () => {
+    it('setItem() and multiMerge()', async () => {
         // Onyx should be empty after clear() is called
         expect(StorageMock.getStorageMap()).toEqual({});
 
         // Given no previous data and several calls to setItem and call to mergeCollection to update a given key
 
         // 1st call
-        Onyx.set('test_1', {a: 'a'});
+        // TODO: Wait for current "set" operations when merging
+        await Onyx.set('test_1', {a: 'a'});
 
         // These merges will all queue together
         Onyx.merge('test_1', {b: 'b'});
