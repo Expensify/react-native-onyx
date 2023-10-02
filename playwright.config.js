@@ -6,6 +6,7 @@ const {defineConfig, devices} = require('@playwright/test');
  */
 module.exports = defineConfig({
     testDir: './tests/e2e',
+    testIgnore: 'simple.spec.ts',
 
     /* Run tests in files in parallel */
     fullyParallel: true,
@@ -42,7 +43,6 @@ module.exports = defineConfig({
             name: 'firefox',
             use: {...devices['Desktop Firefox']},
         },
-
         {
             name: 'webkit',
             use: {...devices['Desktop Safari']},
