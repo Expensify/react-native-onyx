@@ -202,7 +202,7 @@ describe('Onyx', () => {
         });
     });
 
-    it('should merge an object with undefined', () => {
+    it('should ignore top-level undefined values', () => {
         let testKeyValue;
 
         connectionID = Onyx.connect({
@@ -219,7 +219,7 @@ describe('Onyx', () => {
                 return Onyx.merge(ONYX_KEYS.TEST_KEY, undefined);
             })
             .then(() => {
-                expect(testKeyValue).toEqual(undefined);
+                expect(testKeyValue).toEqual({test1: 'test1'});
             });
     });
 
@@ -846,6 +846,61 @@ describe('Onyx', () => {
                 expect(testCallback).toHaveBeenNthCalledWith(1, 'taco', ONYX_KEYS.TEST_KEY);
                 expect(otherTestCallback).toHaveBeenNthCalledWith(1, 'pizza', ONYX_KEYS.OTHER_TEST);
                 Onyx.disconnect(connectionIDs);
+            });
+    });
+
+    it('should merge an object with a batch of objects and undefined', () => {
+        let testKeyValue;
+
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        return Onyx.set(ONYX_KEYS.TEST_KEY, {test1: 'test1'})
+            .then(() => {
+                expect(testKeyValue).toEqual({test1: 'test1'});
+                Onyx.merge(ONYX_KEYS.TEST_KEY, {test2: 'test2'});
+                Onyx.merge(ONYX_KEYS.TEST_KEY, {test3: 'test3'});
+                Onyx.merge(ONYX_KEYS.TEST_KEY, undefined);
+                Onyx.merge(ONYX_KEYS.TEST_KEY, {test4: 'test4'});
+                Onyx.merge(ONYX_KEYS.TEST_KEY, undefined);
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                expect(testKeyValue).toEqual({
+                    test1: 'test1', test2: 'test2', test3: 'test3', test4: 'test4',
+                });
+            });
+    });
+
+    it('should merge an object with null and overwrite the value', () => {
+        let testKeyValue;
+
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        return Onyx.set(ONYX_KEYS.TEST_KEY, {test1: 'test1'})
+            .then(() => {
+                expect(testKeyValue).toEqual({test1: 'test1'});
+                Onyx.merge(ONYX_KEYS.TEST_KEY, null);
+                Onyx.merge(ONYX_KEYS.TEST_KEY, {test2: 'test2'});
+                Onyx.merge(ONYX_KEYS.TEST_KEY, {test3: 'test3'});
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                expect(testKeyValue).toEqual({
+                    test2: 'test2',
+                    test3: 'test3',
+                });
             });
     });
 });
