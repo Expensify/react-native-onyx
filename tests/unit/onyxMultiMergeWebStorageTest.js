@@ -145,7 +145,6 @@ describe('Onyx.mergeCollection() and WebStorage', () => {
         // Given no previous data and several calls to setItem and call to mergeCollection to update a given key
 
         // 1st call
-        // TODO: Wait for current "set" operations when merging
         Onyx.set('test_1', {a: 'a'});
 
         // These merges will all queue together
