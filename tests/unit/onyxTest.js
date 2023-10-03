@@ -237,24 +237,43 @@ describe('Onyx', () => {
         return Onyx.set(ONYX_KEYS.TEST_KEY, {
             test1: {
                 test2: 'test2',
-                test3: 'test3',
+                test3: {
+                    test4: 'test4',
+                },
             },
         })
             .then(() => {
                 expect(testKeyValue).toEqual({
                     test1: {
                         test2: 'test2',
-                        test3: 'test3',
+                        test3: {
+                            test4: 'test4',
+                        },
                     },
                 });
                 return Onyx.merge(ONYX_KEYS.TEST_KEY, {
                     test1: {
-                        test2: null,
+                        test3: {
+                            test4: null,
+                        },
                     },
                 });
             })
             .then(() => {
-                expect(testKeyValue).toEqual({test1: {test3: 'test3'}});
+                expect(testKeyValue).toEqual({
+                    test1: {
+                        test2: 'test2',
+                        test3: {},
+                    },
+                });
+                return Onyx.merge(ONYX_KEYS.TEST_KEY, {
+                    test1: {
+                        test3: null,
+                    },
+                });
+            })
+            .then(() => {
+                expect(testKeyValue).toEqual({test1: {test2: 'test2'}});
                 return Onyx.merge(ONYX_KEYS.TEST_KEY, {test1: null});
             })
             .then(() => {
