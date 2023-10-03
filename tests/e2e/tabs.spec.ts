@@ -10,11 +10,11 @@ test.describe('multiple tabs', () => {
         await secondPage.goto('/');
         await thirdPage.goto('/');
 
-        await page.getByTestId('log-in').click();
+        await page.getByRole('button', {name: 'Log In'}).click();
 
-        expect(page.getByTestId('log-out')).toBeTruthy();
-        expect(secondPage.getByTestId('log-out')).toBeTruthy();
-        expect(thirdPage.getByTestId('log-out')).toBeTruthy();
+        await expect(page.getByRole('button', {name: 'Log Out'})).toBeVisible();
+        await expect(secondPage.getByRole('button', {name: 'Log Out'})).toBeVisible();
+        await expect(thirdPage.getByRole('button', {name: 'Log Out'})).toBeVisible();
     });
 
     test('fetch should stop after log out', async ({page, context}) => {
@@ -25,23 +25,23 @@ test.describe('multiple tabs', () => {
         await secondPage.goto('/');
         await thirdPage.goto('/');
 
-        await page.getByText('Log In').click();
+        await page.getByRole('button', {name: 'Log In'}).click();
 
-        await secondPage.getByTestId('log-out').waitFor({state: 'visible'});
+        await secondPage.getByRole('button', {name: 'Log Out'}).waitFor({state: 'visible'});
         await thirdPage.getByTestId('fetch-space-data').waitFor({state: 'visible'});
 
         await thirdPage.getByTestId('fetch-space-data').click();
         await page.getByTestId('fetch-space-data').click();
-        await secondPage.getByTestId('log-out').click();
+        await secondPage.getByRole('button', {name: 'Log Out'}).click();
 
-        await secondPage.getByTestId('log-in').waitFor({state: 'visible'});
-        await thirdPage.getByTestId('log-in').waitFor({state: 'visible'});
+        await page.getByRole('button', {name: 'Log In'}).waitFor({state: 'visible'});
+        await thirdPage.getByRole('button', {name: 'Log In'}).waitFor({state: 'visible'});
 
         await page.reload();
         await thirdPage.reload();
 
-        expect(secondPage.getByTestId('log-in')).toBeTruthy();
-        expect(thirdPage.getByTestId('log-in')).toBeTruthy();
+        await expect(page.getByRole('button', {name: 'Log In'})).toBeVisible();
+        await expect(thirdPage.getByRole('button', {name: 'Log In'})).toBeVisible();
 
         await expect(page.getByLabel('data-meteorites')).toBeEmpty();
         await expect(secondPage.getByLabel('data-meteorites')).toBeEmpty();
@@ -87,18 +87,18 @@ test.describe('multiple tabs', () => {
 
         await expect(thirdPage.getByLabel('leader')).toHaveText('leader');
 
-        await page.getByTestId('log-in').click();
-        await page.getByTestId('log-out').waitFor({state: 'visible'});
+        await page.getByRole('button', {name: 'Log In'}).click();
+        await page.getByRole('button', {name: 'Log Out'}).waitFor({state: 'visible'});
 
-        expect(page.getByTestId('log-out')).toBeTruthy();
-        expect(secondPage.getByTestId('log-out')).toBeTruthy();
-        expect(thirdPage.getByTestId('log-out')).toBeTruthy();
+        await expect(page.getByRole('button', {name: 'Log Out'})).toBeVisible();
+        await expect(secondPage.getByRole('button', {name: 'Log Out'})).toBeVisible();
+        await expect(thirdPage.getByRole('button', {name: 'Log Out'})).toBeVisible();
 
         await thirdPage.close({runBeforeUnload: true});
 
-        await page.getByTestId('log-out').click();
+        await page.getByRole('button', {name: 'Log Out'}).click();
 
-        expect(page.getByTestId('log-in')).toBeTruthy();
-        expect(secondPage.getByTestId('log-in')).toBeTruthy();
+        await expect(page.getByRole('button', {name: 'Log In'})).toBeVisible();
+        await expect(page.getByRole('button', {name: 'Log In'})).toBeVisible();
     });
 });

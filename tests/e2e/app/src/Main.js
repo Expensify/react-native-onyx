@@ -99,7 +99,6 @@ function Main(props) {
                     <Text>{props.session.login}</Text>
                     <Button
                         title="Log Out"
-                        testID="log-out"
                         onPress={onLogOut}
                     />
                     <View style={styles.containerButtons}>
@@ -121,7 +120,7 @@ function Main(props) {
                     </View>
                 </View>
             ) : (
-                <Button title="Log In" testID="log-in" onPress={onLogIn} />
+                <Button title="Log In" onPress={onLogIn} />
             )}
             <Text aria-label="leader">
                 {isLeader ? 'leader' : 'non-leader'}
