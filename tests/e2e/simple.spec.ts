@@ -5,46 +5,36 @@ test.describe('simple', () => {
     test('shows login button', async ({page}) => {
         await page.goto('/');
 
-        const logInButton = page.getByTestId('log-in');
-        expect(logInButton).toBeTruthy();
+        expect(page.getByTestId('log-in')).toBeTruthy();
     });
 
     test('logs in after clicking button', async ({page}) => {
         await page.goto('/');
 
-        const logInButton = page.getByTestId('log-in');
-        await logInButton.click();
+        await page.getByTestId('log-in').click();
 
-        const logOutButton = page.getByTestId('log-out');
-        const numberElement = page.getByLabel('data-number');
+        expect(page.getByTestId('log-out')).toBeTruthy();
+        await expect(page.getByLabel('data-number')).toBeTruthy();
 
-        await expect(logOutButton).toBeTruthy();
-        expect(numberElement).toBeTruthy();
-
-        const updatesTextElement = page.getByLabel('data-updates');
         // eslint-disable-next-line quotes
-        await expect(updatesTextElement).toHaveText("[\"session\",\"randomNumber\"]");
+        await expect(page.getByLabel('data-updates')).toHaveText("[\"session\",\"randomNumber\"]");
     });
 
     test('logs out in after clicking button', async ({page}) => {
         await page.goto('/');
 
-        const logInButton = page.getByTestId('log-in');
-        await logInButton.click();
+        await page.getByTestId('log-in').click();
 
-        const logOutButton = page.getByTestId('log-out');
-        const numberElement = page.getByLabel('data-number');
-        expect(logOutButton).toBeTruthy();
-        expect(numberElement).toBeTruthy();
+        expect(page.getByTestId('log-out')).toBeTruthy();
+        await expect(page.getByLabel('data-number')).toBeTruthy();
 
-        const updatesTextElement = page.getByLabel('data-updates');
         // eslint-disable-next-line quotes
-        expect(updatesTextElement).toHaveText("[\"session\",\"randomNumber\"]");
+        await expect(page.getByLabel('data-updates')).toHaveText("[\"session\",\"randomNumber\"]");
 
-        await logOutButton.click();
+        await page.getByTestId('log-out').click();
 
-        await expect(logInButton).toBeTruthy();
-        await expect(updatesTextElement).toHaveText(
+        expect(page.getByTestId('log-in')).toBeTruthy();
+        await expect(page.getByLabel('data-updates')).toHaveText(
             // eslint-disable-next-line quotes
             "[\"session\",\"randomNumber\",\"session\",\"randomNumber\"]",
         );
