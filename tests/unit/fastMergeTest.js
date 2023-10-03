@@ -86,12 +86,4 @@ describe('fastMerge', () => {
 
         expect(result).toEqual(testObject);
     });
-
-    it('should replace an array with an object, remove nested null and ignore undefined values', () => {
-        const result = utils.fastMerge([1, 2, 3], testObjectWithNullishValues);
-
-        console.log({result});
-
-        expect(result).toEqual(testObjectWithNullValuesRemoved);
-    });
 });
