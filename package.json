@@ -118,7 +118,8 @@
     ],
     "testPathIgnorePatterns": [
       "<rootDir>/node_modules/",
-      "<rootDir>/tests/unit/mocks/"
+      "<rootDir>/tests/unit/mocks/",
+      "<rootDir>/tests/e2e/"
     ],
     "testMatch": [
       "**/tests/unit/**/*.[jt]s?(x)",
