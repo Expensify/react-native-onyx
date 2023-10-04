@@ -1,7 +1,7 @@
 /* eslint-disable @lwc/lwc/no-async-await */
 import {test, expect} from '@playwright/test';
 
-test.describe('simple', () => {
+test.describe('one tab', () => {
     test('shows login button', async ({page}) => {
         await page.goto('/');
 
