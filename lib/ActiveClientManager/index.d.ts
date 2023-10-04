@@ -4,7 +4,7 @@
 declare function isReady(): Promise<void>;
 
 /**
- * Subscribe to the broadcast channel to listen for messages from other tabs, so that
+ * Subscribes to the broadcast channel to listen for messages from other tabs, so that
  * all tabs agree on who the leader is, which should always be the last tab to open.
  */
 declare function init(): void;

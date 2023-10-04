@@ -1,4 +1,4 @@
-import React, {useMemo} from 'react';
+import React from 'react';
 import {Text, View} from 'react-native';
 import PropTypes from 'prop-types';
 import {withOnyx} from 'react-native-onyx';
@@ -15,10 +15,7 @@ const defaultProps = {
 };
 
 function App(props) {
-    const isAuthenticated = useMemo(
-        () => Boolean(lodashGet(props.session, 'login', null)),
-        [props.session],
-    );
+    const isAuthenticated = Boolean(lodashGet(props.session, 'login', null));
 
     return (
         <View>
@@ -32,6 +29,7 @@ function App(props) {
 
 App.propTypes = propTypes;
 App.defaultProps = defaultProps;
+App.displayName = 'App';
 
 export default withOnyx({
     session: {

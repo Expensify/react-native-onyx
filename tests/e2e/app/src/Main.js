@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
     Button, StyleSheet, Text, View,
 } from 'react-native';
@@ -44,14 +44,9 @@ const styles = StyleSheet.create({
 });
 
 function Main(props) {
-    const [isLeader, setIsLeader] = useState(
-        Onyx.isClientTheLeader ? Onyx.isClientTheLeader() : false,
-    );
+    const [isLeader, setIsLeader] = useState(Onyx.isClientTheLeader());
 
-    const isAuthenticated = useMemo(
-        () => Boolean(lodashGet(props.session, 'login', null)),
-        [props.session],
-    );
+    const isAuthenticated = Boolean(lodashGet(props.session, 'login', null));
 
     useEffect(() => {
         if (!Onyx.subscribeToClientChange) {
@@ -155,6 +150,7 @@ function Main(props) {
 
 Main.propTypes = propTypes;
 Main.defaultProps = defaultProps;
+Main.displayName = 'Main';
 
 export default withOnyx({
     session: {
