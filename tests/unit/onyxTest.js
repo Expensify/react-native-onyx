@@ -962,7 +962,7 @@ describe('Onyx', () => {
     });
 
     it('should write data in order', () => {
-        const key = `${ONYX_KEYS.TEST_KEY}123`
+        const key = `${ONYX_KEYS.TEST_KEY}123`;
         connectionID = Onyx.connect({
             key,
             initWithStoredValues: false,
