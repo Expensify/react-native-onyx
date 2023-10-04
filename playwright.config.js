@@ -43,6 +43,7 @@ module.exports = defineConfig({
             use: {...devices['Desktop Firefox']},
         },
 
+        // There's currently an issue with multiple browser contexts in WebKit
         /*
         {
             name: 'webkit',
