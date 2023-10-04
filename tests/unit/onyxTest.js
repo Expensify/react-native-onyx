@@ -223,7 +223,7 @@ describe('Onyx', () => {
             });
     });
 
-    it('should remove top-level keys that are set to null/undefined when merging', () => {
+    it('should remove keys that are set to null when merging', () => {
         let testKeyValue;
 
         connectionID = Onyx.connect({
@@ -234,13 +234,89 @@ describe('Onyx', () => {
             },
         });
 
-        return Onyx.set(ONYX_KEYS.TEST_KEY, {test1: 'test1', test2: 'test2'})
+        return Onyx.set(ONYX_KEYS.TEST_KEY, {
+            test1: {
+                test2: 'test2',
+                test3: {
+                    test4: 'test4',
+                },
+            },
+        })
             .then(() => {
-                expect(testKeyValue).toEqual({test1: 'test1', test2: 'test2'});
+                expect(testKeyValue).toEqual({
+                    test1: {
+                        test2: 'test2',
+                        test3: {
+                            test4: 'test4',
+                        },
+                    },
+                });
+                return Onyx.merge(ONYX_KEYS.TEST_KEY, {
+                    test1: {
+                        test3: {
+                            test4: null,
+                        },
+                    },
+                });
+            })
+            .then(() => {
+                expect(testKeyValue).toEqual({
+                    test1: {
+                        test2: 'test2',
+                        test3: {},
+                    },
+                });
+                return Onyx.merge(ONYX_KEYS.TEST_KEY, {
+                    test1: {
+                        test3: null,
+                    },
+                });
+            })
+            .then(() => {
+                expect(testKeyValue).toEqual({test1: {test2: 'test2'}});
                 return Onyx.merge(ONYX_KEYS.TEST_KEY, {test1: null});
             })
             .then(() => {
-                expect(testKeyValue).toEqual({test2: 'test2'});
+                expect(testKeyValue).toEqual({});
+            });
+    });
+
+    it('should ignore `undefined` values when merging', () => {
+        let testKeyValue;
+
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        return Onyx.set(ONYX_KEYS.TEST_KEY, {
+            test1: {
+                test2: 'test2',
+                test3: 'test3',
+            },
+        })
+            .then(() => {
+                expect(testKeyValue).toEqual({
+                    test1: {
+                        test2: 'test2',
+                        test3: 'test3',
+                    },
+                });
+                return Onyx.merge(ONYX_KEYS.TEST_KEY, {
+                    test1: {
+                        test2: undefined,
+                    },
+                });
+            })
+            .then(() => {
+                expect(testKeyValue).toEqual({test1: {test2: 'test2', test3: 'test3'}});
+                return Onyx.merge(ONYX_KEYS.TEST_KEY, {test1: undefined});
+            })
+            .then(() => {
+                expect(testKeyValue).toEqual({test1: {test2: 'test2', test3: 'test3'}});
             });
     });
 
