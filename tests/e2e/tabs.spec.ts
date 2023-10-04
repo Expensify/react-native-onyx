@@ -88,7 +88,6 @@ test.describe('multiple tabs', () => {
         await expect(thirdPage.getByLabel('leader')).toHaveText('leader');
 
         await page.getByRole('button', {name: 'Log In'}).click();
-        await page.getByRole('button', {name: 'Log Out'}).waitFor({state: 'visible'});
 
         await expect(page.getByRole('button', {name: 'Log Out'})).toBeVisible();
         await expect(secondPage.getByRole('button', {name: 'Log Out'})).toBeVisible();
@@ -99,6 +98,6 @@ test.describe('multiple tabs', () => {
         await page.getByRole('button', {name: 'Log Out'}).click();
 
         await expect(page.getByRole('button', {name: 'Log In'})).toBeVisible();
-        await expect(page.getByRole('button', {name: 'Log In'})).toBeVisible();
+        await expect(secondPage.getByRole('button', {name: 'Log In'})).toBeVisible();
     });
 });
