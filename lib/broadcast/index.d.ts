@@ -10,13 +10,8 @@ declare function sendMessage(message: string): void;
 declare function subscribe(callback: () => {}): void;
 
 /**
- * Unsubscribes from the broadcast channel.
- */
-declare function unsubscribe(callback: () => {}): void;
-
-/**
  * Disconnects from the broadcast channel.
  */
 declare function disconnect(): void;
 
-export {sendMessage, subscribe, unsubscribe, disconnect};
+export {sendMessage, subscribe, disconnect};
