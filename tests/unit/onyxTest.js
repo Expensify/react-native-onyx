@@ -1,6 +1,7 @@
 import _ from 'underscore';
 import Onyx from '../../lib';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
+import Storage from '../../lib/storage';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
@@ -961,20 +962,16 @@ describe('Onyx', () => {
             });
     });
 
-    it('should write data in order', () => {
+    it('should persist data in the correct order', () => {
         const key = `${ONYX_KEYS.TEST_KEY}123`;
+        const callback = jest.fn();
         connectionID = Onyx.connect({
             key,
             initWithStoredValues: false,
-            callback: () => null,
+            callback,
         });
 
         return waitForPromisesToResolve()
-            .then(() => {
-                // Given the initial Onyx state: {test: true, otherTest: {test1: 'test1'}}
-                Onyx.set(key, true);
-                return waitForPromisesToResolve();
-            })
             .then(() => Onyx.update([
                 {
                     onyxMethod: 'set',
@@ -992,8 +989,11 @@ describe('Onyx', () => {
                     value: 'three',
                 },
             ]))
-            .then(() => Onyx.get(key))
+            .then(() => Storage.getItem(key))
             .then((value) => {
+                expect(callback).toHaveBeenNthCalledWith(1, 'one', key);
+                expect(callback).toHaveBeenNthCalledWith(2, 'two', key);
+                expect(callback).toHaveBeenNthCalledWith(3, 'three', key);
                 expect(value).toBe('three');
             });
     });
