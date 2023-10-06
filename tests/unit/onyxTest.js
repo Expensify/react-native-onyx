@@ -997,4 +997,32 @@ describe('Onyx', () => {
                 expect(value).toBe('three');
             });
     });
+
+    it('should persist data in the correct order', () => {
+        const key = `${ONYX_KEYS.TEST_KEY}123`;
+        const callback = jest.fn();
+        connectionID = Onyx.connect({
+            key,
+            initWithStoredValues: false,
+            callback,
+        });
+
+        return waitForPromisesToResolve()
+            .then(() => Onyx.update([
+                {
+                    onyxMethod: 'set',
+                    key,
+                    value: 'one',
+                },
+                {
+                    onyxMethod: 'clear',
+                },
+
+            ]))
+            .then(() => Storage.getItem(key))
+            .then((value) => {
+                expect(callback).toHaveBeenNthCalledWith(1, 'one', key);
+                expect(value).toBe('one');
+            });
+    });
 });
