@@ -249,13 +249,13 @@ describe('withOnyxTest', () => {
         const onRender = jest.fn();
         const markReadyForHydration = jest.fn();
 
-        // Given three collections with multiple items in each
+        // Given several collections with multiple items in each
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.STATIC, {
             static_1: {name: 'Static 1', id: 1},
             static_2: {name: 'Static 2', id: 2},
         });
 
-        // And one collection will depends on data being loaded from the static collection
+        // And one collection will depend on data being loaded from the static collection
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.DEPENDS_ON_STATIC, {
             dependsOnStatic_1: {name: 'dependsOnStatic 1', id: 3},
             dependsOnStatic_2: {name: 'dependsOnStatic 2', id: 4},
