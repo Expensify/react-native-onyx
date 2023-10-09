@@ -1,6 +1,7 @@
 import _ from 'underscore';
 import Onyx from '../../lib';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
+import Storage from '../../lib/storage';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
@@ -918,9 +919,9 @@ describe('Onyx', () => {
             {onyxMethod: Onyx.METHOD.MERGE_COLLECTION, key: ONYX_KEYS.COLLECTION.TEST_UPDATE, value: {[itemKey]: {a: 'a'}}},
         ])
             .then(() => {
-                expect(collectionCallback).toHaveBeenNthCalledWith(1, {[itemKey]: {a: 'a'}});
-                expect(testCallback).toHaveBeenNthCalledWith(1, 'taco', ONYX_KEYS.TEST_KEY);
-                expect(otherTestCallback).toHaveBeenNthCalledWith(1, 'pizza', ONYX_KEYS.OTHER_TEST);
+                expect(collectionCallback).toHaveBeenNthCalledWith(2, {[itemKey]: {a: 'a'}});
+                expect(testCallback).toHaveBeenNthCalledWith(2, 'taco', ONYX_KEYS.TEST_KEY);
+                expect(otherTestCallback).toHaveBeenNthCalledWith(2, 'pizza', ONYX_KEYS.OTHER_TEST);
                 Onyx.disconnect(connectionIDs);
             });
     });
@@ -977,6 +978,70 @@ describe('Onyx', () => {
                     test2: 'test2',
                     test3: 'test3',
                 });
+            });
+    });
+
+    it('should persist data in the correct order', () => {
+        const key = `${ONYX_KEYS.TEST_KEY}123`;
+        const callback = jest.fn();
+        connectionID = Onyx.connect({
+            key,
+            initWithStoredValues: false,
+            callback,
+        });
+
+        return waitForPromisesToResolve()
+            .then(() => Onyx.update([
+                {
+                    onyxMethod: 'set',
+                    key,
+                    value: 'one',
+                },
+                {
+                    onyxMethod: 'merge',
+                    key,
+                    value: 'two',
+                },
+                {
+                    onyxMethod: 'set',
+                    key,
+                    value: 'three',
+                },
+            ]))
+            .then(() => Storage.getItem(key))
+            .then((value) => {
+                expect(callback).toHaveBeenNthCalledWith(1, 'one', key);
+                expect(callback).toHaveBeenNthCalledWith(2, 'two', key);
+                expect(callback).toHaveBeenNthCalledWith(3, 'three', key);
+                expect(value).toBe('three');
+            });
+    });
+
+    it('should persist data in the correct order', () => {
+        const key = `${ONYX_KEYS.TEST_KEY}123`;
+        const callback = jest.fn();
+        connectionID = Onyx.connect({
+            key,
+            initWithStoredValues: false,
+            callback,
+        });
+
+        return waitForPromisesToResolve()
+            .then(() => Onyx.update([
+                {
+                    onyxMethod: 'set',
+                    key,
+                    value: 'one',
+                },
+                {
+                    onyxMethod: 'clear',
+                },
+
+            ]))
+            .then(() => Storage.getItem(key))
+            .then((value) => {
+                expect(callback).toHaveBeenNthCalledWith(1, 'one', key);
+                expect(value).toBe('one');
             });
     });
 });
