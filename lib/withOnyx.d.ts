@@ -8,7 +8,14 @@ type BaseMapping<TComponentProps, TOnyxProps> = {
     canEvict?: boolean | ((props: Omit<TComponentProps, keyof TOnyxProps>) => boolean);
     initWithStoredValues?: boolean;
     allowStaleData?: boolean;
-    initialValue?: boolean;
+};
+
+type CollectionBaseMapping<TOnyxKey extends CollectionKeyBase> = {
+    initialValue?: OnyxCollection<KeyValueMapping[TOnyxKey]>;
+};
+
+type EntryBaseMapping<TOnyxKey extends OnyxKey> = {
+    initialValue?: OnyxEntry<KeyValueMapping[TOnyxKey]>;
 };
 
 /**
@@ -101,7 +108,7 @@ type BaseMappingFunctionKeyAndSelector<
 type Mapping<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TOnyxKey extends OnyxKey> = BaseMapping<
     TComponentProps,
     TOnyxProps
-> &
+> & EntryBaseMapping<TOnyxKey> &
     (
         | BaseMappingKey<TComponentProps, TOnyxProps, TOnyxProp, TOnyxKey, OnyxEntry<KeyValueMapping[TOnyxKey]>>
         | BaseMappingStringKeyAndSelector<TComponentProps, TOnyxProps, TOnyxProp, TOnyxKey>
@@ -116,7 +123,7 @@ type CollectionMapping<
     TOnyxProps,
     TOnyxProp extends keyof TOnyxProps,
     TOnyxKey extends CollectionKeyBase
-> = BaseMapping<TComponentProps, TOnyxProps> &
+> = BaseMapping<TComponentProps, TOnyxProps> & CollectionBaseMapping<TOnyxKey> &
     (
         | BaseMappingKey<TComponentProps, TOnyxProps, TOnyxProp, TOnyxKey, OnyxCollection<KeyValueMapping[TOnyxKey]>>
         | BaseMappingStringKeyAndSelector<TComponentProps, TOnyxProps, TOnyxProp, TOnyxKey>
