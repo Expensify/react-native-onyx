@@ -7,6 +7,8 @@ import {CollectionKeyBase, KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey, 
 type BaseMapping<TComponentProps, TOnyxProps> = {
     canEvict?: boolean | ((props: Omit<TComponentProps, keyof TOnyxProps>) => boolean);
     initWithStoredValues?: boolean;
+    allowStaleData?: boolean;
+    initialValue?: boolean;
 };
 
 /**
