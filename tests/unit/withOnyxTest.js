@@ -5,14 +5,16 @@ import Onyx, {withOnyx} from '../../lib';
 import ViewWithText from '../components/ViewWithText';
 import ViewWithCollections from '../components/ViewWithCollections';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
-import compose from '../../lib/compose';
 import ViewWithObject from '../components/ViewWithObject';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
     COLLECTION: {
         TEST_KEY: 'test_',
-        RELATED_KEY: 'related_',
+        STATIC: 'static_',
+        DEPENDS_ON_STATIC: 'dependsOnStatic_',
+        DEPENDS_ON_DEPENDS_ON_STATIC: 'dependsOnDependsOnStatic_',
+        DEPENDS_ON_DEPENDS_ON_DEPENDS_ON_STATIC: 'dependsOnDependsOnDependsOnStatic_',
     },
     SIMPLE_KEY: 'simple',
     SIMPLE_KEY_2: 'simple2',
@@ -215,10 +217,10 @@ describe('withOnyxTest', () => {
             .then(() => {
                 rerender(<TestComponentWithOnyx collectionID="2" />);
 
-                // Note, when we change the prop, we need to wait for one tick for the
-                // component to update and one tick for batching.
-                return waitForPromisesToResolve().then(waitForPromisesToResolve);
+                // Note, when we change the prop, we need to wait for the next tick:
+                return waitForPromisesToResolve();
             })
+            .then(waitForPromisesToResolve)
             .then(() => {
                 expect(getByTestId('text-element').props.children).toEqual('test_2');
             });
@@ -244,31 +246,73 @@ describe('withOnyxTest', () => {
     });
 
     it('should pass a prop from one connected component to another', () => {
-        const collectionItemID = 1;
         const onRender = jest.fn();
         const markReadyForHydration = jest.fn();
-        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {id: 1}});
-        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.RELATED_KEY, {related_1: 'Test'});
+
+        // Given several collections with multiple items in each
+        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.STATIC, {
+            static_1: {name: 'Static 1', id: 1},
+            static_2: {name: 'Static 2', id: 2},
+        });
+
+        // And one collection will depend on data being loaded from the static collection
+        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.DEPENDS_ON_STATIC, {
+            dependsOnStatic_1: {name: 'dependsOnStatic 1', id: 3},
+            dependsOnStatic_2: {name: 'dependsOnStatic 2', id: 4},
+        });
+
+        // And one collection will depend on the data being loaded from the collection that depends on the static collection (multiple nested dependencies)
+        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.DEPENDS_ON_DEPENDS_ON_STATIC, {
+            dependsOnDependsOnStatic_3: {name: 'dependsOnDependsOnStatic 1', id: 5},
+            dependsOnDependsOnStatic_4: {name: 'dependsOnDependsOnStatic 2', id: 6},
+        });
+
+        // And another collection with one more layer of dependency just to prove it works
+        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.DEPENDS_ON_DEPENDS_ON_DEPENDS_ON_STATIC, {
+            dependsOnDependsOnDependsOnStatic_5: {name: 'dependsOnDependsOnDependsOnStatic 1'},
+            dependsOnDependsOnDependsOnStatic_6: {name: 'dependsOnDependsOnDependsOnStatic 2'},
+        });
+
+        // When a component is rendered using withOnyx and several nested dependencies on the keys
         return waitForPromisesToResolve()
             .then(() => {
-                const TestComponentWithOnyx = compose(
-                    withOnyx({
-                        testObject: {
-                            key: `${ONYX_KEYS.COLLECTION.TEST_KEY}${collectionItemID}`,
-                        },
-                    }),
-                    withOnyx({
-                        testThing: {
-                            key: ({testObject}) => `${ONYX_KEYS.COLLECTION.RELATED_KEY}${testObject.id}`,
-                        },
-                    }),
-                )(ViewWithCollections);
+                const TestComponentWithOnyx = withOnyx({
+                    staticObject: {
+                        key: `${ONYX_KEYS.COLLECTION.STATIC}1`,
+                    },
+                    dependentObject: {
+                        key: ({staticObject}) => `${ONYX_KEYS.COLLECTION.DEPENDS_ON_STATIC}${(staticObject && staticObject.id) || 0}`,
+                    },
+                    multiDependentObject: {
+                        key: ({dependentObject}) => `${ONYX_KEYS.COLLECTION.DEPENDS_ON_DEPENDS_ON_STATIC}${(dependentObject && dependentObject.id) || 0}`,
+                    },
+                    extremeMultiDependentObject: {
+                        key: ({multiDependentObject}) => `${ONYX_KEYS.COLLECTION.DEPENDS_ON_DEPENDS_ON_DEPENDS_ON_STATIC}${(multiDependentObject && multiDependentObject.id) || 0}`,
+                    },
+                })(ViewWithCollections);
                 render(<TestComponentWithOnyx markReadyForHydration={markReadyForHydration} onRender={onRender} />);
+
+                // First promise is for the staticObject and dependentObject to load
+                return waitForPromisesToResolve();
             })
+
+            // Second promise is for multiDependentObject to load
             .then(waitForPromisesToResolve)
+
+            // Third promise is for extremeMultiDependentObject to load
+            .then(waitForPromisesToResolve)
+
+            // Then all of the data gets properly loaded into the component as expected with the nested dependencies resolved
             .then(() => {
                 expect(onRender).toHaveBeenLastCalledWith({
-                    collections: {}, markReadyForHydration, onRender, testObject: {id: 1}, testThing: 'Test',
+                    markReadyForHydration,
+                    onRender,
+                    collections: {},
+                    testObject: {isDefaultProp: true},
+                    staticObject: {name: 'Static 1', id: 1},
+                    dependentObject: {name: 'dependsOnStatic 1', id: 3},
+                    multiDependentObject: {name: 'dependsOnDependsOnStatic 1', id: 5},
+                    extremeMultiDependentObject: {name: 'dependsOnDependsOnDependsOnStatic 1'},
                 });
             });
     });
