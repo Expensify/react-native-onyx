@@ -67,7 +67,7 @@ For `Array` the default behavior is to replace it fully, effectively making it e
 
 ```javascript
 Onyx.merge(ONYXKEYS.EMPLOYEE_LIST, ['Joe']); // -> ['Joe']
-Onyx.merge(ONYXKEYS.EMPLOYEE_LIST, ['Jack']); // -> ['Joe', 'Jack']
+Onyx.merge(ONYXKEYS.EMPLOYEE_LIST, ['Jack']); // -> ['Jack']
 ```
 
 For `Object` values the default behavior uses `lodash/merge` under the hood to do a deep extend of the object.
