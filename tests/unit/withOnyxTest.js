@@ -539,6 +539,8 @@ describe('withOnyxTest', () => {
                 renderResult = render(<TestComponentWithOnyx onRender={onRender} />);
 
                 // The component should not render initially since we have no data in cache.
+                // Use `waitForPromisesToResolve` before making the assertions and make sure
+                // onRender was not called.
                 expect(onRender).not.toHaveBeenCalled();
                 return waitForPromisesToResolve();
             })
@@ -549,6 +551,8 @@ describe('withOnyxTest', () => {
                 expect(onRender).toHaveBeenCalledTimes(1);
 
                 // Unmount the component and mount it again. It should now render immediately.
+                // Do not use `waitForPromisesToResolve` before making the assertions and make sure
+                // onRender was called.
                 renderResult.unmount();
                 renderResult = render(<TestComponentWithOnyx onRender={onRender} />);
 
@@ -570,6 +574,8 @@ describe('withOnyxTest', () => {
         let renderResult = render(<TestComponentWithOnyx onRender={onRender} />);
 
         // The component should not render initially since we have no data in cache.
+        // Use `waitForPromisesToResolve` before making the assertions and make sure
+        // onRender was not called.
         expect(onRender).not.toHaveBeenCalled();
         return waitForPromisesToResolve().then(() => {
             let textComponent = renderResult.getByText('null');
@@ -577,6 +583,8 @@ describe('withOnyxTest', () => {
             expect(onRender).toHaveBeenCalledTimes(1);
 
             // Unmount the component and mount it again. It should now render immediately.
+            // Do not use `waitForPromisesToResolve` before making the assertions and make sure
+            // onRender was called.
             renderResult.unmount();
             renderResult = render(<TestComponentWithOnyx onRender={onRender} />);
             textComponent = renderResult.getByText('null');
@@ -594,12 +602,16 @@ describe('withOnyxTest', () => {
         const onRender = jest.fn();
         let renderResult;
 
+        // Set a random item in storage since Onyx will only think keys are loaded
+        // in cache if there are at least one key.
         return StorageMock.setItem(ONYX_KEYS.SIMPLE_KEY, 'simple')
             .then(() => {
                 // Render with a collection that doesn't exist in cache or storage.
                 renderResult = render(<TestComponentWithOnyx onRender={onRender} />);
 
                 // The component should not render initially since we have no data in cache.
+                // Use `waitForPromisesToResolve` before making the assertions and make sure
+                // onRender was not called.
                 expect(onRender).not.toHaveBeenCalled();
 
                 return waitForPromisesToResolve();
@@ -610,6 +622,8 @@ describe('withOnyxTest', () => {
                 expect(onRender).toHaveBeenCalledTimes(1);
 
                 // Unmount the component and mount it again. It should now render immediately.
+                // Do not use `waitForPromisesToResolve` before making the assertions and make sure
+                // onRender was called.
                 renderResult.unmount();
                 renderResult = render(<TestComponentWithOnyx onRender={onRender} />);
                 textComponent = renderResult.getByText('empty');
