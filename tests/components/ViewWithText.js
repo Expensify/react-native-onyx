@@ -4,12 +4,13 @@ import PropTypes from 'prop-types';
 import {View, Text} from 'react-native';
 
 const propTypes = {
-    text: PropTypes.string.isRequired,
+    text: PropTypes.string,
     onRender: PropTypes.func,
 };
 
 const defaultProps = {
     onRender: () => {},
+    text: null,
 };
 
 function ViewWithText(props) {
@@ -17,7 +18,7 @@ function ViewWithText(props) {
 
     return (
         <View>
-            <Text testID="text-element">{props.text}</Text>
+            <Text testID="text-element">{props.text || 'null'}</Text>
         </View>
     );
 }
