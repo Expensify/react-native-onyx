@@ -6,6 +6,7 @@ import ViewWithText from '../components/ViewWithText';
 import ViewWithCollections from '../components/ViewWithCollections';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import ViewWithObject from '../components/ViewWithObject';
+import StorageMock from '../../lib/storage';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
@@ -520,6 +521,114 @@ describe('withOnyxTest', () => {
                 // Component still has not updated
                 expect(onRender).toHaveBeenCalledTimes(4);
                 expect(onRender.mock.calls[3][0].simple).toBe('long_string');
+            });
+    });
+
+    it('should render immediately when a onyx component is mounted a 2nd time', () => {
+        const TestComponentWithOnyx = withOnyx({
+            text: {
+                key: ONYX_KEYS.TEST_KEY,
+            },
+        })(ViewWithText);
+        const onRender = jest.fn();
+        let renderResult;
+
+        // Set the value in storage, but not in cache.
+        return StorageMock.setItem(ONYX_KEYS.TEST_KEY, 'test1')
+            .then(() => {
+                renderResult = render(<TestComponentWithOnyx onRender={onRender} />);
+
+                // The component should not render initially since we have no data in cache.
+                // Use `waitForPromisesToResolve` before making the assertions and make sure
+                // onRender was not called.
+                expect(onRender).not.toHaveBeenCalled();
+                return waitForPromisesToResolve();
+            })
+            .then(waitForPromisesToResolve)
+            .then(() => {
+                let textComponent = renderResult.getByText('test1');
+                expect(textComponent).not.toBeNull();
+                expect(onRender).toHaveBeenCalledTimes(1);
+
+                // Unmount the component and mount it again. It should now render immediately.
+                // Do not use `waitForPromisesToResolve` before making the assertions and make sure
+                // onRender was called.
+                renderResult.unmount();
+                renderResult = render(<TestComponentWithOnyx onRender={onRender} />);
+
+                textComponent = renderResult.getByText('test1');
+                expect(textComponent).not.toBeNull();
+                expect(onRender).toHaveBeenCalledTimes(2);
+            });
+    });
+
+    it('should cache missing keys', () => {
+        const TestComponentWithOnyx = withOnyx({
+            text: {
+                key: ONYX_KEYS.TEST_KEY,
+            },
+        })(ViewWithText);
+        const onRender = jest.fn();
+
+        // Render with a key that doesn't exist in cache or storage.
+        let renderResult = render(<TestComponentWithOnyx onRender={onRender} />);
+
+        // The component should not render initially since we have no data in cache.
+        // Use `waitForPromisesToResolve` before making the assertions and make sure
+        // onRender was not called.
+        expect(onRender).not.toHaveBeenCalled();
+        return waitForPromisesToResolve().then(() => {
+            let textComponent = renderResult.getByText('null');
+            expect(textComponent).not.toBeNull();
+            expect(onRender).toHaveBeenCalledTimes(1);
+
+            // Unmount the component and mount it again. It should now render immediately.
+            // Do not use `waitForPromisesToResolve` before making the assertions and make sure
+            // onRender was called.
+            renderResult.unmount();
+            renderResult = render(<TestComponentWithOnyx onRender={onRender} />);
+            textComponent = renderResult.getByText('null');
+            expect(textComponent).not.toBeNull();
+            expect(onRender).toHaveBeenCalledTimes(2);
+        });
+    });
+
+    it('should cache empty collections', () => {
+        const TestComponentWithOnyx = withOnyx({
+            text: {
+                key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            },
+        })(ViewWithCollections);
+        const onRender = jest.fn();
+        let renderResult;
+
+        // Set a random item in storage since Onyx will only think keys are loaded
+        // in cache if there are at least one key.
+        return StorageMock.setItem(ONYX_KEYS.SIMPLE_KEY, 'simple')
+            .then(() => {
+                // Render with a collection that doesn't exist in cache or storage.
+                renderResult = render(<TestComponentWithOnyx onRender={onRender} />);
+
+                // The component should not render initially since we have no data in cache.
+                // Use `waitForPromisesToResolve` before making the assertions and make sure
+                // onRender was not called.
+                expect(onRender).not.toHaveBeenCalled();
+
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                let textComponent = renderResult.getByText('empty');
+                expect(textComponent).not.toBeNull();
+                expect(onRender).toHaveBeenCalledTimes(1);
+
+                // Unmount the component and mount it again. It should now render immediately.
+                // Do not use `waitForPromisesToResolve` before making the assertions and make sure
+                // onRender was called.
+                renderResult.unmount();
+                renderResult = render(<TestComponentWithOnyx onRender={onRender} />);
+                textComponent = renderResult.getByText('empty');
+                expect(textComponent).not.toBeNull();
+                expect(onRender).toHaveBeenCalledTimes(2);
             });
     });
 });
