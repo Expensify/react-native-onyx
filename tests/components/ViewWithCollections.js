@@ -29,10 +29,6 @@ const ViewWithCollections = React.forwardRef((props, ref) => {
 
     props.onRender(props);
 
-    if (_.size(props.collections) === 0) {
-        return <Text>empty</Text>;
-    }
-
     return (
         <View>
             {_.map(props.collections, (collection, i) => (
