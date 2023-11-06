@@ -42,7 +42,7 @@
   "dependencies": {
     "ascii-table": "0.0.9",
     "fast-equals": "^4.0.3",
-    "underscore": "^1.13.1"
+    "underscore": "^1.13.6"
   },
   "devDependencies": {
     "@babel/core": "7.20.12",
