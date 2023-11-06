@@ -347,6 +347,18 @@ describe('Onyx', () => {
                 expect(() => cache.merge(0)).toThrow();
                 expect(() => cache.merge({})).not.toThrow();
             });
+
+            it('Should merge `null` values', () => {
+                // `null` values can override existing values and should also
+                // be preserved during merges.
+                cache.set('mockKey', {ID: 5});
+                cache.set('mockNullKey', null);
+
+                cache.merge({mockKey: null});
+
+                expect(cache.getValue('mockKey')).toEqual(null);
+                expect(cache.getValue('mockNullKey')).toEqual(null);
+            });
         });
 
         describe('hasPendingTask', () => {
