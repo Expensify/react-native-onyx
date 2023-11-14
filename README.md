@@ -405,3 +405,11 @@ To continuously work on Onyx we have to set up a task that copies content to par
 3. Optional: run `npm run build` (if you're working or want to test on a non react-native project)
    - `npm link` would actually work outside of `react-native` and it can be used to link Onyx locally for a web only project
 4. Copy Onyx to consumer project's `node_modules/react-native-onyx`
+
+# Automated Tests
+
+There are Playwright e2e tests implemented for the web. To run them:
+
+- `npm install` - to install package dependencies and the e2e app as well
+- `npm run e2e` to run the e2e tests
+- or `npm run e2e-ui` to run the e2e tests in UI mode 
