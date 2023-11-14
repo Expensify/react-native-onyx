@@ -979,4 +979,29 @@ describe('Onyx', () => {
                 });
             });
     });
+
+    it('should merge a key with null and allow subsequent updates', () => {
+        let testKeyValue;
+
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        return Onyx.set(ONYX_KEYS.TEST_KEY, 1)
+            .then(() => {
+                expect(testKeyValue).toEqual(1);
+                Onyx.merge(ONYX_KEYS.TEST_KEY, null);
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                expect(testKeyValue).toEqual(null);
+                return Onyx.merge(ONYX_KEYS.TEST_KEY, 2);
+            }).then(() => {
+                expect(testKeyValue).toEqual(2);
+            });
+    });
 });

@@ -64,42 +64,42 @@ Each set of changes should be tested against the Expensify/App repo on all platf
 
 ### Screenshots/Videos
 <details>
-<summary>Web</summary>
+<summary>Android: Native</summary>
 
 <!-- add screenshots or videos here -->
 
 </details>
 
 <details>
-<summary>Mobile Web - Chrome</summary>
+<summary>Android: mWeb Chrome</summary>
 
 <!-- add screenshots or videos here -->
 
 </details>
 
 <details>
-<summary>Mobile Web - Safari</summary>
+<summary>iOS: Native</summary>
 
 <!-- add screenshots or videos here -->
 
 </details>
 
 <details>
-<summary>Desktop</summary>
+<summary>iOS: mWeb Safari</summary>
 
 <!-- add screenshots or videos here -->
 
 </details>
 
 <details>
-<summary>iOS</summary>
+<summary>MacOS: Chrome / Safari</summary>
 
 <!-- add screenshots or videos here -->
 
 </details>
 
 <details>
-<summary>Android</summary>
+<summary>MacOS: Desktop</summary>
 
 <!-- add screenshots or videos here -->
 
