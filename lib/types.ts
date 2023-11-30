@@ -107,6 +107,30 @@ type OnyxKey = Key | CollectionKey;
  */
 type OnyxValue<TKey extends OnyxKey> = string extends TKey ? unknown : TKey extends CollectionKeyBase ? OnyxCollection<KeyValueMapping[TKey]> : OnyxEntry<KeyValueMapping[TKey]>;
 
+type ComputedKeyDependencies = Record<string, OnyxKey | ComputedKey<any, unknown>>;
+
+/**
+ * A computed key is a key that is not stored in the database, but instead is computed from other keys
+ * and cached in memory. This is useful for expensive computations that are used in multiple places.
+ */
+type ComputedKey<DependenciesT extends Record<string, unknown>, ValueT> = {
+    /**
+     * The cache key of the computed value.
+     */
+    cacheKey: string;
+    /**
+     * Keys that this computed key depends on. The values of these keys will be passed to the compute function.
+     * This will also cause the key to be recomputed whenever any of the dependencies value change.
+     */
+    dependencies?: {[KeyT in keyof DependenciesT]: OnyxKey | ComputedKey<any, unknown>};
+    /**
+     * Compute the value for this computed key.
+     */
+    compute: (params: DependenciesT) => ValueT;
+};
+
+type AnyComputedKey = ComputedKey<Record<string, unknown>, unknown>;
+
 /**
  * Represents a mapping of Onyx keys to values, where keys are either normal or collection Onyx keys
  * and values are the corresponding values in Onyx's state.
@@ -288,21 +312,26 @@ type BaseConnectOptions = {
  * If `waitForCollectionCallback` is `false` or not specified, the `key` can be any Onyx key and `callback` will be triggered with updates of each collection item
  * and will pass `value` as an `OnyxEntry`.
  */
-type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions &
+type ConnectOptions<TKey extends OnyxKey | AnyComputedKey> = BaseConnectOptions &
     (
         | {
+              key: TKey;
+              callback?: TKey extends ComputedKey<Record<string, unknown>, infer ValT> ? (value: OnyxCollection<ValT>) => void : never;
+              waitForCollectionCallback: true;
+          }
+        | {
               key: TKey extends CollectionKeyBase ? TKey : never;
-              callback?: (value: OnyxCollection<KeyValueMapping[TKey]>) => void;
+              callback?: TKey extends OnyxKey ? (value: OnyxCollection<KeyValueMapping[TKey]>) => void : never;
               waitForCollectionCallback: true;
           }
         | {
               key: TKey;
-              callback?: (value: OnyxEntry<KeyValueMapping[TKey]>, key: TKey) => void;
+              callback?: TKey extends OnyxKey ? (value: OnyxEntry<KeyValueMapping[TKey]>, key: TKey) => void : never;
               waitForCollectionCallback?: false;
           }
     );
 
-type Mapping<TKey extends OnyxKey> = ConnectOptions<TKey> & {connectionID: number; statePropertyName: string; displayName: string};
+type Mapping<TKey extends OnyxKey | AnyComputedKey> = ConnectOptions<TKey> & {connectionID: number; statePropertyName: string; displayName: string; dependencyConnections?: number[]};
 
 /**
  * Represents different kinds of updates that can be passed to `Onyx.update()` method. It is a discriminated union of
@@ -374,8 +403,10 @@ type InitOptions = {
 };
 
 export type {
+    AnyComputedKey,
     CollectionKey,
     CollectionKeyBase,
+    ComputedKey,
     CustomTypeOptions,
     DeepRecord,
     Key,
