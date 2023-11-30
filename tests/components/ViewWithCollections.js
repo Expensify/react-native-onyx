@@ -5,9 +5,11 @@ import {View, Text} from 'react-native';
 import _ from 'underscore';
 
 const propTypes = {
-    collections: PropTypes.objectOf(PropTypes.shape({
-        ID: PropTypes.number,
-    })),
+    collections: PropTypes.objectOf(
+        PropTypes.shape({
+            ID: PropTypes.number,
+        }),
+    ),
     testObject: PropTypes.shape({
         ID: PropTypes.number,
     }),

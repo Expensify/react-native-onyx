@@ -34,7 +34,7 @@ describe('Set data while storage is clearing', () => {
         connectionID = Onyx.connect({
             key: ONYX_KEYS.DEFAULT_KEY,
             initWithStoredValues: false,
-            callback: val => onyxValue = val,
+            callback: (val) => (onyxValue = val),
         });
         return waitForPromisesToResolve();
     });
@@ -51,15 +51,14 @@ describe('Set data while storage is clearing', () => {
         // When set then clear is called on a key with a default key state
         Onyx.set(ONYX_KEYS.DEFAULT_KEY, SET_VALUE);
         Onyx.clear();
-        return waitForPromisesToResolve()
-            .then(() => {
-                // Then the value in Onyx, the cache, and Storage is the default key state
-                expect(onyxValue).toBe(DEFAULT_VALUE);
-                const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
-                expect(cachedValue).toBe(DEFAULT_VALUE);
-                const storedValue = StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY);
-                return expect(storedValue).resolves.toBe(DEFAULT_VALUE);
-            });
+        return waitForPromisesToResolve().then(() => {
+            // Then the value in Onyx, the cache, and Storage is the default key state
+            expect(onyxValue).toBe(DEFAULT_VALUE);
+            const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
+            expect(cachedValue).toBe(DEFAULT_VALUE);
+            const storedValue = StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY);
+            return expect(storedValue).resolves.toBe(DEFAULT_VALUE);
+        });
     });
 
     it('should replace the value of Onyx.merge with the default key state in the cache', () => {
@@ -69,15 +68,14 @@ describe('Set data while storage is clearing', () => {
         // When merge then clear is called on a key with a default key state
         Onyx.merge(ONYX_KEYS.DEFAULT_KEY, MERGED_VALUE);
         Onyx.clear();
-        return waitForPromisesToResolve()
-            .then(() => {
-                // Then the value in Onyx, the cache, and Storage is the default key state
-                expect(onyxValue).toBe(DEFAULT_VALUE);
-                const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
-                expect(cachedValue).toBe(DEFAULT_VALUE);
-                const storedValue = StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY);
-                return expect(storedValue).resolves.toBe(DEFAULT_VALUE);
-            });
+        return waitForPromisesToResolve().then(() => {
+            // Then the value in Onyx, the cache, and Storage is the default key state
+            expect(onyxValue).toBe(DEFAULT_VALUE);
+            const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
+            expect(cachedValue).toBe(DEFAULT_VALUE);
+            const storedValue = StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY);
+            return expect(storedValue).resolves.toBe(DEFAULT_VALUE);
+        });
     });
 
     it('should preserve the value of any keysToPreserve passed in', () => {
@@ -88,22 +86,21 @@ describe('Set data while storage is clearing', () => {
         Onyx.connect({
             key: ONYX_KEYS.REGULAR_KEY,
             initWithStoredValues: false,
-            callback: val => regularKeyOnyxValue = val,
+            callback: (val) => (regularKeyOnyxValue = val),
         });
         Onyx.set(ONYX_KEYS.REGULAR_KEY, SET_VALUE).then(() => {
             // When clear is called with a key to preserve
             Onyx.clear([ONYX_KEYS.REGULAR_KEY]);
         });
 
-        return waitForPromisesToResolve()
-            .then(() => {
-                // Then the value of the preserved key is also still set in both the cache and storage
-                expect(regularKeyOnyxValue).toBe(SET_VALUE);
-                const regularKeyCachedValue = cache.getValue(ONYX_KEYS.REGULAR_KEY);
-                expect(regularKeyCachedValue).toBe(SET_VALUE);
-                const regularKeyStoredValue = StorageMock.getItem(ONYX_KEYS.REGULAR_KEY);
-                return expect(regularKeyStoredValue).resolves.toBe(SET_VALUE);
-            });
+        return waitForPromisesToResolve().then(() => {
+            // Then the value of the preserved key is also still set in both the cache and storage
+            expect(regularKeyOnyxValue).toBe(SET_VALUE);
+            const regularKeyCachedValue = cache.getValue(ONYX_KEYS.REGULAR_KEY);
+            expect(regularKeyCachedValue).toBe(SET_VALUE);
+            const regularKeyStoredValue = StorageMock.getItem(ONYX_KEYS.REGULAR_KEY);
+            return expect(regularKeyStoredValue).resolves.toBe(SET_VALUE);
+        });
     });
 
     it('should preserve the value of any keysToPreserve over any default key states', () => {
@@ -115,15 +112,14 @@ describe('Set data while storage is clearing', () => {
             Onyx.clear([ONYX_KEYS.DEFAULT_KEY]);
         });
 
-        return waitForPromisesToResolve()
-            .then(() => {
-                // Then the value in Onyx, the cache, and Storage is the set value
-                expect(onyxValue).toBe(SET_VALUE);
-                const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
-                expect(cachedValue).toBe(SET_VALUE);
-                const storedValue = StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY);
-                return expect(storedValue).resolves.toBe(SET_VALUE);
-            });
+        return waitForPromisesToResolve().then(() => {
+            // Then the value in Onyx, the cache, and Storage is the set value
+            expect(onyxValue).toBe(SET_VALUE);
+            const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
+            expect(cachedValue).toBe(SET_VALUE);
+            const storedValue = StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY);
+            return expect(storedValue).resolves.toBe(SET_VALUE);
+        });
     });
 
     it('should only trigger the connection callback once when using wait for collection callback', () => {
@@ -136,35 +132,39 @@ describe('Set data while storage is clearing', () => {
             waitForCollectionCallback: true,
             callback: collectionCallback,
         });
-        return waitForPromisesToResolve()
-            .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST, {
-                [`${ONYX_KEYS.COLLECTION.TEST}1`]: 1,
-                [`${ONYX_KEYS.COLLECTION.TEST}2`]: 2,
-                [`${ONYX_KEYS.COLLECTION.TEST}3`]: 3,
-                [`${ONYX_KEYS.COLLECTION.TEST}4`]: 4,
-            }))
+        return (
+            waitForPromisesToResolve()
+                .then(() =>
+                    Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST, {
+                        [`${ONYX_KEYS.COLLECTION.TEST}1`]: 1,
+                        [`${ONYX_KEYS.COLLECTION.TEST}2`]: 2,
+                        [`${ONYX_KEYS.COLLECTION.TEST}3`]: 3,
+                        [`${ONYX_KEYS.COLLECTION.TEST}4`]: 4,
+                    }),
+                )
 
-            // When onyx is cleared
-            .then(Onyx.clear)
-            .then(() => {
-                Onyx.disconnect(testConnectionID);
-            })
-            .then(() => {
-                // Then the collection callback should only have been called three times:
-                // 1. connect()
-                // 2. merge()
-                // 3. clear()
-                expect(collectionCallback).toHaveBeenCalledTimes(3);
+                // When onyx is cleared
+                .then(Onyx.clear)
+                .then(() => {
+                    Onyx.disconnect(testConnectionID);
+                })
+                .then(() => {
+                    // Then the collection callback should only have been called three times:
+                    // 1. connect()
+                    // 2. merge()
+                    // 3. clear()
+                    expect(collectionCallback).toHaveBeenCalledTimes(3);
 
-                // And it should be called with the expected parameters each time
-                expect(collectionCallback).toHaveBeenNthCalledWith(1, null, undefined);
-                expect(collectionCallback).toHaveBeenNthCalledWith(2, {
-                    test_1: 1,
-                    test_2: 2,
-                    test_3: 3,
-                    test_4: 4,
-                });
-                expect(collectionCallback).toHaveBeenLastCalledWith({});
-            });
+                    // And it should be called with the expected parameters each time
+                    expect(collectionCallback).toHaveBeenNthCalledWith(1, null, undefined);
+                    expect(collectionCallback).toHaveBeenNthCalledWith(2, {
+                        test_1: 1,
+                        test_2: 2,
+                        test_3: 3,
+                        test_4: 4,
+                    });
+                    expect(collectionCallback).toHaveBeenLastCalledWith({});
+                })
+        );
     });
 });

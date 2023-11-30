@@ -60,22 +60,25 @@ describe('Onyx.mergeCollection() and WebStorage', () => {
             test_3: additionalDataTwo,
         });
 
-        return waitForPromisesToResolve()
-            .then(() => {
-                const finalObject = {
-                    a: 'a', b: 'b', c: 'c', d: 'd', e: [2],
-                };
+        return waitForPromisesToResolve().then(() => {
+            const finalObject = {
+                a: 'a',
+                b: 'b',
+                c: 'c',
+                d: 'd',
+                e: [2],
+            };
 
-                // Then our new data should merge with the existing data in the cache
-                expect(OnyxCache.getValue('test_1')).toEqual(finalObject);
-                expect(OnyxCache.getValue('test_2')).toEqual(finalObject);
-                expect(OnyxCache.getValue('test_3')).toEqual(finalObject);
+            // Then our new data should merge with the existing data in the cache
+            expect(OnyxCache.getValue('test_1')).toEqual(finalObject);
+            expect(OnyxCache.getValue('test_2')).toEqual(finalObject);
+            expect(OnyxCache.getValue('test_3')).toEqual(finalObject);
 
-                // And the storage should reflect the same state
-                expect(StorageMock.getStorageMap().test_1).toEqual(finalObject);
-                expect(StorageMock.getStorageMap().test_2).toEqual(finalObject);
-                expect(StorageMock.getStorageMap().test_3).toEqual(finalObject);
-            });
+            // And the storage should reflect the same state
+            expect(StorageMock.getStorageMap().test_1).toEqual(finalObject);
+            expect(StorageMock.getStorageMap().test_2).toEqual(finalObject);
+            expect(StorageMock.getStorageMap().test_3).toEqual(finalObject);
+        });
     });
 
     it('cache updates correctly when accessed again if keys are removed or evicted', () => {
@@ -123,7 +126,9 @@ describe('Onyx.mergeCollection() and WebStorage', () => {
             })
             .then(() => {
                 const finalObject = {
-                    a: 'a', b: 'b', c: 'c',
+                    a: 'a',
+                    b: 'b',
+                    c: 'c',
                 };
 
                 // Then our new data should merge with the existing data in the cache
@@ -158,14 +163,18 @@ describe('Onyx.mergeCollection() and WebStorage', () => {
 
         // Last call
         Onyx.merge('test_1', {f: 'f'});
-        return waitForPromisesToResolve()
-            .then(() => {
-                const finalObject = {
-                    a: 'a', b: 'b', c: 'c', d: 'd', e: 'e', f: 'f',
-                };
+        return waitForPromisesToResolve().then(() => {
+            const finalObject = {
+                a: 'a',
+                b: 'b',
+                c: 'c',
+                d: 'd',
+                e: 'e',
+                f: 'f',
+            };
 
-                expect(OnyxCache.getValue('test_1')).toEqual(finalObject);
-                expect(StorageMock.getStorageMap().test_1).toEqual(finalObject);
-            });
+            expect(OnyxCache.getValue('test_1')).toEqual(finalObject);
+            expect(StorageMock.getStorageMap().test_1).toEqual(finalObject);
+        });
     });
 });

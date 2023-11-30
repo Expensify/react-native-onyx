@@ -33,7 +33,7 @@ describe('Set data while storage is clearing', () => {
         connectionID = Onyx.connect({
             key: ONYX_KEYS.DEFAULT_KEY,
             initWithStoredValues: false,
-            callback: val => onyxValue = val,
+            callback: (val) => (onyxValue = val),
         });
         return waitForPromisesToResolve();
     });
@@ -50,15 +50,13 @@ describe('Set data while storage is clearing', () => {
         // When set then clear is called on a key with a default key state
         Onyx.set(ONYX_KEYS.DEFAULT_KEY, SET_VALUE);
         Onyx.clear();
-        return waitForPromisesToResolve()
-            .then(() => {
-                // Then the value in Onyx, the cache, and Storage is the default key state
-                expect(onyxValue).toBe(DEFAULT_VALUE);
-                const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
-                expect(cachedValue).toBe(DEFAULT_VALUE);
-                return StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY)
-                    .then(storedValue => expect(parseInt(storedValue, 10)).toBe(DEFAULT_VALUE));
-            });
+        return waitForPromisesToResolve().then(() => {
+            // Then the value in Onyx, the cache, and Storage is the default key state
+            expect(onyxValue).toBe(DEFAULT_VALUE);
+            const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
+            expect(cachedValue).toBe(DEFAULT_VALUE);
+            return StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY).then((storedValue) => expect(parseInt(storedValue, 10)).toBe(DEFAULT_VALUE));
+        });
     });
 
     it('should replace the value of Onyx.merge with the default key state in the cache', () => {
@@ -68,15 +66,13 @@ describe('Set data while storage is clearing', () => {
         // When merge then clear is called on a key with a default key state
         Onyx.merge(ONYX_KEYS.DEFAULT_KEY, MERGED_VALUE);
         Onyx.clear();
-        return waitForPromisesToResolve()
-            .then(() => {
-                // Then the value in Onyx, the cache, and Storage is the default key state
-                expect(onyxValue).toBe(DEFAULT_VALUE);
-                const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
-                expect(cachedValue).toBe(DEFAULT_VALUE);
-                return StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY)
-                    .then(storedValue => expect(parseInt(storedValue, 10)).toBe(DEFAULT_VALUE));
-            });
+        return waitForPromisesToResolve().then(() => {
+            // Then the value in Onyx, the cache, and Storage is the default key state
+            expect(onyxValue).toBe(DEFAULT_VALUE);
+            const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
+            expect(cachedValue).toBe(DEFAULT_VALUE);
+            return StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY).then((storedValue) => expect(parseInt(storedValue, 10)).toBe(DEFAULT_VALUE));
+        });
     });
 
     it('should preserve the value of any keysToPreserve passed in', () => {
@@ -87,21 +83,19 @@ describe('Set data while storage is clearing', () => {
         Onyx.connect({
             key: ONYX_KEYS.REGULAR_KEY,
             initWithStoredValues: false,
-            callback: val => regularKeyOnyxValue = val,
+            callback: (val) => (regularKeyOnyxValue = val),
         });
         Onyx.set(ONYX_KEYS.REGULAR_KEY, SET_VALUE).then(() => {
             // When clear is called with a key to preserve
             Onyx.clear([ONYX_KEYS.REGULAR_KEY]);
         });
 
-        return waitForPromisesToResolve()
-            .then(() => {
-                // Then the value of the preserved key is also still set in both the cache and storage
-                expect(regularKeyOnyxValue).toBe(SET_VALUE);
-                expect(cache.getValue(ONYX_KEYS.REGULAR_KEY)).toBe(SET_VALUE);
-                return StorageMock.getItem(ONYX_KEYS.REGULAR_KEY)
-                    .then(storedValue => expect(parseInt(storedValue, 10)).toBe(SET_VALUE));
-            });
+        return waitForPromisesToResolve().then(() => {
+            // Then the value of the preserved key is also still set in both the cache and storage
+            expect(regularKeyOnyxValue).toBe(SET_VALUE);
+            expect(cache.getValue(ONYX_KEYS.REGULAR_KEY)).toBe(SET_VALUE);
+            return StorageMock.getItem(ONYX_KEYS.REGULAR_KEY).then((storedValue) => expect(parseInt(storedValue, 10)).toBe(SET_VALUE));
+        });
     });
 
     it('should preserve the value of any keysToPreserve over any default key states', () => {
@@ -113,14 +107,12 @@ describe('Set data while storage is clearing', () => {
             Onyx.clear([ONYX_KEYS.DEFAULT_KEY]);
         });
 
-        return waitForPromisesToResolve()
-            .then(() => {
-                // Then the value in Onyx, the cache, and Storage is the set value
-                expect(onyxValue).toBe(SET_VALUE);
-                const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
-                expect(cachedValue).toBe(SET_VALUE);
-                return StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY)
-                    .then(storedValue => expect(parseInt(storedValue, 10)).toBe(SET_VALUE));
-            });
+        return waitForPromisesToResolve().then(() => {
+            // Then the value in Onyx, the cache, and Storage is the set value
+            expect(onyxValue).toBe(SET_VALUE);
+            const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
+            expect(cachedValue).toBe(SET_VALUE);
+            return StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY).then((storedValue) => expect(parseInt(storedValue, 10)).toBe(SET_VALUE));
+        });
     });
 });

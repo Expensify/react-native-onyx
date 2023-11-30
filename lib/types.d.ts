@@ -221,16 +221,4 @@ type NullishObjectDeep<ObjectType extends object> = {
     [KeyType in keyof ObjectType]?: NullishDeep<ObjectType[KeyType]> | null;
 };
 
-export {
-    CollectionKey,
-    CollectionKeyBase,
-    CustomTypeOptions,
-    DeepRecord,
-    Key,
-    KeyValueMapping,
-    OnyxCollection,
-    OnyxEntry,
-    OnyxKey,
-    Selector,
-    NullishDeep,
-};
+export {CollectionKey, CollectionKeyBase, CustomTypeOptions, DeepRecord, Key, KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey, Selector, NullishDeep};
