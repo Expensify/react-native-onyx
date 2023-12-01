@@ -1,0 +1,40 @@
+{
+  "name": "app",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "android": "react-native run-android",
+    "ios": "react-native run-ios",
+    "web": "craco start",
+    "start": "react-native start"
+  },
+  "dependencies": {
+    "react": "18.2.0",
+    "react-dom": "^18.2.0",
+    "react-native": "0.71.2",
+    "react-native-web": "^0.19.9"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "@babel/runtime": "^7.20.0",
+    "@craco/craco": "^7.1.0",
+    "metro-react-native-babel-preset": "0.76.8",
+    "prop-types": "^15.7.2",
+    "react-app-alias-ex": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}

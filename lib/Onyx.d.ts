@@ -1,5 +1,6 @@
 import {Component} from 'react';
 import * as Logger from './Logger';
+import * as ActiveClientManager from './ActiveClientManager';
 import {CollectionKey, CollectionKeyBase, DeepRecord, KeyValueMapping, NullishDeep, OnyxCollection, OnyxEntry, OnyxKey} from './types';
 
 /**
@@ -293,6 +294,11 @@ declare function hasPendingMergeForKey(key: OnyxKey): boolean;
  */
 declare function setMemoryOnlyKeys(keyList: OnyxKey[]): void;
 
+/**
+ * Sets the callback to be called when the clear finishes executing.
+ */
+declare function onClear(callback: () => void): void;
+
 declare const Onyx: {
     connect: typeof connect;
     disconnect: typeof disconnect;
@@ -311,6 +317,10 @@ declare const Onyx: {
     isSafeEvictionKey: typeof isSafeEvictionKey;
     METHOD: typeof METHOD;
     setMemoryOnlyKeys: typeof setMemoryOnlyKeys;
+    onClear: typeof onClear;
+    isClientManagerReady: typeof ActiveClientManager.isReady,
+    isClientTheLeader: typeof ActiveClientManager.isClientTheLeader,
+    subscribeToClientChange: typeof ActiveClientManager.subscribeToClientChange,
 };
 
 export default Onyx;
