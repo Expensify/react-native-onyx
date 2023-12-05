@@ -42,6 +42,7 @@
   "dependencies": {
     "ascii-table": "0.0.9",
     "fast-equals": "^4.0.3",
+    "object-sizeof": "^2.6.3",
     "underscore": "^1.13.6"
   },
   "devDependencies": {
@@ -81,9 +82,9 @@
     "idb-keyval": "^6.2.1",
     "react": ">=18.1.0",
     "react-dom": ">=18.1.0",
+    "react-native-device-info": "^10.3.0",
     "react-native-performance": "^5.1.0",
-    "react-native-quick-sqlite": "^8.0.0-beta.2",
-    "react-native-device-info": "^10.3.0"
+    "react-native-quick-sqlite": "^8.0.0-beta.2"
   },
   "peerDependenciesMeta": {
     "idb-keyval": {
