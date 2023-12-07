@@ -38,10 +38,9 @@ describe('storage/providers/IDBKeyVal', () => {
         IDBKeyValProviderMock.multiSet(SAMPLE_ITEMS);
 
         return waitForPromisesToResolve().then(() => {
-        // Then multi get should retrieve them
+            // Then multi get should retrieve them
             const keys = _.map(SAMPLE_ITEMS, _.head);
-            return IDBKeyValProviderMock.multiGet(keys)
-                .then(pairs => expect(pairs).toEqual(expect.arrayContaining(SAMPLE_ITEMS)));
+            return IDBKeyValProviderMock.multiGet(keys).then((pairs) => expect(pairs).toEqual(expect.arrayContaining(SAMPLE_ITEMS)));
         });
     });
 
@@ -59,7 +58,10 @@ describe('storage/providers/IDBKeyVal', () => {
             traits: {hair: 'black'},
         };
 
-        IDBKeyValProviderMock.multiSet([['@USER_1', USER_1], ['@USER_2', USER_2]]);
+        IDBKeyValProviderMock.multiSet([
+            ['@USER_1', USER_1],
+            ['@USER_2', USER_2],
+        ]);
 
         return waitForPromisesToResolve().then(() => {
             IDBKeyValProviderMock.idbKeyvalSet.mockClear();
@@ -81,24 +83,22 @@ describe('storage/providers/IDBKeyVal', () => {
                 ['@USER_2', USER_2_DELTA],
             ]).then(() => {
                 // Then each existing item should be set with the merged content
-                expect(IDBKeyValProviderMock.idbKeyvalSet).toHaveBeenNthCalledWith(1,
-                    '@USER_1', {
-                        name: 'Tom',
-                        age: 31,
-                        traits: {
-                            hair: 'brown',
-                            eyes: 'blue',
-                        },
-                    });
+                expect(IDBKeyValProviderMock.idbKeyvalSet).toHaveBeenNthCalledWith(1, '@USER_1', {
+                    name: 'Tom',
+                    age: 31,
+                    traits: {
+                        hair: 'brown',
+                        eyes: 'blue',
+                    },
+                });
 
-                expect(IDBKeyValProviderMock.idbKeyvalSet).toHaveBeenNthCalledWith(2,
-                    '@USER_2', {
-                        name: 'Sarah',
-                        age: 26,
-                        traits: {
-                            hair: 'green',
-                        },
-                    });
+                expect(IDBKeyValProviderMock.idbKeyvalSet).toHaveBeenNthCalledWith(2, '@USER_2', {
+                    name: 'Sarah',
+                    age: 26,
+                    traits: {
+                        hair: 'green',
+                    },
+                });
             });
         });
     });
@@ -108,7 +108,8 @@ describe('storage/providers/IDBKeyVal', () => {
         const task = createDeferredTask();
 
         // We configure idbKeyval.setItem to return this promise the first time it's called and to otherwise return resolved promises
-        IDBKeyValProviderMock.setItem = jest.fn()
+        IDBKeyValProviderMock.setItem = jest
+            .fn()
             .mockReturnValue(Promise.resolve()) // Default behavior
             .mockReturnValueOnce(task.promise); // First call behavior
 

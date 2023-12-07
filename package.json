@@ -40,7 +40,8 @@
     "build:docs": "node buildDocs.js",
     "e2e": "playwright test",
     "e2e-ui": "playwright test --ui",
-    "postinstall": "cd tests/e2e/app && npm install"
+    "postinstall": "cd tests/e2e/app && npm install",
+    "prettier": "prettier --write ."
   },
   "dependencies": {
     "ascii-table": "0.0.9",
@@ -61,7 +62,8 @@
     "babel-jest": "^26.2.2",
     "babel-loader": "^8.2.5",
     "eslint": "^7.6.0",
-    "eslint-config-expensify": "^2.0.38",
+    "eslint-config-expensify": "^2.0.42",
+    "eslint-config-prettier": "^8.8.0",
     "eslint-plugin-jsx-a11y": "^6.6.1",
     "eslint-plugin-react": "^7.31.10",
     "idb-keyval": "^6.2.1",
@@ -69,6 +71,7 @@
     "jest-cli": "^26.5.2",
     "jsdoc-to-markdown": "^7.1.0",
     "metro-react-native-babel-preset": "^0.72.3",
+    "prettier": "^2.8.8",
     "prop-types": "^15.7.2",
     "react": "18.2.0",
     "react-dom": "^18.2.0",

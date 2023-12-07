@@ -31,12 +31,7 @@ const commonConfig = {
             },
         ],
     },
-    externals: [
-        'react-native',
-        /^lodash\/.+$/,
-        ..._.keys(pkg.peerDependencies),
-        ..._.keys(pkg.dependencies),
-    ],
+    externals: ['react-native', /^lodash\/.+$/, ..._.keys(pkg.peerDependencies), ..._.keys(pkg.dependencies)],
     output: {
         path: path.resolve(__dirname, 'dist'),
         library: {
@@ -68,7 +63,4 @@ const webDevConfig = merge(webConfig, {
     },
 });
 
-module.exports = [
-    webConfig,
-    webDevConfig,
-];
+module.exports = [webConfig, webDevConfig];
