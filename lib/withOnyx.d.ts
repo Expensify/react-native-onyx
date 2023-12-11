@@ -40,13 +40,7 @@ type EntryBaseMapping<TOnyxKey extends OnyxKey> = {
  * },
  * ```
  */
-type BaseMappingKey<
-    TComponentProps,
-    TOnyxProps,
-    TOnyxProp extends keyof TOnyxProps,
-    TOnyxKey extends OnyxKey,
-    TOnyxValue
-> = IsEqual<TOnyxValue, TOnyxProps[TOnyxProp]> extends true
+type BaseMappingKey<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TOnyxKey extends OnyxKey, TOnyxValue> = IsEqual<TOnyxValue, TOnyxProps[TOnyxProp]> extends true
     ? {
           key: TOnyxKey | ((props: Omit<TComponentProps, keyof TOnyxProps>) => TOnyxKey);
       }
@@ -67,12 +61,7 @@ type BaseMappingKey<
  * },
  * ```
  */
-type BaseMappingStringKeyAndSelector<
-    TComponentProps,
-    TOnyxProps,
-    TOnyxProp extends keyof TOnyxProps,
-    TOnyxKey extends OnyxKey
-> = {
+type BaseMappingStringKeyAndSelector<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TOnyxKey extends OnyxKey> = {
     key: TOnyxKey;
     selector: Selector<TOnyxKey, TOnyxProps[TOnyxProp]>;
 };
@@ -92,12 +81,7 @@ type BaseMappingStringKeyAndSelector<
  * },
  * ```
  */
-type BaseMappingFunctionKeyAndSelector<
-    TComponentProps,
-    TOnyxProps,
-    TOnyxProp extends keyof TOnyxProps,
-    TOnyxKey extends OnyxKey
-> = {
+type BaseMappingFunctionKeyAndSelector<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TOnyxKey extends OnyxKey> = {
     key: (props: Omit<TComponentProps, keyof TOnyxProps>) => TOnyxKey;
     selector: Selector<TOnyxKey, TOnyxProps[TOnyxProp]>;
 };
@@ -105,10 +89,8 @@ type BaseMappingFunctionKeyAndSelector<
 /**
  * Represents the mapping options between an Onyx key and the component's prop with all its possibilities.
  */
-type Mapping<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TOnyxKey extends OnyxKey> = BaseMapping<
-    TComponentProps,
-    TOnyxProps
-> & EntryBaseMapping<TOnyxKey> &
+type Mapping<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TOnyxKey extends OnyxKey> = BaseMapping<TComponentProps, TOnyxProps> &
+    EntryBaseMapping<TOnyxKey> &
     (
         | BaseMappingKey<TComponentProps, TOnyxProps, TOnyxProp, TOnyxKey, OnyxEntry<KeyValueMapping[TOnyxKey]>>
         | BaseMappingStringKeyAndSelector<TComponentProps, TOnyxProps, TOnyxProp, TOnyxKey>
@@ -118,12 +100,8 @@ type Mapping<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TO
 /**
  * Represents the mapping options between an Onyx collection key without suffix and the component's prop with all its possibilities.
  */
-type CollectionMapping<
-    TComponentProps,
-    TOnyxProps,
-    TOnyxProp extends keyof TOnyxProps,
-    TOnyxKey extends CollectionKeyBase
-> = BaseMapping<TComponentProps, TOnyxProps> & CollectionBaseMapping<TOnyxKey> &
+type CollectionMapping<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TOnyxKey extends CollectionKeyBase> = BaseMapping<TComponentProps, TOnyxProps> &
+    CollectionBaseMapping<TOnyxKey> &
     (
         | BaseMappingKey<TComponentProps, TOnyxProps, TOnyxProp, TOnyxKey, OnyxCollection<KeyValueMapping[TOnyxKey]>>
         | BaseMappingStringKeyAndSelector<TComponentProps, TOnyxProps, TOnyxProp, TOnyxKey>
@@ -153,9 +131,7 @@ type OnyxPropCollectionMapping<TComponentProps, TOnyxProps, TOnyxProp extends ke
  */
 declare function withOnyx<TComponentProps, TOnyxProps>(
     mapping: {
-        [TOnyxProp in keyof TOnyxProps]:
-            | OnyxPropMapping<TComponentProps, TOnyxProps, TOnyxProp>
-            | OnyxPropCollectionMapping<TComponentProps, TOnyxProps, TOnyxProp>;
+        [TOnyxProp in keyof TOnyxProps]: OnyxPropMapping<TComponentProps, TOnyxProps, TOnyxProp> | OnyxPropCollectionMapping<TComponentProps, TOnyxProps, TOnyxProp>;
     },
     shouldDelayUpdates?: boolean,
 ): (component: React.ComponentType<TComponentProps>) => React.ComponentType<Omit<TComponentProps, keyof TOnyxProps>>;

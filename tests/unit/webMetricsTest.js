@@ -1,4 +1,3 @@
-
 describe('decorateWithMetrics', () => {
     let decorateWithMetrics;
 
