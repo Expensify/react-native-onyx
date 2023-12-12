@@ -410,5 +410,6 @@ To continuously work on Onyx we have to set up a task that copies content to par
 
 There are Playwright e2e tests implemented for the web. To run them:
 
+- in the tests/e2e/app directory, run `npm install`
 - `npm run e2e` to run the e2e tests
 - or `npm run e2e-ui` to run the e2e tests in UI mode 

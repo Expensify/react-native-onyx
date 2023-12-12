@@ -26,6 +26,9 @@ jobs:
 
             - run: npx playwright install --with-deps
 
+            - run: cd tests/e2e/app && npm ci
+
             - run: npm run e2e
+
               env:
                   CI: true
