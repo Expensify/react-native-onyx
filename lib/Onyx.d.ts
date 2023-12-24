@@ -315,9 +315,9 @@ declare const Onyx: {
     METHOD: typeof METHOD;
     setMemoryOnlyKeys: typeof setMemoryOnlyKeys;
     onClear: typeof onClear;
-    isClientManagerReady: typeof ActiveClientManager.isReady,
-    isClientTheLeader: typeof ActiveClientManager.isClientTheLeader,
-    subscribeToClientChange: typeof ActiveClientManager.subscribeToClientChange,
+    isClientManagerReady: typeof ActiveClientManager.isReady;
+    isClientTheLeader: typeof ActiveClientManager.isClientTheLeader;
+    subscribeToClientChange: typeof ActiveClientManager.subscribeToClientChange;
 };
 
 export default Onyx;

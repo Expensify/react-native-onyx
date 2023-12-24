@@ -19,9 +19,7 @@ function App(props) {
 
     return (
         <View>
-            {isAuthenticated && (
-                <Text aria-label="logged-in">You are logged in</Text>
-            )}
+            {isAuthenticated && <Text aria-label="logged-in">You are logged in</Text>}
             <Main />
         </View>
     );

@@ -48,10 +48,7 @@ test.describe('multiple tabs', () => {
         await expect(thirdPage.getByLabel('data-meteorites')).toBeEmpty();
     });
 
-    test('updates the leader tab when tabs are closed', async ({
-        page,
-        context,
-    }) => {
+    test('updates the leader tab when tabs are closed', async ({page, context}) => {
         const secondPage = await context.newPage();
         const thirdPage = await context.newPage();
 
@@ -72,10 +69,7 @@ test.describe('multiple tabs', () => {
         await expect(page.getByLabel('leader')).toHaveText('leader');
     });
 
-    test('should still execute updates to the data after closing the leader tab', async ({
-        page,
-        context,
-    }) => {
+    test('should still execute updates to the data after closing the leader tab', async ({page, context}) => {
         await page.goto('/');
 
         const secondPage = await context.newPage();
