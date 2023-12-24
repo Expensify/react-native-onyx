@@ -36,22 +36,23 @@ describe('Onyx', () => {
         return Onyx.clear();
     });
 
-    it('should remove key value from OnyxCache/Storage when set is called with null value', () => Onyx.set(ONYX_KEYS.OTHER_TEST, 42)
-        .then(() => Onyx.getAllKeys())
-        .then((keys) => {
-            expect(keys.includes(ONYX_KEYS.OTHER_TEST)).toBe(true);
-            return Onyx.set(ONYX_KEYS.OTHER_TEST, null);
-        })
-        .then(() => {
-            // Checks if cache value is removed.
-            expect(cache.getAllKeys().length).toBe(0);
+    it('should remove key value from OnyxCache/Storage when set is called with null value', () =>
+        Onyx.set(ONYX_KEYS.OTHER_TEST, 42)
+            .then(() => Onyx.getAllKeys())
+            .then((keys) => {
+                expect(keys.includes(ONYX_KEYS.OTHER_TEST)).toBe(true);
+                return Onyx.set(ONYX_KEYS.OTHER_TEST, null);
+            })
+            .then(() => {
+                // Checks if cache value is removed.
+                expect(cache.getAllKeys().length).toBe(0);
 
-            // When cache keys length is 0, we fetch the keys from storage.
-            return Onyx.getAllKeys();
-        })
-        .then((keys) => {
-            expect(keys.includes(ONYX_KEYS.OTHER_TEST)).toBe(false);
-        }));
+                // When cache keys length is 0, we fetch the keys from storage.
+                return Onyx.getAllKeys();
+            })
+            .then((keys) => {
+                expect(keys.includes(ONYX_KEYS.OTHER_TEST)).toBe(false);
+            }));
 
     it('should set a simple key', () => {
         let testKeyValue;
@@ -65,10 +66,9 @@ describe('Onyx', () => {
         });
 
         // Set a simple key
-        return Onyx.set(ONYX_KEYS.TEST_KEY, 'test')
-            .then(() => {
-                expect(testKeyValue).toBe('test');
-            });
+        return Onyx.set(ONYX_KEYS.TEST_KEY, 'test').then(() => {
+            expect(testKeyValue).toBe('test');
+        });
     });
 
     it('should merge an object with another object', () => {
@@ -347,15 +347,14 @@ describe('Onyx', () => {
         });
 
         Onyx.merge(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {something: [1, 2, 3]}});
-        return Onyx.merge(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {something: [4]}})
-            .then(() => {
-                expect(testKeyValue).toEqual({test_1: {something: [4]}});
-            });
+        return Onyx.merge(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {something: [4]}}).then(() => {
+            expect(testKeyValue).toEqual({test_1: {something: [4]}});
+        });
     });
 
     it('should properly set and merge when using mergeCollection', () => {
         const valuesReceived = {};
-        const mockCallback = jest.fn(data => valuesReceived[data.ID] = data.value);
+        const mockCallback = jest.fn((data) => (valuesReceived[data.ID] = data.value));
         connectionID = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
             initWithStoredValues: false,
@@ -377,8 +376,7 @@ describe('Onyx', () => {
                 value: 'three',
             },
         })
-            .then(() => (
-
+            .then(() =>
                 // 2 key values to update and 2 new keys to add.
                 // MergeCollection will perform a mix of multiSet and multiMerge
                 Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
@@ -398,8 +396,8 @@ describe('Onyx', () => {
                         ID: 567,
                         value: 'one',
                     },
-                })
-            ))
+                }),
+            )
             .then(() => {
                 // 3 items on the first mergeCollection + 4 items the next mergeCollection
                 expect(mockCallback).toHaveBeenCalledTimes(7);
@@ -423,13 +421,12 @@ describe('Onyx', () => {
         connectionID = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
             initWithStoredValues: false,
-            callback: (data, key) => valuesReceived[key] = data,
+            callback: (data, key) => (valuesReceived[key] = data),
         });
 
-        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, notMyTest: {beep: 'boop'}})
-            .then(() => {
-                expect(valuesReceived).toEqual({});
-            });
+        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, notMyTest: {beep: 'boop'}}).then(() => {
+            expect(valuesReceived).toEqual({});
+        });
     });
 
     it('should return full object to callback when calling mergeCollection()', () => {
@@ -437,7 +434,7 @@ describe('Onyx', () => {
         connectionID = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
             initWithStoredValues: false,
-            callback: (data, key) => valuesReceived[key] = data,
+            callback: (data, key) => (valuesReceived[key] = data),
         });
 
         return Onyx.multiSet({
@@ -448,16 +445,18 @@ describe('Onyx', () => {
                 existingData: 'test',
             },
         })
-            .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
-                test_1: {
-                    ID: 123,
-                    value: 'one',
-                },
-                test_2: {
-                    ID: 234,
-                    value: 'two',
-                },
-            }))
+            .then(() =>
+                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                    test_1: {
+                        ID: 123,
+                        value: 'one',
+                    },
+                    test_2: {
+                        ID: 234,
+                        value: 'two',
+                    },
+                }),
+            )
             .then(() => {
                 expect(valuesReceived).toEqual({
                     test_1: {
@@ -527,7 +526,7 @@ describe('Onyx', () => {
 
     it('should use update data object to merge a collection of keys', () => {
         const valuesReceived = {};
-        const mockCallback = jest.fn(data => valuesReceived[data.ID] = data.value);
+        const mockCallback = jest.fn((data) => (valuesReceived[data.ID] = data.value));
         connectionID = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
             initWithStoredValues: false,
@@ -631,7 +630,7 @@ describe('Onyx', () => {
         connectionID = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
             initWithStoredValues: false,
-            callback: (data, key) => valuesReceived[key] = data,
+            callback: (data, key) => (valuesReceived[key] = data),
         });
 
         return Onyx.multiSet({
@@ -642,21 +641,23 @@ describe('Onyx', () => {
                 existingData: 'test',
             },
         })
-            .then(() => Onyx.update([
-                {
-                    onyxMethod: 'multiset',
-                    value: {
-                        test_1: {
-                            ID: 123,
-                            value: 'one',
-                        },
-                        test_2: {
-                            ID: 234,
-                            value: 'two',
+            .then(() =>
+                Onyx.update([
+                    {
+                        onyxMethod: 'multiset',
+                        value: {
+                            test_1: {
+                                ID: 123,
+                                value: 'one',
+                            },
+                            test_2: {
+                                ID: 234,
+                                value: 'two',
+                            },
                         },
                     },
-                },
-            ]))
+                ]),
+            )
             .then(() => {
                 expect(valuesReceived).toEqual({
                     test_1: {
@@ -689,8 +690,7 @@ describe('Onyx', () => {
                 },
             ]);
         } catch (error) {
-            expect(error.message)
-                .toEqual('Invalid value provided in Onyx multiSet. Onyx multiSet value must be of type object.');
+            expect(error.message).toEqual('Invalid value provided in Onyx multiSet. Onyx multiSet value must be of type object.');
         }
     });
 
@@ -743,20 +743,21 @@ describe('Onyx', () => {
             waitForCollectionCallback: true,
             callback: mockCallback,
         });
-        return waitForPromisesToResolve()
+        return (
+            waitForPromisesToResolve()
+                // When mergeCollection is called with an updated collection
+                .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_POLICY, collectionUpdate))
+                .then(() => {
+                    // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
+                    expect(mockCallback).toHaveBeenCalledTimes(2);
 
-            // When mergeCollection is called with an updated collection
-            .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_POLICY, collectionUpdate))
-            .then(() => {
-                // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
-                expect(mockCallback).toHaveBeenCalledTimes(2);
+                    // AND the value for the first call should be null since the collection was not initialized at that point
+                    expect(mockCallback).toHaveBeenNthCalledWith(1, null, undefined);
 
-                // AND the value for the first call should be null since the collection was not initialized at that point
-                expect(mockCallback).toHaveBeenNthCalledWith(1, null, undefined);
-
-                // AND the value for the second call should be collectionUpdate since the collection was updated
-                expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate);
-            });
+                    // AND the value for the second call should be collectionUpdate since the collection was updated
+                    expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate);
+                })
+        );
     });
 
     it('should send a value to Onyx.connect() when subscribing to a specific collection member key and keysChanged() is called', () => {
@@ -771,20 +772,21 @@ describe('Onyx', () => {
             key: `${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`,
             callback: mockCallback,
         });
-        return waitForPromisesToResolve()
+        return (
+            waitForPromisesToResolve()
+                // When mergeCollection is called with an updated collection
+                .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_POLICY, collectionUpdate))
+                .then(() => {
+                    // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
+                    expect(mockCallback).toHaveBeenCalledTimes(2);
 
-            // When mergeCollection is called with an updated collection
-            .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_POLICY, collectionUpdate))
-            .then(() => {
-                // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
-                expect(mockCallback).toHaveBeenCalledTimes(2);
+                    // AND the value for the first call should be null since the collection was not initialized at that point
+                    expect(mockCallback).toHaveBeenNthCalledWith(1, null, undefined);
 
-                // AND the value for the first call should be null since the collection was not initialized at that point
-                expect(mockCallback).toHaveBeenNthCalledWith(1, null, undefined);
-
-                // AND the value for the second call should be collectionUpdate since the collection was updated
-                expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate.testPolicy_1, 'testPolicy_1');
-            });
+                    // AND the value for the second call should be collectionUpdate since the collection was updated
+                    expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate.testPolicy_1, 'testPolicy_1');
+                })
+        );
     });
 
     it('should return all collection keys as a single object for subscriber using waitForCollectionCallback when a single collection member key is updated', () => {
@@ -799,27 +801,27 @@ describe('Onyx', () => {
             waitForCollectionCallback: true,
             callback: mockCallback,
         });
-        return waitForPromisesToResolve()
+        return (
+            waitForPromisesToResolve()
+                // When mergeCollection is called with an updated collection
+                .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.testPolicy_1))
+                .then(() => {
+                    // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
+                    expect(mockCallback).toHaveBeenCalledTimes(2);
 
-            // When mergeCollection is called with an updated collection
-            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.testPolicy_1))
-            .then(() => {
-                // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
-                expect(mockCallback).toHaveBeenCalledTimes(2);
-
-                // AND the value for the second call should be collectionUpdate
-                expect(mockCallback).toHaveBeenLastCalledWith(collectionUpdate);
-            });
+                    // AND the value for the second call should be collectionUpdate
+                    expect(mockCallback).toHaveBeenLastCalledWith(collectionUpdate);
+                })
+        );
     });
 
     it('should return a promise when set() called with the same value and there is no change', () => {
         const promiseOne = Onyx.set('test', 'pizza');
         expect(promiseOne).toBeInstanceOf(Promise);
-        return promiseOne
-            .then(() => {
-                const promiseTwo = Onyx.set('test', 'pizza');
-                expect(promiseTwo).toBeInstanceOf(Promise);
-            });
+        return promiseOne.then(() => {
+            const promiseTwo = Onyx.set('test', 'pizza');
+            expect(promiseTwo).toBeInstanceOf(Promise);
+        });
     });
 
     it('should not update a subscriber if the value in the cache has not changed at all', () => {
@@ -834,31 +836,32 @@ describe('Onyx', () => {
             waitForCollectionCallback: true,
             callback: mockCallback,
         });
-        return waitForPromisesToResolve()
+        return (
+            waitForPromisesToResolve()
+                // When merge is called with an updated collection
+                .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.testPolicy_1))
+                .then(() => {
+                    // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
+                    expect(mockCallback).toHaveBeenCalledTimes(2);
 
-            // When merge is called with an updated collection
-            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.testPolicy_1))
-            .then(() => {
-                // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
-                expect(mockCallback).toHaveBeenCalledTimes(2);
+                    // And the value for the second call should be collectionUpdate
+                    expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate);
+                })
 
-                // And the value for the second call should be collectionUpdate
-                expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate);
-            })
+                // When merge is called again with the same collection not modified
+                .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.testPolicy_1))
+                .then(() => {
+                    // Then we should not expect another invocation of the callback
+                    expect(mockCallback).toHaveBeenCalledTimes(2);
+                })
 
-            // When merge is called again with the same collection not modified
-            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.testPolicy_1))
-            .then(() => {
-                // Then we should not expect another invocation of the callback
-                expect(mockCallback).toHaveBeenCalledTimes(2);
-            })
-
-            // When merge is called again with an object of equivalent value but not the same reference
-            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, _.clone(collectionUpdate.testPolicy_1)))
-            .then(() => {
-                // Then we should not expect another invocation of the callback
-                expect(mockCallback).toHaveBeenCalledTimes(2);
-            });
+                // When merge is called again with an object of equivalent value but not the same reference
+                .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, _.clone(collectionUpdate.testPolicy_1)))
+                .then(() => {
+                    // Then we should not expect another invocation of the callback
+                    expect(mockCallback).toHaveBeenCalledTimes(2);
+                })
+        );
     });
 
     it('should update subscriber if the value in the cache has not changed at all but initWithStoredValues === false', () => {
@@ -874,31 +877,32 @@ describe('Onyx', () => {
             callback: mockCallback,
             initWithStoredValues: false,
         });
-        return waitForPromisesToResolve()
+        return (
+            waitForPromisesToResolve()
+                // When merge is called with an updated collection
+                .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.testPolicy_1))
+                .then(() => {
+                    // Then we expect the callback to have called once. 0 times the initial connect call + 1 time for the merge()
+                    expect(mockCallback).toHaveBeenCalledTimes(1);
 
-            // When merge is called with an updated collection
-            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.testPolicy_1))
-            .then(() => {
-                // Then we expect the callback to have called once. 0 times the initial connect call + 1 time for the merge()
-                expect(mockCallback).toHaveBeenCalledTimes(1);
+                    // And the value for the second call should be collectionUpdate
+                    expect(mockCallback).toHaveBeenNthCalledWith(1, collectionUpdate);
+                })
 
-                // And the value for the second call should be collectionUpdate
-                expect(mockCallback).toHaveBeenNthCalledWith(1, collectionUpdate);
-            })
+                // When merge is called again with the same collection not modified
+                .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.testPolicy_1))
+                .then(() => {
+                    // Then we should expect another invocation of the callback because initWithStoredValues = false
+                    expect(mockCallback).toHaveBeenCalledTimes(2);
+                })
 
-            // When merge is called again with the same collection not modified
-            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.testPolicy_1))
-            .then(() => {
-                // Then we should expect another invocation of the callback because initWithStoredValues = false
-                expect(mockCallback).toHaveBeenCalledTimes(2);
-            })
-
-            // When merge is called again with an object of equivalent value but not the same reference
-            .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, _.clone(collectionUpdate.testPolicy_1)))
-            .then(() => {
-                // Then we should expect another invocation of the callback because initWithStoredValues = false
-                expect(mockCallback).toHaveBeenCalledTimes(3);
-            });
+                // When merge is called again with an object of equivalent value but not the same reference
+                .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, _.clone(collectionUpdate.testPolicy_1)))
+                .then(() => {
+                    // Then we should expect another invocation of the callback because initWithStoredValues = false
+                    expect(mockCallback).toHaveBeenCalledTimes(3);
+                })
+        );
     });
 
     it('should return a promise that completes when all update() operations are done', () => {
@@ -916,13 +920,12 @@ describe('Onyx', () => {
             {onyxMethod: Onyx.METHOD.SET, key: ONYX_KEYS.TEST_KEY, value: 'taco'},
             {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.OTHER_TEST, value: 'pizza'},
             {onyxMethod: Onyx.METHOD.MERGE_COLLECTION, key: ONYX_KEYS.COLLECTION.TEST_UPDATE, value: {[itemKey]: {a: 'a'}}},
-        ])
-            .then(() => {
-                expect(collectionCallback).toHaveBeenNthCalledWith(1, {[itemKey]: {a: 'a'}});
-                expect(testCallback).toHaveBeenNthCalledWith(1, 'taco', ONYX_KEYS.TEST_KEY);
-                expect(otherTestCallback).toHaveBeenNthCalledWith(1, 'pizza', ONYX_KEYS.OTHER_TEST);
-                Onyx.disconnect(connectionIDs);
-            });
+        ]).then(() => {
+            expect(collectionCallback).toHaveBeenNthCalledWith(1, {[itemKey]: {a: 'a'}});
+            expect(testCallback).toHaveBeenNthCalledWith(1, 'taco', ONYX_KEYS.TEST_KEY);
+            expect(otherTestCallback).toHaveBeenNthCalledWith(1, 'pizza', ONYX_KEYS.OTHER_TEST);
+            Onyx.disconnect(connectionIDs);
+        });
     });
 
     it('should merge an object with a batch of objects and undefined', () => {
@@ -948,7 +951,10 @@ describe('Onyx', () => {
             })
             .then(() => {
                 expect(testKeyValue).toEqual({
-                    test1: 'test1', test2: 'test2', test3: 'test3', test4: 'test4',
+                    test1: 'test1',
+                    test2: 'test2',
+                    test3: 'test3',
+                    test4: 'test4',
                 });
             });
     });
@@ -1000,8 +1006,42 @@ describe('Onyx', () => {
             .then(() => {
                 expect(testKeyValue).toEqual(null);
                 return Onyx.merge(ONYX_KEYS.TEST_KEY, 2);
-            }).then(() => {
+            })
+            .then(() => {
                 expect(testKeyValue).toEqual(2);
             });
+    });
+
+    it('should apply updates in order with Onyx.update', () => {
+        let testKeyValue;
+
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        return Onyx.set(ONYX_KEYS.TEST_KEY, {})
+            .then(() => {
+                expect(testKeyValue).toEqual({});
+                Onyx.update([
+                    {
+                        onyxMethod: 'merge',
+                        key: ONYX_KEYS.TEST_KEY,
+                        value: {test1: 'test1'},
+                    },
+                    {
+                        onyxMethod: 'set',
+                        key: ONYX_KEYS.TEST_KEY,
+                        value: null,
+                    },
+                ]);
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                expect(testKeyValue).toEqual(null);
+            })
     });
 });

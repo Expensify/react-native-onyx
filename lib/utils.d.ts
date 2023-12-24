@@ -5,10 +5,6 @@
  * On native, when merging an existing value with new changes, SQLite will use JSON_PATCH, which removes top-level nullish values.
  * To be consistent with the behaviour for merge, we'll also want to remove null values for "set" operations.
  */
-declare function fastMerge<T>(
-    target: T,
-    source: T,
-    shouldRemoveNullObjectValues: boolean = true
-): T;
+declare function fastMerge<T>(target: T, source: T, shouldRemoveNullObjectValues: boolean = true): T;
 
-export default { fastMerge };
+export default {fastMerge};

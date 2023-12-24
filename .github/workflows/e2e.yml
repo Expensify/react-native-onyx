@@ -1,0 +1,34 @@
+name: e2e
+
+on:
+    pull_request:
+        types: [opened, synchronize]
+        paths: ['tests/e2e/**', 'lib/**', 'package.json', 'package-lock.json']
+
+jobs:
+    test:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/cache@v3
+              with:
+                  path: ~/.npm
+                  key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+                  restore-keys: ${{ runner.os }}-node-
+
+            - name: Setup Node
+              uses: actions/setup-node@v3
+              with:
+                  node-version-file: '.nvmrc'
+
+            - run: npm ci
+
+            - run: npx playwright install --with-deps
+
+            - run: cd tests/e2e/app && npm ci
+
+            - run: npm run e2e
+
+              env:
+                  CI: true

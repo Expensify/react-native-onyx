@@ -17,29 +17,29 @@ jobs:
         if: ${{ github.actor != 'OSBotify' }}
 
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
               with:
-                ref: main
+                  ref: main
 
             - name: Decrypt & Import OSBotify GPG key
               run: |
-                cd .github
-                gpg --quiet --batch --yes --decrypt --passphrase="$LARGE_SECRET_PASSPHRASE" --output OSBotify-private-key.asc OSBotify-private-key.asc.gpg
-                gpg --import OSBotify-private-key.asc
+                  cd .github
+                  gpg --quiet --batch --yes --decrypt --passphrase="$LARGE_SECRET_PASSPHRASE" --output OSBotify-private-key.asc OSBotify-private-key.asc.gpg
+                  gpg --import OSBotify-private-key.asc
               env:
-                LARGE_SECRET_PASSPHRASE: ${{ secrets.LARGE_SECRET_PASSPHRASE }}
+                  LARGE_SECRET_PASSPHRASE: ${{ secrets.LARGE_SECRET_PASSPHRASE }}
 
             - name: Set up git for OSBotify
               run: |
-                git config --global user.signingkey 367811D53E34168C
-                git config --global commit.gpgsign true
-                git config --global user.name OSBotify
-                git config --global user.email infra+osbotify@expensify.com
+                  git config --global user.signingkey 367811D53E34168C
+                  git config --global commit.gpgsign true
+                  git config --global user.name OSBotify
+                  git config --global user.email infra+osbotify@expensify.com
 
-            - uses: actions/setup-node@v3
+            - uses: actions/setup-node@v4
               with:
-                node-version-file: '.nvmrc'
-                registry-url: 'https://registry.npmjs.org'
+                  node-version-file: ".nvmrc"
+                  registry-url: "https://registry.npmjs.org"
 
             - name: Generate branch name
               run: echo "BRANCH_NAME=OSBotify-bump-version-$(uuidgen)" >> $GITHUB_ENV
@@ -61,22 +61,22 @@ jobs:
 
             - name: Create pull request
               run: |
-                gh pr create \
-                  --title "Update version to ${{ env.NEW_VERSION }}" \
-                  --body "Update version to ${{ env.NEW_VERSION }}"
-                sleep 5
+                  gh pr create \
+                    --title "Update version to ${{ env.NEW_VERSION }}" \
+                    --body "Update version to ${{ env.NEW_VERSION }}"
+                  sleep 5
               env:
-                GITHUB_TOKEN: ${{ secrets.OS_BOTIFY_TOKEN }}
+                  GITHUB_TOKEN: ${{ secrets.OS_BOTIFY_TOKEN }}
 
             - name: Auto-approve pull request
               run: gh pr review --approve ${{ env.BRANCH_NAME }}
               env:
-                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Auto-merge pull request
               run: gh pr merge --merge --delete-branch ${{ env.BRANCH_NAME }}
               env:
-                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Build package
               run: npm run build
@@ -84,4 +84,4 @@ jobs:
             - name: Publish to npm
               run: npm publish
               env:
-                NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
