@@ -1,4 +1,4 @@
-import MultiStorageMock from '../../lib/MultiStorage';
+import StorageMock from '../../lib/storage';
 import Onyx from '../../lib';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
@@ -14,7 +14,7 @@ test('Cache eviction', () => {
     const collection = {};
 
     // Given an evictable key previously set in storage
-    return MultiStorageMock.setItem(`${ONYX_KEYS.COLLECTION.TEST_KEY}${RECORD_TO_EVICT}`, {test: 'evict'})
+    return StorageMock.setItem(`${ONYX_KEYS.COLLECTION.TEST_KEY}${RECORD_TO_EVICT}`, {test: 'evict'})
         .then(() => {
             // When we initialize Onyx and mark the set collection key as a safeEvictionKey
             Onyx.init({
@@ -42,9 +42,9 @@ test('Cache eviction', () => {
             expect(collection[`${ONYX_KEYS.COLLECTION.TEST_KEY}${RECORD_TO_EVICT}`]).toStrictEqual({test: 'evict'});
 
             // When we set a new key we want to add and force the first attempt to fail
-            const originalSetItem = MultiStorageMock.setItem;
+            const originalSetItem = StorageMock.setItem;
             const setItemMock = jest.fn(originalSetItem).mockImplementationOnce(() => new Promise((_resolve, reject) => reject()));
-            MultiStorageMock.setItem = setItemMock;
+            StorageMock.setItem = setItemMock;
 
             return Onyx.set(`${ONYX_KEYS.COLLECTION.TEST_KEY}${RECORD_TO_ADD}`, {test: 'add'}).then(() => {
                 // Then our collection should no longer contain the evictable key
