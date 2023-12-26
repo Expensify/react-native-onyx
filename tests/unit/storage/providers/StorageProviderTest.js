@@ -1,7 +1,7 @@
 /* eslint-disable import/first */
-jest.unmock('../../../../lib/storage/NativeStorage');
-jest.unmock('../../../../lib/storage/WebStorage');
-jest.unmock('../../../../lib/storage/providers/IDBKeyVal');
+jest.unmock('../../../../lib/storage/platforms/NativeStorage');
+jest.unmock('../../../../lib/storage/platforms/WebStorage');
+jest.unmock('../../../../lib/storage/providers/IDBKeyValProvider');
 
 import _ from 'underscore';
 import MemoryOnlyProvider from '../../../../lib/storage/providers/MemoryOnlyProvider';
