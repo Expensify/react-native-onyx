@@ -414,7 +414,7 @@ describe('Onyx', () => {
 
     describe('Onyx with Cache', () => {
         let Onyx;
-        let StorageMock;
+        let MultiStorageMock;
         let withOnyx;
 
         /** @type OnyxCache */
@@ -449,7 +449,7 @@ describe('Onyx', () => {
             const OnyxModule = require('../../lib');
             Onyx = OnyxModule.default;
             withOnyx = OnyxModule.withOnyx;
-            StorageMock = require('../../lib/storage').default;
+            MultiStorageMock = require('../../lib/MultiStorage').default;
             cache = require('../../lib/OnyxCache').default;
         });
 
@@ -462,8 +462,8 @@ describe('Onyx', () => {
             })(ViewWithText);
 
             // Given some string value for that key exists in storage
-            StorageMock.getItem.mockResolvedValue('"mockValue"');
-            StorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
+            MultiStorageMock.getItem.mockResolvedValue('"mockValue"');
+            MultiStorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
             return initOnyx()
                 .then(() => {
                     // When multiple components are rendered
@@ -478,7 +478,7 @@ describe('Onyx', () => {
                 .then(waitForPromisesToResolve)
                 .then(() => {
                     // Then Async storage `getItem` should be called only once
-                    expect(StorageMock.getItem).toHaveBeenCalledTimes(1);
+                    expect(MultiStorageMock.getItem).toHaveBeenCalledTimes(1);
                 });
         });
 
@@ -493,8 +493,8 @@ describe('Onyx', () => {
             // Given some string value for that key exists in storage
             return initOnyx()
                 .then(() => {
-                    StorageMock.getItem.mockResolvedValue('"mockValue"');
-                    StorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
+                    MultiStorageMock.getItem.mockResolvedValue('"mockValue"');
+                    MultiStorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
 
                     // When multiple components are rendered
                     render(
@@ -508,15 +508,15 @@ describe('Onyx', () => {
                 .then(waitForPromisesToResolve)
                 .then(() => {
                     // Then Async storage `getItem` should be called only once
-                    expect(StorageMock.getAllKeys).toHaveBeenCalledTimes(1);
+                    expect(MultiStorageMock.getAllKeys).toHaveBeenCalledTimes(1);
                 });
         });
 
         it('Should keep recently accessed items in cache', () => {
             // Given Storage with 10 different keys
-            StorageMock.getItem.mockResolvedValue('"mockValue"');
+            MultiStorageMock.getItem.mockResolvedValue('"mockValue"');
             const range = _.range(10);
-            StorageMock.getAllKeys.mockResolvedValue(_.map(range, (number) => `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}${number}`));
+            MultiStorageMock.getAllKeys.mockResolvedValue(_.map(range, (number) => `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}${number}`));
             let connections;
 
             // Given Onyx is configured with max 5 keys in cache
@@ -562,8 +562,8 @@ describe('Onyx', () => {
             })(ViewWithText);
 
             // Given some string value for that key exists in storage
-            StorageMock.getItem.mockResolvedValue('"mockValue"');
-            StorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
+            MultiStorageMock.getItem.mockResolvedValue('"mockValue"');
+            MultiStorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
 
             return (
                 initOnyx()
@@ -582,7 +582,7 @@ describe('Onyx', () => {
                     .then(waitForPromisesToResolve)
                     .then(() => {
                         // Then Async storage `getItem` should be called twice
-                        expect(StorageMock.getItem).toHaveBeenCalledTimes(2);
+                        expect(MultiStorageMock.getItem).toHaveBeenCalledTimes(2);
                     })
             );
         });
@@ -602,9 +602,9 @@ describe('Onyx', () => {
             })(ViewWithText);
 
             // Given some values exist in storage
-            StorageMock.setItem(ONYX_KEYS.TEST_KEY, {ID: 15, data: 'mock object with ID'});
-            StorageMock.setItem(ONYX_KEYS.OTHER_TEST, 'mock text');
-            StorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY, ONYX_KEYS.OTHER_TEST]);
+            MultiStorageMock.setItem(ONYX_KEYS.TEST_KEY, {ID: 15, data: 'mock object with ID'});
+            MultiStorageMock.setItem(ONYX_KEYS.OTHER_TEST, 'mock text');
+            MultiStorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY, ONYX_KEYS.OTHER_TEST]);
             return initOnyx()
                 .then(() => {
                     // When the components are rendered multiple times
@@ -618,17 +618,17 @@ describe('Onyx', () => {
                 .then(waitForPromisesToResolve)
                 .then(() => {
                     // Then Async storage `getItem` should be called exactly two times (once for each key)
-                    expect(StorageMock.getItem).toHaveBeenCalledTimes(2);
-                    expect(StorageMock.getItem).toHaveBeenNthCalledWith(1, ONYX_KEYS.TEST_KEY);
-                    expect(StorageMock.getItem).toHaveBeenNthCalledWith(2, ONYX_KEYS.OTHER_TEST);
+                    expect(MultiStorageMock.getItem).toHaveBeenCalledTimes(2);
+                    expect(MultiStorageMock.getItem).toHaveBeenNthCalledWith(1, ONYX_KEYS.TEST_KEY);
+                    expect(MultiStorageMock.getItem).toHaveBeenNthCalledWith(2, ONYX_KEYS.OTHER_TEST);
                 });
         });
 
         it('Should clean cache when connections to eviction keys happen', () => {
             // Given storage with some data
-            StorageMock.getItem.mockResolvedValue('"mockValue"');
+            MultiStorageMock.getItem.mockResolvedValue('"mockValue"');
             const range = _.range(1, 10);
-            StorageMock.getAllKeys.mockResolvedValue(_.map(range, (n) => `key${n}`));
+            MultiStorageMock.getAllKeys.mockResolvedValue(_.map(range, (n) => `key${n}`));
 
             // Given Onyx with LRU size of 3
             return initOnyx({maxCachedKeysCount: 3})

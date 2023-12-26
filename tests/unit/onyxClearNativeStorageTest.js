@@ -1,5 +1,5 @@
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
-import StorageMock from '../../lib/storage';
+import MultiStorageMock from '../../lib/MultiStorage';
 import Onyx from '../../lib/Onyx';
 
 const ONYX_KEYS = {
@@ -55,7 +55,7 @@ describe('Set data while storage is clearing', () => {
             expect(onyxValue).toBe(DEFAULT_VALUE);
             const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
             expect(cachedValue).toBe(DEFAULT_VALUE);
-            return StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY).then((storedValue) => expect(parseInt(storedValue, 10)).toBe(DEFAULT_VALUE));
+            return MultiStorageMock.getItem(ONYX_KEYS.DEFAULT_KEY).then((storedValue) => expect(parseInt(storedValue, 10)).toBe(DEFAULT_VALUE));
         });
     });
 
@@ -71,7 +71,7 @@ describe('Set data while storage is clearing', () => {
             expect(onyxValue).toBe(DEFAULT_VALUE);
             const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
             expect(cachedValue).toBe(DEFAULT_VALUE);
-            return StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY).then((storedValue) => expect(parseInt(storedValue, 10)).toBe(DEFAULT_VALUE));
+            return MultiStorageMock.getItem(ONYX_KEYS.DEFAULT_KEY).then((storedValue) => expect(parseInt(storedValue, 10)).toBe(DEFAULT_VALUE));
         });
     });
 
@@ -94,7 +94,7 @@ describe('Set data while storage is clearing', () => {
             // Then the value of the preserved key is also still set in both the cache and storage
             expect(regularKeyOnyxValue).toBe(SET_VALUE);
             expect(cache.getValue(ONYX_KEYS.REGULAR_KEY)).toBe(SET_VALUE);
-            return StorageMock.getItem(ONYX_KEYS.REGULAR_KEY).then((storedValue) => expect(parseInt(storedValue, 10)).toBe(SET_VALUE));
+            return MultiStorageMock.getItem(ONYX_KEYS.REGULAR_KEY).then((storedValue) => expect(parseInt(storedValue, 10)).toBe(SET_VALUE));
         });
     });
 
@@ -112,7 +112,7 @@ describe('Set data while storage is clearing', () => {
             expect(onyxValue).toBe(SET_VALUE);
             const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
             expect(cachedValue).toBe(SET_VALUE);
-            return StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY).then((storedValue) => expect(parseInt(storedValue, 10)).toBe(SET_VALUE));
+            return MultiStorageMock.getItem(ONYX_KEYS.DEFAULT_KEY).then((storedValue) => expect(parseInt(storedValue, 10)).toBe(SET_VALUE));
         });
     });
 });

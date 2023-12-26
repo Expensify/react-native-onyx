@@ -6,7 +6,7 @@ import ViewWithText from '../components/ViewWithText';
 import ViewWithCollections from '../components/ViewWithCollections';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import ViewWithObject from '../components/ViewWithObject';
-import StorageMock from '../../lib/storage';
+import MultiStorageMock from '../../lib/MultiStorage';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
@@ -642,7 +642,7 @@ describe('withOnyxTest', () => {
         let renderResult;
 
         // Set the value in storage, but not in cache.
-        return StorageMock.setItem(ONYX_KEYS.TEST_KEY, 'test1')
+        return MultiStorageMock.setItem(ONYX_KEYS.TEST_KEY, 'test1')
             .then(() => {
                 renderResult = render(<TestComponentWithOnyx onRender={onRender} />);
 
@@ -712,7 +712,7 @@ describe('withOnyxTest', () => {
 
         // Set a random item in storage since Onyx will only think keys are loaded
         // in cache if there are at least one key.
-        return StorageMock.setItem(ONYX_KEYS.SIMPLE_KEY, 'simple')
+        return MultiStorageMock.setItem(ONYX_KEYS.SIMPLE_KEY, 'simple')
             .then(() => {
                 // Render with a collection that doesn't exist in cache or storage.
                 renderResult = render(<TestComponentWithOnyx onRender={onRender} />);

@@ -1,6 +1,6 @@
 import OnyxCache from '../../lib/OnyxCache';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
-import StorageMock from '../../lib/storage';
+import MultiStorageMock from '../../lib/MultiStorage';
 
 const ONYX_KEYS = {
     COLLECTION: {
@@ -32,12 +32,12 @@ describe('Onyx.mergeCollection() and WebStorage', () => {
     afterEach(() => Onyx.clear());
 
     it('merges two sets of data consecutively', () => {
-        StorageMock.setMockStore(initialData);
+        MultiStorageMock.setMockStore(initialData);
 
         // Given initial data in storage
-        expect(StorageMock.getMockStore().test_1).toEqual(initialTestObject);
-        expect(StorageMock.getMockStore().test_2).toEqual(initialTestObject);
-        expect(StorageMock.getMockStore().test_3).toEqual(initialTestObject);
+        expect(MultiStorageMock.getMockStore().test_1).toEqual(initialTestObject);
+        expect(MultiStorageMock.getMockStore().test_2).toEqual(initialTestObject);
+        expect(MultiStorageMock.getMockStore().test_3).toEqual(initialTestObject);
 
         // And an empty cache values for the collection keys
         expect(OnyxCache.getValue('test_1')).not.toBeDefined();
@@ -75,17 +75,17 @@ describe('Onyx.mergeCollection() and WebStorage', () => {
             expect(OnyxCache.getValue('test_3')).toEqual(finalObject);
 
             // And the storage should reflect the same state
-            expect(StorageMock.getMockStore().test_1).toEqual(finalObject);
-            expect(StorageMock.getMockStore().test_2).toEqual(finalObject);
-            expect(StorageMock.getMockStore().test_3).toEqual(finalObject);
+            expect(MultiStorageMock.getMockStore().test_1).toEqual(finalObject);
+            expect(MultiStorageMock.getMockStore().test_2).toEqual(finalObject);
+            expect(MultiStorageMock.getMockStore().test_3).toEqual(finalObject);
         });
     });
 
     it('cache updates correctly when accessed again if keys are removed or evicted', () => {
         // Given empty storage
-        expect(StorageMock.getMockStore().test_1).toBeFalsy();
-        expect(StorageMock.getMockStore().test_2).toBeFalsy();
-        expect(StorageMock.getMockStore().test_3).toBeFalsy();
+        expect(MultiStorageMock.getMockStore().test_1).toBeFalsy();
+        expect(MultiStorageMock.getMockStore().test_2).toBeFalsy();
+        expect(MultiStorageMock.getMockStore().test_3).toBeFalsy();
 
         // And an empty cache values for the collection keys
         expect(OnyxCache.getValue('test_1')).toBeFalsy();
@@ -106,9 +106,9 @@ describe('Onyx.mergeCollection() and WebStorage', () => {
                 expect(OnyxCache.getValue('test_1')).toEqual(data);
                 expect(OnyxCache.getValue('test_2')).toEqual(data);
                 expect(OnyxCache.getValue('test_3')).toEqual(data);
-                expect(StorageMock.getMockStore().test_1).toEqual(data);
-                expect(StorageMock.getMockStore().test_2).toEqual(data);
-                expect(StorageMock.getMockStore().test_3).toEqual(data);
+                expect(MultiStorageMock.getMockStore().test_1).toEqual(data);
+                expect(MultiStorageMock.getMockStore().test_2).toEqual(data);
+                expect(MultiStorageMock.getMockStore().test_3).toEqual(data);
 
                 // When we drop all the cache keys (but do not modify the underlying storage) and merge another object
                 OnyxCache.drop('test_1');
@@ -137,15 +137,15 @@ describe('Onyx.mergeCollection() and WebStorage', () => {
                 expect(OnyxCache.getValue('test_3')).toEqual(finalObject);
 
                 // And the storage should reflect the same state
-                expect(StorageMock.getMockStore().test_1).toEqual(finalObject);
-                expect(StorageMock.getMockStore().test_2).toEqual(finalObject);
-                expect(StorageMock.getMockStore().test_3).toEqual(finalObject);
+                expect(MultiStorageMock.getMockStore().test_1).toEqual(finalObject);
+                expect(MultiStorageMock.getMockStore().test_2).toEqual(finalObject);
+                expect(MultiStorageMock.getMockStore().test_3).toEqual(finalObject);
             });
     });
 
     it('setItem() and multiMerge()', () => {
         // Onyx should be empty after clear() is called
-        expect(StorageMock.getMockStore()).toEqual({});
+        expect(MultiStorageMock.getMockStore()).toEqual({});
 
         // Given no previous data and several calls to setItem and call to mergeCollection to update a given key
 
@@ -174,7 +174,7 @@ describe('Onyx.mergeCollection() and WebStorage', () => {
             };
 
             expect(OnyxCache.getValue('test_1')).toEqual(finalObject);
-            expect(StorageMock.getMockStore().test_1).toEqual(finalObject);
+            expect(MultiStorageMock.getMockStore().test_1).toEqual(finalObject);
         });
     });
 });
