@@ -1,7 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import {
-    Button, StyleSheet, Text, View,
-} from 'react-native';
+import {Button, StyleSheet, Text, View} from 'react-native';
 import PropTypes from 'prop-types';
 import lodashGet from 'lodash/get';
 import _ from 'underscore';
@@ -76,14 +74,8 @@ function Main(props) {
         const date = Date.now();
 
         for (let i = 0; i <= (small ? 10 : 100); i++) {
-            Onyx.merge(
-                `${ONYXKEYS.COLLECTION.METEORITES}${date}${i}`,
-                Data.meteorites,
-            );
-            Onyx.merge(
-                `${ONYXKEYS.COLLECTION.ASTEROIDS}${date}${i}`,
-                Data.asteroids,
-            );
+            Onyx.merge(`${ONYXKEYS.COLLECTION.METEORITES}${date}${i}`, Data.meteorites);
+            Onyx.merge(`${ONYXKEYS.COLLECTION.ASTEROIDS}${date}${i}`, Data.asteroids);
         }
     };
 
@@ -115,26 +107,31 @@ function Main(props) {
                     </View>
                 </View>
             ) : (
-                <Button title="Log In" onPress={onLogIn} />
+                <Button
+                    title="Log In"
+                    onPress={onLogIn}
+                />
             )}
-            <Text aria-label="leader">
-                {isLeader ? 'leader' : 'non-leader'}
+            <Text aria-label="leader">{isLeader ? 'leader' : 'non-leader'}</Text>
+            <Text aria-label="data-number">{lodashGet(props, 'randomNumber.number', undefined)}</Text>
+            <Text aria-label="data-pokedex">{lodashGet(props, 'pokedex.pokemon.length', undefined)}</Text>
+            <Text
+                aria-label="data-meteorites"
+                numberOfLines={10}
+            >
+                {_.filter(
+                    _.map(Object.entries(props.allMeteorites || {}), ([key, value]) => (value ? `${key}-${value && value.length}` : undefined)),
+                    (v) => !!v,
+                ).join(',')}
             </Text>
-            <Text aria-label="data-number">
-                {lodashGet(props, 'randomNumber.number', undefined)}
-            </Text>
-            <Text aria-label="data-pokedex">
-                {lodashGet(props, 'pokedex.pokemon.length', undefined)}
-            </Text>
-            <Text aria-label="data-meteorites" numberOfLines={10}>
-                {_.filter(_.map(Object.entries(props.allMeteorites || {}),
-                    ([key, value]) => (value ? `${key}-${value && value.length}` : undefined)), v => !!v)
-                    .join(',')}
-            </Text>
-            <Text aria-label="data-asteroids" numberOfLines={10}>
-                {_.filter(_.map(Object.entries(props.allAsteroids || {}),
-                    ([key, value]) => (value ? `${key}-${value && value.length}` : undefined)), v => !!v)
-                    .join(',')}
+            <Text
+                aria-label="data-asteroids"
+                numberOfLines={10}
+            >
+                {_.filter(
+                    _.map(Object.entries(props.allAsteroids || {}), ([key, value]) => (value ? `${key}-${value && value.length}` : undefined)),
+                    (v) => !!v,
+                ).join(',')}
             </Text>
             <Text
                 aria-label="data-updates"
@@ -143,7 +140,10 @@ function Main(props) {
             >
                 {JSON.stringify(Updates.updates)}
             </Text>
-            <Button title="Clear updates" onPress={Updates.clear} />
+            <Button
+                title="Clear updates"
+                onPress={Updates.clear}
+            />
         </View>
     );
 }

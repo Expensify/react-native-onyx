@@ -1042,6 +1042,6 @@ describe('Onyx', () => {
             })
             .then(() => {
                 expect(testKeyValue).toEqual(null);
-            })
+            });
     });
 });

@@ -17,7 +17,7 @@ test.describe('one tab', () => {
         await expect(page.getByLabel('data-number')).toBeVisible();
 
         // eslint-disable-next-line quotes
-        await expect(page.getByLabel('data-updates')).toHaveText("[\"session\",\"randomNumber\"]");
+        await expect(page.getByLabel('data-updates')).toHaveText('["session","randomNumber"]');
     });
 
     test('logs out in after clicking button', async ({page}) => {
@@ -29,14 +29,14 @@ test.describe('one tab', () => {
         await expect(page.getByLabel('data-number')).toBeVisible();
 
         // eslint-disable-next-line quotes
-        await expect(page.getByLabel('data-updates')).toHaveText("[\"session\",\"randomNumber\"]");
+        await expect(page.getByLabel('data-updates')).toHaveText('["session","randomNumber"]');
 
         await page.getByRole('button', {name: 'Log Out'}).click();
 
         await expect(page.getByRole('button', {name: 'Log In'})).toBeVisible();
         await expect(page.getByLabel('data-updates')).toHaveText(
             // eslint-disable-next-line quotes
-            "[\"session\",\"randomNumber\",\"session\",\"randomNumber\"]",
+            '["session","randomNumber","session","randomNumber"]',
         );
     });
 });
