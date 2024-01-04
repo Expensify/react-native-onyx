@@ -30,7 +30,7 @@
   ],
   "react-native": "native.js",
   "main": "native.js",
-  "browser": "lib/index.js",
+  "browser": "web.js",
   "types": "lib/index.d.ts",
   "scripts": {
     "lint": "eslint .",
