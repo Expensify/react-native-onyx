@@ -1011,4 +1011,37 @@ describe('Onyx', () => {
                 expect(testKeyValue).toEqual(2);
             });
     });
+
+    it('should apply updates in order with Onyx.update', () => {
+        let testKeyValue;
+
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        return Onyx.set(ONYX_KEYS.TEST_KEY, {})
+            .then(() => {
+                expect(testKeyValue).toEqual({});
+                Onyx.update([
+                    {
+                        onyxMethod: 'merge',
+                        key: ONYX_KEYS.TEST_KEY,
+                        value: {test1: 'test1'},
+                    },
+                    {
+                        onyxMethod: 'set',
+                        key: ONYX_KEYS.TEST_KEY,
+                        value: null,
+                    },
+                ]);
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                expect(testKeyValue).toEqual(null);
+            });
+    });
 });
