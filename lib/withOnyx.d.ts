@@ -42,7 +42,7 @@ type EntryBaseMapping<TOnyxKey extends OnyxKey> = {
  */
 type BaseMappingKey<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TOnyxKey extends OnyxKey, TOnyxValue> = IsEqual<TOnyxValue, TOnyxProps[TOnyxProp]> extends true
     ? {
-          key: TOnyxKey | ((props: Omit<TComponentProps, keyof TOnyxProps>) => TOnyxKey);
+          key: TOnyxKey | ((props: Omit<TComponentProps, keyof TOnyxProps> & Partial<TOnyxProps>) => TOnyxKey);
       }
     : never;
 
@@ -63,7 +63,7 @@ type BaseMappingKey<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxPr
  */
 type BaseMappingStringKeyAndSelector<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TOnyxKey extends OnyxKey> = {
     key: TOnyxKey;
-    selector: Selector<TOnyxKey, TOnyxProps[TOnyxProp]>;
+    selector: Selector<TOnyxKey, TOnyxProps, TOnyxProps[TOnyxProp]>;
 };
 
 /**
@@ -82,8 +82,8 @@ type BaseMappingStringKeyAndSelector<TComponentProps, TOnyxProps, TOnyxProp exte
  * ```
  */
 type BaseMappingFunctionKeyAndSelector<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TOnyxKey extends OnyxKey> = {
-    key: (props: Omit<TComponentProps, keyof TOnyxProps>) => TOnyxKey;
-    selector: Selector<TOnyxKey, TOnyxProps[TOnyxProp]>;
+    key: (props: Omit<TComponentProps, keyof TOnyxProps> & Partial<TOnyxProps>) => TOnyxKey;
+    selector: Selector<TOnyxKey, TOnyxProps, TOnyxProps[TOnyxProp]>;
 };
 
 /**

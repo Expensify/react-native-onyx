@@ -115,13 +115,13 @@ type KeyValueMapping = {
 /**
  * Represents a selector function type which operates based on the provided `TKey` and `ReturnType`.
  *
- * A `Selector` is a function that accepts a value and returns a processed value.
+ * A `Selector` is a function that accepts a value, the withOnyx's internal state and returns a processed value.
  * This type accepts two type parameters: `TKey` and `TReturnType`.
  *
  * The type `TKey` extends `OnyxKey` and it is the key used to access a value in `KeyValueMapping`.
  * `TReturnType` is the type of the returned value from the selector function.
  */
-type Selector<TKey extends OnyxKey, TReturnType> = (value: OnyxEntry<KeyValueMapping[TKey]>) => TReturnType;
+type Selector<TKey extends OnyxKey, TOnyxProps, TReturnType> = (value: OnyxEntry<KeyValueMapping[TKey]>, state: WithOnyxInstanceState<TOnyxProps>) => TReturnType;
 
 /**
  * Represents a single Onyx entry, that can be either `TOnyxValue` or `null` if it doesn't exist.
@@ -215,10 +215,15 @@ type NonTransformableTypes =
 type NullishDeep<T> = T extends NonTransformableTypes ? T : T extends object ? NullishObjectDeep<T> : unknown;
 
 /**
-Same as `NullishDeep`, but accepts only `object`s as inputs. Internal helper for `NullishDeep`.
-*/
+ * Same as `NullishDeep`, but accepts only `object`s as inputs. Internal helper for `NullishDeep`.
+ */
 type NullishObjectDeep<ObjectType extends object> = {
     [KeyType in keyof ObjectType]?: NullishDeep<ObjectType[KeyType]> | null;
 };
 
-export {CollectionKey, CollectionKeyBase, CustomTypeOptions, DeepRecord, Key, KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey, Selector, NullishDeep};
+/**
+ * Represents withOnyx's internal state, containing the Onyx props and a `loading` flag.
+ */
+type WithOnyxInstanceState<TOnyxProps> = (TOnyxProps & {loading: boolean}) | undefined;
+
+export {CollectionKey, CollectionKeyBase, CustomTypeOptions, DeepRecord, Key, KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey, Selector, NullishDeep, WithOnyxInstanceState};
