@@ -390,6 +390,44 @@ Sample output of `Onyx.printMetrics()`
 
 It can be useful to log why Onyx is calling `setState()` on a particular React component so that we can understand which key changed, what changed about the value, and the connected component that ultimately rendered as a result. When used correctly this can help isolate problem areas and unnecessary renders in the code. To enable this feature, pass `debugSetState: true` to the config and grep JS console logs for `[Onyx-Debug]`.
 
+# Redux DevTools Extension
+
+If you want to debug updates made to the local storage on the web app, you can use Redux DevTools Extension, which provides an easy to use GUI.
+This extension provides the following features:
+
+- Each update (merge/set/clear/etc) made to the local storage is logged with the data that was written or erased.
+- Check the state of the local storage at a certain point in time and compare it with it's  previous state.
+
+Currently this tool is only available on Web.
+
+### Installing the extension
+
+To use the extension, simply install it from your favorite web browser store:
+
+- [Google Chrome](https://chromewebstore.google.com/detail/redux-devtools/lmhkpmbekcpmknklioeibfkpmmfibljd?pli=1)
+- [Microsoft Edge](https://microsoftedge.microsoft.com/addons/detail/redux-devtools/nnkgneoiohoecpdiaponcejilbhhikei)
+- [Mozilla Firefox](https://addons.mozilla.org/en-US/firefox/addon/reduxdevtools/)
+
+After installing the extension, Onyx will automatically connect to it and start logging any updates made to the local storage.
+
+### Usage
+
+The extension interface is pretty simple, on the left sidebar you can see all the updates made to the local storage, in ascending order, and on the right pane you can see the whole the current state, payload of an action and the diff between the previous state and the current state after the action was triggered.
+
+The action logs use this naming convention:
+
+`@@INIT` - Initial action which is triggered when Onyx connects to the extension. It's payload consists of the initial state.
+
+`merge/<KEY>` - Merge action which is triggered when `Onyx.merge()` is called.
+
+`mergecollection/<KEY>` - Merge action which is triggered when `Onyx.mergeCollection()` is called.
+
+`set/<KEY>` - Set action which is triggered when `Onyx.set()` is called.
+
+`multiset/<KEY>` - Set action which is triggered when `Onyx.multiSet()` is called.
+
+`CLEAR` - Clear action which is triggered when `Onyx.clear()` is called.
+
 # Development
 
 `react-native` bundles source using the `metro` bundler. `metro` does not follow symlinks, so we can't use `npm link` to
