@@ -107,6 +107,7 @@ declare const METHOD: {
     readonly SET: 'set';
     readonly MERGE: 'merge';
     readonly MERGE_COLLECTION: 'mergecollection';
+    readonly MULTI_SET: 'multiset';
     readonly CLEAR: 'clear';
 };
 

@@ -1,3 +1,5 @@
+import { OnyxKey } from './types';
+
 /**
  * Merges two objects and removes null values if "shouldRemoveNullObjectValues" is set to true
  *
@@ -7,4 +9,9 @@
  */
 declare function fastMerge<T>(target: T, source: T, shouldRemoveNullObjectValues: boolean = true): T;
 
-export default {fastMerge};
+/**
+ * Returns a formatted action name to be send to DevTools, given the method and optionally the key that was changed
+ */
+declare function formatActionName(method: string, key?: OnyxKey): string;
+
+export default { fastMerge, formatActionName };
