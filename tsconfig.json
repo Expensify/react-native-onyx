@@ -1,0 +1,24 @@
+
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+      "target": "esnext",
+      "module": "esnext",
+      "types": ["react-native", "jest"],
+      "lib": ["esnext"],
+      "allowJs": true,
+      "checkJs": false,
+      "jsx": "react-native",
+      "isolatedModules": true,
+      "strict": true,
+      "emitDeclarationOnly": true,
+      "moduleResolution": "node",
+      "resolveJsonModule": true,
+      "allowSyntheticDefaultImports": true,
+      "skipLibCheck": true,
+      "declaration": true,
+      "rootDir": "./lib",
+  },
+  "include": ["."],
+  "exclude": ["**/node_modules/**/*", "**/dist/**/*", "*.config.js"]
+}

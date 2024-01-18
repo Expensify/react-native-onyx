@@ -8,12 +8,12 @@ const commonConfig = {
     devtool: 'source-map',
     entry: './lib/index.js',
     resolve: {
-        extensions: ['.jsx', '.js'],
+        extensions: ['.tsx', '.ts', '.jsx', '.js'],
     },
     module: {
         rules: [
             {
-                test: /\.js$/,
+                test: /\.(js|ts)x?$/,
                 exclude: /(node_modules)/,
                 use: {
                     loader: 'babel-loader',
@@ -50,7 +50,7 @@ const webConfig = merge(commonConfig, {
     },
     resolve: {
         // Resolve any web specific JS file as a normal JS file
-        extensions: ['.web.js'],
+        extensions: ['.web.ts', '.web.js'],
     },
 });
 
