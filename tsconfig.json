@@ -2,7 +2,7 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
-      "target": "esnext",
+      "target": "es2015",
       "module": "esnext",
       "types": ["react-native", "jest"],
       "lib": ["esnext"],
@@ -11,14 +11,13 @@
       "jsx": "react-native",
       "isolatedModules": true,
       "strict": true,
-      "emitDeclarationOnly": true,
       "moduleResolution": "node",
       "resolveJsonModule": true,
       "allowSyntheticDefaultImports": true,
       "skipLibCheck": true,
       "declaration": true,
-      "rootDir": "./lib",
+      "outDir": "./dist",
   },
-  "include": ["."],
+  "include": ["./lib"],
   "exclude": ["**/node_modules/**/*", "**/dist/**/*", "*.config.js"]
 }

@@ -21,23 +21,18 @@
   },
   "files": [
     "dist/**/*",
-    "lib/**/*",
-    "native.js",
-    "web.js",
     "API.md",
     "README.md",
     "LICENSE.md"
   ],
-  "react-native": "native.js",
-  "main": "native.js",
-  "browser": "web.js",
-  "types": "lib/index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "lint-tests": "eslint tests/**",
     "test": "jest",
-    "build": "webpack --config webpack.config.js && tsc",
+    "build": "tsc && cp ./lib/*.d.ts ./dist",
     "build:docs": "node buildDocs.js",
     "e2e": "playwright test",
     "e2e-ui": "playwright test --ui",
@@ -89,10 +84,7 @@
     "react-native-quick-sqlite": "^8.0.6",
     "react-test-renderer": "18.1.0",
     "type-fest": "^3.12.0",
-    "typescript": "^5.3.3",
-    "webpack": "^5.72.1",
-    "webpack-cli": "^4.9.2",
-    "webpack-merge": "^5.8.0"
+    "typescript": "^5.3.3"
   },
   "peerDependencies": {
     "idb-keyval": "^6.2.1",

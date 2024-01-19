@@ -4,7 +4,6 @@ module.exports = {
     env: {
         jest: true,
     },
-    ignorePatterns: 'dist',
     overrides: [
         {
             files: ['*.js', '*.jsx'],
