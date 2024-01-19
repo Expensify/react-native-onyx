@@ -1,6 +1,6 @@
 module.exports = {
     extends: ['expensify', 'prettier'],
-    parser: '@babel/eslint-parser',
+    parser: '@typescript-eslint/parser',
     env: {
         jest: true,
     },
@@ -34,7 +34,6 @@ module.exports = {
             files: ['*.ts', '*.tsx'],
             extends: ['expensify', 'plugin:@typescript-eslint/recommended', 'plugin:@typescript-eslint/stylistic', 'plugin:import/typescript', 'prettier', 'plugin:prettier/recommended'],
             plugins: ['react', 'react-native', 'import', '@typescript-eslint'],
-            parser: '@typescript-eslint/parser',
             parserOptions: {
                 project: './tsconfig.json',
             },

@@ -4,7 +4,7 @@
   "compilerOptions": {
       "target": "es2015",
       "module": "esnext",
-      "types": ["react-native", "jest"],
+      "types": ["react-native", "jest", "node"],
       "lib": ["esnext"],
       "allowJs": true,
       "checkJs": false,
@@ -18,6 +18,5 @@
       "declaration": true,
       "outDir": "./dist",
   },
-  "include": ["./lib"],
-  "exclude": ["**/node_modules/**/*", "**/dist/**/*", "*.config.js"]
+  "exclude": ["**/node_modules/**/*", "**/dist/**/*"]
 }
