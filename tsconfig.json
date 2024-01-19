@@ -1,22 +1,21 @@
-
 {
-  "$schema": "https://json.schemastore.org/tsconfig",
-  "compilerOptions": {
-      "target": "es2015",
-      "module": "esnext",
-      "types": ["react-native", "jest", "node"],
-      "lib": ["esnext"],
-      "allowJs": true,
-      "checkJs": false,
-      "jsx": "react-native",
-      "isolatedModules": true,
-      "strict": true,
-      "moduleResolution": "node",
-      "resolveJsonModule": true,
-      "allowSyntheticDefaultImports": true,
-      "skipLibCheck": true,
-      "declaration": true,
-      "outDir": "./dist",
-  },
-  "exclude": ["**/node_modules/**/*", "**/dist/**/*"]
+    "$schema": "https://json.schemastore.org/tsconfig",
+    "compilerOptions": {
+        "target": "es2015",
+        "module": "esnext",
+        "types": ["react-native", "jest", "node"],
+        "lib": ["esnext"],
+        "allowJs": true,
+        "checkJs": false,
+        "jsx": "react-native",
+        "isolatedModules": true,
+        "strict": true,
+        "moduleResolution": "node",
+        "resolveJsonModule": true,
+        "allowSyntheticDefaultImports": true,
+        "skipLibCheck": true,
+        "declaration": true,
+        "outDir": "./dist"
+    },
+    "exclude": ["**/node_modules/**/*", "**/dist/**/*"]
 }

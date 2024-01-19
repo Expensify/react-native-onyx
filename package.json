@@ -9,7 +9,7 @@
   "keywords": [
     "React Native",
     "React",
-    "Persistant storage",
+    "Persistent storage",
     "Pub/Sub"
   ],
   "repository": {
@@ -43,10 +43,10 @@
     "underscore": "^1.13.6"
   },
   "devDependencies": {
-    "@babel/eslint-parser": "^7.23.3",
     "@lwc/eslint-plugin-lwc": "^1.7.2",
     "@playwright/test": "^1.38.1",
     "@react-native-community/eslint-config": "^3.2.0",
+    "@react-native/polyfills": "^2.0.0",
     "@testing-library/jest-native": "^3.4.2",
     "@testing-library/react-native": "^7.0.2",
     "@types/jest": "^28.1.8",
@@ -102,34 +102,6 @@
   "engines": {
     "node": "20.9.0",
     "npm": "10.1.0"
-  },
-  "jest": {
-    "preset": "react-native",
-    "transform": {
-      "^.+\\.jsx?$": "babel-jest"
-    },
-    "transformIgnorePatterns": [
-      "node_modules/(?!react-native)/"
-    ],
-    "testPathIgnorePatterns": [
-      "<rootDir>/node_modules/",
-      "<rootDir>/tests/unit/mocks/",
-      "<rootDir>/tests/e2e/"
-    ],
-    "testMatch": [
-      "**/tests/unit/**/*.[jt]s?(x)",
-      "**/?(*.)+(spec|test).[jt]s?(x)"
-    ],
-    "globals": {
-      "__DEV__": true,
-      "WebSocket": {}
-    },
-    "timers": "fake",
-    "testEnvironment": "jsdom",
-    "setupFilesAfterEnv": [
-      "@testing-library/jest-native/extend-expect",
-      "./jestSetup.js"
-    ]
   },
   "sideEffects": false
 }
