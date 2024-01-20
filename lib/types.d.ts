@@ -100,6 +100,26 @@ type CollectionKey = `${CollectionKeyBase}${string}`;
 type OnyxKey = Key | CollectionKey;
 
 /**
+ * A computed key is a key that is not stored in the database, but instead is computed from other keys
+ * and cached in memory. This is useful for expensive computations that are used in multiple places.
+ */
+type ComputedKey<DependenciesT, ValueT> = {
+    /**
+     * The cache key of the computed value.
+     */
+    cacheKey: string;
+    /**
+     * Keys that this computed key depends on. The values of these keys will be passed to the compute function.
+     * This will also cause the key to be recomputed whenever any of the dependencies value change.
+     */
+    dependencies?: {[KeyT in keyof DependenciesT]: OnyxKey | ComputedKey<any, unknown>};
+    /**
+     * Compute the value for this computed key.
+     */
+    compute: (params: DependenciesT) => ValueT;
+};
+
+/**
  * Represents a mapping of Onyx keys to values, where keys are either normal or collection Onyx keys
  * and values are the corresponding values in Onyx's state.
  *
@@ -226,4 +246,4 @@ type NullishObjectDeep<ObjectType extends object> = {
  */
 type WithOnyxInstanceState<TOnyxProps> = (TOnyxProps & {loading: boolean}) | undefined;
 
-export {CollectionKey, CollectionKeyBase, CustomTypeOptions, DeepRecord, Key, KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey, Selector, NullishDeep, WithOnyxInstanceState};
+export {CollectionKey, CollectionKeyBase, ComputedKey, CustomTypeOptions, DeepRecord, Key, KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey, Selector, NullishDeep, WithOnyxInstanceState};
