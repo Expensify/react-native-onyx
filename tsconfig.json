@@ -2,20 +2,20 @@
     "$schema": "https://json.schemastore.org/tsconfig",
     "compilerOptions": {
         "target": "es2015",
-        "module": "esnext",
-        "types": ["react-native", "jest", "node"],
+        "module": "commonjs",
+        "types": ["react-native", "react", "jest", "node"],
         "lib": ["esnext"],
         "allowJs": true,
         "checkJs": false,
-        "jsx": "react-native",
+        "jsx": "react",
         "isolatedModules": true,
         "strict": true,
         "moduleResolution": "node",
         "resolveJsonModule": true,
-        "allowSyntheticDefaultImports": true,
+        "esModuleInterop": true,
         "skipLibCheck": true,
         "declaration": true,
-        "outDir": "./dist"
+        "outDir": "./dist",
     },
     "exclude": ["**/node_modules/**/*", "**/dist/**/*"]
 }
