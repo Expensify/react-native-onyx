@@ -1,9 +1,8 @@
 module.exports = {
     preset: 'react-native',
     transform: {
-        '^.+\\.jsx?$': 'babel-jest',
+        '\\.[jt]sx?$': 'babel-jest',
     },
-    transformIgnorePatterns: ['node_modules/(?!react-native)/'],
     testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/tests/unit/mocks/', '<rootDir>/tests/e2e/'],
     testMatch: ['**/tests/unit/**/*.[jt]s?(x)', '**/?(*.)+(spec|test).[jt]s?(x)'],
     globals: {
