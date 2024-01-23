@@ -1,6 +1,6 @@
 {
   "name": "react-native-onyx",
-  "version": "1.0.129",
+  "version": "2.0.0",
   "author": "Expensify, Inc.",
   "homepage": "https://expensify.com",
   "description": "State management for React Native",
@@ -52,6 +52,7 @@
     "@types/jest": "^28.1.8",
     "@types/node": "^20.11.5",
     "@types/react": "^18.2.14",
+    "@types/react-dom": "^18.2.18",
     "@types/react-native": "^0.70.0",
     "@typescript-eslint/eslint-plugin": "^6.19.0",
     "@typescript-eslint/parser": "^6.19.0",
