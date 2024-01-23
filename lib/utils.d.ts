@@ -1,4 +1,4 @@
-import { OnyxKey } from './types';
+import {OnyxKey} from './types';
 
 /**
  * Merges two objects and removes null values if "shouldRemoveNullObjectValues" is set to true
@@ -14,4 +14,4 @@ declare function fastMerge<T>(target: T, source: T, shouldRemoveNullObjectValues
  */
 declare function formatActionName(method: string, key?: OnyxKey): string;
 
-export default { fastMerge, formatActionName };
+export default {fastMerge, formatActionName};
