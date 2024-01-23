@@ -15,7 +15,7 @@
         "esModuleInterop": true,
         "skipLibCheck": true,
         "declaration": true,
-        "outDir": "./dist",
+        "outDir": "./dist"
     },
     "exclude": ["**/node_modules/**/*", "**/dist/**/*"]
 }
