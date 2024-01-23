@@ -33,11 +33,12 @@
   "browser": "web.js",
   "types": "lib/index.d.ts",
   "scripts": {
+    "build": "webpack --config webpack.config.js",
+    "build:docs": "node buildDocs.js",
     "lint": "eslint .",
     "lint-tests": "eslint tests/**",
-    "test": "jest",
-    "build": "webpack --config webpack.config.js",
-    "build:docs": "node buildDocs.js"
+    "prettier": "prettier --write .",
+    "test": "jest"
   },
   "dependencies": {
     "ascii-table": "0.0.9",
