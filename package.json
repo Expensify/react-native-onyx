@@ -1,6 +1,6 @@
 {
   "name": "react-native-onyx",
-  "version": "1.0.123",
+  "version": "1.0.130",
   "author": "Expensify, Inc.",
   "homepage": "https://expensify.com",
   "description": "State management for React Native",
@@ -30,7 +30,7 @@
   ],
   "react-native": "native.js",
   "main": "native.js",
-  "browser": "lib/index.js",
+  "browser": "web.js",
   "types": "lib/index.d.ts",
   "scripts": {
     "lint": "eslint .",
@@ -56,7 +56,7 @@
     "@react-native-community/eslint-config": "^2.0.0",
     "@testing-library/jest-native": "^3.4.2",
     "@testing-library/react-native": "^7.0.2",
-    "@types/node": "^20.7.1",
+    "@types/node": "^20.11.5",
     "@types/react": "^18.2.14",
     "babel-eslint": "^10.1.0",
     "babel-jest": "^26.2.2",
@@ -108,8 +108,8 @@
     }
   },
   "engines": {
-    "node": "20.9.0",
-    "npm": "10.1.0"
+    "node": ">=20.10.0",
+    "npm": ">=10.2.3"
   },
   "jest": {
     "preset": "react-native",

@@ -79,7 +79,7 @@ type OnyxUpdate =
               | {
                     onyxMethod: typeof METHOD.MERGE;
                     key: TKey;
-                    value: NullishDeep<KeyValueMapping[TKey]>;
+                    value: OnyxEntry<NullishDeep<KeyValueMapping[TKey]>>;
                 };
       }[OnyxKey]
     | {
@@ -107,6 +107,7 @@ declare const METHOD: {
     readonly SET: 'set';
     readonly MERGE: 'merge';
     readonly MERGE_COLLECTION: 'mergecollection';
+    readonly MULTI_SET: 'multiset';
     readonly CLEAR: 'clear';
 };
 
@@ -202,7 +203,7 @@ declare function multiSet(data: Partial<NullableKeyValueMapping>): Promise<void>
  * @param key ONYXKEYS key
  * @param value Object or Array value to merge
  */
-declare function merge<TKey extends OnyxKey>(key: TKey, value: NullishDeep<KeyValueMapping[TKey]>): Promise<void>;
+declare function merge<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<NullishDeep<KeyValueMapping[TKey]>>): Promise<void>;
 
 /**
  * Clear out all the data in the store
@@ -315,9 +316,9 @@ declare const Onyx: {
     METHOD: typeof METHOD;
     setMemoryOnlyKeys: typeof setMemoryOnlyKeys;
     onClear: typeof onClear;
-    isClientManagerReady: typeof ActiveClientManager.isReady,
-    isClientTheLeader: typeof ActiveClientManager.isClientTheLeader,
-    subscribeToClientChange: typeof ActiveClientManager.subscribeToClientChange,
+    isClientManagerReady: typeof ActiveClientManager.isReady;
+    isClientTheLeader: typeof ActiveClientManager.isClientTheLeader;
+    subscribeToClientChange: typeof ActiveClientManager.subscribeToClientChange;
 };
 
 export default Onyx;
