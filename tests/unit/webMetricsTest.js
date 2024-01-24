@@ -3,7 +3,8 @@ describe('decorateWithMetrics', () => {
 
     beforeEach(() => {
         jest.resetModules();
-        const metrics = require('../../lib/metrics/index.web');
+        // eslint-disable-next-line import/extensions
+        const metrics = require('../../lib/metrics/index.js');
         decorateWithMetrics = metrics.decorateWithMetrics;
     });
 

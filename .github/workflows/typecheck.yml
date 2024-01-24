@@ -1,0 +1,25 @@
+name: TypeScript Checks
+
+on:
+    pull_request:
+        types: [opened, synchronize]
+
+jobs:
+    lint:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version-file: ".nvmrc"
+                  cache: npm
+                  cache-dependency-path: package-lock.json
+
+            - run: npm ci
+
+            - name: Type check with TypeScript
+              run: npm run typecheck
+              env:
+                CI: true
