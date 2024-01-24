@@ -1,8 +1,0 @@
-{
-    "compilerOptions": {
-        "baseUrl": ".",
-        "paths": {
-            "react-native-onyx/*": ["../../../lib/*"]
-        }
-    }
-}

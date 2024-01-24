@@ -33,8 +33,7 @@
     "test": "jest",
     "build": "tsc -p tsconfig.build.json && cp ./lib/*.d.ts ./dist",
     "build:docs": "node buildDocs.js",
-    "e2e": "playwright test",
-    "e2e-ui": "playwright test --ui",
+    "lint-tests": "eslint tests/**",
     "prettier": "prettier --write ."
   },
   "dependencies": {
@@ -44,7 +43,6 @@
   },
   "devDependencies": {
     "@lwc/eslint-plugin-lwc": "^1.7.2",
-    "@playwright/test": "^1.38.1",
     "@react-native-community/eslint-config": "^3.2.0",
     "@react-native/polyfills": "^2.0.0",
     "@testing-library/jest-native": "^3.4.2",
@@ -83,9 +81,9 @@
     "idb-keyval": "^6.2.1",
     "react": ">=18.1.0",
     "react-dom": ">=18.1.0",
-    "react-native-device-info": "^10.3.0",
     "react-native-performance": "^5.1.0",
-    "react-native-quick-sqlite": "^8.0.0-beta.2"
+    "react-native-quick-sqlite": "^8.0.0-beta.2",
+    "react-native-device-info": "^10.3.0"
   },
   "peerDependenciesMeta": {
     "idb-keyval": {
