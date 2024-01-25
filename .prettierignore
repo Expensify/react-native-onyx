@@ -1,4 +1,4 @@
-dist/**/*.js
+dist
 package.json
 package-lock.json
 *.html

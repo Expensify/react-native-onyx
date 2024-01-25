@@ -5,6 +5,15 @@
 ## Functions
 
 <dl>
+<dt><a href="#sendActionToDevTools">sendActionToDevTools(method, key, value, mergedValue)</a></dt>
+<dd><p>Sends an action to DevTools extension</p>
+</dd>
+<dt><a href="#maybeFlushBatchUpdates">maybeFlushBatchUpdates()</a> ⇒ <code>Promise</code></dt>
+<dd><p>We are batching together onyx updates. This helps with use cases where we schedule onyx updates after each other.
+This happens for example in the Onyx.update function, where we process API responses that might contain a lot of
+update operations. Instead of calling the subscribers for each update operation, we batch them together which will
+cause react to schedule the updates at once instead of after each other. This is mainly a performance optimization.</p>
+</dd>
 <dt><a href="#getSubsetOfData">getSubsetOfData(sourceData, selector, [withOnyxInstanceState])</a> ⇒ <code>Mixed</code></dt>
 <dd><p>Uses a selector function to return a simplified version of sourceData</p>
 </dd>
@@ -25,12 +34,6 @@ If the requested key is a collection, it will return an object with all the coll
 <dt><a href="#disconnect">disconnect(connectionID, [keyToRemoveFromEvictionBlocklist])</a></dt>
 <dd><p>Remove the listener for a react component</p>
 </dd>
-<dt><a href="#maybeFlushBatchUpdates">maybeFlushBatchUpdates()</a> ⇒ <code>Promise</code></dt>
-<dd><p>We are batching together onyx updates. This helps with use cases where we schedule onyx updates after each other.
-This happens for example in the Onyx.update function, where we process API responses that might contain a lot of
-update operations. Instead of calling the subscribers for each update operation, we batch them together which will
-cause react to schedule the updates at once instead of after each other. This is mainly a performance optimization.</p>
-</dd>
 <dt><a href="#scheduleSubscriberUpdate">scheduleSubscriberUpdate(key, value, [canUpdateSubscriber])</a> ⇒ <code>Promise</code></dt>
 <dd><p>Schedules an update that will be appended to the macro task queue (so it doesn&#39;t update the subscribers immediately).</p>
 </dd>
@@ -39,11 +42,15 @@ cause react to schedule the updates at once instead of after each other. This is
 so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
 subscriber callbacks receive the data in a different format than they normally expect and it breaks code.</p>
 </dd>
-<dt><a href="#broadcastUpdate">broadcastUpdate(key, value, hasChanged, method)</a> ⇒ <code>Promise</code></dt>
+<dt><a href="#broadcastUpdate">broadcastUpdate(key, value, method, hasChanged, wasRemoved)</a> ⇒ <code>Promise</code></dt>
 <dd><p>Notifys subscribers and writes current value to cache</p>
 </dd>
 <dt><a href="#hasPendingMergeForKey">hasPendingMergeForKey(key)</a> ⇒ <code>Boolean</code></dt>
 <dd></dd>
+<dt><a href="#removeNullValues">removeNullValues(key, value)</a> ⇒ <code>Mixed</code></dt>
+<dd><p>Removes a key from storage if the value is null.
+Otherwise removes all nested null values in objects and returns the object</p>
+</dd>
 <dt><a href="#set">set(key, value)</a> ⇒ <code>Promise</code></dt>
 <dd><p>Write a value to our store with the given key</p>
 </dd>
@@ -83,11 +90,41 @@ value will be saved to storage after the default value.</p>
 <dt><a href="#setMemoryOnlyKeys">setMemoryOnlyKeys(keyList)</a></dt>
 <dd><p>When set these keys will not be persisted to storage</p>
 </dd>
+<dt><a href="#onClear">onClear(callback)</a></dt>
+<dd><p>Sets the callback to be called when the clear finishes executing.</p>
+</dd>
+<dt><a href="#subscribeToEvents">subscribeToEvents()</a></dt>
+<dd><p>Subscribes to the Broadcast channel and executes actions based on the
+types of events.</p>
+</dd>
 <dt><a href="#init">init([options])</a></dt>
 <dd><p>Initialize the store with actions and listening for storage events</p>
 </dd>
 </dl>
 
+<a name="sendActionToDevTools"></a>
+
+## sendActionToDevTools(method, key, value, mergedValue)
+Sends an action to DevTools extension
+
+**Kind**: global function  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| method | <code>string</code> | Onyx method from METHOD |
+| key | <code>string</code> | Onyx key that was changed |
+| value | <code>any</code> | contains the change that was made by the method |
+| mergedValue | <code>any</code> | (optional) value that was written in the storage after a merge method was executed. |
+
+<a name="maybeFlushBatchUpdates"></a>
+
+## maybeFlushBatchUpdates() ⇒ <code>Promise</code>
+We are batching together onyx updates. This helps with use cases where we schedule onyx updates after each other.
+This happens for example in the Onyx.update function, where we process API responses that might contain a lot of
+update operations. Instead of calling the subscribers for each update operation, we batch them together which will
+cause react to schedule the updates at once instead of after each other. This is mainly a performance optimization.
+
+**Kind**: global function  
 <a name="getSubsetOfData"></a>
 
 ## getSubsetOfData(sourceData, selector, [withOnyxInstanceState]) ⇒ <code>Mixed</code>
@@ -182,15 +219,6 @@ Remove the listener for a react component
 ```js
 Onyx.disconnect(connectionID);
 ```
-<a name="maybeFlushBatchUpdates"></a>
-
-## maybeFlushBatchUpdates() ⇒ <code>Promise</code>
-We are batching together onyx updates. This helps with use cases where we schedule onyx updates after each other.
-This happens for example in the Onyx.update function, where we process API responses that might contain a lot of
-update operations. Instead of calling the subscribers for each update operation, we batch them together which will
-cause react to schedule the updates at once instead of after each other. This is mainly a performance optimization.
-
-**Kind**: global function  
 <a name="scheduleSubscriberUpdate"></a>
 
 ## scheduleSubscriberUpdate(key, value, [canUpdateSubscriber]) ⇒ <code>Promise</code>
@@ -224,17 +252,18 @@ subscriber callbacks receive the data in a different format than they normally e
 
 <a name="broadcastUpdate"></a>
 
-## broadcastUpdate(key, value, hasChanged, method) ⇒ <code>Promise</code>
+## broadcastUpdate(key, value, method, hasChanged, wasRemoved) ⇒ <code>Promise</code>
 Notifys subscribers and writes current value to cache
 
 **Kind**: global function  
 
-| Param | Type |
-| --- | --- |
-| key | <code>String</code> | 
-| value | <code>\*</code> | 
-| hasChanged | <code>Boolean</code> | 
-| method | <code>String</code> | 
+| Param | Type | Default |
+| --- | --- | --- |
+| key | <code>String</code> |  | 
+| value | <code>\*</code> |  | 
+| method | <code>String</code> |  | 
+| hasChanged | <code>Boolean</code> |  | 
+| wasRemoved | <code>Boolean</code> | <code>false</code> | 
 
 <a name="hasPendingMergeForKey"></a>
 
@@ -244,6 +273,20 @@ Notifys subscribers and writes current value to cache
 | Param | Type |
 | --- | --- |
 | key | <code>String</code> | 
+
+<a name="removeNullValues"></a>
+
+## removeNullValues(key, value) ⇒ <code>Mixed</code>
+Removes a key from storage if the value is null.
+Otherwise removes all nested null values in objects and returns the object
+
+**Kind**: global function  
+**Returns**: <code>Mixed</code> - The value without null values and a boolean "wasRemoved", which indicates if the key got removed completely  
+
+| Param | Type |
+| --- | --- |
+| key | <code>String</code> | 
+| value | <code>Mixed</code> | 
 
 <a name="set"></a>
 
@@ -367,6 +410,24 @@ When set these keys will not be persisted to storage
 | --- | --- |
 | keyList | <code>Array.&lt;string&gt;</code> | 
 
+<a name="onClear"></a>
+
+## onClear(callback)
+Sets the callback to be called when the clear finishes executing.
+
+**Kind**: global function  
+
+| Param | Type |
+| --- | --- |
+| callback | <code>function</code> | 
+
+<a name="subscribeToEvents"></a>
+
+## subscribeToEvents()
+Subscribes to the Broadcast channel and executes actions based on the
+types of events.
+
+**Kind**: global function  
 <a name="init"></a>
 
 ## init([options])

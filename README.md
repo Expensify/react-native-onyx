@@ -292,13 +292,13 @@ function signOut() {
 `Onyx.get`, `Onyx.set`, and the rest of the API accesses the underlying storage
 differently depending on the platform
 
-Under the hood storage access calls are delegated to a [`StorageProvider`](lib/storage/index.web.js)
+Under the hood storage access calls are delegated to a [`StorageProvider`](lib/storage/index.js)
 Some platforms (like web and desktop) might use the same storage provider
 
 If a platform needs to use a separate library (like using MMVK for react-native) it should be added in the following way:
 1. Create a `StorageProvider.js` at [lib/storage/providers](lib/storage/providers)
    Reference an existing [StorageProvider](lib/storage/providers/AsyncStorage.js) for the interface that has to be implemented
-2. Update the factory at [lib/storage/index.web.js](lib/storage/index.web.js) and [lib/storage/index.native.js](lib/storage/index.native.js) to return the newly created Provider for the desired Platform(s)
+2. Update the factory at [lib/storage/index.js](lib/storage/index.js) and [lib/storage/index.native.js](lib/storage/index.native.js) to return the newly created Provider for the desired Platform(s)
 
 # API Reference
 
@@ -433,9 +433,7 @@ The action logs use this naming convention:
 `react-native` bundles source using the `metro` bundler. `metro` does not follow symlinks, so we can't use `npm link` to
 link a local version of Onyx during development
 
-To quickly test small changes you can directly go to `node_modules/react-native-onyx` in the parent project and:
-- tweak original source if you're testing over a react-native project
-- tweak `dist/web.development.js` for non react-native-projects
+To quickly test small changes you can directly go to `node_modules/react-native-onyx` in the parent project and tweak original source code.
 
 To continuously work on Onyx we have to set up a task that copies content to parent project's `node_modules/react-native-onyx`:
 1. Work on Onyx feature or a fix
@@ -443,11 +441,3 @@ To continuously work on Onyx we have to set up a task that copies content to par
 3. Optional: run `npm run build` (if you're working or want to test on a non react-native project)
    - `npm link` would actually work outside of `react-native` and it can be used to link Onyx locally for a web only project
 4. Copy Onyx to consumer project's `node_modules/react-native-onyx`
-
-# Automated Tests
-
-There are Playwright e2e tests implemented for the web. To run them:
-
-- in the tests/e2e/app directory, run `npm install`
-- `npm run e2e` to run the e2e tests
-- or `npm run e2e-ui` to run the e2e tests in UI mode 
