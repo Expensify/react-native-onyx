@@ -1,5 +1,3 @@
-/* eslint-disable es/no-nullish-coalescing-operators */
-/* eslint-disable es/no-optional-chaining */
 import {useEffect, useRef, useState} from 'react';
 import Onyx from './Onyx';
 // eslint-disable-next-line rulesdir/prefer-import-module-contents
@@ -29,19 +27,12 @@ type UseOnyxOptions<TKey extends OnyxKey> = {
     initialValue?: OnyxValue<TKey>;
 };
 
-function useOnyx<TKey extends OnyxKey>(keyParam: TKey, options?: UseOnyxOptions<TKey>): OnyxValue<TKey> {
+function useOnyx<TKey extends OnyxKey>(key: TKey, options?: UseOnyxOptions<TKey>): OnyxValue<TKey> {
     const [value, setValue] = useState<OnyxValue<TKey>>(options?.initialValue ?? (null as OnyxValue<TKey>));
-
-    /**
-     * Prevents key reassignment.
-     */
-    const keyRef = useRef(keyParam);
-    const key = keyRef.current;
 
     const connectionIDRef = useRef<number | null>(null);
 
     useEffect(() => {
-        // eslint-disable-next-line rulesdir/prefer-onyx-connect-in-libs
         connectionIDRef.current = Onyx.connect({
             key,
             callback: (val) => {
@@ -57,7 +48,7 @@ function useOnyx<TKey extends OnyxKey>(keyParam: TKey, options?: UseOnyxOptions<
 
             Onyx.disconnect(connectionIDRef.current);
         };
-    }, []);
+    }, [key, options?.initWithStoredValues]);
 
     /**
      * Mimics withOnyx's checkEvictableKeys() behavior.
@@ -76,7 +67,7 @@ function useOnyx<TKey extends OnyxKey>(keyParam: TKey, options?: UseOnyxOptions<
         } else {
             Onyx.addToEvictionBlockList(key, connectionIDRef.current);
         }
-    }, [options?.canEvict]);
+    }, [key, options?.canEvict]);
 
     return value;
 }
