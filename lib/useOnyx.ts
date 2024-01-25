@@ -51,10 +51,6 @@ function useOnyx<TKey extends OnyxKey>(keyParam: TKey, options?: UseOnyxOptions<
         });
 
         return () => {
-            if (!Onyx.isSafeEvictionKey(key)) {
-                throw new Error(`canEvict can't be used on key '${key}'. This key must explicitly be flagged as safe for removal by adding it to Onyx.init({safeEvictionKeys: []}).`);
-            }
-
             if (!connectionIDRef.current) {
                 return;
             }
@@ -69,6 +65,10 @@ function useOnyx<TKey extends OnyxKey>(keyParam: TKey, options?: UseOnyxOptions<
     useEffect(() => {
         if (options?.canEvict === undefined || !connectionIDRef.current) {
             return;
+        }
+
+        if (!Onyx.isSafeEvictionKey(key)) {
+            throw new Error(`canEvict can't be used on key '${key}'. This key must explicitly be flagged as safe for removal by adding it to Onyx.init({safeEvictionKeys: []}).`);
         }
 
         if (options.canEvict) {
