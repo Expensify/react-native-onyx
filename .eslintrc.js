@@ -1,5 +1,6 @@
 module.exports = {
-    extends: ['expensify', 'prettier'],
+    extends: ['expensify', 'prettier', 'plugin:react-hooks/recommended'],
+    plugins: ['react-hooks'],
     parser: '@typescript-eslint/parser',
     env: {
         jest: true,
@@ -53,6 +54,9 @@ module.exports = {
                 '@typescript-eslint/array-type': ['error', {default: 'array-simple'}],
                 '@typescript-eslint/consistent-type-definitions': 'off',
                 'rulesdir/no-multiple-onyx-in-file': 'off',
+                'rulesdir/prefer-onyx-connect-in-libs': 'off',
+                'es/no-nullish-coalescing-operators': 'off',
+                'es/no-optional-chaining': 'off',
             },
         },
     ],

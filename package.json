@@ -60,6 +60,7 @@
     "eslint-plugin-import": "^2.29.1",
     "eslint-plugin-jsx-a11y": "^6.8.0",
     "eslint-plugin-react": "^7.31.10",
+    "eslint-plugin-react-hooks": "^4.6.0",
     "idb-keyval": "^6.2.1",
     "jest": "^26.5.2",
     "jest-cli": "^26.5.2",
@@ -81,9 +82,9 @@
     "idb-keyval": "^6.2.1",
     "react": ">=18.1.0",
     "react-dom": ">=18.1.0",
+    "react-native-device-info": "^10.3.0",
     "react-native-performance": "^5.1.0",
-    "react-native-quick-sqlite": "^8.0.0-beta.2",
-    "react-native-device-info": "^10.3.0"
+    "react-native-quick-sqlite": "^8.0.0-beta.2"
   },
   "peerDependenciesMeta": {
     "idb-keyval": {
