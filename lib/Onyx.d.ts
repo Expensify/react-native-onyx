@@ -35,7 +35,7 @@ type BaseConnectOptions = {
 type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions &
     (
         | {
-              key: TKey extends CollectionKey ? TKey : never;
+              key: TKey extends CollectionKeyBase ? TKey : never;
               callback?: (value: OnyxCollection<KeyValueMapping[TKey]>) => void;
               waitForCollectionCallback: true;
           }
@@ -114,6 +114,12 @@ declare const METHOD: {
  * Returns current key names stored in persisted storage
  */
 declare function getAllKeys(): Promise<Array<OnyxKey>>;
+
+/**
+ * Checks to see if the a subscriber's supplied key
+ * is associated with a collection of keys.
+ */
+declare function isCollectionKey(key: OnyxKey): boolean;
 
 /**
  * Checks to see if this key has been flagged as
@@ -309,6 +315,7 @@ declare const Onyx: {
     isSafeEvictionKey: typeof isSafeEvictionKey;
     METHOD: typeof METHOD;
     setMemoryOnlyKeys: typeof setMemoryOnlyKeys;
+    isCollectionKey: typeof isCollectionKey;
 };
 
 export default Onyx;

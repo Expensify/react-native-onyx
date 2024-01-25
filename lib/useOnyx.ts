@@ -34,11 +34,12 @@ function useOnyx<TKey extends OnyxKey>(key: TKey, options?: UseOnyxOptions<TKey>
 
     useEffect(() => {
         connectionIDRef.current = Onyx.connect({
-            key,
-            callback: (val) => {
+            key: key as CollectionKeyBase,
+            callback: (val: unknown) => {
                 setValue(val as OnyxValue<TKey>);
             },
             initWithStoredValues: options?.initWithStoredValues,
+            waitForCollectionCallback: Onyx.isCollectionKey(key),
         });
 
         return () => {
