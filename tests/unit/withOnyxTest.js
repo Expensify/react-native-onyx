@@ -625,7 +625,7 @@ describe('withOnyxTest', () => {
                     ref.current.markReadyForHydration();
                 })
                 .then(() => {
-                    // Component still has not updated
+                    // Now that the component has been marked as ready for hydration, it has been updated
                     expect(onRender).toHaveBeenCalledTimes(4);
                     expect(onRender.mock.calls[3][0].simple).toBe('long_string');
                 })
