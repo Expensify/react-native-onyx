@@ -741,7 +741,7 @@ describe('withOnyxTest', () => {
     });
 
     it('works with selectors', async () => {
-        const selector = jest.fn().mockImplementation((value) => value ? value.hello : undefined);
+        const selector = jest.fn().mockImplementation((value) => (value ? value.hello : undefined));
         const TestComponentWithOnyx = withOnyx({
             // Note: the prop passed to the wrapped component is called "text",
             // which is different than the key selected by the selector "hello"
