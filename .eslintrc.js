@@ -55,5 +55,13 @@ module.exports = {
                 'rulesdir/no-multiple-onyx-in-file': 'off',
             },
         },
+        {
+            files: ['tests/**/*.{js,jsx,ts,tsx}'],
+            rules: {
+                '@lwc/lwc/no-async-await': 'off',
+                'no-await-in-loop': 'off',
+                'no-restricted-syntax': ['error', 'ForInStatement', 'LabeledStatement', 'WithStatement'],
+            },
+        },
     ],
 };
