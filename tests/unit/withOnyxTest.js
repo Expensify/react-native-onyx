@@ -739,4 +739,68 @@ describe('withOnyxTest', () => {
                 expect(onRender).toHaveBeenCalledTimes(2);
             });
     });
+
+    it('works with selectors', async () => {
+        const selector = jest.fn().mockImplementation((value) => value ? value.hello : undefined);
+        const TestComponentWithOnyx = withOnyx({
+            // Note: the prop passed to the wrapped component is called "text",
+            // which is different than the key selected by the selector "hello"
+            text: {
+                key: ONYX_KEYS.TEST_KEY,
+                selector,
+            },
+        })(ViewWithText);
+        let sourceData = {hello: 'world', goodnight: 'moon'};
+        await StorageMock.setItem(ONYX_KEYS.TEST_KEY, sourceData);
+
+        const onRender = jest.fn();
+        const renderResult = render(<TestComponentWithOnyx onRender={onRender} />);
+
+        // When the data is first loading and not yet in cache, it's expected that the selector be called with undefined
+        expect(onRender).not.toHaveBeenCalled();
+        expect(selector).toHaveBeenCalledTimes(1);
+        expect(selector).toHaveBeenCalledWith(undefined, undefined);
+        selector.mockClear();
+
+        // Then the selector is called with the correct data
+        await waitForPromisesToResolve();
+        await waitForPromisesToResolve();
+        expect(onRender).toHaveBeenCalledTimes(1);
+        onRender.mockClear();
+
+        // And the component is rendered correctly
+        expect(selector).toHaveBeenCalledTimes(1);
+        expect(selector).toHaveBeenCalledWith(sourceData, {loading: true, text: 'world'});
+        let textComponent = renderResult.getByText('world');
+        expect(textComponent).not.toBeNull();
+        selector.mockClear();
+
+        // When we update some data that's not targeted by the selector
+        await Onyx.merge(ONYX_KEYS.TEST_KEY, {goodnight: 'dougal'});
+        await waitForPromisesToResolve();
+
+        // Correct data has been passed to the selector
+        expect(selector).not.toHaveBeenCalledWith('world', expect.anything());
+        expect(selector).not.toHaveBeenCalledWith('moon', expect.anything());
+        expect(selector).toHaveReturnedWith('world');
+        selector.mockClear();
+
+        // And the component has not re-render
+        expect(onRender).not.toHaveBeenCalled();
+
+        // When we delete the data
+        sourceData = null;
+        await Onyx.set(ONYX_KEYS.TEST_KEY, sourceData);
+        await waitForPromisesToResolve();
+
+        // Correct data has been passed to the selector
+        expect(selector).not.toHaveBeenCalledWith('world', expect.anything());
+        expect(selector).not.toHaveBeenCalledWith('dougal', expect.anything());
+        expect(selector).toHaveBeenLastCalledWith(sourceData, {loading: false, text: 'world'});
+
+        // Default text has been rendered
+        expect(onRender).toHaveBeenCalledTimes(1);
+        textComponent = renderResult.getByText('null');
+        expect(textComponent).not.toBeNull();
+    });
 });
