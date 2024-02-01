@@ -430,14 +430,14 @@ The action logs use this naming convention:
 
 # Development
 
-`react-native` bundles source using the `metro` bundler. `metro` does not follow symlinks, so we can't use `npm link` to
-link a local version of Onyx during development
+React Native bundles source code using the `metro` bundler. Until React Native 0.73, `metro` does not follow symlinks, so we can't use `npm link` to
+link a local version of Onyx during development. Fortunately, we have set up a workflow that's easy to follow and enables
+you to edit the Onyx source directly in the Onyx repo, and have those changes hot-reload in a React Native project in realtime.
 
-To quickly test small changes you can directly go to `node_modules/react-native-onyx` in the parent project and tweak original source code.
+1. In one terminal tab, open the `react-native-onyx` directory and run `npm run build:watch`
+2. In another terminal tab, open your React Native project and run `npx link publish <path_to_onyx_directory_on_your_machine>`
+3. Then run your React Native project as normal!
 
-To continuously work on Onyx we have to set up a task that copies content to parent project's `node_modules/react-native-onyx`:
-1. Work on Onyx feature or a fix
-2. Save files
-3. Optional: run `npm run build` (if you're working or want to test on a non react-native project)
-   - `npm link` would actually work outside of `react-native` and it can be used to link Onyx locally for a web only project
-4. Copy Onyx to consumer project's `node_modules/react-native-onyx`
+Now you can make changes directly to the `react-native-onyx` source code and your React Native project should-hot reload with those changes in realtime.
+
+_Note:_ If you want to unlink `react-native-onyx`, simply run `npm install` from your React Native project directory again. That will reinstall `react-native-onyx` from npm.
