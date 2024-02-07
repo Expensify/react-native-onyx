@@ -3,6 +3,17 @@ import Onyx from './Onyx';
 // eslint-disable-next-line rulesdir/prefer-import-module-contents
 import type {CollectionKeyBase, KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey} from './types';
 
+// TODO: Move to a different file once issue with imports is resolved.
+function usePrevious<T>(value: T): T {
+    const ref = useRef<T>(value);
+
+    useEffect(() => {
+        ref.current = value;
+    }, [value]);
+
+    return ref.current;
+}
+
 type OnyxValue<TKey extends OnyxKey> = TKey extends CollectionKeyBase ? OnyxCollection<KeyValueMapping[TKey]> : OnyxEntry<KeyValueMapping[TKey]>;
 
 type UseOnyxOptions<TKey extends OnyxKey> = {
@@ -77,10 +88,23 @@ const cache = new Map<string, unknown>();
 
 function useOnyxWithSyncExternalStore<TKey extends OnyxKey>(key: TKey, options?: UseOnyxOptions<TKey>): OnyxValue<TKey> {
     const connectionIDRef = useRef<number | null>(null);
+    const previousKey = usePrevious(key);
 
+    /**
+     * According to React docs, `getSnapshot` is a function that returns a snapshot of the data in the store that’s needed by the component.
+     * **While the store has not changed, repeated calls to getSnapshot must return the same value.**
+     * If the store changes and the returned value is different (as compared by Object.is), React re-renders the component.
+     *
+     * When the `key` is changed (e.g. to get a different record from a collection) and it's not yet in the cache,
+     * we return the value from the previous key to avoid briefly returning a `null` value to the component, thus avoiding a useless re-render.
+     */
     const getSnapshot = useCallback(() => {
+        if (previousKey !== key && !cache.has(key)) {
+            return (cache.get(previousKey) ?? null) as OnyxValue<TKey>;
+        }
+
         return (cache.get(key) ?? null) as OnyxValue<TKey>;
-    }, [key]);
+    }, [key, previousKey]);
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
