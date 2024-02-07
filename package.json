@@ -1,6 +1,6 @@
 {
   "name": "react-native-onyx",
-  "version": "2.0.1",
+  "version": "2.0.3",
   "author": "Expensify, Inc.",
   "homepage": "https://expensify.com",
   "description": "State management for React Native",
@@ -32,6 +32,7 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "build": "tsc -p tsconfig.build.json && cp ./lib/*.d.ts ./dist",
+    "build:watch": "nodemon --watch lib --exec \"npm run build && npm pack\"",
     "build:docs": "node buildDocs.js",
     "lint-tests": "eslint tests/**",
     "prettier": "prettier --write ."
@@ -66,6 +67,7 @@
     "jest-cli": "^26.5.2",
     "jsdoc-to-markdown": "^7.1.0",
     "metro-react-native-babel-preset": "^0.77.0",
+    "nodemon": "^3.0.3",
     "prettier": "^2.8.8",
     "prop-types": "^15.7.2",
     "react": "18.2.0",
