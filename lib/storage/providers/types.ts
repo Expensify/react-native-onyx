@@ -6,7 +6,6 @@ type KeyValuePair = [Key, Value];
 type KeyList = Key[];
 type KeyValuePairList = KeyValuePair[];
 
-/** StorageProvider encapsulates the shape of the storage provider expected by the module. */
 type StorageProvider = {
     /**
      * Gets the value of a given key or return `null` if it's not available in storage
