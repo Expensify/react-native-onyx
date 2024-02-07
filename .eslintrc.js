@@ -55,6 +55,17 @@ module.exports = {
                 'rulesdir/no-multiple-onyx-in-file': 'off',
                 'valid-jsdoc': 'off',
                 'rulesdir/prefer-import-module-contents': 'off',
+                'es/no-optional-chaining': 'off',
+                'import/extensions': [
+                    'error',
+                    'ignorePackages',
+                    {
+                        js: 'never',
+                        jsx: 'never',
+                        ts: 'never',
+                        tsx: 'never',
+                    },
+                ],
             },
         },
         {

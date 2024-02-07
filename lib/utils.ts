@@ -22,8 +22,8 @@ function mergeObject<TTarget extends unknown[] | Record<string, unknown>>(target
         const targetKeys = Object.keys(target);
         for (let i = 0; i < targetKeys.length; ++i) {
             const key = targetKeys[i];
-            const sourceValue = source[key as keyof TTarget];
-            const targetValue = target[key as keyof TTarget];
+            const sourceValue = source?.[key as keyof TTarget];
+            const targetValue = target?.[key as keyof TTarget];
 
             // If shouldRemoveNullObjectValues is true, we want to remove null values from the merged object
             const isSourceOrTargetNull = targetValue === null || sourceValue === null;
@@ -40,8 +40,8 @@ function mergeObject<TTarget extends unknown[] | Record<string, unknown>>(target
     const sourceKeys = Object.keys(source);
     for (let i = 0; i < sourceKeys.length; ++i) {
         const key = sourceKeys[i];
-        const sourceValue = source[key as keyof TTarget];
-        const targetValue = target[key as keyof TTarget];
+        const sourceValue = source?.[key as keyof TTarget];
+        const targetValue = target?.[key as keyof TTarget];
 
         // If shouldRemoveNullObjectValues is true, we want to remove null values from the merged object
         const shouldOmitSourceKey = shouldRemoveNullObjectValues && sourceValue === null;
