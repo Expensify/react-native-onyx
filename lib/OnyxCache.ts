@@ -29,7 +29,7 @@ class OnyxCache {
         return Array.from(this.storageKeys);
     }
 
-    getValue(key: string, shouldReindexCache = true): T {
+    getValue(key: string, shouldReindexCache = true): unknown {
         if (shouldReindexCache) {
             this.addToAccessedKeys(key);
         }
@@ -118,7 +118,7 @@ class OnyxCache {
         this.maxRecentKeysSize = limit;
     }
 
-    hasValueChanged(key: string, value: T): boolean {
+    hasValueChanged(key: string, value: unknown): boolean {
         return !deepEqual(this.storageMap[key], value);
     }
 }
