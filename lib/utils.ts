@@ -5,7 +5,7 @@ type EmptyObject = Record<string, never>;
 type EmptyValue = EmptyObject | null | undefined;
 
 function isEmptyObject<T>(obj: T | EmptyValue): obj is EmptyValue {
-    return Object.keys(obj || {}).length === 0;
+    return typeof obj === 'object' && Object.keys(obj || {}).length === 0;
 }
 
 // Mostly copied from https://medium.com/@lubaka.a/how-to-remove-lodash-performance-improvement-b306669ad0e1
