@@ -6,6 +6,8 @@ type KeyValuePair = [Key, Value];
 type KeyList = Key[];
 type KeyValuePairList = KeyValuePair[];
 
+type OnStorageKeyChanged = (key: Key, value: Value | null) => void;
+
 type StorageProvider = {
     /**
      * Gets the value of a given key or return `null` if it's not available in storage
@@ -72,7 +74,7 @@ type StorageProvider = {
     /**
      * @param  onStorageKeyChanged Storage synchronization mechanism keeping all opened tabs in sync
      */
-    keepInstancesSync?: (onStorageKeyChanged: (key: Key, value: Value | null) => void) => void;
+    keepInstancesSync?: (onStorageKeyChanged: OnStorageKeyChanged) => void;
 };
 
 export default StorageProvider;

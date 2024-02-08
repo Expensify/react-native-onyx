@@ -35,8 +35,6 @@ function mergeObject<TTarget extends unknown[] | Record<string, unknown>>(target
         }
     }
 
-    // lodash adds a small overhead so we don't use it here
-    // eslint-disable-next-line rulesdir/prefer-underscore-method
     const sourceKeys = Object.keys(source);
     for (let i = 0; i < sourceKeys.length; ++i) {
         const key = sourceKeys[i];
