@@ -1,4 +1,3 @@
-import _ from 'underscore';
 import utils from '../../utils';
 import type {Key, KeyValuePairList, Value} from '../providers/types';
 import type StorageProvider from '../providers/types';
@@ -59,6 +58,7 @@ const idbKeyvalMock: StorageProvider = {
     getDatabaseSize() {
         return Promise.resolve({bytesRemaining: 0, bytesUsed: 99999});
     },
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
     setMemoryOnlyKeys() {},
 };
 
