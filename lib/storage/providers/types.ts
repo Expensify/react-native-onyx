@@ -72,7 +72,7 @@ type StorageProvider = {
     getDatabaseSize: () => Promise<{bytesUsed: number; bytesRemaining: number}>;
 
     /**
-     * @param  onStorageKeyChanged Storage synchronization mechanism keeping all opened tabs in sync
+     * @param onStorageKeyChanged Storage synchronization mechanism keeping all opened tabs in sync
      */
     keepInstancesSync?: (onStorageKeyChanged: OnStorageKeyChanged) => void;
 };

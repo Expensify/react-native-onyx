@@ -56,6 +56,7 @@ module.exports = {
                 'valid-jsdoc': 'off',
                 'rulesdir/prefer-import-module-contents': 'off',
                 'es/no-optional-chaining': 'off',
+                'es/no-nullish-coalescing-operators': 'off',
                 'import/extensions': [
                     'error',
                     'ignorePackages',

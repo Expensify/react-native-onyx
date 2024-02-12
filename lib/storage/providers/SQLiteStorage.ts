@@ -82,8 +82,6 @@ const provider: StorageProvider = {
         return db.executeAsync(query, keys);
     },
     clear: () => db.executeAsync('DELETE FROM keyvaluepairs;', []),
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
-    setMemoryOnlyKeys: () => {},
     getDatabaseSize() {
         return Promise.all([db.executeAsync('PRAGMA page_size;'), db.executeAsync('PRAGMA page_count;'), getFreeDiskStorage()]).then(([pageSizeResult, pageCountResult, bytesRemaining]) => {
             const pageSize: number = pageSizeResult.rows?.item(0).page_size;
@@ -94,6 +92,10 @@ const provider: StorageProvider = {
             };
         });
     },
+
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    setMemoryOnlyKeys: () => {},
+
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     keepInstancesSync: () => {},
 };

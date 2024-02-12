@@ -56,8 +56,8 @@ const provider: StorageProvider = {
         return window.navigator.storage
             .estimate()
             .then((value) => ({
-                bytesUsed: value.usage || 0,
-                bytesRemaining: (value.quota || 0) - (value.usage || 0),
+                bytesUsed: value.usage ?? 0,
+                bytesRemaining: (value.quota ?? 0) - (value.usage ?? 0),
             }))
             .catch((error) => {
                 throw new Error(`Unable to estimate web storage quota. Original error: ${error}`);
