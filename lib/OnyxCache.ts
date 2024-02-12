@@ -1,19 +1,28 @@
 import {deepEqual} from 'fast-equals';
+import bindAll from 'lodash/bindAll';
+import type {Key, Value} from './storage/providers/types';
 import utils from './utils';
 
-type StorageMap = Record<string, unknown>;
+type StorageMap = Record<Key, Value>;
 
 /**
  * In memory cache providing data by reference
  * Encapsulates Onyx cache related functionality
  */
 class OnyxCache {
-    private storageKeys: Set<string>;
+    /** Cache of all the storage keys available in persistent storage */
+    private storageKeys: Set<Key>;
 
-    private recentKeys: Set<string>;
+    /** Unique list of keys maintained in access order (most recent at the end) */
+    private recentKeys: Set<Key>;
 
+    /** A map of cached values */
     private storageMap: StorageMap;
 
+    /**
+     * Captured pending tasks for already running storage methods
+     * Using a map yields better performance on operations such a delete
+     */
     private pendingPromises: Map<string, Promise<unknown>>;
 
     private maxRecentKeysSize = 0;
@@ -23,28 +32,44 @@ class OnyxCache {
         this.recentKeys = new Set();
         this.storageMap = {};
         this.pendingPromises = new Map();
+
+        bindAll(
+            this,
+            'getAllKeys',
+            'getValue',
+            'hasCacheForKey',
+            'addKey',
+            'set',
+            'drop',
+            'merge',
+            'hasPendingTask',
+            'getTaskPromise',
+            'captureTask',
+            'removeLeastRecentlyUsedKeys',
+            'setRecentKeysLimit',
+        );
     }
 
-    getAllKeys(): string[] {
+    getAllKeys(): Key[] {
         return Array.from(this.storageKeys);
     }
 
-    getValue(key: string, shouldReindexCache = true): unknown {
+    getValue(key: Key, shouldReindexCache = true): Value {
         if (shouldReindexCache) {
             this.addToAccessedKeys(key);
         }
         return this.storageMap[key];
     }
 
-    hasCacheForKey(key: string): boolean {
+    hasCacheForKey(key: Key): boolean {
         return this.storageMap[key] !== undefined;
     }
 
-    addKey(key: string): void {
+    addKey(key: Key): void {
         this.storageKeys.add(key);
     }
 
-    set(key: string, value: unknown): unknown {
+    set(key: Key, value: Value): Value {
         this.addKey(key);
         this.addToAccessedKeys(key);
         this.storageMap[key] = value;
@@ -52,7 +77,7 @@ class OnyxCache {
         return value;
     }
 
-    drop(key: string): void {
+    drop(key: Key): void {
         delete this.storageMap[key];
         this.storageKeys.delete(key);
         this.recentKeys.delete(key);
@@ -89,7 +114,7 @@ class OnyxCache {
         return returnPromise;
     }
 
-    private addToAccessedKeys(key: string): void {
+    private addToAccessedKeys(key: Key): void {
         this.recentKeys.delete(key);
         this.recentKeys.add(key);
     }
@@ -118,7 +143,7 @@ class OnyxCache {
         this.maxRecentKeysSize = limit;
     }
 
-    hasValueChanged(key: string, value: unknown): boolean {
+    hasValueChanged(key: Key, value: Value): boolean {
         return !deepEqual(this.storageMap[key], value);
     }
 }
