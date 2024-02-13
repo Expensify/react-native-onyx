@@ -1,18 +1,7 @@
 import {useCallback, useEffect, useRef, useState, useSyncExternalStore} from 'react';
 import Onyx from './Onyx';
-// eslint-disable-next-line rulesdir/prefer-import-module-contents
 import type {CollectionKeyBase, KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey} from './types';
-
-// TODO: Move to a different file once issue with imports is resolved.
-function usePrevious<T>(value: T): T {
-    const ref = useRef<T>(value);
-
-    useEffect(() => {
-        ref.current = value;
-    }, [value]);
-
-    return ref.current;
-}
+import usePrevious from './usePrevious';
 
 type OnyxValue<TKey extends OnyxKey> = TKey extends CollectionKeyBase ? OnyxCollection<KeyValueMapping[TKey]> : OnyxEntry<KeyValueMapping[TKey]>;
 
