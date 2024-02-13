@@ -32,7 +32,7 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "build": "tsc -p tsconfig.build.json && cp ./lib/*.d.ts ./dist",
-    "build:watch": "nodemon --watch lib --exec \"npm run build && npm pack\"",
+    "build:watch": "nodemon --watch lib --ext js,json,ts,tsx --exec \"npm run build && npm pack\"",
     "build:docs": "node buildDocs.js",
     "lint-tests": "eslint tests/**",
     "prettier": "prettier --write ."
