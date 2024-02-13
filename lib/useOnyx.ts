@@ -1,5 +1,6 @@
 import {useCallback, useEffect, useRef, useState, useSyncExternalStore} from 'react';
 import Onyx from './Onyx';
+import cache from './OnyxCache';
 import type {CollectionKeyBase, KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey} from './types';
 import usePrevious from './usePrevious';
 
@@ -73,8 +74,6 @@ function useOnyx<TKey extends OnyxKey>(key: TKey, options?: UseOnyxOptions<TKey>
     return value;
 }
 
-const cache = new Map<string, unknown>();
-
 function useOnyxWithSyncExternalStore<TKey extends OnyxKey>(key: TKey, options?: UseOnyxOptions<TKey>): OnyxValue<TKey> {
     const connectionIDRef = useRef<number | null>(null);
     const previousKey = usePrevious(key);
@@ -88,11 +87,11 @@ function useOnyxWithSyncExternalStore<TKey extends OnyxKey>(key: TKey, options?:
      * we return the value from the previous key to avoid briefly returning a `null` value to the component, thus avoiding a useless re-render.
      */
     const getSnapshot = useCallback(() => {
-        if (previousKey !== key && !cache.has(key)) {
-            return (cache.get(previousKey) ?? null) as OnyxValue<TKey>;
+        if (previousKey !== key && !cache.hasCacheForKey(key)) {
+            return (cache.getValue(previousKey) ?? null) as OnyxValue<TKey>;
         }
 
-        return (cache.get(key) ?? null) as OnyxValue<TKey>;
+        return (cache.getValue(key) ?? null) as OnyxValue<TKey>;
     }, [key, previousKey]);
 
     const subscribe = useCallback(
