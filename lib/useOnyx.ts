@@ -78,6 +78,18 @@ function useOnyxWithSyncExternalStore<TKey extends OnyxKey>(key: TKey, options?:
     const connectionIDRef = useRef<number | null>(null);
     const previousKey = usePrevious(key);
 
+    // eslint-disable-next-line rulesdir/prefer-early-return
+    useEffect(() => {
+        /**
+         * This condition will ensure we can only handle collection member keys changing.
+         */
+        if (previousKey !== key && !(previousKey.includes('_') && !previousKey.endsWith('_') && key.includes('_') && !key.endsWith('_'))) {
+            throw new Error(
+                `'${previousKey}' key can't be changed to '${key}'. useOnyx() doesn't support changing keys unless they are both collection member keys e.g. from 'collection_id1' to 'collection_id2'.`,
+            );
+        }
+    }, [previousKey, key]);
+
     /**
      * According to React docs, `getSnapshot` is a function that returns a snapshot of the data in the store that’s needed by the component.
      * **While the store has not changed, repeated calls to getSnapshot must return the same value.**
