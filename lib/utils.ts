@@ -4,17 +4,29 @@ import type {OnyxKey} from './types';
 type EmptyObject = Record<string, never>;
 type EmptyValue = EmptyObject | null | undefined;
 
+/** Checks whether the given object is an object and not null/undefined. */
 function isEmptyObject<T>(obj: T | EmptyValue): obj is EmptyValue {
     return typeof obj === 'object' && Object.keys(obj || {}).length === 0;
 }
 
 // Mostly copied from https://medium.com/@lubaka.a/how-to-remove-lodash-performance-improvement-b306669ad0e1
 
+/**
+ * Checks whether the given value can be merged.
+ * @param value - The value to be checked.
+ */
 function isMergeableObject(value: unknown): boolean {
     const nonNullObject = value != null ? typeof value === 'object' : false;
     return nonNullObject && Object.prototype.toString.call(value) !== '[object RegExp]' && Object.prototype.toString.call(value) !== '[object Date]' && !Array.isArray(value);
 }
 
+/**
+ * Merges the source object into the target object.
+ * @param target - The target object.
+ * @param source - The source object.
+ * @param shouldRemoveNullObjectValues - If true, null object values will be removed.
+ * @returns - The merged object.
+ */
 function mergeObject<TTarget extends unknown[] | Record<string, unknown>>(target: TTarget, source: TTarget, shouldRemoveNullObjectValues = true): TTarget {
     const destination: Record<string, unknown> = {};
     if (isMergeableObject(target)) {
@@ -79,6 +91,7 @@ function fastMerge<TTarget extends unknown[] | Record<string, unknown>>(target: 
     return mergeObject(target, source, shouldRemoveNullObjectValues);
 }
 
+/** Deep removes the nested null values from the given value. */
 function removeNestedNullValues(value: unknown[] | Record<string, unknown>) {
     if (typeof value === 'object' && !Array.isArray(value)) {
         return fastMerge(value, value);
@@ -87,6 +100,7 @@ function removeNestedNullValues(value: unknown[] | Record<string, unknown>) {
     return value;
 }
 
+/** Formats the action name by uppercasing and adding the key if provided. */
 function formatActionName(method: string, key?: OnyxKey): string {
     return key ? `${method.toUpperCase()}/${key}` : method.toUpperCase();
 }
