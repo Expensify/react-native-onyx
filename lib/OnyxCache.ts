@@ -25,6 +25,7 @@ class OnyxCache {
      */
     private pendingPromises: Map<string, Promise<unknown>>;
 
+    /** Maximum size of the keys store din cache */
     private maxRecentKeysSize = 0;
 
     constructor() {

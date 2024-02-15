@@ -12,8 +12,7 @@ function isEmptyObject<T>(obj: T | EmptyValue): obj is EmptyValue {
 // Mostly copied from https://medium.com/@lubaka.a/how-to-remove-lodash-performance-improvement-b306669ad0e1
 
 /**
- * Checks whether the given value can be merged.
- * @param value - The value to be checked.
+ * Checks whether the given value can be merged. It has to be an object, but not an array, RegExp or Date.
  */
 function isMergeableObject(value: unknown): boolean {
     const nonNullObject = value != null ? typeof value === 'object' : false;

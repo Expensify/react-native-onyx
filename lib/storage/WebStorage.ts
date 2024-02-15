@@ -25,6 +25,9 @@ function raiseStorageSyncManyKeysEvent(onyxKeys: KeyList) {
 
 const webStorage: StorageProvider = {
     ...Storage,
+    /**
+     * @param onStorageKeyChanged Storage synchronization mechanism keeping all opened tabs in sync
+     */
     keepInstancesSync(onStorageKeyChanged) {
         // Override set, remove and clear to raise storage events that we intercept in other tabs
         this.setItem = (key, value) => Storage.setItem(key, value).then(() => raiseStorageSyncEvent(key));

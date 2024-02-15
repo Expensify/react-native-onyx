@@ -36,7 +36,7 @@ const provider: StorageProvider = {
         return db.executeAsync(command, keys).then(({rows}) => {
             // eslint-disable-next-line no-underscore-dangle
             const result = rows?._array.map((row) => [row.record_key, JSON.parse(row.valueJSON)]);
-            return result as KeyValuePairList;
+            return (result ?? []) as KeyValuePairList;
         });
     },
     setItem(key, value) {
@@ -73,7 +73,7 @@ const provider: StorageProvider = {
         db.executeAsync('SELECT record_key FROM keyvaluepairs;').then(({rows}) => {
             // eslint-disable-next-line no-underscore-dangle
             const result = rows?._array.map((row) => row.record_key);
-            return result as KeyList;
+            return (result ?? []) as KeyList;
         }),
     removeItem: (key) => db.executeAsync('DELETE FROM keyvaluepairs WHERE record_key = ?;', [key]),
     removeItems: (keys) => {
