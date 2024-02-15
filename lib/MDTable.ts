@@ -46,7 +46,7 @@ class MDTable extends AsciTable {
      * Pass the columns that are non numeric here - the rest will be aligned to the right
      * @param [options.rows] The table can be initialized with row. Rows can also be added by `addRow`
      */
-    static factory = ({title, heading, leftAlignedCols = [], rows = []}: MDTableOptions) => {
+    static factory = ({title, heading, leftAlignedCols = [], rows = []}: MDTableOptions): MDTable => {
         const table = new MDTable({title, heading, rows});
         table.leftAlignedCols = leftAlignedCols;
 
