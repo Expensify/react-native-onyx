@@ -4,7 +4,7 @@ describe('decorateWithMetrics', () => {
     beforeEach(() => {
         jest.resetModules();
         // eslint-disable-next-line import/extensions
-        const metrics = require('../../lib/metrics/index.js');
+        const metrics = require('../../lib/metrics/index.ts');
         decorateWithMetrics = metrics.decorateWithMetrics;
     });
 

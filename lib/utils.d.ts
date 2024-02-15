@@ -1,5 +1,8 @@
 import {OnyxKey} from './types';
 
+export declare function maxBy<T>(arr: T[], func: (arg: T) => number): T;
+export declare function minBy<T>(arr: T[], func: (arg: T) => number): T;
+
 /**
  * Merges two objects and removes null values if "shouldRemoveNullObjectValues" is set to true
  *
@@ -14,4 +17,4 @@ declare function fastMerge<T>(target: T, source: T, shouldRemoveNullObjectValues
  */
 declare function formatActionName(method: string, key?: OnyxKey): string;
 
-export default {fastMerge, formatActionName};
+export default {fastMerge, minBy, maxBy, formatActionName};

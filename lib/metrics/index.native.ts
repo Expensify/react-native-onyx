@@ -1,25 +1,22 @@
-import _ from 'underscore';
+import type {PerformanceMark, PerformanceMeasure} from 'react-native-performance';
 import performance from 'react-native-performance';
 import MDTable from '../MDTable';
+import type {CallbackFunction, Metrics, PrintMetricsOptions, Summary} from './types';
+import {minBy, maxBy} from '../utils';
 
 const decoratedAliases = new Set();
 
 /**
  * Capture a start mark to performance entries
- * @param {string} alias
- * @param {Array<*>} args
- * @returns {{name: string, startTime:number, detail: {args: [], alias: string}}}
  */
-function addMark(alias, args) {
+function addMark(alias: string, args: unknown[]): PerformanceMark {
     return performance.mark(alias, {detail: {args, alias}});
 }
 
 /**
  * Capture a measurement between the start mark and now
- * @param {{name: string, startTime:number, detail: {args: []}}} startMark
- * @param {*} detail
  */
-function measureMarkToNow(startMark, detail) {
+function measureMarkToNow(startMark: PerformanceMark, detail: Record<string, unknown>) {
     performance.measure(`${startMark.name} [${startMark.detail.args.toString()}]`, {
         start: startMark.startTime,
         end: performance.now(),
@@ -29,18 +26,16 @@ function measureMarkToNow(startMark, detail) {
 
 /**
  * Wraps a function with metrics capturing logic
- * @param {function} func
- * @param {String} [alias]
- * @returns {function} The wrapped function
+ * @returns The wrapped function
  */
-function decorateWithMetrics(func, alias = func.name) {
+function decorateWithMetrics<TArgs extends unknown[], TPromise>(func: CallbackFunction<TArgs, TPromise>, alias = func.name): CallbackFunction<TArgs, TPromise> {
     if (decoratedAliases.has(alias)) {
         throw new Error(`"${alias}" is already decorated`);
     }
 
     decoratedAliases.add(alias);
 
-    function decorated(...args) {
+    function decorated(this: unknown, ...args: TArgs): Promise<TPromise> {
         const mark = addMark(alias, args);
 
         // eslint-disable-next-line no-invalid-this
@@ -51,7 +46,7 @@ function decorateWithMetrics(func, alias = func.name) {
          * They create a separate chain that's not exposed (returned) to the original caller
          * */
         originalPromise
-            .then((result) => {
+            .then((result: TPromise) => {
                 measureMarkToNow(mark, {result});
             })
             .catch((error) => {
@@ -66,55 +61,68 @@ function decorateWithMetrics(func, alias = func.name) {
 
 /**
  * Calculate the total sum of a given key in a list
- * @param {Array<Record<prop, Number>>} list
- * @param {string} prop
- * @returns {number}
  */
-function sum(list, prop) {
-    return _.reduce(list, (memo, next) => memo + next[prop], 0);
+function sum<T>(list: T[], prop: keyof T): number {
+    return list.reduce((memo, next) => {
+        const nextProp = next[prop];
+
+        return typeof nextProp === 'number' ? memo + nextProp : memo;
+    }, 0);
 }
 
 /**
  * Aggregates and returns benchmark information
- * @returns {{summaries: Record<string, Object>, totalTime: number, lastCompleteCall: *}}
- * An object with
+ * @returns An object with
  * - `totalTime` - total time spent by decorated methods
  * - `lastCompleteCall` - millisecond since launch the last call completed at
  * - `summaries` - mapping of all captured stats: summaries.methodName -> method stats
  */
-function getMetrics() {
-    const summaries = _.chain(performance.getEntriesByType('measure'))
+function getMetrics(): Metrics {
+    const groupedMeasures = performance
+        .getEntriesByType('measure')
         .filter((entry) => entry.detail && decoratedAliases.has(entry.detail.alias))
-        .groupBy((entry) => entry.detail.alias)
-        .map((calls, methodName) => {
-            const total = sum(calls, 'duration');
-            const avg = total / calls.length || 0;
-            const max = _.max(calls, 'duration').duration || 0;
-            const min = _.min(calls, 'duration').duration || 0;
+        .reduce((obj: Record<string, PerformanceMeasure[]>, entry) => {
+            const alias: string = entry.detail.alias;
+            if (!(alias in obj)) {
+                // eslint-disable-next-line no-param-reassign
+                obj[alias] = [];
+            }
 
-            // Latest complete call (by end time) for all the calls made to the current method
-            const lastCall = _.max(calls, (call) => call.startTime + call.duration);
+            obj[alias].push(entry);
 
-            return [
-                methodName,
-                {
-                    methodName,
-                    total,
-                    max,
-                    min,
-                    avg,
-                    lastCall,
-                    calls,
-                },
-            ];
-        })
-        .object() // Create a map like methodName -> StatSummary
-        .value();
+            return obj;
+        }, {});
 
-    const totalTime = sum(_.values(summaries), 'total');
+    const summaries: Record<string, Summary> = {};
+    Object.keys(groupedMeasures).forEach((methodName) => {
+        const calls = groupedMeasures[methodName];
+        const total = sum(calls, 'duration');
+        const avg = total / calls.length || 0;
+        const max = maxBy(calls, (call) => call.duration)?.duration || 0;
+        const min = minBy(calls, (call) => call.duration)?.duration || 0;
+
+        // Latest complete call (by end time) for all the calls made to the current method
+        const lastCall = maxBy(calls, (call) => call.startTime + call.duration);
+
+        if (typeof lastCall === 'number') {
+            return;
+        }
+
+        summaries[methodName] = {
+            methodName,
+            total,
+            max,
+            min,
+            avg,
+            lastCall,
+            calls,
+        };
+    });
+
+    const totalTime = sum(Object.values(summaries), 'total');
 
     // Latest complete call (by end time) of all methods up to this point
-    const lastCompleteCall = _.max(_.values(summaries), (summary) => summary.lastCall.startTime + summary.lastCall.duration).lastCall;
+    const lastCompleteCall = maxBy(Object.values(summaries), (summary) => (!summary.lastCall ? 0 : summary.lastCall?.startTime + summary.lastCall?.duration)).lastCall;
 
     return {
         totalTime,
@@ -125,11 +133,8 @@ function getMetrics() {
 
 /**
  * Convert milliseconds to human readable time
- * @param {number} millis
- * @param {boolean} [raw=false]
- * @returns {string|number}
  */
-function toDuration(millis, raw = false) {
+function toDuration(millis: number, raw = false): string | number {
     if (raw) {
         return millis;
     }
@@ -152,16 +157,15 @@ function toDuration(millis, raw = false) {
  * max, min, average, total time for each method
  * and a table of individual calls
  *
- * @param {Object} [options]
- * @param {boolean} [options.raw=false] - setting this to true will print raw instead of human friendly times
+ * @param options
+ * @param [options.raw] setting this to true will print raw instead of human friendly times
  * Useful when you copy the printed table to excel and let excel do the number formatting
- * @param {'console'|'csv'|'json'|'string'} [options.format=console] The output format of this function
+ * @param [options.format] The output format of this function
  * `string` is useful when __DEV__ is set to `false` as writing to the console is disabled, but the result of this
  * method would still get printed as output
- * @param {string[]} [options.methods] Print stats only for these method names
- * @returns {string|undefined}
+ * @param [options.methods] Print stats only for these method names
  */
-function printMetrics({raw = false, format = 'console', methods} = {}) {
+function printMetrics({raw = false, format = 'console', methods}: PrintMetricsOptions): string | undefined {
     const {totalTime, summaries, lastCompleteCall} = getMetrics();
 
     const tableSummary = MDTable.factory({
@@ -174,9 +178,9 @@ function printMetrics({raw = false, format = 'console', methods} = {}) {
      * We use timeOrigin to display times relative to app launch time
      * See: https://github.com/oblador/react-native-performance/issues/50 */
     const timeOrigin = performance.timeOrigin;
-    const methodNames = _.isArray(methods) ? methods : _.keys(summaries);
+    const methodNames = Array.isArray(methods) ? methods : Object.keys(summaries);
 
-    const methodCallTables = _.chain(methodNames)
+    const methodCallTables = methodNames
         .filter((methodName) => summaries[methodName] && summaries[methodName].avg > 0)
         .map((methodName) => {
             const {calls, ...methodStats} = summaries[methodName];
@@ -186,7 +190,7 @@ function printMetrics({raw = false, format = 'console', methods} = {}) {
                 toDuration(methodStats.max, raw),
                 toDuration(methodStats.min, raw),
                 toDuration(methodStats.avg, raw),
-                toDuration(methodStats.lastCall.startTime + methodStats.lastCall.duration - timeOrigin, raw),
+                toDuration(!methodStats.lastCall ? 0 : methodStats.lastCall?.startTime + methodStats.lastCall?.duration - timeOrigin, raw),
                 calls.length,
             );
 
@@ -194,29 +198,33 @@ function printMetrics({raw = false, format = 'console', methods} = {}) {
                 title: methodName,
                 heading: ['start time', 'end time', 'duration', 'args'],
                 leftAlignedCols: [3],
-                rows: _.map(calls, (call) => [
+                rows: calls.map((call) => [
                     toDuration(call.startTime - performance.timeOrigin, raw),
                     toDuration(call.startTime + call.duration - timeOrigin, raw),
                     toDuration(call.duration, raw),
-                    _.map(call.detail.args, String).join(', ').slice(0, 60), // Restrict cell width to 60 chars max
+                    call.detail.args
+                        .map((item: unknown) => `${item}`)
+                        .join(', ')
+                        .slice(0, 60), // Restrict cell width to 60 chars max
                 ]),
             });
-        })
-        .value();
+        });
 
     if (/csv|json|string/i.test(format)) {
         const allTables = [tableSummary, ...methodCallTables];
 
-        return _.map(allTables, (table) => {
-            switch (format.toLowerCase()) {
-                case 'csv':
-                    return table.toCSV();
-                case 'json':
-                    return table.toJSON();
-                default:
-                    return table.toString();
-            }
-        }).join('\n\n');
+        return allTables
+            .map((table) => {
+                switch (format.toLowerCase()) {
+                    case 'csv':
+                        return table.toCSV();
+                    case 'json':
+                        return table.toJSON();
+                    default:
+                        return table.toString();
+                }
+            })
+            .join('\n\n');
     }
 
     const lastComplete = lastCompleteCall && toDuration(lastCompleteCall.startTime + lastCompleteCall.duration - timeOrigin, raw);
@@ -239,13 +247,12 @@ function printMetrics({raw = false, format = 'console', methods} = {}) {
 function resetMetrics() {
     const {summaries} = getMetrics();
 
-    _.chain(summaries)
-        .map((summary) => summary.calls)
-        .flatten()
-        .each((measure) => {
+    Object.values(summaries).forEach((summary) => {
+        summary.calls.forEach((measure) => {
             performance.clearMarks(measure.detail.alias);
             performance.clearMeasures(measure.name);
         });
+    });
 }
 
 export {decorateWithMetrics, getMetrics, resetMetrics, printMetrics};
