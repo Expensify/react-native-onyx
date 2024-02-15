@@ -23,7 +23,7 @@ db.execute('PRAGMA journal_mode=WAL;');
 const provider: StorageProvider = {
     getItem(key) {
         return db.executeAsync('SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key = ?;', [key]).then(({rows}) => {
-            if (rows?.length === 0) {
+            if (!rows || rows?.length === 0) {
                 return null;
             }
             const result = rows?.item(0);
