@@ -1,6 +1,6 @@
 import {Component} from 'react';
 import * as Logger from './Logger';
-import {CollectionKey, CollectionKeyBase, DeepRecord, KeyValueMapping, NullishDeep, OnyxCollection, OnyxEntry, OnyxKey} from './types';
+import {CollectionKeyBase, DeepRecord, KeyValueMapping, NullishDeep, OnyxCollection, OnyxEntry, OnyxKey, Selector} from './types';
 
 /**
  * Represents a mapping object where each `OnyxKey` maps to either a value of its corresponding type in `KeyValueMapping` or `null`.
@@ -18,6 +18,11 @@ type BaseConnectOptions = {
     statePropertyName?: string;
     withOnyxInstance?: Component;
     initWithStoredValues?: boolean;
+};
+
+type TryGetCachedValueMapping<TKey extends OnyxKey> = {
+    selector?: Selector<TKey, unknown, unknown>;
+    withOnyxInstance?: Component;
 };
 
 /**
@@ -297,6 +302,15 @@ declare function hasPendingMergeForKey(key: OnyxKey): boolean;
  */
 declare function setMemoryOnlyKeys(keyList: OnyxKey[]): void;
 
+/**
+ * Tries to get a value from the cache. If the value is not present in cache it will return the default value or undefined.
+ * If the requested key is a collection, it will return an object with all the collection members.
+ */
+declare function tryGetCachedValue<TKey extends OnyxKey>(
+    key: TKey,
+    mapping?: TryGetCachedValueMapping,
+): TKey extends CollectionKeyBase ? OnyxCollection<KeyValueMapping[TKey]> : OnyxEntry<KeyValueMapping[TKey]>;
+
 declare const Onyx: {
     connect: typeof connect;
     disconnect: typeof disconnect;
@@ -315,8 +329,9 @@ declare const Onyx: {
     isSafeEvictionKey: typeof isSafeEvictionKey;
     METHOD: typeof METHOD;
     setMemoryOnlyKeys: typeof setMemoryOnlyKeys;
+    tryGetCachedValue: typeof tryGetCachedValue;
     isCollectionKey: typeof isCollectionKey;
 };
 
 export default Onyx;
-export {OnyxUpdate, ConnectOptions};
+export {ConnectOptions, OnyxUpdate};

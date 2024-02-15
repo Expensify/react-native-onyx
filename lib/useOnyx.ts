@@ -1,12 +1,14 @@
+import {deepEqual} from 'fast-equals';
 import {useCallback, useEffect, useRef, useState, useSyncExternalStore} from 'react';
 import Onyx from './Onyx';
-import cache from './OnyxCache';
-import type {CollectionKeyBase, KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey} from './types';
+import type {CollectionKeyBase, KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey, Selector} from './types';
 import usePrevious from './usePrevious';
 
 type OnyxValue<TKey extends OnyxKey> = TKey extends CollectionKeyBase ? OnyxCollection<KeyValueMapping[TKey]> : OnyxEntry<KeyValueMapping[TKey]>;
 
-type UseOnyxOptions<TKey extends OnyxKey> = {
+type SelectorReturn<TKey, TReturnData> = TKey extends CollectionKeyBase ? OnyxCollection<Partial<KeyValueMapping[TKey]>> : TReturnData;
+
+type UseOnyxOptions<TKey extends OnyxKey, TReturnData> = {
     /**
      * Determines if this key in this subscription is safe to be evicted.
      */
@@ -20,15 +22,23 @@ type UseOnyxOptions<TKey extends OnyxKey> = {
     /**
      * TODO: Check if we still need this flag and associated logic.
      */
-    allowStaleData?: boolean;
+    // allowStaleData?: boolean;
 
     /**
      * Sets an initial value to be returned by the hook during the first render.
      */
     initialValue?: OnyxValue<TKey>;
+
+    /**
+     * If included, this will be used to subscribe to a subset of an Onyx key's data.
+     * Using this setting on `useOnyx` can have very positive performance benefits because the component will only re-render
+     * when the subset of data changes. Otherwise, any change of data on any property would normally
+     * cause the component to re-render (and that can be expensive from a performance standpoint).
+     */
+    selector?: Selector<TKey, unknown, TKey extends CollectionKeyBase ? Partial<KeyValueMapping[TKey]> : TReturnData>;
 };
 
-function useOnyx<TKey extends OnyxKey>(key: TKey, options?: UseOnyxOptions<TKey>): OnyxValue<TKey> {
+function useOnyx<TKey extends OnyxKey>(key: TKey, options?: UseOnyxOptions<TKey, unknown>): OnyxValue<TKey> {
     const [value, setValue] = useState<OnyxValue<TKey>>(options?.initialValue ?? (null as OnyxValue<TKey>));
 
     const connectionIDRef = useRef<number | null>(null);
@@ -74,18 +84,30 @@ function useOnyx<TKey extends OnyxKey>(key: TKey, options?: UseOnyxOptions<TKey>
     return value;
 }
 
-function useOnyxWithSyncExternalStore<TKey extends OnyxKey>(key: TKey, options?: UseOnyxOptions<TKey>): OnyxValue<TKey> {
+function isCollectionMemberKey<TKey extends OnyxKey>(key: TKey): boolean {
+    return key.includes('_') && !key.endsWith('_');
+}
+
+function getCachedValue<TKey extends OnyxKey>(key: TKey, selector?: Selector<TKey, unknown, unknown>): OnyxValue<TKey> {
+    return Onyx.tryGetCachedValue(key, {selector});
+}
+
+function useOnyxWithSyncExternalStore<TKey extends OnyxKey>(key: TKey): OnyxValue<TKey>;
+function useOnyxWithSyncExternalStore<TKey extends OnyxKey>(key: TKey, options: Omit<UseOnyxOptions<TKey, unknown>, 'selector'>): OnyxValue<TKey>;
+function useOnyxWithSyncExternalStore<TKey extends OnyxKey, TReturnData>(key: TKey, options: UseOnyxOptions<TKey, TReturnData>): SelectorReturn<TKey, TReturnData>;
+function useOnyxWithSyncExternalStore<TKey extends OnyxKey, TReturnData>(key: TKey, options?: UseOnyxOptions<TKey, TReturnData>): OnyxValue<TKey> | SelectorReturn<TKey, TReturnData> {
     const connectionIDRef = useRef<number | null>(null);
     const previousKey = usePrevious(key);
+    const previousDataRef = useRef<unknown | null>(null);
 
     // eslint-disable-next-line rulesdir/prefer-early-return
     useEffect(() => {
         /**
-         * This condition will ensure we can only handle collection member keys changing.
+         * This condition will ensure we can only handle dynamic collection member keys.
          */
-        if (previousKey !== key && !(previousKey.includes('_') && !previousKey.endsWith('_') && key.includes('_') && !key.endsWith('_'))) {
+        if (previousKey !== key && !(isCollectionMemberKey(previousKey) && isCollectionMemberKey(key))) {
             throw new Error(
-                `'${previousKey}' key can't be changed to '${key}'. useOnyx() doesn't support changing keys unless they are both collection member keys e.g. from 'collection_id1' to 'collection_id2'.`,
+                `'${previousKey}' key can't be changed to '${key}'. useOnyx() only supports dynamic keys if they are both collection member keys e.g. from 'collection_id1' to 'collection_id2'.`,
             );
         }
     }, [previousKey, key]);
@@ -94,24 +116,59 @@ function useOnyxWithSyncExternalStore<TKey extends OnyxKey>(key: TKey, options?:
      * According to React docs, `getSnapshot` is a function that returns a snapshot of the data in the store that’s needed by the component.
      * **While the store has not changed, repeated calls to getSnapshot must return the same value.**
      * If the store changes and the returned value is different (as compared by Object.is), React re-renders the component.
-     *
-     * When the `key` is changed (e.g. to get a different record from a collection) and it's not yet in the cache,
-     * we return the value from the previous key to avoid briefly returning a `null` value to the component, thus avoiding a useless re-render.
      */
     const getSnapshot = useCallback(() => {
-        if (previousKey !== key && !cache.hasCacheForKey(key)) {
-            return (cache.getValue(previousKey) ?? null) as OnyxValue<TKey>;
+        /**
+         * Case 1 - We have a normal key without selector
+         *
+         * We just return the data from the Onyx cache.
+         */
+        if (!Onyx.isCollectionKey(key) && !options?.selector) {
+            return (getCachedValue(key) ?? null) as OnyxValue<TKey>;
         }
 
-        return (cache.getValue(key) ?? null) as OnyxValue<TKey>;
-    }, [key, previousKey]);
+        /**
+         * Case 2 - We have a normal key with selector
+         *
+         * Since selected data is not directly stored in the cache, we need to generate it with `getCachedValue`
+         * and deep compare with our previous internal data.
+         *
+         * If they are not equal, we update the internal data and return it.
+         *
+         * If they are equal, we just return the previous internal data.
+         */
+        if (!Onyx.isCollectionKey(key) && options?.selector) {
+            const newData = getCachedValue(key, options.selector);
+            if (!deepEqual(previousDataRef.current, newData)) {
+                previousDataRef.current = newData;
+            }
+
+            return (previousDataRef.current ?? null) as OnyxValue<TKey>;
+        }
+
+        /**
+         * Case 3 - We have a collection key with/without selector
+         *
+         * Since both collection objects and selected data are not directly stored in the cache, we need to generate them with `getCachedValue`
+         * and deep compare with our previous internal data.
+         *
+         * If they are not equal, we update the internal data and return it.
+         *
+         * If they are equal, we just return the previous internal data.
+         */
+        const newData = getCachedValue(key, options?.selector);
+        if (!deepEqual(previousDataRef.current, newData)) {
+            previousDataRef.current = newData;
+        }
+
+        return (previousDataRef.current ?? null) as OnyxValue<TKey>;
+    }, [key, options?.selector]);
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
             connectionIDRef.current = Onyx.connect({
                 key: key as CollectionKeyBase,
-                callback: (val: unknown) => {
-                    cache.set(key, val);
+                callback: () => {
                     onStoreChange();
                 },
                 initWithStoredValues: options?.initWithStoredValues,
