@@ -53,6 +53,20 @@ module.exports = {
                 '@typescript-eslint/array-type': ['error', {default: 'array-simple'}],
                 '@typescript-eslint/consistent-type-definitions': 'off',
                 'rulesdir/no-multiple-onyx-in-file': 'off',
+                'valid-jsdoc': 'off',
+                'rulesdir/prefer-import-module-contents': 'off',
+                'es/no-optional-chaining': 'off',
+                'es/no-nullish-coalescing-operators': 'off',
+                'import/extensions': [
+                    'error',
+                    'ignorePackages',
+                    {
+                        js: 'never',
+                        jsx: 'never',
+                        ts: 'never',
+                        tsx: 'never',
+                    },
+                ],
             },
         },
         {

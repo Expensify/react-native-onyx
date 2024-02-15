@@ -3,31 +3,30 @@
  * when using LocalStorage APIs in the browser. These events are great because multiple tabs can listen for when
  * data changes and then stay up-to-date with everything happening in Onyx.
  */
-import _ from 'underscore';
 import Storage from './providers/IDBKeyVal';
+import type {KeyList, Key} from './providers/types';
+import type StorageProvider from './providers/types';
 
 const SYNC_ONYX = 'SYNC_ONYX';
 
 /**
  * Raise an event thorough `localStorage` to let other tabs know a value changed
- * @param {String} onyxKey
  */
-function raiseStorageSyncEvent(onyxKey) {
+function raiseStorageSyncEvent(onyxKey: Key) {
     global.localStorage.setItem(SYNC_ONYX, onyxKey);
-    global.localStorage.removeItem(SYNC_ONYX, onyxKey);
+    global.localStorage.removeItem(SYNC_ONYX);
 }
 
-function raiseStorageSyncManyKeysEvent(onyxKeys) {
-    _.each(onyxKeys, (onyxKey) => {
+function raiseStorageSyncManyKeysEvent(onyxKeys: KeyList) {
+    onyxKeys.forEach((onyxKey) => {
         raiseStorageSyncEvent(onyxKey);
     });
 }
 
-const webStorage = {
+const webStorage: StorageProvider = {
     ...Storage,
-
     /**
-     * @param {Function} onStorageKeyChanged Storage synchronization mechanism keeping all opened tabs in sync
+     * @param onStorageKeyChanged Storage synchronization mechanism keeping all opened tabs in sync
      */
     keepInstancesSync(onStorageKeyChanged) {
         // Override set, remove and clear to raise storage events that we intercept in other tabs
@@ -43,7 +42,7 @@ const webStorage = {
         // so that they can call keysChanged for them. That's why we iterate over every key and raise a storage sync
         // event for each one
         this.clear = () => {
-            let allKeys;
+            let allKeys: KeyList;
 
             // The keys must be retrieved before storage is cleared or else the list of keys would be empty
             return Storage.getAllKeys()
@@ -54,7 +53,7 @@ const webStorage = {
                 .then(() => {
                     // Now that storage is cleared, the storage sync event can happen which is a more atomic action
                     // for other browser tabs
-                    _.each(allKeys, raiseStorageSyncEvent);
+                    allKeys.forEach(raiseStorageSyncEvent);
                 });
         };
 

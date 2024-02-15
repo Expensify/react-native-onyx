@@ -4,7 +4,7 @@
         "target": "es2015",
         "module": "commonjs",
         "types": ["react-native", "react", "jest", "node"],
-        "lib": ["esnext"],
+        "lib": ["esnext", "dom"],
         "allowJs": true,
         "checkJs": false,
         "jsx": "react",
