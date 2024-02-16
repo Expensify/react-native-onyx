@@ -132,8 +132,8 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
                      * We don't need to update the Onyx cache again here, when `callback` is called the cache is already
                      * expected to be updated, so we just signal that the store changed and `getSnapshot()` can be called.
                      */
-                    fetchStatusRef.current = 'loaded';
                     onStoreChange();
+                    fetchStatusRef.current = 'loaded';
                 },
                 initWithStoredValues: options?.initWithStoredValues,
                 waitForCollectionCallback: Onyx.isCollectionKey(key),
