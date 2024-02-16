@@ -89,7 +89,7 @@ function isCollectionMemberKey<TKey extends OnyxKey>(key: TKey): boolean {
 }
 
 function getCachedValue<TKey extends OnyxKey>(key: TKey, selector?: Selector<TKey, unknown, unknown>): OnyxValue<TKey> {
-    return Onyx.tryGetCachedValue(key, {selector});
+    return (Onyx.tryGetCachedValue(key, {selector}) ?? null) as OnyxValue<TKey>;
 }
 
 function useOnyxWithSyncExternalStore<TKey extends OnyxKey>(key: TKey): OnyxValue<TKey>;
@@ -98,7 +98,7 @@ function useOnyxWithSyncExternalStore<TKey extends OnyxKey, TReturnData>(key: TK
 function useOnyxWithSyncExternalStore<TKey extends OnyxKey, TReturnData>(key: TKey, options?: UseOnyxOptions<TKey, TReturnData>): OnyxValue<TKey> | SelectorReturn<TKey, TReturnData> {
     const connectionIDRef = useRef<number | null>(null);
     const previousKey = usePrevious(key);
-    const previousDataRef = useRef<unknown | null>(null);
+    const previousDataRef = useRef<OnyxValue<TKey> | SelectorReturn<TKey, TReturnData> | null>(null);
     const isFirstRenderRef = useRef(true);
 
     // eslint-disable-next-line rulesdir/prefer-early-return
@@ -125,7 +125,7 @@ function useOnyxWithSyncExternalStore<TKey extends OnyxKey, TReturnData>(key: TK
          * We just return the data from the Onyx cache.
          */
         if (!Onyx.isCollectionKey(key) && !options?.selector) {
-            return (getCachedValue(key) ?? null) as OnyxValue<TKey>;
+            return getCachedValue(key);
         }
 
         /**
@@ -144,7 +144,7 @@ function useOnyxWithSyncExternalStore<TKey extends OnyxKey, TReturnData>(key: TK
                 previousDataRef.current = newData;
             }
 
-            return (previousDataRef.current ?? null) as OnyxValue<TKey>;
+            return previousDataRef.current as SelectorReturn<TKey, TReturnData>;
         }
 
         /**
@@ -162,7 +162,7 @@ function useOnyxWithSyncExternalStore<TKey extends OnyxKey, TReturnData>(key: TK
             previousDataRef.current = newData;
         }
 
-        return (previousDataRef.current ?? null) as OnyxValue<TKey>;
+        return previousDataRef.current as OnyxValue<TKey> | SelectorReturn<TKey, TReturnData>;
     }, [key, options?.selector]);
 
     const subscribe = useCallback(
@@ -170,6 +170,10 @@ function useOnyxWithSyncExternalStore<TKey extends OnyxKey, TReturnData>(key: TK
             connectionIDRef.current = Onyx.connect({
                 key: key as CollectionKeyBase,
                 callback: () => {
+                    /**
+                     * We don't need to update the Onyx cache again here, when `callback` is called the cache is already
+                     * expected to be updated, so we just signal that the store changed and `getSnapshot()` can be called.
+                     */
                     onStoreChange();
                 },
                 initWithStoredValues: options?.initWithStoredValues,
