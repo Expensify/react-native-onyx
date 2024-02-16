@@ -78,7 +78,7 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
      */
     const getSnapshot = useCallback(() => {
         /**
-         * Case 1 - We have a normal key without selector
+         * Case 1 - We have a non-collection key without selector
          *
          * We just return the data from the Onyx cache.
          */
@@ -87,7 +87,7 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
         }
 
         /**
-         * Case 2 - We have a normal key with selector
+         * Case 2 - We have a non-collection key with selector
          *
          * Since selected data is not directly stored in the cache, we need to generate it with `getCachedValue`
          * and deep compare with our previous internal data.
