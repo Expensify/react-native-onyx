@@ -4,17 +4,4 @@ import withOnyx from './withOnyx';
 import useOnyx from './useOnyx';
 
 export default Onyx;
-export {
-    CustomTypeOptions,
-    OnyxCollection,
-    OnyxEntry,
-    OnyxUpdate,
-    withOnyx,
-    ConnectOptions,
-    NullishDeep,
-    KeyValueMapping,
-    OnyxKey,
-    Selector,
-    WithOnyxInstanceState,
-    useOnyx,
-};
+export {CustomTypeOptions, OnyxCollection, OnyxEntry, OnyxUpdate, withOnyx, ConnectOptions, NullishDeep, KeyValueMapping, OnyxKey, Selector, WithOnyxInstanceState, useOnyx};
