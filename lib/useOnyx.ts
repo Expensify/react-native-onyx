@@ -94,26 +94,7 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
         }
 
         /**
-         * Case 2 - We have a non-collection key with selector
-         *
-         * Since selected data is not directly stored in the cache, we need to generate it with `getCachedValue`
-         * and deep compare with our previous internal data.
-         *
-         * If they are not equal, we update the internal data and return it.
-         *
-         * If they are equal, we just return the previous internal data.
-         */
-        if (!Onyx.isCollectionKey(key) && options?.selector) {
-            const newData = getCachedValue(key, options.selector);
-            if (!deepEqual(currentDataRef.current, newData)) {
-                currentDataRef.current = newData as UseOnyxDataValue<TKey, TReturnData>;
-            }
-
-            return currentDataRef.current as UseOnyxDataValue<TKey, TReturnData>;
-        }
-
-        /**
-         * Case 3 - We have a collection key with/without selector
+         * Case 2 - We have a non-collection/collection key with/without selector
          *
          * Since both collection objects and selected data are not directly stored in the cache, we need to generate them with `getCachedValue`
          * and deep compare with our previous internal data.
