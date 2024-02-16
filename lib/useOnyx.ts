@@ -54,7 +54,12 @@ function getCachedValue<TKey extends OnyxKey>(key: TKey, selector?: Selector<TKe
 function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey, options?: UseOnyxOptions<TKey, TReturnData>): UseOnyxData<TReturnData> {
     const connectionIDRef = useRef<number | null>(null);
     const previousKey = usePrevious(key);
-    const previousDataRef = useRef<TReturnData | null>(null);
+
+    /**
+     * Used to store collection objects or selected data since they aren't stored in the cache.
+     */
+    const currentDataRef = useRef<TReturnData | null>(null);
+
     const isFirstRenderRef = useRef(true);
     const fetchStatusRef = useRef<FetchStatus>('loading');
 
@@ -98,11 +103,11 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
          */
         if (!Onyx.isCollectionKey(key) && options?.selector) {
             const newData = getCachedValue(key, options.selector);
-            if (!deepEqual(previousDataRef.current, newData)) {
-                previousDataRef.current = newData as TReturnData;
+            if (!deepEqual(currentDataRef.current, newData)) {
+                currentDataRef.current = newData as TReturnData;
             }
 
-            return previousDataRef.current as TReturnData;
+            return currentDataRef.current as TReturnData;
         }
 
         /**
@@ -116,11 +121,11 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
          * If they are equal, we just return the previous internal data.
          */
         const newData = getCachedValue(key, options?.selector);
-        if (!deepEqual(previousDataRef.current, newData)) {
-            previousDataRef.current = newData as TReturnData;
+        if (!deepEqual(currentDataRef.current, newData)) {
+            currentDataRef.current = newData as TReturnData;
         }
 
-        return previousDataRef.current as TReturnData;
+        return currentDataRef.current as TReturnData;
     }, [key, options?.selector]);
 
     const subscribe = useCallback(
