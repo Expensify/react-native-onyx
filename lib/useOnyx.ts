@@ -38,8 +38,10 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnData> = {
 
 type FetchStatus = 'loading' | 'loaded';
 
-type UseOnyxData<TValue> = {
-    value: TValue;
+type UseOnyxDataValue<TKey extends OnyxKey, TValue> = TValue extends OnyxValue<TKey> ? TValue : TKey extends CollectionKeyBase ? NonNullable<OnyxCollection<TValue>> : TValue;
+
+type UseOnyxData<TKey extends OnyxKey, TValue> = {
+    value: UseOnyxDataValue<TKey, TValue>;
     status: FetchStatus;
 };
 
@@ -51,14 +53,14 @@ function getCachedValue<TKey extends OnyxKey>(key: TKey, selector?: Selector<TKe
     return (Onyx.tryGetCachedValue(key, {selector}) ?? null) as OnyxValue<TKey>;
 }
 
-function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey, options?: UseOnyxOptions<TKey, TReturnData>): UseOnyxData<TReturnData> {
+function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey, options?: UseOnyxOptions<TKey, TReturnData>): UseOnyxData<TKey, TReturnData> {
     const connectionIDRef = useRef<number | null>(null);
     const previousKey = usePrevious(key);
 
     /**
      * Used to store collection objects or selected data since they aren't stored in the cache.
      */
-    const currentDataRef = useRef<TReturnData | null>(null);
+    const currentDataRef = useRef<UseOnyxDataValue<TKey, TReturnData> | null>(null);
 
     const isFirstRenderRef = useRef(true);
     const fetchStatusRef = useRef<FetchStatus>('loading');
@@ -88,7 +90,7 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
          * We just return the data from the Onyx cache.
          */
         if (!Onyx.isCollectionKey(key) && !options?.selector) {
-            return getCachedValue(key) as TReturnData;
+            return getCachedValue(key) as UseOnyxDataValue<TKey, TReturnData>;
         }
 
         /**
@@ -104,10 +106,10 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
         if (!Onyx.isCollectionKey(key) && options?.selector) {
             const newData = getCachedValue(key, options.selector);
             if (!deepEqual(currentDataRef.current, newData)) {
-                currentDataRef.current = newData as TReturnData;
+                currentDataRef.current = newData as UseOnyxDataValue<TKey, TReturnData>;
             }
 
-            return currentDataRef.current as TReturnData;
+            return currentDataRef.current as UseOnyxDataValue<TKey, TReturnData>;
         }
 
         /**
@@ -122,10 +124,10 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
          */
         const newData = getCachedValue(key, options?.selector);
         if (!deepEqual(currentDataRef.current, newData)) {
-            currentDataRef.current = newData as TReturnData;
+            currentDataRef.current = newData as UseOnyxDataValue<TKey, TReturnData>;
         }
 
-        return currentDataRef.current as TReturnData;
+        return currentDataRef.current as UseOnyxDataValue<TKey, TReturnData>;
     }, [key, options?.selector]);
 
     const subscribe = useCallback(
@@ -179,7 +181,7 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
         }
     }, [key, options?.canEvict]);
 
-    let value = useSyncExternalStore<TReturnData>(subscribe, getSnapshot);
+    let value = useSyncExternalStore<UseOnyxDataValue<TKey, TReturnData>>(subscribe, getSnapshot);
 
     if (isFirstRenderRef.current) {
         isFirstRenderRef.current = false;
@@ -196,7 +198,7 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
          */
         if (value === null && options?.initialValue !== undefined) {
             fetchStatusRef.current = 'loaded';
-            value = options.initialValue as TReturnData;
+            value = options.initialValue as UseOnyxDataValue<TKey, TReturnData>;
         }
     }
 
