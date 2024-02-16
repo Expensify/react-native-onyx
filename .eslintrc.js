@@ -1,6 +1,5 @@
 module.exports = {
     extends: ['expensify', 'prettier'],
-    plugins: ['react-hooks'],
     parser: '@typescript-eslint/parser',
     env: {
         jest: true,
