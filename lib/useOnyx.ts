@@ -38,6 +38,13 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnData> = {
     selector?: Selector<TKey, unknown, TKey extends CollectionKeyBase ? Partial<KeyValueMapping[TKey]> : TReturnData>;
 };
 
+type FetchStatus = 'loading' | 'loaded';
+
+type UseOnyxData<TValue> = {
+    value: TValue;
+    status: FetchStatus;
+};
+
 function useOnyx<TKey extends OnyxKey>(key: TKey, options?: UseOnyxOptions<TKey, unknown>): OnyxValue<TKey> {
     const [value, setValue] = useState<OnyxValue<TKey>>(options?.initialValue ?? (null as OnyxValue<TKey>));
 
@@ -92,14 +99,18 @@ function getCachedValue<TKey extends OnyxKey>(key: TKey, selector?: Selector<TKe
     return (Onyx.tryGetCachedValue(key, {selector}) ?? null) as OnyxValue<TKey>;
 }
 
-function useOnyxWithSyncExternalStore<TKey extends OnyxKey>(key: TKey): OnyxValue<TKey>;
-function useOnyxWithSyncExternalStore<TKey extends OnyxKey>(key: TKey, options: Omit<UseOnyxOptions<TKey, unknown>, 'selector'>): OnyxValue<TKey>;
-function useOnyxWithSyncExternalStore<TKey extends OnyxKey, TReturnData>(key: TKey, options: UseOnyxOptions<TKey, TReturnData>): SelectorReturn<TKey, TReturnData>;
-function useOnyxWithSyncExternalStore<TKey extends OnyxKey, TReturnData>(key: TKey, options?: UseOnyxOptions<TKey, TReturnData>): OnyxValue<TKey> | SelectorReturn<TKey, TReturnData> {
+function useOnyxWithSyncExternalStore<TKey extends OnyxKey>(key: TKey): UseOnyxData<OnyxValue<TKey>>;
+function useOnyxWithSyncExternalStore<TKey extends OnyxKey>(key: TKey, options: Omit<UseOnyxOptions<TKey, unknown>, 'selector'>): UseOnyxData<OnyxValue<TKey>>;
+function useOnyxWithSyncExternalStore<TKey extends OnyxKey, TReturnData>(key: TKey, options: UseOnyxOptions<TKey, TReturnData>): UseOnyxData<SelectorReturn<TKey, TReturnData>>;
+function useOnyxWithSyncExternalStore<TKey extends OnyxKey, TReturnData>(
+    key: TKey,
+    options?: UseOnyxOptions<TKey, TReturnData>,
+): UseOnyxData<OnyxValue<TKey> | SelectorReturn<TKey, TReturnData>> {
     const connectionIDRef = useRef<number | null>(null);
     const previousKey = usePrevious(key);
     const previousDataRef = useRef<OnyxValue<TKey> | SelectorReturn<TKey, TReturnData> | null>(null);
     const isFirstRenderRef = useRef(true);
+    const fetchStatusRef = useRef<FetchStatus>('loading');
 
     // eslint-disable-next-line rulesdir/prefer-early-return
     useEffect(() => {
@@ -174,6 +185,7 @@ function useOnyxWithSyncExternalStore<TKey extends OnyxKey, TReturnData>(key: TK
                      * We don't need to update the Onyx cache again here, when `callback` is called the cache is already
                      * expected to be updated, so we just signal that the store changed and `getSnapshot()` can be called.
                      */
+                    fetchStatusRef.current = 'loaded';
                     onStoreChange();
                 },
                 initWithStoredValues: options?.initWithStoredValues,
@@ -186,6 +198,11 @@ function useOnyxWithSyncExternalStore<TKey extends OnyxKey, TReturnData>(key: TK
                 }
 
                 Onyx.disconnect(connectionIDRef.current);
+
+                /**
+                 * Sets the fetch status back to "loading" as we are connecting to a new key.
+                 */
+                fetchStatusRef.current = 'loading';
             };
         },
         [key, options?.initWithStoredValues],
@@ -210,17 +227,28 @@ function useOnyxWithSyncExternalStore<TKey extends OnyxKey, TReturnData>(key: TK
         }
     }, [key, options?.canEvict]);
 
-    const value = useSyncExternalStore<OnyxValue<TKey>>(subscribe, getSnapshot);
+    let value = useSyncExternalStore<OnyxValue<TKey>>(subscribe, getSnapshot);
 
-    /**
-     * Return `initialValue` if it's the first render, we don't have anything in the cache and `initialValue` is set.
-     */
-    if (isFirstRenderRef.current && value === null && options?.initialValue !== undefined) {
+    if (isFirstRenderRef.current) {
         isFirstRenderRef.current = false;
-        return options.initialValue;
+
+        /**
+         * Sets the fetch status to "loaded" in the first render if data is already retrieved from cache.
+         */
+        if (value !== null) {
+            fetchStatusRef.current = 'loaded';
+        }
+
+        /**
+         * Sets the fetch status to "loaded" and `value` to `initialValue` in the first render if we don't have anything in the cache and `initialValue` is set.
+         */
+        if (value === null && options?.initialValue !== undefined) {
+            fetchStatusRef.current = 'loaded';
+            value = options.initialValue;
+        }
     }
 
-    return value;
+    return {value, status: fetchStatusRef.current};
 }
 
 export {useOnyx, useOnyxWithSyncExternalStore};
