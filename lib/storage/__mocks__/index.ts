@@ -1,32 +1,34 @@
-import _ from 'underscore';
 import utils from '../../utils';
+import type {Key, KeyValuePairList, Value} from '../providers/types';
+import type StorageProvider from '../providers/types';
 
-let storageMapInternal = {};
+let storageMapInternal: Record<Key, Value> = {};
 
 const set = jest.fn((key, value) => {
     storageMapInternal[key] = value;
     return Promise.resolve(value);
 });
 
-const idbKeyvalMock = {
+const idbKeyvalMock: StorageProvider = {
     setItem(key, value) {
         return set(key, value);
     },
     multiSet(pairs) {
-        const setPromises = _.map(pairs, ([key, value]) => this.setItem(key, value));
+        const setPromises = pairs.map(([key, value]) => this.setItem(key, value));
         return new Promise((resolve) => Promise.all(setPromises).then(() => resolve(storageMapInternal)));
     },
     getItem(key) {
         return Promise.resolve(storageMapInternal[key]);
     },
     multiGet(keys) {
-        const getPromises = _.map(keys, (key) => new Promise((resolve) => this.getItem(key).then((value) => resolve([key, value]))));
-        return Promise.all(getPromises);
+        const getPromises = keys.map((key) => new Promise((resolve) => this.getItem(key).then((value) => resolve([key, value]))));
+        return Promise.all(getPromises) as Promise<KeyValuePairList>;
     },
     multiMerge(pairs) {
-        _.forEach(pairs, ([key, value]) => {
+        pairs.forEach(([key, value]) => {
             const existingValue = storageMapInternal[key];
-            const newValue = utils.fastMerge(existingValue, value);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const newValue = utils.fastMerge(existingValue as any, value);
 
             set(key, newValue);
         });
@@ -41,7 +43,7 @@ const idbKeyvalMock = {
         return Promise.resolve();
     },
     removeItems(keys) {
-        _.each(keys, (key) => {
+        keys.forEach((key) => {
             delete storageMapInternal[key];
         });
         return Promise.resolve();
@@ -51,12 +53,12 @@ const idbKeyvalMock = {
         return Promise.resolve();
     },
     getAllKeys() {
-        return Promise.resolve(_.keys(storageMapInternal));
+        return Promise.resolve(Object.keys(storageMapInternal));
     },
-    config() {},
     getDatabaseSize() {
         return Promise.resolve({bytesRemaining: 0, bytesUsed: 99999});
     },
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
     setMemoryOnlyKeys() {},
 };
 
@@ -68,7 +70,6 @@ const idbKeyvalMockSpy = {
     removeItems: jest.fn(idbKeyvalMock.removeItems),
     clear: jest.fn(idbKeyvalMock.clear),
     getAllKeys: jest.fn(idbKeyvalMock.getAllKeys),
-    config: jest.fn(idbKeyvalMock.config),
     multiGet: jest.fn(idbKeyvalMock.multiGet),
     multiSet: jest.fn(idbKeyvalMock.multiSet),
     multiMerge: jest.fn(idbKeyvalMock.multiMerge),
