@@ -124,7 +124,7 @@ declare function getAllKeys(): Promise<Array<OnyxKey>>;
  * Checks to see if the a subscriber's supplied key
  * is associated with a collection of keys.
  */
-declare function isCollectionKey(key: OnyxKey): boolean;
+declare function isCollectionKey(key: OnyxKey): key is CollectionKeyBase;
 
 /**
  * Checks to see if this key has been flagged as
