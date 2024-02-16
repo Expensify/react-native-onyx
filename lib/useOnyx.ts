@@ -58,16 +58,17 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
     const isFirstRenderRef = useRef(true);
     const fetchStatusRef = useRef<FetchStatus>('loading');
 
-    // eslint-disable-next-line rulesdir/prefer-early-return
     useEffect(() => {
         /**
          * This condition will ensure we can only handle dynamic collection member keys.
          */
-        if (previousKey !== key && !(isCollectionMemberKey(previousKey) && isCollectionMemberKey(key))) {
-            throw new Error(
-                `'${previousKey}' key can't be changed to '${key}'. useOnyx() only supports dynamic keys if they are both collection member keys e.g. from 'collection_id1' to 'collection_id2'.`,
-            );
+        if (previousKey === key || (isCollectionMemberKey(previousKey) && isCollectionMemberKey(key))) {
+            return;
         }
+
+        throw new Error(
+            `'${previousKey}' key can't be changed to '${key}'. useOnyx() only supports dynamic keys if they are both collection member keys e.g. from 'collection_id1' to 'collection_id2'.`,
+        );
     }, [previousKey, key]);
 
     /**
