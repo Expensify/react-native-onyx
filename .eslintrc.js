@@ -71,5 +71,13 @@ module.exports = {
                 'rulesdir/prefer-onyx-connect-in-libs': 'off',
             },
         },
+        {
+            files: ['tests/**/*.{js,jsx,ts,tsx}'],
+            rules: {
+                '@lwc/lwc/no-async-await': 'off',
+                'no-await-in-loop': 'off',
+                'no-restricted-syntax': ['error', 'ForInStatement', 'LabeledStatement', 'WithStatement'],
+            },
+        },
     ],
 };
