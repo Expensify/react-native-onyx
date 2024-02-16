@@ -1,5 +1,5 @@
 import {deepEqual} from 'fast-equals';
-import {useCallback, useEffect, useRef, useState, useSyncExternalStore} from 'react';
+import {useCallback, useEffect, useRef, useSyncExternalStore} from 'react';
 import Onyx from './Onyx';
 import type {CollectionKeyBase, KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey, Selector} from './types';
 import usePrevious from './usePrevious';
@@ -45,52 +45,6 @@ type UseOnyxData<TValue> = {
     status: FetchStatus;
 };
 
-function useOnyx<TKey extends OnyxKey>(key: TKey, options?: UseOnyxOptions<TKey, unknown>): OnyxValue<TKey> {
-    const [value, setValue] = useState<OnyxValue<TKey>>(options?.initialValue ?? (null as OnyxValue<TKey>));
-
-    const connectionIDRef = useRef<number | null>(null);
-
-    useEffect(() => {
-        connectionIDRef.current = Onyx.connect({
-            key: key as CollectionKeyBase,
-            callback: (val: unknown) => {
-                setValue(val as OnyxValue<TKey>);
-            },
-            initWithStoredValues: options?.initWithStoredValues,
-            waitForCollectionCallback: Onyx.isCollectionKey(key),
-        });
-
-        return () => {
-            if (!connectionIDRef.current) {
-                return;
-            }
-
-            Onyx.disconnect(connectionIDRef.current);
-        };
-    }, [key, options?.initWithStoredValues]);
-
-    /**
-     * Mimics withOnyx's checkEvictableKeys() behavior.
-     */
-    useEffect(() => {
-        if (options?.canEvict === undefined || !connectionIDRef.current) {
-            return;
-        }
-
-        if (!Onyx.isSafeEvictionKey(key)) {
-            throw new Error(`canEvict can't be used on key '${key}'. This key must explicitly be flagged as safe for removal by adding it to Onyx.init({safeEvictionKeys: []}).`);
-        }
-
-        if (options.canEvict) {
-            Onyx.removeFromEvictionBlockList(key, connectionIDRef.current);
-        } else {
-            Onyx.addToEvictionBlockList(key, connectionIDRef.current);
-        }
-    }, [key, options?.canEvict]);
-
-    return value;
-}
-
 function isCollectionMemberKey<TKey extends OnyxKey>(key: TKey): boolean {
     return key.includes('_') && !key.endsWith('_');
 }
@@ -99,13 +53,10 @@ function getCachedValue<TKey extends OnyxKey>(key: TKey, selector?: Selector<TKe
     return (Onyx.tryGetCachedValue(key, {selector}) ?? null) as OnyxValue<TKey>;
 }
 
-function useOnyxWithSyncExternalStore<TKey extends OnyxKey>(key: TKey): UseOnyxData<OnyxValue<TKey>>;
-function useOnyxWithSyncExternalStore<TKey extends OnyxKey>(key: TKey, options: Omit<UseOnyxOptions<TKey, unknown>, 'selector'>): UseOnyxData<OnyxValue<TKey>>;
-function useOnyxWithSyncExternalStore<TKey extends OnyxKey, TReturnData>(key: TKey, options: UseOnyxOptions<TKey, TReturnData>): UseOnyxData<SelectorReturn<TKey, TReturnData>>;
-function useOnyxWithSyncExternalStore<TKey extends OnyxKey, TReturnData>(
-    key: TKey,
-    options?: UseOnyxOptions<TKey, TReturnData>,
-): UseOnyxData<OnyxValue<TKey> | SelectorReturn<TKey, TReturnData>> {
+function useOnyx<TKey extends OnyxKey>(key: TKey): UseOnyxData<OnyxValue<TKey>>;
+function useOnyx<TKey extends OnyxKey>(key: TKey, options: Omit<UseOnyxOptions<TKey, unknown>, 'selector'>): UseOnyxData<OnyxValue<TKey>>;
+function useOnyx<TKey extends OnyxKey, TReturnData>(key: TKey, options: UseOnyxOptions<TKey, TReturnData>): UseOnyxData<SelectorReturn<TKey, TReturnData>>;
+function useOnyx<TKey extends OnyxKey, TReturnData>(key: TKey, options?: UseOnyxOptions<TKey, TReturnData>): UseOnyxData<OnyxValue<TKey> | SelectorReturn<TKey, TReturnData>> {
     const connectionIDRef = useRef<number | null>(null);
     const previousKey = usePrevious(key);
     const previousDataRef = useRef<OnyxValue<TKey> | SelectorReturn<TKey, TReturnData> | null>(null);
@@ -251,4 +202,4 @@ function useOnyxWithSyncExternalStore<TKey extends OnyxKey, TReturnData>(
     return {value, status: fetchStatusRef.current};
 }
 
-export {useOnyx, useOnyxWithSyncExternalStore};
+export default useOnyx;
