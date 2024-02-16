@@ -1,7 +1,7 @@
 import Onyx, {OnyxUpdate, ConnectOptions} from './Onyx';
 import {CustomTypeOptions, OnyxCollection, OnyxEntry, NullishDeep, KeyValueMapping, OnyxKey, Selector, WithOnyxInstanceState} from './types';
 import withOnyx from './withOnyx';
-import {useOnyx, useOnyxWithSyncExternalStore} from './useOnyx';
+import useOnyx from './useOnyx';
 
 export default Onyx;
 export {
@@ -17,5 +17,4 @@ export {
     Selector,
     WithOnyxInstanceState,
     useOnyx,
-    useOnyxWithSyncExternalStore,
 };
