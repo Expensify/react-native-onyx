@@ -99,6 +99,7 @@ function useOnyxWithSyncExternalStore<TKey extends OnyxKey, TReturnData>(key: TK
     const connectionIDRef = useRef<number | null>(null);
     const previousKey = usePrevious(key);
     const previousDataRef = useRef<unknown | null>(null);
+    const isFirstRenderRef = useRef(true);
 
     // eslint-disable-next-line rulesdir/prefer-early-return
     useEffect(() => {
@@ -206,6 +207,14 @@ function useOnyxWithSyncExternalStore<TKey extends OnyxKey, TReturnData>(key: TK
     }, [key, options?.canEvict]);
 
     const value = useSyncExternalStore<OnyxValue<TKey>>(subscribe, getSnapshot);
+
+    /**
+     * Return `initialValue` if it's the first render, we don't have anything in the cache and `initialValue` is set.
+     */
+    if (isFirstRenderRef.current && value === null && options?.initialValue !== undefined) {
+        isFirstRenderRef.current = false;
+        return options.initialValue;
+    }
 
     return value;
 }
