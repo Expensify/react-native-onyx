@@ -98,7 +98,7 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
         }
 
         /**
-         * Case 2 - We have a non-collection/collection key and/or selector
+         * Case 2 - We have a collection key and/or selector
          *
          * Since both collection objects and selected data are not directly stored in the cache, we need to generate them with `getCachedValue`
          * and deep compare with our previous internal data.
