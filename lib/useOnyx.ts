@@ -81,11 +81,6 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
         );
     }, [previousKey, key]);
 
-    /**
-     * According to React docs, `getSnapshot` is a function that returns a snapshot of the data in the store that’s needed by the component.
-     * **While the store has not changed, repeated calls to getSnapshot must return the same value.**
-     * If the store changes and the returned value is different (as compared by Object.is), React re-renders the component.
-     */
     const getSnapshot = useCallback(() => {
         /**
          * Case 1 - We have a non-collection key without selector
@@ -97,7 +92,7 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
         }
 
         /**
-         * Case 2 - We have a non-collection/collection key with/without selector
+         * Case 2 - We have a non-collection/collection key and/or selector
          *
          * Since both collection objects and selected data are not directly stored in the cache, we need to generate them with `getCachedValue`
          * and deep compare with our previous internal data.
