@@ -45,10 +45,6 @@ type UseOnyxData<TKey extends OnyxKey, TValue> = {
     status: FetchStatus;
 };
 
-function isCollectionMemberKey<TKey extends OnyxKey>(key: TKey): boolean {
-    return key.includes('_') && !key.endsWith('_');
-}
-
 function getCachedValue<TKey extends OnyxKey, TValue>(key: TKey, selector?: Selector<TKey, unknown, unknown>): CachedValue<TKey, TValue> {
     return (Onyx.tryGetCachedValue(key, {selector}) ?? null) as CachedValue<TKey, TValue>;
 }
@@ -67,14 +63,21 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
 
     useEffect(() => {
         /**
-         * This condition will ensure we can only handle dynamic collection member keys.
+         * These conditions will ensure we can only handle dynamic collection member keys from the same collection.
          */
-        if (previousKey === key || (isCollectionMemberKey(previousKey) && isCollectionMemberKey(key))) {
+        if (previousKey === key) {
+            return;
+        }
+
+        const previousCollectionKey = Onyx.splitCollectionMemberKey(previousKey)[0];
+        const collectionKey = Onyx.splitCollectionMemberKey(key)[0];
+
+        if (Onyx.isCollectionMemberKey(previousCollectionKey, previousKey) && Onyx.isCollectionMemberKey(collectionKey, key) && previousCollectionKey === collectionKey) {
             return;
         }
 
         throw new Error(
-            `'${previousKey}' key can't be changed to '${key}'. useOnyx() only supports dynamic keys if they are both collection member keys e.g. from 'collection_id1' to 'collection_id2'.`,
+            `'${previousKey}' key can't be changed to '${key}'. useOnyx() only supports dynamic keys if they are both collection member keys from the same collection e.g. from 'collection_id1' to 'collection_id2'.`,
         );
     }, [previousKey, key]);
 

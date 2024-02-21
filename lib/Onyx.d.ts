@@ -1,6 +1,6 @@
 import {Component} from 'react';
 import * as Logger from './Logger';
-import {CollectionKeyBase, DeepRecord, KeyValueMapping, NullishDeep, OnyxCollection, OnyxEntry, OnyxKey, Selector} from './types';
+import {CollectionKey, CollectionKeyBase, DeepRecord, KeyValueMapping, NullishDeep, OnyxCollection, OnyxEntry, OnyxKey, Selector} from './types';
 
 /**
  * Represents a mapping object where each `OnyxKey` maps to either a value of its corresponding type in `KeyValueMapping` or `null`.
@@ -125,6 +125,15 @@ declare function getAllKeys(): Promise<Array<OnyxKey>>;
  * is associated with a collection of keys.
  */
 declare function isCollectionKey(key: OnyxKey): key is CollectionKeyBase;
+
+declare function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collectionKey: TCollectionKey, key: string): key is `${TCollectionKey}${string}`;
+
+/**
+ * Splits a collection member key into the collection key part and the ID part.
+ * @param key - The collection member key to split.
+ * @returns A tuple where the first element is the collection part and the second element is the ID part.
+ */
+declare function splitCollectionMemberKey<TKey extends CollectionKey>(key: TKey): [TKey extends `${infer Prefix}_${string}` ? `${Prefix}_` : never, string];
 
 /**
  * Checks to see if this key has been flagged as
@@ -331,6 +340,8 @@ declare const Onyx: {
     setMemoryOnlyKeys: typeof setMemoryOnlyKeys;
     tryGetCachedValue: typeof tryGetCachedValue;
     isCollectionKey: typeof isCollectionKey;
+    isCollectionMemberKey: typeof isCollectionMemberKey;
+    splitCollectionMemberKey: typeof splitCollectionMemberKey;
 };
 
 export default Onyx;
