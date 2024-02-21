@@ -2,6 +2,7 @@ import {deepEqual} from 'fast-equals';
 import {useCallback, useEffect, useRef, useSyncExternalStore} from 'react';
 import Onyx from './Onyx';
 import type {CollectionKeyBase, KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey, Selector} from './types';
+import useLiveRef from './useLiveRef';
 import usePrevious from './usePrevious';
 
 type OnyxValue<TKey extends OnyxKey> = TKey extends CollectionKeyBase ? OnyxCollection<KeyValueMapping[TKey]> : OnyxEntry<KeyValueMapping[TKey]>;
@@ -54,6 +55,11 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
     const previousKey = usePrevious(key);
 
     /**
+     * Used to stabilize the selector reference and avoid unnecessary calls to `getSnapshot()`.
+     */
+    const selectorRef = useLiveRef(options?.selector);
+
+    /**
      * Used to store collection objects or selected data since they aren't stored in the cache.
      */
     const currentDataRef = useRef<CachedValue<TKey, TReturnData> | null>(null);
@@ -87,7 +93,7 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
          *
          * We just return the data from the Onyx cache.
          */
-        if (!Onyx.isCollectionKey(key) && !options?.selector) {
+        if (!Onyx.isCollectionKey(key) && !selectorRef.current) {
             return getCachedValue(key);
         }
 
@@ -101,13 +107,13 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
          *
          * If they are equal, we just return the previous internal data.
          */
-        const newData = getCachedValue(key, options?.selector);
+        const newData = getCachedValue(key, selectorRef.current);
         if (!deepEqual(currentDataRef.current, newData)) {
             currentDataRef.current = newData as CachedValue<TKey, TReturnData>;
         }
 
         return currentDataRef.current as CachedValue<TKey, TReturnData>;
-    }, [key, options?.selector]);
+    }, [key, selectorRef]);
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
