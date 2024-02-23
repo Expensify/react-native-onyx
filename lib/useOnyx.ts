@@ -19,9 +19,9 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnData> = {
     initWithStoredValues?: boolean;
 
     /**
-     * TODO: Check if we still need this flag and associated logic.
+     * If set to true, data will be retrieved from cache during the first render even if there is a pending merge for the key.
      */
-    // allowStaleData?: boolean;
+    allowStaleData?: boolean;
 
     /**
      * Sets an initial value to be returned by the hook during the first render.
@@ -124,8 +124,8 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
                      * We don't need to update the Onyx cache again here, when `callback` is called the cache is already
                      * expected to be updated, so we just signal that the store changed and `getSnapshot()` can be called.
                      */
-                    onStoreChange();
                     fetchStatusRef.current = 'loaded';
+                    onStoreChange();
                 },
                 initWithStoredValues: options?.initWithStoredValues,
                 waitForCollectionCallback: Onyx.isCollectionKey(key),
@@ -166,28 +166,30 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
         }
     }, [key, options?.canEvict]);
 
-    let value = useSyncExternalStore<CachedValue<TKey, TReturnData>>(subscribe, getSnapshot);
+    let storeValue = useSyncExternalStore<CachedValue<TKey, TReturnData>>(subscribe, getSnapshot);
+    let resultValue: CachedValue<TKey, TReturnData> | null = isFirstRenderRef.current ? null : storeValue;
 
     if (isFirstRenderRef.current) {
         isFirstRenderRef.current = false;
 
         /**
-         * Sets the fetch status to "loaded" in the first render if data is already retrieved from cache.
+         * Sets the fetch status to "loaded" and `value` to `initialValue` in the first render if we don't have anything in the cache and `initialValue` is set.
          */
-        if (value !== null) {
+        if (storeValue === null && options?.initialValue !== undefined) {
             fetchStatusRef.current = 'loaded';
+            storeValue = options.initialValue as CachedValue<TKey, TReturnData>;
         }
 
         /**
-         * Sets the fetch status to "loaded" and `value` to `initialValue` in the first render if we don't have anything in the cache and `initialValue` is set.
+         * Sets the fetch status to "loaded" in the first render if data is already retrieved from cache.
          */
-        if (value === null && options?.initialValue !== undefined) {
+        if ((storeValue !== null && !Onyx.hasPendingMergeForKey(key)) || options?.allowStaleData) {
             fetchStatusRef.current = 'loaded';
-            value = options.initialValue as CachedValue<TKey, TReturnData>;
+            resultValue = storeValue;
         }
     }
 
-    return {value, status: fetchStatusRef.current};
+    return {value: resultValue as CachedValue<TKey, TReturnData>, status: fetchStatusRef.current};
 }
 
 export default useOnyx;
