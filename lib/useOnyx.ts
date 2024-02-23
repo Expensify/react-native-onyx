@@ -24,12 +24,12 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnData> = {
     allowStaleData?: boolean;
 
     /**
-     * Sets an initial value to be returned by the hook during the first render.
+     * This value will be returned by the hook on the first render while the data is being read from Onyx.
      */
     initialValue?: OnyxValue<TKey>;
 
     /**
-     * If included, this will be used to subscribe to a subset of an Onyx key's data.
+     * This will be used to subscribe to a subset of an Onyx key's data.
      * Using this setting on `useOnyx` can have very positive performance benefits because the component will only re-render
      * when the subset of data changes. Otherwise, any change of data on any property would normally
      * cause the component to re-render (and that can be expensive from a performance standpoint).
@@ -54,23 +54,17 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
     const connectionIDRef = useRef<number | null>(null);
     const previousKey = usePrevious(key);
 
-    /**
-     * Used to stabilize the selector reference and avoid unnecessary calls to `getSnapshot()`.
-     */
+    // Used to stabilize the selector reference and avoid unnecessary calls to `getSnapshot()`.
     const selectorRef = useLiveRef(options?.selector);
 
-    /**
-     * Used to store collection objects or selected data since they aren't stored in the cache.
-     */
+    // Used to store collection objects or selected data since they aren't stored in the cache.
     const currentDataRef = useRef<CachedValue<TKey, TReturnData> | null>(null);
 
     const isFirstRenderRef = useRef(true);
     const fetchStatusRef = useRef<FetchStatus>('loading');
 
     useEffect(() => {
-        /**
-         * These conditions will ensure we can only handle dynamic collection member keys from the same collection.
-         */
+        // These conditions will ensure we can only handle dynamic collection member keys from the same collection.
         if (previousKey === key) {
             return;
         }
@@ -88,25 +82,17 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
     }, [previousKey, key]);
 
     const getSnapshot = useCallback(() => {
-        /**
-         * Case 1 - We have a non-collection key without selector
-         *
-         * We just return the data from the Onyx cache.
-         */
+        // Case 1 - We have a non-collection key without selector
+        // We just return the data from the Onyx cache.
         if (!Onyx.isCollectionKey(key) && !selectorRef.current) {
             return getCachedValue(key);
         }
 
-        /**
-         * Case 2 - We have a collection key and/or selector
-         *
-         * Since both collection objects and selected data are not directly stored in the cache, we need to generate them with `getCachedValue`
-         * and deep compare with our previous internal data.
-         *
-         * If they are not equal, we update the internal data and return it.
-         *
-         * If they are equal, we just return the previous internal data.
-         */
+        // Case 2 - We have a collection key and/or selector
+        // Since both collection objects and selected data are not directly stored in the cache, we need to generate them with `getCachedValue`
+        // and deep compare with our previous internal data.
+        // If they are not equal, we update the internal data and return it.
+        // If they are equal, we just return the previous internal data.
         const newData = getCachedValue(key, selectorRef.current);
         if (!deepEqual(currentDataRef.current, newData)) {
             currentDataRef.current = newData as CachedValue<TKey, TReturnData>;
@@ -120,10 +106,8 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
             connectionIDRef.current = Onyx.connect({
                 key: key as CollectionKeyBase,
                 callback: () => {
-                    /**
-                     * We don't need to update the Onyx cache again here, when `callback` is called the cache is already
-                     * expected to be updated, so we just signal that the store changed and `getSnapshot()` can be called.
-                     */
+                    // We don't need to update the Onyx cache again here, when `callback` is called the cache is already
+                    // expected to be updated, so we just signal that the store changed and `getSnapshot()` can be called.
                     fetchStatusRef.current = 'loaded';
                     onStoreChange();
                 },
@@ -138,18 +122,14 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
 
                 Onyx.disconnect(connectionIDRef.current);
 
-                /**
-                 * Sets the fetch status back to "loading" as we are connecting to a new key.
-                 */
+                // Sets the fetch status back to "loading" as we are connecting to a new key.
                 fetchStatusRef.current = 'loading';
             };
         },
         [key, options?.initWithStoredValues],
     );
 
-    /**
-     * Mimics withOnyx's checkEvictableKeys() behavior.
-     */
+    // Mimics withOnyx's checkEvictableKeys() behavior.
     useEffect(() => {
         if (options?.canEvict === undefined || !connectionIDRef.current) {
             return;
@@ -172,17 +152,13 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
     if (isFirstRenderRef.current) {
         isFirstRenderRef.current = false;
 
-        /**
-         * Sets the fetch status to "loaded" and `value` to `initialValue` in the first render if we don't have anything in the cache and `initialValue` is set.
-         */
+        // Sets the fetch status to "loaded" and `value` to `initialValue` in the first render if we don't have anything in the cache and `initialValue` is set.
         if (storeValue === null && options?.initialValue !== undefined) {
             fetchStatusRef.current = 'loaded';
             storeValue = options.initialValue as CachedValue<TKey, TReturnData>;
         }
 
-        /**
-         * Sets the fetch status to "loaded" in the first render if data is already retrieved from cache.
-         */
+        // Sets the fetch status to "loaded" in the first render if data is already retrieved from cache.
         if ((storeValue !== null && !Onyx.hasPendingMergeForKey(key)) || options?.allowStaleData) {
             fetchStatusRef.current = 'loaded';
             resultValue = storeValue;
