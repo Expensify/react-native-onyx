@@ -1,3 +1,3 @@
-import IDBKeyValProvider from '../providers/IDBKeyValProvider';
+import {default as WebStorage} from '../providers/IDBKeyValProvider';
 
-export default IDBKeyValProvider;
+export default WebStorage;

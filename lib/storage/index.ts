@@ -12,7 +12,6 @@ type Storage = {
 const Storage: Storage = {
     /**
      * Returns the storage provider currently in use
-     * @returns {Object} the current storage provider
      */
     getStorageProvider() {
         return provider;
@@ -27,24 +26,17 @@ const Storage: Storage = {
     },
 
     /**
-     * Get the value of a given key or return `null` if it's not available in memory
-     * @param {String} key
-     * @return {Promise<*>}
+     * Get the value of a given key or return `null` if it's not available
      */
     getItem: (key) => provider.getItem(key),
 
     /**
-     * Get multiple key-value pairs for the give array of keys in a batch.
-     * @param {String[]} keys
-     * @return {Promise<Array<[key, value]>>}
+     * Get multiple key-value pairs for the give array of keys in a batch
      */
     multiGet: (keys) => provider.multiGet(keys),
 
     /**
      * Sets the value for a given key. The only requirement is that the value should be serializable to JSON string
-     * @param {String} key
-     * @param {*} value
-     * @return {Promise<void>}
      */
     setItem: (key, value) => {
         const promise = provider.setItem(key, value);
@@ -58,17 +50,11 @@ const Storage: Storage = {
 
     /**
      * Stores multiple key-value pairs in a batch
-     * @param {Array<[key, value]>} pairs
-     * @return {Promise<void>}
      */
     multiSet: (pairs) => provider.multiSet(pairs),
 
     /**
      * Merging an existing value with a new one
-     * @param {String} key
-     * @param {*} changes - the delta for a specific key
-     * @param {any} modifiedData - the pre-merged data from `Onyx.applyMerge`
-     * @return {Promise<void>}
      */
     mergeItem: (key, changes, modifiedData) => {
         const promise = provider.mergeItem(key, changes, modifiedData);
@@ -82,16 +68,12 @@ const Storage: Storage = {
 
     /**
      * Multiple merging of existing and new values in a batch
-     * @param {Array<[key, value]>} pairs
      * This function also removes all nested null values from an object.
-     * @return {Promise<void>}
      */
     multiMerge: (pairs) => provider.multiMerge(pairs),
 
     /**
-     * Remove given key and it's value from memory
-     * @param {String} key
-     * @returns {Promise<void>}
+     * Removes given key and its value
      */
     removeItem: (key) => {
         const promise = provider.removeItem(key);
@@ -104,10 +86,7 @@ const Storage: Storage = {
     },
 
     /**
-     * Remove given keys and their values from memory
-     *
-     * @param {Array} keys
-     * @returns {Promise}
+     * Remove given keys and their values
      */
     removeItems: (keys) => {
         const promise = provider.removeItems(keys);
@@ -120,8 +99,7 @@ const Storage: Storage = {
     },
 
     /**
-     * Clear everything from memory
-     * @returns {Promise<void>}
+     * Clears everything
      */
     clear: () => {
         if (shouldKeepInstancesSync) {
@@ -135,20 +113,17 @@ const Storage: Storage = {
     setMemoryOnlyKeys: () => provider.setMemoryOnlyKeys(),
 
     /**
-     * Returns all keys available in memory
-     * @returns {Promise<String[]>}
+     * Returns all available keys
      */
     getAllKeys: () => provider.getAllKeys(),
 
     /**
-     * Gets the total bytes of the store.
-     * `bytesRemaining` will always be `Number.POSITIVE_INFINITY` since we don't have a hard limit on memory.
-     * @returns {Promise<number>}
+     * Gets the total bytes of the store
      */
     getDatabaseSize: () => provider.getDatabaseSize(),
 
     /**
-     * @param {Function} onStorageKeyChanged Storage synchronization mechanism keeping all opened tabs in sync (web only)
+     * @param onStorageKeyChanged - Storage synchronization mechanism keeping all opened tabs in sync (web only)
      */
     keepInstancesSync(onStorageKeyChanged) {
         // If InstanceSync is null, it means we're on a native platform and we don't need to keep instances in sync

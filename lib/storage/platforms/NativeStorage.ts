@@ -1,3 +1,3 @@
-import SQLiteStorage from '../providers/SQLiteProvider';
+import {default as NativeStorage} from '../providers/SQLiteProvider';
 
-export default SQLiteStorage;
+export default NativeStorage;
