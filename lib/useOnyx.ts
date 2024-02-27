@@ -41,10 +41,12 @@ type FetchStatus = 'loading' | 'loaded';
 
 type CachedValue<TKey extends OnyxKey, TValue> = TValue extends OnyxValue<TKey> ? TValue : TKey extends CollectionKeyBase ? NonNullable<OnyxCollection<TValue>> : TValue;
 
-type UseOnyxData<TKey extends OnyxKey, TValue> = {
-    value: CachedValue<TKey, TValue>;
-    status: FetchStatus;
-};
+type UseOnyxData<TKey extends OnyxKey, TValue> = [
+    CachedValue<TKey, TValue>,
+    {
+        status: FetchStatus;
+    },
+];
 
 function getCachedValue<TKey extends OnyxKey, TValue>(key: TKey, selector?: Selector<TKey, unknown, unknown>): CachedValue<TKey, TValue> {
     return (Onyx.tryGetCachedValue(key, {selector}) ?? null) as CachedValue<TKey, TValue>;
@@ -165,7 +167,7 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
         }
     }
 
-    return {value: resultValue as CachedValue<TKey, TReturnData>, status: fetchStatusRef.current};
+    return [resultValue as CachedValue<TKey, TReturnData>, {status: fetchStatusRef.current}];
 }
 
 export default useOnyx;
