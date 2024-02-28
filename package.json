@@ -40,7 +40,6 @@
   "dependencies": {
     "ascii-table": "0.0.9",
     "fast-equals": "^4.0.3",
-    "object-sizeof": "^2.6.4",
     "underscore": "^1.13.6"
   },
   "devDependencies": {
