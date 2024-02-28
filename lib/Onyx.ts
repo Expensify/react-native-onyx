@@ -223,7 +223,7 @@ function getAllKeys(): Promise<OnyxKey[]> {
 
     // When a value retrieving task for all keys is still running hook to it
     if (cache.hasPendingTask(taskName)) {
-        return cache.getTaskPromise(taskName);
+        return cache.getTaskPromise(taskName) as Promise<OnyxKey[]>;
     }
 
     // Otherwise retrieve the keys from storage and capture a promise to aid concurrent usages
@@ -232,7 +232,7 @@ function getAllKeys(): Promise<OnyxKey[]> {
         return keys;
     });
 
-    return cache.captureTask(taskName, promise);
+    return cache.captureTask(taskName, promise) as Promise<OnyxKey[]>;
 }
 
 /**
@@ -327,7 +327,7 @@ function removeFromEvictionBlockList(key: OnyxKey, connectionID: number): void {
     evictionBlocklist[key] = evictionBlocklist[key]?.filter((evictionKey) => evictionKey !== connectionID);
 
     // Remove the key if there are no more subscribers
-    if (evictionBlocklist[key].length === 0) {
+    if (evictionBlocklist[key]?.length === 0) {
         delete evictionBlocklist[key];
     }
 }
@@ -377,12 +377,7 @@ function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey
 }
 
 /** When a collection of keys change, search for any callbacks matching the collection key and trigger those callbacks */
-function keysChanged<TKey extends CollectionKeyBase, TMap>(
-    collectionKey: TKey,
-    partialCollection: Collection<TKey, TMap, NullishDeep<KeyValueMapping[TKey]>>,
-    notifyRegularSubscibers = true,
-    notifyWithOnyxSubscibers = true,
-) {
+function keysChanged<TKey extends CollectionKeyBase>(collectionKey: TKey, partialCollection: OnyxValue, notifyRegularSubscibers = true, notifyWithOnyxSubscibers = true) {
     // We are iterating over all subscribers similar to keyChanged(). However, we are looking for subscribers who are subscribing to either a collection key or
     // individual collection key member for the collection that is being updated. It is important to note that the collection parameter cane be a PARTIAL collection
     // and does not represent all of the combined keys and values for a collection key. It is just the "new" data that was merged in via mergeCollection().
@@ -428,7 +423,7 @@ function keysChanged<TKey extends CollectionKeyBase, TMap>(
 
                 // If they are not using waitForCollectionCallback then we notify the subscriber with
                 // the new merged data but only for any keys in the partial collection.
-                const dataKeys = Object.keys(partialCollection);
+                const dataKeys = partialCollection && typeof partialCollection === 'object' ? Object.keys(partialCollection) : [];
                 for (let j = 0; j < dataKeys.length; j++) {
                     const dataKey = dataKeys[j];
                     subscriber.callback(cachedCollection[dataKey], dataKey);
@@ -890,7 +885,7 @@ function disconnect(connectionID: number, keyToRemoveFromEvictionBlocklist?: Ony
  * @example
  * scheduleSubscriberUpdate(key, value, subscriber => subscriber.initWithStoredValues === false)
  */
-function scheduleSubscriberUpdate<TKey extends OnyxKey>(key: TKey, value: KeyValueMapping[TKey], prevValue: KeyValueMapping[TKey], canUpdateSubscriber = () => true) {
+function scheduleSubscriberUpdate<TKey extends OnyxKey>(key: TKey, value: KeyValueMapping[TKey], prevValue: KeyValueMapping[TKey], canUpdateSubscriber = () => true): Promise<[void, void]> {
     const promise = Promise.resolve().then(() => keyChanged(key, value, prevValue, canUpdateSubscriber, true, false));
     batchUpdates(() => keyChanged(key, value, prevValue, canUpdateSubscriber, false, true));
     return Promise.all([maybeFlushBatchUpdates(), promise]);
@@ -913,23 +908,15 @@ function scheduleNotifyCollectionSubscribers<TKey extends OnyxKey>(key: TKey, va
 
 /**
  * Remove a key from Onyx and update the subscribers
- *
- * @private
- * @param {String} key
- * @return {Promise}
  */
-function remove<TKey extends OnyxKey>(key: TKey) {
+function remove<TKey extends OnyxKey>(key: TKey): Promise<void> {
     const prevValue = cache.getValue(key, false);
     cache.drop(key);
     scheduleSubscriberUpdate(key, null, prevValue);
-    return Storage.removeItem(key);
+    return Storage.removeItem(key) as Promise<void>;
 }
 
-/**
- * @private
- * @returns {Promise<void>}
- */
-function reportStorageQuota() {
+function reportStorageQuota(): Promise<void> {
     return Storage.getDatabaseSize()
         .then(({bytesUsed, bytesRemaining}) => {
             Logger.logInfo(`Storage Quota Check -- bytesUsed: ${bytesUsed} bytesRemaining: ${bytesRemaining}`);
@@ -982,7 +969,7 @@ function evictStorageAndRetry<TMethod extends typeof set | typeof multiSet | typ
  */
 function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: KeyValueMapping[TKey], method: string, hasChanged: boolean, wasRemoved = false) {
     // Logging properties only since values could be sensitive things we don't want to log
-    Logger.logInfo(`${method}() called for key: ${key}${typeof value === 'object' ? ` properties: ${Object.keys(value).join(',')}` : ''}`);
+    Logger.logInfo(`${method}() called for key: ${key}${value && typeof value === 'object' ? ` properties: ${Object.keys(value).join(',')}` : ''}`);
     const prevValue = cache.getValue(key, false);
 
     // Update subscribers if the cached value has changed, or when the subscriber specifically requires
@@ -1219,7 +1206,7 @@ function initializeWithDefaultKeyStates(): Promise<void> {
         const merged = utils.fastMerge(existingDataAsObject, defaultKeyStates);
         cache.merge(merged);
 
-        merged.forEach((val, key) => keyChanged(key, val, existingDataAsObject));
+        Object.entries(merged).forEach(([key, value]) => keyChanged(key, value, existingDataAsObject));
     });
 }
 
@@ -1244,11 +1231,11 @@ function initializeWithDefaultKeyStates(): Promise<void> {
  *
  * @param keysToPreserve is a list of ONYXKEYS that should not be cleared with the rest of the data
  */
-function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
+function clear(keysToPreserve: OnyxKey[] = []): Promise<Array<[void, void]>> {
     return getAllKeys().then((keys) => {
-        const keysToBeClearedFromStorage = [];
-        const keyValuesToResetAsCollection = {};
-        const keyValuesToResetIndividually = {};
+        const keysToBeClearedFromStorage: OnyxKey[] = [];
+        const keyValuesToResetAsCollection: Record<OnyxKey, OnyxCollection<OnyxValue>> = {};
+        const keyValuesToResetIndividually: Record<OnyxKey, OnyxValue> = {};
 
         // The only keys that should not be cleared are:
         // 1. Anything specifically passed in keysToPreserve (because some keys like language preferences, offline
@@ -1270,10 +1257,11 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                     cache.set(key, newValue);
                     const collectionKey = key.substring(0, key.indexOf('_') + 1);
                     if (collectionKey) {
-                        if (!keyValuesToResetAsCollection[collectionKey]) {
-                            keyValuesToResetAsCollection[collectionKey] = {};
+                        let collection = keyValuesToResetAsCollection[collectionKey];
+                        if (!collection) {
+                            collection = {};
                         }
-                        keyValuesToResetAsCollection[collectionKey][key] = newValue;
+                        collection[key] = newValue;
                     } else {
                         keyValuesToResetIndividually[key] = newValue;
                     }
@@ -1288,13 +1276,13 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
             keysToBeClearedFromStorage.push(key);
         });
 
-        const updatePromises = [];
+        const updatePromises: Array<Promise<[void, void]>> = [];
 
         // Notify the subscribers for each key/value group so they can receive the new values
-        keyValuesToResetIndividually.forEach((value, key) => {
+        Object.entries(keyValuesToResetIndividually).forEach(([key, value]) => {
             updatePromises.push(scheduleSubscriberUpdate(key, value, cache.getValue(key, false)));
         });
-        keyValuesToResetAsCollection.forEach((value, key) => {
+        Object.entries(keyValuesToResetAsCollection).forEach(([key, value]) => {
             updatePromises.push(scheduleNotifyCollectionSubscribers(key, value));
         });
 
@@ -1469,7 +1457,7 @@ function update(data: OnyxUpdate[]): Promise<void | void[]> {
     });
 
     const promises: Array<() => Promise<void>> = [];
-    let clearPromise = Promise.resolve();
+    let clearPromise: Promise<unknown> = Promise.resolve();
 
     data.forEach(({onyxMethod, key, value}) => {
         switch (onyxMethod) {
@@ -1548,7 +1536,7 @@ function init({
 
     // We need the value of the collection keys later for checking if a
     // key is a collection. We store it in a map for faster lookup.
-    const collectionValues = Object.values(keys.COLLECTION);
+    const collectionValues = keys.COLLECTION ? Object.values(keys.COLLECTION) : [];
     onyxCollectionKeyMap = collectionValues.reduce((acc, val) => {
         acc.set(val, true);
         return acc;
