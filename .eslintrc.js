@@ -38,6 +38,7 @@ module.exports = {
                 project: './tsconfig.json',
             },
             rules: {
+                '@typescript-eslint/prefer-for-of': 'off',
                 'rulesdir/prefer-underscore-method': 'off',
                 'react/jsx-props-no-spreading': 'off',
                 'react/require-default-props': 'off',

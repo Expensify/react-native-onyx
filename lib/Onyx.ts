@@ -1,7 +1,9 @@
+import {Onyx} from 'react-native-onyx';
 /* eslint-disable no-continue */
 import type {Component} from 'react';
 import {deepEqual} from 'fast-equals';
 import _ from 'underscore';
+import type {ValueOf} from 'type-fest';
 import * as Logger from './Logger';
 import cache from './OnyxCache';
 import * as Str from './Str';
@@ -11,7 +13,7 @@ import Storage from './storage';
 import utils from './utils';
 import unstable_batchedUpdates from './batch';
 import DevTools from './DevTools';
-import type {CollectionKeyBase, DeepRecord, KeyValueMapping, NullishDeep, OnyxCollection, OnyxEntry, OnyxKey, Selector} from './types';
+import type {CollectionKeyBase, DeepRecord, KeyValueMapping, NullishDeep, OnyxCollection, OnyxEntry, OnyxKey, Selector, WithOnyxInstanceState} from './types';
 
 /**
  * Represents a mapping object where each `OnyxKey` maps to either a value of its corresponding type in `KeyValueMapping` or `null`.
@@ -81,15 +83,17 @@ const METHOD = {
     CLEAR: 'clear',
 } as const;
 
+type OnyxMethod = ValueOf<typeof METHOD>;
+
 // Key/value store of Onyx key and arrays of values to merge
-const mergeQueue = {};
-const mergeQueuePromise = {};
+const mergeQueue: Record<OnyxKey, any> = {};
+const mergeQueuePromise: Record<OnyxKey, Promise<void>> = {};
 
 // Keeps track of the last connectionID that was used so we can keep incrementing it
 let lastConnectionID = 0;
 
 // Holds a mapping of all the react components that want their state subscribed to a store key
-const callbackToStateMapping: Record<string, ConnectOptions<OnyxKey>> = {};
+const callbackToStateMapping: Record<string, Mapping<OnyxKey>> = {};
 
 // Keeps a copy of the values of the onyx collection keys as a map for faster lookups
 let onyxCollectionKeyMap = new Map<OnyxKey, KeyValueMapping[OnyxKey]>();
@@ -122,7 +126,7 @@ let batchUpdatesQueue: Array<() => void> = [];
  * @param value - contains the change that was made by the method
  * @param mergedValue - (optional) value that was written in the storage after a merge method was executed.
  */
-function sendActionToDevTools(method: string, key: OnyxKey, value: KeyValueMapping[OnyxKey], mergedValue: any = undefined) {
+function sendActionToDevTools(method: OnyxMethod, key: OnyxKey, value: KeyValueMapping[OnyxKey], mergedValue: any = undefined) {
     DevTools.registerAction(utils.formatActionName(method, key), value, key ? {[key]: mergedValue || value} : value);
 }
 
@@ -164,43 +168,24 @@ function batchUpdates(updates: () => void): Promise<void> {
 }
 
 /**
- * Uses a selector function to return a simplified version of sourceData
- * @param {Mixed} sourceData
- * @param {Function} selector Function that takes sourceData and returns a simplified version of it
- * @param {Object} [withOnyxInstanceState]
- * @returns {Mixed}
- */
-const getSubsetOfData = (sourceData, selector, withOnyxInstanceState) => selector(sourceData, withOnyxInstanceState);
-
-/**
  * Takes a collection of items (eg. {testKey_1:{a:'a'}, testKey_2:{b:'b'}})
  * and runs it through a reducer function to return a subset of the data according to a selector.
  * The resulting collection will only contain items that are returned by the selector.
- * @param {Object} collection
- * @param {String|Function} selector (see method docs for getSubsetOfData() for full details)
- * @param {Object} [withOnyxInstanceState]
- * @returns {Object}
  */
-const reduceCollectionWithSelector = (collection, selector, withOnyxInstanceState) =>
-    _.reduce(
-        collection,
-        (finalCollection, item, key) => {
-            // eslint-disable-next-line no-param-reassign
-            finalCollection[key] = getSubsetOfData(item, selector, withOnyxInstanceState);
+function reduceCollectionWithSelector<TKey extends CollectionKeyBase, TMap, TReturn>(
+    collection: Collection<TKey, TMap, NullishDeep<KeyValueMapping[TKey]>>,
+    selector: Selector<TKey, TMap, TReturn>,
+    withOnyxInstanceState: WithOnyxInstanceState<TMap>,
+) {
+    return Object.values(collection).reduce((finalCollection, item, key) => {
+        finalCollection[key] = selector(item, withOnyxInstanceState);
 
-            return finalCollection;
-        },
-        {},
-    );
+        return finalCollection;
+    }, {});
+}
 
-/**
- * Get some data from the store
- *
- * @private
- * @param {string} key
- * @returns {Promise<*>}
- */
-function get(key) {
+/** Get some data from the store */
+function get(key: OnyxKey): Promise<unknown> | undefined {
     // When we already have the value in cache - resolve right away
     if (cache.hasCacheForKey(key)) {
         return Promise.resolve(cache.getValue(key));
@@ -273,15 +258,17 @@ function isSafeEvictionKey(testKey: OnyxKey): boolean {
     return evictionAllowList.some((key) => isKeyMatch(key, testKey));
 }
 
+type Mapping<TKey extends OnyxKey> = {
+    selector?: Selector<TKey, unknown, unknown>;
+    withOnyxInstance?: Component;
+    connectionID: number;
+};
+
 /**
  * Tries to get a value from the cache. If the value is not present in cache it will return the default value or undefined.
  * If the requested key is a collection, it will return an object with all the collection members.
- *
- * @param {String} key
- * @param {Object} mapping
- * @returns {Mixed}
  */
-function tryGetCachedValue(key, mapping = {}) {
+function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping: Mapping<TKey>) {
     let val = cache.getValue(key);
 
     if (isCollectionKey(key)) {
@@ -292,20 +279,16 @@ function tryGetCachedValue(key, mapping = {}) {
         if (allCacheKeys.length === 0) {
             return;
         }
-        const matchingKeys = _.filter(allCacheKeys, (k) => k.startsWith(key));
-        const values = _.reduce(
-            matchingKeys,
-            (finalObject, matchedKey) => {
-                const cachedValue = cache.getValue(matchedKey);
-                if (cachedValue) {
-                    // This is permissible because we're in the process of constructing the final object in a reduce function.
-                    // eslint-disable-next-line no-param-reassign
-                    finalObject[matchedKey] = cachedValue;
-                }
-                return finalObject;
-            },
-            {},
-        );
+        const matchingKeys = allCacheKeys.filter((k) => k.startsWith(key));
+        const values = matchingKeys.reduce((finalObject, matchedKey) => {
+            const cachedValue = cache.getValue(matchedKey);
+            if (cachedValue) {
+                // This is permissible because we're in the process of constructing the final object in a reduce function.
+                // eslint-disable-next-line no-param-reassign
+                finalObject[matchedKey] = cachedValue;
+            }
+            return finalObject;
+        }, {});
 
         val = values;
     }
@@ -315,7 +298,7 @@ function tryGetCachedValue(key, mapping = {}) {
         if (isCollectionKey(key)) {
             return reduceCollectionWithSelector(val, mapping.selector, state);
         }
-        return getSubsetOfData(val, mapping.selector, state);
+        return mapping.selector(val, state);
     }
 
     return val;
@@ -382,44 +365,32 @@ function addAllSafeEvictionKeysToRecentlyAccessedList(): Promise<void> {
     });
 }
 
-/**
- * @private
- * @param {String} collectionKey
- * @returns {Object}
- */
-function getCachedCollection(collectionKey) {
-    const collectionMemberKeys = _.filter(cache.getAllKeys(), (storedKey) => isCollectionMemberKey(collectionKey, storedKey));
+function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey): Record<string, OnyxEntry<KeyValueMapping[TKey]>> {
+    const collectionMemberKeys = cache.getAllKeys().filter((storedKey) => isCollectionMemberKey(collectionKey, storedKey));
 
-    return _.reduce(
-        collectionMemberKeys,
-        (prev, curr) => {
-            const cachedValue = cache.getValue(curr);
-            if (!cachedValue) {
-                return prev;
-            }
-
-            // eslint-disable-next-line no-param-reassign
-            prev[curr] = cachedValue;
+    return collectionMemberKeys.reduce((prev: Record<string, OnyxEntry<KeyValueMapping[TKey]>>, key) => {
+        const cachedValue = cache.getValue(key);
+        if (!cachedValue) {
             return prev;
-        },
-        {},
-    );
+        }
+
+        // eslint-disable-next-line no-param-reassign
+        prev[key] = cachedValue;
+        return prev;
+    }, {});
 }
 
-/**
- * When a collection of keys change, search for any callbacks matching the collection key and trigger those callbacks
- *
- * @private
- * @param {String} collectionKey
- * @param {Object} partialCollection - a partial collection of grouped member keys
- * @param {boolean} [notifyRegularSubscibers=true]
- * @param {boolean} [notifyWithOnyxSubscibers=true]
- */
-function keysChanged(collectionKey, partialCollection, notifyRegularSubscibers = true, notifyWithOnyxSubscibers = true) {
+/** When a collection of keys change, search for any callbacks matching the collection key and trigger those callbacks */
+function keysChanged<TKey extends CollectionKeyBase, TMap>(
+    collectionKey: TKey,
+    partialCollection: Collection<TKey, TMap, NullishDeep<KeyValueMapping[TKey]>>,
+    notifyRegularSubscibers = true,
+    notifyWithOnyxSubscibers = true,
+) {
     // We are iterating over all subscribers similar to keyChanged(). However, we are looking for subscribers who are subscribing to either a collection key or
     // individual collection key member for the collection that is being updated. It is important to note that the collection parameter cane be a PARTIAL collection
     // and does not represent all of the combined keys and values for a collection key. It is just the "new" data that was merged in via mergeCollection().
-    const stateMappingKeys = _.keys(callbackToStateMapping);
+    const stateMappingKeys = Object.keys(callbackToStateMapping);
     for (let i = 0; i < stateMappingKeys.length; i++) {
         const subscriber = callbackToStateMapping[stateMappingKeys[i]];
         if (!subscriber) {
@@ -461,7 +432,7 @@ function keysChanged(collectionKey, partialCollection, notifyRegularSubscibers =
 
                 // If they are not using waitForCollectionCallback then we notify the subscriber with
                 // the new merged data but only for any keys in the partial collection.
-                const dataKeys = _.keys(partialCollection);
+                const dataKeys = Object.keys(partialCollection);
                 for (let j = 0; j < dataKeys.length; j++) {
                     const dataKey = dataKeys[j];
                     subscriber.callback(cachedCollection[dataKey], dataKey);
@@ -507,7 +478,7 @@ function keysChanged(collectionKey, partialCollection, notifyRegularSubscibers =
 
                 subscriber.withOnyxInstance.setStateProxy((prevState) => {
                     const finalCollection = _.clone(prevState[subscriber.statePropertyName] || {});
-                    const dataKeys = _.keys(partialCollection);
+                    const dataKeys = Object.keys(partialCollection);
                     for (let j = 0; j < dataKeys.length; j++) {
                         const dataKey = dataKeys[j];
                         finalCollection[dataKey] = cachedCollection[dataKey];
@@ -536,7 +507,7 @@ function keysChanged(collectionKey, partialCollection, notifyRegularSubscibers =
                 if (subscriber.selector) {
                     subscriber.withOnyxInstance.setStateProxy((prevState) => {
                         const prevData = prevState[subscriber.statePropertyName];
-                        const newData = getSubsetOfData(cachedCollection[subscriber.key], subscriber.selector, subscriber.withOnyxInstance.state);
+                        const newData = subscriber.selector(cachedCollection[subscriber.key], subscriber.withOnyxInstance.state);
                         if (!deepEqual(prevData, newData)) {
                             PerformanceUtils.logSetStateCall(subscriber, prevData, newData, 'keysChanged', collectionKey);
                             return {
@@ -577,15 +548,16 @@ function keysChanged(collectionKey, partialCollection, notifyRegularSubscibers =
  * @example
  * keyChanged(key, value, subscriber => subscriber.initWithStoredValues === false)
  *
- * @private
- * @param {String} key
- * @param {*} data
- * @param {*} prevData
  * @param {Function} [canUpdateSubscriber] only subscribers that pass this truth test will be updated
- * @param {boolean} [notifyRegularSubscibers=true]
- * @param {boolean} [notifyWithOnyxSubscibers=true]
  */
-function keyChanged(key, data, prevData, canUpdateSubscriber = () => true, notifyRegularSubscibers = true, notifyWithOnyxSubscibers = true) {
+function keyChanged<TKey extends OnyxKey>(
+    key: TKey,
+    data: KeyValueMapping[TKey],
+    prevData: KeyValueMapping[TKey],
+    canUpdateSubscriber = () => true,
+    notifyRegularSubscibers = true,
+    notifyWithOnyxSubscibers = true,
+) {
     // Add or remove this key from the recentlyAccessedKeys lists
     if (data !== null) {
         addLastAccessedKey(key);
@@ -596,7 +568,7 @@ function keyChanged(key, data, prevData, canUpdateSubscriber = () => true, notif
     // We are iterating over all subscribers to see if they are interested in the key that has just changed. If the subscriber's  key is a collection key then we will
     // notify them if the key that changed is a collection member. Or if it is a regular key notify them when there is an exact match. Depending on whether the subscriber
     // was connected via withOnyx we will call setState() directly on the withOnyx instance. If it is a regular connection we will pass the data to the provided callback.
-    const stateMappingKeys = _.keys(callbackToStateMapping);
+    const stateMappingKeys = Object.keys(callbackToStateMapping);
     for (let i = 0; i < stateMappingKeys.length; i++) {
         const subscriber = callbackToStateMapping[stateMappingKeys[i]];
         if (!subscriber || !isKeyMatch(subscriber.key, key) || !canUpdateSubscriber(subscriber)) {
@@ -633,7 +605,7 @@ function keyChanged(key, data, prevData, canUpdateSubscriber = () => true, notif
                     subscriber.withOnyxInstance.setStateProxy((prevState) => {
                         const prevWithOnyxData = prevState[subscriber.statePropertyName];
                         const newWithOnyxData = {
-                            [key]: getSubsetOfData(data, subscriber.selector, subscriber.withOnyxInstance.state),
+                            [key]: subscriber.selector(data, subscriber.withOnyxInstance.state),
                         };
                         const prevDataWithNewData = {
                             ...prevWithOnyxData,
@@ -668,8 +640,8 @@ function keyChanged(key, data, prevData, canUpdateSubscriber = () => true, notif
             // returned by the selector and only if the selected data has changed.
             if (subscriber.selector) {
                 subscriber.withOnyxInstance.setStateProxy(() => {
-                    const previousValue = getSubsetOfData(prevData, subscriber.selector, subscriber.withOnyxInstance.state);
-                    const newValue = getSubsetOfData(data, subscriber.selector, subscriber.withOnyxInstance.state);
+                    const previousValue = subscriber.selector(prevData, subscriber.withOnyxInstance.state);
+                    const newValue = subscriber.selector(data, subscriber.withOnyxInstance.state);
 
                     if (!deepEqual(previousValue, newValue)) {
                         return {
@@ -709,18 +681,8 @@ function keyChanged(key, data, prevData, canUpdateSubscriber = () => true, notif
  * Sends the data obtained from the keys to the connection. It either:
  *     - sets state on the withOnyxInstances
  *     - triggers the callback function
- *
- * @private
- * @param {Object} mapping
- * @param {Object} [mapping.withOnyxInstance]
- * @param {String} [mapping.statePropertyName]
- * @param {Function} [mapping.callback]
- * @param {String} [mapping.selector]
- * @param {*|null} val
- * @param {String|undefined} matchedKey
- * @param {Boolean} isBatched
  */
-function sendDataToConnection(mapping, val, matchedKey, isBatched) {
+function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, val: any, matchedKey: OnyxKey, isBatched: boolean) {
     // If the mapping no longer exists then we should not send any data.
     // This means our subscriber disconnected or withOnyx wrapped component unmounted.
     if (!callbackToStateMapping[mapping.connectionID]) {
@@ -734,9 +696,9 @@ function sendDataToConnection(mapping, val, matchedKey, isBatched) {
         // returned by the selector.
         if (mapping.selector) {
             if (isCollectionKey(mapping.key)) {
-                newData = reduceCollectionWithSelector(val, mapping.selector, mapping.withOnyxInstance.state);
+                newData = mapping.selector(val, mapping.withOnyxInstance.state);
             } else {
-                newData = getSubsetOfData(val, mapping.selector, mapping.withOnyxInstance.state);
+                newData = mapping.selector(val, mapping.withOnyxInstance.state);
             }
         }
 
@@ -759,11 +721,8 @@ function sendDataToConnection(mapping, val, matchedKey, isBatched) {
 /**
  * We check to see if this key is flagged as safe for eviction and add it to the recentlyAccessedKeys list so that when we
  * run out of storage the least recently accessed key can be removed.
- *
- * @private
- * @param {Object} mapping
  */
-function addKeyToRecentlyAccessedIfNeeded(mapping) {
+function addKeyToRecentlyAccessedIfNeeded<TKey extends OnyxKey>(mapping: Mapping<TKey>) {
     if (!isSafeEvictionKey(mapping.key)) {
         return;
     }
@@ -788,18 +747,14 @@ function addKeyToRecentlyAccessedIfNeeded(mapping) {
  * @param {Array} matchingKeys
  * @param {Object} mapping
  */
-function getCollectionDataAndSendAsObject(matchingKeys, mapping) {
+function getCollectionDataAndSendAsObject<TKey extends CollectionKeyBase>(matchingKeys: OnyxKey[], mapping: Mapping<TKey>) {
     Promise.all(matchingKeys.map((key) => get(key)))
         .then((values) =>
-            _.reduce(
-                values,
-                (finalObject, value, i) => {
-                    // eslint-disable-next-line no-param-reassign
-                    finalObject[matchingKeys[i]] = value;
-                    return finalObject;
-                },
-                {},
-            ),
+            values.reduce((finalObject, value, i) => {
+                // eslint-disable-next-line no-param-reassign
+                finalObject[matchingKeys[i]] = value;
+                return finalObject;
+            }, {}),
         )
         .then((val) => sendDataToConnection(mapping, val, undefined, true));
 }
@@ -825,7 +780,7 @@ function getCollectionDataAndSendAsObject(matchingKeys, mapping) {
  * @param [mapping.waitForCollectionCallback] If set to true, it will return the entire collection to the callback as a single object
  * @returns an ID to use when calling disconnect
  */
-function connect<TKey extends OnyxKey>(mapping: ConnectOptions<TKey>): number {
+function connect<TKey extends OnyxKey>(mapping: Mapping<TKey>): number {
     const connectionID = lastConnectionID++;
     callbackToStateMapping[connectionID] = mapping;
     callbackToStateMapping[connectionID].connectionID = connectionID;
@@ -850,7 +805,7 @@ function connect<TKey extends OnyxKey>(mapping: ConnectOptions<TKey>): number {
             // We search all the keys in storage to see if any are a "match" for the subscriber we are connecting so that we
             // can send data back to the subscriber. Note that multiple keys can match as a subscriber could either be
             // subscribed to a "collection key" or a single key.
-            const matchingKeys = _.filter(keys, (key) => isKeyMatch(mapping.key, key));
+            const matchingKeys = keys.filter((key) => isKeyMatch(mapping.key, key));
 
             // If the key being connected to does not exist we initialize the value with null. For subscribers that connected
             // directly via connect() they will simply get a null value sent to them without any information about which key matched
@@ -936,14 +891,8 @@ function disconnect(connectionID: number, keyToRemoveFromEvictionBlocklist?: Ony
  *
  * @example
  * scheduleSubscriberUpdate(key, value, subscriber => subscriber.initWithStoredValues === false)
- *
- * @param {String} key
- * @param {*} value
- * @param {*} prevValue
- * @param {Function} [canUpdateSubscriber] only subscribers that pass this truth test will be updated
- * @returns {Promise}
  */
-function scheduleSubscriberUpdate(key, value, prevValue, canUpdateSubscriber = () => true) {
+function scheduleSubscriberUpdate<TKey extends OnyxKey>(key: TKey, value: KeyValueMapping[TKey], prevValue: KeyValueMapping[TKey], canUpdateSubscriber = () => true) {
     const promise = Promise.resolve().then(() => keyChanged(key, value, prevValue, canUpdateSubscriber, true, false));
     batchUpdates(() => keyChanged(key, value, prevValue, canUpdateSubscriber, false, true));
     return Promise.all([maybeFlushBatchUpdates(), promise]);
@@ -958,7 +907,7 @@ function scheduleSubscriberUpdate(key, value, prevValue, canUpdateSubscriber = (
  * @param {*} value
  * @returns {Promise}
  */
-function scheduleNotifyCollectionSubscribers(key, value) {
+function scheduleNotifyCollectionSubscribers<TKey extends OnyxKey>(key: TKey, value: KeyValueMapping[TKey]) {
     const promise = Promise.resolve().then(() => keysChanged(key, value, true, false));
     batchUpdates(() => keysChanged(key, value, false, true));
     return Promise.all([maybeFlushBatchUpdates(), promise]);
@@ -971,7 +920,7 @@ function scheduleNotifyCollectionSubscribers(key, value) {
  * @param {String} key
  * @return {Promise}
  */
-function remove(key) {
+function remove<TKey extends OnyxKey>(key: TKey) {
     const prevValue = cache.getValue(key, false);
     cache.drop(key);
     scheduleSubscriberUpdate(key, null, prevValue);
@@ -996,14 +945,8 @@ function reportStorageQuota() {
  * If we fail to set or merge we must handle this by
  * evicting some data from Onyx and then retrying to do
  * whatever it is we attempted to do.
- *
- * @private
- * @param {Error} error
- * @param {Function} onyxMethod
- * @param  {...any} args
- * @return {Promise}
  */
-function evictStorageAndRetry(error, onyxMethod, ...args) {
+function evictStorageAndRetry<TMethod extends typeof set | typeof multiSet | typeof mergeCollection>(error: Error, onyxMethod: TMethod, ...args: Parameters<TMethod>) {
     Logger.logInfo(`Failed to save to storage. Error: ${error}. onyxMethod: ${onyxMethod.name}`);
 
     if (error && Str.startsWith(error.message, "Failed to execute 'put' on 'IDBObjectStore'")) {
@@ -1012,7 +955,7 @@ function evictStorageAndRetry(error, onyxMethod, ...args) {
     }
 
     // Find the first key that we can remove that has no subscribers in our blocklist
-    const keyForRemoval = _.find(recentlyAccessedKeys, (key) => !evictionBlocklist[key]);
+    const keyForRemoval = recentlyAccessedKeys.find((key) => !evictionBlocklist[key]);
     if (!keyForRemoval) {
         // If we have no acceptable keys to remove then we are possibly trying to save mission critical data. If this is the case,
         // then we should stop retrying as there is not much the user can do to fix this. Instead of getting them stuck in an infinite loop we
@@ -1037,9 +980,9 @@ function evictStorageAndRetry(error, onyxMethod, ...args) {
  * @param {Boolean} wasRemoved
  * @returns {Promise}
  */
-function broadcastUpdate(key, value, method, hasChanged, wasRemoved = false) {
+function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: KeyValueMapping[TKey], method: string, hasChanged: boolean, wasRemoved = false) {
     // Logging properties only since values could be sensitive things we don't want to log
-    Logger.logInfo(`${method}() called for key: ${key}${typeof value === 'object' ? ` properties: ${_.keys(value).join(',')}` : ''}`);
+    Logger.logInfo(`${method}() called for key: ${key}${typeof value === 'object' ? ` properties: ${Object.keys(value).join(',')}` : ''}`);
     const prevValue = cache.getValue(key, false);
 
     // Update subscribers if the cached value has changed, or when the subscriber specifically requires
@@ -1113,14 +1056,13 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[T
  * Storage expects array like: [["@MyApp_user", value_1], ["@MyApp_key", value_2]]
  * This method transforms an object like {'@MyApp_user': myUserValue, '@MyApp_key': myKeyValue}
  * to an array of key-value pairs in the above format and removes key-value pairs that are being set to null
- * @private
- * @param {Record} data
+ *
  * @return {Array} an array of key - value pairs <[key, value]>
  */
-function prepareKeyValuePairsForStorage(data) {
-    const keyValuePairs = [];
+function prepareKeyValuePairsForStorage(data: Partial<NullableKeyValueMapping>): Array<[string, unknown]> {
+    const keyValuePairs: Array<[string, unknown]> = [];
 
-    data.forEach((value, key) => {
+    Object.entries(data).forEach(([key, value]) => {
         const {value: valueAfterRemoving, wasRemoved} = removeNullValues(key, value);
 
         if (wasRemoved) return;
@@ -1160,14 +1102,10 @@ function multiSet(data: Partial<NullableKeyValueMapping>): Promise<void> {
 /**
  * Merges an array of changes with an existing value
  *
- * @private
- * @param {*} existingValue
  * @param {Array<*>} changes Array of changes that should be applied to the existing value
- * @param {Boolean} shouldRemoveNullObjectValues
- * @returns {*}
  */
-function applyMerge(existingValue, changes, shouldRemoveNullObjectValues) {
-    const lastChange = _.last(changes);
+function applyMerge(existingValue: unknown, changes: [], shouldRemoveNullObjectValues: boolean) {
+    const lastChange = changes?.at(-1);
 
     if (Array.isArray(lastChange)) {
         return lastChange;
@@ -1175,7 +1113,7 @@ function applyMerge(existingValue, changes, shouldRemoveNullObjectValues) {
 
     if (changes.some((change) => typeof change === 'object')) {
         // Object values are then merged one after the other
-        return _.reduce(changes, (modifiedData, change) => utils.fastMerge(modifiedData, change, shouldRemoveNullObjectValues), existingValue || {});
+        return changes.reduce((modifiedData, change) => utils.fastMerge(modifiedData, change, shouldRemoveNullObjectValues), existingValue || {});
     }
 
     // If we have anything else we can't merge it so we'll
@@ -1225,7 +1163,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<K
 
             // The presence of a `null` in the merge queue instructs us to drop the existing value.
             // In this case, we can't simply merge the batched changes with the existing value, because then the null in the merge queue would have no effect
-            const shouldOverwriteExistingValue = _.includes(mergeQueue[key], null);
+            const shouldOverwriteExistingValue = mergeQueue[key].includes(null);
 
             // Clean up the write queue, so we don't apply these changes again
             delete mergeQueue[key];
@@ -1276,8 +1214,8 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<K
  * @returns {Promise}
  */
 function initializeWithDefaultKeyStates() {
-    return Storage.multiGet(_.keys(defaultKeyStates)).then((pairs) => {
-        const existingDataAsObject = _.object(pairs);
+    return Storage.multiGet(Object.keys(defaultKeyStates)).then((pairs) => {
+        const existingDataAsObject = Object.fromEntries(pairs);
 
         const merged = utils.fastMerge(existingDataAsObject, defaultKeyStates);
         cache.merge(merged);
@@ -1319,8 +1257,8 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
         // 2. Any keys with a default state (because they need to remain in Onyx as their default, and setting them
         //      to null would cause unknown behavior)
         keys.forEach((key) => {
-            const isKeyToPreserve = _.contains(keysToPreserve, key);
-            const isDefaultKey = _.has(defaultKeyStates, key);
+            const isKeyToPreserve = keysToPreserve.includes(key);
+            const isDefaultKey = key in defaultKeyStates;
 
             // If the key is being removed or reset to default:
             // 1. Update it in the cache
@@ -1328,7 +1266,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
             //      since collection key subscribers need to be updated differently
             if (!isKeyToPreserve) {
                 const oldValue = cache.getValue(key);
-                const newValue = _.get(defaultKeyStates, key, null);
+                const newValue = defaultKeyStates[key] ?? null;
                 if (newValue !== oldValue) {
                     cache.set(key, newValue);
                     const collectionKey = key.substring(0, key.indexOf('_') + 1);
@@ -1415,20 +1353,26 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
 
     return getAllKeys().then((persistedKeys) => {
         // Split to keys that exist in storage and keys that don't
-        const [existingKeys, newKeys] = _.chain(collection)
-            .pick((value, key) => {
-                if (value === null) {
-                    remove(key);
-                    return false;
-                }
-                return true;
-            })
-            .keys()
-            .partition((key) => persistedKeys.includes(key))
-            .value();
+        const keys = Object.keys(collection).filter((key) => {
+            if (collection[key] === null) {
+                remove(key);
+                return false;
+            }
+            return true;
+        });
 
-        const existingKeyCollection = _.pick(collection, existingKeys);
-        const newCollection = _.pick(collection, newKeys);
+        const existingKeys = keys.filter((key) => persistedKeys.includes(key));
+        const newKeys = keys.filter((key) => !persistedKeys.includes(key));
+
+        const existingKeyCollection = existingKeys.reduce((obj, key) => {
+            obj[key] = collection[key];
+            return obj;
+        }, {});
+
+        const newCollection = newKeys.reduce((obj, key) => {
+            obj[key] = collection[key];
+            return obj;
+        }, {});
         const keyValuePairsForExistingCollection = prepareKeyValuePairsForStorage(existingKeyCollection);
         const keyValuePairsForNewCollection = prepareKeyValuePairsForStorage(newCollection);
 
@@ -1495,7 +1439,7 @@ type OnyxUpdate =
 function update(data: OnyxUpdate[]): Promise<void> {
     // First, validate the Onyx object is in the format we expect
     data.forEach(({onyxMethod, key, value}) => {
-        if (!_.contains([METHOD.CLEAR, METHOD.SET, METHOD.MERGE, METHOD.MERGE_COLLECTION, METHOD.MULTI_SET], onyxMethod)) {
+        if (![METHOD.CLEAR, METHOD.SET, METHOD.MERGE, METHOD.MERGE_COLLECTION, METHOD.MULTI_SET].includes(onyxMethod)) {
             throw new Error(`Invalid onyxMethod ${onyxMethod} in Onyx update.`);
         }
         if (onyxMethod === METHOD.MULTI_SET) {
@@ -1589,14 +1533,10 @@ function init({
     // We need the value of the collection keys later for checking if a
     // key is a collection. We store it in a map for faster lookup.
     const collectionValues = Object.values(keys.COLLECTION);
-    onyxCollectionKeyMap = _.reduce(
-        collectionValues,
-        (acc, val) => {
-            acc.set(val, true);
-            return acc;
-        },
-        new Map(),
-    );
+    onyxCollectionKeyMap = collectionValues.reduce((acc, val) => {
+        acc.set(val, true);
+        return acc;
+    }, new Map());
 
     // Set our default key states to use when initializing and clearing Onyx data
     defaultKeyStates = initialKeyStates;
