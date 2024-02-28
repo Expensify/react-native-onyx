@@ -1,9 +1,7 @@
 import {deepEqual} from 'fast-equals';
 import bindAll from 'lodash/bindAll';
-import type {Key, Value} from './storage/providers/types';
 import utils from './utils';
-
-type StorageMap = Record<Key, Value>;
+import type {OnyxKey, OnyxValue} from './types';
 
 /**
  * In memory cache providing data by reference
@@ -11,19 +9,19 @@ type StorageMap = Record<Key, Value>;
  */
 class OnyxCache {
     /** Cache of all the storage keys available in persistent storage */
-    private storageKeys: Set<Key>;
+    storageKeys: Set<OnyxKey>;
 
     /** Unique list of keys maintained in access order (most recent at the end) */
-    private recentKeys: Set<Key>;
+    private recentKeys: Set<OnyxKey>;
 
     /** A map of cached values */
-    private storageMap: StorageMap;
+    private storageMap: Record<OnyxKey, OnyxValue>;
 
     /**
      * Captured pending tasks for already running storage methods
      * Using a map yields better performance on operations such a delete
      */
-    private pendingPromises: Map<string, Promise<unknown>>;
+    private pendingPromises: Map<string, Promise<OnyxValue>>;
 
     /** Maximum size of the keys store din cache */
     private maxRecentKeysSize = 0;
@@ -53,7 +51,7 @@ class OnyxCache {
     }
 
     /** Get all the storage keys */
-    getAllKeys(): Key[] {
+    getAllKeys(): OnyxKey[] {
         return Array.from(this.storageKeys);
     }
 
@@ -61,7 +59,7 @@ class OnyxCache {
      * Get a cached value from storage
      * @param [shouldReindexCache] – This is an LRU cache, and by default accessing a value will make it become last in line to be evicted. This flag can be used to skip that and just access the value directly without side-effects.
      */
-    getValue(key: Key, shouldReindexCache = true): Value {
+    getValue(key: OnyxKey, shouldReindexCache = true): OnyxValue {
         if (shouldReindexCache) {
             this.addToAccessedKeys(key);
         }
@@ -69,14 +67,14 @@ class OnyxCache {
     }
 
     /** Check whether cache has data for the given key */
-    hasCacheForKey(key: Key): boolean {
+    hasCacheForKey(key: OnyxKey): boolean {
         return this.storageMap[key] !== undefined;
     }
 
     /** Saves a key in the storage keys list
      * Serves to keep the result of `getAllKeys` up to date
      */
-    addKey(key: Key): void {
+    addKey(key: OnyxKey): void {
         this.storageKeys.add(key);
     }
 
@@ -84,7 +82,7 @@ class OnyxCache {
      * Set's a key value in cache
      * Adds the key to the storage keys list as well
      */
-    set(key: Key, value: Value): Value {
+    set(key: OnyxKey, value: OnyxValue): OnyxValue {
         this.addKey(key);
         this.addToAccessedKeys(key);
         this.storageMap[key] = value;
@@ -93,7 +91,7 @@ class OnyxCache {
     }
 
     /** Forget the cached value for the given key */
-    drop(key: Key): void {
+    drop(key: OnyxKey): void {
         delete this.storageMap[key];
         this.storageKeys.delete(key);
         this.recentKeys.delete(key);
@@ -103,7 +101,7 @@ class OnyxCache {
      * Deep merge data to cache, any non existing keys will be created
      * @param data - a map of (cache) key - values
      */
-    merge(data: StorageMap): void {
+    merge(data: Record<OnyxKey, OnyxValue>): void {
         if (typeof data !== 'object' || Array.isArray(data)) {
             throw new Error('data passed to cache.merge() must be an Object of onyx key/value pairs');
         }
@@ -130,7 +128,7 @@ class OnyxCache {
      * provided from this function
      * @param taskName - unique name given for the task
      */
-    getTaskPromise(taskName: string): Promise<unknown> {
+    getTaskPromise(taskName: string): Promise<OnyxValue> {
         return this.pendingPromises.get(taskName) ?? Promise.resolve();
     }
 
@@ -139,7 +137,7 @@ class OnyxCache {
      * hook up to the promise if it's still pending
      * @param taskName - unique name for the task
      */
-    captureTask(taskName: string, promise: Promise<unknown>): Promise<unknown> {
+    captureTask(taskName: string, promise: Promise<OnyxValue>): Promise<OnyxValue> {
         const returnPromise = promise.finally(() => {
             this.pendingPromises.delete(taskName);
         });
@@ -150,7 +148,7 @@ class OnyxCache {
     }
 
     /** Adds a key to the top of the recently accessed keys */
-    private addToAccessedKeys(key: Key): void {
+    private addToAccessedKeys(key: OnyxKey): void {
         this.recentKeys.delete(key);
         this.recentKeys.add(key);
     }
@@ -182,7 +180,7 @@ class OnyxCache {
     }
 
     /** Check if the value has changed */
-    hasValueChanged(key: Key, value: Value): boolean {
+    hasValueChanged(key: OnyxKey, value: OnyxValue): boolean {
         return !deepEqual(this.storageMap[key], value);
     }
 }

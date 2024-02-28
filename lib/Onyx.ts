@@ -41,10 +41,12 @@ type Collection<TKey extends CollectionKeyBase, TMap, TValue> = {
 };
 
 /** Represents the base options used in `Onyx.connect()` method. */
-type BaseConnectOptions = {
+type BaseConnectOptions<TKey extends OnyxKey> = {
     statePropertyName?: string;
     withOnyxInstance?: Component;
     initWithStoredValues?: boolean;
+    selector?: Selector<TKey, unknown, unknown>;
+    connectionID: number;
 };
 
 /**
@@ -59,7 +61,7 @@ type BaseConnectOptions = {
  * If `waitForCollectionCallback` is `false` or not specified, the `key` can be any Onyx key and `callback` will be triggered with updates of each collection item
  * and will pass `value` as an `OnyxEntry`.
  */
-type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions &
+type Mapping<TKey extends OnyxKey> = BaseConnectOptions<TKey> &
     (
         | {
               key: TKey extends CollectionKeyBase ? TKey : never;
@@ -85,14 +87,14 @@ const METHOD = {
 type OnyxMethod = ValueOf<typeof METHOD>;
 
 // Key/value store of Onyx key and arrays of values to merge
-const mergeQueue: Record<OnyxKey, OnyxEntry<NullishDeep<OnyxValue>>> = {};
+const mergeQueue: Record<OnyxKey, OnyxValue> = {};
 const mergeQueuePromise: Record<OnyxKey, Promise<void>> = {};
 
 // Keeps track of the last connectionID that was used so we can keep incrementing it
 let lastConnectionID = 0;
 
 // Holds a mapping of all the react components that want their state subscribed to a store key
-const callbackToStateMapping: Record<string, Mapping<OnyxKey>> = {};
+const callbackToStateMapping: Record<number, Mapping<OnyxKey>> = {};
 
 // Keeps a copy of the values of the onyx collection keys as a map for faster lookups
 let onyxCollectionKeyMap = new Map<OnyxKey, OnyxValue>();
@@ -125,7 +127,7 @@ let batchUpdatesQueue: Array<() => void> = [];
  * @param value - contains the change that was made by the method
  * @param mergedValue - (optional) value that was written in the storage after a merge method was executed.
  */
-function sendActionToDevTools(method: OnyxMethod, key: OnyxKey, value: OnyxValue, mergedValue: any = undefined) {
+function sendActionToDevTools(method: OnyxMethod, key: OnyxKey | undefined, value: OnyxValue, mergedValue: any = undefined) {
     // @ts-expect-error Migrate DevTools
     DevTools.registerAction(utils.formatActionName(method, key), value, key ? {[key]: mergedValue || value} : value);
 }
@@ -185,7 +187,7 @@ function reduceCollectionWithSelector<TKey extends CollectionKeyBase, TMap, TRet
 }
 
 /** Get some data from the store */
-function get(key: OnyxKey): Promise<unknown> {
+function get(key: OnyxKey): Promise<OnyxValue> {
     // When we already have the value in cache - resolve right away
     if (cache.hasCacheForKey(key)) {
         return Promise.resolve(cache.getValue(key));
@@ -257,12 +259,6 @@ function isKeyMatch(configKey: OnyxKey, key: OnyxKey): boolean {
 function isSafeEvictionKey(testKey: OnyxKey): boolean {
     return evictionAllowList.some((key) => isKeyMatch(key, testKey));
 }
-
-type Mapping<TKey extends OnyxKey> = {
-    selector?: Selector<TKey, unknown, unknown>;
-    withOnyxInstance?: Component;
-    connectionID: number;
-};
 
 /**
  * Tries to get a value from the cache. If the value is not present in cache it will return the default value or undefined.
@@ -682,7 +678,7 @@ function keyChanged<TKey extends OnyxKey>(
  *     - sets state on the withOnyxInstances
  *     - triggers the callback function
  */
-function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, val: any, matchedKey: OnyxKey, isBatched: boolean) {
+function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, val: OnyxValue, matchedKey: OnyxKey | undefined, isBatched: boolean) {
     // If the mapping no longer exists then we should not send any data.
     // This means our subscriber disconnected or withOnyx wrapped component unmounted.
     if (!callbackToStateMapping[mapping.connectionID]) {
@@ -722,7 +718,7 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, val:
  * We check to see if this key is flagged as safe for eviction and add it to the recentlyAccessedKeys list so that when we
  * run out of storage the least recently accessed key can be removed.
  */
-function addKeyToRecentlyAccessedIfNeeded<TKey extends OnyxKey>(mapping: Mapping<TKey>) {
+function addKeyToRecentlyAccessedIfNeeded(mapping: Mapping<OnyxKey>) {
     if (!isSafeEvictionKey(mapping.key)) {
         return;
     }
@@ -780,7 +776,9 @@ function getCollectionDataAndSendAsObject<TKey extends CollectionKeyBase>(matchi
  * @param [mapping.waitForCollectionCallback] If set to true, it will return the entire collection to the callback as a single object
  * @returns an ID to use when calling disconnect
  */
-function connect<TKey extends OnyxKey>(mapping: Mapping<TKey>): number {
+function connect(mappingWithoutConnectionID: Omit<Mapping<OnyxKey>, 'connectionID'>): number {
+    const mapping = mappingWithoutConnectionID as Mapping<OnyxKey>;
+
     const connectionID = lastConnectionID++;
     callbackToStateMapping[connectionID] = mapping;
     callbackToStateMapping[connectionID].connectionID = connectionID;
@@ -967,6 +965,8 @@ function evictStorageAndRetry<TMethod extends typeof set | typeof multiSet | typ
     // Remove the least recently viewed key that is not currently being accessed and retry.
     Logger.logInfo(`Out of storage. Evicting least recently accessed key (${keyForRemoval}) and retrying.`);
     reportStorageQuota();
+
+    // @ts-expect-error No overload matches this call.
     return remove(keyForRemoval).then(() => onyxMethod(...args));
 }
 
@@ -1059,8 +1059,8 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[T
  *
  * @return {Array} an array of key - value pairs <[key, value]>
  */
-function prepareKeyValuePairsForStorage(data: Partial<NullableKeyValueMapping>): Array<[string, unknown]> {
-    const keyValuePairs: Array<[string, unknown]> = [];
+function prepareKeyValuePairsForStorage(data: Partial<NullableKeyValueMapping>): Array<[OnyxKey, OnyxValue]> {
+    const keyValuePairs: Array<[OnyxKey, OnyxValue]> = [];
 
     Object.entries(data).forEach(([key, value]) => {
         const {value: valueAfterRemoving, wasRemoved} = removeNullValues(key, value);
@@ -1102,9 +1102,9 @@ function multiSet(data: Partial<NullableKeyValueMapping>): Promise<void> {
 /**
  * Merges an array of changes with an existing value
  *
- * @param {Array<*>} changes Array of changes that should be applied to the existing value
+ * @param changes Array of changes that should be applied to the existing value
  */
-function applyMerge(existingValue: unknown, changes: Array<OnyxEntry<OnyxValue>>, shouldRemoveNullObjectValues: boolean) {
+function applyMerge(existingValue: OnyxValue, changes: Array<OnyxEntry<OnyxValue>>, shouldRemoveNullObjectValues: boolean) {
     const lastChange = changes?.at(-1);
 
     if (Array.isArray(lastChange)) {
@@ -1113,7 +1113,8 @@ function applyMerge(existingValue: unknown, changes: Array<OnyxEntry<OnyxValue>>
 
     if (changes.some((change) => typeof change === 'object')) {
         // Object values are then merged one after the other
-        return changes.reduce((modifiedData, change) => utils.fastMerge(modifiedData, change, shouldRemoveNullObjectValues), existingValue || {});
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return changes.reduce((modifiedData, change) => utils.fastMerge(modifiedData as any, change as any, shouldRemoveNullObjectValues), existingValue || {});
     }
 
     // If we have anything else we can't merge it so we'll
@@ -1210,10 +1211,8 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<K
 
 /**
  * Merge user provided default key value pairs.
- * @private
- * @returns {Promise}
  */
-function initializeWithDefaultKeyStates() {
+function initializeWithDefaultKeyStates(): Promise<void> {
     return Storage.multiGet(Object.keys(defaultKeyStates)).then((pairs) => {
         const existingDataAsObject = Object.fromEntries(pairs);
 
@@ -1403,7 +1402,7 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
         });
 
         return Promise.all(promises)
-            .catch((error) => evictStorageAndRetry(error, mergeCollection, collection))
+            .catch((error) => evictStorageAndRetry(error, mergeCollection, collectionKey, collection))
             .then(() => {
                 sendActionToDevTools(METHOD.MERGE_COLLECTION, undefined, collection);
                 return promiseUpdate;

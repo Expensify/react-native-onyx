@@ -1,19 +1,17 @@
 import type {BatchQueryResult, QueryResult} from 'react-native-quick-sqlite';
-import type {KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey} from '../../types';
+import type {OnyxKey, OnyxValue} from '../../types';
 
-type Key = OnyxKey;
-type Value = OnyxEntry<KeyValueMapping[OnyxKey]> | OnyxCollection<KeyValueMapping[OnyxKey]>;
-type KeyValuePair = [Key, Value];
-type KeyList = Key[];
+type KeyValuePair = [OnyxKey, OnyxValue];
+type KeyList = OnyxKey[];
 type KeyValuePairList = KeyValuePair[];
 
-type OnStorageKeyChanged = (key: Key, value: Value | null) => void;
+type OnStorageKeyChanged = (key: OnyxKey, value: OnyxValue | null) => void;
 
 type StorageProvider = {
     /**
      * Gets the value of a given key or return `null` if it's not available in storage
      */
-    getItem: (key: Key) => Promise<Value | null>;
+    getItem: (key: OnyxKey) => Promise<OnyxValue | null>;
 
     /**
      * Get multiple key-value pairs for the given array of keys in a batch
@@ -23,7 +21,7 @@ type StorageProvider = {
     /**
      * Sets the value for a given key. The only requirement is that the value should be serializable to JSON string
      */
-    setItem: (key: Key, value: Value) => Promise<QueryResult | void>;
+    setItem: (key: OnyxKey, value: OnyxValue) => Promise<QueryResult | void>;
 
     /**
      * Stores multiple key-value pairs in a batch
@@ -40,7 +38,7 @@ type StorageProvider = {
      * @param changes - the delta for a specific key
      * @param modifiedData - the pre-merged data from `Onyx.applyMerge`
      */
-    mergeItem: (key: Key, changes: Value, modifiedData: Value) => Promise<BatchQueryResult | void>;
+    mergeItem: (key: OnyxKey, changes: OnyxValue, modifiedData: OnyxValue) => Promise<BatchQueryResult | void>;
 
     /**
      * Returns all keys available in storage
@@ -50,7 +48,7 @@ type StorageProvider = {
     /**
      * Removes given key and its value from storage
      */
-    removeItem: (key: Key) => Promise<QueryResult | void>;
+    removeItem: (key: OnyxKey) => Promise<QueryResult | void>;
 
     /**
      * Removes given keys and their values from storage
@@ -74,4 +72,4 @@ type StorageProvider = {
 };
 
 export default StorageProvider;
-export type {Value, Key, KeyList, KeyValuePairList};
+export type {OnyxValue as Value, OnyxKey as Key, KeyList, KeyValuePairList};
