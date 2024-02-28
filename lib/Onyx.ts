@@ -1,8 +1,7 @@
-import {Onyx} from 'react-native-onyx';
 /* eslint-disable no-continue */
 import type {Component} from 'react';
 import {deepEqual} from 'fast-equals';
-import _ from 'underscore';
+import lodashClone from 'lodash/clone';
 import type {ValueOf} from 'type-fest';
 import * as Logger from './Logger';
 import cache from './OnyxCache';
@@ -13,7 +12,7 @@ import Storage from './storage';
 import utils from './utils';
 import unstable_batchedUpdates from './batch';
 import DevTools from './DevTools';
-import type {CollectionKeyBase, DeepRecord, KeyValueMapping, NullishDeep, OnyxCollection, OnyxEntry, OnyxKey, Selector, WithOnyxInstanceState} from './types';
+import type {CollectionKeyBase, DeepRecord, KeyValueMapping, NullishDeep, OnyxCollection, OnyxEntry, OnyxKey, OnyxValue, Selector, WithOnyxInstanceState} from './types';
 
 /**
  * Represents a mapping object where each `OnyxKey` maps to either a value of its corresponding type in `KeyValueMapping` or `null`.
@@ -86,7 +85,7 @@ const METHOD = {
 type OnyxMethod = ValueOf<typeof METHOD>;
 
 // Key/value store of Onyx key and arrays of values to merge
-const mergeQueue: Record<OnyxKey, any> = {};
+const mergeQueue: Record<OnyxKey, OnyxEntry<NullishDeep<OnyxValue>>> = {};
 const mergeQueuePromise: Record<OnyxKey, Promise<void>> = {};
 
 // Keeps track of the last connectionID that was used so we can keep incrementing it
@@ -96,7 +95,7 @@ let lastConnectionID = 0;
 const callbackToStateMapping: Record<string, Mapping<OnyxKey>> = {};
 
 // Keeps a copy of the values of the onyx collection keys as a map for faster lookups
-let onyxCollectionKeyMap = new Map<OnyxKey, KeyValueMapping[OnyxKey]>();
+let onyxCollectionKeyMap = new Map<OnyxKey, OnyxValue>();
 
 // Holds a list of keys that have been directly subscribed to or recently modified from least to most recent
 let recentlyAccessedKeys: OnyxKey[] = [];
@@ -126,7 +125,8 @@ let batchUpdatesQueue: Array<() => void> = [];
  * @param value - contains the change that was made by the method
  * @param mergedValue - (optional) value that was written in the storage after a merge method was executed.
  */
-function sendActionToDevTools(method: OnyxMethod, key: OnyxKey, value: KeyValueMapping[OnyxKey], mergedValue: any = undefined) {
+function sendActionToDevTools(method: OnyxMethod, key: OnyxKey, value: OnyxValue, mergedValue: any = undefined) {
+    // @ts-expect-error Migrate DevTools
     DevTools.registerAction(utils.formatActionName(method, key), value, key ? {[key]: mergedValue || value} : value);
 }
 
@@ -185,7 +185,7 @@ function reduceCollectionWithSelector<TKey extends CollectionKeyBase, TMap, TRet
 }
 
 /** Get some data from the store */
-function get(key: OnyxKey): Promise<unknown> | undefined {
+function get(key: OnyxKey): Promise<unknown> {
     // When we already have the value in cache - resolve right away
     if (cache.hasCacheForKey(key)) {
         return Promise.resolve(cache.getValue(key));
@@ -477,7 +477,7 @@ function keysChanged<TKey extends CollectionKeyBase, TMap>(
                 }
 
                 subscriber.withOnyxInstance.setStateProxy((prevState) => {
-                    const finalCollection = _.clone(prevState[subscriber.statePropertyName] || {});
+                    const finalCollection = lodashClone(prevState[subscriber.statePropertyName] || {});
                     const dataKeys = Object.keys(partialCollection);
                     for (let j = 0; j < dataKeys.length; j++) {
                         const dataKey = dataKeys[j];
@@ -1104,7 +1104,7 @@ function multiSet(data: Partial<NullableKeyValueMapping>): Promise<void> {
  *
  * @param {Array<*>} changes Array of changes that should be applied to the existing value
  */
-function applyMerge(existingValue: unknown, changes: [], shouldRemoveNullObjectValues: boolean) {
+function applyMerge(existingValue: unknown, changes: Array<OnyxEntry<OnyxValue>>, shouldRemoveNullObjectValues: boolean) {
     const lastChange = changes?.at(-1);
 
     if (Array.isArray(lastChange)) {
@@ -1299,7 +1299,14 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
             updatePromises.push(scheduleNotifyCollectionSubscribers(key, value));
         });
 
-        const defaultKeyValuePairs = _.pairs(_.omit(defaultKeyStates, keysToPreserve));
+        const defaultKeyValuePairs = Object.entries(
+            Object.keys(defaultKeyStates)
+                .filter((key) => !keysToPreserve.includes(key))
+                .reduce((obj, key) => {
+                    obj[key] = defaultKeyStates[key];
+                    return obj;
+                }, {}),
+        );
 
         // Remove only the items that we want cleared from storage, and reset others to default
         keysToBeClearedFromStorage.forEach((key) => cache.drop(key));
@@ -1420,6 +1427,16 @@ type OnyxUpdate =
                     onyxMethod: typeof METHOD.MERGE;
                     key: TKey;
                     value: OnyxEntry<NullishDeep<KeyValueMapping[TKey]>>;
+                }
+              | {
+                    onyxMethod: typeof METHOD.MULTI_SET;
+                    key: TKey;
+                    value: Partial<NullableKeyValueMapping>;
+                }
+              | {
+                    onyxMethod: typeof METHOD.CLEAR;
+                    key: TKey;
+                    value?: undefined;
                 };
       }[OnyxKey]
     | {
@@ -1436,7 +1453,7 @@ type OnyxUpdate =
  * @param {Array} data An array of objects with shape {onyxMethod: oneOf('set', 'merge', 'mergeCollection', 'multiSet', 'clear'), key: string, value: *}
  * @returns {Promise} resolves when all operations are complete
  */
-function update(data: OnyxUpdate[]): Promise<void> {
+function update(data: OnyxUpdate[]): Promise<void | void[]> {
     // First, validate the Onyx object is in the format we expect
     data.forEach(({onyxMethod, key, value}) => {
         if (![METHOD.CLEAR, METHOD.SET, METHOD.MERGE, METHOD.MERGE_COLLECTION, METHOD.MULTI_SET].includes(onyxMethod)) {
@@ -1452,7 +1469,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
         }
     });
 
-    const promises = [];
+    const promises: Array<() => Promise<void>> = [];
     let clearPromise = Promise.resolve();
 
     data.forEach(({onyxMethod, key, value}) => {

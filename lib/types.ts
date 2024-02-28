@@ -1,5 +1,5 @@
-import {Merge} from 'type-fest';
-import {BuiltIns} from 'type-fest/source/internal';
+import type {Merge} from 'type-fest';
+import type {BuiltIns} from 'type-fest/source/internal';
 
 /**
  * Represents a deeply nested record. It maps keys to values,
@@ -76,6 +76,7 @@ type TypeOptions = Merge<
  * }
  * ```
  */
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
 interface CustomTypeOptions {}
 
 /**
@@ -98,6 +99,11 @@ type CollectionKey = `${CollectionKeyBase}${string}`;
  * Represents a string union of all Onyx normal and collection keys.
  */
 type OnyxKey = Key | CollectionKey;
+
+/**
+ * Represents a value type of an Onyx key.
+ */
+type OnyxValue = TypeOptions['values'][OnyxKey];
 
 /**
  * Represents a mapping of Onyx keys to values, where keys are either normal or collection Onyx keys
@@ -185,6 +191,7 @@ type OnyxCollection<TOnyxValue> = OnyxEntry<Record<string, TOnyxValue | null>>;
 
 type NonTransformableTypes =
     | BuiltIns
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     | ((...args: any[]) => unknown)
     | Map<unknown, unknown>
     | Set<unknown>
@@ -226,4 +233,18 @@ type NullishObjectDeep<ObjectType extends object> = {
  */
 type WithOnyxInstanceState<TOnyxProps> = (TOnyxProps & {loading: boolean}) | undefined;
 
-export {CollectionKey, CollectionKeyBase, CustomTypeOptions, DeepRecord, Key, KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey, Selector, NullishDeep, WithOnyxInstanceState};
+export type {
+    CollectionKey,
+    CollectionKeyBase,
+    OnyxValue,
+    CustomTypeOptions,
+    DeepRecord,
+    Key,
+    KeyValueMapping,
+    OnyxCollection,
+    OnyxEntry,
+    OnyxKey,
+    Selector,
+    NullishDeep,
+    WithOnyxInstanceState,
+};

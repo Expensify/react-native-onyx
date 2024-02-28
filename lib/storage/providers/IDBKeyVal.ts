@@ -27,7 +27,7 @@ const provider: StorageProvider = {
                 const upsertMany = pairs.map(([key, value], index) => {
                     const prev = values[index];
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const newValue = utils.fastMerge(prev as any, value);
+                    const newValue = utils.fastMerge(prev as any, value as any);
                     return promisifyRequest(store.put(newValue, key));
                 });
                 return Promise.all(upsertMany);

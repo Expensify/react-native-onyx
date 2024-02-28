@@ -1,7 +1,8 @@
 import type {BatchQueryResult, QueryResult} from 'react-native-quick-sqlite';
+import type {KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey} from '../../types';
 
-type Key = string;
-type Value = IDBValidKey | null;
+type Key = OnyxKey;
+type Value = OnyxEntry<KeyValueMapping[OnyxKey]> | OnyxCollection<KeyValueMapping[OnyxKey]>;
 type KeyValuePair = [Key, Value];
 type KeyList = Key[];
 type KeyValuePairList = KeyValuePair[];
