@@ -1,7 +1,7 @@
 import type {BatchQueryResult, QueryResult} from 'react-native-quick-sqlite';
 
 type Key = string;
-type Value = IDBValidKey;
+type Value = IDBValidKey | null;
 type KeyValuePair = [Key, Value];
 type KeyList = Key[];
 type KeyValuePairList = KeyValuePair[];
@@ -60,11 +60,6 @@ type StorageProvider = {
      * Clears absolutely everything from storage
      */
     clear: () => Promise<QueryResult | void>;
-
-    /**
-     * Sets memory only keys
-     */
-    setMemoryOnlyKeys: () => void;
 
     /**
      * Gets the total bytes of the database file
