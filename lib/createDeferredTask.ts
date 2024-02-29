@@ -1,6 +1,6 @@
 type DeferredTask = {
-    promise: Promise<unknown>;
-    resolve: (value: unknown) => void;
+    promise: Promise<void>;
+    resolve?: () => void;
 };
 
 /**
@@ -9,7 +9,7 @@ type DeferredTask = {
  * Useful when we want to wait for a tasks that is resolved from an external action
  */
 export default function createDeferredTask(): DeferredTask {
-    const deferred: DeferredTask = {} as DeferredTask;
+    const deferred = {} as DeferredTask;
 
     deferred.promise = new Promise((res) => {
         deferred.resolve = res;
