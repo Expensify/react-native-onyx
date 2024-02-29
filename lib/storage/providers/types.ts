@@ -10,6 +10,10 @@ type OnStorageKeyChanged = (key: Key, value: Value | null) => void;
 
 type StorageProvider = {
     /**
+     * Initializes the storage provider
+     */
+    init: () => void;
+    /**
      * Gets the value of a given key or return `null` if it's not available in storage
      */
     getItem: (key: Key) => Promise<Value | null>;
@@ -78,4 +82,4 @@ type StorageProvider = {
 };
 
 export default StorageProvider;
-export type {Value, Key, KeyList, KeyValuePairList};
+export type {Value, Key, KeyList, KeyValuePairList, OnStorageKeyChanged};

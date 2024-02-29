@@ -10,6 +10,7 @@ const set = jest.fn((key, value) => {
 });
 
 const idbKeyvalMock: StorageProvider = {
+    init: () => undefined,
     setItem(key, value) {
         return set(key, value);
     },
@@ -60,10 +61,12 @@ const idbKeyvalMock: StorageProvider = {
     },
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     setMemoryOnlyKeys() {},
+    keepInstancesSync: () => undefined,
 };
 
 const idbKeyvalMockSpy = {
     idbKeyvalSet: set,
+    init: jest.fn(idbKeyvalMock.init),
     setItem: jest.fn(idbKeyvalMock.setItem),
     getItem: jest.fn(idbKeyvalMock.getItem),
     removeItem: jest.fn(idbKeyvalMock.removeItem),
@@ -80,6 +83,7 @@ const idbKeyvalMockSpy = {
     }),
     getDatabaseSize: jest.fn(idbKeyvalMock.getDatabaseSize),
     setMemoryOnlyKeys: jest.fn(idbKeyvalMock.setMemoryOnlyKeys),
+    keepInstancesSync: jest.fn(idbKeyvalMock.keepInstancesSync),
 };
 
 export default idbKeyvalMockSpy;
