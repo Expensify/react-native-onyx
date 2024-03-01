@@ -183,6 +183,11 @@ type OnyxEntry<TOnyxValue> = TOnyxValue | null;
  */
 type OnyxCollection<TOnyxValue> = OnyxEntry<Record<string, TOnyxValue | null>>;
 
+/**
+ * * Utility type to extract `TOnyxValue` from `OnyxCollection<TOnyxValue>`.
+ */
+type ExtractOnyxCollectionValue<TOnyxCollection> = TOnyxCollection extends NonNullable<OnyxCollection<infer U>> ? U : never;
+
 type NonTransformableTypes =
     | BuiltIns
     | ((...args: any[]) => unknown)
@@ -226,4 +231,18 @@ type NullishObjectDeep<ObjectType extends object> = {
  */
 type WithOnyxInstanceState<TOnyxProps> = (TOnyxProps & {loading: boolean}) | undefined;
 
-export {CollectionKey, CollectionKeyBase, CustomTypeOptions, DeepRecord, Key, KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey, Selector, NullishDeep, WithOnyxInstanceState};
+export {
+    CollectionKey,
+    CollectionKeyBase,
+    CustomTypeOptions,
+    DeepRecord,
+    Key,
+    KeyValueMapping,
+    OnyxCollection,
+    OnyxEntry,
+    OnyxKey,
+    Selector,
+    NullishDeep,
+    WithOnyxInstanceState,
+    ExtractOnyxCollectionValue,
+};
