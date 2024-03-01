@@ -61,9 +61,7 @@ const Storage: Storage = {
      * and enables fallback providers if necessary
      */
     init() {
-        tryOrDegradePerformance(() => {
-            provider.init();
-        }).finally(() => {
+        tryOrDegradePerformance(provider.init).finally(() => {
             finishInitalization();
         });
     },
