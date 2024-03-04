@@ -921,9 +921,12 @@ describe('Onyx', () => {
             {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.OTHER_TEST, value: 'pizza'},
             {onyxMethod: Onyx.METHOD.MERGE_COLLECTION, key: ONYX_KEYS.COLLECTION.TEST_UPDATE, value: {[itemKey]: {a: 'a'}}},
         ]).then(() => {
-            expect(collectionCallback).toHaveBeenNthCalledWith(1, {[itemKey]: {a: 'a'}});
-            expect(testCallback).toHaveBeenNthCalledWith(1, 'taco', ONYX_KEYS.TEST_KEY);
-            expect(otherTestCallback).toHaveBeenNthCalledWith(1, 'pizza', ONYX_KEYS.OTHER_TEST);
+            expect(collectionCallback).toHaveBeenNthCalledWith(1, null, undefined);
+            expect(collectionCallback).toHaveBeenNthCalledWith(2, {[itemKey]: {a: 'a'}});
+            expect(testCallback).toHaveBeenNthCalledWith(1, null, undefined);
+            expect(testCallback).toHaveBeenNthCalledWith(2, 'taco', ONYX_KEYS.TEST_KEY);
+            expect(otherTestCallback).toHaveBeenNthCalledWith(1, 42, ONYX_KEYS.OTHER_TEST);
+            expect(otherTestCallback).toHaveBeenNthCalledWith(2, 'pizza', ONYX_KEYS.OTHER_TEST);
             Onyx.disconnect(connectionIDs);
         });
     });
