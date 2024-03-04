@@ -43,7 +43,12 @@ test('Cache eviction', () => {
 
             // When we set a new key we want to add and force the first attempt to fail
             const originalSetItem = StorageMock.setItem;
-            const setItemMock = jest.fn(originalSetItem).mockImplementationOnce(() => new Promise((_resolve, reject) => reject()));
+            const setItemMock = jest.fn(originalSetItem).mockImplementationOnce(
+                () =>
+                    new Promise((_resolve, reject) => {
+                        reject();
+                    }),
+            );
             StorageMock.setItem = setItemMock;
 
             return Onyx.set(`${ONYX_KEYS.COLLECTION.TEST_KEY}${RECORD_TO_ADD}`, {test: 'add'}).then(() => {

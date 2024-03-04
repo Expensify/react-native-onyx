@@ -4,15 +4,15 @@
  * when using LocalStorage APIs in the browser. These events are great because multiple tabs can listen for when
  * data changes and then stay up-to-date with everything happening in Onyx.
  */
-import type {KeyList, Key, OnStorageKeyChanged, Value} from '../providers/types';
+import type {OnyxKey, OnyxValue} from '../../types';
+import type {KeyList, OnStorageKeyChanged} from '../providers/types';
 
 const SYNC_ONYX = 'SYNC_ONYX';
 
 /**
  * Raise an event through `localStorage` to let other tabs know a value changed
- * @param {String} onyxKey
  */
-function raiseStorageSyncEvent(onyxKey: Key) {
+function raiseStorageSyncEvent(onyxKey: OnyxKey) {
     global.localStorage.setItem(SYNC_ONYX, onyxKey);
     global.localStorage.removeItem(SYNC_ONYX);
 }
@@ -25,7 +25,7 @@ function raiseStorageSyncManyKeysEvent(onyxKeys: KeyList) {
 
 const InstanceSync = {
     /**
-     * @param {Function} onStorageKeyChanged Storage synchronization mechanism keeping all opened tabs in sync
+     * @param onStorageKeyChanged Storage synchronization mechanism keeping all opened tabs in sync
      */
     init: (onStorageKeyChanged: OnStorageKeyChanged) => {
         // This listener will only be triggered by events coming from other tabs
@@ -37,7 +37,7 @@ const InstanceSync = {
 
             const onyxKey = event.newValue;
             // @ts-expect-error `this` will be substituted later in actual function call
-            this.getItem(onyxKey).then((value: Value) => onStorageKeyChanged(onyxKey, value));
+            this.getItem(onyxKey).then((value: OnyxValue) => onStorageKeyChanged(onyxKey, value));
         });
     },
     setItem: raiseStorageSyncEvent,
