@@ -1,8 +1,9 @@
+import type {OnyxKey, OnyxValue} from '../../types';
 import utils from '../../utils';
-import type {Key, KeyValuePairList, Value} from '../providers/types';
+import type {KeyValuePairList} from '../providers/types';
 import type StorageProvider from '../providers/types';
 
-let storageMapInternal: Record<Key, Value> = {};
+let storageMapInternal: Record<OnyxKey, OnyxValue> = {};
 
 const set = jest.fn((key, value) => {
     storageMapInternal[key] = value;
@@ -10,6 +11,7 @@ const set = jest.fn((key, value) => {
 });
 
 const idbKeyvalMock: StorageProvider = {
+    init: () => undefined,
     setItem(key, value) {
         return set(key, value);
     },
@@ -69,6 +71,7 @@ const idbKeyvalMock: StorageProvider = {
 
 const idbKeyvalMockSpy = {
     idbKeyvalSet: set,
+    init: jest.fn(idbKeyvalMock.init),
     setItem: jest.fn(idbKeyvalMock.setItem),
     getItem: jest.fn(idbKeyvalMock.getItem),
     removeItem: jest.fn(idbKeyvalMock.removeItem),
