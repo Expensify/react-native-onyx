@@ -1583,3 +1583,4 @@ const Onyx = {
 } as const;
 
 export default Onyx;
+export type {OnyxUpdate, Mapping};
