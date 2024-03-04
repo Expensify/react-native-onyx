@@ -7,7 +7,7 @@ import * as Logger from './Logger';
 import cache from './OnyxCache';
 import * as Str from './Str';
 import createDeferredTask from './createDeferredTask';
-import * as PerformanceUtils from './metrics/PerformanceUtils';
+import * as PerformanceUtils from './PerformanceUtils';
 import Storage from './storage';
 import utils from './utils';
 import unstable_batchedUpdates from './batch';
