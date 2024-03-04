@@ -148,7 +148,7 @@ class OnyxCache {
     }
 
     /** Adds a key to the top of the recently accessed keys */
-    private addToAccessedKeys(key: OnyxKey): void {
+    addToAccessedKeys(key: OnyxKey): void {
         this.recentKeys.delete(key);
         this.recentKeys.add(key);
     }

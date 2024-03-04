@@ -109,9 +109,6 @@ const Storage: Storage = {
         return provider.clear();
     },
 
-    // This is a noop for now in order to keep clients from crashing see https://github.com/Expensify/Expensify/issues/312438
-    setMemoryOnlyKeys: () => provider.setMemoryOnlyKeys(),
-
     /**
      * Returns all available keys
      */
