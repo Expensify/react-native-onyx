@@ -1254,11 +1254,10 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<Array<[void, void]>> {
                     cache.set(key, newValue);
                     const collectionKey = key.substring(0, key.indexOf('_') + 1);
                     if (collectionKey) {
-                        let collection = keyValuesToResetAsCollection[collectionKey];
-                        if (!collection) {
-                            collection = {};
+                        if (!keyValuesToResetAsCollection[collectionKey]) {
+                            keyValuesToResetAsCollection[collectionKey] = {};
                         }
-                        collection[key] = newValue;
+                        keyValuesToResetAsCollection[collectionKey]![key] = newValue;
                     } else {
                         keyValuesToResetIndividually[key] = newValue;
                     }
