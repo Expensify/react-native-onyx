@@ -682,7 +682,7 @@ function keyChanged(
  *     - sets state on the withOnyxInstances
  *     - triggers the callback function
  */
-function sendDataToConnection(mapping: Mapping<OnyxKey>, val: OnyxValue, matchedKey: OnyxKey | undefined, isBatched: boolean) {
+function sendDataToConnection(mapping: Mapping<OnyxKey>, val: OnyxValue | Record<OnyxKey, OnyxValue>, matchedKey: OnyxKey | undefined, isBatched: boolean) {
     // If the mapping no longer exists then we should not send any data.
     // This means our subscriber disconnected or withOnyx wrapped component unmounted.
     if (!callbackToStateMapping[mapping.connectionID]) {
@@ -696,7 +696,7 @@ function sendDataToConnection(mapping: Mapping<OnyxKey>, val: OnyxValue, matched
         // returned by the selector.
         if (mapping.selector) {
             if (isCollectionKey(mapping.key)) {
-                newData = reduceCollectionWithSelector(val, mapping.selector, mapping.withOnyxInstance.state);
+                newData = reduceCollectionWithSelector(val as Record<OnyxKey, OnyxValue>, mapping.selector, mapping.withOnyxInstance.state);
             } else {
                 newData = mapping.selector(val, mapping.withOnyxInstance.state);
             }
