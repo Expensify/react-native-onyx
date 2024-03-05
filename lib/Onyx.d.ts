@@ -318,7 +318,7 @@ declare function setMemoryOnlyKeys(keyList: OnyxKey[]): void;
 declare function tryGetCachedValue<TKey extends OnyxKey>(
     key: TKey,
     mapping?: TryGetCachedValueMapping,
-): TKey extends CollectionKeyBase ? OnyxCollection<KeyValueMapping[TKey]> : OnyxEntry<KeyValueMapping[TKey]>;
+): TKey extends CollectionKeyBase ? OnyxCollection<KeyValueMapping[TKey]> | undefined : OnyxEntry<KeyValueMapping[TKey]>;
 
 declare const Onyx: {
     connect: typeof connect;
