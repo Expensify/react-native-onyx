@@ -71,3 +71,5 @@ jobs:
 
             - name: Comment on merged pull request
               run: gh pr comment ${{ steps.getMergedPullRequest.outputs.number }} --body "🚀Published to npm in v${{ env.NEW_VERSION }}"
+              env:
+                GITHUB_TOKEN: ${{ github.token }}
