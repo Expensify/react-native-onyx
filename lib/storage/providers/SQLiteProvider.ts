@@ -14,6 +14,10 @@ let db: QuickSQLiteConnection;
 
 const provider: StorageProvider = {
     /**
+     * The name of the provider that can be printed to the logs
+     */
+    name: 'SQLiteProvider',
+    /**
      * Initializes the storage provider
      */
     init() {

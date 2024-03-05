@@ -9,6 +9,10 @@ type OnStorageKeyChanged = (key: OnyxKey, value: OnyxValue | null) => void;
 
 type StorageProvider = {
     /**
+     * The name of the provider that can be printed to the logs
+     */
+    name: string;
+    /**
      * Initializes the storage provider
      */
     init: () => void;
@@ -76,4 +80,4 @@ type StorageProvider = {
 };
 
 export default StorageProvider;
-export type {KeyList, KeyValuePairList, OnStorageKeyChanged};
+export type {KeyList, KeyValuePair, KeyValuePairList, OnStorageKeyChanged};
