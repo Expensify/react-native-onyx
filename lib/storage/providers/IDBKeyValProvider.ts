@@ -10,10 +10,6 @@ let idbKeyValStore: UseStore;
 
 const provider: StorageProvider = {
     /**
-     * The name of the provider that can be printed to the logs
-     */
-    name: 'IDBKeyValProvider',
-    /**
      * Initializes the storage provider
      */
     init() {

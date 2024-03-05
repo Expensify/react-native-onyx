@@ -10,7 +10,6 @@ const set = jest.fn((key, value) => {
 });
 
 const idbKeyvalMock: StorageProvider = {
-    name: 'KeyValMockProvider',
     init: () => undefined,
     setItem(key, value) {
         return set(key, value);
