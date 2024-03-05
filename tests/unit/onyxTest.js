@@ -911,22 +911,36 @@ describe('Onyx', () => {
         const testCallback = jest.fn();
         const otherTestCallback = jest.fn();
         const collectionCallback = jest.fn();
-        const itemKey = `${ONYX_KEYS.COLLECTION.TEST_UPDATE}1`;
+        const itemKey1 = `${ONYX_KEYS.COLLECTION.TEST_UPDATE}1`;
+        const itemKey2 = `${ONYX_KEYS.COLLECTION.TEST_UPDATE}2`;
 
         connectionIDs.push(Onyx.connect({key: ONYX_KEYS.TEST_KEY, callback: testCallback}));
         connectionIDs.push(Onyx.connect({key: ONYX_KEYS.OTHER_TEST, callback: otherTestCallback}));
         connectionIDs.push(Onyx.connect({key: ONYX_KEYS.COLLECTION.TEST_UPDATE, callback: collectionCallback, waitForCollectionCallback: true}));
+
         return Onyx.update([
             {onyxMethod: Onyx.METHOD.SET, key: ONYX_KEYS.TEST_KEY, value: 'taco'},
-            {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.OTHER_TEST, value: 'pizza'},
-            {onyxMethod: Onyx.METHOD.MERGE_COLLECTION, key: ONYX_KEYS.COLLECTION.TEST_UPDATE, value: {[itemKey]: {a: 'a'}}},
+            {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.OTHER_TEST, value: {food: 'pizza'}},
+            {onyxMethod: Onyx.METHOD.MERGE, key: itemKey2, value: {b: 'b'}},
+            {
+                onyxMethod: Onyx.METHOD.MERGE_COLLECTION,
+                key: ONYX_KEYS.COLLECTION.TEST_UPDATE,
+                value: {
+                    [itemKey1]: {a: 'a'},
+                    [itemKey2]: {c: 'c'},
+                },
+            },
+            {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.OTHER_TEST, value: {drink: 'water'}},
         ]).then(() => {
             expect(collectionCallback).toHaveBeenNthCalledWith(1, null, undefined);
-            expect(collectionCallback).toHaveBeenNthCalledWith(2, {[itemKey]: {a: 'a'}});
+            expect(collectionCallback).toHaveBeenNthCalledWith(2, {
+                [itemKey1]: {a: 'a'},
+                [itemKey2]: {b: 'b', c: 'c'},
+            });
             expect(testCallback).toHaveBeenNthCalledWith(1, null, undefined);
             expect(testCallback).toHaveBeenNthCalledWith(2, 'taco', ONYX_KEYS.TEST_KEY);
             expect(otherTestCallback).toHaveBeenNthCalledWith(1, 42, ONYX_KEYS.OTHER_TEST);
-            expect(otherTestCallback).toHaveBeenNthCalledWith(2, 'pizza', ONYX_KEYS.OTHER_TEST);
+            expect(otherTestCallback).toHaveBeenNthCalledWith(2, {food: 'pizza', drink: 'water'}, ONYX_KEYS.OTHER_TEST);
             Onyx.disconnect(connectionIDs);
         });
     });
