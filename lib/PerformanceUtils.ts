@@ -41,7 +41,7 @@ function diffObject<TObject extends UnknownObject, TBase extends UnknownObject>(
 /**
  * Provide insights into why a setState() call occurred by diffing the before and after values.
  */
-function logSetStateCall(mapping: Mapping<OnyxKey>, previousValue: unknown, newValue: unknown, caller: string, keyThatChanged?: string) {
+function logSetStateCall<TKey extends OnyxKey>(mapping: Mapping<TKey>, previousValue: unknown, newValue: unknown, caller: string, keyThatChanged?: string) {
     if (!debugSetState) {
         return;
     }

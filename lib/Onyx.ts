@@ -48,13 +48,10 @@ type WithOnyxInstance = Component<unknown, WithOnyxInstanceState<Record<OnyxKey,
 
 /** Represents the base options used in `Onyx.connect()` method. */
 type BaseConnectOptions<TKey extends OnyxKey> = {
-    statePropertyName: string;
+    key: string;
+    selector?: Selector<TKey, unknown, unknown>;
     withOnyxInstance?: WithOnyxInstance;
     initWithStoredValues?: boolean;
-    selector?: Selector<TKey, unknown, unknown>;
-    connectionID: number;
-    key: string;
-    displayName: string;
     canEvict?: boolean;
 };
 
@@ -70,7 +67,7 @@ type BaseConnectOptions<TKey extends OnyxKey> = {
  * If `waitForCollectionCallback` is `false` or not specified, the `key` can be any Onyx key and `callback` will be triggered with updates of each collection item
  * and will pass `value` as an `OnyxEntry`.
  */
-type Mapping<TKey extends OnyxKey> = BaseConnectOptions<TKey> &
+type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions<TKey> &
     (
         | {
               key: TKey extends CollectionKeyBase ? TKey : never;
@@ -83,6 +80,8 @@ type Mapping<TKey extends OnyxKey> = BaseConnectOptions<TKey> &
               waitForCollectionCallback?: false;
           }
     );
+
+type Mapping<TKey extends OnyxKey> = ConnectOptions<TKey> & {connectionID: number; statePropertyName: string; displayName: string};
 
 // Method constants
 const METHOD = {
@@ -682,7 +681,7 @@ function keyChanged(
  *     - sets state on the withOnyxInstances
  *     - triggers the callback function
  */
-function sendDataToConnection(mapping: Mapping<OnyxKey>, val: OnyxValue | Record<OnyxKey, OnyxValue>, matchedKey: OnyxKey | undefined, isBatched: boolean) {
+function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, val: OnyxValue | Record<OnyxKey, OnyxValue>, matchedKey: TKey | undefined, isBatched: boolean) {
     // If the mapping no longer exists then we should not send any data.
     // This means our subscriber disconnected or withOnyx wrapped component unmounted.
     if (!callbackToStateMapping[mapping.connectionID]) {
@@ -714,7 +713,7 @@ function sendDataToConnection(mapping: Mapping<OnyxKey>, val: OnyxValue | Record
     }
 
     if (typeof mapping.callback === 'function') {
-        mapping.callback(val as Record<OnyxKey, OnyxValue>, matchedKey as string);
+        mapping.callback(val as Record<OnyxKey, OnyxValue>, matchedKey as TKey);
     }
 }
 
@@ -722,7 +721,7 @@ function sendDataToConnection(mapping: Mapping<OnyxKey>, val: OnyxValue | Record
  * We check to see if this key is flagged as safe for eviction and add it to the recentlyAccessedKeys list so that when we
  * run out of storage the least recently accessed key can be removed.
  */
-function addKeyToRecentlyAccessedIfNeeded(mapping: Mapping<OnyxKey>) {
+function addKeyToRecentlyAccessedIfNeeded<TKey extends OnyxKey>(mapping: Mapping<TKey>) {
     if (!isSafeEvictionKey(mapping.key)) {
         return;
     }
@@ -743,7 +742,7 @@ function addKeyToRecentlyAccessedIfNeeded(mapping: Mapping<OnyxKey>) {
 /**
  * Gets the data for a given an array of matching keys, combines them into an object, and sends the result back to the subscriber.
  */
-function getCollectionDataAndSendAsObject(matchingKeys: CollectionKeyBase[], mapping: Mapping<OnyxKey>) {
+function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: CollectionKeyBase[], mapping: Mapping<TKey>) {
     // Keys that are not in the cache
     const missingKeys: OnyxKey[] = [];
     // Tasks that are pending
@@ -836,8 +835,8 @@ function getCollectionDataAndSendAsObject(matchingKeys: CollectionKeyBase[], map
  * @param [mapping.waitForCollectionCallback] If set to true, it will return the entire collection to the callback as a single object
  * @returns an ID to use when calling disconnect
  */
-function connect(mappingWithoutConnectionID: Omit<Mapping<OnyxKey>, 'connectionID'>): number {
-    const mapping = mappingWithoutConnectionID as Mapping<OnyxKey>;
+function connect<TKey extends OnyxKey>(options: ConnectOptions<TKey>): number {
+    const mapping = options as unknown as Mapping<OnyxKey>;
 
     const connectionID = lastConnectionID++;
     callbackToStateMapping[connectionID] = mapping;
@@ -892,7 +891,7 @@ function connect(mappingWithoutConnectionID: Omit<Mapping<OnyxKey>, 'connectionI
 
                     // We did not opt into using waitForCollectionCallback mode so the callback is called for every matching key.
                     for (let i = 0; i < matchingKeys.length; i++) {
-                        get(matchingKeys[i]).then((val) => sendDataToConnection(mapping, val, matchingKeys[i], true));
+                        get(matchingKeys[i]).then((val) => sendDataToConnection(mapping, val, matchingKeys[i] as TKey, true));
                     }
                     return;
                 }
