@@ -13,7 +13,7 @@ import Storage from './storage';
 import utils from './utils';
 import unstable_batchedUpdates from './batch';
 import DevTools from './DevTools';
-import type {CollectionKeyBase, DeepRecord, KeyValueMapping, NullishDeep, OnyxCollection, OnyxEntry, OnyxKey, OnyxValue, Selector, WithOnyxInstanceState} from './types';
+import type {CollectionKey, CollectionKeyBase, DeepRecord, KeyValueMapping, NullishDeep, OnyxCollection, OnyxEntry, OnyxKey, OnyxValue, Selector, WithOnyxInstanceState} from './types';
 
 /**
  * Represents a mapping object where each `OnyxKey` maps to either a value of its corresponding type in `KeyValueMapping` or `null`.
@@ -48,7 +48,6 @@ type WithOnyxInstance = Component<unknown, WithOnyxInstanceState<Record<OnyxKey,
 
 /** Represents the base options used in `Onyx.connect()` method. */
 type BaseConnectOptions<TKey extends OnyxKey> = {
-    key: string;
     selector?: Selector<TKey, unknown, unknown>;
     withOnyxInstance?: WithOnyxInstance;
     initWithStoredValues?: boolean;
@@ -70,7 +69,7 @@ type BaseConnectOptions<TKey extends OnyxKey> = {
 type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions<TKey> &
     (
         | {
-              key: TKey extends CollectionKeyBase ? TKey : never;
+              key: TKey extends CollectionKey ? TKey : never;
               callback?: (value: OnyxCollection<KeyValueMapping[TKey]>) => void;
               waitForCollectionCallback: true;
           }
@@ -1652,4 +1651,4 @@ const Onyx = {
 } as const;
 
 export default Onyx;
-export type {OnyxUpdate, Mapping};
+export type {OnyxUpdate, Mapping, ConnectOptions};
