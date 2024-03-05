@@ -60,3 +60,14 @@ jobs:
               run: npm publish
               env:
                   NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+            - name: Get merged pull request
+              id: getMergedPullRequest
+              run: |
+                read -r number < <(gh pr list --search ${{ github.sha }} --state merged --json 'number' | jq -r '.[0] | [.number] | join(" ")')
+                echo "number=$number" >> "$GITHUB_OUTPUT"
+              env:
+                GITHUB_TOKEN: ${{ github.token }}
+
+            - name: Comment on merged pull request
+              run: gh pr comment ${{ steps.getMergedPullRequest.outputs.number }} --body "🚀Published to npm in v${{ env.NEW_VERSION }}"
