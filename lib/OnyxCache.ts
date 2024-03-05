@@ -130,10 +130,13 @@ class OnyxCache {
 
         this.storageMap = {...utils.fastMerge(this.storageMap, data, false)};
 
-        this.hasKeysChanged = true;
         const storageKeys = this.getAllKeys();
         const mergedKeys = Object.keys(data);
         this.storageKeys = new Set([...storageKeys, ...mergedKeys]);
+
+        // set the flag to indicate that the keys have changed
+        this.hasKeysChanged = true;
+
         mergedKeys.forEach((key) => this.addToAccessedKeys(key));
     }
 
