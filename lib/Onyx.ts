@@ -189,7 +189,7 @@ function reduceCollectionWithSelector<TKey extends CollectionKeyBase, TMap, TRet
     selector: Selector<TKey, TMap, TReturn> | undefined,
     withOnyxInstanceState: WithOnyxInstanceState<TMap> | undefined,
 ): Record<OnyxKey, OnyxValue> {
-    return Object.values(collection).reduce((finalCollection: Record<OnyxKey, OnyxValue>, item, key) => {
+    return Object.entries(collection ?? {}).reduce((finalCollection: Record<OnyxKey, OnyxValue>, [key, item]) => {
         // eslint-disable-next-line no-param-reassign
         finalCollection[key] = selector?.(item, withOnyxInstanceState);
 
@@ -696,7 +696,7 @@ function sendDataToConnection(mapping: Mapping<OnyxKey>, val: OnyxValue, matched
         // returned by the selector.
         if (mapping.selector) {
             if (isCollectionKey(mapping.key)) {
-                newData = mapping.selector(val, mapping.withOnyxInstance.state);
+                newData = reduceCollectionWithSelector(val, mapping.selector, mapping.withOnyxInstance.state);
             } else {
                 newData = mapping.selector(val, mapping.withOnyxInstance.state);
             }
