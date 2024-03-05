@@ -113,7 +113,9 @@ const provider: StorageProvider = {
         return Promise.resolve();
     },
 
-    // This is a noop for now in order to keep clients from crashing see https://github.com/Expensify/Expensify/issues/312438
+    /*
+     * Since this is an in-memory only provider, nothing special needs to happen here and it can just be a noop
+     */
     setMemoryOnlyKeys() {
         // do nothing
     },
