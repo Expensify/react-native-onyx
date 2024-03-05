@@ -1578,6 +1578,12 @@ type InitOptions = {
     debugSetState?: boolean;
 };
 
+/** When set these keys will not be persisted to storage */
+function setMemoryOnlyKeys() {
+    // When in memory only mode for certain keys we do not want to ever drop items from the cache as the user will have no way to recover them again via storage.
+    cache.setRecentKeysLimit(Infinity);
+}
+
 /** Initialize the store with actions and listening for storage events */
 function init({
     keys = {},
@@ -1643,6 +1649,7 @@ const Onyx = {
     METHOD,
     tryGetCachedValue,
     hasPendingMergeForKey,
+    setMemoryOnlyKeys,
 } as const;
 
 export default Onyx;
