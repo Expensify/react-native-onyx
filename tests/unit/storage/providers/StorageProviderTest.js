@@ -1,11 +1,11 @@
 /* eslint-disable import/first */
-jest.unmock('../../../../lib/storage/platforms/index.native');
-jest.unmock('../../../../lib/storage/platforms/index');
-jest.unmock('../../../../lib/storage/providers/IDBKeyValProvider');
+jest.unmock('../../../../lib/storage/NativeStorage');
+jest.unmock('../../../../lib/storage/WebStorage');
+jest.unmock('../../../../lib/storage/providers/IDBKeyVal');
 
 import _ from 'underscore';
-import NativeStorage from '../../../../lib/storage/platforms/index.native';
-import WebStorage from '../../../../lib/storage/platforms/index';
+import NativeStorage from '../../../../lib/storage/NativeStorage';
+import WebStorage from '../../../../lib/storage/WebStorage';
 
 it('storage providers have same methods implemented', () => {
     const nativeMethods = _.keys(NativeStorage);
