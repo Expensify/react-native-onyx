@@ -28,11 +28,25 @@ class OnyxCache {
     /** Maximum size of the keys store din cache */
     private maxRecentKeysSize = 0;
 
+    /**
+     * Array to store the keys that are created from the storageKeys using
+     * `Array.from` method. This is used to prevent creating a new array
+     * every time `getAllKeys` is called.
+     */
+    private storageKeysArray: Key[];
+
+    /**
+     * Flag to indicate if the keys have changed.
+     */
+    private hasKeysChanged: boolean;
+
     constructor() {
         this.storageKeys = new Set();
         this.recentKeys = new Set();
         this.storageMap = {};
         this.pendingPromises = new Map();
+        this.storageKeysArray = [];
+        this.hasKeysChanged = false;
 
         // bind all public methods to prevent problems with `this`
         bindAll(
@@ -54,7 +68,11 @@ class OnyxCache {
 
     /** Get all the storage keys */
     getAllKeys(): Key[] {
-        return Array.from(this.storageKeys);
+        if (this.hasKeysChanged) {
+            this.storageKeysArray = Array.from(this.storageKeys);
+        }
+        this.hasKeysChanged = false;
+        return this.storageKeysArray;
     }
 
     /**
@@ -78,6 +96,7 @@ class OnyxCache {
      */
     addKey(key: Key): void {
         this.storageKeys.add(key);
+        this.hasKeysChanged = true;
     }
 
     /**
@@ -97,6 +116,7 @@ class OnyxCache {
         delete this.storageMap[key];
         this.storageKeys.delete(key);
         this.recentKeys.delete(key);
+        this.hasKeysChanged = true;
     }
 
     /**
@@ -110,6 +130,7 @@ class OnyxCache {
 
         this.storageMap = {...utils.fastMerge(this.storageMap, data, false)};
 
+        this.hasKeysChanged = true;
         const storageKeys = this.getAllKeys();
         const mergedKeys = Object.keys(data);
         this.storageKeys = new Set([...storageKeys, ...mergedKeys]);
