@@ -561,10 +561,6 @@ describe('withOnyxTest', () => {
                         key: ONYX_KEYS.SIMPLE_KEY,
                         initialValue: 'initialValue',
                     },
-                    simple2: {
-                        key: ONYX_KEYS.SIMPLE_KEY_2,
-                        initialValue: false,
-                    },
                 })(ViewWithCollections);
                 render(
                     <TestComponentWithOnyx
@@ -582,7 +578,6 @@ describe('withOnyxTest', () => {
                     onRender,
                     testObject: {isDefaultProp: true},
                     simple: 'initialValue',
-                    simple2: false,
                 });
             });
     });
