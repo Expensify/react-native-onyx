@@ -9,6 +9,10 @@ type OnStorageKeyChanged = <TKey extends OnyxKey>(key: TKey, value: OnyxValue<TK
 
 type StorageProvider = {
     /**
+     * The name of the provider that can be printed to the logs
+     */
+    name: string;
+    /**
      * Initializes the storage provider
      */
     init: () => void;
