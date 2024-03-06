@@ -77,11 +77,17 @@ function useOnyx<TKey extends OnyxKey, TReturnData = OnyxValue<TKey>>(key: TKey,
             return;
         }
 
-        const previousCollectionKey = Onyx.splitCollectionMemberKey(previousKey)[0];
-        const collectionKey = Onyx.splitCollectionMemberKey(key)[0];
+        try {
+            const previousCollectionKey = Onyx.splitCollectionMemberKey(previousKey)[0];
+            const collectionKey = Onyx.splitCollectionMemberKey(key)[0];
 
-        if (Onyx.isCollectionMemberKey(previousCollectionKey, previousKey) && Onyx.isCollectionMemberKey(collectionKey, key) && previousCollectionKey === collectionKey) {
-            return;
+            if (Onyx.isCollectionMemberKey(previousCollectionKey, previousKey) && Onyx.isCollectionMemberKey(collectionKey, key) && previousCollectionKey === collectionKey) {
+                return;
+            }
+        } catch (e) {
+            throw new Error(
+                `'${previousKey}' key can't be changed to '${key}'. useOnyx() only supports dynamic keys if they are both collection member keys from the same collection e.g. from 'collection_id1' to 'collection_id2'.`,
+            );
         }
 
         throw new Error(
