@@ -176,7 +176,7 @@ const Storage: Storage = {
         if (InstanceSync === null) return;
 
         shouldKeepInstancesSync = true;
-        InstanceSync.init(onStorageKeyChanged);
+        InstanceSync.init(onStorageKeyChanged, this);
     },
 };
 
