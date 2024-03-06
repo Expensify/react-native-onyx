@@ -1,5 +1,4 @@
 import _ from 'underscore';
-import sizeof from 'object-sizeof';
 import utils from '../../utils';
 import type StorageProvider from './types';
 import type {Key, KeyValuePair, Value} from './types';
@@ -132,9 +131,7 @@ const provider: StorageProvider = {
      * `bytesRemaining` will always be `Number.POSITIVE_INFINITY` since we don't have a hard limit on memory.
      */
     getDatabaseSize() {
-        const storeSize = sizeof(store);
-
-        return Promise.resolve({bytesRemaining: Number.POSITIVE_INFINITY, bytesUsed: storeSize});
+        return Promise.resolve({bytesRemaining: Number.POSITIVE_INFINITY, bytesUsed: 0});
     },
 };
 
