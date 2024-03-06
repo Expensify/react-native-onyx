@@ -28,9 +28,11 @@ function degradePerformance(error: Error) {
 /**
  * Runs a piece of code and degrades performance if certain errors are thrown
  */
-function tryOrDegradePerformance<T>(fn: () => Promise<T> | T): Promise<T> {
+function tryOrDegradePerformance<T>(fn: () => Promise<T> | T, waitForInitialization = true): Promise<T> {
     return new Promise<T>((resolve, reject) => {
-        initPromise.then(() => {
+        const promise = waitForInitialization ? initPromise : Promise.resolve();
+
+        promise.then(() => {
             try {
                 resolve(fn());
             } catch (error) {
@@ -61,7 +63,7 @@ const Storage: Storage = {
      * and enables fallback providers if necessary
      */
     init() {
-        tryOrDegradePerformance(provider.init).finally(() => {
+        tryOrDegradePerformance(provider.init, false).finally(() => {
             finishInitalization();
         });
     },
