@@ -1,6 +1,6 @@
 import _ from 'underscore';
 
-import IDBKeyValProviderMock from '../../../../lib/storage/providers/IDBKeyVal';
+import IDBKeyValProviderMock from '../../../../lib/storage/providers/IDBKeyValProvider';
 import createDeferredTask from '../../../../lib/createDeferredTask';
 import waitForPromisesToResolve from '../../../utils/waitForPromisesToResolve';
 

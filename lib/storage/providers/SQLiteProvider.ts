@@ -2,7 +2,7 @@
  * The SQLiteStorage provider stores everything in a key/value store by
  * converting the value to a JSON string
  */
-import type {BatchQueryResult} from 'react-native-quick-sqlite';
+import type {BatchQueryResult, QuickSQLiteConnection} from 'react-native-quick-sqlite';
 import {open} from 'react-native-quick-sqlite';
 import {getFreeDiskStorage} from 'react-native-device-info';
 import type StorageProvider from './types';
@@ -10,17 +10,23 @@ import utils from '../../utils';
 import type {KeyList, KeyValuePairList} from './types';
 
 const DB_NAME = 'OnyxDB';
-const db = open({name: DB_NAME});
-
-db.execute('CREATE TABLE IF NOT EXISTS keyvaluepairs (record_key TEXT NOT NULL PRIMARY KEY , valueJSON JSON NOT NULL) WITHOUT ROWID;');
-
-// All of the 3 pragmas below were suggested by SQLite team.
-// You can find more info about them here: https://www.sqlite.org/pragma.html
-db.execute('PRAGMA CACHE_SIZE=-20000;');
-db.execute('PRAGMA synchronous=NORMAL;');
-db.execute('PRAGMA journal_mode=WAL;');
+let db: QuickSQLiteConnection;
 
 const provider: StorageProvider = {
+    /**
+     * Initializes the storage provider
+     */
+    init() {
+        db = open({name: DB_NAME});
+
+        db.execute('CREATE TABLE IF NOT EXISTS keyvaluepairs (record_key TEXT NOT NULL PRIMARY KEY , valueJSON JSON NOT NULL) WITHOUT ROWID;');
+
+        // All of the 3 pragmas below were suggested by SQLite team.
+        // You can find more info about them here: https://www.sqlite.org/pragma.html
+        db.execute('PRAGMA CACHE_SIZE=-20000;');
+        db.execute('PRAGMA synchronous=NORMAL;');
+        db.execute('PRAGMA journal_mode=WAL;');
+    },
     getItem(key) {
         return db.executeAsync('SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key = ?;', [key]).then(({rows}) => {
             if (!rows || rows?.length === 0) {
@@ -94,7 +100,7 @@ const provider: StorageProvider = {
     },
 
     // eslint-disable-next-line @typescript-eslint/no-empty-function
-    keepInstancesSync: () => {},
+    setMemoryOnlyKeys: () => {},
 };
 
 export default provider;

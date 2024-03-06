@@ -9,6 +9,10 @@ type OnStorageKeyChanged = <TKey extends OnyxKey>(key: TKey, value: OnyxValue<TK
 
 type StorageProvider = {
     /**
+     * Initializes the storage provider
+     */
+    init: () => void;
+    /**
      * Gets the value of a given key or return `null` if it's not available in storage
      */
     getItem: <TKey extends OnyxKey>(key: TKey) => Promise<OnyxValue<TKey> | null>;
@@ -72,4 +76,4 @@ type StorageProvider = {
 };
 
 export default StorageProvider;
-export type {KeyList, KeyValuePair, KeyValuePairList};
+export type {KeyList, KeyValuePair, KeyValuePairList, OnStorageKeyChanged};
