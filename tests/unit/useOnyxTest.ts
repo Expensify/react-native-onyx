@@ -219,6 +219,29 @@ describe('useOnyx', () => {
             // must be the same reference
             expect(oldResult).toBe(result.current);
         });
+
+        it('should always use the current selector reference to return new data', async () => {
+            Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name'});
+
+            let selector = (entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name}`;
+
+            const {result} = renderHook(() =>
+                useOnyx(ONYXKEYS.TEST_KEY, {
+                    // @ts-expect-error bypass
+                    selector,
+                }),
+            );
+
+            expect(result.current[0]).toEqual('id - test_id, name - test_name');
+            expect(result.current[1].status).toEqual('loaded');
+
+            selector = (entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name} - selector changed`;
+
+            await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, {id: 'changed_id', name: 'changed_name'}));
+
+            expect(result.current[0]).toEqual('id - changed_id, name - changed_name - selector changed');
+            expect(result.current[1].status).toEqual('loaded');
+        });
     });
 
     describe('initialValue', () => {
