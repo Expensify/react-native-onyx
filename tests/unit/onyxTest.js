@@ -10,6 +10,8 @@ const ONYX_KEYS = {
         TEST_CONNECT_COLLECTION: 'testConnectCollection_',
         TEST_POLICY: 'testPolicy_',
         TEST_UPDATE: 'testUpdate_',
+        PEOPLE: 'people_',
+        ANIMALS: 'animals_',
     },
 };
 
@@ -908,37 +910,68 @@ describe('Onyx', () => {
     it('should return a promise that completes when all update() operations are done', () => {
         const connectionIDs = [];
 
+        const bob = `${ONYX_KEYS.COLLECTION.PEOPLE}bob`;
+        const lisa = `${ONYX_KEYS.COLLECTION.PEOPLE}lisa`;
+
+        const cat = `${ONYX_KEYS.COLLECTION.ANIMALS}cat`;
+        const dog = `${ONYX_KEYS.COLLECTION.ANIMALS}dog`;
+
         const testCallback = jest.fn();
         const otherTestCallback = jest.fn();
-        const collectionCallback = jest.fn();
-        const itemKey1 = `${ONYX_KEYS.COLLECTION.TEST_UPDATE}1`;
-        const itemKey2 = `${ONYX_KEYS.COLLECTION.TEST_UPDATE}2`;
+        const peopleCollectionCallback = jest.fn();
+        const animalsCollectionCallback = jest.fn();
+        const catCallback = jest.fn();
 
         connectionIDs.push(Onyx.connect({key: ONYX_KEYS.TEST_KEY, callback: testCallback}));
         connectionIDs.push(Onyx.connect({key: ONYX_KEYS.OTHER_TEST, callback: otherTestCallback}));
-        connectionIDs.push(Onyx.connect({key: ONYX_KEYS.COLLECTION.TEST_UPDATE, callback: collectionCallback, waitForCollectionCallback: true}));
+        connectionIDs.push(Onyx.connect({key: ONYX_KEYS.COLLECTION.ANIMALS, callback: animalsCollectionCallback, waitForCollectionCallback: true}));
+        connectionIDs.push(Onyx.connect({key: ONYX_KEYS.COLLECTION.PEOPLE, callback: peopleCollectionCallback, waitForCollectionCallback: true}));
+        connectionIDs.push(Onyx.connect({key: cat, callback: catCallback}));
 
         return Onyx.update([
             {onyxMethod: Onyx.METHOD.SET, key: ONYX_KEYS.TEST_KEY, value: 'taco'},
             {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.OTHER_TEST, value: {food: 'pizza'}},
-            {onyxMethod: Onyx.METHOD.MERGE, key: itemKey2, value: {b: 'b'}},
+            {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.OTHER_TEST, value: {drink: 'water'}},
+            {onyxMethod: Onyx.METHOD.MERGE, key: dog, value: {sound: 'woof'}},
             {
                 onyxMethod: Onyx.METHOD.MERGE_COLLECTION,
-                key: ONYX_KEYS.COLLECTION.TEST_UPDATE,
+                key: ONYX_KEYS.COLLECTION.ANIMALS,
                 value: {
-                    [itemKey1]: {a: 'a'},
-                    [itemKey2]: {c: 'c'},
+                    [cat]: {sound: 'meow'},
+                    [dog]: {size: 'M'},
                 },
             },
-            {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.OTHER_TEST, value: {drink: 'water'}},
+            {onyxMethod: Onyx.METHOD.MERGE, key: cat, value: {size: 'S'}},
+            {onyxMethod: Onyx.METHOD.MERGE, key: bob, value: {car: 'sedan'}},
+            {onyxMethod: Onyx.METHOD.MERGE, key: lisa, value: {car: 'SUV', age: 21}},
+            {onyxMethod: Onyx.METHOD.MERGE, key: bob, value: {age: 25}},
         ]).then(() => {
-            expect(collectionCallback).toHaveBeenNthCalledWith(1, null, undefined);
-            expect(collectionCallback).toHaveBeenNthCalledWith(2, {
-                [itemKey1]: {a: 'a'},
-                [itemKey2]: {b: 'b', c: 'c'},
+            expect(animalsCollectionCallback).toHaveBeenCalledTimes(2);
+            expect(animalsCollectionCallback).toHaveBeenNthCalledWith(1, null, undefined);
+            expect(animalsCollectionCallback).toHaveBeenNthCalledWith(2, {
+                [cat]: {size: 'S', sound: 'meow'},
+                [dog]: {size: 'M', sound: 'woof'},
             });
+
+            expect(catCallback).toHaveBeenCalledTimes(2);
+            expect(catCallback).toHaveBeenNthCalledWith(1, null, undefined);
+            expect(catCallback).toHaveBeenNthCalledWith(2, {size: 'S', sound: 'meow'}, cat);
+
+            expect(peopleCollectionCallback).toHaveBeenCalledTimes(2);
+            expect(peopleCollectionCallback).toHaveBeenNthCalledWith(1, null, undefined);
+            expect(peopleCollectionCallback).toHaveBeenNthCalledWith(
+                2,
+                {
+                    [bob]: {age: 25, car: 'sedan'},
+                    [lisa]: {age: 21, car: 'SUV'},
+                },
+            );
+
+            expect(testCallback).toHaveBeenCalledTimes(2);
             expect(testCallback).toHaveBeenNthCalledWith(1, null, undefined);
             expect(testCallback).toHaveBeenNthCalledWith(2, 'taco', ONYX_KEYS.TEST_KEY);
+
+            expect(otherTestCallback).toHaveBeenCalledTimes(2);
             expect(otherTestCallback).toHaveBeenNthCalledWith(1, 42, ONYX_KEYS.OTHER_TEST);
             expect(otherTestCallback).toHaveBeenNthCalledWith(2, {food: 'pizza', drink: 'water'}, ONYX_KEYS.OTHER_TEST);
             Onyx.disconnect(connectionIDs);
