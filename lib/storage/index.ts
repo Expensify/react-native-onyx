@@ -42,6 +42,11 @@ function tryOrDegradePerformance<T>(fn: () => Promise<T> | T, waitForInitializat
                     if (error.message.includes('Internal error opening backing store for indexedDB.open')) {
                         degradePerformance(error);
                     }
+
+                    // catch the error if DB connection can not be established/DB can not be created
+                    if (error.message.includes('IDBKeyVal store could not be created')) {
+                        degradePerformance(error);
+                    }
                 }
 
                 reject(error);
