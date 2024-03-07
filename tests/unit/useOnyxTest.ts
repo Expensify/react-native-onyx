@@ -252,6 +252,40 @@ describe('useOnyx', () => {
     });
 
     describe('stale data', () => {
-        // TODO: Not sure if we'll be able to implement tests for these cases.
+        it('should return null and loading state while we have pending merges for the key, and then return updated value and loaded state', async () => {
+            Onyx.set(ONYXKEYS.TEST_KEY, 'test1');
+
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test3');
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test4');
+
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
+
+            expect(result.current[0]).toEqual(null);
+            expect(result.current[1].status).toEqual('loading');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('test4');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should return stale value and loaded state if allowStaleData is true, and then return updated value and loaded state', async () => {
+            Onyx.set(ONYXKEYS.TEST_KEY, 'test1');
+
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test3');
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test4');
+
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {allowStaleData: true}));
+
+            expect(result.current[0]).toEqual('test1');
+            expect(result.current[1].status).toEqual('loaded');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('test4');
+            expect(result.current[1].status).toEqual('loaded');
+        });
     });
 });
