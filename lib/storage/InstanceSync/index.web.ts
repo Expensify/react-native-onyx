@@ -6,7 +6,7 @@
 import type {OnyxKey} from '../../types';
 import NoopProvider from '../providers/NoopProvider';
 import type {KeyList, OnStorageKeyChanged} from '../providers/types';
-import StorageProvider from '../providers/types';
+import type StorageProvider from '../providers/types';
 
 const SYNC_ONYX = 'SYNC_ONYX';
 
