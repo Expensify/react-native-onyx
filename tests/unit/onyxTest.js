@@ -959,13 +959,10 @@ describe('Onyx', () => {
 
             expect(peopleCollectionCallback).toHaveBeenCalledTimes(2);
             expect(peopleCollectionCallback).toHaveBeenNthCalledWith(1, null, undefined);
-            expect(peopleCollectionCallback).toHaveBeenNthCalledWith(
-                2,
-                {
-                    [bob]: {age: 25, car: 'sedan'},
-                    [lisa]: {age: 21, car: 'SUV'},
-                },
-            );
+            expect(peopleCollectionCallback).toHaveBeenNthCalledWith(2, {
+                [bob]: {age: 25, car: 'sedan'},
+                [lisa]: {age: 21, car: 'SUV'},
+            });
 
             expect(testCallback).toHaveBeenCalledTimes(2);
             expect(testCallback).toHaveBeenNthCalledWith(1, null, undefined);
