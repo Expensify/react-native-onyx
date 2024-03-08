@@ -301,6 +301,29 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
         });
 
+        it('should return initial value and loaded state while we have pending merges for the key, and then return updated value and loaded state', async () => {
+            Onyx.set(ONYXKEYS.TEST_KEY, 'test1');
+
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test3');
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test4');
+
+            const {result} = renderHook(() =>
+                useOnyx(ONYXKEYS.TEST_KEY, {
+                    // @ts-expect-error bypass
+                    initialValue: 'initial value',
+                }),
+            );
+
+            expect(result.current[0]).toEqual('initial value');
+            expect(result.current[1].status).toEqual('loaded');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('test4');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
         it('should return stale value and loaded state if allowStaleData is true, and then return updated value and loaded state', async () => {
             Onyx.set(ONYXKEYS.TEST_KEY, 'test1');
 
