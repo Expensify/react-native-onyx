@@ -22,8 +22,15 @@ cause react to schedule the updates at once instead of after each other. This is
 and runs it through a reducer function to return a subset of the data according to a selector.
 The resulting collection will only contain items that are returned by the selector.</p>
 </dd>
+<dt><a href="#isCollectionKey">isCollectionKey(key)</a> ⇒ <code>Boolean</code></dt>
+<dd><p>Checks to see if the a subscriber&#39;s supplied key
+is associated with a collection of keys.</p>
+</dd>
 <dt><a href="#isCollectionMemberKey">isCollectionMemberKey(collectionKey, key)</a> ⇒ <code>Boolean</code></dt>
 <dd></dd>
+<dt><a href="#splitCollectionMemberKey">splitCollectionMemberKey(key)</a> ⇒ <code>Array.&lt;String&gt;</code></dt>
+<dd><p>Splits a collection member key into the collection key part and the ID part.</p>
+</dd>
 <dt><a href="#tryGetCachedValue">tryGetCachedValue(key, mapping)</a> ⇒ <code>Mixed</code></dt>
 <dd><p>Tries to get a value from the cache. If the value is not present in cache it will return the default value or undefined.
 If the requested key is a collection, it will return an object with all the collection members.</p>
@@ -34,7 +41,7 @@ If the requested key is a collection, it will return an object with all the coll
 <dt><a href="#disconnect">disconnect(connectionID, [keyToRemoveFromEvictionBlocklist])</a></dt>
 <dd><p>Remove the listener for a react component</p>
 </dd>
-<dt><a href="#scheduleSubscriberUpdate">scheduleSubscriberUpdate(key, value, [canUpdateSubscriber])</a> ⇒ <code>Promise</code></dt>
+<dt><a href="#scheduleSubscriberUpdate">scheduleSubscriberUpdate(key, value, prevValue, [canUpdateSubscriber])</a> ⇒ <code>Promise</code></dt>
 <dd><p>Schedules an update that will be appended to the macro task queue (so it doesn&#39;t update the subscribers immediately).</p>
 </dd>
 <dt><a href="#scheduleNotifyCollectionSubscribers">scheduleNotifyCollectionSubscribers(key, value)</a> ⇒ <code>Promise</code></dt>
@@ -89,13 +96,6 @@ value will be saved to storage after the default value.</p>
 </dd>
 <dt><a href="#setMemoryOnlyKeys">setMemoryOnlyKeys(keyList)</a></dt>
 <dd><p>When set these keys will not be persisted to storage</p>
-</dd>
-<dt><a href="#onClear">onClear(callback)</a></dt>
-<dd><p>Sets the callback to be called when the clear finishes executing.</p>
-</dd>
-<dt><a href="#subscribeToEvents">subscribeToEvents()</a></dt>
-<dd><p>Subscribes to the Broadcast channel and executes actions based on the
-types of events.</p>
 </dd>
 <dt><a href="#init">init([options])</a></dt>
 <dd><p>Initialize the store with actions and listening for storage events</p>
@@ -153,6 +153,18 @@ The resulting collection will only contain items that are returned by the select
 | selector | <code>String</code> \| <code>function</code> | (see method docs for getSubsetOfData() for full details) |
 | [withOnyxInstanceState] | <code>Object</code> |  |
 
+<a name="isCollectionKey"></a>
+
+## isCollectionKey(key) ⇒ <code>Boolean</code>
+Checks to see if the a subscriber's supplied key
+is associated with a collection of keys.
+
+**Kind**: global function  
+
+| Param | Type |
+| --- | --- |
+| key | <code>String</code> | 
+
 <a name="isCollectionMemberKey"></a>
 
 ## isCollectionMemberKey(collectionKey, key) ⇒ <code>Boolean</code>
@@ -162,6 +174,18 @@ The resulting collection will only contain items that are returned by the select
 | --- | --- |
 | collectionKey | <code>String</code> | 
 | key | <code>String</code> | 
+
+<a name="splitCollectionMemberKey"></a>
+
+## splitCollectionMemberKey(key) ⇒ <code>Array.&lt;String&gt;</code>
+Splits a collection member key into the collection key part and the ID part.
+
+**Kind**: global function  
+**Returns**: <code>Array.&lt;String&gt;</code> - A tuple where the first element is the collection part and the second element is the ID part.  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| key | <code>String</code> | The collection member key to split. |
 
 <a name="tryGetCachedValue"></a>
 
@@ -221,7 +245,7 @@ Onyx.disconnect(connectionID);
 ```
 <a name="scheduleSubscriberUpdate"></a>
 
-## scheduleSubscriberUpdate(key, value, [canUpdateSubscriber]) ⇒ <code>Promise</code>
+## scheduleSubscriberUpdate(key, value, prevValue, [canUpdateSubscriber]) ⇒ <code>Promise</code>
 Schedules an update that will be appended to the macro task queue (so it doesn't update the subscribers immediately).
 
 **Kind**: global function  
@@ -230,6 +254,7 @@ Schedules an update that will be appended to the macro task queue (so it doesn't
 | --- | --- | --- |
 | key | <code>String</code> |  |
 | value | <code>\*</code> |  |
+| prevValue | <code>\*</code> |  |
 | [canUpdateSubscriber] | <code>function</code> | only subscribers that pass this truth test will be updated |
 
 **Example**  
@@ -410,24 +435,6 @@ When set these keys will not be persisted to storage
 | --- | --- |
 | keyList | <code>Array.&lt;string&gt;</code> | 
 
-<a name="onClear"></a>
-
-## onClear(callback)
-Sets the callback to be called when the clear finishes executing.
-
-**Kind**: global function  
-
-| Param | Type |
-| --- | --- |
-| callback | <code>function</code> | 
-
-<a name="subscribeToEvents"></a>
-
-## subscribeToEvents()
-Subscribes to the Broadcast channel and executes actions based on the
-types of events.
-
-**Kind**: global function  
 <a name="init"></a>
 
 ## init([options])
