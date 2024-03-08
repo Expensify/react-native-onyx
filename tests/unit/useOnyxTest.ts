@@ -361,7 +361,7 @@ describe('useOnyx', () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test1');
 
             const {result} = renderHook(() =>
-                useOnyx<string, OnyxEntry<string>>(ONYXKEYS.TEST_KEY, {
+                useOnyx(ONYXKEYS.TEST_KEY, {
                     initWithStoredValues: false,
                     initialValue: 'initial value',
                 }),
