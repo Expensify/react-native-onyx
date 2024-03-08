@@ -248,7 +248,6 @@ describe('useOnyx', () => {
         it('should return initial value from non-cached key and then return null', async () => {
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
-                    // @ts-expect-error bypass
                     initialValue: 'initial value',
                 }),
             );
@@ -267,7 +266,6 @@ describe('useOnyx', () => {
 
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
-                    // @ts-expect-error bypass
                     initialValue: 'initial value',
                 }),
             );
@@ -310,7 +308,6 @@ describe('useOnyx', () => {
 
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
-                    // @ts-expect-error bypass
                     initialValue: 'initial value',
                 }),
             );
@@ -364,9 +361,8 @@ describe('useOnyx', () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test1');
 
             const {result} = renderHook(() =>
-                useOnyx(ONYXKEYS.TEST_KEY, {
+                useOnyx<string, OnyxEntry<string>>(ONYXKEYS.TEST_KEY, {
                     initWithStoredValues: false,
-                    // @ts-expect-error bypass
                     initialValue: 'initial value',
                 }),
             );

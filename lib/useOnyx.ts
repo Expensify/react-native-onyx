@@ -25,7 +25,7 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
     /**
      * This value will be returned by the hook on the first render while the data is being read from Onyx.
      */
-    initialValue?: OnyxValue<TKey>;
+    initialValue?: TReturnValue;
 
     /**
      * This will be used to subscribe to a subset of an Onyx key's data.
