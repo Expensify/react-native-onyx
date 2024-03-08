@@ -1,5 +1,6 @@
 import {deepEqual} from 'fast-equals';
 import {useCallback, useEffect, useRef, useSyncExternalStore} from 'react';
+import type {IsEqual} from 'type-fest';
 import Onyx from './Onyx';
 import type {CollectionKeyBase, OnyxCollection, OnyxKey, OnyxValue, Selector} from './types';
 import useLiveRef from './useLiveRef';
@@ -37,7 +38,7 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
 
 type FetchStatus = 'loading' | 'loaded';
 
-type CachedValue<TKey extends OnyxKey, TValue> = TValue extends OnyxValue<TKey> ? TValue : TKey extends CollectionKeyBase ? NonNullable<OnyxCollection<TValue>> : TValue;
+type CachedValue<TKey extends OnyxKey, TValue> = IsEqual<TValue, OnyxValue<TKey>> extends true ? TValue : TKey extends CollectionKeyBase ? NonNullable<OnyxCollection<TValue>> : TValue;
 
 type ResultMetadata = {
     status: FetchStatus;
@@ -104,7 +105,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
         // If `newValue` is `null` or any other value if means that the cache does have a value for that key.
         // This difference between `undefined` and other values is crucial and it's used to address the following
         // conditions and use cases.
-        let newValue = getCachedValue(key, selectorRef.current);
+        let newValue = getCachedValue<TKey, TReturnValue>(key, selectorRef.current);
 
         // Since the fetch status can be different given the use cases below, we define the variable right away.
         let newFetchStatus: FetchStatus | undefined;
@@ -127,7 +128,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
         // If the previously cached value is different from the new value, we update both cached value
         // and the result to be returned by the hook.
         if (!deepEqual(cachedValueRef.current, newValue)) {
-            cachedValueRef.current = newValue as CachedValue<TKey, TReturnValue>;
+            cachedValueRef.current = newValue;
 
             // If the new value is `undefined` we default it to `null` to ensure the consumer get a consistent result from the hook.
             resultRef.current = [(cachedValueRef.current ?? null) as CachedValue<TKey, TReturnValue>, {status: newFetchStatus ?? 'loaded'}];
