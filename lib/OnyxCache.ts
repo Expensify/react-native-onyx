@@ -129,7 +129,7 @@ class OnyxCache {
      * @param keys - an array of keys
      */
     setAllKeys(keys: Key[]) {
-        this.storageKeys = new Set([...keys]);
+        this.storageKeys = new Set(keys);
     }
 
     /**
