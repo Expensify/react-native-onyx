@@ -102,7 +102,6 @@ type InitOptions = {
     initialKeyStates?: Partial<NullableKeyValueMapping>;
     safeEvictionKeys?: OnyxKey[];
     maxCachedKeysCount?: number;
-    captureMetrics?: boolean;
     shouldSyncMultipleInstances?: boolean;
     debugSetState?: boolean;
 };
@@ -287,7 +286,6 @@ declare function update(data: OnyxUpdate[]): Promise<void>;
  * @param [options.maxCachedKeysCount=55] Sets how many recent keys should we try to keep in cache
  * Setting this to 0 would practically mean no cache
  * We try to free cache when we connect to a safe eviction key
- * @param [options.captureMetrics] Enables Onyx benchmarking and exposes the get/print/reset functions
  * @param [options.shouldSyncMultipleInstances] Auto synchronize storage events between multiple instances
  * of Onyx running in different tabs/windows. Defaults to true for platforms that support local storage (web/desktop)
  * @param [options.debugSetState] Enables debugging setState() calls to connected components.
