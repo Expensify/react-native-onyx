@@ -2,7 +2,7 @@ import * as Logger from '../Logger';
 
 import PlatformStorage from './platforms';
 import InstanceSync from './InstanceSync';
-import NoopProvider from './providers/NoopProvider';
+import MemoryOnlyProvider from './providers/MemoryOnlyProvider';
 import type StorageProvider from './providers/types';
 
 let provider = PlatformStorage;
@@ -22,7 +22,7 @@ type Storage = {
 function degradePerformance(error: Error) {
     Logger.logAlert(`Error while using ${provider.name}. Falling back to only using cache and dropping storage.`);
     console.error(error);
-    provider = NoopProvider;
+    provider = MemoryOnlyProvider;
 }
 
 /**
