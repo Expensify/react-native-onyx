@@ -49,6 +49,7 @@ class OnyxCache {
             'captureTask',
             'removeLeastRecentlyUsedKeys',
             'setRecentKeysLimit',
+            'setAllKeys',
         );
     }
 
@@ -114,6 +115,21 @@ class OnyxCache {
         const mergedKeys = Object.keys(data);
         this.storageKeys = new Set([...storageKeys, ...mergedKeys]);
         mergedKeys.forEach((key) => this.addToAccessedKeys(key));
+    }
+
+    /**
+     * Allows to set all the keys at once.
+     * This is useful when we are getting
+     * all the keys from the storage provider
+     * and we want to keep the cache in sync.
+     *
+     * Previously, we had to call `addKey` in a loop
+     * to achieve the same result.
+     *
+     * @param keys - an array of keys
+     */
+    setAllKeys(keys: Key[]) {
+        this.storageKeys = new Set(keys);
     }
 
     /**
