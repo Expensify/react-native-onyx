@@ -68,6 +68,7 @@ module.exports = {
                         tsx: 'never',
                     },
                 ],
+                'rulesdir/prefer-onyx-connect-in-libs': 'off',
             },
         },
         {

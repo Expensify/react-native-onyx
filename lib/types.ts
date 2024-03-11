@@ -101,9 +101,9 @@ type CollectionKey = `${CollectionKeyBase}${string}`;
 type OnyxKey = Key | CollectionKey;
 
 /**
- * Represents a value type of an Onyx key.
+ * Represents a Onyx value that can be either a single entry or a collection of entries, depending on the `TKey` provided.
  */
-type OnyxValue = TypeOptions['values'][OnyxKey];
+type OnyxValue<TKey extends OnyxKey> = TKey extends CollectionKeyBase ? OnyxCollection<KeyValueMapping[TKey]> : OnyxEntry<KeyValueMapping[TKey]>;
 
 /**
  * Represents a mapping of Onyx keys to values, where keys are either normal or collection Onyx keys
@@ -247,6 +247,7 @@ export type {
     OnyxCollection,
     OnyxEntry,
     OnyxKey,
+    OnyxValue,
     Selector,
     NullishDeep,
     WithOnyxInstanceState,

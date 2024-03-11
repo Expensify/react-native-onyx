@@ -237,7 +237,7 @@ function getAllKeys(): Promise<OnyxKey[]> {
 
     // Otherwise retrieve the keys from storage and capture a promise to aid concurrent usages
     const promise = Storage.getAllKeys().then((keys) => {
-        keys.forEach((key) => cache.addKey(key));
+        cache.setAllKeys(keys);
         return keys;
     });
 
@@ -253,6 +253,21 @@ function isCollectionKey(key: OnyxKey): key is CollectionKeyBase {
 
 function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collectionKey: TCollectionKey, key: string): key is `${TCollectionKey}${string}` {
     return Str.startsWith(key, collectionKey) && key.length > collectionKey.length;
+}
+
+/**
+ * Splits a collection member key into the collection key part and the ID part.
+ * @param {String} key - The collection member key to split.
+ * @returns {Array<String>} A tuple where the first element is the collection part and the second element is the ID part.
+ */
+function splitCollectionMemberKey(key) {
+    const underscoreIndex = key.indexOf('_');
+
+    if (underscoreIndex === -1) {
+        throw new Error(`Invalid ${key} key provided, only collection keys are allowed.`);
+    }
+
+    return [key.substring(0, underscoreIndex + 1), key.substring(underscoreIndex + 1)];
 }
 
 /**
@@ -1576,12 +1591,6 @@ type InitOptions = {
     debugSetState?: boolean;
 };
 
-/** When set these keys will not be persisted to storage */
-function setMemoryOnlyKeys() {
-    // When in memory only mode for certain keys we do not want to ever drop items from the cache as the user will have no way to recover them again via storage.
-    cache.setRecentKeysLimit(Infinity);
-}
-
 /** Initialize the store with actions and listening for storage events */
 function init({
     keys = {},
@@ -1591,16 +1600,6 @@ function init({
     shouldSyncMultipleInstances = Boolean(global.localStorage),
     debugSetState = false,
 }: InitOptions) {
-    Storage.init();
-
-    if (shouldSyncMultipleInstances && typeof Storage.keepInstancesSync === 'function') {
-        Storage.keepInstancesSync((key, value) => {
-            const prevValue = cache.getValue(key, false);
-            cache.set(key, value);
-            keyChanged(key, value, prevValue);
-        });
-    }
-
     if (debugSetState) {
         PerformanceUtils.setShouldDebugSetState(true);
     }
@@ -1627,6 +1626,14 @@ function init({
 
     // Initialize all of our keys with data provided then give green light to any pending connections
     Promise.all([addAllSafeEvictionKeysToRecentlyAccessedList(), initializeWithDefaultKeyStates()]).then(deferredInitTask.resolve);
+
+    if (shouldSyncMultipleInstances && _.isFunction(Storage.keepInstancesSync)) {
+        Storage.keepInstancesSync((key, value) => {
+            const prevValue = cache.getValue(key, false);
+            cache.set(key, value);
+            keyChanged(key, value, prevValue);
+        });
+    }
 }
 
 const Onyx = {
@@ -1647,7 +1654,9 @@ const Onyx = {
     METHOD,
     tryGetCachedValue,
     hasPendingMergeForKey,
-    setMemoryOnlyKeys,
+    isCollectionKey,
+    isCollectionMemberKey,
+    splitCollectionMemberKey,
 } as const;
 
 export default Onyx;

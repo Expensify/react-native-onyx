@@ -11,8 +11,6 @@ const set = jest.fn((key, value) => {
 });
 
 const idbKeyvalMock: StorageProvider = {
-    name: 'KeyValMockProvider',
-    init: () => undefined,
     setItem(key, value) {
         return set(key, value);
     },
@@ -72,7 +70,6 @@ const idbKeyvalMock: StorageProvider = {
 
 const idbKeyvalMockSpy = {
     idbKeyvalSet: set,
-    init: jest.fn(idbKeyvalMock.init),
     setItem: jest.fn(idbKeyvalMock.setItem),
     getItem: jest.fn(idbKeyvalMock.getItem),
     removeItem: jest.fn(idbKeyvalMock.removeItem),

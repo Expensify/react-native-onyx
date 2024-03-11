@@ -9,14 +9,6 @@ type OnStorageKeyChanged = (key: OnyxKey, value: OnyxValue | null) => void;
 
 type StorageProvider = {
     /**
-     * The name of the provider that can be printed to the logs
-     */
-    name: string;
-    /**
-     * Initializes the storage provider
-     */
-    init: () => void;
-    /**
      * Gets the value of a given key or return `null` if it's not available in storage
      */
     getItem: (key: OnyxKey) => Promise<OnyxValue | null>;
