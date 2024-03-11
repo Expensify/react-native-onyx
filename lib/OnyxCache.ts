@@ -21,7 +21,7 @@ class OnyxCache {
      * Captured pending tasks for already running storage methods
      * Using a map yields better performance on operations such a delete
      */
-    private pendingPromises: Map<string, Promise<OnyxValue>>;
+    private pendingPromises: Map<string, Promise<OnyxValue | OnyxKey[]>>;
 
     /** Maximum size of the keys store din cache */
     private maxRecentKeysSize = 0;
@@ -126,7 +126,7 @@ class OnyxCache {
      *
      * @param keys - an array of keys
      */
-    setAllKeys(keys: Key[]) {
+    setAllKeys(keys: OnyxKey[]) {
         this.storageKeys = new Set(keys);
     }
 
@@ -145,7 +145,13 @@ class OnyxCache {
      * @param taskName - unique name given for the task
      */
     getTaskPromise(taskName: string): Promise<OnyxValue | OnyxKey[]> {
-        return this.pendingPromises.get(taskName) as Promise<OnyxValue | OnyxKey[]>;
+        const promise = this.pendingPromises.get(taskName);
+
+        if (!promise) {
+            throw new Error(`No pending task found for ${taskName}`);
+        }
+
+        return promise;
     }
 
     /**
