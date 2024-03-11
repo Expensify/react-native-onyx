@@ -94,6 +94,9 @@ const provider: StorageProvider = {
     },
 
     // eslint-disable-next-line @typescript-eslint/no-empty-function
+    setMemoryOnlyKeys: () => {},
+
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
     keepInstancesSync: () => {},
 };
 

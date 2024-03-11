@@ -38,6 +38,8 @@ const provider: StorageProvider = {
         return provider.setItem(key, modifiedData);
     },
     multiSet: (pairs) => setMany(pairs, getCustomStore()),
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    setMemoryOnlyKeys: () => {},
     clear: () => clear(getCustomStore()),
     getAllKeys: () => keys(getCustomStore()),
     getItem: (key) =>
