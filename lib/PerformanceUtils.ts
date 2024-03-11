@@ -1,7 +1,7 @@
 import lodashTransform from 'lodash/transform';
 import {deepEqual} from 'fast-equals';
-import type {Mapping} from './Onyx';
 import type {OnyxKey} from './types';
+import type {ConnectOptions} from './Onyx';
 
 type UnknownObject = Record<string, unknown>;
 
@@ -41,7 +41,7 @@ function diffObject<TObject extends UnknownObject, TBase extends UnknownObject>(
 /**
  * Provide insights into why a setState() call occurred by diffing the before and after values.
  */
-function logSetStateCall<TKey extends OnyxKey>(mapping: Mapping<TKey>, previousValue: unknown, newValue: unknown, caller: string, keyThatChanged?: string) {
+function logSetStateCall<TKey extends OnyxKey>(mapping: ConnectOptions<TKey>, previousValue: unknown, newValue: unknown, caller: string, keyThatChanged?: string) {
     if (!debugSetState) {
         return;
     }

@@ -144,12 +144,8 @@ class OnyxCache {
      * provided from this function
      * @param taskName - unique name given for the task
      */
-    getTaskPromise(taskName: string): Promise<OnyxValue | OnyxKey[]> {
+    getTaskPromise(taskName: string): Promise<OnyxValue | OnyxKey[]> | undefined {
         const promise = this.pendingPromises.get(taskName);
-
-        if (!promise) {
-            throw new Error(`No pending task found for ${taskName}`);
-        }
 
         return promise;
     }
