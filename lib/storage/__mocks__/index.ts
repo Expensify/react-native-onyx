@@ -35,8 +35,7 @@ const idbKeyvalMock: StorageProvider = {
     multiMerge(pairs) {
         pairs.forEach(([key, value]) => {
             const existingValue = storageMapInternal[key];
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const newValue = utils.fastMerge(existingValue as any, value as any);
+            const newValue = utils.fastMerge(existingValue!, value!);
 
             set(key, newValue);
         });

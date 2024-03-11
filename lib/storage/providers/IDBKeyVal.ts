@@ -26,8 +26,7 @@ const provider: StorageProvider = {
             return getValues.then((values) => {
                 const upsertMany = pairs.map(([key, value], index) => {
                     const prev = values[index];
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const newValue = utils.fastMerge(prev as any, value as any);
+                    const newValue = utils.fastMerge(prev!, value!);
                     return promisifyRequest(store.put(newValue, key));
                 });
                 return Promise.all(upsertMany);
@@ -38,9 +37,9 @@ const provider: StorageProvider = {
         return provider.setItem(key, modifiedData);
     },
     multiSet: (pairs) => setMany(pairs, getCustomStore()),
+    clear: () => clear(getCustomStore()),
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     setMemoryOnlyKeys: () => {},
-    clear: () => clear(getCustomStore()),
     getAllKeys: () => keys(getCustomStore()),
     getItem: (key) =>
         get(key, getCustomStore())
