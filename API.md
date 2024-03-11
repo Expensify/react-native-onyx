@@ -94,9 +94,6 @@ value will be saved to storage after the default value.</p>
 <dt><a href="#update">update(data)</a> ⇒ <code>Promise</code></dt>
 <dd><p>Insert API responses and lifecycle data into Onyx</p>
 </dd>
-<dt><a href="#setMemoryOnlyKeys">setMemoryOnlyKeys(keyList)</a></dt>
-<dd><p>When set these keys will not be persisted to storage</p>
-</dd>
 <dt><a href="#init">init([options])</a></dt>
 <dd><p>Initialize the store with actions and listening for storage events</p>
 </dd>
@@ -423,17 +420,6 @@ Insert API responses and lifecycle data into Onyx
 | Param | Type | Description |
 | --- | --- | --- |
 | data | <code>Array</code> | An array of objects with shape {onyxMethod: oneOf('set', 'merge', 'mergeCollection', 'multiSet', 'clear'), key: string, value: *} |
-
-<a name="setMemoryOnlyKeys"></a>
-
-## setMemoryOnlyKeys(keyList)
-When set these keys will not be persisted to storage
-
-**Kind**: global function  
-
-| Param | Type |
-| --- | --- |
-| keyList | <code>Array.&lt;string&gt;</code> | 
 
 <a name="init"></a>
 
