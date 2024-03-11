@@ -305,11 +305,6 @@ declare function init(config?: InitOptions): void;
 declare function hasPendingMergeForKey(key: OnyxKey): boolean;
 
 /**
- * When set these keys will not be persisted to storage
- */
-declare function setMemoryOnlyKeys(keyList: OnyxKey[]): void;
-
-/**
  * Tries to get a value from the cache. If the value is not present in cache it will return the default value or undefined.
  * If the requested key is a collection, it will return an object with all the collection members.
  */
@@ -335,7 +330,6 @@ declare const Onyx: {
     removeFromEvictionBlockList: typeof removeFromEvictionBlockList;
     isSafeEvictionKey: typeof isSafeEvictionKey;
     METHOD: typeof METHOD;
-    setMemoryOnlyKeys: typeof setMemoryOnlyKeys;
     tryGetCachedValue: typeof tryGetCachedValue;
     isCollectionKey: typeof isCollectionKey;
     isCollectionMemberKey: typeof isCollectionMemberKey;

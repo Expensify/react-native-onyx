@@ -65,8 +65,6 @@ const idbKeyvalMock: StorageProvider = {
     getDatabaseSize() {
         return Promise.resolve({bytesRemaining: 0, bytesUsed: 99999});
     },
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
-    setMemoryOnlyKeys() {},
 };
 
 const idbKeyvalMockSpy = {
@@ -86,7 +84,6 @@ const idbKeyvalMockSpy = {
         storageMapInternal = data;
     }),
     getDatabaseSize: jest.fn(idbKeyvalMock.getDatabaseSize),
-    setMemoryOnlyKeys: jest.fn(idbKeyvalMock.setMemoryOnlyKeys),
 };
 
 export default idbKeyvalMockSpy;
