@@ -32,7 +32,7 @@ type StorageProvider = {
     /**
      * Multiple merging of existing and new values in a batch
      */
-    multiMerge: (pairs: KeyValuePairList) => Promise<BatchQueryResult | IDBValidKey[]>;
+    multiMerge: (pairs: KeyValuePairList, keysToOverwrite?: Set<string>) => Promise<BatchQueryResult | IDBValidKey[]>;
 
     /**
      * Merges an existing value with a new one by leveraging JSON_PATCH

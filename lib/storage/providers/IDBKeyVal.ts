@@ -17,15 +17,15 @@ function getCustomStore(): UseStore {
 const provider: StorageProvider = {
     setItem: (key, value) => set(key, value, getCustomStore()),
     multiGet: (keysParam) => getMany(keysParam, getCustomStore()).then((values) => values.map((value, index) => [keysParam[index], value])),
-    multiMerge: (pairs) =>
+    multiMerge: (pairs, keysToOverwrite) =>
         getCustomStore()('readwrite', (store) => {
             // Note: we are using the manual store transaction here, to fit the read and update
-            // of the items in one transaction to achieve best performance.
+            // of the items in one transaction to achieve the best performance.
             const getValues = Promise.all(pairs.map(([key]) => promisifyRequest<Value>(store.get(key))));
 
             return getValues.then((values) => {
                 const upsertMany = pairs.map(([key, value], index) => {
-                    const prev = values[index];
+                    const prev = keysToOverwrite?.has(key) ? {} : values[index];
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const newValue = utils.fastMerge(prev as any, value);
                     return promisifyRequest(store.put(newValue, key));

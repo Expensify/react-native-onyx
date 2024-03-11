@@ -29,7 +29,7 @@ function isMergeableObject(value: unknown): boolean {
 function mergeObject<TTarget extends unknown[] | Record<string, unknown>>(target: TTarget, source: TTarget, shouldRemoveNullObjectValues = true): TTarget {
     const destination: Record<string, unknown> = {};
     if (isMergeableObject(target)) {
-        // lodash adds a small overhead so we don't use it here
+        // lodash adds a small overhead, so we don't use it here
         const targetKeys = Object.keys(target);
         for (let i = 0; i < targetKeys.length; ++i) {
             const key = targetKeys[i];
@@ -59,13 +59,14 @@ function mergeObject<TTarget extends unknown[] | Record<string, unknown>>(target
         const isSourceKeyUndefined = sourceValue === undefined;
 
         if (!isSourceKeyUndefined && !shouldOmitSourceKey) {
-            const isSourceKeyMergable = isMergeableObject(sourceValue);
+            const isSourceKeyMergeable = isMergeableObject(sourceValue);
 
-            if (isSourceKeyMergable && targetValue) {
+            if (isSourceKeyMergeable && targetValue) {
                 // eslint-disable-next-line no-use-before-define
                 destination[key] = fastMerge(targetValue, sourceValue as typeof targetValue, shouldRemoveNullObjectValues);
             } else if (!shouldRemoveNullObjectValues || sourceValue !== null) {
-                destination[key] = sourceValue;
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                destination[key] = shouldRemoveNullObjectValues ? removeNestedNullValues(sourceValue as any) : sourceValue;
             }
         }
     }
