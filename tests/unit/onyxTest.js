@@ -40,18 +40,18 @@ describe('Onyx', () => {
         Onyx.set(ONYX_KEYS.OTHER_TEST, 42)
             .then(() => Onyx.getAllKeys())
             .then((keys) => {
-                expect(keys.includes(ONYX_KEYS.OTHER_TEST)).toBe(true);
+                expect(keys.has(ONYX_KEYS.OTHER_TEST)).toBe(true);
                 return Onyx.set(ONYX_KEYS.OTHER_TEST, null);
             })
             .then(() => {
                 // Checks if cache value is removed.
-                expect(cache.getAllKeys().length).toBe(0);
+                expect(cache.getAllKeys().size).toBe(0);
 
                 // When cache keys length is 0, we fetch the keys from storage.
                 return Onyx.getAllKeys();
             })
             .then((keys) => {
-                expect(keys.includes(ONYX_KEYS.OTHER_TEST)).toBe(false);
+                expect(keys.has(ONYX_KEYS.OTHER_TEST)).toBe(false);
             }));
 
     it('should set a simple key', () => {

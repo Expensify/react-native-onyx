@@ -54,8 +54,8 @@ class OnyxCache {
     }
 
     /** Get all the storage keys */
-    getAllKeys(): Key[] {
-        return Array.from(this.storageKeys);
+    getAllKeys(): Set<Key> {
+        return this.storageKeys;
     }
 
     /**
