@@ -112,13 +112,6 @@ const provider: StorageProvider = {
         return Promise.resolve();
     },
 
-    /*
-     * Since this is an in-memory only provider, nothing special needs to happen here and it can just be a noop
-     */
-    setMemoryOnlyKeys() {
-        // do nothing
-    },
-
     /**
      * Returns all keys available in memory
      */

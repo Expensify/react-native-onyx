@@ -79,11 +79,6 @@ const provider: StorageProvider = {
         return Promise.resolve();
     },
 
-    // This is a noop for now in order to keep clients from crashing see https://github.com/Expensify/Expensify/issues/312438
-    setMemoryOnlyKeys() {
-        // do nothing
-    },
-
     /**
      * Returns all keys available in memory
      */

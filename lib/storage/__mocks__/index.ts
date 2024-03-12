@@ -15,7 +15,6 @@ const StorageMock = {
     removeItem: jest.fn(MemoryOnlyProvider.removeItem),
     removeItems: jest.fn(MemoryOnlyProvider.removeItems),
     clear: jest.fn(MemoryOnlyProvider.clear),
-    setMemoryOnlyKeys: jest.fn(MemoryOnlyProvider.setMemoryOnlyKeys),
     getAllKeys: jest.fn(MemoryOnlyProvider.getAllKeys),
     getDatabaseSize: jest.fn(MemoryOnlyProvider.getDatabaseSize),
     keepInstancesSync: jest.fn(),

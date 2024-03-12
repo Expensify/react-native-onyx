@@ -46,8 +46,6 @@ const provider: StorageProvider = {
     },
     multiSet: (pairs) => setMany(pairs, idbKeyValStore),
     clear: () => clear(idbKeyValStore),
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
-    setMemoryOnlyKeys: () => {},
     getAllKeys: () => keys(idbKeyValStore),
     getItem: (key) =>
         get(key, idbKeyValStore)
