@@ -1007,33 +1007,6 @@ describe('Onyx', () => {
             });
     });
 
-    it('should merge a non-existing key with a nested null removed', () => {
-        let testKeyValue;
-
-        connectionID = Onyx.connect({
-            key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
-            callback: (value) => {
-                testKeyValue = value;
-            },
-        });
-
-        return Onyx.merge(ONYX_KEYS.TEST_KEY, {
-            waypoints: {
-                1: 'Home',
-                2: 'Work',
-                3: null,
-            },
-        }).then(() => {
-            expect(testKeyValue).toEqual({
-                waypoints: {
-                    1: 'Home',
-                    2: 'Work',
-                },
-            });
-        });
-    });
-
     it('should merge a key with null and allow subsequent updates', () => {
         let testKeyValue;
 
@@ -1269,30 +1242,58 @@ describe('Onyx', () => {
                     });
                 });
         });
+    });
 
-        it('should remove a deeply nested null when merging a non-existing key', () => {
+    describe('mergeCollection', () => {
+        it('should overwrite specified keys', () => {
             let result;
 
             connectionID = Onyx.connect({
-                key: ONYX_KEYS.TEST_KEY,
+                key: ONYX_KEYS.COLLECTION.PEOPLE,
                 initWithStoredValues: false,
+                waitForCollectionCallback: true,
                 callback: (value) => (result = value),
             });
 
-            return Onyx.merge(ONYX_KEYS.TEST_KEY, {
-                waypoints: {
-                    1: 'Home',
-                    2: 'Work',
-                    3: null,
+            const bob = `${ONYX_KEYS.COLLECTION.PEOPLE}bob`;
+            const lisa = `${ONYX_KEYS.COLLECTION.PEOPLE}lisa`;
+
+            const initialValue = {
+                [bob]: {
+                    pet: 'dog',
                 },
-            }).then(() => {
-                expect(result).toEqual({
-                    waypoints: {
-                        1: 'Home',
-                        2: 'Work',
-                    },
-                });
-            });
+                [lisa]: {
+                    pet: 'cat',
+                },
+            };
+            return Onyx.multiSet(initialValue)
+                .then(() => {
+                    expect(result).toEqual(initialValue);
+                    Onyx.mergeCollection(
+                        ONYX_KEYS.COLLECTION.PEOPLE,
+                        {
+                            [bob]: {
+                                age: 22,
+                            },
+                            [lisa]: {
+                                age: 21,
+                            },
+                        },
+                        new Set([bob]),
+                    );
+                    return waitForPromisesToResolve();
+                })
+                .then(() =>
+                    expect(result).toEqual({
+                        [bob]: {
+                            age: 22,
+                        },
+                        [lisa]: {
+                            age: 21,
+                            pet: 'cat',
+                        },
+                    }),
+                );
         });
     });
 });

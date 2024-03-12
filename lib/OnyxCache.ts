@@ -100,7 +100,7 @@ class OnyxCache {
     }
 
     /**
-     * Deep merge data to cache, any non-existing keys will be created
+     * Deep merge data to cache, any non existing keys will be created
      * @param data - a map of (cache) key - values
      */
     merge(data: StorageMap): void {

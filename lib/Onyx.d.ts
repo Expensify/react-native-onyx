@@ -242,8 +242,13 @@ declare function clear(keysToPreserve?: OnyxKey[]): Promise<void>;
  *
  * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
  * @param collection Object collection keyed by individual collection member keys and values
+ * @param keysToOverwrite Set of collection item keys that should be overwritten (i.e. perform `set` instead of `merge`)
  */
-declare function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: Collection<TKey, TMap, NullishDeep<KeyValueMapping[TKey]>>): Promise<void>;
+declare function mergeCollection<TKey extends CollectionKeyBase, TMap>(
+    collectionKey: TKey,
+    collection: Collection<TKey, TMap, NullishDeep<KeyValueMapping[TKey]>>,
+    keysToOverwrite?: Set<TKey>,
+): Promise<void>;
 
 /**
  * Insert API responses and lifecycle data into Onyx
