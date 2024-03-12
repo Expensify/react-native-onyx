@@ -145,9 +145,7 @@ class OnyxCache {
      * @param taskName - unique name given for the task
      */
     getTaskPromise(taskName: string): Promise<OnyxValue | OnyxKey[]> | undefined {
-        const promise = this.pendingPromises.get(taskName);
-
-        return promise;
+        return this.pendingPromises.get(taskName);
     }
 
     /**
