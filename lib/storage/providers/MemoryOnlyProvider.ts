@@ -42,7 +42,13 @@ const provider: StorageProvider = {
      * Get multiple key-value pairs for the give array of keys in a batch.
      */
     multiGet(keys) {
-        const getPromises = _.map(keys, (key) => new Promise((resolve) => this.getItem(key).then((value) => resolve([key, value])))) as Array<Promise<KeyValuePair>>;
+        const getPromises = _.map(
+            keys,
+            (key) =>
+                new Promise((resolve) => {
+                    this.getItem(key).then((value) => resolve([key, value]));
+                }),
+        ) as Array<Promise<KeyValuePair>>;
         return Promise.all(getPromises);
     },
 
@@ -60,7 +66,12 @@ const provider: StorageProvider = {
      */
     multiSet(pairs) {
         const setPromises = _.map(pairs, ([key, value]) => this.setItem(key, value));
-        return new Promise((resolve) => Promise.all(setPromises).then(() => resolve()));
+
+        return new Promise((resolve) => {
+            Promise.all(setPromises).then(() => {
+                resolve(undefined);
+            });
+        });
     },
 
     /**
