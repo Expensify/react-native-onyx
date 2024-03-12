@@ -26,7 +26,7 @@ describe('Onyx', () => {
                 const allKeys = cache.getAllKeys();
 
                 // Then the result should be empty
-                expect(allKeys).toEqual([]);
+                expect(allKeys).toEqual(new Set());
             });
 
             it('Should keep storage keys', () => {
@@ -37,7 +37,7 @@ describe('Onyx', () => {
 
                 // Then the keys should be stored in cache
                 const allKeys = cache.getAllKeys();
-                expect(allKeys).toEqual(['mockKey', 'mockKey2', 'mockKey3']);
+                expect(allKeys).toEqual(new Set(['mockKey', 'mockKey2', 'mockKey3']));
             });
 
             it('Should keep storage keys even when no values are provided', () => {
@@ -48,7 +48,7 @@ describe('Onyx', () => {
 
                 // Then the keys should be stored in cache
                 const allKeys = cache.getAllKeys();
-                expect(allKeys).toEqual(['mockKey', 'mockKey2', 'mockKey3']);
+                expect(allKeys).toEqual(new Set(['mockKey', 'mockKey2', 'mockKey3']));
             });
 
             it('Should not store duplicate keys', () => {
@@ -62,7 +62,7 @@ describe('Onyx', () => {
 
                 // Then getAllKeys should not include a duplicate value
                 const allKeys = cache.getAllKeys();
-                expect(allKeys).toEqual(['mockKey', 'mockKey2', 'mockKey3']);
+                expect(allKeys).toEqual(new Set(['mockKey', 'mockKey2', 'mockKey3']));
             });
         });
 
@@ -121,7 +121,7 @@ describe('Onyx', () => {
                 expect(cache.hasCacheForKey('mockKey')).toBe(false);
 
                 // Then but a key should be available
-                expect(cache.getAllKeys()).toEqual(expect.arrayContaining(['mockKey']));
+                expect(cache.getAllKeys()).toEqual(new Set(['mockKey']));
             });
 
             it('Should not make duplicate keys', () => {
@@ -135,7 +135,7 @@ describe('Onyx', () => {
 
                 // Then getAllKeys should not include a duplicate value
                 const allKeys = cache.getAllKeys();
-                expect(allKeys).toEqual(['mockKey', 'mockKey2']);
+                expect(allKeys).toEqual(new Set(['mockKey', 'mockKey2']));
             });
         });
 
@@ -158,7 +158,7 @@ describe('Onyx', () => {
                 cache.set('mockKey', {value: 'mockValue'});
 
                 // Then but a key should be available
-                expect(cache.getAllKeys()).toEqual(expect.arrayContaining(['mockKey']));
+                expect(cache.getAllKeys()).toEqual(new Set(['mockKey']));
             });
 
             it('Should overwrite existing cache items for the Given key', () => {
@@ -186,7 +186,7 @@ describe('Onyx', () => {
                 // Then a value should not be available in cache
                 expect(cache.hasCacheForKey('mockKey')).toBe(false);
                 expect(cache.getValue('mockKey')).not.toBeDefined();
-                expect(cache.getAllKeys('mockKey').includes('mockKey')).toBe(false);
+                expect(cache.getAllKeys('mockKey').has('mockKey')).toBe(false);
             });
         });
 
@@ -336,7 +336,7 @@ describe('Onyx', () => {
                 });
 
                 // Then getAllStorage keys should return updated storage keys
-                expect(cache.getAllKeys()).toEqual(['mockKey', 'mockKey2', 'mockKey3', 'mockKey4']);
+                expect(cache.getAllKeys()).toEqual(new Set(['mockKey', 'mockKey2', 'mockKey3', 'mockKey4']));
             });
 
             it('Should throw if called with anything that is not an object', () => {
