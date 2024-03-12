@@ -114,7 +114,6 @@ class OnyxCache {
         const storageKeys = this.getAllKeys();
         const mergedKeys = Object.keys(data);
         this.storageKeys = new Set([...storageKeys, ...mergedKeys]);
-
         mergedKeys.forEach((key) => this.addToAccessedKeys(key));
     }
 
