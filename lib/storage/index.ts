@@ -176,8 +176,8 @@ const Storage: Storage = {
      * @param onStorageKeyChanged - Storage synchronization mechanism keeping all opened tabs in sync (web only)
      */
     keepInstancesSync(onStorageKeyChanged) {
-        // If InstanceSync is null, it means we're on a native platform and we don't need to keep instances in sync
-        if (InstanceSync === null) return;
+        // If InstanceSync shouldn't be used, it means we're on a native platform and we don't need to keep instances in sync
+        if (!InstanceSync.shouldBeUsed) return;
 
         shouldKeepInstancesSync = true;
         InstanceSync.init(onStorageKeyChanged, this);

@@ -5,6 +5,7 @@ import NOOP from 'lodash/noop';
  *  On native platforms, we omit this syncing logic by setting this to mock implementation.
  */
 const InstanceSync = {
+    shouldBeUsed: false,
     init: NOOP,
     setItem: NOOP,
     removeItem: NOOP,

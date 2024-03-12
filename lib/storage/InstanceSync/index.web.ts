@@ -28,6 +28,7 @@ function raiseStorageSyncManyKeysEvent(onyxKeys: KeyList) {
 let storage = NoopProvider;
 
 const InstanceSync = {
+    shouldBeUsed: true,
     /**
      * @param {Function} onStorageKeyChanged Storage synchronization mechanism keeping all opened tabs in sync
      */
