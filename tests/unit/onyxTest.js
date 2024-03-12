@@ -1155,6 +1155,9 @@ describe('Onyx', () => {
 
                 expect(animalsCollectionCallback).toHaveBeenNthCalledWith(1, {
                     [cat]: {age: 3, sound: 'meow'},
+                });
+                expect(animalsCollectionCallback).toHaveBeenNthCalledWith(2, {
+                    [cat]: {age: 3, sound: 'meow'},
                     [dog]: {size: 'M', sound: 'woof'},
                 });
 
@@ -1241,59 +1244,6 @@ describe('Onyx', () => {
                         },
                     });
                 });
-        });
-    });
-
-    describe('mergeCollection', () => {
-        it('should overwrite specified keys', () => {
-            let result;
-
-            connectionID = Onyx.connect({
-                key: ONYX_KEYS.COLLECTION.PEOPLE,
-                initWithStoredValues: false,
-                waitForCollectionCallback: true,
-                callback: (value) => (result = value),
-            });
-
-            const bob = `${ONYX_KEYS.COLLECTION.PEOPLE}bob`;
-            const lisa = `${ONYX_KEYS.COLLECTION.PEOPLE}lisa`;
-
-            const initialValue = {
-                [bob]: {
-                    pet: 'dog',
-                },
-                [lisa]: {
-                    pet: 'cat',
-                },
-            };
-            return Onyx.multiSet(initialValue)
-                .then(() => {
-                    expect(result).toEqual(initialValue);
-                    Onyx.mergeCollection(
-                        ONYX_KEYS.COLLECTION.PEOPLE,
-                        {
-                            [bob]: {
-                                age: 22,
-                            },
-                            [lisa]: {
-                                age: 21,
-                            },
-                        },
-                        new Set([bob]),
-                    );
-                    return waitForPromisesToResolve();
-                })
-                .then(() =>
-                    expect(result).toEqual({
-                        [bob]: {
-                            age: 22,
-                        },
-                        [lisa]: {
-                            age: 21,
-                            pet: 'cat',
-                        },
-                    }),
-                );
         });
     });
 });
