@@ -62,11 +62,6 @@ type StorageProvider = {
     clear: () => Promise<QueryResult | void>;
 
     /**
-     * Sets memory only keys
-     */
-    setMemoryOnlyKeys: () => void;
-
-    /**
      * Gets the total bytes of the database file
      */
     getDatabaseSize: () => Promise<{bytesUsed: number; bytesRemaining: number}>;
