@@ -298,7 +298,6 @@ declare const Onyx: {
     mergeCollection: typeof mergeCollection;
     hasPendingMergeForKey: typeof hasPendingMergeForKey;
     update: typeof update;
-    legacyUpdate: typeof update;
     clear: typeof clear;
     getAllKeys: typeof getAllKeys;
     init: typeof init;

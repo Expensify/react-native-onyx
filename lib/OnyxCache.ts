@@ -102,14 +102,13 @@ class OnyxCache {
     /**
      * Deep merge data to cache, any non-existing keys will be created
      * @param data - a map of (cache) key - values
-     * @param shouldRemoveNullObjectValues - if true, the `null` object values will be removed
      */
-    merge(data: StorageMap, shouldRemoveNullObjectValues = false): void {
+    merge(data: StorageMap): void {
         if (typeof data !== 'object' || Array.isArray(data)) {
             throw new Error('data passed to cache.merge() must be an Object of onyx key/value pairs');
         }
 
-        this.storageMap = {...utils.fastMerge(this.storageMap, data, shouldRemoveNullObjectValues)};
+        this.storageMap = {...utils.fastMerge(this.storageMap, data, false)};
 
         const storageKeys = this.getAllKeys();
         const mergedKeys = Object.keys(data);
