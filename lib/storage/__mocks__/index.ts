@@ -10,20 +10,25 @@ const set = jest.fn((key, value) => {
 });
 
 const idbKeyvalMock: StorageProvider = {
-    name: 'KeyValMockProvider',
-    init: () => undefined,
     setItem(key, value) {
         return set(key, value);
     },
     multiSet(pairs) {
         const setPromises = pairs.map(([key, value]) => this.setItem(key, value));
-        return new Promise((resolve) => Promise.all(setPromises).then(() => resolve(storageMapInternal)));
+        return new Promise((resolve) => {
+            Promise.all(setPromises).then(() => resolve(storageMapInternal));
+        });
     },
     getItem(key) {
         return Promise.resolve(storageMapInternal[key]);
     },
     multiGet(keys) {
-        const getPromises = keys.map((key) => new Promise((resolve) => this.getItem(key).then((value) => resolve([key, value]))));
+        const getPromises = keys.map(
+            (key) =>
+                new Promise((resolve) => {
+                    this.getItem(key).then((value) => resolve([key, value]));
+                }),
+        );
         return Promise.all(getPromises) as Promise<KeyValuePairList>;
     },
     multiMerge(pairs) {
@@ -62,12 +67,10 @@ const idbKeyvalMock: StorageProvider = {
     },
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     setMemoryOnlyKeys() {},
-    keepInstancesSync: () => undefined,
 };
 
 const idbKeyvalMockSpy = {
     idbKeyvalSet: set,
-    init: jest.fn(idbKeyvalMock.init),
     setItem: jest.fn(idbKeyvalMock.setItem),
     getItem: jest.fn(idbKeyvalMock.getItem),
     removeItem: jest.fn(idbKeyvalMock.removeItem),
@@ -84,7 +87,6 @@ const idbKeyvalMockSpy = {
     }),
     getDatabaseSize: jest.fn(idbKeyvalMock.getDatabaseSize),
     setMemoryOnlyKeys: jest.fn(idbKeyvalMock.setMemoryOnlyKeys),
-    keepInstancesSync: jest.fn(idbKeyvalMock.keepInstancesSync),
 };
 
 export default idbKeyvalMockSpy;
