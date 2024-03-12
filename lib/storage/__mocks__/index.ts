@@ -15,13 +15,20 @@ const idbKeyvalMock: StorageProvider = {
     },
     multiSet(pairs) {
         const setPromises = pairs.map(([key, value]) => this.setItem(key, value));
-        return new Promise((resolve) => Promise.all(setPromises).then(() => resolve(storageMapInternal)));
+        return new Promise((resolve) => {
+            Promise.all(setPromises).then(() => resolve(storageMapInternal));
+        });
     },
     getItem(key) {
         return Promise.resolve(storageMapInternal[key]);
     },
     multiGet(keys) {
-        const getPromises = keys.map((key) => new Promise((resolve) => this.getItem(key).then((value) => resolve([key, value]))));
+        const getPromises = keys.map(
+            (key) =>
+                new Promise((resolve) => {
+                    this.getItem(key).then((value) => resolve([key, value]));
+                }),
+        );
         return Promise.all(getPromises) as Promise<KeyValuePairList>;
     },
     multiMerge(pairs) {

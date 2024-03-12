@@ -1,6 +1,6 @@
 import {Component} from 'react';
 import * as Logger from './Logger';
-import {CollectionKey, CollectionKeyBase, DeepRecord, KeyValueMapping, NullishDeep, OnyxCollection, OnyxEntry, OnyxKey} from './types';
+import {CollectionKey, CollectionKeyBase, DeepRecord, KeyValueMapping, NullishDeep, OnyxCollection, OnyxEntry, OnyxKey, Selector} from './types';
 
 /**
  * Represents a mapping object where each `OnyxKey` maps to either a value of its corresponding type in `KeyValueMapping` or `null`.
@@ -20,6 +20,11 @@ type BaseConnectOptions = {
     initWithStoredValues?: boolean;
 };
 
+type TryGetCachedValueMapping<TKey extends OnyxKey> = {
+    selector?: Selector<TKey, unknown, unknown>;
+    withOnyxInstance?: Component;
+};
+
 /**
  * Represents the options used in `Onyx.connect()` method.
  * The type is built from `BaseConnectOptions` and extended to handle key/callback related options.
@@ -35,7 +40,7 @@ type BaseConnectOptions = {
 type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions &
     (
         | {
-              key: TKey extends CollectionKey ? TKey : never;
+              key: TKey extends CollectionKeyBase ? TKey : never;
               callback?: (value: OnyxCollection<KeyValueMapping[TKey]>) => void;
               waitForCollectionCallback: true;
           }
@@ -113,6 +118,21 @@ declare const METHOD: {
  * Returns current key names stored in persisted storage
  */
 declare function getAllKeys(): Promise<Array<OnyxKey>>;
+
+/**
+ * Checks to see if the a subscriber's supplied key
+ * is associated with a collection of keys.
+ */
+declare function isCollectionKey(key: OnyxKey): key is CollectionKeyBase;
+
+declare function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collectionKey: TCollectionKey, key: string): key is `${TCollectionKey}${string}`;
+
+/**
+ * Splits a collection member key into the collection key part and the ID part.
+ * @param key - The collection member key to split.
+ * @returns A tuple where the first element is the collection part and the second element is the ID part.
+ */
+declare function splitCollectionMemberKey<TKey extends CollectionKey>(key: TKey): [TKey extends `${infer Prefix}_${string}` ? `${Prefix}_` : never, string];
 
 /**
  * Checks to see if this key has been flagged as
@@ -294,6 +314,15 @@ declare function hasPendingMergeForKey(key: OnyxKey): boolean;
  */
 declare function setMemoryOnlyKeys(keyList: OnyxKey[]): void;
 
+/**
+ * Tries to get a value from the cache. If the value is not present in cache it will return the default value or undefined.
+ * If the requested key is a collection, it will return an object with all the collection members.
+ */
+declare function tryGetCachedValue<TKey extends OnyxKey>(
+    key: TKey,
+    mapping?: TryGetCachedValueMapping,
+): TKey extends CollectionKeyBase ? OnyxCollection<KeyValueMapping[TKey]> | undefined : OnyxEntry<KeyValueMapping[TKey]> | undefined;
+
 declare const Onyx: {
     connect: typeof connect;
     disconnect: typeof disconnect;
@@ -312,7 +341,11 @@ declare const Onyx: {
     isSafeEvictionKey: typeof isSafeEvictionKey;
     METHOD: typeof METHOD;
     setMemoryOnlyKeys: typeof setMemoryOnlyKeys;
+    tryGetCachedValue: typeof tryGetCachedValue;
+    isCollectionKey: typeof isCollectionKey;
+    isCollectionMemberKey: typeof isCollectionMemberKey;
+    splitCollectionMemberKey: typeof splitCollectionMemberKey;
 };
 
 export default Onyx;
-export {OnyxUpdate, ConnectOptions};
+export {ConnectOptions, OnyxUpdate};
