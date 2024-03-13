@@ -15,13 +15,13 @@ class OnyxCache {
     private recentKeys: Set<OnyxKey>;
 
     /** A map of cached values */
-    private storageMap: Record<OnyxKey, OnyxValue>;
+    private storageMap: Record<OnyxKey, OnyxValue<OnyxKey>>;
 
     /**
      * Captured pending tasks for already running storage methods
      * Using a map yields better performance on operations such a delete
      */
-    private pendingPromises: Map<string, Promise<OnyxValue | OnyxKey[]>>;
+    private pendingPromises: Map<string, Promise<OnyxValue<OnyxKey> | OnyxKey[]>>;
 
     /** Maximum size of the keys store din cache */
     private maxRecentKeysSize = 0;
@@ -60,7 +60,7 @@ class OnyxCache {
      * Get a cached value from storage
      * @param [shouldReindexCache] – This is an LRU cache, and by default accessing a value will make it become last in line to be evicted. This flag can be used to skip that and just access the value directly without side-effects.
      */
-    getValue(key: OnyxKey, shouldReindexCache = true): OnyxValue {
+    getValue(key: OnyxKey, shouldReindexCache = true): OnyxValue<OnyxKey> {
         if (shouldReindexCache) {
             this.addToAccessedKeys(key);
         }
@@ -83,7 +83,7 @@ class OnyxCache {
      * Set's a key value in cache
      * Adds the key to the storage keys list as well
      */
-    set(key: OnyxKey, value: OnyxValue): OnyxValue {
+    set(key: OnyxKey, value: OnyxValue<OnyxKey>): OnyxValue<OnyxKey> {
         this.addKey(key);
         this.addToAccessedKeys(key);
         this.storageMap[key] = value;
@@ -102,7 +102,7 @@ class OnyxCache {
      * Deep merge data to cache, any non existing keys will be created
      * @param data - a map of (cache) key - values
      */
-    merge(data: Record<OnyxKey, OnyxValue>): void {
+    merge(data: Record<OnyxKey, OnyxValue<OnyxKey>>): void {
         if (typeof data !== 'object' || Array.isArray(data)) {
             throw new Error('data passed to cache.merge() must be an Object of onyx key/value pairs');
         }
@@ -144,7 +144,7 @@ class OnyxCache {
      * provided from this function
      * @param taskName - unique name given for the task
      */
-    getTaskPromise(taskName: string): Promise<OnyxValue | OnyxKey[]> | undefined {
+    getTaskPromise(taskName: string): Promise<OnyxValue<OnyxKey> | OnyxKey[]> | undefined {
         return this.pendingPromises.get(taskName);
     }
 
@@ -153,7 +153,7 @@ class OnyxCache {
      * hook up to the promise if it's still pending
      * @param taskName - unique name for the task
      */
-    captureTask(taskName: string, promise: Promise<OnyxValue>): Promise<OnyxValue> {
+    captureTask(taskName: string, promise: Promise<OnyxValue<OnyxKey>>): Promise<OnyxValue<OnyxKey>> {
         const returnPromise = promise.finally(() => {
             this.pendingPromises.delete(taskName);
         });
@@ -196,7 +196,7 @@ class OnyxCache {
     }
 
     /** Check if the value has changed */
-    hasValueChanged(key: OnyxKey, value: OnyxValue): boolean {
+    hasValueChanged(key: OnyxKey, value: OnyxValue<OnyxKey>): boolean {
         return !deepEqual(this.storageMap[key], value);
     }
 }
