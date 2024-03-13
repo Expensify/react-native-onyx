@@ -1,10 +1,11 @@
 import {deepEqual} from 'fast-equals';
 import {useCallback, useEffect, useRef, useSyncExternalStore} from 'react';
 import type {IsEqual} from 'type-fest';
-import Onyx from './Onyx';
+import * as OnyxUtils from './OnyxUtils';
 import type {CollectionKeyBase, OnyxCollection, OnyxKey, OnyxValue, Selector} from './types';
 import useLiveRef from './useLiveRef';
 import usePrevious from './usePrevious';
+import Onyx from './Onyx';
 
 type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
     /**
@@ -47,7 +48,7 @@ type ResultMetadata = {
 type UseOnyxResult<TKey extends OnyxKey, TValue> = [CachedValue<TKey, TValue>, ResultMetadata];
 
 function getCachedValue<TKey extends OnyxKey, TValue>(key: TKey, selector?: Selector<TKey, unknown, unknown>): CachedValue<TKey, TValue> | undefined {
-    return Onyx.tryGetCachedValue(key, {selector}) as CachedValue<TKey, TValue> | undefined;
+    return OnyxUtils.tryGetCachedValue(key, {selector}) as CachedValue<TKey, TValue> | undefined;
 }
 
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey, options?: UseOnyxOptions<TKey, TReturnValue>): UseOnyxResult<TKey, TReturnValue> {
@@ -82,10 +83,10 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
         }
 
         try {
-            const previousCollectionKey = Onyx.splitCollectionMemberKey(previousKey)[0];
-            const collectionKey = Onyx.splitCollectionMemberKey(key)[0];
+            const previousCollectionKey = OnyxUtils.splitCollectionMemberKey(previousKey)[0];
+            const collectionKey = OnyxUtils.splitCollectionMemberKey(key)[0];
 
-            if (Onyx.isCollectionMemberKey(previousCollectionKey, previousKey) && Onyx.isCollectionMemberKey(collectionKey, key) && previousCollectionKey === collectionKey) {
+            if (OnyxUtils.isCollectionMemberKey(previousCollectionKey, previousKey) && OnyxUtils.isCollectionMemberKey(collectionKey, key) && previousCollectionKey === collectionKey) {
                 return;
             }
         } catch (e) {
@@ -113,7 +114,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
         // If we have pending merge operations for the key during the first connection, we set the new value to `undefined`
         // and fetch status to `loading` to simulate that it is still being loaded until we have the most updated data.
         // If `allowStaleData` is `true` this logic will be ignored and cached value will be used, even if it's stale data.
-        if (isFirstConnectionRef.current && Onyx.hasPendingMergeForKey(key) && !options?.allowStaleData) {
+        if (isFirstConnectionRef.current && OnyxUtils.hasPendingMergeForKey(key) && !options?.allowStaleData) {
             newValue = undefined;
             newFetchStatus = 'loading';
         }
@@ -148,7 +149,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
                     onStoreChange();
                 },
                 initWithStoredValues: options?.initWithStoredValues,
-                waitForCollectionCallback: Onyx.isCollectionKey(key),
+                waitForCollectionCallback: OnyxUtils.isCollectionKey(key),
             });
 
             return () => {
@@ -169,14 +170,14 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
             return;
         }
 
-        if (!Onyx.isSafeEvictionKey(key)) {
-            throw new Error(`canEvict can't be used on key '${key}'. This key must explicitly be flagged as safe for removal by adding it to Onyx.init({safeEvictionKeys: []}).`);
+        if (!OnyxUtils.isSafeEvictionKey(key)) {
+            throw new Error(`canEvict can't be used on key '${key}'. This key must explicitly be flagged as safe for removal by adding it to OnyxUtils.init({safeEvictionKeys: []}).`);
         }
 
         if (options.canEvict) {
-            Onyx.removeFromEvictionBlockList(key, connectionIDRef.current);
+            OnyxUtils.removeFromEvictionBlockList(key, connectionIDRef.current);
         } else {
-            Onyx.addToEvictionBlockList(key, connectionIDRef.current);
+            OnyxUtils.addToEvictionBlockList(key, connectionIDRef.current);
         }
     }, [key, options?.canEvict]);
 
