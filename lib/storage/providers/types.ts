@@ -1,17 +1,17 @@
 import type {BatchQueryResult, QueryResult} from 'react-native-quick-sqlite';
 import type {OnyxKey, OnyxValue} from '../../types';
 
-type KeyValuePair = [OnyxKey, OnyxValue];
+type KeyValuePair = [OnyxKey, OnyxValue<OnyxKey>];
 type KeyList = OnyxKey[];
 type KeyValuePairList = KeyValuePair[];
 
-type OnStorageKeyChanged = (key: OnyxKey, value: OnyxValue | null) => void;
+type OnStorageKeyChanged = <TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey> | null) => void;
 
 type StorageProvider = {
     /**
      * Gets the value of a given key or return `null` if it's not available in storage
      */
-    getItem: (key: OnyxKey) => Promise<OnyxValue | null>;
+    getItem: <TKey extends OnyxKey>(key: TKey) => Promise<OnyxValue<TKey> | null>;
 
     /**
      * Get multiple key-value pairs for the given array of keys in a batch
@@ -21,7 +21,7 @@ type StorageProvider = {
     /**
      * Sets the value for a given key. The only requirement is that the value should be serializable to JSON string
      */
-    setItem: (key: OnyxKey, value: OnyxValue) => Promise<QueryResult | void>;
+    setItem: <TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>) => Promise<QueryResult | void>;
 
     /**
      * Stores multiple key-value pairs in a batch
@@ -38,7 +38,7 @@ type StorageProvider = {
      * @param changes - the delta for a specific key
      * @param modifiedData - the pre-merged data from `Onyx.applyMerge`
      */
-    mergeItem: (key: OnyxKey, changes: OnyxValue, modifiedData: OnyxValue) => Promise<BatchQueryResult | void>;
+    mergeItem: <TKey extends OnyxKey>(key: TKey, changes: OnyxValue<TKey>, modifiedData: OnyxValue<TKey>) => Promise<BatchQueryResult | void>;
 
     /**
      * Returns all keys available in storage

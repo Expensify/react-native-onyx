@@ -3,7 +3,7 @@ import utils from '../../utils';
 import type {KeyValuePairList} from '../providers/types';
 import type StorageProvider from '../providers/types';
 
-let storageMapInternal: Record<OnyxKey, OnyxValue> = {};
+let storageMapInternal: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
 
 const set = jest.fn((key, value) => {
     storageMapInternal[key] = value;
@@ -20,8 +20,8 @@ const idbKeyvalMock: StorageProvider = {
             Promise.all(setPromises).then(() => resolve(storageMapInternal));
         });
     },
-    getItem(key) {
-        return Promise.resolve(storageMapInternal[key]);
+    getItem<TKey extends OnyxKey>(key: TKey) {
+        return Promise.resolve(storageMapInternal[key] as OnyxValue<TKey>);
     },
     multiGet(keys) {
         const getPromises = keys.map(
@@ -35,7 +35,7 @@ const idbKeyvalMock: StorageProvider = {
     multiMerge(pairs) {
         pairs.forEach(([key, value]) => {
             const existingValue = storageMapInternal[key];
-            const newValue = utils.fastMerge(existingValue!, value!);
+            const newValue = utils.fastMerge(existingValue, value);
 
             set(key, newValue);
         });
