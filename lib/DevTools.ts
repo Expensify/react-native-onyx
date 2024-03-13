@@ -44,7 +44,7 @@ class DevTools {
             if ((options && options.remote) || typeof window === 'undefined' || !reduxDevtools) {
                 return;
             }
-            // eslint-disable-next-line no-underscore-dangle, @typescript-eslint/no-explicit-any
+
             return reduxDevtools.connect(options);
         } catch (e) {
             console.error(ERROR_LABEL, e);
