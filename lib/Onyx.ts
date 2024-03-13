@@ -47,21 +47,7 @@ function init({
         cache.setRecentKeysLimit(maxCachedKeysCount);
     }
 
-    // We need the value of the collection keys later for checking if a
-    // key is a collection. We store it in a map for faster lookup.
-    const collectionValues = keys.COLLECTION ? Object.values(keys.COLLECTION) : [];
-    OnyxUtils.onyxCollectionKeyMap = collectionValues.reduce((acc, val) => {
-        acc.set(val, true);
-        return acc;
-    }, new Map());
-
-    // Set our default key states to use when initializing and clearing Onyx data
-    OnyxUtils.defaultKeyStates = initialKeyStates;
-
-    DevTools.initState(initialKeyStates);
-
-    // Let Onyx know about which keys are safe to evict
-    evictionAllowList = safeEvictionKeys;
+    OnyxUtils.initStoreValues(keys, initialKeyStates, safeEvictionKeys);
 
     // Initialize all of our keys with data provided then give green light to any pending connections
     Promise.all([OnyxUtils.addAllSafeEvictionKeysToRecentlyAccessedList(), OnyxUtils.initializeWithDefaultKeyStates()]).then(deferredInitTask.resolve);
@@ -336,7 +322,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<K
 
             // If the value has not changed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
             if (!hasChanged || wasRemoved) {
-                return updatePromise as Promise<OnyxValue>;
+                return updatePromise;
             }
 
             return Storage.mergeItem(key, batchedChanges, modifiedData).then(() => {
