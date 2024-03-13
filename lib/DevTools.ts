@@ -90,7 +90,7 @@ class DevTools {
     /**
      * This clears the internal state of the DevTools, preserving the keys included in `keysToPreserve`
      */
-    public clearState(keysToPreserve: string[] = []): void {
+    clearState(keysToPreserve: string[] = []): void {
         const newState = Object.entries(this.state).reduce((obj: Record<string, unknown>, [key, value]) => {
             // eslint-disable-next-line no-param-reassign
             obj[key] = keysToPreserve.includes(key) ? value : this.defaultState[key];
