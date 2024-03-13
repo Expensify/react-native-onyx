@@ -1,5 +1,4 @@
 /* eslint-disable no-continue */
-import type {Component} from 'react';
 import type {QueryResult} from 'react-native-quick-sqlite';
 import * as Logger from './Logger';
 import cache from './OnyxCache';
@@ -8,81 +7,73 @@ import * as PerformanceUtils from './PerformanceUtils';
 import Storage from './storage';
 import utils from './utils';
 import DevTools from './DevTools';
-import type {CollectionKey, CollectionKeyBase, DeepRecord, KeyValueMapping, NullishDeep, OnyxCollection, OnyxEntry, OnyxKey, OnyxValue, Selector, WithOnyxInstanceState} from './types';
+import type {
+    Collection,
+    CollectionKeyBase,
+    ConnectOptions,
+    InitOptions,
+    KeyValueMapping,
+    Mapping,
+    NullableKeyValueMapping,
+    NullishDeep,
+    OnyxCollection,
+    OnyxEntry,
+    OnyxKey,
+    OnyxUpdate,
+    OnyxValue,
+} from './types';
 import * as OnyxUtils from './OnyxUtils';
-
-/**
- * Represents a mapping object where each `OnyxKey` maps to either a value of its corresponding type in `KeyValueMapping` or `null`.
- *
- * It's very similar to `KeyValueMapping` but this type accepts using `null` as well.
- */
-type NullableKeyValueMapping = {
-    [TKey in OnyxKey]: OnyxEntry<KeyValueMapping[TKey]>;
-};
-
-/**
- * Represents a mapping between Onyx collection keys and their respective values.
- *
- * It helps to enforce that a Onyx collection key should not be without suffix (e.g. should always be of the form `${TKey}${string}`),
- * and to map each Onyx collection key with suffix to a value of type `TValue`.
- *
- * Also, the `TMap` type is inferred automatically in `mergeCollection()` method and represents
- * the object of collection keys/values specified in the second parameter of the method.
- */
-type Collection<TKey extends CollectionKeyBase, TMap, TValue> = {
-    [MapK in keyof TMap]: MapK extends `${TKey}${string}`
-        ? MapK extends `${TKey}`
-            ? never // forbids empty id
-            : TValue
-        : never;
-};
-
-type WithOnyxInstance = Component<unknown, WithOnyxInstanceState<Record<OnyxKey, OnyxValue>>> & {
-    setStateProxy: (cb: (state: Record<OnyxKey, OnyxValue>) => OnyxValue) => void;
-    setWithOnyxState: (statePropertyName: OnyxKey, value: OnyxValue) => void;
-};
-
-/** Represents the base options used in `Onyx.connect()` method. */
-type BaseConnectOptions<TKey extends OnyxKey> = {
-    selector?: Selector<TKey, unknown, unknown>;
-    withOnyxInstance?: WithOnyxInstance;
-    initWithStoredValues?: boolean;
-    canEvict?: boolean;
-};
-
-/**
- * Represents the options used in `Onyx.connect()` method.
- * The type is built from `BaseConnectOptions` and extended to handle key/callback related options.
- * It includes two different forms, depending on whether we are waiting for a collection callback or not.
- *
- * If `waitForCollectionCallback` is `true`, it expects `key` to be a Onyx collection key and `callback` will be triggered with the whole collection
- * and will pass `value` as an `OnyxCollection`.
- *
- *
- * If `waitForCollectionCallback` is `false` or not specified, the `key` can be any Onyx key and `callback` will be triggered with updates of each collection item
- * and will pass `value` as an `OnyxEntry`.
- */
-type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions<TKey> &
-    (
-        | {
-              key: TKey extends CollectionKey ? TKey : never;
-              callback?: (value: OnyxCollection<KeyValueMapping[TKey]>) => void;
-              waitForCollectionCallback: true;
-          }
-        | {
-              key: TKey;
-              callback?: (value: OnyxEntry<KeyValueMapping[TKey]>, key: TKey) => void;
-              waitForCollectionCallback?: false;
-          }
-    );
-
-type Mapping<TKey extends OnyxKey> = ConnectOptions<TKey> & {connectionID: number; statePropertyName: string; displayName: string};
 
 // Keeps track of the last connectionID that was used so we can keep incrementing it
 let lastConnectionID = 0;
 
 // Connections can be made before `Onyx.init`. They would wait for this task before resolving
 const deferredInitTask = createDeferredTask();
+
+/** Initialize the store with actions and listening for storage events */
+function init({
+    keys = {},
+    initialKeyStates = {},
+    safeEvictionKeys = [],
+    maxCachedKeysCount = 1000,
+    shouldSyncMultipleInstances = Boolean(global.localStorage),
+    debugSetState = false,
+}: InitOptions) {
+    if (debugSetState) {
+        PerformanceUtils.setShouldDebugSetState(true);
+    }
+
+    if (maxCachedKeysCount > 0) {
+        cache.setRecentKeysLimit(maxCachedKeysCount);
+    }
+
+    // We need the value of the collection keys later for checking if a
+    // key is a collection. We store it in a map for faster lookup.
+    const collectionValues = keys.COLLECTION ? Object.values(keys.COLLECTION) : [];
+    OnyxUtils.onyxCollectionKeyMap = collectionValues.reduce((acc, val) => {
+        acc.set(val, true);
+        return acc;
+    }, new Map());
+
+    // Set our default key states to use when initializing and clearing Onyx data
+    OnyxUtils.defaultKeyStates = initialKeyStates;
+
+    DevTools.initState(initialKeyStates);
+
+    // Let Onyx know about which keys are safe to evict
+    evictionAllowList = safeEvictionKeys;
+
+    // Initialize all of our keys with data provided then give green light to any pending connections
+    Promise.all([OnyxUtils.addAllSafeEvictionKeysToRecentlyAccessedList(), OnyxUtils.initializeWithDefaultKeyStates()]).then(deferredInitTask.resolve);
+
+    if (shouldSyncMultipleInstances) {
+        Storage.keepInstancesSync?.((key, value) => {
+            const prevValue = cache.getValue(key, false);
+            cache.set(key, value);
+            OnyxUtils.keyChanged(key, value, prevValue);
+        });
+    }
+}
 
 /**
  * Subscribes a react component's state directly to a store key
@@ -219,8 +210,7 @@ function disconnect(connectionID: number, keyToRemoveFromEvictionBlocklist?: Ony
  * @param key ONYXKEY to set
  * @param value value to store
  */
-
-function set(key: OnyxKey, value: OnyxValue | Record<OnyxKey, OnyxValue>): Promise<QueryResult | void | [void, void]> {
+function set(key: OnyxKey, value: NullableKeyValueMapping): Promise<QueryResult | void | [void, void]> {
     // If the value is null, we remove the key from storage
     const {value: valueAfterRemoving, wasRemoved} = OnyxUtils.removeNullValues(key, value);
 
@@ -362,6 +352,101 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<K
 }
 
 /**
+ * Merges a collection based on their keys
+ *
+ * @example
+ *
+ * Onyx.mergeCollection(ONYXKEYS.COLLECTION.REPORT, {
+ *     [`${ONYXKEYS.COLLECTION.REPORT}1`]: report1,
+ *     [`${ONYXKEYS.COLLECTION.REPORT}2`]: report2,
+ * });
+ *
+ * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
+ * @param collection Object collection keyed by individual collection member keys and values
+ */
+function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: Collection<TKey, TMap, NullishDeep<KeyValueMapping[TKey]>>): Promise<void | [void, void]> {
+    if (typeof collection !== 'object' || Array.isArray(collection) || utils.isEmptyObject(collection)) {
+        Logger.logInfo('mergeCollection() called with invalid or empty value. Skipping this update.');
+        return Promise.resolve();
+    }
+    const mergedCollection: NullableKeyValueMapping = collection;
+
+    // Confirm all the collection keys belong to the same parent
+    let hasCollectionKeyCheckFailed = false;
+    Object.keys(mergedCollection).forEach((dataKey) => {
+        if (OnyxUtils.isKeyMatch(collectionKey, dataKey)) {
+            return;
+        }
+
+        if (process.env.NODE_ENV === 'development') {
+            throw new Error(`Provided collection doesn't have all its data belonging to the same parent. CollectionKey: ${collectionKey}, DataKey: ${dataKey}`);
+        }
+
+        hasCollectionKeyCheckFailed = true;
+        Logger.logAlert(`Provided collection doesn't have all its data belonging to the same parent. CollectionKey: ${collectionKey}, DataKey: ${dataKey}`);
+    });
+
+    // Gracefully handle bad mergeCollection updates so it doesn't block the merge queue
+    if (hasCollectionKeyCheckFailed) {
+        return Promise.resolve();
+    }
+
+    return OnyxUtils.getAllKeys().then((persistedKeys) => {
+        // Split to keys that exist in storage and keys that don't
+        const keys = Object.keys(mergedCollection).filter((key) => {
+            if (mergedCollection[key] === null) {
+                OnyxUtils.remove(key);
+                return false;
+            }
+            return true;
+        });
+
+        const existingKeys = keys.filter((key) => persistedKeys.includes(key));
+        const newKeys = keys.filter((key) => !persistedKeys.includes(key));
+
+        const existingKeyCollection = existingKeys.reduce((obj: NullableKeyValueMapping, key) => {
+            // eslint-disable-next-line no-param-reassign
+            obj[key] = mergedCollection[key];
+            return obj;
+        }, {});
+
+        const newCollection = newKeys.reduce((obj: NullableKeyValueMapping, key) => {
+            // eslint-disable-next-line no-param-reassign
+            obj[key] = mergedCollection[key];
+            return obj;
+        }, {});
+        const keyValuePairsForExistingCollection = OnyxUtils.prepareKeyValuePairsForStorage(existingKeyCollection);
+        const keyValuePairsForNewCollection = OnyxUtils.prepareKeyValuePairsForStorage(newCollection);
+
+        const promises = [];
+
+        // New keys will be added via multiSet while existing keys will be updated using multiMerge
+        // This is because setting a key that doesn't exist yet with multiMerge will throw errors
+        if (keyValuePairsForExistingCollection.length > 0) {
+            promises.push(Storage.multiMerge(keyValuePairsForExistingCollection));
+        }
+
+        if (keyValuePairsForNewCollection.length > 0) {
+            promises.push(Storage.multiSet(keyValuePairsForNewCollection));
+        }
+
+        // Prefill cache if necessary by calling get() on any existing keys and then merge original data to cache
+        // and update all subscribers
+        const promiseUpdate = Promise.all(existingKeys.map(OnyxUtils.get)).then(() => {
+            cache.merge(mergedCollection);
+            return OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, mergedCollection);
+        });
+
+        return Promise.all(promises)
+            .catch((error) => OnyxUtils.evictStorageAndRetry(error, mergeCollection, collectionKey, mergedCollection))
+            .then(() => {
+                OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE_COLLECTION, undefined, mergedCollection);
+                return promiseUpdate;
+            });
+    });
+}
+
+/**
  * Clear out all the data in the store
  *
  * Note that calling Onyx.clear() and then Onyx.set() on a key with a default
@@ -386,7 +471,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<Array<[void, void]>> {
     return OnyxUtils.getAllKeys().then((keys) => {
         const keysToBeClearedFromStorage: OnyxKey[] = [];
         const keyValuesToResetAsCollection: Record<OnyxKey, OnyxCollection<OnyxValue>> = {};
-        const keyValuesToResetIndividually: Record<OnyxKey, OnyxValue> = {};
+        const keyValuesToResetIndividually: NullableKeyValueMapping = {};
 
         // The only keys that should not be cleared are:
         // 1. Anything specifically passed in keysToPreserve (because some keys like language preferences, offline
@@ -439,7 +524,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<Array<[void, void]>> {
         const defaultKeyValuePairs = Object.entries(
             Object.keys(OnyxUtils.defaultKeyStates)
                 .filter((key) => !keysToPreserve.includes(key))
-                .reduce((obj: Record<OnyxKey, OnyxValue>, key) => {
+                .reduce((obj: NullableKeyValueMapping, key) => {
                     // eslint-disable-next-line no-param-reassign
                     obj[key] = OnyxUtils.defaultKeyStates[key];
                     return obj;
@@ -456,137 +541,6 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<Array<[void, void]>> {
             });
     });
 }
-
-/**
- * Merges a collection based on their keys
- *
- * @example
- *
- * Onyx.mergeCollection(ONYXKEYS.COLLECTION.REPORT, {
- *     [`${ONYXKEYS.COLLECTION.REPORT}1`]: report1,
- *     [`${ONYXKEYS.COLLECTION.REPORT}2`]: report2,
- * });
- *
- * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
- * @param collection Object collection keyed by individual collection member keys and values
- */
-function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: Collection<TKey, TMap, NullishDeep<KeyValueMapping[TKey]>>): Promise<void | [void, void]> {
-    if (typeof collection !== 'object' || Array.isArray(collection) || utils.isEmptyObject(collection)) {
-        Logger.logInfo('mergeCollection() called with invalid or empty value. Skipping this update.');
-        return Promise.resolve();
-    }
-    const mergedCollection: Record<OnyxKey, OnyxValue> = collection;
-
-    // Confirm all the collection keys belong to the same parent
-    let hasCollectionKeyCheckFailed = false;
-    Object.keys(mergedCollection).forEach((dataKey) => {
-        if (OnyxUtils.isKeyMatch(collectionKey, dataKey)) {
-            return;
-        }
-
-        if (process.env.NODE_ENV === 'development') {
-            throw new Error(`Provided collection doesn't have all its data belonging to the same parent. CollectionKey: ${collectionKey}, DataKey: ${dataKey}`);
-        }
-
-        hasCollectionKeyCheckFailed = true;
-        Logger.logAlert(`Provided collection doesn't have all its data belonging to the same parent. CollectionKey: ${collectionKey}, DataKey: ${dataKey}`);
-    });
-
-    // Gracefully handle bad mergeCollection updates so it doesn't block the merge queue
-    if (hasCollectionKeyCheckFailed) {
-        return Promise.resolve();
-    }
-
-    return OnyxUtils.getAllKeys().then((persistedKeys) => {
-        // Split to keys that exist in storage and keys that don't
-        const keys = Object.keys(mergedCollection).filter((key) => {
-            if (mergedCollection[key] === null) {
-                OnyxUtils.remove(key);
-                return false;
-            }
-            return true;
-        });
-
-        const existingKeys = keys.filter((key) => persistedKeys.includes(key));
-        const newKeys = keys.filter((key) => !persistedKeys.includes(key));
-
-        const existingKeyCollection = existingKeys.reduce((obj: Record<OnyxKey, OnyxValue>, key) => {
-            // eslint-disable-next-line no-param-reassign
-            obj[key] = mergedCollection[key];
-            return obj;
-        }, {});
-
-        const newCollection = newKeys.reduce((obj: Record<OnyxKey, OnyxValue>, key) => {
-            // eslint-disable-next-line no-param-reassign
-            obj[key] = mergedCollection[key];
-            return obj;
-        }, {});
-        const keyValuePairsForExistingCollection = OnyxUtils.prepareKeyValuePairsForStorage(existingKeyCollection);
-        const keyValuePairsForNewCollection = OnyxUtils.prepareKeyValuePairsForStorage(newCollection);
-
-        const promises = [];
-
-        // New keys will be added via multiSet while existing keys will be updated using multiMerge
-        // This is because setting a key that doesn't exist yet with multiMerge will throw errors
-        if (keyValuePairsForExistingCollection.length > 0) {
-            promises.push(Storage.multiMerge(keyValuePairsForExistingCollection));
-        }
-
-        if (keyValuePairsForNewCollection.length > 0) {
-            promises.push(Storage.multiSet(keyValuePairsForNewCollection));
-        }
-
-        // Prefill cache if necessary by calling get() on any existing keys and then merge original data to cache
-        // and update all subscribers
-        const promiseUpdate = Promise.all(existingKeys.map(OnyxUtils.get)).then(() => {
-            cache.merge(mergedCollection);
-            return OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, mergedCollection);
-        });
-
-        return Promise.all(promises)
-            .catch((error) => OnyxUtils.evictStorageAndRetry(error, mergeCollection, collectionKey, mergedCollection))
-            .then(() => {
-                OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE_COLLECTION, undefined, mergedCollection);
-                return promiseUpdate;
-            });
-    });
-}
-
-/**
- * Represents different kinds of updates that can be passed to `Onyx.update()` method. It is a discriminated union of
- * different update methods (`SET`, `MERGE`, `MERGE_COLLECTION`), each with their own key and value structure.
- */
-type OnyxUpdate =
-    | {
-          [TKey in OnyxKey]:
-              | {
-                    onyxMethod: typeof OnyxUtils.METHOD.SET;
-                    key: TKey;
-                    value: OnyxEntry<KeyValueMapping[TKey]>;
-                }
-              | {
-                    onyxMethod: typeof OnyxUtils.METHOD.MERGE;
-                    key: TKey;
-                    value: OnyxEntry<NullishDeep<KeyValueMapping[TKey]>>;
-                }
-              | {
-                    onyxMethod: typeof OnyxUtils.METHOD.MULTI_SET;
-                    key: TKey;
-                    value: Partial<NullableKeyValueMapping>;
-                }
-              | {
-                    onyxMethod: typeof OnyxUtils.METHOD.CLEAR;
-                    key: TKey;
-                    value?: undefined;
-                };
-      }[OnyxKey]
-    | {
-          [TKey in CollectionKeyBase]: {
-              onyxMethod: typeof OnyxUtils.METHOD.MERGE_COLLECTION;
-              key: TKey;
-              value: Record<`${TKey}${string}`, NullishDeep<KeyValueMapping[TKey]>>;
-          };
-      }[CollectionKeyBase];
 
 /**
  * Insert API responses and lifecycle data into Onyx
@@ -637,84 +591,6 @@ function update(data: OnyxUpdate[]): Promise<unknown> {
     });
 
     return clearPromise.then(() => Promise.all(promises.map((p) => p())));
-}
-
-/**
- * Represents the options used in `Onyx.init()` method.
- */
-type InitOptions = {
-    /** `ONYXKEYS` constants object */
-    keys?: DeepRecord<string, OnyxKey>;
-
-    /** initial data to set when `init()` and `clear()` is called */
-    initialKeyStates?: Partial<NullableKeyValueMapping>;
-
-    /**
-     * This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged
-     * as "safe" for removal. Any components subscribing to these keys must also implement a canEvict option. See the README for more info.
-     */
-    safeEvictionKeys?: OnyxKey[];
-
-    /**
-     * Sets how many recent keys should we try to keep in cache
-     * Setting this to 0 would practically mean no cache
-     * We try to free cache when we connect to a safe eviction key
-     */
-    maxCachedKeysCount?: number;
-
-    /**
-     * Auto synchronize storage events between multiple instances
-     * of Onyx running in different tabs/windows. Defaults to true for platforms that support local storage (web/desktop)
-     */
-    shouldSyncMultipleInstances?: boolean;
-
-    /** Enables debugging setState() calls to connected components */
-    debugSetState?: boolean;
-};
-
-/** Initialize the store with actions and listening for storage events */
-function init({
-    keys = {},
-    initialKeyStates = {},
-    safeEvictionKeys = [],
-    maxCachedKeysCount = 1000,
-    shouldSyncMultipleInstances = Boolean(global.localStorage),
-    debugSetState = false,
-}: InitOptions) {
-    if (debugSetState) {
-        PerformanceUtils.setShouldDebugSetState(true);
-    }
-
-    if (maxCachedKeysCount > 0) {
-        cache.setRecentKeysLimit(maxCachedKeysCount);
-    }
-
-    // We need the value of the collection keys later for checking if a
-    // key is a collection. We store it in a map for faster lookup.
-    const collectionValues = keys.COLLECTION ? Object.values(keys.COLLECTION) : [];
-    OnyxUtils.onyxCollectionKeyMap = collectionValues.reduce((acc, val) => {
-        acc.set(val, true);
-        return acc;
-    }, new Map());
-
-    // Set our default key states to use when initializing and clearing Onyx data
-    OnyxUtils.defaultKeyStates = initialKeyStates;
-
-    DevTools.initState(initialKeyStates);
-
-    // Let Onyx know about which keys are safe to evict
-    evictionAllowList = safeEvictionKeys;
-
-    // Initialize all of our keys with data provided then give green light to any pending connections
-    Promise.all([OnyxUtils.addAllSafeEvictionKeysToRecentlyAccessedList(), OnyxUtils.initializeWithDefaultKeyStates()]).then(deferredInitTask.resolve);
-
-    if (shouldSyncMultipleInstances && _.isFunction(Storage.keepInstancesSync)) {
-        Storage.keepInstancesSync((key, value) => {
-            const prevValue = cache.getValue(key, false);
-            cache.set(key, value);
-            OnyxUtils.keyChanged(key, value, prevValue);
-        });
-    }
 }
 
 const Onyx = {
