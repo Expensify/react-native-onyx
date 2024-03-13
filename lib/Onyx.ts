@@ -22,7 +22,7 @@ import type {
     OnyxUpdate,
     OnyxValue,
 } from './types';
-import * as OnyxUtils from './OnyxUtils';
+import OnyxUtils from './OnyxUtils';
 
 // Keeps track of the last connectionID that was used so we can keep incrementing it
 let lastConnectionID = 0;
@@ -151,6 +151,7 @@ function connect<TKey extends OnyxKey>(options: ConnectOptions<TKey>): number {
                     }
 
                     // We did not opt into using waitForCollectionCallback mode so the callback is called for every matching key.
+                    // eslint-disable-next-line @typescript-eslint/prefer-for-of
                     for (let i = 0; i < matchingKeys.length; i++) {
                         OnyxUtils.get(matchingKeys[i]).then((val) => OnyxUtils.sendDataToConnection(mapping, val, matchingKeys[i] as TKey, true));
                     }

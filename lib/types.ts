@@ -1,7 +1,7 @@
 import type {Component} from 'react';
 import type {Merge} from 'type-fest';
 import type {BuiltIns} from 'type-fest/source/internal';
-import type * as OnyxUtils from './OnyxUtils';
+import type OnyxUtils from './OnyxUtils';
 
 /**
  * Represents a deeply nested record. It maps keys to values,

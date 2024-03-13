@@ -249,7 +249,7 @@ declare function applyMerge(existingValue: OnyxValue, changes: Array<OnyxEntry<O
  */
 declare function initializeWithDefaultKeyStates(): Promise<void>;
 
-export {
+const OnyxUtils = {
     METHOD,
     mergeQueue,
     mergeQueuePromise,
@@ -289,4 +289,6 @@ export {
     prepareKeyValuePairsForStorage,
     applyMerge,
     initializeWithDefaultKeyStates,
-};
+} as const;
+
+export default OnyxUtils;
