@@ -270,11 +270,10 @@ type WithOnyxInstance = Component<unknown, WithOnyxInstanceState<NullableKeyValu
 };
 
 /** Represents the base options used in `Onyx.connect()` method. */
-type BaseConnectOptions<TKey extends OnyxKey> = {
-    selector?: Selector<TKey, unknown, unknown>;
-    withOnyxInstance?: WithOnyxInstance;
+type BaseConnectOptions = {
+    statePropertyName?: string;
+    withOnyxInstance?: Component;
     initWithStoredValues?: boolean;
-    canEvict?: boolean;
 };
 
 /**
@@ -289,7 +288,7 @@ type BaseConnectOptions<TKey extends OnyxKey> = {
  * If `waitForCollectionCallback` is `false` or not specified, the `key` can be any Onyx key and `callback` will be triggered with updates of each collection item
  * and will pass `value` as an `OnyxEntry`.
  */
-type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions<TKey> &
+type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions &
     (
         | {
               key: TKey extends CollectionKey ? TKey : never;

@@ -38,7 +38,7 @@ function init({
     maxCachedKeysCount = 1000,
     shouldSyncMultipleInstances = Boolean(global.localStorage),
     debugSetState = false,
-}: InitOptions) {
+}: InitOptions): void {
     if (debugSetState) {
         PerformanceUtils.setShouldDebugSetState(true);
     }
@@ -197,7 +197,7 @@ function disconnect(connectionID: number, keyToRemoveFromEvictionBlocklist?: Ony
  * @param key ONYXKEY to set
  * @param value value to store
  */
-function set(key: OnyxKey, value: NullableKeyValueMapping): Promise<QueryResult | void | [void, void]> {
+function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[TKey]>): Promise<QueryResult | void | [void, void]> {
     // If the value is null, we remove the key from storage
     const {value: valueAfterRemoving, wasRemoved} = OnyxUtils.removeNullValues(key, value);
 
@@ -265,7 +265,7 @@ function multiSet(data: Partial<NullableKeyValueMapping>): Promise<Array<[void, 
  * Onyx.merge(ONYXKEYS.POLICY, {id: 1}); // -> {id: 1}
  * Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Workspace'}
  */
-function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<KeyValueMapping[TKey]>>): Promise<OnyxValue> {
+function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<KeyValueMapping[TKey]>>): Promise<OnyxValue<TKey>> {
     // Top-level undefined values are ignored
     // Therefore we need to prevent adding them to the merge queue
     if (changes === undefined) {
