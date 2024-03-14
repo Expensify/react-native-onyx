@@ -26,7 +26,7 @@ const provider: StorageProvider = {
             return getValues.then((values) => {
                 const upsertMany = pairs.map(([key, value], index) => {
                     const prev = values[index];
-                    const newValue = utils.fastMerge(prev, value);
+                    const newValue = utils.fastMerge(prev as Record<string, unknown>, value as Record<string, unknown>);
                     return promisifyRequest(store.put(newValue, key));
                 });
                 return Promise.all(upsertMany);
