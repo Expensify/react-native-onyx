@@ -3,8 +3,9 @@
  * when using LocalStorage APIs in the browser. These events are great because multiple tabs can listen for when
  * data changes and then stay up-to-date with everything happening in Onyx.
  */
+import type {OnyxKey} from '../types';
 import Storage from './providers/IDBKeyVal';
-import type {KeyList, Key} from './providers/types';
+import type {KeyList} from './providers/types';
 import type StorageProvider from './providers/types';
 
 const SYNC_ONYX = 'SYNC_ONYX';
@@ -12,7 +13,7 @@ const SYNC_ONYX = 'SYNC_ONYX';
 /**
  * Raise an event thorough `localStorage` to let other tabs know a value changed
  */
-function raiseStorageSyncEvent(onyxKey: Key) {
+function raiseStorageSyncEvent(onyxKey: OnyxKey) {
     global.localStorage.setItem(SYNC_ONYX, onyxKey);
     global.localStorage.removeItem(SYNC_ONYX);
 }

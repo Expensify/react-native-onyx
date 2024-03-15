@@ -2,7 +2,7 @@ import type {UseStore} from 'idb-keyval';
 import {set, keys, getMany, setMany, get, clear, del, delMany, createStore, promisifyRequest} from 'idb-keyval';
 import utils from '../../utils';
 import type StorageProvider from './types';
-import type {Value} from './types';
+import type {OnyxKey, OnyxValue} from '../../types';
 
 // We don't want to initialize the store while the JS bundle loads as idb-keyval will try to use global.indexedDB
 // which might not be available in certain environments that load the bundle (e.g. electron main process).
@@ -21,13 +21,12 @@ const provider: StorageProvider = {
         getCustomStore()('readwrite', (store) => {
             // Note: we are using the manual store transaction here, to fit the read and update
             // of the items in one transaction to achieve best performance.
-            const getValues = Promise.all(pairs.map(([key]) => promisifyRequest<Value>(store.get(key))));
+            const getValues = Promise.all(pairs.map(([key]) => promisifyRequest<OnyxValue<OnyxKey>>(store.get(key))));
 
             return getValues.then((values) => {
                 const upsertMany = pairs.map(([key, value], index) => {
                     const prev = values[index];
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const newValue = utils.fastMerge(prev as any, value);
+                    const newValue = utils.fastMerge(prev as Record<string, unknown>, value as Record<string, unknown>);
                     return promisifyRequest(store.put(newValue, key));
                 });
                 return Promise.all(upsertMany);

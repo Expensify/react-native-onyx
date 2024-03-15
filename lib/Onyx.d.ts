@@ -18,6 +18,7 @@ type BaseConnectOptions = {
     statePropertyName?: string;
     withOnyxInstance?: Component;
     initWithStoredValues?: boolean;
+    displayName?: string;
 };
 
 type TryGetCachedValueMapping<TKey extends OnyxKey> = {
