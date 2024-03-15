@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/prefer-for-of */
-import type {OnyxEntry, OnyxKey, OnyxValue} from './types';
+
+import type {OnyxKey} from './types';
 
 type EmptyObject = Record<string, never>;
 type EmptyValue = EmptyObject | null | undefined;
@@ -26,7 +27,7 @@ function isMergeableObject(value: unknown): value is Record<string, unknown> {
  * @param shouldRemoveNullObjectValues - If true, null object values will be removed.
  * @returns - The merged object.
  */
-function mergeObject<TValue extends OnyxValue<OnyxKey>>(target: OnyxEntry<TValue>, source: TValue, shouldRemoveNullObjectValues = true): TValue {
+function mergeObject<TObject extends Record<string, unknown>>(target: TObject | null, source: TObject, shouldRemoveNullObjectValues = true): TObject {
     const destination: Record<string, unknown> = {};
     if (isMergeableObject(target)) {
         // lodash adds a small overhead so we don't use it here
@@ -46,7 +47,7 @@ function mergeObject<TValue extends OnyxValue<OnyxKey>>(target: OnyxEntry<TValue
         }
     }
 
-    const sourceKeys = Object.keys(source!);
+    const sourceKeys = Object.keys(source);
     for (let i = 0; i < sourceKeys.length; ++i) {
         const key = sourceKeys[i];
         const sourceValue = source?.[key];
@@ -63,14 +64,14 @@ function mergeObject<TValue extends OnyxValue<OnyxKey>>(target: OnyxEntry<TValue
 
             if (isSourceKeyMergable && targetValue) {
                 // eslint-disable-next-line no-use-before-define
-                destination[key] = fastMerge(targetValue as OnyxValue<OnyxKey>, sourceValue, shouldRemoveNullObjectValues);
+                destination[key] = fastMerge(targetValue as TObject, sourceValue, shouldRemoveNullObjectValues);
             } else if (!shouldRemoveNullObjectValues || sourceValue !== null) {
                 destination[key] = sourceValue;
             }
         }
     }
 
-    return destination as TValue;
+    return destination as TObject;
 }
 
 /**
@@ -80,13 +81,14 @@ function mergeObject<TValue extends OnyxValue<OnyxKey>>(target: OnyxEntry<TValue
  * On native, when merging an existing value with new changes, SQLite will use JSON_PATCH, which removes top-level nullish values.
  * To be consistent with the behaviour for merge, we'll also want to remove null values for "set" operations.
  */
-function fastMerge<TValue extends OnyxValue<OnyxKey>>(target: TValue, source: TValue, shouldRemoveNullObjectValues = true): TValue {
+function fastMerge<TObject extends Record<string, unknown>>(target: TObject | null, source: TObject | null, shouldRemoveNullObjectValues = true): TObject | null {
     // We have to ignore arrays and nullish values here,
     // otherwise "mergeObject" will throw an error,
     // because it expects an object as "source"
     if (Array.isArray(source) || source === null || source === undefined) {
         return source;
     }
+
     return mergeObject(target, source, shouldRemoveNullObjectValues);
 }
 
