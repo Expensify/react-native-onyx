@@ -1,14 +1,15 @@
 import _ from 'underscore';
 import utils from '../../utils';
 import type StorageProvider from './types';
-import type {Key, KeyValuePair, Value} from './types';
+import type {KeyValuePair} from './types';
+import type {OnyxKey, OnyxValue} from '../../types';
 
-type Store = Record<Key, Value>;
+type Store = Record<OnyxKey, OnyxValue<OnyxKey>>;
 
 // eslint-disable-next-line import/no-mutable-exports
 let store: Store = {};
 
-const setInternal = (key: Key, value: Value) => {
+const setInternal = (key: OnyxKey, value: OnyxValue<OnyxKey>) => {
     store[key] = value;
     return Promise.resolve(value);
 };
@@ -33,7 +34,7 @@ const provider: StorageProvider = {
      * Get the value of a given key or return `null` if it's not available in memory
      */
     getItem(key) {
-        const value = store[key];
+        const value = store[key] as OnyxValue<typeof key>;
 
         return Promise.resolve(value === undefined ? null : value);
     },
@@ -88,8 +89,8 @@ const provider: StorageProvider = {
      */
     multiMerge(pairs) {
         _.forEach(pairs, ([key, value]) => {
-            const existingValue = store[key] as unknown as Record<string, unknown>;
-            const newValue = utils.fastMerge(existingValue, value as unknown as Record<string, unknown>) as unknown as Value;
+            const existingValue = store[key] as Record<string, unknown>;
+            const newValue = utils.fastMerge(existingValue, value as Record<string, unknown>) as OnyxValue<OnyxKey>;
 
             set(key, newValue);
         });
