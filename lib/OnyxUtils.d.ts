@@ -14,7 +14,7 @@ type OnyxMethod = ValueOf<typeof METHOD>;
 
 // Key/value store of Onyx key and arrays of values to merge
 declare const mergeQueue: Record<OnyxKey, OnyxValue<OnyxKey>[]>;
-declare const mergeQueuePromise: Record<OnyxKey, Promise<OnyxValue<OnyxKey>>>;
+declare const mergeQueuePromise: Record<OnyxKey, Promise<void | void[]>>;
 
 // Holds a mapping of all the react components that want their state subscribed to a store key
 declare const callbackToStateMapping: Record<string, Mapping<OnyxKey>>;
@@ -188,14 +188,14 @@ declare function scheduleSubscriberUpdate<TKey extends OnyxKey>(
     value: KeyValueMapping[TKey],
     prevValue: KeyValueMapping[TKey],
     canUpdateSubscriber?: (_subscriber: Mapping<OnyxKey>) => boolean,
-): Promise<[void, void]>;
+): Promise<void>;
 
 /**
  * This method is similar to notifySubscribersOnNextTick but it is built for working specifically with collections
  * so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
  * subscriber callbacks receive the data in a different format than they normally expect and it breaks code.
  */
-declare function scheduleNotifyCollectionSubscribers(key: OnyxKey, value: OnyxCollection<OnyxValue<OnyxKey>>): Promise<[void, void]>;
+declare function scheduleNotifyCollectionSubscribers(key: OnyxKey, value: OnyxCollection<OnyxValue<OnyxKey>>): Promise<void>;
 
 /**
  * Remove a key from Onyx and update the subscribers
@@ -213,10 +213,10 @@ declare function evictStorageAndRetry<TMethod extends typeof Onyx.set | typeof O
     error: Error,
     onyxMethod: TMethod,
     ...args: Parameters<TMethod>
-): Promise<void | QueryResult | [void, void]>;
+): Promise<void>;
 
 /** Notifies subscribers and writes current value to cache */
-declare function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: KeyValueMapping[TKey], method: string, hasChanged: boolean, wasRemoved?: boolean): Promise<[void, void]>;
+declare function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: KeyValueMapping[TKey], method: string, hasChanged: boolean, wasRemoved?: boolean): Promise<void[]>;
 
 /**
  * @private

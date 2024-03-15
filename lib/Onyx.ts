@@ -1,5 +1,4 @@
 /* eslint-disable no-continue */
-import type {QueryResult} from 'react-native-quick-sqlite';
 import * as Logger from './Logger';
 import cache from './OnyxCache';
 import createDeferredTask from './createDeferredTask';
@@ -197,7 +196,7 @@ function disconnect(connectionID: number, keyToRemoveFromEvictionBlocklist?: Ony
  * @param key ONYXKEY to set
  * @param value value to store
  */
-function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[TKey]>): Promise<QueryResult | void | [void, void]> {
+function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[TKey]>): Promise<void[]> {
     // If the value is null, we remove the key from storage
     const {value: valueAfterRemoving, wasRemoved} = OnyxUtils.removeNullValues(key, value);
 
@@ -230,7 +229,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[T
  *
  * @param data object keyed by ONYXKEYS and the values to set
  */
-function multiSet(data: Partial<NullableKeyValueMapping>): Promise<Array<[void, void]>> {
+function multiSet(data: Partial<NullableKeyValueMapping>): Promise<void[]> {
     const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(data);
 
     const updatePromises = keyValuePairs.map(([key, value]) => {
@@ -265,7 +264,7 @@ function multiSet(data: Partial<NullableKeyValueMapping>): Promise<Array<[void, 
  * Onyx.merge(ONYXKEYS.POLICY, {id: 1}); // -> {id: 1}
  * Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Workspace'}
  */
-function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<KeyValueMapping[TKey]>>): Promise<OnyxValue<TKey>> {
+function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<KeyValueMapping[TKey]>>): Promise<void | void[]> {
     // Top-level undefined values are ignored
     // Therefore we need to prevent adding them to the merge queue
     if (changes === undefined) {
@@ -351,7 +350,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<K
  * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
  * @param collection Object collection keyed by individual collection member keys and values
  */
-function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: Collection<TKey, TMap, NullishDeep<KeyValueMapping[TKey]>>): Promise<void | [void, void]> {
+function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: Collection<TKey, TMap, NullishDeep<KeyValueMapping[TKey]>>): Promise<void> {
     if (typeof collection !== 'object' || Array.isArray(collection) || utils.isEmptyObject(collection)) {
         Logger.logInfo('mergeCollection() called with invalid or empty value. Skipping this update.');
         return Promise.resolve();
@@ -454,7 +453,7 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
  *
  * @param keysToPreserve is a list of ONYXKEYS that should not be cleared with the rest of the data
  */
-function clear(keysToPreserve: OnyxKey[] = []): Promise<Array<[void, void]>> {
+function clear(keysToPreserve: OnyxKey[] = []): Promise<void[]> {
     return OnyxUtils.getAllKeys().then((keys) => {
         const keysToBeClearedFromStorage: OnyxKey[] = [];
         const keyValuesToResetAsCollection: Record<OnyxKey, OnyxCollection<OnyxValue<OnyxKey>>> = {};
@@ -498,7 +497,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<Array<[void, void]>> {
             keysToBeClearedFromStorage.push(key);
         });
 
-        const updatePromises: Array<Promise<[void, void]>> = [];
+        const updatePromises: Array<Promise<void>> = [];
 
         // Notify the subscribers for each key/value group so they can receive the new values
         Object.entries(keyValuesToResetIndividually).forEach(([key, value]) => {
@@ -535,7 +534,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<Array<[void, void]>> {
  * @param data An array of objects with shape {onyxMethod: oneOf('set', 'merge', 'mergeCollection', 'multiSet', 'clear'), key: string, value: *}
  * @returns resolves when all operations are complete
  */
-function update(data: OnyxUpdate[]): Promise<unknown> {
+function update(data: OnyxUpdate[]): Promise<Array<void | void[]>> {
     // First, validate the Onyx object is in the format we expect
     data.forEach(({onyxMethod, key, value}) => {
         if (![OnyxUtils.METHOD.CLEAR, OnyxUtils.METHOD.SET, OnyxUtils.METHOD.MERGE, OnyxUtils.METHOD.MERGE_COLLECTION, OnyxUtils.METHOD.MULTI_SET].includes(onyxMethod)) {
@@ -551,8 +550,8 @@ function update(data: OnyxUpdate[]): Promise<unknown> {
         }
     });
 
-    const promises: Array<() => Promise<unknown>> = [];
-    let clearPromise: Promise<unknown> = Promise.resolve();
+    const promises: Array<() => Promise<void | void[]>> = [];
+    let clearPromise: Promise<void | void[]> = Promise.resolve();
 
     data.forEach(({onyxMethod, key, value}) => {
         switch (onyxMethod) {
