@@ -13,14 +13,14 @@ declare const METHOD: {
 type OnyxMethod = ValueOf<typeof METHOD>;
 
 // Key/value store of Onyx key and arrays of values to merge
-declare const mergeQueue: Record<OnyxKey, OnyxValue[]>;
-declare const mergeQueuePromise: Record<OnyxKey, Promise<OnyxValue>>;
+declare const mergeQueue: Record<OnyxKey, OnyxValue<OnyxKey>[]>;
+declare const mergeQueuePromise: Record<OnyxKey, Promise<OnyxValue<OnyxKey>>>;
 
 // Holds a mapping of all the react components that want their state subscribed to a store key
 declare const callbackToStateMapping: Record<string, Mapping<OnyxKey>>;
 
 // Keeps a copy of the values of the onyx collection keys as a map for faster lookups
-declare let onyxCollectionKeyMap: Map<OnyxKey, OnyxValue>;
+declare let onyxCollectionKeyMap: Map<OnyxKey, OnyxValue<OnyxKey>>;
 
 // Holds a list of keys that have been directly subscribed to or recently modified from least to most recent
 declare let recentlyAccessedKeys: OnyxKey[];
@@ -34,7 +34,7 @@ declare let evictionAllowList: OnyxKey[];
 declare const evictionBlocklist: Record<OnyxKey, number[]>;
 
 // Optional user-provided key value states set when Onyx initializes or clears
-declare let defaultKeyStates: Record<OnyxKey, OnyxValue>;
+declare let defaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>>;
 
 declare let batchUpdatesPromise: Promise<void> | null;
 declare let batchUpdatesQueue: Array<() => void>;
@@ -47,8 +47,8 @@ declare let batchUpdatesQueue: Array<() => void>;
  * @param value - contains the change that was made by the method
  * @param mergedValue - (optional) value that was written in the storage after a merge method was executed.
  */
-declare function sendActionToDevTools(method: OnyxMethod, key: undefined, value: Record<OnyxKey, OnyxValue>, mergedValue?: OnyxValue): void;
-declare function sendActionToDevTools(method: OnyxMethod, key: OnyxKey, value: OnyxValue, mergedValue?: OnyxValue): void;
+declare function sendActionToDevTools(method: OnyxMethod, key: undefined, value: Record<OnyxKey, OnyxValue<OnyxKey>>, mergedValue?: OnyxValue<OnyxKey>): void;
+declare function sendActionToDevTools(method: OnyxMethod, key: OnyxKey, value: OnyxValue<OnyxKey>, mergedValue?: OnyxValue<OnyxKey>): void;
 
 /**
  * We are batching together onyx updates. This helps with use cases where we schedule onyx updates after each other.
@@ -61,7 +61,7 @@ declare function maybeFlushBatchUpdates(): Promise<void>;
 declare function batchUpdates(updates: () => void): Promise<void>;
 
 /** Get some data from the store */
-declare function get(key: OnyxKey): Promise<OnyxValue>;
+declare function get(key: OnyxKey): Promise<OnyxValue<OnyxKey>>;
 
 /**
  * Returns current key names stored in persisted storage
@@ -99,7 +99,7 @@ declare function isSafeEvictionKey(testKey: OnyxKey): boolean;
  * Tries to get a value from the cache. If the value is not present in cache it will return the default value or undefined.
  * If the requested key is a collection, it will return an object with all the collection members.
  */
-declare function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping: Mapping<TKey>): OnyxValue;
+declare function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping: Mapping<TKey>): OnyxValue<OnyxKey>;
 
 /** Remove a key from the recently accessed key list. */
 declare function removeLastAccessedKey(key: OnyxKey): void;
@@ -128,12 +128,12 @@ declare function addToEvictionBlockList(key: OnyxKey, connectionID: number): voi
  */
 declare function addAllSafeEvictionKeysToRecentlyAccessedList(): Promise<void>;
 
-declare function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey): Record<OnyxKey, OnyxValue>;
+declare function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey): Record<OnyxKey, OnyxValue<OnyxKey>>;
 
 /** When a collection of keys change, search for any callbacks matching the collection key and trigger those callbacks */
 declare function keysChanged<TKey extends CollectionKeyBase>(
     collectionKey: TKey,
-    partialCollection: OnyxCollection<OnyxValue>,
+    partialCollection: OnyxCollection<OnyxValue<OnyxKey>>,
     notifyRegularSubscibers?: boolean,
     notifyWithOnyxSubscibers?: boolean,
 ): void;
@@ -147,8 +147,8 @@ declare function keysChanged<TKey extends CollectionKeyBase>(
  */
 declare function keyChanged(
     key: OnyxKey,
-    data: OnyxValue,
-    prevData: OnyxValue,
+    data: OnyxValue<OnyxKey>,
+    prevData: OnyxValue<OnyxKey>,
     canUpdateSubscriber?: (_subscriber: Mapping<OnyxKey>) => boolean,
     notifyRegularSubscibers?: boolean,
     notifyWithOnyxSubscibers?: boolean,
@@ -159,7 +159,12 @@ declare function keyChanged(
  *     - sets state on the withOnyxInstances
  *     - triggers the callback function
  */
-declare function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, val: OnyxValue | Record<OnyxKey, OnyxValue>, matchedKey: TKey | undefined, isBatched: boolean): void;
+declare function sendDataToConnection<TKey extends OnyxKey>(
+    mapping: Mapping<TKey>,
+    val: OnyxValue<OnyxKey> | Record<OnyxKey, OnyxValue<OnyxKey>>,
+    matchedKey: TKey | undefined,
+    isBatched: boolean,
+): void;
 
 /**
  * We check to see if this key is flagged as safe for eviction and add it to the recentlyAccessedKeys list so that when we
@@ -190,7 +195,7 @@ declare function scheduleSubscriberUpdate<TKey extends OnyxKey>(
  * so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
  * subscriber callbacks receive the data in a different format than they normally expect and it breaks code.
  */
-declare function scheduleNotifyCollectionSubscribers(key: OnyxKey, value: OnyxCollection<OnyxValue>): Promise<[void, void]>;
+declare function scheduleNotifyCollectionSubscribers(key: OnyxKey, value: OnyxCollection<OnyxValue<OnyxKey>>): Promise<[void, void]>;
 
 /**
  * Remove a key from Onyx and update the subscribers
@@ -223,11 +228,11 @@ declare function hasPendingMergeForKey(key: OnyxKey): boolean;
  * Otherwise removes all nested null values in objects and returns the object
  * @returns The value without null values and a boolean "wasRemoved", which indicates if the key got removed completely
  */
-declare function removeNullValues(
-    key: OnyxKey,
-    value: OnyxValue | Record<OnyxKey, OnyxValue> | null,
+declare function removeNullValues<TKey extends OnyxKey>(
+    key: TKey,
+    value: OnyxValue<TKey>,
 ): {
-    value: unknown[] | Record<string, unknown>;
+    value: OnyxValue<TKey>;
     wasRemoved: boolean;
 };
 /**
@@ -237,13 +242,13 @@ declare function removeNullValues(
  *
  * @return an array of key - value pairs <[key, value]>
  */
-declare function prepareKeyValuePairsForStorage(data: Record<OnyxKey, OnyxValue>): Array<[OnyxKey, OnyxValue]>;
+declare function prepareKeyValuePairsForStorage(data: Record<OnyxKey, OnyxValue<OnyxKey>>): Array<[OnyxKey, OnyxValue<OnyxKey>]>;
 /**
  * Merges an array of changes with an existing value
  *
  * @param changes Array of changes that should be applied to the existing value
  */
-declare function applyMerge(existingValue: OnyxValue, changes: Array<OnyxEntry<OnyxValue>>, shouldRemoveNullObjectValues: boolean): any;
+declare function applyMerge(existingValue: OnyxValue<OnyxKey>, changes: Array<OnyxValue<OnyxKey>>, shouldRemoveNullObjectValues: boolean): any;
 /**
  * Merge user provided default key value pairs.
  */
@@ -255,6 +260,7 @@ const OnyxUtils = {
     mergeQueuePromise,
     callbackToStateMapping,
     initStoreValues,
+    defaultKeyStates,
     sendActionToDevTools,
     maybeFlushBatchUpdates,
     batchUpdates,

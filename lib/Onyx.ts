@@ -457,7 +457,7 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
 function clear(keysToPreserve: OnyxKey[] = []): Promise<Array<[void, void]>> {
     return OnyxUtils.getAllKeys().then((keys) => {
         const keysToBeClearedFromStorage: OnyxKey[] = [];
-        const keyValuesToResetAsCollection: Record<OnyxKey, OnyxCollection<OnyxValue>> = {};
+        const keyValuesToResetAsCollection: Record<OnyxKey, OnyxCollection<OnyxValue<OnyxKey>>> = {};
         const keyValuesToResetIndividually: NullableKeyValueMapping = {};
 
         // The only keys that should not be cleared are:
