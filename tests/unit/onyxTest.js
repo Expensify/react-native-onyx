@@ -1067,6 +1067,22 @@ describe('Onyx', () => {
                     },
                 },
                 {
+                    onyxMethod: Onyx.METHOD.MERGE_COLLECTION,
+                    key: ONYX_KEYS.COLLECTION.ROUTES,
+                    value: {
+                        [holidayRoute]: {
+                            waypoints: {
+                                0: 'Bed',
+                            },
+                        },
+                        [routineRoute]: {
+                            waypoints: {
+                                0: 'Bed',
+                            },
+                        },
+                    },
+                },
+                {
                     onyxMethod: Onyx.METHOD.MERGE,
                     key: holidayRoute,
                     value: {
@@ -1088,6 +1104,7 @@ describe('Onyx', () => {
                 expect(routesCollectionCallback).toHaveBeenNthCalledWith(1, {
                     [holidayRoute]: {
                         waypoints: {
+                            0: 'Bed',
                             1: 'Home',
                             2: 'Beach',
                             3: 'Restaurant',
@@ -1096,6 +1113,7 @@ describe('Onyx', () => {
                     },
                     [routineRoute]: {
                         waypoints: {
+                            0: 'Bed',
                             1: 'Home',
                             2: 'Work',
                             3: 'Gym',
