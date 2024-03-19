@@ -1,5 +1,6 @@
 import _ from 'underscore';
 import Onyx from '../../lib';
+import StorageMock from '../../lib/storage';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 const ONYX_KEYS = {
@@ -10,6 +11,7 @@ const ONYX_KEYS = {
         TEST_CONNECT_COLLECTION: 'testConnectCollection_',
         TEST_POLICY: 'testPolicy_',
         TEST_UPDATE: 'testUpdate_',
+        ROUTES: 'route_',
     },
 };
 
@@ -1043,5 +1045,43 @@ describe('Onyx', () => {
             .then(() => {
                 expect(testKeyValue).toEqual(null);
             });
+    });
+
+    describe('mergeCollection', () => {
+        it('should call subscriber callback and storage multiMerge with the same data', () => {
+            const storageSpy = jest.spyOn(StorageMock, 'multiMerge');
+            const routineRoute = `${ONYX_KEYS.COLLECTION.ROUTES}routine`;
+
+            let result;
+            connectionID = Onyx.connect({
+                key: routineRoute,
+                initWithStoredValues: false,
+                callback: (value) => (result = value),
+            });
+
+            const initialValue = {
+                pendingFields: {
+                    waypoints: 'add',
+                },
+            };
+            const updatedValue = {
+                pendingFields: {
+                    waypoints: null,
+                },
+            };
+
+            return Onyx.set(routineRoute, initialValue)
+                .then(() => {
+                    expect(result).toEqual(initialValue);
+                    Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                        [routineRoute]: updatedValue,
+                    });
+                    return waitForPromisesToResolve();
+                })
+                .then(() => {
+                    expect(result).toEqual(updatedValue);
+                    expect(storageSpy).toHaveBeenCalledWith([[routineRoute, updatedValue]]);
+                });
+        });
     });
 });
