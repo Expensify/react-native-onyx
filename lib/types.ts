@@ -291,7 +291,7 @@ type BaseConnectOptions = {
 type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions &
     (
         | {
-              key: TKey extends CollectionKey ? TKey : never;
+              key: TKey extends CollectionKeyBase ? TKey : never;
               callback?: (value: OnyxCollection<KeyValueMapping[TKey]>) => void;
               waitForCollectionCallback: true;
           }

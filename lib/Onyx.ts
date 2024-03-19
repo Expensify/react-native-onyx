@@ -81,9 +81,7 @@ function init({
  * @param [mapping.waitForCollectionCallback] If set to true, it will return the entire collection to the callback as a single object
  * @returns an ID to use when calling disconnect
  */
-function connect<TKey extends OnyxKey>(options: ConnectOptions<TKey>): number {
-    const mapping = options as unknown as Mapping<OnyxKey>;
-
+function connect<TKey extends OnyxKey>(mapping: ConnectOptions<TKey>): number {
     const connectionID = lastConnectionID++;
     OnyxUtils.callbackToStateMapping[connectionID] = mapping;
     OnyxUtils.callbackToStateMapping[connectionID].connectionID = connectionID;
