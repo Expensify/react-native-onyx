@@ -106,7 +106,7 @@ function connect<TKey extends OnyxKey>(mapping: ConnectOptions<TKey>): number {
             // We search all the keys in storage to see if any are a "match" for the subscriber we are connecting so that we
             // can send data back to the subscriber. Note that multiple keys can match as a subscriber could either be
             // subscribed to a "collection key" or a single key.
-            const matchingKeys = keys.filter((key) => OnyxUtils.isKeyMatch(mapping.key, key));
+            const matchingKeys = Array.from(keys).filter((key) => OnyxUtils.isKeyMatch(mapping.key, key));
 
             // If the key being connected to does not exist we initialize the value with null. For subscribers that connected
             // directly via connect() they will simply get a null value sent to them without any information about which key matched
@@ -385,8 +385,8 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
             return true;
         });
 
-        const existingKeys = keys.filter((key) => persistedKeys.includes(key));
-        const newKeys = keys.filter((key) => !persistedKeys.includes(key));
+        const existingKeys = keys.filter((key) => Array.from(persistedKeys).includes(key));
+        const newKeys = keys.filter((key) => !Array.from(persistedKeys).includes(key));
 
         const existingKeyCollection = existingKeys.reduce((obj: NullableKeyValueMapping, key) => {
             // eslint-disable-next-line no-param-reassign
