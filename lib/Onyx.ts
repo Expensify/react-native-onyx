@@ -98,7 +98,7 @@ function connect<TKey extends OnyxKey>(mapping: ConnectOptions<TKey>): number {
             // If the mapping is connected to an onyx key that is not a collection
             // we can skip the call to getAllKeys() and return an array with a single item
             if (Boolean(mapping.key) && typeof mapping.key === 'string' && !mapping.key.endsWith('_') && cache.storageKeys.has(mapping.key)) {
-                return [mapping.key];
+                return new Set([mapping.key]);
             }
             return OnyxUtils.getAllKeys();
         })
@@ -385,8 +385,8 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
             return true;
         });
 
-        const existingKeys = keys.filter((key) => Array.from(persistedKeys).includes(key));
-        const newKeys = keys.filter((key) => !Array.from(persistedKeys).includes(key));
+        const existingKeys = keys.filter((key) => persistedKeys.has(key));
+        const newKeys = keys.filter((key) => !persistedKeys.has(key));
 
         const existingKeyCollection = existingKeys.reduce((obj: NullableKeyValueMapping, key) => {
             // eslint-disable-next-line no-param-reassign

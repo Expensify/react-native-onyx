@@ -66,7 +66,7 @@ declare function get(key: OnyxKey): Promise<OnyxValue<OnyxKey>>;
 /**
  * Returns current key names stored in persisted storage
  */
-declare function getAllKeys(): Promise<OnyxKey[]>;
+declare function getAllKeys(): Promise<Set<string>>;
 
 /**
  * Checks to see if the a subscriber's supplied key
