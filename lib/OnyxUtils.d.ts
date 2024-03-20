@@ -58,7 +58,7 @@ declare function getDefaultKeyStates(): Record<string, OnyxValue<string>>;
  * @param initialKeyStates - initial data to set when `init()` and `clear()` are called
  * @param safeEvictionKeys - This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal.
  */
-declare function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Partial<NullableKeyValueMapping>, safeEvictionKeys: OnyxKey[]): Record<string, OnyxValue<string>>;
+declare function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Partial<NullableKeyValueMapping>, safeEvictionKeys: OnyxKey[]): void;
 
 /**
  * Sends an action to DevTools extension

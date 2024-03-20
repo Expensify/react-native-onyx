@@ -85,7 +85,7 @@ function init({
  *       cause the component to re-render (and that can be expensive from a performance standpoint).
  * @param [mapping.initialValue] THIS PARAM IS ONLY USED WITH withOnyx().
  * If included, this will be passed to the component so that something can be rendered while data is being fetched from the DB.
- * Note that it will not cause the component to have the loading prop set to true. |
+ * Note that it will not cause the component to have the loading prop set to true.
  * @returns an ID to use when calling disconnect
  */
 function connect<TKey extends OnyxKey>(mapping: ConnectOptions<TKey>): number {
