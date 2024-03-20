@@ -79,6 +79,13 @@ function init({
  * @param [mapping.initWithStoredValues] If set to false, then no data will be prefilled into the
  *  component
  * @param [mapping.waitForCollectionCallback] If set to true, it will return the entire collection to the callback as a single object
+ * @param [mapping.selector] THIS PARAM IS ONLY USED WITH withOnyx(). If included, this will be used to subscribe to a subset of an Onyx key's data.
+ *       The sourceData and withOnyx state are passed to the selector and should return the simplified data. Using this setting on `withOnyx` can have very positive
+ *       performance benefits because the component will only re-render when the subset of data changes. Otherwise, any change of data on any property would normally
+ *       cause the component to re-render (and that can be expensive from a performance standpoint).
+ * @param [mapping.initialValue] THIS PARAM IS ONLY USED WITH withOnyx().
+ * If included, this will be passed to the component so that something can be rendered while data is being fetched from the DB.
+ * Note that it will not cause the component to have the loading prop set to true. |
  * @returns an ID to use when calling disconnect
  */
 function connect<TKey extends OnyxKey>(mapping: ConnectOptions<TKey>): number {
