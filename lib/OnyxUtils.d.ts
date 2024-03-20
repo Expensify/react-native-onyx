@@ -39,6 +39,27 @@ declare let defaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>>;
 declare let batchUpdatesPromise: Promise<void> | null;
 declare let batchUpdatesQueue: Array<() => void>;
 
+/** Getter - returns the merge queue. */
+declare function getMergeQueue(): Record<string, OnyxValue<string>[]>;
+
+/** Getter - returns the merge queue promise. */
+declare function getMergeQueuePromise(): Record<string, Promise<void | void[]>>;
+
+/** Getter - returns the callback to state mapping. */
+declare function getCallbackToStateMapping(): Record<string, Mapping<string>>;
+
+/** Getter - returns the default key states. */
+declare function getDefaultKeyStates(): Record<string, OnyxValue<string>>;
+
+/**
+ * Sets the initial values for the Onyx store
+ *
+ * @param keys - `ONYXKEYS` constants object from Onyx.init()
+ * @param initialKeyStates - initial data to set when `init()` and `clear()` are called
+ * @param safeEvictionKeys - This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal.
+ */
+declare function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Partial<NullableKeyValueMapping>, safeEvictionKeys: OnyxKey[]): Record<string, OnyxValue<string>>;
+
 /**
  * Sends an action to DevTools extension
  *
@@ -256,11 +277,11 @@ declare function initializeWithDefaultKeyStates(): Promise<void>;
 
 const OnyxUtils = {
     METHOD,
-    mergeQueue,
-    mergeQueuePromise,
-    callbackToStateMapping,
+    getMergeQueue,
+    getMergeQueuePromise,
+    getCallbackToStateMapping,
+    getDefaultKeyStates,
     initStoreValues,
-    defaultKeyStates,
     sendActionToDevTools,
     maybeFlushBatchUpdates,
     batchUpdates,

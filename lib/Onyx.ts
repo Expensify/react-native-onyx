@@ -90,8 +90,9 @@ function init({
  */
 function connect<TKey extends OnyxKey>(mapping: ConnectOptions<TKey>): number {
     const connectionID = lastConnectionID++;
-    OnyxUtils.callbackToStateMapping[connectionID] = mapping;
-    OnyxUtils.callbackToStateMapping[connectionID].connectionID = connectionID;
+    const callbackToStateMapping = OnyxUtils.getCallbackToStateMapping();
+    callbackToStateMapping[connectionID] = mapping;
+    callbackToStateMapping[connectionID].connectionID = connectionID;
 
     if (mapping.initWithStoredValues === false) {
         return connectionID;
@@ -182,7 +183,8 @@ function connect<TKey extends OnyxKey>(mapping: ConnectOptions<TKey>): number {
  * @param connectionID unique id returned by call to Onyx.connect()
  */
 function disconnect(connectionID: number, keyToRemoveFromEvictionBlocklist?: OnyxKey): void {
-    if (!OnyxUtils.callbackToStateMapping[connectionID]) {
+    const callbackToStateMapping = OnyxUtils.getCallbackToStateMapping();
+    if (!callbackToStateMapping[connectionID]) {
         return;
     }
 
@@ -192,7 +194,7 @@ function disconnect(connectionID: number, keyToRemoveFromEvictionBlocklist?: Ony
         OnyxUtils.removeFromEvictionBlockList(keyToRemoveFromEvictionBlocklist, connectionID);
     }
 
-    delete OnyxUtils.callbackToStateMapping[connectionID];
+    delete callbackToStateMapping[connectionID];
 }
 
 /**
@@ -206,7 +208,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[T
     const {value: valueAfterRemoving, wasRemoved} = OnyxUtils.removeNullValues(key, value);
 
     if (OnyxUtils.hasPendingMergeForKey(key)) {
-        delete OnyxUtils.mergeQueue[key];
+        delete OnyxUtils.getMergeQueue()[key];
     }
 
     const hasChanged = cache.hasValueChanged(key, valueAfterRemoving);
@@ -270,38 +272,41 @@ function multiSet(data: Partial<NullableKeyValueMapping>): Promise<void[]> {
  * Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Workspace'}
  */
 function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<KeyValueMapping[TKey]>>): Promise<void | void[]> {
+    const mergeQueue = OnyxUtils.getMergeQueue();
+    const mergeQueuePromise = OnyxUtils.getMergeQueuePromise();
+
     // Top-level undefined values are ignored
     // Therefore we need to prevent adding them to the merge queue
     if (changes === undefined) {
-        return OnyxUtils.mergeQueue[key] ? OnyxUtils.mergeQueuePromise[key] : Promise.resolve();
+        return mergeQueue[key] ? mergeQueuePromise[key] : Promise.resolve();
     }
 
     // Merge attempts are batched together. The delta should be applied after a single call to get() to prevent a race condition.
     // Using the initial value from storage in subsequent merge attempts will lead to an incorrect final merged value.
-    if (OnyxUtils.mergeQueue[key]) {
-        OnyxUtils.mergeQueue[key].push(changes);
-        return OnyxUtils.mergeQueuePromise[key];
+    if (mergeQueue[key]) {
+        mergeQueue[key].push(changes);
+        return mergeQueuePromise[key];
     }
-    OnyxUtils.mergeQueue[key] = [changes];
+    mergeQueue[key] = [changes];
 
-    OnyxUtils.mergeQueuePromise[key] = OnyxUtils.get(key).then((existingValue) => {
+    mergeQueuePromise[key] = OnyxUtils.get(key).then((existingValue) => {
         // Calls to Onyx.set after a merge will terminate the current merge process and clear the merge queue
-        if (OnyxUtils.mergeQueue[key] == null) {
+        if (mergeQueue[key] == null) {
             return undefined;
         }
 
         try {
             // We first only merge the changes, so we can provide these to the native implementation (SQLite uses only delta changes in "JSON_PATCH" to merge)
             // We don't want to remove null values from the "batchedChanges", because SQLite uses them to remove keys from storage natively.
-            let batchedChanges = OnyxUtils.applyMerge(undefined, OnyxUtils.mergeQueue[key], false);
+            let batchedChanges = OnyxUtils.applyMerge(undefined, mergeQueue[key], false);
 
             // The presence of a `null` in the merge queue instructs us to drop the existing value.
             // In this case, we can't simply merge the batched changes with the existing value, because then the null in the merge queue would have no effect
-            const shouldOverwriteExistingValue = OnyxUtils.mergeQueue[key].includes(null);
+            const shouldOverwriteExistingValue = mergeQueue[key].includes(null);
 
             // Clean up the write queue, so we don't apply these changes again
-            delete OnyxUtils.mergeQueue[key];
-            delete OnyxUtils.mergeQueuePromise[key];
+            delete mergeQueue[key];
+            delete mergeQueuePromise[key];
 
             // If the batched changes equal null, we want to remove the key from storage, to reduce storage size
             const {wasRemoved} = OnyxUtils.removeNullValues(key, batchedChanges);
@@ -339,7 +344,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<K
         }
     });
 
-    return OnyxUtils.mergeQueuePromise[key];
+    return mergeQueuePromise[key];
 }
 
 /**
@@ -471,7 +476,8 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void[]> {
         //      to null would cause unknown behavior)
         keys.forEach((key) => {
             const isKeyToPreserve = keysToPreserve.includes(key);
-            const isDefaultKey = key in OnyxUtils.defaultKeyStates;
+            const defaultKeyStates = OnyxUtils.getDefaultKeyStates();
+            const isDefaultKey = key in defaultKeyStates;
 
             // If the key is being removed or reset to default:
             // 1. Update it in the cache
@@ -479,7 +485,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void[]> {
             //      since collection key subscribers need to be updated differently
             if (!isKeyToPreserve) {
                 const oldValue = cache.getValue(key);
-                const newValue = OnyxUtils.defaultKeyStates[key] ?? null;
+                const newValue = defaultKeyStates[key] ?? null;
                 if (newValue !== oldValue) {
                     cache.set(key, newValue);
                     const collectionKey = key.substring(0, key.indexOf('_') + 1);
@@ -512,12 +518,13 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void[]> {
             updatePromises.push(OnyxUtils.scheduleNotifyCollectionSubscribers(key, value));
         });
 
+        const defaultKeyStates = OnyxUtils.getDefaultKeyStates();
         const defaultKeyValuePairs = Object.entries(
-            Object.keys(OnyxUtils.defaultKeyStates)
+            Object.keys(defaultKeyStates)
                 .filter((key) => !keysToPreserve.includes(key))
                 .reduce((obj: NullableKeyValueMapping, key) => {
                     // eslint-disable-next-line no-param-reassign
-                    obj[key] = OnyxUtils.defaultKeyStates[key];
+                    obj[key] = defaultKeyStates[key];
                     return obj;
                 }, {}),
         );
