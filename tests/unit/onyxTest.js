@@ -1,6 +1,7 @@
 import _ from 'underscore';
 import Onyx from '../../lib';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
+import OnyxUtils from '../../lib/OnyxUtils';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
@@ -38,7 +39,7 @@ describe('Onyx', () => {
 
     it('should remove key value from OnyxCache/Storage when set is called with null value', () =>
         Onyx.set(ONYX_KEYS.OTHER_TEST, 42)
-            .then(() => Onyx.getAllKeys())
+            .then(() => OnyxUtils.getAllKeys())
             .then((keys) => {
                 expect(keys.has(ONYX_KEYS.OTHER_TEST)).toBe(true);
                 return Onyx.set(ONYX_KEYS.OTHER_TEST, null);
@@ -48,7 +49,7 @@ describe('Onyx', () => {
                 expect(cache.getAllKeys().size).toBe(0);
 
                 // When cache keys length is 0, we fetch the keys from storage.
-                return Onyx.getAllKeys();
+                return OnyxUtils.getAllKeys();
             })
             .then((keys) => {
                 expect(keys.has(ONYX_KEYS.OTHER_TEST)).toBe(false);
