@@ -49,7 +49,7 @@ If the requested key is a collection, it will return an object with all the coll
 so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
 subscriber callbacks receive the data in a different format than they normally expect and it breaks code.</p>
 </dd>
-<dt><a href="#broadcastUpdate">broadcastUpdate(key, value, method, hasChanged, wasRemoved)</a> ⇒ <code>Promise</code></dt>
+<dt><a href="#broadcastUpdate">broadcastUpdate(key, value, hasChanged, wasRemoved)</a> ⇒ <code>Promise</code></dt>
 <dd><p>Notifys subscribers and writes current value to cache</p>
 </dd>
 <dt><a href="#hasPendingMergeForKey">hasPendingMergeForKey(key)</a> ⇒ <code>Boolean</code></dt>
@@ -104,7 +104,7 @@ value will be saved to storage after the default value.</p>
 ## sendActionToDevTools(method, key, value, mergedValue)
 Sends an action to DevTools extension
 
-**Kind**: global function  
+**Kind**: global function
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -121,13 +121,13 @@ This happens for example in the Onyx.update function, where we process API respo
 update operations. Instead of calling the subscribers for each update operation, we batch them together which will
 cause react to schedule the updates at once instead of after each other. This is mainly a performance optimization.
 
-**Kind**: global function  
+**Kind**: global function
 <a name="getSubsetOfData"></a>
 
 ## getSubsetOfData(sourceData, selector, [withOnyxInstanceState]) ⇒ <code>Mixed</code>
 Uses a selector function to return a simplified version of sourceData
 
-**Kind**: global function  
+**Kind**: global function
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -142,7 +142,7 @@ Takes a collection of items (eg. {testKey_1:{a:'a'}, testKey_2:{b:'b'}})
 and runs it through a reducer function to return a subset of the data according to a selector.
 The resulting collection will only contain items that are returned by the selector.
 
-**Kind**: global function  
+**Kind**: global function
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -156,29 +156,29 @@ The resulting collection will only contain items that are returned by the select
 Checks to see if the a subscriber's supplied key
 is associated with a collection of keys.
 
-**Kind**: global function  
+**Kind**: global function
 
 | Param | Type |
 | --- | --- |
-| key | <code>String</code> | 
+| key | <code>String</code> |
 
 <a name="isCollectionMemberKey"></a>
 
 ## isCollectionMemberKey(collectionKey, key) ⇒ <code>Boolean</code>
-**Kind**: global function  
+**Kind**: global function
 
 | Param | Type |
 | --- | --- |
-| collectionKey | <code>String</code> | 
-| key | <code>String</code> | 
+| collectionKey | <code>String</code> |
+| key | <code>String</code> |
 
 <a name="splitCollectionMemberKey"></a>
 
 ## splitCollectionMemberKey(key) ⇒ <code>Array.&lt;String&gt;</code>
 Splits a collection member key into the collection key part and the ID part.
 
-**Kind**: global function  
-**Returns**: <code>Array.&lt;String&gt;</code> - A tuple where the first element is the collection part and the second element is the ID part.  
+**Kind**: global function
+**Returns**: <code>Array.&lt;String&gt;</code> - A tuple where the first element is the collection part and the second element is the ID part.
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -190,20 +190,20 @@ Splits a collection member key into the collection key part and the ID part.
 Tries to get a value from the cache. If the value is not present in cache it will return the default value or undefined.
 If the requested key is a collection, it will return an object with all the collection members.
 
-**Kind**: global function  
+**Kind**: global function
 
 | Param | Type |
 | --- | --- |
-| key | <code>String</code> | 
-| mapping | <code>Object</code> | 
+| key | <code>String</code> |
+| mapping | <code>Object</code> |
 
 <a name="connect"></a>
 
 ## connect(mapping) ⇒ <code>Number</code>
 Subscribes a react component's state directly to a store key
 
-**Kind**: global function  
-**Returns**: <code>Number</code> - an ID to use when calling disconnect  
+**Kind**: global function
+**Returns**: <code>Number</code> - an ID to use when calling disconnect
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -217,7 +217,7 @@ Subscribes a react component's state directly to a store key
 | [mapping.selector] | <code>function</code> | THIS PARAM IS ONLY USED WITH withOnyx(). If included, this will be used to subscribe to a subset of an Onyx key's data.       The sourceData and withOnyx state are passed to the selector and should return the simplified data. Using this setting on `withOnyx` can have very positive       performance benefits because the component will only re-render when the subset of data changes. Otherwise, any change of data on any property would normally       cause the component to re-render (and that can be expensive from a performance standpoint). |
 | [mapping.initialValue] | <code>String</code> \| <code>Number</code> \| <code>Boolean</code> \| <code>Object</code> | THIS PARAM IS ONLY USED WITH withOnyx(). If included, this will be passed to the component so that something can be rendered while data is being fetched from the DB. Note that it will not cause the component to have the loading prop set to true. | |
 
-**Example**  
+**Example**
 ```js
 const connectionID = Onyx.connect({
     key: ONYXKEYS.SESSION,
@@ -229,14 +229,14 @@ const connectionID = Onyx.connect({
 ## disconnect(connectionID, [keyToRemoveFromEvictionBlocklist])
 Remove the listener for a react component
 
-**Kind**: global function  
+**Kind**: global function
 
 | Param | Type | Description |
 | --- | --- | --- |
 | connectionID | <code>Number</code> | unique id returned by call to Onyx.connect() |
 | [keyToRemoveFromEvictionBlocklist] | <code>String</code> |  |
 
-**Example**  
+**Example**
 ```js
 Onyx.disconnect(connectionID);
 ```
@@ -245,7 +245,7 @@ Onyx.disconnect(connectionID);
 ## scheduleSubscriberUpdate(key, value, prevValue, [canUpdateSubscriber]) ⇒ <code>Promise</code>
 Schedules an update that will be appended to the macro task queue (so it doesn't update the subscribers immediately).
 
-**Kind**: global function  
+**Kind**: global function
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -254,7 +254,7 @@ Schedules an update that will be appended to the macro task queue (so it doesn't
 | prevValue | <code>\*</code> |  |
 | [canUpdateSubscriber] | <code>function</code> | only subscribers that pass this truth test will be updated |
 
-**Example**  
+**Example**
 ```js
 scheduleSubscriberUpdate(key, value, subscriber => subscriber.initWithStoredValues === false)
 ```
@@ -265,36 +265,35 @@ This method is similar to notifySubscribersOnNextTick but it is built for workin
 so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
 subscriber callbacks receive the data in a different format than they normally expect and it breaks code.
 
-**Kind**: global function  
+**Kind**: global function
 
 | Param | Type |
 | --- | --- |
-| key | <code>String</code> | 
-| value | <code>\*</code> | 
+| key | <code>String</code> |
+| value | <code>\*</code> |
 
 <a name="broadcastUpdate"></a>
 
-## broadcastUpdate(key, value, method, hasChanged, wasRemoved) ⇒ <code>Promise</code>
+## broadcastUpdate(key, value, hasChanged, wasRemoved) ⇒ <code>Promise</code>
 Notifys subscribers and writes current value to cache
 
-**Kind**: global function  
+**Kind**: global function
 
 | Param | Type | Default |
 | --- | --- | --- |
-| key | <code>String</code> |  | 
-| value | <code>\*</code> |  | 
-| method | <code>String</code> |  | 
-| hasChanged | <code>Boolean</code> |  | 
-| wasRemoved | <code>Boolean</code> | <code>false</code> | 
+| key | <code>String</code> |  |
+| value | <code>\*</code> |  |
+| hasChanged | <code>Boolean</code> |  |
+| wasRemoved | <code>Boolean</code> | <code>false</code> |
 
 <a name="hasPendingMergeForKey"></a>
 
 ## hasPendingMergeForKey(key) ⇒ <code>Boolean</code>
-**Kind**: global function  
+**Kind**: global function
 
 | Param | Type |
 | --- | --- |
-| key | <code>String</code> | 
+| key | <code>String</code> |
 
 <a name="removeNullValues"></a>
 
@@ -302,20 +301,20 @@ Notifys subscribers and writes current value to cache
 Removes a key from storage if the value is null.
 Otherwise removes all nested null values in objects and returns the object
 
-**Kind**: global function  
-**Returns**: <code>Mixed</code> - The value without null values and a boolean "wasRemoved", which indicates if the key got removed completely  
+**Kind**: global function
+**Returns**: <code>Mixed</code> - The value without null values and a boolean "wasRemoved", which indicates if the key got removed completely
 
 | Param | Type |
 | --- | --- |
-| key | <code>String</code> | 
-| value | <code>Mixed</code> | 
+| key | <code>String</code> |
+| value | <code>Mixed</code> |
 
 <a name="set"></a>
 
 ## set(key, value) ⇒ <code>Promise</code>
 Write a value to our store with the given key
 
-**Kind**: global function  
+**Kind**: global function
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -327,13 +326,13 @@ Write a value to our store with the given key
 ## multiSet(data) ⇒ <code>Promise</code>
 Sets multiple keys and values
 
-**Kind**: global function  
+**Kind**: global function
 
 | Param | Type | Description |
 | --- | --- | --- |
 | data | <code>Object</code> | object keyed by ONYXKEYS and the values to set |
 
-**Example**  
+**Example**
 ```js
 Onyx.multiSet({'key1': 'a', 'key2': 'b'});
 ```
@@ -349,14 +348,14 @@ Calls to `Onyx.merge()` are batched so that any calls performed in a single tick
 applied in the order they were called. Note: `Onyx.set()` calls do not work this way so use caution when mixing
 `Onyx.merge()` and `Onyx.set()`.
 
-**Kind**: global function  
+**Kind**: global function
 
 | Param | Type | Description |
 | --- | --- | --- |
 | key | <code>String</code> | ONYXKEYS key |
 | changes | <code>Object</code> \| <code>Array</code> | Object or Array value to merge |
 
-**Example**  
+**Example**
 ```js
 Onyx.merge(ONYXKEYS.EMPLOYEE_LIST, ['Joe']); // -> ['Joe']
 Onyx.merge(ONYXKEYS.EMPLOYEE_LIST, ['Jack']); // -> ['Joe', 'Jack']
@@ -384,7 +383,7 @@ Onyx.get(key) before calling Storage.setItem() via Onyx.set().
 Storage.setItem() from Onyx.clear() will have already finished and the merged
 value will be saved to storage after the default value.
 
-**Kind**: global function  
+**Kind**: global function
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -395,14 +394,14 @@ value will be saved to storage after the default value.
 ## mergeCollection(collectionKey, collection) ⇒ <code>Promise</code>
 Merges a collection based on their keys
 
-**Kind**: global function  
+**Kind**: global function
 
 | Param | Type | Description |
 | --- | --- | --- |
 | collectionKey | <code>String</code> | e.g. `ONYXKEYS.COLLECTION.REPORT` |
 | collection | <code>Object</code> | Object collection keyed by individual collection member keys and values |
 
-**Example**  
+**Example**
 ```js
 Onyx.mergeCollection(ONYXKEYS.COLLECTION.REPORT, {
     [`${ONYXKEYS.COLLECTION.REPORT}1`]: report1,
@@ -414,8 +413,8 @@ Onyx.mergeCollection(ONYXKEYS.COLLECTION.REPORT, {
 ## update(data) ⇒ <code>Promise</code>
 Insert API responses and lifecycle data into Onyx
 
-**Kind**: global function  
-**Returns**: <code>Promise</code> - resolves when all operations are complete  
+**Kind**: global function
+**Returns**: <code>Promise</code> - resolves when all operations are complete
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -426,7 +425,7 @@ Insert API responses and lifecycle data into Onyx
 ## init([options])
 Initialize the store with actions and listening for storage events
 
-**Kind**: global function  
+**Kind**: global function
 
 | Param | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -439,7 +438,7 @@ Initialize the store with actions and listening for storage events
 | [options.shouldSyncMultipleInstances] | <code>Boolean</code> |  | Auto synchronize storage events between multiple instances of Onyx running in different tabs/windows. Defaults to true for platforms that support local storage (web/desktop) |
 | [options.debugSetState] | <code>Boolean</code> |  | Enables debugging setState() calls to connected components. |
 
-**Example**  
+**Example**
 ```js
 Onyx.init({
     keys: ONYXKEYS,
