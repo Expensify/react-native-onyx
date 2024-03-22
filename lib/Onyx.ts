@@ -215,7 +215,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[T
     const hasChanged = cache.hasValueChanged(key, valueAfterRemoving);
 
     // Logging properties only since values could be sensitive things we don't want to log
-    Logger.logInfo(`set called for key: ${key}${_.isObject(value) ? ` properties: ${_.keys(value).join(',')}` : ''}`);
+    Logger.logInfo(`set called for key: ${key}${_.isObject(value) ? ` properties: ${_.keys(value).join(',')}` : ''} hasChanged: ${hasChanged}`);
 
     // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
     const updatePromise = OnyxUtils.broadcastUpdate(key, valueAfterRemoving, hasChanged, wasRemoved);
