@@ -237,7 +237,7 @@ declare function evictStorageAndRetry<TMethod extends typeof Onyx.set | typeof O
 ): Promise<void>;
 
 /** Notifies subscribers and writes current value to cache */
-declare function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: KeyValueMapping[TKey], method: string, hasChanged: boolean, wasRemoved?: boolean): Promise<void[]>;
+declare function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: KeyValueMapping[TKey], hasChanged: boolean, wasRemoved?: boolean): Promise<void[]>;
 
 /**
  * @private
