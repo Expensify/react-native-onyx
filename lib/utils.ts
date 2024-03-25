@@ -16,8 +16,8 @@ function isEmptyObject<T>(obj: T | EmptyValue): obj is EmptyValue {
  * Checks whether the given value can be merged. It has to be an object, but not an array, RegExp or Date.
  */
 function isMergeableObject(value: unknown): value is Record<string, unknown> {
-    const nonNullObject = value != null ? typeof value === 'object' : false;
-    return nonNullObject && Object.prototype.toString.call(value) !== '[object RegExp]' && Object.prototype.toString.call(value) !== '[object Date]' && !Array.isArray(value);
+    const isNonNullObject = value != null ? typeof value === 'object' : false;
+    return isNonNullObject && Object.prototype.toString.call(value) !== '[object RegExp]' && Object.prototype.toString.call(value) !== '[object Date]' && !Array.isArray(value);
 }
 
 /**
@@ -29,43 +29,54 @@ function isMergeableObject(value: unknown): value is Record<string, unknown> {
  */
 function mergeObject<TObject extends Record<string, unknown>>(target: TObject | null, source: TObject, shouldRemoveNullObjectValues = true): TObject {
     const destination: Record<string, unknown> = {};
+
+    // First we want to copy over all keys from the target into the destination object,
+    // in case "target" is a mergable object.
+    // If "shouldRemoveNullObjectValues" is true, we want to remove null values from the merged object
+    // and therefore we need to omit keys where either the source or target value is null.
     if (isMergeableObject(target)) {
-        // lodash adds a small overhead so we don't use it here
         const targetKeys = Object.keys(target);
         for (let i = 0; i < targetKeys.length; ++i) {
             const key = targetKeys[i];
             const sourceValue = source?.[key];
             const targetValue = target?.[key];
 
-            // If shouldRemoveNullObjectValues is true, we want to remove null values from the merged object
+            // If "shouldRemoveNullObjectValues" is true, we want to remove null values from the merged object.
+            // Therefore, if either target or source value is null, we want to prevent the key from being set.
             const isSourceOrTargetNull = targetValue === null || sourceValue === null;
-            const shouldOmitSourceKey = shouldRemoveNullObjectValues && isSourceOrTargetNull;
+            const shouldOmitTargetKey = shouldRemoveNullObjectValues && isSourceOrTargetNull;
 
-            if (!shouldOmitSourceKey) {
+            if (!shouldOmitTargetKey) {
                 destination[key] = targetValue;
             }
         }
     }
 
+    // After copying over all keys from the target object, we want to merge the source object into the destination object.
     const sourceKeys = Object.keys(source);
     for (let i = 0; i < sourceKeys.length; ++i) {
         const key = sourceKeys[i];
         const sourceValue = source?.[key];
         const targetValue = target?.[key];
 
-        // If shouldRemoveNullObjectValues is true, we want to remove null values from the merged object
-        const shouldOmitSourceKey = shouldRemoveNullObjectValues && sourceValue === null;
+        // If undefined is passed as the source value for a key, we want to generally ignore it.
+        // If "shouldRemoveNullObjectValues" is set to true and the source value is null,
+        // we don't want to set/merge the source value into the merged object.
+        const shouldIgnoreNullSourceValue = shouldRemoveNullObjectValues && sourceValue === null;
+        const shouldOmitSourceKey = sourceValue === undefined || shouldIgnoreNullSourceValue;
 
-        // If we pass undefined as the updated value for a key, we want to generally ignore it
-        const isSourceKeyUndefined = sourceValue === undefined;
-
-        if (!isSourceKeyUndefined && !shouldOmitSourceKey) {
-            const isSourceKeyMergable = isMergeableObject(sourceValue);
-
-            if (isSourceKeyMergable && targetValue) {
-                // eslint-disable-next-line no-use-before-define
-                destination[key] = fastMerge(targetValue as TObject, sourceValue, shouldRemoveNullObjectValues);
-            } else if (!shouldRemoveNullObjectValues || sourceValue !== null) {
+        if (!shouldOmitSourceKey) {
+            // If the source value is a mergable object, we want to merge it into the target value.
+            // If "shouldRemoveNullObjectValues" is true, "fastMerge" will recursively
+            // remove nested null values from the merged object.
+            // If source value is any other value we need to set the source value it directly.
+            if (isMergeableObject(sourceValue)) {
+                // If the target value is null or undefined, we need to fallback to an empty object,
+                // so that we can still use "fastMerge" to merge the source value,
+                // to ensure that nested null values are removed from the merged object.
+                const targetValueWithFallback = (targetValue ?? {}) as TObject;
+                destination[key] = fastMerge(targetValueWithFallback, sourceValue, shouldRemoveNullObjectValues);
+            } else {
                 destination[key] = sourceValue;
             }
         }

@@ -1013,6 +1013,32 @@ describe('Onyx', () => {
             });
     });
 
+    it('should merge a non-existing key with a nested null removed', () => {
+        let testKeyValue;
+
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        return Onyx.merge(ONYX_KEYS.TEST_KEY, {
+            waypoints: {
+                1: 'Home',
+                2: 'Work',
+                3: null,
+            },
+        }).then(() => {
+            expect(testKeyValue).toEqual({
+                waypoints: {
+                    1: 'Home',
+                    2: 'Work',
+                },
+            });
+        });
+    });
     it('should apply updates in order with Onyx.update', () => {
         let testKeyValue;
 
