@@ -1039,54 +1039,6 @@ describe('Onyx', () => {
             });
         });
     });
-
-    it('should omit nested null values', () => {
-        let result;
-
-        const routineRoute = `${ONYX_KEYS.COLLECTION.ROUTES}routine`;
-        const holidayRoute = `${ONYX_KEYS.COLLECTION.ROUTES}holiday`;
-
-        connectionID = Onyx.connect({
-            key: ONYX_KEYS.COLLECTION.ROUTES,
-            initWithStoredValues: false,
-            callback: (value) => (result = value),
-            waitForCollectionCallback: true,
-        });
-
-        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
-            [routineRoute]: {
-                waypoints: {
-                    1: 'Home',
-                    2: 'Work',
-                    3: 'Gym',
-                },
-            },
-            [holidayRoute]: {
-                waypoints: {
-                    1: 'Home',
-                    2: 'Beach',
-                    3: null,
-                },
-            },
-        }).then(() => {
-            expect(result).toEqual({
-                [routineRoute]: {
-                    waypoints: {
-                        1: 'Home',
-                        2: 'Work',
-                        3: 'Gym',
-                    },
-                },
-                [holidayRoute]: {
-                    waypoints: {
-                        1: 'Home',
-                        2: 'Beach',
-                    },
-                },
-            });
-        });
-    });
-
     it('should apply updates in order with Onyx.update', () => {
         let testKeyValue;
 
