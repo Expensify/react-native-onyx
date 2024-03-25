@@ -1013,6 +1013,80 @@ describe('Onyx', () => {
             });
     });
 
+    it('should merge a non-existing key with a nested null removed', () => {
+        let testKeyValue;
+
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        return Onyx.merge(ONYX_KEYS.TEST_KEY, {
+            waypoints: {
+                1: 'Home',
+                2: 'Work',
+                3: null,
+            },
+        }).then(() => {
+            expect(testKeyValue).toEqual({
+                waypoints: {
+                    1: 'Home',
+                    2: 'Work',
+                },
+            });
+        });
+    });
+
+    it('should omit nested null values', () => {
+        let result;
+
+        const routineRoute = `${ONYX_KEYS.COLLECTION.ROUTES}routine`;
+        const holidayRoute = `${ONYX_KEYS.COLLECTION.ROUTES}holiday`;
+
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.ROUTES,
+            initWithStoredValues: false,
+            callback: (value) => (result = value),
+            waitForCollectionCallback: true,
+        });
+
+        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+            [routineRoute]: {
+                waypoints: {
+                    1: 'Home',
+                    2: 'Work',
+                    3: 'Gym',
+                },
+            },
+            [holidayRoute]: {
+                waypoints: {
+                    1: 'Home',
+                    2: 'Beach',
+                    3: null,
+                },
+            },
+        }).then(() => {
+            expect(result).toEqual({
+                [routineRoute]: {
+                    waypoints: {
+                        1: 'Home',
+                        2: 'Work',
+                        3: 'Gym',
+                    },
+                },
+                [holidayRoute]: {
+                    waypoints: {
+                        1: 'Home',
+                        2: 'Beach',
+                    },
+                },
+            });
+        });
+    });
+
     it('should apply updates in order with Onyx.update', () => {
         let testKeyValue;
 
