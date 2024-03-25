@@ -1,5 +1,7 @@
-import {Merge} from 'type-fest';
-import {BuiltIns} from 'type-fest/source/internal';
+import type {Component} from 'react';
+import type {Merge} from 'type-fest';
+import type {BuiltIns} from 'type-fest/source/internal';
+import type OnyxUtils from './OnyxUtils';
 
 /**
  * Represents a deeply nested record. It maps keys to values,
@@ -76,6 +78,7 @@ type TypeOptions = Merge<
  * }
  * ```
  */
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
 interface CustomTypeOptions {}
 
 /**
@@ -102,7 +105,7 @@ type OnyxKey = Key | CollectionKey;
 /**
  * Represents a Onyx value that can be either a single entry or a collection of entries, depending on the `TKey` provided.
  */
-type OnyxValue<TKey extends OnyxKey> = TKey extends CollectionKeyBase ? OnyxCollection<KeyValueMapping[TKey]> : OnyxEntry<KeyValueMapping[TKey]>;
+type OnyxValue<TKey extends OnyxKey> = string extends TKey ? unknown : TKey extends CollectionKeyBase ? OnyxCollection<KeyValueMapping[TKey]> : OnyxEntry<KeyValueMapping[TKey]>;
 
 /**
  * Represents a mapping of Onyx keys to values, where keys are either normal or collection Onyx keys
@@ -115,6 +118,15 @@ type OnyxValue<TKey extends OnyxKey> = TKey extends CollectionKeyBase ? OnyxColl
  */
 type KeyValueMapping = {
     [TKey in keyof TypeOptions['values'] as TKey extends CollectionKeyBase ? `${TKey}${string}` : TKey]: TypeOptions['values'][TKey];
+};
+
+/**
+ * Represents a mapping object where each `OnyxKey` maps to either a value of its corresponding type in `KeyValueMapping` or `null`.
+ *
+ * It's very similar to `KeyValueMapping` but this type accepts using `null` as well.
+ */
+type NullableKeyValueMapping = {
+    [TKey in OnyxKey]: OnyxValue<TKey>;
 };
 
 /**
@@ -193,6 +205,7 @@ type ExtractOnyxCollectionValue<TOnyxCollection> = TOnyxCollection extends NonNu
 
 type NonTransformableTypes =
     | BuiltIns
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     | ((...args: any[]) => unknown)
     | Map<unknown, unknown>
     | Set<unknown>
@@ -234,13 +247,140 @@ type NullishObjectDeep<ObjectType extends object> = {
  */
 type WithOnyxInstanceState<TOnyxProps> = (TOnyxProps & {loading: boolean}) | undefined;
 
-export {
+/**
+ * Represents a mapping between Onyx collection keys and their respective values.
+ *
+ * It helps to enforce that a Onyx collection key should not be without suffix (e.g. should always be of the form `${TKey}${string}`),
+ * and to map each Onyx collection key with suffix to a value of type `TValue`.
+ *
+ * Also, the `TMap` type is inferred automatically in `mergeCollection()` method and represents
+ * the object of collection keys/values specified in the second parameter of the method.
+ */
+type Collection<TKey extends CollectionKeyBase, TMap, TValue> = {
+    [MapK in keyof TMap]: MapK extends `${TKey}${string}`
+        ? MapK extends `${TKey}`
+            ? never // forbids empty id
+            : TValue
+        : never;
+};
+
+type WithOnyxInstance = Component<unknown, WithOnyxInstanceState<NullableKeyValueMapping>> & {
+    setStateProxy: (cb: (state: NullableKeyValueMapping) => OnyxValue<OnyxKey>) => void;
+    setWithOnyxState: (statePropertyName: OnyxKey, value: OnyxValue<OnyxKey>) => void;
+};
+
+/** Represents the base options used in `Onyx.connect()` method. */
+type BaseConnectOptions = {
+    statePropertyName?: string;
+    withOnyxInstance?: Component;
+    initWithStoredValues?: boolean;
+};
+
+/**
+ * Represents the options used in `Onyx.connect()` method.
+ * The type is built from `BaseConnectOptions` and extended to handle key/callback related options.
+ * It includes two different forms, depending on whether we are waiting for a collection callback or not.
+ *
+ * If `waitForCollectionCallback` is `true`, it expects `key` to be a Onyx collection key and `callback` will be triggered with the whole collection
+ * and will pass `value` as an `OnyxCollection`.
+ *
+ *
+ * If `waitForCollectionCallback` is `false` or not specified, the `key` can be any Onyx key and `callback` will be triggered with updates of each collection item
+ * and will pass `value` as an `OnyxEntry`.
+ */
+type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions &
+    (
+        | {
+              key: TKey extends CollectionKeyBase ? TKey : never;
+              callback?: (value: OnyxCollection<KeyValueMapping[TKey]>) => void;
+              waitForCollectionCallback: true;
+          }
+        | {
+              key: TKey;
+              callback?: (value: OnyxEntry<KeyValueMapping[TKey]>, key: TKey) => void;
+              waitForCollectionCallback?: false;
+          }
+    );
+
+type Mapping<TKey extends OnyxKey> = ConnectOptions<TKey> & {connectionID: number; statePropertyName: string; displayName: string};
+
+/**
+ * Represents different kinds of updates that can be passed to `Onyx.update()` method. It is a discriminated union of
+ * different update methods (`SET`, `MERGE`, `MERGE_COLLECTION`), each with their own key and value structure.
+ */
+type OnyxUpdate =
+    | {
+          [TKey in OnyxKey]:
+              | {
+                    onyxMethod: typeof OnyxUtils.METHOD.SET;
+                    key: TKey;
+                    value: OnyxEntry<KeyValueMapping[TKey]>;
+                }
+              | {
+                    onyxMethod: typeof OnyxUtils.METHOD.MERGE;
+                    key: TKey;
+                    value: OnyxEntry<NullishDeep<KeyValueMapping[TKey]>>;
+                }
+              | {
+                    onyxMethod: typeof OnyxUtils.METHOD.MULTI_SET;
+                    key: TKey;
+                    value: Partial<NullableKeyValueMapping>;
+                }
+              | {
+                    onyxMethod: typeof OnyxUtils.METHOD.CLEAR;
+                    key: TKey;
+                    value?: undefined;
+                };
+      }[OnyxKey]
+    | {
+          [TKey in CollectionKeyBase]: {
+              onyxMethod: typeof OnyxUtils.METHOD.MERGE_COLLECTION;
+              key: TKey;
+              value: Record<`${TKey}${string}`, NullishDeep<KeyValueMapping[TKey]>>;
+          };
+      }[CollectionKeyBase];
+
+/**
+ * Represents the options used in `Onyx.init()` method.
+ */
+type InitOptions = {
+    /** `ONYXKEYS` constants object */
+    keys?: DeepRecord<string, OnyxKey>;
+
+    /** initial data to set when `init()` and `clear()` is called */
+    initialKeyStates?: Partial<NullableKeyValueMapping>;
+
+    /**
+     * This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged
+     * as "safe" for removal. Any components subscribing to these keys must also implement a canEvict option. See the README for more info.
+     */
+    safeEvictionKeys?: OnyxKey[];
+
+    /**
+     * Sets how many recent keys should we try to keep in cache
+     * Setting this to 0 would practically mean no cache
+     * We try to free cache when we connect to a safe eviction key
+     */
+    maxCachedKeysCount?: number;
+
+    /**
+     * Auto synchronize storage events between multiple instances
+     * of Onyx running in different tabs/windows. Defaults to true for platforms that support local storage (web/desktop)
+     */
+    shouldSyncMultipleInstances?: boolean;
+
+    /** Enables debugging setState() calls to connected components */
+    debugSetState?: boolean;
+};
+
+export type {
     CollectionKey,
     CollectionKeyBase,
     CustomTypeOptions,
     DeepRecord,
     Key,
     KeyValueMapping,
+    NullableKeyValueMapping,
     OnyxCollection,
     OnyxEntry,
     OnyxKey,
@@ -249,4 +389,11 @@ export {
     NullishDeep,
     WithOnyxInstanceState,
     ExtractOnyxCollectionValue,
+    Collection,
+    WithOnyxInstance,
+    BaseConnectOptions,
+    ConnectOptions,
+    Mapping,
+    OnyxUpdate,
+    InitOptions,
 };

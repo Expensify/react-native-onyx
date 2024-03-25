@@ -1,6 +1,7 @@
 import _ from 'underscore';
 import Onyx from '../../lib';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
+import OnyxUtils from '../../lib/OnyxUtils';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
@@ -18,7 +19,8 @@ const ONYX_KEYS = {
 
 Onyx.init({
     keys: ONYX_KEYS,
-    registerStorageEventListener: () => {},
+    registerStorageEventListener: () => {
+    },
     initialKeyStates: {
         [ONYX_KEYS.OTHER_TEST]: 42,
     },
@@ -41,7 +43,7 @@ describe('Onyx', () => {
 
     it('should remove key value from OnyxCache/Storage when set is called with null value', () =>
         Onyx.set(ONYX_KEYS.OTHER_TEST, 42)
-            .then(() => Onyx.getAllKeys())
+            .then(() => OnyxUtils.getAllKeys())
             .then((keys) => {
                 expect(keys.has(ONYX_KEYS.OTHER_TEST)).toBe(true);
                 return Onyx.set(ONYX_KEYS.OTHER_TEST, null);
@@ -51,7 +53,7 @@ describe('Onyx', () => {
                 expect(cache.getAllKeys().size).toBe(0);
 
                 // When cache keys length is 0, we fetch the keys from storage.
-                return Onyx.getAllKeys();
+                return OnyxUtils.getAllKeys();
             })
             .then((keys) => {
                 expect(keys.has(ONYX_KEYS.OTHER_TEST)).toBe(false);
@@ -427,7 +429,10 @@ describe('Onyx', () => {
             callback: (data, key) => (valuesReceived[key] = data),
         });
 
-        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, notMyTest: {beep: 'boop'}}).then(() => {
+        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+            test_1: {ID: 123},
+            notMyTest: {beep: 'boop'}
+        }).then(() => {
             expect(valuesReceived).toEqual({});
         });
     });
@@ -595,8 +600,16 @@ describe('Onyx', () => {
                     }
                 */
 
-                expect(mockCallback).toHaveBeenNthCalledWith(3, {ID: 123, value: 'one', existingData: 'test'}, 'test_1');
-                expect(mockCallback).toHaveBeenNthCalledWith(4, {ID: 234, value: 'two', existingData: 'test'}, 'test_2');
+                expect(mockCallback).toHaveBeenNthCalledWith(3, {
+                    ID: 123,
+                    value: 'one',
+                    existingData: 'test'
+                }, 'test_1');
+                expect(mockCallback).toHaveBeenNthCalledWith(4, {
+                    ID: 234,
+                    value: 'two',
+                    existingData: 'test'
+                }, 'test_2');
                 expect(mockCallback).toHaveBeenNthCalledWith(5, {ID: 345, value: 'three'}, 'test_3');
             });
     });
@@ -1033,195 +1046,266 @@ describe('Onyx', () => {
             });
     });
 
-    describe('update', () => {
-        it('should squash all updates of collection-related keys into a single mergeCollection call', () => {
-            const connectionIDs = [];
+    it('should merge a non-existing key with a nested null removed', () => {
+        let testKeyValue;
 
-            const routineRoute = `${ONYX_KEYS.COLLECTION.ROUTES}routine`;
-            const holidayRoute = `${ONYX_KEYS.COLLECTION.ROUTES}holiday`;
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
 
-            const routesCollectionCallback = jest.fn();
-            connectionIDs.push(Onyx.connect({key: ONYX_KEYS.COLLECTION.ROUTES, callback: routesCollectionCallback, waitForCollectionCallback: true}));
+        return Onyx.merge(ONYX_KEYS.TEST_KEY, {
+            waypoints: {
+                1: 'Home',
+                2: 'Work',
+                3: null,
+            },
+        }).then(() => {
+            expect(testKeyValue).toEqual({
+                waypoints: {
+                    1: 'Home',
+                    2: 'Work',
+                },
+            });
+        });
+    });
+    it('should apply updates in order with Onyx.update', () => {
+        let testKeyValue;
 
-            return Onyx.update([
-                {
-                    onyxMethod: Onyx.METHOD.MERGE,
-                    key: routineRoute,
-                    value: {
-                        waypoints: {
-                            1: 'Home',
-                            2: 'Work',
-                            3: 'Gym',
-                        },
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        return Onyx.set(ONYX_KEYS.TEST_KEY, {})
+            .then(() => {
+                expect(testKeyValue).toEqual({});
+                Onyx.update([
+                    {
+                        onyxMethod: 'merge',
+                        key: ONYX_KEYS.TEST_KEY,
+                        value: {test1: 'test1'},
+                    },
+                    {
+                        onyxMethod: 'set',
+                        key: ONYX_KEYS.TEST_KEY,
+                        value: null,
+                    },
+                ]);
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                expect(testKeyValue).toEqual(null);
+            });
+    });
+});
+
+describe('update', () => {
+    it('should squash all updates of collection-related keys into a single mergeCollection call', () => {
+        const connectionIDs = [];
+
+        const routineRoute = `${ONYX_KEYS.COLLECTION.ROUTES}routine`;
+        const holidayRoute = `${ONYX_KEYS.COLLECTION.ROUTES}holiday`;
+
+        const routesCollectionCallback = jest.fn();
+        connectionIDs.push(Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.ROUTES,
+            callback: routesCollectionCallback,
+            waitForCollectionCallback: true
+        }));
+
+        return Onyx.update([
+            {
+                onyxMethod: Onyx.METHOD.MERGE,
+                key: routineRoute,
+                value: {
+                    waypoints: {
+                        1: 'Home',
+                        2: 'Work',
+                        3: 'Gym',
                     },
                 },
-                {
-                    onyxMethod: Onyx.METHOD.MERGE,
-                    key: holidayRoute,
-                    value: {
-                        waypoints: {
-                            1: 'Home',
-                            2: 'Beach',
-                            3: 'Restaurant',
-                        },
+            },
+            {
+                onyxMethod: Onyx.METHOD.MERGE,
+                key: holidayRoute,
+                value: {
+                    waypoints: {
+                        1: 'Home',
+                        2: 'Beach',
+                        3: 'Restaurant',
                     },
                 },
-                {
-                    onyxMethod: Onyx.METHOD.MERGE_COLLECTION,
-                    key: ONYX_KEYS.COLLECTION.ROUTES,
-                    value: {
-                        [holidayRoute]: {
-                            waypoints: {
-                                0: 'Bed',
-                            },
-                        },
-                        [routineRoute]: {
-                            waypoints: {
-                                0: 'Bed',
-                            },
-                        },
-                    },
-                },
-                {
-                    onyxMethod: Onyx.METHOD.MERGE,
-                    key: holidayRoute,
-                    value: {
-                        waypoints: {
-                            4: 'Home',
-                        },
-                    },
-                },
-                {
-                    onyxMethod: Onyx.METHOD.MERGE,
-                    key: routineRoute,
-                    value: {
-                        waypoints: {
-                            3: 'Gym',
-                        },
-                    },
-                },
-            ]).then(() => {
-                expect(routesCollectionCallback).toHaveBeenNthCalledWith(1, {
+            },
+            {
+                onyxMethod: Onyx.METHOD.MERGE_COLLECTION,
+                key: ONYX_KEYS.COLLECTION.ROUTES,
+                value: {
                     [holidayRoute]: {
                         waypoints: {
                             0: 'Bed',
-                            1: 'Home',
-                            2: 'Beach',
-                            3: 'Restaurant',
-                            4: 'Home',
                         },
                     },
                     [routineRoute]: {
                         waypoints: {
                             0: 'Bed',
-                            1: 'Home',
-                            2: 'Work',
-                            3: 'Gym',
                         },
                     },
-                });
-
-                Onyx.disconnect(connectionIDs);
-            });
-        });
-
-        it('should return a promise that completes when all update() operations are done', () => {
-            const connectionIDs = [];
-
-            const bob = `${ONYX_KEYS.COLLECTION.PEOPLE}bob`;
-            const lisa = `${ONYX_KEYS.COLLECTION.PEOPLE}lisa`;
-
-            const cat = `${ONYX_KEYS.COLLECTION.ANIMALS}cat`;
-            const dog = `${ONYX_KEYS.COLLECTION.ANIMALS}dog`;
-
-            const testCallback = jest.fn();
-            const otherTestCallback = jest.fn();
-            const peopleCollectionCallback = jest.fn();
-            const animalsCollectionCallback = jest.fn();
-            const catCallback = jest.fn();
-
-            connectionIDs.push(Onyx.connect({key: ONYX_KEYS.TEST_KEY, callback: testCallback}));
-            connectionIDs.push(Onyx.connect({key: ONYX_KEYS.OTHER_TEST, callback: otherTestCallback}));
-            connectionIDs.push(Onyx.connect({key: ONYX_KEYS.COLLECTION.ANIMALS, callback: animalsCollectionCallback, waitForCollectionCallback: true}));
-            connectionIDs.push(Onyx.connect({key: ONYX_KEYS.COLLECTION.PEOPLE, callback: peopleCollectionCallback, waitForCollectionCallback: true}));
-            connectionIDs.push(Onyx.connect({key: cat, callback: catCallback}));
-
-            return Onyx.update([
-                {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.TEST_KEY, value: 'none'},
-                {onyxMethod: Onyx.METHOD.SET, key: ONYX_KEYS.TEST_KEY, value: {food: 'taco'}},
-                {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.TEST_KEY, value: {drink: 'wine'}},
-                {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.OTHER_TEST, value: {food: 'pizza'}},
-                {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.OTHER_TEST, value: {drink: 'water'}},
-                {onyxMethod: Onyx.METHOD.MERGE, key: dog, value: {sound: 'woof'}},
-                {
-                    onyxMethod: Onyx.METHOD.MERGE_COLLECTION,
-                    key: ONYX_KEYS.COLLECTION.ANIMALS,
-                    value: {
-                        [cat]: {age: 5, size: 'S'},
-                        [dog]: {size: 'M'},
+                },
+            },
+            {
+                onyxMethod: Onyx.METHOD.MERGE,
+                key: holidayRoute,
+                value: {
+                    waypoints: {
+                        4: 'Home',
                     },
                 },
-                {onyxMethod: Onyx.METHOD.SET, key: cat, value: {age: 3}},
-                {onyxMethod: Onyx.METHOD.MERGE, key: cat, value: {sound: 'meow'}},
-                {onyxMethod: Onyx.METHOD.MERGE, key: bob, value: {car: 'sedan'}},
-                {onyxMethod: Onyx.METHOD.MERGE, key: lisa, value: {car: 'SUV', age: 21}},
-                {onyxMethod: Onyx.METHOD.MERGE, key: bob, value: {age: 25}},
-            ]).then(() => {
-                expect(testCallback).toHaveBeenNthCalledWith(1, {food: 'taco', drink: 'wine'}, ONYX_KEYS.TEST_KEY);
-
-                expect(otherTestCallback).toHaveBeenNthCalledWith(1, {food: 'pizza', drink: 'water'}, ONYX_KEYS.OTHER_TEST);
-
-                expect(animalsCollectionCallback).toHaveBeenNthCalledWith(1, {
-                    [cat]: {age: 3, sound: 'meow'},
-                });
-                expect(animalsCollectionCallback).toHaveBeenNthCalledWith(2, {
-                    [cat]: {age: 3, sound: 'meow'},
-                    [dog]: {size: 'M', sound: 'woof'},
-                });
-
-                expect(catCallback).toHaveBeenNthCalledWith(1, {age: 3, sound: 'meow'}, cat);
-
-                expect(peopleCollectionCallback).toHaveBeenNthCalledWith(1, {
-                    [bob]: {age: 25, car: 'sedan'},
-                    [lisa]: {age: 21, car: 'SUV'},
-                });
-
-                Onyx.disconnect(connectionIDs);
-            });
-        });
-
-        it('should apply updates in the correct order with Onyx.update', () => {
-            let testKeyValue;
-
-            connectionID = Onyx.connect({
-                key: ONYX_KEYS.TEST_KEY,
-                initWithStoredValues: false,
-                callback: (value) => {
-                    testKeyValue = value;
+            },
+            {
+                onyxMethod: Onyx.METHOD.MERGE,
+                key: routineRoute,
+                value: {
+                    waypoints: {
+                        3: 'Gym',
+                    },
+                },
+            },
+        ]).then(() => {
+            expect(routesCollectionCallback).toHaveBeenNthCalledWith(1, {
+                [holidayRoute]: {
+                    waypoints: {
+                        0: 'Bed',
+                        1: 'Home',
+                        2: 'Beach',
+                        3: 'Restaurant',
+                        4: 'Home',
+                    },
+                },
+                [routineRoute]: {
+                    waypoints: {
+                        0: 'Bed',
+                        1: 'Home',
+                        2: 'Work',
+                        3: 'Gym',
+                    },
                 },
             });
 
-            return Onyx.set(ONYX_KEYS.TEST_KEY, {})
-                .then(() => {
-                    expect(testKeyValue).toEqual({});
-                    Onyx.update([
-                        {
-                            onyxMethod: 'merge',
-                            key: ONYX_KEYS.TEST_KEY,
-                            value: {test1: 'test1'},
-                        },
-                        {
-                            onyxMethod: 'set',
-                            key: ONYX_KEYS.TEST_KEY,
-                            value: null,
-                        },
-                    ]);
-                    return waitForPromisesToResolve();
-                })
-                .then(() => {
-                    expect(testKeyValue).toEqual(null);
-                });
+            Onyx.disconnect(connectionIDs);
         });
+    });
+
+    it('should return a promise that completes when all update() operations are done', () => {
+        const connectionIDs = [];
+
+        const bob = `${ONYX_KEYS.COLLECTION.PEOPLE}bob`;
+        const lisa = `${ONYX_KEYS.COLLECTION.PEOPLE}lisa`;
+
+        const cat = `${ONYX_KEYS.COLLECTION.ANIMALS}cat`;
+        const dog = `${ONYX_KEYS.COLLECTION.ANIMALS}dog`;
+
+        const testCallback = jest.fn();
+        const otherTestCallback = jest.fn();
+        const peopleCollectionCallback = jest.fn();
+        const animalsCollectionCallback = jest.fn();
+        const catCallback = jest.fn();
+
+        connectionIDs.push(Onyx.connect({key: ONYX_KEYS.TEST_KEY, callback: testCallback}));
+        connectionIDs.push(Onyx.connect({key: ONYX_KEYS.OTHER_TEST, callback: otherTestCallback}));
+        connectionIDs.push(Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.ANIMALS,
+            callback: animalsCollectionCallback,
+            waitForCollectionCallback: true
+        }));
+        connectionIDs.push(Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.PEOPLE,
+            callback: peopleCollectionCallback,
+            waitForCollectionCallback: true
+        }));
+        connectionIDs.push(Onyx.connect({key: cat, callback: catCallback}));
+
+        return Onyx.update([
+            {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.TEST_KEY, value: 'none'},
+            {onyxMethod: Onyx.METHOD.SET, key: ONYX_KEYS.TEST_KEY, value: {food: 'taco'}},
+            {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.TEST_KEY, value: {drink: 'wine'}},
+            {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.OTHER_TEST, value: {food: 'pizza'}},
+            {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.OTHER_TEST, value: {drink: 'water'}},
+            {onyxMethod: Onyx.METHOD.MERGE, key: dog, value: {sound: 'woof'}},
+            {
+                onyxMethod: Onyx.METHOD.MERGE_COLLECTION,
+                key: ONYX_KEYS.COLLECTION.ANIMALS,
+                value: {
+                    [cat]: {age: 5, size: 'S'},
+                    [dog]: {size: 'M'},
+                },
+            },
+            {onyxMethod: Onyx.METHOD.SET, key: cat, value: {age: 3}},
+            {onyxMethod: Onyx.METHOD.MERGE, key: cat, value: {sound: 'meow'}},
+            {onyxMethod: Onyx.METHOD.MERGE, key: bob, value: {car: 'sedan'}},
+            {onyxMethod: Onyx.METHOD.MERGE, key: lisa, value: {car: 'SUV', age: 21}},
+            {onyxMethod: Onyx.METHOD.MERGE, key: bob, value: {age: 25}},
+        ]).then(() => {
+            expect(testCallback).toHaveBeenNthCalledWith(1, {food: 'taco', drink: 'wine'}, ONYX_KEYS.TEST_KEY);
+
+            expect(otherTestCallback).toHaveBeenNthCalledWith(1, {food: 'pizza', drink: 'water'}, ONYX_KEYS.OTHER_TEST);
+
+            expect(animalsCollectionCallback).toHaveBeenNthCalledWith(1, {
+                [cat]: {age: 3, sound: 'meow'},
+            });
+            expect(animalsCollectionCallback).toHaveBeenNthCalledWith(2, {
+                [cat]: {age: 3, sound: 'meow'},
+                [dog]: {size: 'M', sound: 'woof'},
+            });
+
+            expect(catCallback).toHaveBeenNthCalledWith(1, {age: 3, sound: 'meow'}, cat);
+
+            expect(peopleCollectionCallback).toHaveBeenNthCalledWith(1, {
+                [bob]: {age: 25, car: 'sedan'},
+                [lisa]: {age: 21, car: 'SUV'},
+            });
+
+            Onyx.disconnect(connectionIDs);
+        });
+    });
+
+    it('should apply updates in the correct order with Onyx.update', () => {
+        let testKeyValue;
+
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        return Onyx.set(ONYX_KEYS.TEST_KEY, {})
+            .then(() => {
+                expect(testKeyValue).toEqual({});
+                Onyx.update([
+                    {
+                        onyxMethod: 'merge',
+                        key: ONYX_KEYS.TEST_KEY,
+                        value: {test1: 'test1'},
+                    },
+                    {
+                        onyxMethod: 'set',
+                        key: ONYX_KEYS.TEST_KEY,
+                        value: null,
+                    },
+                ]);
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                expect(testKeyValue).toEqual(null);
+            });
     });
 
     describe('merge', () => {
@@ -1264,4 +1348,5 @@ describe('Onyx', () => {
                 });
         });
     });
-});
+})
+;
