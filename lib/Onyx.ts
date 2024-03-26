@@ -1,4 +1,5 @@
 /* eslint-disable no-continue */
+import _ from 'underscore';
 import * as Logger from './Logger';
 import cache from './OnyxCache';
 import createDeferredTask from './createDeferredTask';
@@ -213,8 +214,11 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[T
 
     const hasChanged = cache.hasValueChanged(key, valueAfterRemoving);
 
+    // Logging properties only since values could be sensitive things we don't want to log
+    Logger.logInfo(`set called for key: ${key}${_.isObject(value) ? ` properties: ${_.keys(value).join(',')}` : ''} hasChanged: ${hasChanged}`);
+
     // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
-    const updatePromise = OnyxUtils.broadcastUpdate(key, valueAfterRemoving, 'set', hasChanged, wasRemoved);
+    const updatePromise = OnyxUtils.broadcastUpdate(key, valueAfterRemoving, hasChanged, wasRemoved);
 
     // If the value has not changed or the key got removed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
     if (!hasChanged || wasRemoved) {
@@ -326,8 +330,11 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<K
 
             const hasChanged = cache.hasValueChanged(key, modifiedData);
 
+            // Logging properties only since values could be sensitive things we don't want to log
+            Logger.logInfo(`merge called for key: ${key}${_.isObject(batchedChanges) ? ` properties: ${_.keys(batchedChanges).join(',')}` : ''} hasChanged: ${hasChanged}`);
+
             // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
-            const updatePromise = OnyxUtils.broadcastUpdate(key, modifiedData, 'merge', hasChanged, wasRemoved);
+            const updatePromise = OnyxUtils.broadcastUpdate(key, modifiedData, hasChanged, wasRemoved);
 
             // If the value has not changed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
             if (!hasChanged || wasRemoved) {
