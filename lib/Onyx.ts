@@ -39,6 +39,16 @@ function init({
     shouldSyncMultipleInstances = Boolean(global.localStorage),
     debugSetState = false,
 }: InitOptions): void {
+    Storage.init();
+
+    if (shouldSyncMultipleInstances) {
+        Storage.keepInstancesSync?.((key, value) => {
+            const prevValue = cache.getValue(key, false);
+            cache.set(key, value);
+            OnyxUtils.keyChanged(key, value, prevValue);
+        });
+    }
+
     if (debugSetState) {
         PerformanceUtils.setShouldDebugSetState(true);
     }
@@ -51,14 +61,6 @@ function init({
 
     // Initialize all of our keys with data provided then give green light to any pending connections
     Promise.all([OnyxUtils.addAllSafeEvictionKeysToRecentlyAccessedList(), OnyxUtils.initializeWithDefaultKeyStates()]).then(deferredInitTask.resolve);
-
-    if (shouldSyncMultipleInstances) {
-        Storage.keepInstancesSync?.((key, value) => {
-            const prevValue = cache.getValue(key, false);
-            cache.set(key, value);
-            OnyxUtils.keyChanged(key, value, prevValue);
-        });
-    }
 }
 
 /**
