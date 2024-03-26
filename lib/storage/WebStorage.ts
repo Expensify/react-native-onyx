@@ -39,9 +39,9 @@ const webStorage: StorageProvider = {
 
         this.mergeItem = (key, batchedChanges, modifiedData) => Storage.mergeItem(key, batchedChanges, modifiedData).then(() => raiseStorageSyncEvent(key));
 
-        this.multiMerge = (pairs) => Storage.multiMerge(pairs).then(() => raiseStorageSyncManyKeysEvent(pairs.map(pair => pair[0])));
+        this.multiMerge = (pairs) => Storage.multiMerge(pairs).then(() => raiseStorageSyncManyKeysEvent(pairs.map((pair) => pair[0])));
 
-        this.multiSet = (pairs) => Storage.multiSet(pairs).then(() => raiseStorageSyncManyKeysEvent(pairs.map(pair => pair[0])));
+        this.multiSet = (pairs) => Storage.multiSet(pairs).then(() => raiseStorageSyncManyKeysEvent(pairs.map((pair) => pair[0])));
 
         // If we just call Storage.clear other tabs will have no idea which keys were available previously
         // so that they can call keysChanged for them. That's why we iterate over every key and raise a storage sync
