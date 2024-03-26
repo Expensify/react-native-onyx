@@ -94,6 +94,8 @@ function connect<TKey extends OnyxKey>(mapping: ConnectOptions<TKey>): number {
     callbackToStateMapping[connectionID] = mapping;
     callbackToStateMapping[connectionID].connectionID = connectionID;
 
+    OnyxUtils.storeKeyByConnections(mapping.key, callbackToStateMapping[connectionID].connectionID);
+
     if (mapping.initWithStoredValues === false) {
         return connectionID;
     }
@@ -193,6 +195,8 @@ function disconnect(connectionID: number, keyToRemoveFromEvictionBlocklist?: Ony
     if (keyToRemoveFromEvictionBlocklist) {
         OnyxUtils.removeFromEvictionBlockList(keyToRemoveFromEvictionBlocklist, connectionID);
     }
+
+    OnyxUtils.deleteKeyByConnections(lastConnectionID);
 
     delete callbackToStateMapping[connectionID];
 }
