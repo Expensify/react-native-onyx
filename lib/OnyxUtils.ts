@@ -10,8 +10,7 @@ import Storage from './storage';
 import utils from './utils';
 import unstable_batchedUpdates from './batch';
 import DevTools from './DevTools';
-import type {CollectionKey, CollectionKeyBase, NullableKeyValueMapping, OnyxKey, OnyxValue, Selector, WithOnyxInstanceState} from './types';
-import type {DeepRecord, Mapping} from './types';
+import type {DeepRecord, Mapping, CollectionKey, CollectionKeyBase, NullableKeyValueMapping, OnyxKey, OnyxValue, Selector, WithOnyxInstanceState} from './types';
 
 // Method constants
 const METHOD = {
@@ -271,12 +270,8 @@ function isSafeEvictionKey(testKey: OnyxKey): boolean {
 /**
  * Tries to get a value from the cache. If the value is not present in cache it will return the default value or undefined.
  * If the requested key is a collection, it will return an object with all the collection members.
- *
- * @param {String} key
- * @param {Object} mapping
- * @returns {Mixed}
  */
-function tryGetCachedValue(key, mapping = {}) {
+function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Mapping<TKey>): OnyxValue<OnyxKey> {
     let val = cache.getValue(key);
 
     if (isCollectionKey(key)) {
@@ -288,37 +283,26 @@ function tryGetCachedValue(key, mapping = {}) {
             return;
         }
 
-        const matchingKeys = [];
-        allCacheKeys.forEach((k) => {
-            if (!k.startsWith(key)) {
-                return;
+        const matchingKeys = Array.from(allCacheKeys).filter((k) => k.startsWith(key));
+        const values = matchingKeys.reduce((finalObject: Record<OnyxKey, OnyxValue<OnyxKey>>, matchedKey) => {
+            const cachedValue = cache.getValue(matchedKey);
+            if (cachedValue) {
+                // This is permissible because we're in the process of constructing the final object in a reduce function.
+                // eslint-disable-next-line no-param-reassign
+                finalObject[matchedKey] = cachedValue;
             }
-            matchingKeys.push(k);
-        });
-
-        const values = _.reduce(
-            matchingKeys,
-            (finalObject, matchedKey) => {
-                const cachedValue = cache.getValue(matchedKey);
-                if (cachedValue) {
-                    // This is permissible because we're in the process of constructing the final object in a reduce function.
-                    // eslint-disable-next-line no-param-reassign
-                    finalObject[matchedKey] = cachedValue;
-                }
-                return finalObject;
-            },
-            {},
-        );
+            return finalObject;
+        }, {});
 
         val = values;
     }
 
-    if (mapping.selector) {
+    if (mapping?.selector) {
         const state = mapping.withOnyxInstance ? mapping.withOnyxInstance.state : undefined;
         if (isCollectionKey(key)) {
-            return reduceCollectionWithSelector(val, mapping.selector, state);
+            return reduceCollectionWithSelector(val as Record<OnyxKey, OnyxValue<OnyxKey>>, mapping.selector, state);
         }
-        return getSubsetOfData(val, mapping.selector, state);
+        return mapping.selector(val, state);
     }
 
     return val;

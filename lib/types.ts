@@ -302,7 +302,7 @@ type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions &
           }
     );
 
-type Mapping<TKey extends OnyxKey> = ConnectOptions<TKey> & {connectionID: number; statePropertyName: string; displayName: string};
+type Mapping<TKey extends OnyxKey> = ConnectOptions<TKey> & {connectionID: number; statePropertyName: string; displayName: string; selector: Selector<TKey, unknown, unknown>};
 
 /**
  * Represents different kinds of updates that can be passed to `Onyx.update()` method. It is a discriminated union of
