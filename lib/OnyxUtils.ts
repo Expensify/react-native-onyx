@@ -1,7 +1,7 @@
 /* eslint-disable no-continue */
 import {deepEqual} from 'fast-equals';
 import _ from 'underscore';
-import {Component} from 'react';
+import type {ValueOf} from 'type-fest';
 import * as Logger from './Logger';
 import cache from './OnyxCache';
 import * as Str from './Str';
@@ -11,7 +11,7 @@ import utils from './utils';
 import unstable_batchedUpdates from './batch';
 import DevTools from './DevTools';
 import type {NullableKeyValueMapping, OnyxKey, OnyxValue} from './types';
-import {CollectionKey, CollectionKeyBase, DeepRecord, Mapping, KeyValueMapping, NullishDeep, OnyxCollection, OnyxEntry, Selector} from './types';
+import type {DeepRecord, Mapping} from './types';
 
 // Method constants
 const METHOD = {
@@ -21,6 +21,8 @@ const METHOD = {
     MULTI_SET: 'multiset',
     CLEAR: 'clear',
 } as const;
+
+type OnyxMethod = ValueOf<typeof METHOD>;
 
 // Key/value store of Onyx key and arrays of values to merge
 const mergeQueue: Record<OnyxKey, Array<OnyxValue<OnyxKey>>> = {};
@@ -105,13 +107,20 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
 /**
  * Sends an action to DevTools extension
  *
- * @param {string} method - Onyx method from METHOD
- * @param {string} key - Onyx key that was changed
- * @param {any} value - contains the change that was made by the method
- * @param {any} mergedValue - (optional) value that was written in the storage after a merge method was executed.
+ * @param method - Onyx method from METHOD
+ * @param key - Onyx key that was changed
+ * @param value - contains the change that was made by the method
+ * @param mergedValue - (optional) value that was written in the storage after a merge method was executed.
  */
-function sendActionToDevTools(method, key, value, mergedValue = undefined) {
-    DevTools.registerAction(utils.formatActionName(method, key), value, key ? {[key]: mergedValue || value} : value);
+function sendActionToDevTools(method: OnyxMethod, key: undefined, value: Record<OnyxKey, OnyxValue<OnyxKey>>, mergedValue?: OnyxValue<OnyxKey>): void;
+function sendActionToDevTools(method: OnyxMethod, key: OnyxKey, value: OnyxValue<OnyxKey>, mergedValue?: OnyxValue<OnyxKey>): void;
+function sendActionToDevTools(
+    method: OnyxMethod,
+    key: OnyxKey | undefined,
+    value: Record<OnyxKey, OnyxValue<OnyxKey>> | OnyxValue<OnyxKey>,
+    mergedValue: OnyxValue<OnyxKey> = undefined,
+): void {
+    DevTools.registerAction(utils.formatActionName(method, key), value, key ? {[key]: mergedValue || value} : (value as Record<OnyxKey, OnyxValue<OnyxKey>>));
 }
 
 /**
