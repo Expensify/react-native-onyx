@@ -258,26 +258,14 @@ function splitCollectionMemberKey<TKey extends CollectionKey>(key: TKey): [TKey 
 /**
  * Checks to see if a provided key is the exact configured key of our connected subscriber
  * or if the provided key is a collection member key (in case our configured key is a "collection key")
- *
- * @private
- * @param {String} configKey
- * @param {String} key
- * @return {Boolean}
  */
-function isKeyMatch(configKey, key) {
+function isKeyMatch(configKey: OnyxKey, key: OnyxKey): boolean {
     return isCollectionKey(configKey) ? Str.startsWith(key, configKey) : configKey === key;
 }
 
-/**
- * Checks to see if this key has been flagged as
- * safe for removal.
- *
- * @private
- * @param {String} testKey
- * @returns {Boolean}
- */
-function isSafeEvictionKey(testKey) {
-    return _.some(evictionAllowList, (key) => isKeyMatch(key, testKey));
+/** Checks to see if this key has been flagged as safe for removal. */
+function isSafeEvictionKey(testKey: OnyxKey): boolean {
+    return evictionAllowList.some((key) => isKeyMatch(key, testKey));
 }
 
 /**
