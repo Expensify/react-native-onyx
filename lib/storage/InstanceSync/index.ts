@@ -10,6 +10,8 @@ const InstanceSync = {
     setItem: NOOP,
     removeItem: NOOP,
     removeItems: NOOP,
+    multiMerge: NOOP,
+    multiSet: NOOP,
     mergeItem: NOOP,
     clear: <T extends () => void>(callback: T) => Promise.resolve(callback()),
 };
