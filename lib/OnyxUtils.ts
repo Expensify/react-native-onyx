@@ -128,9 +128,8 @@ function sendActionToDevTools(
  * This happens for example in the Onyx.update function, where we process API responses that might contain a lot of
  * update operations. Instead of calling the subscribers for each update operation, we batch them together which will
  * cause react to schedule the updates at once instead of after each other. This is mainly a performance optimization.
- * @returns {Promise}
  */
-function maybeFlushBatchUpdates() {
+function maybeFlushBatchUpdates(): Promise<void> {
     if (batchUpdatesPromise) {
         return batchUpdatesPromise;
     }
@@ -156,7 +155,7 @@ function maybeFlushBatchUpdates() {
     return batchUpdatesPromise;
 }
 
-function batchUpdates(updates) {
+function batchUpdates(updates: () => void): Promise<void> {
     batchUpdatesQueue.push(updates);
     return maybeFlushBatchUpdates();
 }
