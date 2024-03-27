@@ -10,7 +10,7 @@ import Storage from './storage';
 import utils from './utils';
 import unstable_batchedUpdates from './batch';
 import DevTools from './DevTools';
-import type {NullableKeyValueMapping, OnyxKey, OnyxValue} from './types';
+import type {CollectionKeyBase, NullableKeyValueMapping, OnyxKey, OnyxValue, Selector, WithOnyxInstanceState} from './types';
 import type {DeepRecord, Mapping} from './types';
 
 // Method constants
@@ -161,34 +161,22 @@ function batchUpdates(updates: () => void): Promise<void> {
 }
 
 /**
- * Uses a selector function to return a simplified version of sourceData
- * @param {Mixed} sourceData
- * @param {Function} selector Function that takes sourceData and returns a simplified version of it
- * @param {Object} [withOnyxInstanceState]
- * @returns {Mixed}
- */
-const getSubsetOfData = (sourceData, selector, withOnyxInstanceState) => selector(sourceData, withOnyxInstanceState);
-
-/**
  * Takes a collection of items (eg. {testKey_1:{a:'a'}, testKey_2:{b:'b'}})
  * and runs it through a reducer function to return a subset of the data according to a selector.
  * The resulting collection will only contain items that are returned by the selector.
- * @param {Object} collection
- * @param {String|Function} selector (see method docs for getSubsetOfData() for full details)
- * @param {Object} [withOnyxInstanceState]
- * @returns {Object}
  */
-const reduceCollectionWithSelector = (collection, selector, withOnyxInstanceState) =>
-    _.reduce(
-        collection,
-        (finalCollection, item, key) => {
-            // eslint-disable-next-line no-param-reassign
-            finalCollection[key] = getSubsetOfData(item, selector, withOnyxInstanceState);
+function reduceCollectionWithSelector<TKey extends CollectionKeyBase, TMap, TReturn>(
+    collection: Record<OnyxKey, OnyxValue<OnyxKey>>,
+    selector: Selector<TKey, TMap, TReturn> | undefined,
+    withOnyxInstanceState: WithOnyxInstanceState<TMap> | undefined,
+): Record<OnyxKey, OnyxValue<OnyxKey>> {
+    return Object.entries(collection ?? {}).reduce((finalCollection: Record<OnyxKey, OnyxValue<OnyxKey>>, [key, item]) => {
+        // eslint-disable-next-line no-param-reassign
+        finalCollection[key] = selector?.(item, withOnyxInstanceState);
 
-            return finalCollection;
-        },
-        {},
-    );
+        return finalCollection;
+    }, {});
+}
 
 /**
  * Get some data from the store
