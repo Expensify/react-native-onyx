@@ -100,7 +100,16 @@ const Storage: Storage = {
     /**
      * Stores multiple key-value pairs in a batch
      */
-    multiSet: (pairs) => tryOrDegradePerformance(() => provider.multiSet(pairs)),
+    multiSet: (pairs) =>
+        tryOrDegradePerformance(() => {
+            const promise = provider.multiSet(pairs);
+
+            if (shouldKeepInstancesSync) {
+                return promise.then(() => InstanceSync.multiSet(pairs.map((pair) => pair[0])));
+            }
+
+            return promise;
+        }),
 
     /**
      * Merging an existing value with a new one
@@ -120,7 +129,16 @@ const Storage: Storage = {
      * Multiple merging of existing and new values in a batch
      * This function also removes all nested null values from an object.
      */
-    multiMerge: (pairs) => tryOrDegradePerformance(() => provider.multiMerge(pairs)),
+    multiMerge: (pairs) =>
+        tryOrDegradePerformance(() => {
+            const promise = provider.multiMerge(pairs);
+
+            if (shouldKeepInstancesSync) {
+                return promise.then(() => InstanceSync.multiMerge(pairs.map((pair) => pair[0])));
+            }
+
+            return promise;
+        }),
 
     /**
      * Removes given key and its value
