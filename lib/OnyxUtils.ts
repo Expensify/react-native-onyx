@@ -203,12 +203,8 @@ function get(key: OnyxKey): Promise<OnyxValue<OnyxKey>> {
     return cache.captureTask(taskName, promise);
 }
 
-/**
- * Returns current key names stored in persisted storage
- * @private
- * @returns {Promise<Set<Key>>}
- */
-function getAllKeys() {
+/** Returns current key names stored in persisted storage */
+function getAllKeys(): Promise<Set<string>> {
     // When we've already read stored keys, resolve right away
     const storedKeys = cache.getAllKeys();
     if (storedKeys.size > 0) {
@@ -219,7 +215,7 @@ function getAllKeys() {
 
     // When a value retrieving task for all keys is still running hook to it
     if (cache.hasPendingTask(taskName)) {
-        return cache.getTaskPromise(taskName);
+        return cache.getTaskPromise(taskName) as Promise<Set<string>>;
     }
 
     // Otherwise retrieve the keys from storage and capture a promise to aid concurrent usages
@@ -229,17 +225,14 @@ function getAllKeys() {
         return cache.getAllKeys();
     });
 
-    return cache.captureTask(taskName, promise);
+    return cache.captureTask(taskName, promise) as Promise<Set<string>>;
 }
 
 /**
  * Checks to see if the a subscriber's supplied key
  * is associated with a collection of keys.
- *
- * @param {String} key
- * @returns {Boolean}
  */
-function isCollectionKey(key) {
+function isCollectionKey(key: OnyxKey): key is CollectionKeyBase {
     return onyxCollectionKeyMap.has(key);
 }
 
