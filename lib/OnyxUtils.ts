@@ -236,12 +236,7 @@ function isCollectionKey(key: OnyxKey): key is CollectionKeyBase {
     return onyxCollectionKeyMap.has(key);
 }
 
-/**
- * @param {String} collectionKey
- * @param {String} key
- * @returns {Boolean}
- */
-function isCollectionMemberKey(collectionKey, key) {
+function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collectionKey: TCollectionKey, key: string): key is `${TCollectionKey}${string}` {
     return Str.startsWith(key, collectionKey) && key.length > collectionKey.length;
 }
 
