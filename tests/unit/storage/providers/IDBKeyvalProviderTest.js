@@ -1,6 +1,6 @@
 import _ from 'underscore';
 
-import IDBKeyValProviderMock from '../../../../lib/storage/providers/IDBKeyVal';
+import IDBKeyValProviderMock from '../../../../lib/storage/providers/IDBKeyValProvider';
 import createDeferredTask from '../../../../lib/createDeferredTask';
 import waitForPromisesToResolve from '../../../utils/waitForPromisesToResolve';
 
@@ -64,7 +64,7 @@ describe('storage/providers/IDBKeyVal', () => {
         ]);
 
         return waitForPromisesToResolve().then(() => {
-            IDBKeyValProviderMock.idbKeyvalSet.mockClear();
+            IDBKeyValProviderMock.mockSet.mockClear();
 
             // Given deltas matching existing structure
             const USER_1_DELTA = {
@@ -83,7 +83,7 @@ describe('storage/providers/IDBKeyVal', () => {
                 ['@USER_2', USER_2_DELTA],
             ]).then(() => {
                 // Then each existing item should be set with the merged content
-                expect(IDBKeyValProviderMock.idbKeyvalSet).toHaveBeenNthCalledWith(1, '@USER_1', {
+                expect(IDBKeyValProviderMock.mockSet).toHaveBeenNthCalledWith(1, '@USER_1', {
                     name: 'Tom',
                     age: 31,
                     traits: {
@@ -92,7 +92,7 @@ describe('storage/providers/IDBKeyVal', () => {
                     },
                 });
 
-                expect(IDBKeyValProviderMock.idbKeyvalSet).toHaveBeenNthCalledWith(2, '@USER_2', {
+                expect(IDBKeyValProviderMock.mockSet).toHaveBeenNthCalledWith(2, '@USER_2', {
                     name: 'Sarah',
                     age: 26,
                     traits: {
@@ -131,7 +131,7 @@ describe('storage/providers/IDBKeyVal', () => {
         // If StorageProvider.clear() does not abort the queue, more idbKeyval.setItem calls would be executed because they would
         // be sitting in the setItemQueue
         return waitForPromisesToResolve().then(() => {
-            expect(IDBKeyValProviderMock.idbKeyvalSet).toHaveBeenCalledTimes(0);
+            expect(IDBKeyValProviderMock.mockSet).toHaveBeenCalledTimes(0);
             expect(IDBKeyValProviderMock.clear).toHaveBeenCalledTimes(1);
         });
     });
