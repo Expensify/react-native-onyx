@@ -10,7 +10,7 @@ import Storage from './storage';
 import utils from './utils';
 import unstable_batchedUpdates from './batch';
 import DevTools from './DevTools';
-import type {CollectionKeyBase, NullableKeyValueMapping, OnyxKey, OnyxValue, Selector, WithOnyxInstanceState} from './types';
+import type {CollectionKey, CollectionKeyBase, NullableKeyValueMapping, OnyxKey, OnyxValue, Selector, WithOnyxInstanceState} from './types';
 import type {DeepRecord, Mapping} from './types';
 
 // Method constants
@@ -242,10 +242,10 @@ function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collect
 
 /**
  * Splits a collection member key into the collection key part and the ID part.
- * @param {String} key - The collection member key to split.
- * @returns {Array<String>} A tuple where the first element is the collection part and the second element is the ID part.
+ * @param key - The collection member key to split.
+ * @returns A tuple where the first element is the collection part and the second element is the ID part.
  */
-function splitCollectionMemberKey(key) {
+function splitCollectionMemberKey<TKey extends CollectionKey>(key: TKey): [TKey extends `${infer Prefix}_${string}` ? `${Prefix}_` : never, string] {
     const underscoreIndex = key.indexOf('_');
 
     if (underscoreIndex === -1) {
