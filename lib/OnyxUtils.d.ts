@@ -247,11 +247,15 @@ declare function hasPendingMergeForKey(key: OnyxKey): boolean;
 /**
  * Removes a key from storage if the value is null.
  * Otherwise removes all nested null values in objects and returns the object
- * @returns The value without null values and a boolean "wasRemoved", which indicates if the key got removed completely
+ * @param {String} key
+ * @param {Mixed} value
+ * @param {Boolean} shouldRemoveNestedNullsInObjects
+ * @returns {Mixed} The value without null values and a boolean "wasRemoved", which indicates if the key got removed completely
  */
 declare function removeNullValues<TKey extends OnyxKey>(
     key: TKey,
     value: OnyxValue<TKey>,
+    shouldRemoveNestedNullsInObjects?: boolean,
 ): {
     value: OnyxValue<TKey>;
     wasRemoved: boolean;
@@ -260,16 +264,22 @@ declare function removeNullValues<TKey extends OnyxKey>(
  * Storage expects array like: [["@MyApp_user", value_1], ["@MyApp_key", value_2]]
  * This method transforms an object like {'@MyApp_user': myUserValue, '@MyApp_key': myKeyValue}
  * to an array of key-value pairs in the above format and removes key-value pairs that are being set to null
- *
- * @return an array of key - value pairs <[key, value]>
+ * @private
+ * @param {Record} data
+ * @param {Boolean} shouldRemoveNestedNullsInObjects
+ * @return {Array} an array of key - value pairs <[key, value]>
  */
-declare function prepareKeyValuePairsForStorage(data: Record<OnyxKey, OnyxValue<OnyxKey>>): Array<[OnyxKey, OnyxValue<OnyxKey>]>;
+declare function prepareKeyValuePairsForStorage(data: Record<OnyxKey, OnyxValue<OnyxKey>>, shouldRemoveNestedNullsInObjects: boolean): Array<[OnyxKey, OnyxValue<OnyxKey>]>;
 /**
  * Merges an array of changes with an existing value
  *
- * @param changes Array of changes that should be applied to the existing value
+ * @private
+ * @param {*} existingValue
+ * @param {Array<*>} changes Array of changes that should be applied to the existing value
+ * @param {Boolean} shouldRemoveNestedNullsInObjects
+ * @returns {*}
  */
-declare function applyMerge(existingValue: OnyxValue<OnyxKey>, changes: Array<OnyxValue<OnyxKey>>, shouldRemoveNullObjectValues: boolean): any;
+declare function applyMerge(existingValue: OnyxValue<OnyxKey>, changes: Array<OnyxValue<OnyxKey>>, shouldRemoveNestedNullsInObjects: boolean): any;
 /**
  * Merge user provided default key value pairs.
  */
