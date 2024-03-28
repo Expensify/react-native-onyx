@@ -1102,17 +1102,17 @@ describe('Onyx', () => {
     it('mergeCollection should omit nested null values', () => {
         let result;
 
-        const routineRoute = `${ONYX_KEYS.COLLECTION.ROUTES}routine`;
-        const holidayRoute = `${ONYX_KEYS.COLLECTION.ROUTES}holiday`;
+        const routineRoute = `${ONYX_KEYS.COLLECTION.TEST_KEY}routine`;
+        const holidayRoute = `${ONYX_KEYS.COLLECTION.TEST_KEY}holiday`;
 
         connectionID = Onyx.connect({
-            key: ONYX_KEYS.COLLECTION.ROUTES,
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
             initWithStoredValues: false,
             callback: (value) => (result = value),
             waitForCollectionCallback: true,
         });
 
-        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
             [routineRoute]: {
                 waypoints: {
                     1: 'Home',
