@@ -249,13 +249,13 @@ declare function hasPendingMergeForKey(key: OnyxKey): boolean;
  * Otherwise removes all nested null values in objects and returns the object
  * @param {String} key
  * @param {Mixed} value
- * @param {Boolean} shouldRemoveNestedNullsInObjects
+ * @param {Boolean} shouldRemoveNestedNulls
  * @returns {Mixed} The value without null values and a boolean "wasRemoved", which indicates if the key got removed completely
  */
 declare function removeNullValues<TKey extends OnyxKey>(
     key: TKey,
     value: OnyxValue<TKey>,
-    shouldRemoveNestedNullsInObjects?: boolean,
+    shouldRemoveNestedNulls?: boolean,
 ): {
     value: OnyxValue<TKey>;
     wasRemoved: boolean;
@@ -266,20 +266,20 @@ declare function removeNullValues<TKey extends OnyxKey>(
  * to an array of key-value pairs in the above format and removes key-value pairs that are being set to null
  * @private
  * @param {Record} data
- * @param {Boolean} shouldRemoveNestedNullsInObjects
+ * @param {Boolean} shouldRemoveNestedNulls
  * @return {Array} an array of key - value pairs <[key, value]>
  */
-declare function prepareKeyValuePairsForStorage(data: Record<OnyxKey, OnyxValue<OnyxKey>>, shouldRemoveNestedNullsInObjects: boolean): Array<[OnyxKey, OnyxValue<OnyxKey>]>;
+declare function prepareKeyValuePairsForStorage(data: Record<OnyxKey, OnyxValue<OnyxKey>>, shouldRemoveNestedNulls: boolean): Array<[OnyxKey, OnyxValue<OnyxKey>]>;
 /**
  * Merges an array of changes with an existing value
  *
  * @private
  * @param {*} existingValue
  * @param {Array<*>} changes Array of changes that should be applied to the existing value
- * @param {Boolean} shouldRemoveNestedNullsInObjects
+ * @param {Boolean} shouldRemoveNestedNulls
  * @returns {*}
  */
-declare function applyMerge(existingValue: OnyxValue<OnyxKey>, changes: Array<OnyxValue<OnyxKey>>, shouldRemoveNestedNullsInObjects: boolean): any;
+declare function applyMerge(existingValue: OnyxValue<OnyxKey>, changes: Array<OnyxValue<OnyxKey>>, shouldRemoveNestedNulls: boolean): any;
 /**
  * Merge user provided default key value pairs.
  */
