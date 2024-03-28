@@ -17,3 +17,6 @@ dist/
 
 # Published package
 *.tgz
+
+# Perf tests
+.reassure
