@@ -282,7 +282,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<K
     const mergeQueuePromise = OnyxUtils.getMergeQueuePromise();
 
     // Top-level undefined values are ignored
-    // Therefore we need to prevent adding them to the merge queue
+    // Therefore, we need to prevent adding them to the merge queue
     if (changes === undefined) {
         return mergeQueue[key] ? mergeQueuePromise[key] : Promise.resolve();
     }
@@ -325,7 +325,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<K
             // On native platforms we use SQLite which utilises JSON_PATCH to merge changes.
             // JSON_PATCH generally removes null values from the stored object.
             // When there is no existing value though, SQLite will just insert the changes as a new value and thus the null values won't be removed.
-            // Therefore we need to remove null values from the `batchedChanges` which are sent to the SQLite, if no existing value is present.
+            // Therefore, we need to remove null values from the `batchedChanges` which are sent to the SQLite, if no existing value is present.
             // Passing the "batchedChanges" alongside undefined as the existing value with  the "shouldRemoveNestedNullsInObjects" set to true,
             // will (only) remove the null values from the "batchedChanges" and return the result.
             if (!existingValue) {
