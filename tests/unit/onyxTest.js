@@ -2,6 +2,7 @@ import _ from 'underscore';
 import Onyx from '../../lib';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import OnyxUtils from '../../lib/OnyxUtils';
+import StorageMock from '../../lib/storage/__mocks__';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
@@ -1069,6 +1070,64 @@ describe('Onyx', () => {
             })
             .then(() => {
                 expect(testKeyValue).toEqual(null);
+            });
+    });
+
+    it('(nested) nullish values should be removed when changes are batched during merge (SQLite)', () => {
+        let result;
+
+        const initialData = {
+            a: 'a',
+            b: 'b',
+            c: {
+                d: 'd',
+                e: 'e',
+            },
+        };
+        const change1 = null;
+        const change2 = {
+            f: 'f',
+            c: {
+                g: 'g',
+            },
+        };
+        const changes = [change1, change2];
+
+        const batchedChanges = OnyxUtils.applyMerge(undefined, changes, false);
+
+        console.log('Batched changes\n', JSON.stringify(batchedChanges, null, 2));
+
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => (result = value),
+        });
+
+        return Onyx.set(ONYX_KEYS.TEST_KEY, initialData)
+            .then(() => {
+                expect(result).toEqual(initialData);
+                Onyx.merge(ONYX_KEYS.TEST_KEY, changes[0]);
+                Onyx.merge(ONYX_KEYS.TEST_KEY, changes[1]);
+            })
+            .then(waitForPromisesToResolve)
+            .then(() => {
+                expect(result).toEqual({
+                    f: 'f',
+                    c: {
+                        g: 'g',
+                    },
+                });
+
+                console.log('Result in storage\n', JSON.stringify(result, null, 2));
+
+                // We would need to mock SQLite here to actually see what happens
+                // The current storage mock will just use the "modifiedData" from Onyx and just set it instead of actually applying the delta change.
+                expect(StorageMock.getItem(ONYX_KEYS.TEST_KEY)).toEqual({
+                    f: 'f',
+                    c: {
+                        g: 'g',
+                    },
+                });
             });
     });
 });
