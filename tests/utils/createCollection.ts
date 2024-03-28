@@ -1,6 +1,6 @@
 import {randAvatar, randEmail, randWord} from '@ngneat/falso';
 
-export type PersonalDetailsMock = {
+type PersonalDetailsMock = {
     accountID: number;
     avatar: string;
     displayName: string;
@@ -31,3 +31,4 @@ function createPersonalDetails(index: number): PersonalDetailsMock {
 }
 
 export {createCollection, createPersonalDetails};
+export type {PersonalDetailsMock};

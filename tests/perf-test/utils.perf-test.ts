@@ -1,6 +1,7 @@
 import {measureFunction} from 'reassure';
 import utils from '../../lib/utils';
-import {PersonalDetailsMock, createCollection, createPersonalDetails} from '../utils/createCollection';
+import {createCollection, createPersonalDetails} from '../utils/createCollection';
+import type {PersonalDetailsMock} from '../utils/createCollection';
 
 const getMockedPersonalDetails = (length = 10) =>
     createCollection<PersonalDetailsMock>(
