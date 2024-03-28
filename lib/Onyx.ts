@@ -243,7 +243,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[T
  * @param data object keyed by ONYXKEYS and the values to set
  */
 function multiSet(data: Partial<NullableKeyValueMapping>): Promise<void[]> {
-    const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(data);
+    const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(data, true);
 
     const updatePromises = keyValuePairs.map(([key, value]) => {
         const prevValue = cache.getValue(key, false);
