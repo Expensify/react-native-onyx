@@ -85,8 +85,6 @@ const provider: StorageProvider = {
      */
     multiMerge(pairs) {
         _.forEach(pairs, ([key, value]) => {
-            console.log({key, value});
-
             const existingValue = store[key] as Record<string, unknown>;
             const newValue = utils.fastMerge(existingValue, value as Record<string, unknown>) as OnyxValue<OnyxKey>;
 
