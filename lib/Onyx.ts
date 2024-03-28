@@ -326,7 +326,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<K
             // JSON_PATCH generally removes null values from the stored object.
             // When there is no existing value though, SQLite will just insert the changes as a new value and thus the null values won't be removed.
             // Therefore we need to remove null values from the `batchedChanges` which are sent to the SQLite, if no existing value is present.
-            // Passing the "batchedChanges" alongside undefined as the existing value with  the "shouldRemoveNullObjectValues" set to true,
+            // Passing the "batchedChanges" alongside undefined as the existing value with  the "shouldRemoveNestedNullsInObjects" set to true,
             // will (only) remove the null values from the "batchedChanges" and return the result.
             if (!existingValue) {
                 batchedChanges = OnyxUtils.applyMerge(undefined, [batchedChanges], true);
