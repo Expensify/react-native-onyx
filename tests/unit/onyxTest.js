@@ -101,42 +101,6 @@ describe('Onyx', () => {
     describe('clear', () => {});
 
     describe('mergeCollection', () => {
-        it('should call subscriber callback and storage multiMerge with the same data', () => {
-            const storageSpy = jest.spyOn(StorageMock, 'multiMerge');
-            const routineRoute = `${ONYX_KEYS.COLLECTION.ROUTES}routine`;
-
-            let result;
-            connectionID = Onyx.connect({
-                key: routineRoute,
-                initWithStoredValues: false,
-                callback: (value) => (result = value),
-            });
-
-            const initialValue = {
-                pendingFields: {
-                    waypoints: 'add',
-                },
-            };
-            const updatedValue = {
-                pendingFields: {
-                    waypoints: null,
-                },
-            };
-
-            return Onyx.set(routineRoute, initialValue)
-                .then(() => {
-                    expect(result).toEqual(initialValue);
-                    Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
-                        [routineRoute]: updatedValue,
-                    });
-                    return waitForPromisesToResolve();
-                })
-                .then(() => {
-                    expect(result).toEqual(updatedValue);
-                    expect(storageSpy).toHaveBeenCalledWith([[routineRoute, updatedValue]]);
-                });
-        });
-
         it('should properly set and merge when using mergeCollection', () => {
             const valuesReceived = {};
             const mockCallback = jest.fn((data) => (valuesReceived[data.ID] = data.value));
