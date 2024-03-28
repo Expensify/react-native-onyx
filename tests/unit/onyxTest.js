@@ -1069,8 +1069,6 @@ describe('Onyx', () => {
                 },
             },
         }).then(() => {
-            console.log(JSON.stringify(result));
-
             expect(result).toEqual({
                 [routineRoute]: {
                     waypoints: {
