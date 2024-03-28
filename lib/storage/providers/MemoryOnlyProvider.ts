@@ -68,11 +68,7 @@ const provider: StorageProvider = {
     multiSet(pairs) {
         const setPromises = _.map(pairs, ([key, value]) => this.setItem(key, value));
 
-        return new Promise((resolve) => {
-            Promise.all(setPromises).then(() => {
-                resolve(undefined);
-            });
-        });
+        return Promise.all(setPromises).then(() => undefined);
     },
 
     /**

@@ -243,7 +243,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[T
  * @param data object keyed by ONYXKEYS and the values to set
  */
 function multiSet(data: Partial<NullableKeyValueMapping>): Promise<void[]> {
-    const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(data);
+    const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(data, true);
 
     const updatePromises = keyValuePairs.map(([key, value]) => {
         const prevValue = cache.getValue(key, false);
@@ -282,7 +282,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<K
     const mergeQueuePromise = OnyxUtils.getMergeQueuePromise();
 
     // Top-level undefined values are ignored
-    // Therefore we need to prevent adding them to the merge queue
+    // Therefore, we need to prevent adding them to the merge queue
     if (changes === undefined) {
         return mergeQueue[key] ? mergeQueuePromise[key] : Promise.resolve();
     }
@@ -325,7 +325,9 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<K
             // On native platforms we use SQLite which utilises JSON_PATCH to merge changes.
             // JSON_PATCH generally removes null values from the stored object.
             // When there is no existing value though, SQLite will just insert the changes as a new value and thus the null values won't be removed.
-            // Therefore we need to remove null values from the `batchedChanges` which are sent to the SQLite, if no existing value is present.
+            // Therefore, we need to remove null values from the `batchedChanges` which are sent to the SQLite, if no existing value is present.
+            // Passing the "batchedChanges" alongside undefined as the existing value with  the "shouldRemoveNestedNulls" set to true,
+            // will (only) remove the null values from the "batchedChanges" and return the result.
             if (!existingValue) {
                 batchedChanges = OnyxUtils.applyMerge(undefined, [batchedChanges], true);
             }
@@ -420,8 +422,15 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
             obj[key] = mergedCollection[key];
             return obj;
         }, {});
-        const keyValuePairsForExistingCollection = OnyxUtils.prepareKeyValuePairsForStorage(existingKeyCollection);
-        const keyValuePairsForNewCollection = OnyxUtils.prepareKeyValuePairsForStorage(newCollection);
+
+        // When (multi-)merging the values with the existing values in storage,
+        // we don't want to remove nested null values from the data that we pass to the storage layer,
+        // because the storage layer uses them to remove nested keys from storage natively.
+        const keyValuePairsForExistingCollection = OnyxUtils.prepareKeyValuePairsForStorage(existingKeyCollection, false);
+
+        // We can safely remove nested null values when using (multi-)set,
+        // because we will simply overwrite the existing values in storage.
+        const keyValuePairsForNewCollection = OnyxUtils.prepareKeyValuePairsForStorage(newCollection, true);
 
         const promises = [];
 
