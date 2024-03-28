@@ -68,11 +68,7 @@ const provider: StorageProvider = {
     multiSet(pairs) {
         const setPromises = _.map(pairs, ([key, value]) => this.setItem(key, value));
 
-        return new Promise((resolve) => {
-            Promise.all(setPromises).then(() => {
-                resolve(undefined);
-            });
-        });
+        return Promise.all(setPromises).then(() => undefined);
     },
 
     /**
@@ -89,6 +85,8 @@ const provider: StorageProvider = {
      */
     multiMerge(pairs) {
         _.forEach(pairs, ([key, value]) => {
+            console.log({key, value});
+
             const existingValue = store[key] as Record<string, unknown>;
             const newValue = utils.fastMerge(existingValue, value as Record<string, unknown>) as OnyxValue<OnyxKey>;
 
