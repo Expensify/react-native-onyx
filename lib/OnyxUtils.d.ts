@@ -52,6 +52,14 @@ declare function getCallbackToStateMapping(): Record<string, Mapping<string>>;
 declare function getDefaultKeyStates(): Record<string, OnyxValue<string>>;
 
 /**
+ *
+ * @param connectionID connectionID of the subscriber
+ * @param key key that the subscriber is connected to
+ */
+declare function storeKeyByConnections(connectionID: string, key: OnyxKey): void;
+
+declare function deleteKeyByConnections(connectionID: number): void;
+/**
  * Sets the initial values for the Onyx store
  *
  * @param keys - `ONYXKEYS` constants object from Onyx.init()
@@ -315,6 +323,8 @@ const OnyxUtils = {
     prepareKeyValuePairsForStorage,
     applyMerge,
     initializeWithDefaultKeyStates,
+    storeKeyByConnections,
+    deleteKeyByConnections,
 } as const;
 
 export default OnyxUtils;
