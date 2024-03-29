@@ -1089,9 +1089,15 @@ describe('Onyx', () => {
             f: 'f',
             c: {
                 g: 'g',
+                h: 'h',
             },
         };
-        const changes = [change1, change2];
+        const change3 = {
+            c: {
+                g: null,
+            },
+        };
+        const changes = [change1, change2, change3];
 
         const batchedChanges = OnyxUtils.applyMerge(undefined, changes, false);
 
@@ -1106,26 +1112,29 @@ describe('Onyx', () => {
         return Onyx.set(ONYX_KEYS.TEST_KEY, initialData)
             .then(() => {
                 expect(result).toEqual(initialData);
-                Onyx.merge(ONYX_KEYS.TEST_KEY, changes[0]);
-                Onyx.merge(ONYX_KEYS.TEST_KEY, changes[1]);
+
+                _.map(changes, (change) => Onyx.merge(ONYX_KEYS.TEST_KEY, change));
             })
             .then(waitForPromisesToResolve)
             .then(() => {
+                const valueInStorage = StorageMock.getItem(ONYX_KEYS.TEST_KEY);
+
+                console.log('Result from Onyx (most likely from cache)\n', JSON.stringify(result, null, 2));
+                console.log('Result in storage\n', JSON.stringify(valueInStorage, null, 2));
+
                 expect(result).toEqual({
                     f: 'f',
                     c: {
-                        g: 'g',
+                        h: 'h',
                     },
                 });
 
-                console.log('Result in storage\n', JSON.stringify(result, null, 2));
-
                 // We would need to mock SQLite here to actually see what happens
                 // The current storage mock will just use the "modifiedData" from Onyx and just set it instead of actually applying the delta change.
-                expect(StorageMock.getItem(ONYX_KEYS.TEST_KEY)).toEqual({
+                expect(valueInStorage).toEqual({
                     f: 'f',
                     c: {
-                        g: 'g',
+                        h: 'h',
                     },
                 });
             });
