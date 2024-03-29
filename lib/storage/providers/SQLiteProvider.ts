@@ -76,8 +76,12 @@ const provider: StorageProvider = {
 
         return db.executeBatchAsync([[query, queryArguments]]);
     },
-    mergeItem(key, changes) {
-        return this.multiMerge([[key, changes]]) as Promise<BatchQueryResult>;
+    mergeItem(key, deltaChanges, preMergedValue, shouldSetValue = false) {
+        if (shouldSetValue) {
+            return this.setItem(key, preMergedValue) as Promise<BatchQueryResult>;
+        }
+
+        return this.multiMerge([[key, deltaChanges]]) as Promise<BatchQueryResult>;
     },
     getAllKeys: () =>
         db.executeAsync('SELECT record_key FROM keyvaluepairs;').then(({rows}) => {

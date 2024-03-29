@@ -40,9 +40,9 @@ const provider: StorageProvider = {
                 return Promise.all(upsertMany);
             });
         }),
-    mergeItem(key, _changes, modifiedData) {
+    mergeItem(key, _deltaChanges, preMergedValue) {
         // Since Onyx also merged the existing value with the changes, we can just set the value directly
-        return provider.setItem(key, modifiedData);
+        return provider.setItem(key, preMergedValue);
     },
     multiSet: (pairs) => setMany(pairs, idbKeyValStore),
     clear: () => clear(idbKeyValStore),

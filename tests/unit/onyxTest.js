@@ -1075,6 +1075,7 @@ describe('Onyx', () => {
 
     it('(nested) nullish values should be removed when changes are batched during merge (SQLite)', () => {
         let result;
+        let valueInStorage;
 
         const initialData = {
             a: 'a',
@@ -1084,20 +1085,23 @@ describe('Onyx', () => {
                 e: 'e',
             },
         };
-        const change1 = null;
-        const change2 = {
+        const change1 = {
+            b: null,
+        };
+        const change2 = null;
+        const change3 = {
             f: 'f',
             c: {
                 g: 'g',
                 h: 'h',
             },
         };
-        const change3 = {
+        const change4 = {
             c: {
                 g: null,
             },
         };
-        const changes = [change1, change2, change3];
+        const changes = [change1, change2, change3, change4];
 
         const batchedChanges = OnyxUtils.applyMerge(undefined, changes, false);
 
@@ -1113,12 +1117,13 @@ describe('Onyx', () => {
             .then(() => {
                 expect(result).toEqual(initialData);
 
-                _.map(changes, (change) => Onyx.merge(ONYX_KEYS.TEST_KEY, change));
+                return Promise.all(_.map(changes, (change) => Onyx.merge(ONYX_KEYS.TEST_KEY, change)));
             })
             .then(waitForPromisesToResolve)
             .then(() => {
-                const valueInStorage = StorageMock.getItem(ONYX_KEYS.TEST_KEY);
-
+                StorageMock.getItem(ONYX_KEYS.TEST_KEY).then((v) => (valueInStorage = v));
+            })
+            .then(() => {
                 console.log('Result from Onyx (most likely from cache)\n', JSON.stringify(result, null, 2));
                 console.log('Result in storage\n', JSON.stringify(valueInStorage, null, 2));
 

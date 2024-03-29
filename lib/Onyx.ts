@@ -303,48 +303,43 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<K
 
         try {
             // We first only merge the changes, so we can provide these to the native implementation (SQLite uses only delta changes in "JSON_PATCH" to merge)
-            // We don't want to remove null values from the "batchedChanges", because SQLite uses them to remove keys from storage natively.
-            let batchedChanges = OnyxUtils.applyMerge(undefined, mergeQueue[key], false);
+            // We don't want to remove null values from the "batchedDeltaChanges", because SQLite uses them to remove keys from storage natively.
+            const batchedDeltaChanges = OnyxUtils.applyMerge(undefined, mergeQueue[key], false);
 
-            // The presence of a `null` in the merge queue instructs us to drop the existing value.
+            // Case (1): When there is no existing value in storage, we want to set the value instead of merge it.
+            // Case (2): The presence of a top-level`null` in the merge queue instructs us to drop the whole existing value.
             // In this case, we can't simply merge the batched changes with the existing value, because then the null in the merge queue would have no effect
-            const shouldOverwriteExistingValue = mergeQueue[key].includes(null);
+            const shouldSetValue = !existingValue || mergeQueue[key].includes(null);
 
             // Clean up the write queue, so we don't apply these changes again
             delete mergeQueue[key];
             delete mergeQueuePromise[key];
 
             // If the batched changes equal null, we want to remove the key from storage, to reduce storage size
-            const {wasRemoved} = OnyxUtils.removeNullValues(key, batchedChanges);
+            const {wasRemoved} = OnyxUtils.removeNullValues(key, batchedDeltaChanges);
 
-            // After that we merge the batched changes with the existing value
-            // We can remove null values from the "modifiedData", because "null" implicates that the user wants to remove a value from storage.
-            // The "modifiedData" will be directly "set" in storage instead of being merged
-            const modifiedData = shouldOverwriteExistingValue ? batchedChanges : OnyxUtils.applyMerge(existingValue, [batchedChanges], true);
+            // For providers that can't handle delta changes, we need to merge the batched changes with the existing value beforehand.
+            // The "preMergedValue" will be directly "set" in storage instead of being merged
+            // Therefore we merge the batched changes with the existing value to get the final merged value that will be stored.
+            // We can remove null values from the "preMergedValue", because "null" implicates that the user wants to remove a value from storage.
+            const preMergedValue = OnyxUtils.applyMerge(shouldSetValue ? undefined : existingValue, [batchedDeltaChanges], true);
 
-            // On native platforms we use SQLite which utilises JSON_PATCH to merge changes.
-            // JSON_PATCH generally removes null values from the stored object.
-            // When there is no existing value though, SQLite will just insert the changes as a new value and thus the null values won't be removed.
-            // Therefore we need to remove null values from the `batchedChanges` which are sent to the SQLite, if no existing value is present.
-            if (!existingValue) {
-                batchedChanges = OnyxUtils.applyMerge(undefined, [batchedChanges], true);
-            }
-
-            const hasChanged = cache.hasValueChanged(key, modifiedData);
+            // In cache, we don't want to remove the key if it's null to improve performance and speed up the next merge.
+            const hasChanged = cache.hasValueChanged(key, preMergedValue);
 
             // Logging properties only since values could be sensitive things we don't want to log
-            Logger.logInfo(`merge called for key: ${key}${_.isObject(batchedChanges) ? ` properties: ${_.keys(batchedChanges).join(',')}` : ''} hasChanged: ${hasChanged}`);
+            Logger.logInfo(`merge called for key: ${key}${_.isObject(batchedDeltaChanges) ? ` properties: ${_.keys(batchedDeltaChanges).join(',')}` : ''} hasChanged: ${hasChanged}`);
 
             // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
-            const updatePromise = OnyxUtils.broadcastUpdate(key, modifiedData, hasChanged, wasRemoved);
+            const updatePromise = OnyxUtils.broadcastUpdate(key, preMergedValue, hasChanged, wasRemoved);
 
             // If the value has not changed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
             if (!hasChanged || wasRemoved) {
                 return updatePromise;
             }
 
-            return Storage.mergeItem(key, batchedChanges, modifiedData).then(() => {
-                OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, changes, modifiedData);
+            return Storage.mergeItem(key, batchedDeltaChanges, preMergedValue, shouldSetValue).then(() => {
+                OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, changes, preMergedValue);
                 return updatePromise;
             });
         } catch (error) {
