@@ -760,21 +760,17 @@ function addKeyToRecentlyAccessedIfNeeded<TKey extends OnyxKey>(mapping: Mapping
 
 /**
  * Gets the data for a given an array of matching keys, combines them into an object, and sends the result back to the subscriber.
- *
- * @private
- * @param {Array} matchingKeys
- * @param {Object} mapping
  */
-function getCollectionDataAndSendAsObject(matchingKeys, mapping) {
+function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: CollectionKeyBase[], mapping: Mapping<TKey>): void {
     // Keys that are not in the cache
-    const missingKeys = [];
+    const missingKeys: OnyxKey[] = [];
     // Tasks that are pending
-    const pendingTasks = [];
+    const pendingTasks: Array<Promise<OnyxValue<OnyxKey>>> = [];
     // Keys for the tasks that are pending
-    const pendingKeys = [];
+    const pendingKeys: OnyxKey[] = [];
 
     // We are going to combine all the data from the matching keys into a single object
-    const data = {};
+    const data: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
 
     /**
      * We are going to iterate over all the matching keys and check if we have the data in the cache.
@@ -812,7 +808,7 @@ function getCollectionDataAndSendAsObject(matchingKeys, mapping) {
         // We are going to get the missing keys using multiGet from the storage.
         .then(() => {
             if (missingKeys.length === 0) {
-                return Promise.resolve();
+                return Promise.resolve(undefined);
             }
             return Storage.multiGet(missingKeys);
         })
@@ -823,7 +819,7 @@ function getCollectionDataAndSendAsObject(matchingKeys, mapping) {
             }
 
             // temp object is used to merge the missing data into the cache
-            const temp = {};
+            const temp: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
             values.forEach((value) => {
                 data[value[0]] = value[1];
                 temp[value[0]] = value[1];
