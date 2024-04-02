@@ -953,12 +953,10 @@ function hasPendingMergeForKey(key: OnyxKey): boolean {
 /**
  * Removes a key from storage if the value is null.
  * Otherwise removes all nested null values in objects and returns the object
- * @param {String} key
- * @param {Mixed} value
- * @returns {Mixed} The value without null values and a boolean "wasRemoved", which indicates if the key got removed completely
+ * @returns The value without null values and a boolean "wasRemoved", which indicates if the key got removed completely
  */
-function removeNullValues(key, value) {
-    if (_.isNull(value)) {
+function removeNullValues(key: OnyxKey, value: OnyxValue<OnyxKey>) {
+    if (value === null) {
         remove(key);
         return {value, wasRemoved: true};
     }
