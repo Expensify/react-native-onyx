@@ -931,14 +931,8 @@ function evictStorageAndRetry<TMethod extends typeof Onyx.set | typeof Onyx.mult
 
 /**
  * Notifys subscribers and writes current value to cache
- *
- * @param {String} key
- * @param {*} value
- * @param {Boolean} hasChanged
- * @param {Boolean} wasRemoved
- * @returns {Promise}
  */
-function broadcastUpdate(key, value, hasChanged, wasRemoved = false) {
+function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: KeyValueMapping[TKey], hasChanged?: boolean, wasRemoved = false): Promise<[void, void]> {
     const prevValue = cache.getValue(key, false);
 
     // Update subscribers if the cached value has changed, or when the subscriber specifically requires
@@ -949,7 +943,7 @@ function broadcastUpdate(key, value, hasChanged, wasRemoved = false) {
         cache.addToAccessedKeys(key);
     }
 
-    return scheduleSubscriberUpdate(key, value, prevValue, (subscriber) => hasChanged || subscriber.initWithStoredValues === false);
+    return scheduleSubscriberUpdate(key, value, prevValue, (subscriber) => hasChanged || subscriber?.initWithStoredValues === false);
 }
 
 /**
