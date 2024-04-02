@@ -319,11 +319,8 @@ function removeLastAccessedKey(key: OnyxKey): void {
  * Add a key to the list of recently accessed keys. The least
  * recently accessed key should be at the head and the most
  * recently accessed key at the tail.
- *
- * @private
- * @param {String} key
  */
-function addLastAccessedKey(key) {
+function addLastAccessedKey(key: OnyxKey): void {
     // Only specific keys belong in this list since we cannot remove an entire collection.
     if (isCollectionKey(key) || !isSafeEvictionKey(key)) {
         return;
