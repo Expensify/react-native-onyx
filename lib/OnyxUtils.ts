@@ -25,7 +25,7 @@ import type {
     OnyxCollection,
     KeyValueMapping,
 } from './types';
-import Onyx from './Onyx';
+import type Onyx from './Onyx';
 
 // Method constants
 const METHOD = {
