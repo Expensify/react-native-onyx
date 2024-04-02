@@ -995,7 +995,7 @@ function prepareKeyValuePairsForStorage(data: Record<OnyxKey, OnyxValue<OnyxKey>
  *
  * @param changes Array of changes that should be applied to the existing value
  */
-function applyMerge(existingValue: OnyxValue<OnyxKey>, changes: Array<OnyxValue<OnyxKey>>, shouldRemoveNullObjectValues: boolean) {
+function applyMerge(existingValue: OnyxValue<OnyxKey>, changes: Array<OnyxValue<OnyxKey>>, shouldRemoveNullObjectValues: boolean): OnyxValue<OnyxKey> {
     const lastChange = changes?.at(-1);
 
     if (Array.isArray(lastChange)) {
@@ -1014,17 +1014,15 @@ function applyMerge(existingValue: OnyxValue<OnyxKey>, changes: Array<OnyxValue<
 
 /**
  * Merge user provided default key value pairs.
- * @private
- * @returns {Promise}
  */
-function initializeWithDefaultKeyStates() {
-    return Storage.multiGet(_.keys(defaultKeyStates)).then((pairs) => {
-        const existingDataAsObject = _.object(pairs);
+function initializeWithDefaultKeyStates(): Promise<void> {
+    return Storage.multiGet(Object.keys(defaultKeyStates)).then((pairs) => {
+        const existingDataAsObject = Object.fromEntries(pairs);
 
         const merged = utils.fastMerge(existingDataAsObject, defaultKeyStates);
         cache.merge(merged);
 
-        _.each(merged, (val, key) => keyChanged(key, val, existingDataAsObject));
+        Object.entries(merged).forEach(([key, value]) => keyChanged(key, value, existingDataAsObject));
     });
 }
 
