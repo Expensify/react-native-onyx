@@ -856,7 +856,7 @@ function scheduleSubscriberUpdate<TKey extends OnyxKey>(
     value: KeyValueMapping[TKey],
     prevValue: KeyValueMapping[TKey],
     canUpdateSubscriber: (subscriber?: Mapping<OnyxKey>) => boolean = () => true,
-) {
+): Promise<[void, void]> {
     const promise = Promise.resolve().then(() => keyChanged(key, value, prevValue, canUpdateSubscriber, true, false));
     batchUpdates(() => keyChanged(key, value, prevValue, canUpdateSubscriber, false, true));
     return Promise.all([maybeFlushBatchUpdates(), promise]);
@@ -866,12 +866,8 @@ function scheduleSubscriberUpdate<TKey extends OnyxKey>(
  * This method is similar to notifySubscribersOnNextTick but it is built for working specifically with collections
  * so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
  * subscriber callbacks receive the data in a different format than they normally expect and it breaks code.
- *
- * @param {String} key
- * @param {*} value
- * @returns {Promise}
  */
-function scheduleNotifyCollectionSubscribers(key, value) {
+function scheduleNotifyCollectionSubscribers(key: OnyxKey, value: OnyxValue<OnyxKey>): Promise<[void, void]> {
     const promise = Promise.resolve().then(() => keysChanged(key, value, true, false));
     batchUpdates(() => keysChanged(key, value, false, true));
     return Promise.all([maybeFlushBatchUpdates(), promise]);
