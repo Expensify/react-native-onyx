@@ -875,16 +875,12 @@ function scheduleNotifyCollectionSubscribers(key: OnyxKey, value: OnyxValue<Onyx
 
 /**
  * Remove a key from Onyx and update the subscribers
- *
- * @private
- * @param {String} key
- * @return {Promise}
  */
-function remove(key) {
+function remove<TKey extends OnyxKey>(key: TKey): Promise<void> {
     const prevValue = cache.getValue(key, false);
     cache.drop(key);
     scheduleSubscriberUpdate(key, null, prevValue);
-    return Storage.removeItem(key);
+    return Storage.removeItem(key) as Promise<void>;
 }
 
 /**
