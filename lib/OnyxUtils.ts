@@ -1,5 +1,7 @@
+/* eslint-disable @typescript-eslint/prefer-for-of */
 /* eslint-disable no-continue */
 import {deepEqual} from 'fast-equals';
+import lodashClone from 'lodash/clone';
 import _ from 'underscore';
 import type {ValueOf} from 'type-fest';
 import * as Logger from './Logger';
@@ -10,7 +12,7 @@ import Storage from './storage';
 import utils from './utils';
 import unstable_batchedUpdates from './batch';
 import DevTools from './DevTools';
-import type {DeepRecord, Mapping, CollectionKey, CollectionKeyBase, NullableKeyValueMapping, OnyxKey, OnyxValue, Selector, WithOnyxInstanceState} from './types';
+import type {DeepRecord, Mapping, CollectionKey, CollectionKeyBase, NullableKeyValueMapping, OnyxKey, OnyxValue, Selector, WithOnyxInstanceState, OnyxCollection} from './types';
 
 // Method constants
 const METHOD = {
@@ -390,18 +392,17 @@ function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey
 
 /**
  * When a collection of keys change, search for any callbacks matching the collection key and trigger those callbacks
- *
- * @private
- * @param {String} collectionKey
- * @param {Object} partialCollection - a partial collection of grouped member keys
- * @param {boolean} [notifyRegularSubscibers=true]
- * @param {boolean} [notifyWithOnyxSubscibers=true]
  */
-function keysChanged(collectionKey, partialCollection, notifyRegularSubscibers = true, notifyWithOnyxSubscibers = true) {
+function keysChanged<TKey extends CollectionKeyBase>(
+    collectionKey: TKey,
+    partialCollection: OnyxCollection<OnyxValue<TKey>>,
+    notifyRegularSubscibers = true,
+    notifyWithOnyxSubscibers = true,
+) {
     // We are iterating over all subscribers similar to keyChanged(). However, we are looking for subscribers who are subscribing to either a collection key or
     // individual collection key member for the collection that is being updated. It is important to note that the collection parameter cane be a PARTIAL collection
     // and does not represent all of the combined keys and values for a collection key. It is just the "new" data that was merged in via mergeCollection().
-    const stateMappingKeys = _.keys(callbackToStateMapping);
+    const stateMappingKeys = Object.keys(callbackToStateMapping);
     for (let i = 0; i < stateMappingKeys.length; i++) {
         const subscriber = callbackToStateMapping[stateMappingKeys[i]];
         if (!subscriber) {
@@ -428,7 +429,7 @@ function keysChanged(collectionKey, partialCollection, notifyRegularSubscibers =
         const cachedCollection = getCachedCollection(collectionKey);
 
         // Regular Onyx.connect() subscriber found.
-        if (_.isFunction(subscriber.callback)) {
+        if (typeof subscriber.callback === 'function') {
             if (!notifyRegularSubscibers) {
                 continue;
             }
@@ -443,7 +444,7 @@ function keysChanged(collectionKey, partialCollection, notifyRegularSubscibers =
 
                 // If they are not using waitForCollectionCallback then we notify the subscriber with
                 // the new merged data but only for any keys in the partial collection.
-                const dataKeys = _.keys(partialCollection);
+                const dataKeys = partialCollection && typeof partialCollection === 'object' ? Object.keys(partialCollection) : [];
                 for (let j = 0; j < dataKeys.length; j++) {
                     const dataKey = dataKeys[j];
                     subscriber.callback(cachedCollection[dataKey], dataKey);
@@ -454,7 +455,7 @@ function keysChanged(collectionKey, partialCollection, notifyRegularSubscibers =
             // And if the subscriber is specifically only tracking a particular collection member key then we will
             // notify them with the cached data for that key only.
             if (isSubscribedToCollectionMemberKey) {
-                subscriber.callback(cachedCollection[subscriber.key], subscriber.key);
+                subscriber.callback(cachedCollection[subscriber.key] as OnyxCollection<OnyxValue<TKey>>, subscriber.key);
                 continue;
             }
 
@@ -488,8 +489,8 @@ function keysChanged(collectionKey, partialCollection, notifyRegularSubscibers =
                 }
 
                 subscriber.withOnyxInstance.setStateProxy((prevState) => {
-                    const finalCollection = _.clone(prevState[subscriber.statePropertyName] || {});
-                    const dataKeys = _.keys(partialCollection);
+                    const finalCollection = lodashClone(prevState[subscriber.statePropertyName] || {});
+                    const dataKeys = Object.keys(partialCollection ?? {});
                     for (let j = 0; j < dataKeys.length; j++) {
                         const dataKey = dataKeys[j];
                         finalCollection[dataKey] = cachedCollection[dataKey];
@@ -507,8 +508,8 @@ function keysChanged(collectionKey, partialCollection, notifyRegularSubscibers =
             if (isSubscribedToCollectionMemberKey) {
                 // However, we only want to update this subscriber if the partial data contains a change.
                 // Otherwise, we would update them with a value they already have and trigger an unnecessary re-render.
-                const dataFromCollection = partialCollection[subscriber.key];
-                if (_.isUndefined(dataFromCollection)) {
+                const dataFromCollection = partialCollection?.[subscriber.key];
+                if (dataFromCollection === undefined) {
                     continue;
                 }
 
@@ -518,7 +519,7 @@ function keysChanged(collectionKey, partialCollection, notifyRegularSubscibers =
                 if (subscriber.selector) {
                     subscriber.withOnyxInstance.setStateProxy((prevState) => {
                         const prevData = prevState[subscriber.statePropertyName];
-                        const newData = getSubsetOfData(cachedCollection[subscriber.key], subscriber.selector, subscriber.withOnyxInstance.state);
+                        const newData = subscriber.selector(cachedCollection[subscriber.key], subscriber.withOnyxInstance.state);
                         if (!deepEqual(prevData, newData)) {
                             PerformanceUtils.logSetStateCall(subscriber, prevData, newData, 'keysChanged', collectionKey);
                             return {
