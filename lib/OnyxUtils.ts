@@ -699,18 +699,8 @@ function keyChanged<TKey extends OnyxKey>(
  * Sends the data obtained from the keys to the connection. It either:
  *     - sets state on the withOnyxInstances
  *     - triggers the callback function
- *
- * @private
- * @param {Object} mapping
- * @param {Object} [mapping.withOnyxInstance]
- * @param {String} [mapping.statePropertyName]
- * @param {Function} [mapping.callback]
- * @param {String} [mapping.selector]
- * @param {*|null} val
- * @param {String|undefined} matchedKey
- * @param {Boolean} isBatched
  */
-function sendDataToConnection(mapping, val, matchedKey, isBatched) {
+function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, val: OnyxValue<TKey>, matchedKey: TKey | undefined, isBatched: boolean) {
     // If the mapping no longer exists then we should not send any data.
     // This means our subscriber disconnected or withOnyx wrapped component unmounted.
     if (!callbackToStateMapping[mapping.connectionID]) {
@@ -726,14 +716,14 @@ function sendDataToConnection(mapping, val, matchedKey, isBatched) {
             if (isCollectionKey(mapping.key)) {
                 newData = reduceCollectionWithSelector(val, mapping.selector, mapping.withOnyxInstance.state);
             } else {
-                newData = getSubsetOfData(val, mapping.selector, mapping.withOnyxInstance.state);
+                newData = mapping.selector(val, mapping.withOnyxInstance.state);
             }
         }
 
         PerformanceUtils.logSetStateCall(mapping, null, newData, 'sendDataToConnection');
         if (isBatched) {
             batchUpdates(() => {
-                mapping.withOnyxInstance.setWithOnyxState(mapping.statePropertyName, newData);
+                mapping.withOnyxInstance?.setWithOnyxState(mapping.statePropertyName, newData);
             });
         } else {
             mapping.withOnyxInstance.setWithOnyxState(mapping.statePropertyName, newData);
@@ -741,7 +731,7 @@ function sendDataToConnection(mapping, val, matchedKey, isBatched) {
         return;
     }
 
-    if (_.isFunction(mapping.callback)) {
+    if (typeof mapping.callback === 'function') {
         mapping.callback(val, matchedKey);
     }
 }
