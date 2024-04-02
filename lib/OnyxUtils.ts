@@ -993,22 +993,18 @@ function prepareKeyValuePairsForStorage(data: Record<OnyxKey, OnyxValue<OnyxKey>
 /**
  * Merges an array of changes with an existing value
  *
- * @private
- * @param {*} existingValue
- * @param {Array<*>} changes Array of changes that should be applied to the existing value
- * @param {Boolean} shouldRemoveNullObjectValues
- * @returns {*}
+ * @param changes Array of changes that should be applied to the existing value
  */
-function applyMerge(existingValue, changes, shouldRemoveNullObjectValues) {
-    const lastChange = _.last(changes);
+function applyMerge(existingValue: OnyxValue<OnyxKey>, changes: Array<OnyxValue<OnyxKey>>, shouldRemoveNullObjectValues: boolean) {
+    const lastChange = changes?.at(-1);
 
-    if (_.isArray(lastChange)) {
+    if (Array.isArray(lastChange)) {
         return lastChange;
     }
 
-    if (_.some(changes, _.isObject)) {
+    if (changes.some((change) => typeof change === 'object')) {
         // Object values are then merged one after the other
-        return _.reduce(changes, (modifiedData, change) => utils.fastMerge(modifiedData, change, shouldRemoveNullObjectValues), existingValue || {});
+        return changes.reduce((modifiedData, change) => utils.fastMerge(modifiedData, change, shouldRemoveNullObjectValues), existingValue || {});
     }
 
     // If we have anything else we can't merge it so we'll
