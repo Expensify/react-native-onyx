@@ -568,9 +568,16 @@ function keysChanged<TKey extends CollectionKeyBase>(
  * @param {boolean} [notifyRegularSubscibers=true]
  * @param {boolean} [notifyWithOnyxSubscibers=true]
  */
-function keyChanged(key, data, prevData, canUpdateSubscriber = () => true, notifyRegularSubscibers = true, notifyWithOnyxSubscibers = true) {
+function keyChanged<TKey extends OnyxKey>(
+    key: TKey,
+    data: OnyxValue<TKey>,
+    prevData: OnyxValue<TKey>,
+    canUpdateSubscriber: (subscriber?: Mapping<OnyxKey>) => boolean = () => true,
+    notifyRegularSubscibers = true,
+    notifyWithOnyxSubscibers = true,
+): void {
     // Add or remove this key from the recentlyAccessedKeys lists
-    if (!_.isNull(data)) {
+    if (data !== null) {
         addLastAccessedKey(key);
     } else {
         removeLastAccessedKey(key);
@@ -579,7 +586,7 @@ function keyChanged(key, data, prevData, canUpdateSubscriber = () => true, notif
     // We are iterating over all subscribers to see if they are interested in the key that has just changed. If the subscriber's  key is a collection key then we will
     // notify them if the key that changed is a collection member. Or if it is a regular key notify them when there is an exact match. Depending on whether the subscriber
     // was connected via withOnyx we will call setState() directly on the withOnyx instance. If it is a regular connection we will pass the data to the provided callback.
-    const stateMappingKeys = _.keys(callbackToStateMapping);
+    const stateMappingKeys = Object.keys(callbackToStateMapping);
     for (let i = 0; i < stateMappingKeys.length; i++) {
         const subscriber = callbackToStateMapping[stateMappingKeys[i]];
         if (!subscriber || !isKeyMatch(subscriber.key, key) || !canUpdateSubscriber(subscriber)) {
@@ -587,7 +594,7 @@ function keyChanged(key, data, prevData, canUpdateSubscriber = () => true, notif
         }
 
         // Subscriber is a regular call to connect() and provided a callback
-        if (_.isFunction(subscriber.callback)) {
+        if (typeof subscriber.callback === 'function') {
             if (!notifyRegularSubscibers) {
                 continue;
             }
@@ -598,7 +605,7 @@ function keyChanged(key, data, prevData, canUpdateSubscriber = () => true, notif
                 continue;
             }
 
-            subscriber.callback(data, key);
+            subscriber.callback(data as Record<TKey, OnyxValue<TKey>>, key);
             continue;
         }
 
@@ -616,7 +623,7 @@ function keyChanged(key, data, prevData, canUpdateSubscriber = () => true, notif
                     subscriber.withOnyxInstance.setStateProxy((prevState) => {
                         const prevWithOnyxData = prevState[subscriber.statePropertyName];
                         const newWithOnyxData = {
-                            [key]: getSubsetOfData(data, subscriber.selector, subscriber.withOnyxInstance.state),
+                            [key]: subscriber.selector(data, subscriber.withOnyxInstance.state),
                         };
                         const prevDataWithNewData = {
                             ...prevWithOnyxData,
@@ -651,8 +658,8 @@ function keyChanged(key, data, prevData, canUpdateSubscriber = () => true, notif
             // returned by the selector and only if the selected data has changed.
             if (subscriber.selector) {
                 subscriber.withOnyxInstance.setStateProxy(() => {
-                    const previousValue = getSubsetOfData(prevData, subscriber.selector, subscriber.withOnyxInstance.state);
-                    const newValue = getSubsetOfData(data, subscriber.selector, subscriber.withOnyxInstance.state);
+                    const previousValue = subscriber.selector(prevData, subscriber.withOnyxInstance.state);
+                    const newValue = subscriber.selector(data, subscriber.withOnyxInstance.state);
 
                     if (!deepEqual(previousValue, newValue)) {
                         return {
