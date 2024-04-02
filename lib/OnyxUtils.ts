@@ -359,13 +359,10 @@ function addToEvictionBlockList(key: OnyxKey, connectionID: number): void {
  * the recently accessed list when initializing the app. This
  * enables keys that have not recently been accessed to be
  * removed.
- *
- * @private
- * @returns {Promise}
  */
-function addAllSafeEvictionKeysToRecentlyAccessedList() {
+function addAllSafeEvictionKeysToRecentlyAccessedList(): Promise<void> {
     return getAllKeys().then((keys) => {
-        _.each(evictionAllowList, (safeEvictionKey) => {
+        evictionAllowList.forEach((safeEvictionKey) => {
             keys.forEach((key) => {
                 if (!isKeyMatch(safeEvictionKey, key)) {
                     return;
