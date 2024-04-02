@@ -373,33 +373,19 @@ function addAllSafeEvictionKeysToRecentlyAccessedList(): Promise<void> {
     });
 }
 
-/**
- * @private
- * @param {String} collectionKey
- * @returns {Object}
- */
-function getCachedCollection(collectionKey) {
-    const collectionMemberKeys = [];
-    cache.getAllKeys().forEach((storedKey) => {
-        if (!isCollectionMemberKey(collectionKey, storedKey)) {
-            return;
-        }
-        collectionMemberKeys.push(storedKey);
-    });
-    return _.reduce(
-        collectionMemberKeys,
-        (prev, curr) => {
-            const cachedValue = cache.getValue(curr);
-            if (!cachedValue) {
-                return prev;
-            }
+function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey): Record<OnyxKey, OnyxValue<OnyxKey>> {
+    const collectionMemberKeys = Array.from(cache.getAllKeys()).filter((storedKey) => isCollectionMemberKey(collectionKey, storedKey));
 
-            // eslint-disable-next-line no-param-reassign
-            prev[curr] = cachedValue;
+    return collectionMemberKeys.reduce((prev: Record<OnyxKey, OnyxValue<OnyxKey>>, key) => {
+        const cachedValue = cache.getValue(key);
+        if (!cachedValue) {
             return prev;
-        },
-        {},
-    );
+        }
+
+        // eslint-disable-next-line no-param-reassign
+        prev[key] = cachedValue;
+        return prev;
+    }, {});
 }
 
 /**
