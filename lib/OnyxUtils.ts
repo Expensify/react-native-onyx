@@ -25,6 +25,7 @@ import type {
     OnyxCollection,
     KeyValueMapping,
 } from './types';
+import Onyx from './Onyx';
 
 // Method constants
 const METHOD = {
@@ -897,14 +898,12 @@ function reportStorageQuota(): Promise<void> {
  * If we fail to set or merge we must handle this by
  * evicting some data from Onyx and then retrying to do
  * whatever it is we attempted to do.
- *
- * @private
- * @param {Error} error
- * @param {Function} onyxMethod
- * @param  {...any} args
- * @return {Promise}
  */
-function evictStorageAndRetry(error, onyxMethod, ...args) {
+function evictStorageAndRetry<TMethod extends typeof Onyx.set | typeof Onyx.multiSet | typeof Onyx.mergeCollection>(
+    error: Error,
+    onyxMethod: TMethod,
+    ...args: Parameters<TMethod>
+): Promise<void> {
     Logger.logInfo(`Failed to save to storage. Error: ${error}. onyxMethod: ${onyxMethod.name}`);
 
     if (error && Str.startsWith(error.message, "Failed to execute 'put' on 'IDBObjectStore'")) {
@@ -913,7 +912,7 @@ function evictStorageAndRetry(error, onyxMethod, ...args) {
     }
 
     // Find the first key that we can remove that has no subscribers in our blocklist
-    const keyForRemoval = _.find(recentlyAccessedKeys, (key) => !evictionBlocklist[key]);
+    const keyForRemoval = recentlyAccessedKeys.find((key) => !evictionBlocklist[key]);
     if (!keyForRemoval) {
         // If we have no acceptable keys to remove then we are possibly trying to save mission critical data. If this is the case,
         // then we should stop retrying as there is not much the user can do to fix this. Instead of getting them stuck in an infinite loop we
@@ -925,6 +924,8 @@ function evictStorageAndRetry(error, onyxMethod, ...args) {
     // Remove the least recently viewed key that is not currently being accessed and retry.
     Logger.logInfo(`Out of storage. Evicting least recently accessed key (${keyForRemoval}) and retrying.`);
     reportStorageQuota();
+
+    // @ts-expect-error No overload matches this call.
     return remove(keyForRemoval).then(() => onyxMethod(...args));
 }
 
