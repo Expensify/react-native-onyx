@@ -12,7 +12,19 @@ import Storage from './storage';
 import utils from './utils';
 import unstable_batchedUpdates from './batch';
 import DevTools from './DevTools';
-import type {DeepRecord, Mapping, CollectionKey, CollectionKeyBase, NullableKeyValueMapping, OnyxKey, OnyxValue, Selector, WithOnyxInstanceState, OnyxCollection} from './types';
+import type {
+    DeepRecord,
+    Mapping,
+    CollectionKey,
+    CollectionKeyBase,
+    NullableKeyValueMapping,
+    OnyxKey,
+    OnyxValue,
+    Selector,
+    WithOnyxInstanceState,
+    OnyxCollection,
+    KeyValueMapping,
+} from './types';
 
 // Method constants
 const METHOD = {
@@ -838,14 +850,13 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
  *
  * @example
  * scheduleSubscriberUpdate(key, value, subscriber => subscriber.initWithStoredValues === false)
- *
- * @param {String} key
- * @param {*} value
- * @param {*} prevValue
- * @param {Function} [canUpdateSubscriber] only subscribers that pass this truth test will be updated
- * @returns {Promise}
  */
-function scheduleSubscriberUpdate(key, value, prevValue, canUpdateSubscriber = () => true) {
+function scheduleSubscriberUpdate<TKey extends OnyxKey>(
+    key: TKey,
+    value: KeyValueMapping[TKey],
+    prevValue: KeyValueMapping[TKey],
+    canUpdateSubscriber: (subscriber?: Mapping<OnyxKey>) => boolean = () => true,
+) {
     const promise = Promise.resolve().then(() => keyChanged(key, value, prevValue, canUpdateSubscriber, true, false));
     batchUpdates(() => keyChanged(key, value, prevValue, canUpdateSubscriber, false, true));
     return Promise.all([maybeFlushBatchUpdates(), promise]);
