@@ -343,14 +343,8 @@ function removeFromEvictionBlockList(key: OnyxKey, connectionID: number): void {
     }
 }
 
-/**
- * Keys added to this list can never be deleted.
- *
- * @private
- * @param {String} key
- * @param {Number} connectionID
- */
-function addToEvictionBlockList(key, connectionID) {
+/** Keys added to this list can never be deleted. */
+function addToEvictionBlockList(key: OnyxKey, connectionID: number): void {
     removeFromEvictionBlockList(key, connectionID);
 
     if (!evictionBlocklist[key]) {
