@@ -883,11 +883,7 @@ function remove<TKey extends OnyxKey>(key: TKey): Promise<void> {
     return Storage.removeItem(key) as Promise<void>;
 }
 
-/**
- * @private
- * @returns {Promise<void>}
- */
-function reportStorageQuota() {
+function reportStorageQuota(): Promise<void> {
     return Storage.getDatabaseSize()
         .then(({bytesUsed, bytesRemaining}) => {
             Logger.logInfo(`Storage Quota Check -- bytesUsed: ${bytesUsed} bytesRemaining: ${bytesRemaining}`);
