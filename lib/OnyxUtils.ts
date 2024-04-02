@@ -310,12 +310,9 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Mapping<TK
 
 /**
  * Remove a key from the recently accessed key list.
- *
- * @private
- * @param {String} key
  */
-function removeLastAccessedKey(key) {
-    recentlyAccessedKeys = _.without(recentlyAccessedKeys, key);
+function removeLastAccessedKey(key: OnyxKey): void {
+    recentlyAccessedKeys = recentlyAccessedKeys.filter((recentlyAccessedKey) => recentlyAccessedKey !== key);
 }
 
 /**
