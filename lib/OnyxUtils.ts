@@ -930,7 +930,7 @@ function evictStorageAndRetry<TMethod extends typeof Onyx.set | typeof Onyx.mult
 }
 
 /**
- * Notifys subscribers and writes current value to cache
+ * Notifies subscribers and writes current value to cache
  */
 function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: KeyValueMapping[TKey], hasChanged?: boolean, wasRemoved = false): Promise<[void, void]> {
     const prevValue = cache.getValue(key, false);
@@ -946,12 +946,8 @@ function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: KeyValueMapping
     return scheduleSubscriberUpdate(key, value, prevValue, (subscriber) => hasChanged || subscriber?.initWithStoredValues === false);
 }
 
-/**
- * @param {String} key
- * @returns {Boolean}
- */
-function hasPendingMergeForKey(key) {
-    return Boolean(mergeQueue[key]);
+function hasPendingMergeForKey(key: OnyxKey): boolean {
+    return !!mergeQueue[key];
 }
 
 /**
