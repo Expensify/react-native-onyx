@@ -333,16 +333,12 @@ function addLastAccessedKey(key: OnyxKey): void {
 /**
  * Removes a key previously added to this list
  * which will enable it to be deleted again.
- *
- * @private
- * @param {String} key
- * @param {Number} connectionID
  */
-function removeFromEvictionBlockList(key, connectionID) {
-    evictionBlocklist[key] = _.without(evictionBlocklist[key] || [], connectionID);
+function removeFromEvictionBlockList(key: OnyxKey, connectionID: number): void {
+    evictionBlocklist[key] = evictionBlocklist[key]?.filter((evictionKey) => evictionKey !== connectionID) ?? [];
 
     // Remove the key if there are no more subscribers
-    if (evictionBlocklist[key].length === 0) {
+    if (evictionBlocklist[key]?.length === 0) {
         delete evictionBlocklist[key];
     }
 }
