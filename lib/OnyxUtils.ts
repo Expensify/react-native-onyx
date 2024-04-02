@@ -739,11 +739,8 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, val:
 /**
  * We check to see if this key is flagged as safe for eviction and add it to the recentlyAccessedKeys list so that when we
  * run out of storage the least recently accessed key can be removed.
- *
- * @private
- * @param {Object} mapping
  */
-function addKeyToRecentlyAccessedIfNeeded(mapping) {
+function addKeyToRecentlyAccessedIfNeeded<TKey extends OnyxKey>(mapping: Mapping<TKey>): void {
     if (!isSafeEvictionKey(mapping.key)) {
         return;
     }
@@ -753,7 +750,7 @@ function addKeyToRecentlyAccessedIfNeeded(mapping) {
 
     if (mapping.withOnyxInstance && !isCollectionKey(mapping.key)) {
         // All React components subscribing to a key flagged as a safe eviction key must implement the canEvict property.
-        if (_.isUndefined(mapping.canEvict)) {
+        if (mapping.canEvict === undefined) {
             throw new Error(`Cannot subscribe to safe eviction key '${mapping.key}' without providing a canEvict value.`);
         }
 
