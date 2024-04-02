@@ -971,17 +971,18 @@ function removeNullValues(key: OnyxKey, value: OnyxValue<OnyxKey>) {
  * Storage expects array like: [["@MyApp_user", value_1], ["@MyApp_key", value_2]]
  * This method transforms an object like {'@MyApp_user': myUserValue, '@MyApp_key': myKeyValue}
  * to an array of key-value pairs in the above format and removes key-value pairs that are being set to null
- * @private
- * @param {Record} data
- * @return {Array} an array of key - value pairs <[key, value]>
- */
-function prepareKeyValuePairsForStorage(data) {
-    const keyValuePairs = [];
 
-    _.forEach(data, (value, key) => {
+* @return an array of key - value pairs <[key, value]>
+ */
+function prepareKeyValuePairsForStorage(data: Record<OnyxKey, OnyxValue<OnyxKey>>): Array<[OnyxKey, OnyxValue<OnyxKey>]> {
+    const keyValuePairs: Array<[OnyxKey, OnyxValue<OnyxKey>]> = [];
+
+    Object.entries(data).forEach(([key, value]) => {
         const {value: valueAfterRemoving, wasRemoved} = removeNullValues(key, value);
 
-        if (wasRemoved) return;
+        if (wasRemoved) {
+            return;
+        }
 
         keyValuePairs.push([key, valueAfterRemoving]);
     });
