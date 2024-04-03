@@ -2,7 +2,6 @@
 /* eslint-disable no-continue */
 import {deepEqual} from 'fast-equals';
 import lodashClone from 'lodash/clone';
-import _ from 'underscore';
 import type {ValueOf} from 'type-fest';
 import * as Logger from './Logger';
 import cache from './OnyxCache';
@@ -572,18 +571,10 @@ function keysChanged<TKey extends CollectionKeyBase>(
  *
  * @example
  * keyChanged(key, value, subscriber => subscriber.initWithStoredValues === false)
- *
- * @private
- * @param {String} key
- * @param {*} data
- * @param {*} prevData
- * @param {Function} [canUpdateSubscriber] only subscribers that pass this truth test will be updated
- * @param {boolean} [notifyRegularSubscibers=true]
- * @param {boolean} [notifyWithOnyxSubscibers=true]
  */
 function keyChanged<TKey extends OnyxKey>(
     key: TKey,
-    data: OnyxValue<TKey>,
+    data: OnyxValue<TKey> | null,
     prevData: OnyxValue<TKey>,
     canUpdateSubscriber: (subscriber?: Mapping<OnyxKey>) => boolean = () => true,
     notifyRegularSubscibers = true,
@@ -713,7 +704,7 @@ function keyChanged<TKey extends OnyxKey>(
  *     - sets state on the withOnyxInstances
  *     - triggers the callback function
  */
-function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, val: OnyxValue<TKey>, matchedKey: TKey | undefined, isBatched: boolean) {
+function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, val: OnyxValue<TKey> | null, matchedKey: TKey | undefined, isBatched: boolean) {
     // If the mapping no longer exists then we should not send any data.
     // This means our subscriber disconnected or withOnyx wrapped component unmounted.
     if (!callbackToStateMapping[mapping.connectionID]) {
