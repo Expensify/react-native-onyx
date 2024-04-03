@@ -140,8 +140,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
-            connectionIDRef.current = Onyx.connect({
-                key: key as CollectionKeyBase,
+            connectionIDRef.current = Onyx.connect<CollectionKeyBase>({
+                key,
                 callback: () => {
                     // We don't need to update the Onyx cache again here, when `callback` is called the cache is already
                     // expected to be updated, so we just signal that the store changed and `getSnapshot()` can be called again.
@@ -149,7 +149,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
                     onStoreChange();
                 },
                 initWithStoredValues: options?.initWithStoredValues,
-                waitForCollectionCallback: OnyxUtils.isCollectionKey(key),
+                waitForCollectionCallback: OnyxUtils.isCollectionKey(key) as true,
             });
 
             return () => {

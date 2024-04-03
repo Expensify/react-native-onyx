@@ -23,6 +23,7 @@ import type {
     WithOnyxInstanceState,
     OnyxCollection,
     KeyValueMapping,
+    WithOnyxConnectOptions,
 } from './types';
 import type Onyx from './Onyx';
 
@@ -102,7 +103,7 @@ function getDefaultKeyStates(): Record<string, unknown> {
 function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Partial<NullableKeyValueMapping>, safeEvictionKeys: OnyxKey[]) {
     // We need the value of the collection keys later for checking if a
     // key is a collection. We store it in a map for faster lookup.
-    const collectionValues = Object.values(keys.COLLECTION);
+    const collectionValues = Object.values(keys.COLLECTION ?? {});
     onyxCollectionKeyMap = collectionValues.reduce((acc, val) => {
         acc.set(val, true);
         return acc;
@@ -179,11 +180,11 @@ function batchUpdates(updates: () => void): Promise<void> {
  * The resulting collection will only contain items that are returned by the selector.
  */
 function reduceCollectionWithSelector<TKey extends CollectionKeyBase, TMap, TReturn>(
-    collection: Record<OnyxKey, OnyxValue<OnyxKey>>,
+    collection: OnyxCollection<OnyxValue<TKey>>,
     selector: Selector<TKey, TMap, TReturn> | undefined,
     withOnyxInstanceState: WithOnyxInstanceState<TMap> | undefined,
-): Record<OnyxKey, OnyxValue<OnyxKey>> {
-    return Object.entries(collection ?? {}).reduce((finalCollection: Record<OnyxKey, OnyxValue<OnyxKey>>, [key, item]) => {
+): Record<string, unknown> {
+    return Object.entries(collection ?? {}).reduce((finalCollection: Record<string, unknown>, [key, item]) => {
         // eslint-disable-next-line no-param-reassign
         finalCollection[key] = selector?.(item, withOnyxInstanceState);
 
@@ -202,7 +203,7 @@ function get(key: OnyxKey): Promise<OnyxValue<OnyxKey>> {
 
     // When a value retrieving task for this key is still running hook to it
     if (cache.hasPendingTask(taskName)) {
-        return cache.getTaskPromise(taskName);
+        return cache.getTaskPromise(taskName) as Promise<OnyxValue<OnyxKey>>;
     }
 
     // Otherwise retrieve the value from storage and capture a promise to aid concurrent usages
@@ -285,7 +286,7 @@ function isSafeEvictionKey(testKey: OnyxKey): boolean {
  * Tries to get a value from the cache. If the value is not present in cache it will return the default value or undefined.
  * If the requested key is a collection, it will return an object with all the collection members.
  */
-function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Mapping<TKey>): OnyxValue<OnyxKey> {
+function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Partial<WithOnyxConnectOptions<TKey>>): OnyxValue<OnyxKey> {
     let val = cache.getValue(key);
 
     if (isCollectionKey(key)) {
@@ -314,7 +315,7 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Mapping<TK
     if (mapping?.selector) {
         const state = mapping.withOnyxInstance ? mapping.withOnyxInstance.state : undefined;
         if (isCollectionKey(key)) {
-            return reduceCollectionWithSelector(val as Record<OnyxKey, OnyxValue<OnyxKey>>, mapping.selector, state);
+            return reduceCollectionWithSelector(val as OnyxCollection<OnyxValue<TKey>>, mapping.selector, state);
         }
         return mapping.selector(val, state);
     }
@@ -475,7 +476,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
         }
 
         // React component subscriber found.
-        if (subscriber.withOnyxInstance) {
+        if ('withOnyxInstance' in subscriber) {
             if (!notifyWithOnyxSubscibers) {
                 continue;
             }
@@ -531,7 +532,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
                 if (subscriber.selector) {
                     subscriber.withOnyxInstance.setStateProxy((prevState) => {
                         const prevData = prevState[subscriber.statePropertyName];
-                        const newData = subscriber.selector(cachedCollection[subscriber.key], subscriber.withOnyxInstance.state);
+                        const newData = subscriber.selector?.(cachedCollection[subscriber.key], subscriber.withOnyxInstance.state);
                         if (!deepEqual(prevData, newData)) {
                             PerformanceUtils.logSetStateCall(subscriber, prevData, newData, 'keysChanged', collectionKey);
                             return {
@@ -614,7 +615,7 @@ function keyChanged<TKey extends OnyxKey>(
         }
 
         // Subscriber connected via withOnyx() HOC
-        if (subscriber.withOnyxInstance) {
+        if ('withOnyxInstance' in subscriber) {
             if (!notifyWithOnyxSubscibers) {
                 continue;
             }
@@ -625,9 +626,9 @@ function keyChanged<TKey extends OnyxKey>(
                 // returned by the selector and only when the selected data has changed.
                 if (subscriber.selector) {
                     subscriber.withOnyxInstance.setStateProxy((prevState) => {
-                        const prevWithOnyxData = prevState[subscriber.statePropertyName];
+                        const prevWithOnyxData = prevState[subscriber.statePropertyName] as Record<string, unknown>;
                         const newWithOnyxData = {
-                            [key]: subscriber.selector(data, subscriber.withOnyxInstance.state),
+                            [key]: subscriber.selector?.(data, subscriber.withOnyxInstance.state),
                         };
                         const prevDataWithNewData = {
                             ...prevWithOnyxData,
@@ -662,8 +663,8 @@ function keyChanged<TKey extends OnyxKey>(
             // returned by the selector and only if the selected data has changed.
             if (subscriber.selector) {
                 subscriber.withOnyxInstance.setStateProxy(() => {
-                    const previousValue = subscriber.selector(prevData, subscriber.withOnyxInstance.state);
-                    const newValue = subscriber.selector(data, subscriber.withOnyxInstance.state);
+                    const previousValue = subscriber.selector?.(prevData, subscriber.withOnyxInstance.state);
+                    const newValue = subscriber.selector?.(data, subscriber.withOnyxInstance.state);
 
                     if (!deepEqual(previousValue, newValue)) {
                         return {
@@ -704,21 +705,21 @@ function keyChanged<TKey extends OnyxKey>(
  *     - sets state on the withOnyxInstances
  *     - triggers the callback function
  */
-function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, val: OnyxValue<TKey> | null, matchedKey: TKey | undefined, isBatched: boolean) {
+function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, val: OnyxValue<TKey> | null, matchedKey: TKey, isBatched: boolean) {
     // If the mapping no longer exists then we should not send any data.
     // This means our subscriber disconnected or withOnyx wrapped component unmounted.
     if (!callbackToStateMapping[mapping.connectionID]) {
         return;
     }
 
-    if (mapping.withOnyxInstance) {
-        let newData = val;
+    if ('withOnyxInstance' in mapping) {
+        let newData: OnyxValue<OnyxKey> = val;
 
         // If the mapping has a selector, then the component's state must only be updated with the data
         // returned by the selector.
         if (mapping.selector) {
             if (isCollectionKey(mapping.key)) {
-                newData = reduceCollectionWithSelector(val, mapping.selector, mapping.withOnyxInstance.state);
+                newData = reduceCollectionWithSelector(val as Record<TKey, OnyxValue<TKey>>, mapping.selector, mapping.withOnyxInstance.state);
             } else {
                 newData = mapping.selector(val, mapping.withOnyxInstance.state);
             }
@@ -727,7 +728,7 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, val:
         PerformanceUtils.logSetStateCall(mapping, null, newData, 'sendDataToConnection');
         if (isBatched) {
             batchUpdates(() => {
-                mapping.withOnyxInstance?.setWithOnyxState(mapping.statePropertyName, newData);
+                mapping.withOnyxInstance.setWithOnyxState(mapping.statePropertyName, newData);
             });
         } else {
             mapping.withOnyxInstance.setWithOnyxState(mapping.statePropertyName, newData);
@@ -735,9 +736,7 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, val:
         return;
     }
 
-    if (typeof mapping.callback === 'function') {
-        mapping.callback(val, matchedKey);
-    }
+    mapping.callback?.(val as OnyxCollection<unknown>, matchedKey);
 }
 
 /**
@@ -752,7 +751,7 @@ function addKeyToRecentlyAccessedIfNeeded<TKey extends OnyxKey>(mapping: Mapping
     // Try to free some cache whenever we connect to a safe eviction key
     cache.removeLeastRecentlyUsedKeys();
 
-    if (mapping.withOnyxInstance && !isCollectionKey(mapping.key)) {
+    if ('withOnyxInstance' in mapping && !isCollectionKey(mapping.key)) {
         // All React components subscribing to a key flagged as a safe eviction key must implement the canEvict property.
         if (mapping.canEvict === undefined) {
             throw new Error(`Cannot subscribe to safe eviction key '${mapping.key}' without providing a canEvict value.`);
@@ -824,9 +823,9 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
 
             // temp object is used to merge the missing data into the cache
             const temp: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
-            values.forEach((value) => {
-                data[value[0]] = value[1];
-                temp[value[0]] = value[1];
+            values.forEach(([key, value]) => {
+                data[key] = value;
+                temp[key] = value;
             });
             cache.merge(temp);
             return Promise.resolve();
@@ -1011,9 +1010,9 @@ function initializeWithDefaultKeyStates(): Promise<void> {
         const existingDataAsObject = Object.fromEntries(pairs);
 
         const merged = utils.fastMerge(existingDataAsObject, defaultKeyStates);
-        cache.merge(merged);
+        cache.merge(merged ?? {});
 
-        Object.entries(merged).forEach(([key, value]) => keyChanged(key, value, existingDataAsObject));
+        Object.entries(merged ?? {}).forEach(([key, value]) => keyChanged(key, value, existingDataAsObject));
     });
 }
 

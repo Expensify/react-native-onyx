@@ -271,9 +271,17 @@ type WithOnyxInstance = Component<unknown, WithOnyxInstanceState<NullableKeyValu
 
 /** Represents the base options used in `Onyx.connect()` method. */
 type BaseConnectOptions = {
-    statePropertyName?: string;
-    withOnyxInstance?: Component;
     initWithStoredValues?: boolean;
+};
+
+/** Represents the options used in `Onyx.connect()` within withOnyx HOC */
+type WithOnyxConnectOptions<TKey extends OnyxKey> = {
+    withOnyxInstance: WithOnyxInstance;
+    statePropertyName: string;
+    displayName: string;
+    initWithStoredValues?: boolean;
+    selector?: Selector<TKey, unknown, unknown>;
+    canEvict?: boolean;
 };
 
 /**
@@ -288,7 +296,7 @@ type BaseConnectOptions = {
  * If `waitForCollectionCallback` is `false` or not specified, the `key` can be any Onyx key and `callback` will be triggered with updates of each collection item
  * and will pass `value` as an `OnyxEntry`.
  */
-type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions &
+type ConnectOptions<TKey extends OnyxKey> = (BaseConnectOptions | WithOnyxConnectOptions<TKey>) &
     (
         | {
               key: TKey extends CollectionKeyBase ? TKey : never;
@@ -302,7 +310,9 @@ type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions &
           }
     );
 
-type Mapping<TKey extends OnyxKey> = ConnectOptions<TKey> & {connectionID: number; statePropertyName: string; displayName: string; selector: Selector<TKey, unknown, unknown>};
+type Mapping<TKey extends OnyxKey> = ConnectOptions<TKey> & {
+    connectionID: number;
+};
 
 /**
  * Represents different kinds of updates that can be passed to `Onyx.update()` method. It is a discriminated union of
@@ -392,6 +402,7 @@ export type {
     Collection,
     WithOnyxInstance,
     BaseConnectOptions,
+    WithOnyxConnectOptions,
     ConnectOptions,
     Mapping,
     OnyxUpdate,

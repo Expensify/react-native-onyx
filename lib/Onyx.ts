@@ -160,7 +160,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): nu
 
             // If we have a withOnyxInstance that means a React component has subscribed via the withOnyx() HOC and we need to
             // group collection key member data into an object.
-            if (mapping.withOnyxInstance) {
+            if ('withOnyxInstance' in mapping) {
                 if (OnyxUtils.isCollectionKey(mapping.key)) {
                     OnyxUtils.getCollectionDataAndSendAsObject(matchingKeys, mapping);
                     return;
