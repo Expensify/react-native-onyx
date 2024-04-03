@@ -52,13 +52,20 @@ declare function getCallbackToStateMapping(): Record<string, Mapping<string>>;
 declare function getDefaultKeyStates(): Record<string, OnyxValue<string>>;
 
 /**
+ * Stores a connection ID associated with a given key.
  *
  * @param connectionID connectionID of the subscriber
  * @param key key that the subscriber is connected to
  */
 declare function storeKeyByConnections(connectionID: string, key: OnyxKey): void;
 
+/**
+ * Deletes a connection ID associated with its corresponding key.
+ *
+ * @param {number} connectionID - The connection ID to be deleted.
+ */
 declare function deleteKeyByConnections(connectionID: number): void;
+
 /**
  * Sets the initial values for the Onyx store
  *
