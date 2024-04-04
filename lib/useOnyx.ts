@@ -188,4 +188,4 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
 
 export default useOnyx;
 
-export type {UseOnyxResult, FetchStatus};
+export type {UseOnyxResult, ResultMetadata, FetchStatus};
