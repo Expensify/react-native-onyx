@@ -41,3 +41,10 @@ jobs:
                   git checkout --ours .
                   npm install --force
                   npx reassure --branch
+
+            - name: Validate output.json
+              id: validateReassureOutput
+              uses: ./.github/actions/javascript/validateReassureOutput
+              with:
+                  DURATION_DEVIATION_PERCENTAGE: 20
+                  COUNT_DEVIATION: 0
