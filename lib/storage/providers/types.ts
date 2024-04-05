@@ -9,6 +9,14 @@ type OnStorageKeyChanged = <TKey extends OnyxKey>(key: TKey, value: OnyxValue<TK
 
 type StorageProvider = {
     /**
+     * The name of the provider that can be printed to the logs
+     */
+    name: string;
+    /**
+     * Initializes the storage provider
+     */
+    init: () => void;
+    /**
      * Gets the value of a given key or return `null` if it's not available in storage
      */
     getItem: <TKey extends OnyxKey>(key: TKey) => Promise<OnyxValue<TKey> | null>;
@@ -31,7 +39,7 @@ type StorageProvider = {
     /**
      * Multiple merging of existing and new values in a batch
      */
-    multiMerge: (pairs: KeyValuePairList) => Promise<BatchQueryResult | IDBValidKey[]>;
+    multiMerge: (pairs: KeyValuePairList) => Promise<BatchQueryResult | IDBValidKey[] | void>;
 
     /**
      * Merges an existing value with a new one by leveraging JSON_PATCH
@@ -72,4 +80,4 @@ type StorageProvider = {
 };
 
 export default StorageProvider;
-export type {KeyList, KeyValuePair, KeyValuePairList};
+export type {KeyList, KeyValuePair, KeyValuePairList, OnStorageKeyChanged};

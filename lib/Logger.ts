@@ -1,6 +1,6 @@
 type LogData = {
     message: string;
-    level: 'alert' | 'info';
+    level: 'alert' | 'info' | 'hmmm';
 };
 type LoggerCallback = (data: LogData) => void;
 
@@ -28,4 +28,11 @@ function logInfo(message: string) {
     logger({message: `[Onyx] ${message}`, level: 'info'});
 }
 
-export {registerLogger, logInfo, logAlert};
+/**
+ * Send an hmmm message to the logger
+ */
+function logHmmm(message: string) {
+    logger({message: `[Onyx] ${message}`, level: 'hmmm'});
+}
+
+export {registerLogger, logInfo, logAlert, logHmmm};
