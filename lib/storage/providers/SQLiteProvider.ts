@@ -76,7 +76,7 @@ const provider: StorageProvider = {
 
         return db.executeBatchAsync([[query, queryArguments]]);
     },
-    mergeItem(key, deltaChanges, preMergedValue, shouldSetValue = false) {
+    mergeItem(key, deltaChanges, preMergedValue, shouldSetValue) {
         if (shouldSetValue) {
             return this.setItem(key, preMergedValue) as Promise<BatchQueryResult>;
         }
