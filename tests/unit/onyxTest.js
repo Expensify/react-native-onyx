@@ -2,7 +2,6 @@ import _ from 'underscore';
 import Onyx from '../../lib';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import OnyxUtils from '../../lib/OnyxUtils';
-import StorageMock from '../../lib/storage/__mocks__';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
