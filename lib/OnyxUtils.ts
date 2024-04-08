@@ -305,9 +305,9 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Partial<Wi
         }
 
         const matchingKeys = Array.from(allCacheKeys).filter((k) => k.startsWith(key));
-        const values = matchingKeys.reduce((finalObject: Record<OnyxKey, OnyxValue<OnyxKey>>, matchedKey) => {
+        const values = matchingKeys.reduce((finalObject: OnyxCollection<OnyxValue<OnyxKey>>, matchedKey) => {
             const cachedValue = cache.getValue(matchedKey);
-            if (cachedValue) {
+            if (cachedValue && finalObject) {
                 // This is permissible because we're in the process of constructing the final object in a reduce function.
                 // eslint-disable-next-line no-param-reassign
                 finalObject[matchedKey] = cachedValue;
