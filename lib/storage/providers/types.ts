@@ -45,6 +45,7 @@ type StorageProvider = {
      * Merges an existing value with a new one by leveraging JSON_PATCH
      * @param deltaChanges - the delta for a specific key
      * @param preMergedValue - the pre-merged data from `Onyx.applyMerge`
+     * @param shouldSetValue - whether the data should be set instead of merged
      */
     mergeItem: <TKey extends OnyxKey>(key: TKey, deltaChanges: OnyxValue<TKey>, preMergedValue: OnyxValue<TKey>, shouldSetValue?: boolean) => Promise<BatchQueryResult | void>;
 
