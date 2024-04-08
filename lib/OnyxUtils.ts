@@ -417,7 +417,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
     partialCollection: OnyxCollection<OnyxValue<TKey>>,
     notifyRegularSubscibers = true,
     notifyWithOnyxSubscibers = true,
-) {
+): void {
     // We are iterating over all subscribers similar to keyChanged(). However, we are looking for subscribers who are subscribing to either a collection key or
     // individual collection key member for the collection that is being updated. It is important to note that the collection parameter cane be a PARTIAL collection
     // and does not represent all of the combined keys and values for a collection key. It is just the "new" data that was merged in via mergeCollection().
@@ -582,7 +582,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
  */
 function keyChanged<TKey extends OnyxKey>(
     key: TKey,
-    data: OnyxValue<TKey> | null,
+    data: OnyxEntry<OnyxValue<TKey>>,
     prevData: OnyxValue<TKey>,
     canUpdateSubscriber: (subscriber?: Mapping<OnyxKey>) => boolean = () => true,
     notifyRegularSubscibers = true,
@@ -617,7 +617,7 @@ function keyChanged<TKey extends OnyxKey>(
                 continue;
             }
 
-            subscriber.callback(data as Record<TKey, OnyxValue<TKey>>, key);
+            subscriber.callback(data as OnyxCollection<OnyxValue<TKey>>, key);
             continue;
         }
 
@@ -633,7 +633,7 @@ function keyChanged<TKey extends OnyxKey>(
                 // returned by the selector and only when the selected data has changed.
                 if (subscriber.selector) {
                     subscriber.withOnyxInstance.setStateProxy((prevState) => {
-                        const prevWithOnyxData = prevState[subscriber.statePropertyName] as Record<string, unknown>;
+                        const prevWithOnyxData = prevState[subscriber.statePropertyName];
                         const newWithOnyxData = {
                             [key]: subscriber.selector?.(data, subscriber.withOnyxInstance.state),
                         };
