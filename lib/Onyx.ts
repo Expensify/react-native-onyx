@@ -307,7 +307,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<K
             const batchedDeltaChanges = OnyxUtils.applyMerge(undefined, mergeQueue[key], false);
 
             // Case (1): When there is no existing value in storage, we want to set the value instead of merge it.
-            // Case (2): The presence of a top-level`null` in the merge queue instructs us to drop the whole existing value.
+            // Case (2): The presence of a top-level `null` in the merge queue instructs us to drop the whole existing value.
             // In this case, we can't simply merge the batched changes with the existing value, because then the null in the merge queue would have no effect
             const shouldSetValue = !existingValue || mergeQueue[key].includes(null);
 
