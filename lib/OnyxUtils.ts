@@ -778,12 +778,12 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
     // Keys that are not in the cache
     const missingKeys: OnyxKey[] = [];
     // Tasks that are pending
-    const pendingTasks: Array<Promise<OnyxValue<OnyxKey>>> = [];
+    const pendingTasks: Array<Promise<OnyxValue<TKey>>> = [];
     // Keys for the tasks that are pending
     const pendingKeys: OnyxKey[] = [];
 
     // We are going to combine all the data from the matching keys into a single object
-    const data: OnyxCollection<OnyxValue<TKey>> = {};
+    const data: OnyxCollection<OnyxValue<TKey>> | OnyxEntry<OnyxValue<TKey>> = {};
 
     /**
      * We are going to iterate over all the matching keys and check if we have the data in the cache.
@@ -802,7 +802,7 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
 
         const pendingKey = `get:${key}`;
         if (cache.hasPendingTask(pendingKey)) {
-            pendingTasks.push(cache.getTaskPromise(pendingKey) as Promise<void>);
+            pendingTasks.push(cache.getTaskPromise(pendingKey) as Promise<OnyxValue<TKey>>);
             pendingKeys.push(key);
         } else {
             missingKeys.push(key);
@@ -813,7 +813,7 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
         // We are going to wait for all the pending tasks to resolve and then add the data to the data object.
         .then((values) => {
             values.forEach((value, index) => {
-                data[pendingKeys[index]] = value as OnyxValue<TKey>;
+                data[pendingKeys[index]] = value;
             });
 
             return Promise.resolve();
@@ -832,7 +832,7 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
             }
 
             // temp object is used to merge the missing data into the cache
-            const temp: OnyxCollection<OnyxValue<TKey>> = {};
+            const temp: OnyxCollection<OnyxValue<TKey>> | OnyxEntry<OnyxValue<TKey>> = {};
             values.forEach(([key, value]) => {
                 data[key] = value as OnyxValue<TKey>;
                 temp[key] = value as OnyxValue<TKey>;
