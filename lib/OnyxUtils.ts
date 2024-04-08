@@ -22,8 +22,9 @@ import type {
     Selector,
     WithOnyxInstanceState,
     OnyxCollection,
-    KeyValueMapping,
     WithOnyxConnectOptions,
+    DefaultConnectOptions,
+    OnyxEntry,
 } from './types';
 import type Onyx from './Onyx';
 
@@ -266,7 +267,7 @@ function splitCollectionMemberKey<TKey extends CollectionKey>(key: TKey): [TKey 
         throw new Error(`Invalid ${key} key provided, only collection keys are allowed.`);
     }
 
-    return [key.substring(0, underscoreIndex + 1), key.substring(underscoreIndex + 1)];
+    return [key.substring(0, underscoreIndex + 1) as TKey extends `${infer Prefix}_${string}` ? `${Prefix}_` : never, key.substring(underscoreIndex + 1)];
 }
 
 /**
@@ -502,14 +503,15 @@ function keysChanged<TKey extends CollectionKeyBase>(
                 }
 
                 subscriber.withOnyxInstance.setStateProxy((prevState) => {
-                    const finalCollection = lodashClone(prevState[subscriber.statePropertyName] || {});
+                    // Record<string, OnyxCollection<unknown>>
+                    const finalCollection = lodashClone(prevState?.[subscriber.statePropertyName] || {});
                     const dataKeys = Object.keys(partialCollection ?? {});
                     for (let j = 0; j < dataKeys.length; j++) {
                         const dataKey = dataKeys[j];
                         finalCollection[dataKey] = cachedCollection[dataKey];
                     }
 
-                    PerformanceUtils.logSetStateCall(subscriber, prevState[subscriber.statePropertyName], finalCollection, 'keysChanged', collectionKey);
+                    PerformanceUtils.logSetStateCall(subscriber, prevState?.[subscriber.statePropertyName], finalCollection, 'keysChanged', collectionKey);
                     return {
                         [subscriber.statePropertyName]: finalCollection,
                     };
@@ -705,7 +707,12 @@ function keyChanged<TKey extends OnyxKey>(
  *     - sets state on the withOnyxInstances
  *     - triggers the callback function
  */
-function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, val: OnyxValue<TKey> | null, matchedKey: TKey, isBatched: boolean) {
+function sendDataToConnection<TKey extends OnyxKey>(
+    mapping: Mapping<TKey>,
+    val: OnyxCollection<OnyxValue<TKey>> | OnyxEntry<OnyxValue<TKey>>,
+    matchedKey: TKey | undefined,
+    isBatched: boolean,
+) {
     // If the mapping no longer exists then we should not send any data.
     // This means our subscriber disconnected or withOnyx wrapped component unmounted.
     if (!callbackToStateMapping[mapping.connectionID]) {
@@ -719,7 +726,7 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, val:
         // returned by the selector.
         if (mapping.selector) {
             if (isCollectionKey(mapping.key)) {
-                newData = reduceCollectionWithSelector(val as Record<TKey, OnyxValue<TKey>>, mapping.selector, mapping.withOnyxInstance.state);
+                newData = reduceCollectionWithSelector(val as OnyxCollection<OnyxValue<TKey>>, mapping.selector, mapping.withOnyxInstance.state);
             } else {
                 newData = mapping.selector(val, mapping.withOnyxInstance.state);
             }
@@ -727,16 +734,14 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, val:
 
         PerformanceUtils.logSetStateCall(mapping, null, newData, 'sendDataToConnection');
         if (isBatched) {
-            batchUpdates(() => {
-                mapping.withOnyxInstance.setWithOnyxState(mapping.statePropertyName, newData);
-            });
+            batchUpdates(() => mapping.withOnyxInstance.setWithOnyxState(mapping.statePropertyName, newData));
         } else {
             mapping.withOnyxInstance.setWithOnyxState(mapping.statePropertyName, newData);
         }
         return;
     }
 
-    mapping.callback?.(val as OnyxCollection<unknown>, matchedKey);
+    (mapping as DefaultConnectOptions<TKey>).callback?.(val, matchedKey as TKey);
 }
 
 /**
@@ -773,7 +778,7 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
     const pendingKeys: OnyxKey[] = [];
 
     // We are going to combine all the data from the matching keys into a single object
-    const data: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
+    const data: OnyxCollection<OnyxValue<TKey>> = {};
 
     /**
      * We are going to iterate over all the matching keys and check if we have the data in the cache.
@@ -784,7 +789,7 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
      * These missingKeys will be later to use to multiGet the data from the storage.
      */
     matchingKeys.forEach((key) => {
-        const cacheValue = cache.getValue(key);
+        const cacheValue = cache.getValue(key) as OnyxValue<TKey>;
         if (cacheValue) {
             data[key] = cacheValue;
             return;
@@ -792,7 +797,7 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
 
         const pendingKey = `get:${key}`;
         if (cache.hasPendingTask(pendingKey)) {
-            pendingTasks.push(cache.getTaskPromise(pendingKey));
+            pendingTasks.push(cache.getTaskPromise(pendingKey) as Promise<void>);
             pendingKeys.push(key);
         } else {
             missingKeys.push(key);
@@ -803,7 +808,7 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
         // We are going to wait for all the pending tasks to resolve and then add the data to the data object.
         .then((values) => {
             values.forEach((value, index) => {
-                data[pendingKeys[index]] = value;
+                data[pendingKeys[index]] = value as OnyxValue<TKey>;
             });
 
             return Promise.resolve();
@@ -822,10 +827,10 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
             }
 
             // temp object is used to merge the missing data into the cache
-            const temp: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
+            const temp: OnyxCollection<OnyxValue<TKey>> = {};
             values.forEach(([key, value]) => {
-                data[key] = value;
-                temp[key] = value;
+                data[key] = value as OnyxValue<TKey>;
+                temp[key] = value as OnyxValue<TKey>;
             });
             cache.merge(temp);
             return Promise.resolve();
@@ -844,8 +849,8 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
  */
 function scheduleSubscriberUpdate<TKey extends OnyxKey>(
     key: TKey,
-    value: KeyValueMapping[TKey],
-    prevValue: KeyValueMapping[TKey],
+    value: OnyxEntry<OnyxValue<TKey>>,
+    prevValue: OnyxValue<TKey>,
     canUpdateSubscriber: (subscriber?: Mapping<OnyxKey>) => boolean = () => true,
 ): Promise<[void, void]> {
     const promise = Promise.resolve().then(() => keyChanged(key, value, prevValue, canUpdateSubscriber, true, false));
@@ -858,7 +863,7 @@ function scheduleSubscriberUpdate<TKey extends OnyxKey>(
  * so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
  * subscriber callbacks receive the data in a different format than they normally expect and it breaks code.
  */
-function scheduleNotifyCollectionSubscribers(key: OnyxKey, value: OnyxValue<OnyxKey>): Promise<[void, void]> {
+function scheduleNotifyCollectionSubscribers(key: OnyxKey, value: OnyxCollection<OnyxValue<OnyxKey>>): Promise<[void, void]> {
     const promise = Promise.resolve().then(() => keysChanged(key, value, true, false));
     batchUpdates(() => keysChanged(key, value, false, true));
     return Promise.all([maybeFlushBatchUpdates(), promise]);
@@ -868,7 +873,7 @@ function scheduleNotifyCollectionSubscribers(key: OnyxKey, value: OnyxValue<Onyx
  * Remove a key from Onyx and update the subscribers
  */
 function remove<TKey extends OnyxKey>(key: TKey): Promise<void> {
-    const prevValue = cache.getValue(key, false);
+    const prevValue = cache.getValue(key, false) as OnyxValue<TKey>;
     cache.drop(key);
     scheduleSubscriberUpdate(key, null, prevValue);
     return Storage.removeItem(key) as Promise<void>;
@@ -922,8 +927,8 @@ function evictStorageAndRetry<TMethod extends typeof Onyx.set | typeof Onyx.mult
 /**
  * Notifies subscribers and writes current value to cache
  */
-function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: KeyValueMapping[TKey], hasChanged?: boolean, wasRemoved = false): Promise<[void, void]> {
-    const prevValue = cache.getValue(key, false);
+function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<OnyxValue<TKey>>, hasChanged?: boolean, wasRemoved = false): Promise<[void, void]> {
+    const prevValue = cache.getValue(key, false) as OnyxValue<TKey>;
 
     // Update subscribers if the cached value has changed, or when the subscriber specifically requires
     // all updates regardless of value changes (indicated by initWithStoredValues set to false).
@@ -943,6 +948,7 @@ function hasPendingMergeForKey(key: OnyxKey): boolean {
 /**
  * Removes a key from storage if the value is null.
  * Otherwise removes all nested null values in objects and returns the object
+ *
  * @returns The value without null values and a boolean "wasRemoved", which indicates if the key got removed completely
  */
 function removeNullValues(key: OnyxKey, value: OnyxValue<OnyxKey>) {
@@ -954,7 +960,7 @@ function removeNullValues(key: OnyxKey, value: OnyxValue<OnyxKey>) {
     // We can remove all null values in an object by merging it with itself
     // utils.fastMerge recursively goes through the object and removes all null values
     // Passing two identical objects as source and target to fastMerge will not change it, but only remove the null values
-    return {value: utils.removeNestedNullValues(value), wasRemoved: false};
+    return {value: utils.removeNestedNullValues(value as Record<string, unknown>), wasRemoved: false};
 }
 
 /**
@@ -994,7 +1000,10 @@ function applyMerge(existingValue: OnyxValue<OnyxKey>, changes: Array<OnyxValue<
 
     if (changes.some((change) => typeof change === 'object')) {
         // Object values are then merged one after the other
-        return changes.reduce((modifiedData, change) => utils.fastMerge(modifiedData, change, shouldRemoveNullObjectValues), existingValue || {});
+        return changes.reduce(
+            (modifiedData, change) => utils.fastMerge(modifiedData as Record<OnyxKey, unknown>, change as Record<OnyxKey, unknown>, shouldRemoveNullObjectValues),
+            existingValue || {},
+        );
     }
 
     // If we have anything else we can't merge it so we'll

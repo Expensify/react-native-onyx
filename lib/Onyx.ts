@@ -210,28 +210,29 @@ function disconnect(connectionID: number, keyToRemoveFromEvictionBlocklist?: Ony
 function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[TKey]>): Promise<void[]> {
     // If the value is null, we remove the key from storage
     const {value: valueAfterRemoving, wasRemoved} = OnyxUtils.removeNullValues(key, value);
+    const valueWithoutNullValues = valueAfterRemoving as OnyxValue<TKey>;
 
     if (OnyxUtils.hasPendingMergeForKey(key)) {
         delete OnyxUtils.getMergeQueue()[key];
     }
 
-    const hasChanged = cache.hasValueChanged(key, valueAfterRemoving);
+    const hasChanged = cache.hasValueChanged(key, valueWithoutNullValues);
 
     // Logging properties only since values could be sensitive things we don't want to log
     Logger.logInfo(`set called for key: ${key}${_.isObject(value) ? ` properties: ${_.keys(value).join(',')}` : ''} hasChanged: ${hasChanged}`);
 
     // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
-    const updatePromise = OnyxUtils.broadcastUpdate(key, valueAfterRemoving, hasChanged, wasRemoved);
+    const updatePromise = OnyxUtils.broadcastUpdate(key, valueWithoutNullValues, hasChanged, wasRemoved);
 
     // If the value has not changed or the key got removed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
     if (!hasChanged || wasRemoved) {
         return updatePromise;
     }
 
-    return Storage.setItem(key, valueAfterRemoving as OnyxValue<TKey>)
-        .catch((error) => OnyxUtils.evictStorageAndRetry(error, set, key, valueAfterRemoving))
+    return Storage.setItem(key, valueWithoutNullValues)
+        .catch((error) => OnyxUtils.evictStorageAndRetry(error, set, key, valueWithoutNullValues))
         .then(() => {
-            OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueAfterRemoving);
+            OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNullValues);
             return updatePromise;
         });
 }
@@ -337,7 +338,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<K
             Logger.logInfo(`merge called for key: ${key}${_.isObject(batchedChanges) ? ` properties: ${_.keys(batchedChanges).join(',')}` : ''} hasChanged: ${hasChanged}`);
 
             // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
-            const updatePromise = OnyxUtils.broadcastUpdate(key, modifiedData, hasChanged, wasRemoved);
+            const updatePromise = OnyxUtils.broadcastUpdate(key, modifiedData as OnyxValue<TKey>, hasChanged, wasRemoved);
 
             // If the value has not changed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
             if (!hasChanged || wasRemoved) {

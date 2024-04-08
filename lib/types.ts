@@ -265,7 +265,7 @@ type Collection<TKey extends CollectionKeyBase, TMap, TValue> = {
 };
 
 type WithOnyxInstance = Component<unknown, WithOnyxInstanceState<NullableKeyValueMapping>> & {
-    setStateProxy: (cb: (state: NullableKeyValueMapping) => OnyxValue<OnyxKey>) => void;
+    setStateProxy: (cb: (state: Record<string, OnyxCollection<OnyxValue<OnyxKey>>>) => OnyxValue<OnyxKey>) => void;
     setWithOnyxState: (statePropertyName: OnyxKey, value: OnyxValue<OnyxKey>) => void;
 };
 
@@ -274,7 +274,7 @@ type BaseConnectOptions = {
     initWithStoredValues?: boolean;
 };
 
-/** Represents the options used in `Onyx.connect()` within withOnyx HOC */
+/** Represents additional options used inside withOnyx HOC */
 type WithOnyxConnectOptions<TKey extends OnyxKey> = {
     withOnyxInstance: WithOnyxInstance;
     statePropertyName: string;
@@ -284,31 +284,34 @@ type WithOnyxConnectOptions<TKey extends OnyxKey> = {
     canEvict?: boolean;
 };
 
+/** Represents the callback function used in `Onyx.connect()` method with a regular key. */
+type DefaultConnectOptions<TKey extends OnyxKey> = {
+    key: TKey;
+    callback?: (value: OnyxEntry<KeyValueMapping[TKey]>, key: TKey) => void;
+    waitForCollectionCallback?: false;
+};
+
+/** Represents the callback function used in `Onyx.connect()` method with a collection key. */
+type CollectionConnectOptions<TKey extends OnyxKey> = {
+    key: TKey extends CollectionKeyBase ? TKey : never;
+    callback?: (value: OnyxCollection<KeyValueMapping[TKey]>) => void;
+    waitForCollectionCallback: true;
+};
+
 /**
  * Represents the options used in `Onyx.connect()` method.
- * The type is built from `BaseConnectOptions` and extended to handle key/callback related options.
+ * The type is built from `DefaultConnectOptions`/`CollectionConnectOptions` depending on the `waitForCollectionCallback` property.
  * It includes two different forms, depending on whether we are waiting for a collection callback or not.
  *
  * If `waitForCollectionCallback` is `true`, it expects `key` to be a Onyx collection key and `callback` will be triggered with the whole collection
  * and will pass `value` as an `OnyxCollection`.
  *
- *
  * If `waitForCollectionCallback` is `false` or not specified, the `key` can be any Onyx key and `callback` will be triggered with updates of each collection item
  * and will pass `value` as an `OnyxEntry`.
+ *
+ * The type is also extended with `BaseConnectOptions` and `WithOnyxConnectOptions` to include additional options, depending on the context where it's used.
  */
-type ConnectOptions<TKey extends OnyxKey> = (BaseConnectOptions | WithOnyxConnectOptions<TKey>) &
-    (
-        | {
-              key: TKey extends CollectionKeyBase ? TKey : never;
-              callback?: (value: OnyxCollection<KeyValueMapping[TKey]>) => void;
-              waitForCollectionCallback: true;
-          }
-        | {
-              key: TKey;
-              callback?: (value: OnyxEntry<KeyValueMapping[TKey]>, key: TKey) => void;
-              waitForCollectionCallback?: false;
-          }
-    );
+type ConnectOptions<TKey extends OnyxKey> = (CollectionConnectOptions<TKey> | DefaultConnectOptions<TKey>) & (BaseConnectOptions | WithOnyxConnectOptions<TKey>);
 
 type Mapping<TKey extends OnyxKey> = ConnectOptions<TKey> & {
     connectionID: number;
@@ -403,6 +406,8 @@ export type {
     WithOnyxInstance,
     BaseConnectOptions,
     WithOnyxConnectOptions,
+    DefaultConnectOptions,
+    CollectionConnectOptions,
     ConnectOptions,
     Mapping,
     OnyxUpdate,
