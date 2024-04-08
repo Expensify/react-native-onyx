@@ -717,7 +717,7 @@ function sendDataToConnection<TKey extends OnyxKey>(
     val: OnyxCollection<OnyxValue<TKey>> | OnyxEntry<OnyxValue<TKey>>,
     matchedKey: TKey | undefined,
     isBatched: boolean,
-) {
+): void {
     // If the mapping no longer exists then we should not send any data.
     // This means our subscriber disconnected or withOnyx wrapped component unmounted.
     if (!callbackToStateMapping[mapping.connectionID]) {
