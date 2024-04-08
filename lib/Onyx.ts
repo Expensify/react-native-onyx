@@ -207,7 +207,7 @@ function disconnect(connectionID: number, keyToRemoveFromEvictionBlocklist?: Ony
  * @param key ONYXKEY to set
  * @param value value to store
  */
-function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[TKey]>): Promise<void[]> {
+function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[TKey]>): Promise<void> {
     // If the value is null, we remove the key from storage
     const {value: valueAfterRemoving, wasRemoved} = OnyxUtils.removeNullValues(key, value);
     const valueWithoutNullValues = valueAfterRemoving as OnyxValue<TKey>;
@@ -226,7 +226,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[T
 
     // If the value has not changed or the key got removed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
     if (!hasChanged || wasRemoved) {
-        return updatePromise;
+        return updatePromise.then(() => undefined);
     }
 
     return Storage.setItem(key, valueWithoutNullValues)
@@ -234,7 +234,8 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[T
         .then(() => {
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNullValues);
             return updatePromise;
-        });
+        })
+        .then(() => undefined);
 }
 
 /**
@@ -244,7 +245,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[T
  *
  * @param data object keyed by ONYXKEYS and the values to set
  */
-function multiSet(data: Partial<NullableKeyValueMapping>): Promise<void[]> {
+function multiSet(data: Partial<NullableKeyValueMapping>): Promise<void> {
     const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(data);
 
     const updatePromises = keyValuePairs.map(([key, value]) => {
@@ -260,7 +261,8 @@ function multiSet(data: Partial<NullableKeyValueMapping>): Promise<void[]> {
         .then(() => {
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MULTI_SET, undefined, data);
             return Promise.all(updatePromises);
-        }) as Promise<void[]>;
+        })
+        .then(() => undefined);
 }
 
 /**
@@ -279,7 +281,7 @@ function multiSet(data: Partial<NullableKeyValueMapping>): Promise<void[]> {
  * Onyx.merge(ONYXKEYS.POLICY, {id: 1}); // -> {id: 1}
  * Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Workspace'}
  */
-function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<KeyValueMapping[TKey]>>): Promise<void | void[]> {
+function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<KeyValueMapping[TKey]>>): Promise<void> {
     const mergeQueue = OnyxUtils.getMergeQueue();
     const mergeQueuePromise = OnyxUtils.getMergeQueuePromise();
 
@@ -522,7 +524,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                 keysToBeClearedFromStorage.push(key);
             });
 
-            const updatePromises: Array<Promise<void | void[]>> = [];
+            const updatePromises: Array<Promise<void>> = [];
 
             // Notify the subscribers for each key/value group so they can receive the new values
             Object.entries(keyValuesToResetIndividually).forEach(([key, value]) => {
@@ -577,8 +579,8 @@ function update(data: OnyxUpdate[]): Promise<void> {
         }
     });
 
-    const promises: Array<() => Promise<void | void[]>> = [];
-    let clearPromise: Promise<void | void[]> = Promise.resolve();
+    const promises: Array<() => Promise<void>> = [];
+    let clearPromise: Promise<void> = Promise.resolve();
 
     data.forEach(({onyxMethod, key, value}) => {
         switch (onyxMethod) {

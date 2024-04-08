@@ -41,7 +41,7 @@ type OnyxMethod = ValueOf<typeof METHOD>;
 
 // Key/value store of Onyx key and arrays of values to merge
 const mergeQueue: Record<OnyxKey, Array<OnyxValue<OnyxKey>>> = {};
-const mergeQueuePromise: Record<OnyxKey, Promise<void | void[]>> = {};
+const mergeQueuePromise: Record<OnyxKey, Promise<void>> = {};
 
 // Holds a mapping of all the react components that want their state subscribed to a store key
 const callbackToStateMapping: Record<string, Mapping<OnyxKey>> = {};
@@ -76,7 +76,7 @@ function getMergeQueue(): Record<string, unknown[]> {
 /**
  * Getter - returns the merge queue promise.
  */
-function getMergeQueuePromise(): Record<string, Promise<void | void[]>> {
+function getMergeQueuePromise(): Record<string, Promise<void>> {
     return mergeQueuePromise;
 }
 
@@ -852,10 +852,10 @@ function scheduleSubscriberUpdate<TKey extends OnyxKey>(
     value: OnyxEntry<OnyxValue<TKey>>,
     prevValue: OnyxValue<TKey>,
     canUpdateSubscriber: (subscriber?: Mapping<OnyxKey>) => boolean = () => true,
-): Promise<[void, void]> {
+): Promise<void> {
     const promise = Promise.resolve().then(() => keyChanged(key, value, prevValue, canUpdateSubscriber, true, false));
     batchUpdates(() => keyChanged(key, value, prevValue, canUpdateSubscriber, false, true));
-    return Promise.all([maybeFlushBatchUpdates(), promise]);
+    return Promise.all([maybeFlushBatchUpdates(), promise]).then(() => undefined);
 }
 
 /**
@@ -863,10 +863,10 @@ function scheduleSubscriberUpdate<TKey extends OnyxKey>(
  * so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
  * subscriber callbacks receive the data in a different format than they normally expect and it breaks code.
  */
-function scheduleNotifyCollectionSubscribers(key: OnyxKey, value: OnyxCollection<OnyxValue<OnyxKey>>): Promise<[void, void]> {
+function scheduleNotifyCollectionSubscribers(key: OnyxKey, value: OnyxCollection<OnyxValue<OnyxKey>>): Promise<void> {
     const promise = Promise.resolve().then(() => keysChanged(key, value, true, false));
     batchUpdates(() => keysChanged(key, value, false, true));
-    return Promise.all([maybeFlushBatchUpdates(), promise]);
+    return Promise.all([maybeFlushBatchUpdates(), promise]).then(() => undefined);
 }
 
 /**
@@ -927,7 +927,7 @@ function evictStorageAndRetry<TMethod extends typeof Onyx.set | typeof Onyx.mult
 /**
  * Notifies subscribers and writes current value to cache
  */
-function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<OnyxValue<TKey>>, hasChanged?: boolean, wasRemoved = false): Promise<[void, void]> {
+function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<OnyxValue<TKey>>, hasChanged?: boolean, wasRemoved = false): Promise<void> {
     const prevValue = cache.getValue(key, false) as OnyxValue<TKey>;
 
     // Update subscribers if the cached value has changed, or when the subscriber specifically requires
@@ -938,7 +938,7 @@ function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<OnyxV
         cache.addToAccessedKeys(key);
     }
 
-    return scheduleSubscriberUpdate(key, value, prevValue, (subscriber) => hasChanged || subscriber?.initWithStoredValues === false);
+    return scheduleSubscriberUpdate(key, value, prevValue, (subscriber) => hasChanged || subscriber?.initWithStoredValues === false).then(() => undefined);
 }
 
 function hasPendingMergeForKey(key: OnyxKey): boolean {
@@ -951,7 +951,7 @@ function hasPendingMergeForKey(key: OnyxKey): boolean {
  *
  * @returns The value without null values and a boolean "wasRemoved", which indicates if the key got removed completely
  */
-function removeNullValues(key: OnyxKey, value: OnyxValue<OnyxKey>) {
+function removeNullValues(key: OnyxKey, value: OnyxValue<OnyxKey>): {value: Record<string, unknown> | unknown[] | null; wasRemoved: boolean} {
     if (value === null) {
         remove(key);
         return {value, wasRemoved: true};
