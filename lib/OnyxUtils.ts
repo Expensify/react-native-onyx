@@ -881,7 +881,7 @@ function remove<TKey extends OnyxKey>(key: TKey): Promise<void> {
     const prevValue = cache.getValue(key, false) as OnyxValue<TKey>;
     cache.drop(key);
     scheduleSubscriberUpdate(key, null, prevValue);
-    return Storage.removeItem(key) as Promise<void>;
+    return Storage.removeItem(key).then(() => undefined);
 }
 
 function reportStorageQuota(): Promise<void> {
@@ -956,7 +956,7 @@ function hasPendingMergeForKey(key: OnyxKey): boolean {
  *
  * @returns The value without null values and a boolean "wasRemoved", which indicates if the key got removed completely
  */
-function removeNullValues(key: OnyxKey, value: OnyxValue<OnyxKey>): {value: Record<string, unknown> | unknown[] | null; wasRemoved: boolean} {
+function removeNullValues(key: OnyxKey, value: OnyxValue<OnyxKey>) {
     if (value === null) {
         remove(key);
         return {value, wasRemoved: true};
