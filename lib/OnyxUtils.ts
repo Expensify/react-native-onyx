@@ -25,6 +25,7 @@ import type {
     WithOnyxConnectOptions,
     DefaultConnectOptions,
     OnyxEntry,
+    KeyValueMapping,
 } from './types';
 import type Onyx from './Onyx';
 
@@ -62,35 +63,35 @@ const evictionBlocklist: Record<OnyxKey, number[]> = {};
 
 // Optional user-provided key value states set when Onyx initializes or clears
 let defaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
-
+// Yes, I tested this in the App. I've done it to clean the return types of Onyx public methods, as it was confusing to return Promise<void[]> or Promise<[void, void]>
 let batchUpdatesPromise: Promise<void> | null = null;
 let batchUpdatesQueue: Array<() => void> = [];
 
 /**
  * Getter - returns the merge queue.
  */
-function getMergeQueue(): Record<string, unknown[]> {
+function getMergeQueue(): Record<OnyxKey, Array<OnyxValue<OnyxKey>>> {
     return mergeQueue;
 }
 
 /**
  * Getter - returns the merge queue promise.
  */
-function getMergeQueuePromise(): Record<string, Promise<void>> {
+function getMergeQueuePromise(): Record<OnyxKey, Promise<void>> {
     return mergeQueuePromise;
 }
 
 /**
  * Getter - returns the callback to state mapping.
  */
-function getCallbackToStateMapping(): Record<string, Mapping<string>> {
+function getCallbackToStateMapping(): Record<string, Mapping<OnyxKey>> {
     return callbackToStateMapping;
 }
 
 /**
  * Getter - returns the default key states.
  */
-function getDefaultKeyStates(): Record<string, unknown> {
+function getDefaultKeyStates(): Record<OnyxKey, OnyxValue<OnyxKey>> {
     return defaultKeyStates;
 }
 
@@ -186,13 +187,13 @@ function batchUpdates(updates: () => void): Promise<void> {
  * The resulting collection will only contain items that are returned by the selector.
  */
 function reduceCollectionWithSelector<TKey extends CollectionKeyBase, TMap, TReturn>(
-    collection: OnyxCollection<OnyxValue<TKey>>,
-    selector: Selector<TKey, TMap, TReturn> | undefined,
+    collection: OnyxCollection<KeyValueMapping[TKey]>,
+    selector: Selector<TKey, TMap, TReturn>,
     withOnyxInstanceState: WithOnyxInstanceState<TMap> | undefined,
 ): Record<string, unknown> {
     return Object.entries(collection ?? {}).reduce((finalCollection: Record<string, unknown>, [key, item]) => {
         // eslint-disable-next-line no-param-reassign
-        finalCollection[key] = selector?.(item, withOnyxInstanceState);
+        finalCollection[key] = selector(item, withOnyxInstanceState);
 
         return finalCollection;
     }, {});
@@ -224,7 +225,7 @@ function get(key: OnyxKey): Promise<OnyxValue<OnyxKey>> {
 }
 
 /** Returns current key names stored in persisted storage */
-function getAllKeys(): Promise<Set<string>> {
+function getAllKeys(): Promise<Set<OnyxKey>> {
     // When we've already read stored keys, resolve right away
     const storedKeys = cache.getAllKeys();
     if (storedKeys.size > 0) {
@@ -235,7 +236,7 @@ function getAllKeys(): Promise<Set<string>> {
 
     // When a value retrieving task for all keys is still running hook to it
     if (cache.hasPendingTask(taskName)) {
-        return cache.getTaskPromise(taskName) as Promise<Set<string>>;
+        return cache.getTaskPromise(taskName) as Promise<Set<OnyxKey>>;
     }
 
     // Otherwise retrieve the keys from storage and capture a promise to aid concurrent usages
@@ -245,7 +246,7 @@ function getAllKeys(): Promise<Set<string>> {
         return cache.getAllKeys();
     });
 
-    return cache.captureTask(taskName, promise) as Promise<Set<string>>;
+    return cache.captureTask(taskName, promise) as Promise<Set<OnyxKey>>;
 }
 
 /**
@@ -305,9 +306,9 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Partial<Wi
         }
 
         const matchingKeys = Array.from(allCacheKeys).filter((k) => k.startsWith(key));
-        const values = matchingKeys.reduce((finalObject: OnyxCollection<OnyxValue<OnyxKey>>, matchedKey) => {
+        const values = matchingKeys.reduce((finalObject: NonNullable<OnyxCollection<KeyValueMapping[TKey]>>, matchedKey) => {
             const cachedValue = cache.getValue(matchedKey);
-            if (cachedValue && finalObject) {
+            if (cachedValue) {
                 // This is permissible because we're in the process of constructing the final object in a reduce function.
                 // eslint-disable-next-line no-param-reassign
                 finalObject[matchedKey] = cachedValue;
@@ -414,7 +415,7 @@ function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey
  */
 function keysChanged<TKey extends CollectionKeyBase>(
     collectionKey: TKey,
-    partialCollection: OnyxCollection<OnyxValue<TKey>>,
+    partialCollection: OnyxCollection<KeyValueMapping[TKey]>,
     notifyRegularSubscibers = true,
     notifyWithOnyxSubscibers = true,
 ): void {
@@ -463,7 +464,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
 
                 // If they are not using waitForCollectionCallback then we notify the subscriber with
                 // the new merged data but only for any keys in the partial collection.
-                const dataKeys = partialCollection && typeof partialCollection === 'object' ? Object.keys(partialCollection) : [];
+                const dataKeys = Object.keys(partialCollection ?? {});
                 for (let j = 0; j < dataKeys.length; j++) {
                     const dataKey = dataKeys[j];
                     subscriber.callback(cachedCollection[dataKey], dataKey);
@@ -492,10 +493,11 @@ function keysChanged<TKey extends CollectionKeyBase>(
             if (isSubscribedToCollectionKey) {
                 // If the subscriber has a selector, then the component's state must only be updated with the data
                 // returned by the selector.
-                if (subscriber.selector) {
+                const collectionSelector = subscriber.selector;
+                if (collectionSelector) {
                     subscriber.withOnyxInstance.setStateProxy((prevState) => {
                         const previousData = prevState[subscriber.statePropertyName];
-                        const newData = reduceCollectionWithSelector(cachedCollection, subscriber.selector, subscriber.withOnyxInstance.state);
+                        const newData = reduceCollectionWithSelector(cachedCollection, collectionSelector, subscriber.withOnyxInstance.state);
 
                         if (!deepEqual(previousData, newData)) {
                             return {
@@ -508,8 +510,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
                 }
 
                 subscriber.withOnyxInstance.setStateProxy((prevState) => {
-                    // Record<string, OnyxCollection<unknown>>
-                    const finalCollection = lodashClone(prevState?.[subscriber.statePropertyName] || {});
+                    const finalCollection = lodashClone(prevState?.[subscriber.statePropertyName] ?? {});
                     const dataKeys = Object.keys(partialCollection ?? {});
                     for (let j = 0; j < dataKeys.length; j++) {
                         const dataKey = dataKeys[j];
@@ -536,10 +537,11 @@ function keysChanged<TKey extends CollectionKeyBase>(
                 // If the subscriber has a selector, then the component's state must only be updated with the data
                 // returned by the selector and the state should only change when the subset of data changes from what
                 // it was previously.
-                if (subscriber.selector) {
+                const selector = subscriber.selector;
+                if (selector) {
                     subscriber.withOnyxInstance.setStateProxy((prevState) => {
                         const prevData = prevState[subscriber.statePropertyName];
-                        const newData = subscriber.selector?.(cachedCollection[subscriber.key], subscriber.withOnyxInstance.state);
+                        const newData = selector(cachedCollection[subscriber.key], subscriber.withOnyxInstance.state);
                         if (!deepEqual(prevData, newData)) {
                             PerformanceUtils.logSetStateCall(subscriber, prevData, newData, 'keysChanged', collectionKey);
                             return {
@@ -622,20 +624,21 @@ function keyChanged<TKey extends OnyxKey>(
         }
 
         // Subscriber connected via withOnyx() HOC
-        if ('withOnyxInstance' in subscriber) {
+        if ('withOnyxInstance' in subscriber && subscriber.withOnyxInstance) {
             if (!notifyWithOnyxSubscibers) {
                 continue;
             }
 
+            const selector = subscriber.selector;
             // Check if we are subscribing to a collection key and overwrite the collection member key value in state
             if (isCollectionKey(subscriber.key)) {
                 // If the subscriber has a selector, then the consumer of this data must only be given the data
                 // returned by the selector and only when the selected data has changed.
-                if (subscriber.selector) {
+                if (selector) {
                     subscriber.withOnyxInstance.setStateProxy((prevState) => {
                         const prevWithOnyxData = prevState[subscriber.statePropertyName];
                         const newWithOnyxData = {
-                            [key]: subscriber.selector?.(data, subscriber.withOnyxInstance.state),
+                            [key]: selector(data, subscriber.withOnyxInstance.state),
                         };
                         const prevDataWithNewData = {
                             ...prevWithOnyxData,
@@ -668,10 +671,10 @@ function keyChanged<TKey extends OnyxKey>(
 
             // If the subscriber has a selector, then the component's state must only be updated with the data
             // returned by the selector and only if the selected data has changed.
-            if (subscriber.selector) {
+            if (selector) {
                 subscriber.withOnyxInstance.setStateProxy(() => {
-                    const previousValue = subscriber.selector?.(prevData, subscriber.withOnyxInstance.state);
-                    const newValue = subscriber.selector?.(data, subscriber.withOnyxInstance.state);
+                    const previousValue = selector(prevData, subscriber.withOnyxInstance.state);
+                    const newValue = selector(data, subscriber.withOnyxInstance.state);
 
                     if (!deepEqual(previousValue, newValue)) {
                         return {
@@ -712,26 +715,21 @@ function keyChanged<TKey extends OnyxKey>(
  *     - sets state on the withOnyxInstances
  *     - triggers the callback function
  */
-function sendDataToConnection<TKey extends OnyxKey>(
-    mapping: Mapping<TKey>,
-    val: OnyxCollection<OnyxValue<TKey>> | OnyxEntry<OnyxValue<TKey>>,
-    matchedKey: TKey | undefined,
-    isBatched: boolean,
-): void {
+function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, val: OnyxValue<TKey>, matchedKey: TKey | undefined, isBatched: boolean): void {
     // If the mapping no longer exists then we should not send any data.
     // This means our subscriber disconnected or withOnyx wrapped component unmounted.
     if (!callbackToStateMapping[mapping.connectionID]) {
         return;
     }
 
-    if ('withOnyxInstance' in mapping) {
+    if ('withOnyxInstance' in mapping && mapping.withOnyxInstance) {
         let newData: OnyxValue<OnyxKey> = val;
 
         // If the mapping has a selector, then the component's state must only be updated with the data
         // returned by the selector.
         if (mapping.selector) {
             if (isCollectionKey(mapping.key)) {
-                newData = reduceCollectionWithSelector(val as OnyxCollection<OnyxValue<TKey>>, mapping.selector, mapping.withOnyxInstance.state);
+                newData = reduceCollectionWithSelector(val as OnyxCollection<KeyValueMapping[TKey]>, mapping.selector, mapping.withOnyxInstance.state);
             } else {
                 newData = mapping.selector(val, mapping.withOnyxInstance.state);
             }
@@ -761,7 +759,7 @@ function addKeyToRecentlyAccessedIfNeeded<TKey extends OnyxKey>(mapping: Mapping
     // Try to free some cache whenever we connect to a safe eviction key
     cache.removeLeastRecentlyUsedKeys();
 
-    if ('withOnyxInstance' in mapping && !isCollectionKey(mapping.key)) {
+    if ('withOnyxInstance' in mapping && mapping.withOnyxInstance && !isCollectionKey(mapping.key)) {
         // All React components subscribing to a key flagged as a safe eviction key must implement the canEvict property.
         if (mapping.canEvict === undefined) {
             throw new Error(`Cannot subscribe to safe eviction key '${mapping.key}' without providing a canEvict value.`);

@@ -160,7 +160,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): nu
 
             // If we have a withOnyxInstance that means a React component has subscribed via the withOnyx() HOC and we need to
             // group collection key member data into an object.
-            if ('withOnyxInstance' in mapping) {
+            if ('withOnyxInstance' in mapping && mapping.withOnyxInstance) {
                 if (OnyxUtils.isCollectionKey(mapping.key)) {
                     OnyxUtils.getCollectionDataAndSendAsObject(matchingKeys, mapping);
                     return;
@@ -226,7 +226,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[T
 
     // If the value has not changed or the key got removed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
     if (!hasChanged || wasRemoved) {
-        return updatePromise.then(() => undefined);
+        return updatePromise;
     }
 
     return Storage.setItem(key, valueWithoutNullValues)
@@ -234,8 +234,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[T
         .then(() => {
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNullValues);
             return updatePromise;
-        })
-        .then(() => undefined);
+        });
 }
 
 /**
