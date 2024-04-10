@@ -845,7 +845,7 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
         })
         // We are going to send the data to the subscriber.
         .finally(() => {
-            sendDataToConnection(mapping, data, undefined, true);
+            sendDataToConnection(mapping, data as OnyxValue<TKey>, undefined, true);
         });
 }
 

@@ -131,7 +131,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): nu
 
                 // Here we cannot use batching because the null value is expected to be set immediately for default props
                 // or they will be undefined.
-                OnyxUtils.sendDataToConnection(mapping, null, undefined, false);
+                OnyxUtils.sendDataToConnection(mapping, null as OnyxValue<TKey>, undefined, false);
                 return;
             }
 
