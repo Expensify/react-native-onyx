@@ -128,20 +128,25 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
  * @param value - contains the change that was made by the method
  * @param mergedValue - (optional) value that was written in the storage after a merge method was executed.
  */
-function sendActionToDevTools(method: typeof METHOD.MERGE_COLLECTION | typeof METHOD.MULTI_SET, key: undefined, value: OnyxCollection<OnyxValue<OnyxKey>>, mergedValue?: undefined): void;
+function sendActionToDevTools(
+    method: typeof METHOD.MERGE_COLLECTION | typeof METHOD.MULTI_SET,
+    key: undefined,
+    value: OnyxCollection<KeyValueMapping[OnyxKey]>,
+    mergedValue?: undefined,
+): void;
 function sendActionToDevTools(
     method: Exclude<OnyxMethod, typeof METHOD.MERGE_COLLECTION | typeof METHOD.MULTI_SET>,
     key: OnyxKey,
-    value: OnyxValue<OnyxKey>,
-    mergedValue?: OnyxValue<OnyxKey>,
+    value: OnyxEntry<KeyValueMapping[OnyxKey]>,
+    mergedValue?: OnyxEntry<KeyValueMapping[OnyxKey]>,
 ): void;
 function sendActionToDevTools(
     method: OnyxMethod,
     key: OnyxKey | undefined,
-    value: OnyxCollection<OnyxValue<OnyxKey>> | OnyxValue<OnyxKey>,
-    mergedValue: OnyxValue<OnyxKey> = undefined,
+    value: OnyxCollection<KeyValueMapping[OnyxKey]> | OnyxEntry<KeyValueMapping[OnyxKey]>,
+    mergedValue: OnyxEntry<KeyValueMapping[OnyxKey]> = undefined,
 ): void {
-    DevTools.registerAction(utils.formatActionName(method, key), value, key ? {[key]: mergedValue || value} : (value as OnyxCollection<OnyxValue<OnyxKey>>));
+    DevTools.registerAction(utils.formatActionName(method, key), value, key ? {[key]: mergedValue || value} : (value as OnyxCollection<KeyValueMapping[OnyxKey]>));
 }
 
 /**
