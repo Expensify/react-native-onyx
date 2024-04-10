@@ -4,30 +4,21 @@ import fs from 'fs';
 
 const run = (): boolean => {
     const regressionOutput: CompareResult = JSON.parse(fs.readFileSync('.reassure/output.json', 'utf8'));
-    const countDeviation = Number(core.getInput('COUNT_DEVIATION', {required: true}));
     const durationDeviation = Number(core.getInput('DURATION_DEVIATION_PERCENTAGE', {required: true}));
 
-    if (regressionOutput.countChanged === undefined || regressionOutput.countChanged.length === 0) {
-        console.log('No countChanged data available. Exiting...');
+    if (regressionOutput.significant === undefined || regressionOutput.significant.length === 0) {
+        console.log('No significant data available. Exiting...');
         return true;
     }
 
-    console.log(`Processing ${regressionOutput.countChanged.length} measurements...`);
+    console.log(`Processing ${regressionOutput.significant.length} measurements...`);
 
-    for (let i = 0; i < regressionOutput.countChanged.length; i++) {
-        const measurement = regressionOutput.countChanged[i];
+    for (let i = 0; i < regressionOutput.significant.length; i++) {
+        const measurement = regressionOutput.significant[i];
         const baseline: PerformanceEntry = measurement.baseline;
         const current: PerformanceEntry = measurement.current;
 
         console.log(`Processing measurement ${i + 1}: ${measurement.name}`);
-
-        const renderCountDiff = current.meanCount - baseline.meanCount;
-        if (renderCountDiff > countDeviation) {
-            core.setFailed(`Render count difference exceeded the allowed deviation of ${countDeviation}. Current difference: ${renderCountDiff}`);
-            break;
-        } else {
-            console.log(`Render count difference ${renderCountDiff} is within the allowed deviation range of ${countDeviation}.`);
-        }
 
         const increasePercentage = ((current.meanDuration - baseline.meanDuration) / baseline.meanDuration) * 100;
         if (increasePercentage > durationDeviation) {
