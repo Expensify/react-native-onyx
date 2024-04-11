@@ -19,8 +19,6 @@ jobs:
               uses: actions/setup-node@v4
               with:
                   node-version-file: '.nvmrc'
-                  cache: npm
-                  cache-dependency-path: package-lock.json
 
             - name: Set dummy git credentials
               run: |
@@ -35,6 +33,7 @@ jobs:
                   git fetch origin "$BASELINE_BRANCH" --no-tags --depth=1
                   git switch "$BASELINE_BRANCH"
                   npm install --force
+                  npm install -g reassure
                   npx reassure --baseline
                   git switch --force --detach -
                   npm install --force
