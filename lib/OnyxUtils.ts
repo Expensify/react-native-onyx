@@ -26,6 +26,7 @@ import type {
     DefaultConnectOptions,
     OnyxEntry,
     KeyValueMapping,
+    DefaultConnectCallback,
 } from './types';
 import type Onyx from './Onyx';
 
@@ -63,7 +64,7 @@ const evictionBlocklist: Record<OnyxKey, number[]> = {};
 
 // Optional user-provided key value states set when Onyx initializes or clears
 let defaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
-// Yes, I tested this in the App. I've done it to clean the return types of Onyx public methods, as it was confusing to return Promise<void[]> or Promise<[void, void]>
+
 let batchUpdatesPromise: Promise<void> | null = null;
 let batchUpdatesQueue: Array<() => void> = [];
 
@@ -195,8 +196,8 @@ function reduceCollectionWithSelector<TKey extends CollectionKeyBase, TMap, TRet
     collection: OnyxCollection<KeyValueMapping[TKey]>,
     selector: Selector<TKey, TMap, TReturn>,
     withOnyxInstanceState: WithOnyxInstanceState<TMap> | undefined,
-): Record<string, unknown> {
-    return Object.entries(collection ?? {}).reduce((finalCollection: Record<string, unknown>, [key, item]) => {
+): Record<string, TReturn> {
+    return Object.entries(collection ?? {}).reduce((finalCollection: Record<string, TReturn>, [key, item]) => {
         // eslint-disable-next-line no-param-reassign
         finalCollection[key] = selector(item, withOnyxInstanceState);
 
@@ -327,7 +328,7 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Partial<Wi
     if (mapping?.selector) {
         const state = mapping.withOnyxInstance ? mapping.withOnyxInstance.state : undefined;
         if (isCollectionKey(key)) {
-            return reduceCollectionWithSelector(val as OnyxCollection<OnyxValue<TKey>>, mapping.selector, state);
+            return reduceCollectionWithSelector(val as OnyxCollection<KeyValueMapping[TKey]>, mapping.selector, state);
         }
         return mapping.selector(val, state);
     }
@@ -400,10 +401,10 @@ function addAllSafeEvictionKeysToRecentlyAccessedList(): Promise<void> {
     });
 }
 
-function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey): Record<OnyxKey, OnyxValue<OnyxKey>> {
+function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey): NonNullable<OnyxCollection<KeyValueMapping[TKey]>> {
     const collectionMemberKeys = Array.from(cache.getAllKeys()).filter((storedKey) => isCollectionMemberKey(collectionKey, storedKey));
 
-    return collectionMemberKeys.reduce((prev: Record<OnyxKey, OnyxValue<OnyxKey>>, key) => {
+    return collectionMemberKeys.reduce((prev: NonNullable<OnyxCollection<KeyValueMapping[TKey]>>, key) => {
         const cachedValue = cache.getValue(key);
         if (!cachedValue) {
             return prev;
@@ -480,7 +481,8 @@ function keysChanged<TKey extends CollectionKeyBase>(
             // And if the subscriber is specifically only tracking a particular collection member key then we will
             // notify them with the cached data for that key only.
             if (isSubscribedToCollectionMemberKey) {
-                subscriber.callback(cachedCollection[subscriber.key] as OnyxCollection<OnyxValue<TKey>>, subscriber.key);
+                const subscriberCallback = subscriber.callback as DefaultConnectCallback<TKey>;
+                subscriberCallback(cachedCollection[subscriber.key], subscriber.key as TKey);
                 continue;
             }
 
@@ -589,7 +591,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
  */
 function keyChanged<TKey extends OnyxKey>(
     key: TKey,
-    data: OnyxEntry<OnyxValue<TKey>>,
+    data: OnyxValue<TKey>,
     prevData: OnyxValue<TKey>,
     canUpdateSubscriber: (subscriber?: Mapping<OnyxKey>) => boolean = () => true,
     notifyRegularSubscibers = true,
@@ -624,7 +626,8 @@ function keyChanged<TKey extends OnyxKey>(
                 continue;
             }
 
-            subscriber.callback(data as OnyxCollection<OnyxValue<TKey>>, key);
+            const subscriberCallback = subscriber.callback as DefaultConnectCallback<TKey>;
+            subscriberCallback(data, key);
             continue;
         }
 
@@ -786,7 +789,7 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
     const pendingKeys: OnyxKey[] = [];
 
     // We are going to combine all the data from the matching keys into a single object
-    const data: OnyxCollection<OnyxValue<TKey>> | OnyxEntry<OnyxValue<TKey>> = {};
+    const data: OnyxCollection<KeyValueMapping[TKey]> = {};
 
     /**
      * We are going to iterate over all the matching keys and check if we have the data in the cache.
@@ -835,7 +838,7 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
             }
 
             // temp object is used to merge the missing data into the cache
-            const temp: OnyxCollection<OnyxValue<TKey>> | OnyxEntry<OnyxValue<TKey>> = {};
+            const temp: OnyxCollection<KeyValueMapping[TKey]> = {};
             values.forEach(([key, value]) => {
                 data[key] = value as OnyxValue<TKey>;
                 temp[key] = value as OnyxValue<TKey>;
@@ -857,7 +860,7 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
  */
 function scheduleSubscriberUpdate<TKey extends OnyxKey>(
     key: TKey,
-    value: OnyxEntry<OnyxValue<TKey>>,
+    value: OnyxValue<TKey>,
     prevValue: OnyxValue<TKey>,
     canUpdateSubscriber: (subscriber?: Mapping<OnyxKey>) => boolean = () => true,
 ): Promise<void> {
@@ -871,7 +874,7 @@ function scheduleSubscriberUpdate<TKey extends OnyxKey>(
  * so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
  * subscriber callbacks receive the data in a different format than they normally expect and it breaks code.
  */
-function scheduleNotifyCollectionSubscribers(key: OnyxKey, value: OnyxCollection<OnyxValue<OnyxKey>>): Promise<void> {
+function scheduleNotifyCollectionSubscribers<TKey extends OnyxKey>(key: TKey, value: OnyxCollection<KeyValueMapping[TKey]>): Promise<void> {
     const promise = Promise.resolve().then(() => keysChanged(key, value, true, false));
     batchUpdates(() => keysChanged(key, value, false, true));
     return Promise.all([maybeFlushBatchUpdates(), promise]).then(() => undefined);
@@ -883,7 +886,7 @@ function scheduleNotifyCollectionSubscribers(key: OnyxKey, value: OnyxCollection
 function remove<TKey extends OnyxKey>(key: TKey): Promise<void> {
     const prevValue = cache.getValue(key, false) as OnyxValue<TKey>;
     cache.drop(key);
-    scheduleSubscriberUpdate(key, null, prevValue);
+    scheduleSubscriberUpdate(key, null as OnyxValue<TKey>, prevValue);
     return Storage.removeItem(key).then(() => undefined);
 }
 
@@ -935,7 +938,7 @@ function evictStorageAndRetry<TMethod extends typeof Onyx.set | typeof Onyx.mult
 /**
  * Notifies subscribers and writes current value to cache
  */
-function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<OnyxValue<TKey>>, hasChanged?: boolean, wasRemoved = false): Promise<void> {
+function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>, hasChanged?: boolean, wasRemoved = false): Promise<void> {
     const prevValue = cache.getValue(key, false) as OnyxValue<TKey>;
 
     // Update subscribers if the cached value has changed, or when the subscriber specifically requires
@@ -953,13 +956,18 @@ function hasPendingMergeForKey(key: OnyxKey): boolean {
     return !!mergeQueue[key];
 }
 
+type RemoveNullValuesOutput = {
+    value: Record<string, unknown> | unknown[] | null;
+    wasRemoved: boolean;
+};
+
 /**
  * Removes a key from storage if the value is null.
  * Otherwise removes all nested null values in objects and returns the object
  *
  * @returns The value without null values and a boolean "wasRemoved", which indicates if the key got removed completely
  */
-function removeNullValues(key: OnyxKey, value: OnyxValue<OnyxKey>): {value: Record<string, unknown> | unknown[] | null; wasRemoved: boolean} {
+function removeNullValues(key: OnyxKey, value: OnyxValue<OnyxKey>): RemoveNullValuesOutput {
     if (value === null) {
         remove(key);
         return {value, wasRemoved: true};

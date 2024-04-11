@@ -45,7 +45,7 @@ function init({
         Storage.keepInstancesSync?.((key, value) => {
             const prevValue = cache.getValue(key, false) as OnyxValue<typeof key>;
             cache.set(key, value);
-            OnyxUtils.keyChanged(key, value, prevValue);
+            OnyxUtils.keyChanged(key, value as OnyxValue<typeof key>, prevValue);
         });
     }
 
@@ -476,7 +476,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
     return OnyxUtils.getAllKeys()
         .then((keys) => {
             const keysToBeClearedFromStorage: OnyxKey[] = [];
-            const keyValuesToResetAsCollection: Record<OnyxKey, OnyxCollection<OnyxValue<OnyxKey>>> = {};
+            const keyValuesToResetAsCollection: Record<OnyxKey, OnyxCollection<KeyValueMapping[OnyxKey]>> = {};
             const keyValuesToResetIndividually: NullableKeyValueMapping = {};
 
             // The only keys that should not be cleared are:
