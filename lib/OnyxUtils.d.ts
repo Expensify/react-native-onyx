@@ -1,15 +1,6 @@
 import {Component} from 'react';
 import * as Logger from './Logger';
-import {
-    Collection,
-    CollectionKey,
-    CollectionKeyBase,
-    DeepRecord,
-    KeyValueMapping,
-    NullishDeep,
-    OnyxCollection,
-    OnyxKey,
-} from './types';
+import {Collection, CollectionKey, CollectionKeyBase, DeepRecord, KeyValueMapping, NullishDeep, OnyxCollection, OnyxKey} from './types';
 
 declare const METHOD: {
     readonly SET: 'set';
