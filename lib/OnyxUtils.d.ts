@@ -1,6 +1,15 @@
 import {Component} from 'react';
 import * as Logger from './Logger';
-import {CollectionKey, CollectionKeyBase, DeepRecord, KeyValueMapping, NullishDeep, OnyxCollection, OnyxEntry, OnyxKey, Selector} from './types';
+import {
+    Collection,
+    CollectionKey,
+    CollectionKeyBase,
+    DeepRecord,
+    KeyValueMapping,
+    NullishDeep,
+    OnyxCollection,
+    OnyxKey,
+} from './types';
 
 declare const METHOD: {
     readonly SET: 'set';
@@ -20,7 +29,7 @@ declare const mergeQueuePromise: Record<OnyxKey, Promise<void | void[]>>;
 declare const callbackToStateMapping: Record<string, Mapping<OnyxKey>>;
 
 // Keeps a copy of the values of the onyx collection keys as a map for faster lookups
-declare let onyxCollectionKeyMap: Map<OnyxKey, OnyxValue<OnyxKey>>;
+declare let onyxCollectionKeySet: Set<OnyxKey>;
 
 // Holds a list of keys that have been directly subscribed to or recently modified from least to most recent
 declare let recentlyAccessedKeys: OnyxKey[];
@@ -88,6 +97,11 @@ declare function get(key: OnyxKey): Promise<OnyxValue<OnyxKey>>;
  * Returns current key names stored in persisted storage
  */
 declare function getAllKeys(): Promise<Set<string>>;
+
+/**
+ * Returns a set of collection key names stored in persisted storage
+ */
+declare function getCollectionKeys(): Set<string>;
 
 /**
  * Checks to see if the a subscriber's supplied key
@@ -275,6 +289,8 @@ declare function applyMerge(existingValue: OnyxValue<OnyxKey>, changes: Array<On
  */
 declare function initializeWithDefaultKeyStates(): Promise<void>;
 
+declare function isValidMergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: Collection<TKey, TMap, NullishDeep<KeyValueMapping[TKey]>>): boolean;
+
 const OnyxUtils = {
     METHOD,
     getMergeQueue,
@@ -287,6 +303,7 @@ const OnyxUtils = {
     batchUpdates,
     get,
     getAllKeys,
+    getCollectionKeys,
     isCollectionKey,
     isCollectionMemberKey,
     splitCollectionMemberKey,
@@ -315,6 +332,7 @@ const OnyxUtils = {
     prepareKeyValuePairsForStorage,
     applyMerge,
     initializeWithDefaultKeyStates,
+    isValidMergeCollection,
 } as const;
 
 export default OnyxUtils;
