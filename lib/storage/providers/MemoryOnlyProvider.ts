@@ -74,9 +74,9 @@ const provider: StorageProvider = {
     /**
      * Merging an existing value with a new one
      */
-    mergeItem(key, _changes, modifiedData) {
+    mergeItem(key, _deltaChanges, preMergedValue) {
         // Since Onyx already merged the existing value with the changes, we can just set the value directly
-        return this.setItem(key, modifiedData);
+        return this.setItem(key, preMergedValue);
     },
 
     /**

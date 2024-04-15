@@ -17,3 +17,7 @@ dist/
 
 # Published package
 *.tgz
+
+# Yalc
+.yalc
+yalc.lock

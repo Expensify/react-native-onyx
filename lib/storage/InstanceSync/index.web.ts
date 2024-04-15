@@ -50,6 +50,8 @@ const InstanceSync = {
     setItem: raiseStorageSyncEvent,
     removeItem: raiseStorageSyncEvent,
     removeItems: raiseStorageSyncManyKeysEvent,
+    multiMerge: raiseStorageSyncManyKeysEvent,
+    multiSet: raiseStorageSyncManyKeysEvent,
     mergeItem: raiseStorageSyncEvent,
     clear: (clearImplementation: () => void) => {
         let allKeys: KeyList;
