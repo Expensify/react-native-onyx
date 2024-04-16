@@ -1,18 +1,25 @@
 import type {BatchQueryResult, QueryResult} from 'react-native-quick-sqlite';
+import type {OnyxKey, OnyxValue} from '../../types';
 
-type Key = string;
-type Value = IDBValidKey;
-type KeyValuePair = [Key, Value];
-type KeyList = Key[];
+type KeyValuePair = [OnyxKey, OnyxValue<OnyxKey>];
+type KeyList = OnyxKey[];
 type KeyValuePairList = KeyValuePair[];
 
-type OnStorageKeyChanged = (key: Key, value: Value | null) => void;
+type OnStorageKeyChanged = <TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>) => void;
 
 type StorageProvider = {
     /**
+     * The name of the provider that can be printed to the logs
+     */
+    name: string;
+    /**
+     * Initializes the storage provider
+     */
+    init: () => void;
+    /**
      * Gets the value of a given key or return `null` if it's not available in storage
      */
-    getItem: (key: Key) => Promise<Value | null>;
+    getItem: <TKey extends OnyxKey>(key: TKey) => Promise<OnyxValue<TKey>>;
 
     /**
      * Get multiple key-value pairs for the given array of keys in a batch
@@ -22,7 +29,7 @@ type StorageProvider = {
     /**
      * Sets the value for a given key. The only requirement is that the value should be serializable to JSON string
      */
-    setItem: (key: Key, value: Value) => Promise<QueryResult | void>;
+    setItem: <TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>) => Promise<QueryResult | void>;
 
     /**
      * Stores multiple key-value pairs in a batch
@@ -32,14 +39,15 @@ type StorageProvider = {
     /**
      * Multiple merging of existing and new values in a batch
      */
-    multiMerge: (pairs: KeyValuePairList) => Promise<BatchQueryResult | IDBValidKey[]>;
+    multiMerge: (pairs: KeyValuePairList) => Promise<BatchQueryResult | IDBValidKey[] | void>;
 
     /**
      * Merges an existing value with a new one by leveraging JSON_PATCH
-     * @param changes - the delta for a specific key
-     * @param modifiedData - the pre-merged data from `Onyx.applyMerge`
+     * @param deltaChanges - the delta for a specific key
+     * @param preMergedValue - the pre-merged data from `Onyx.applyMerge`
+     * @param shouldSetValue - whether the data should be set instead of merged
      */
-    mergeItem: (key: Key, changes: Value, modifiedData: Value) => Promise<BatchQueryResult | void>;
+    mergeItem: <TKey extends OnyxKey>(key: TKey, deltaChanges: OnyxValue<TKey>, preMergedValue: OnyxValue<TKey>, shouldSetValue?: boolean) => Promise<BatchQueryResult | void>;
 
     /**
      * Returns all keys available in storage
@@ -49,7 +57,7 @@ type StorageProvider = {
     /**
      * Removes given key and its value from storage
      */
-    removeItem: (key: Key) => Promise<QueryResult | void>;
+    removeItem: (key: OnyxKey) => Promise<QueryResult | void>;
 
     /**
      * Removes given keys and their values from storage
@@ -60,11 +68,6 @@ type StorageProvider = {
      * Clears absolutely everything from storage
      */
     clear: () => Promise<QueryResult | void>;
-
-    /**
-     * Sets memory only keys
-     */
-    setMemoryOnlyKeys: () => void;
 
     /**
      * Gets the total bytes of the database file
@@ -78,4 +81,4 @@ type StorageProvider = {
 };
 
 export default StorageProvider;
-export type {Value, Key, KeyList, KeyValuePairList};
+export type {KeyList, KeyValuePair, KeyValuePairList, OnStorageKeyChanged};

@@ -1,6 +1,7 @@
 import _ from 'underscore';
 import Onyx from '../../lib';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
+import OnyxUtils from '../../lib/OnyxUtils';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
@@ -38,20 +39,20 @@ describe('Onyx', () => {
 
     it('should remove key value from OnyxCache/Storage when set is called with null value', () =>
         Onyx.set(ONYX_KEYS.OTHER_TEST, 42)
-            .then(() => Onyx.getAllKeys())
+            .then(() => OnyxUtils.getAllKeys())
             .then((keys) => {
-                expect(keys.includes(ONYX_KEYS.OTHER_TEST)).toBe(true);
+                expect(keys.has(ONYX_KEYS.OTHER_TEST)).toBe(true);
                 return Onyx.set(ONYX_KEYS.OTHER_TEST, null);
             })
             .then(() => {
                 // Checks if cache value is removed.
-                expect(cache.getAllKeys().length).toBe(0);
+                expect(cache.getAllKeys().size).toBe(0);
 
                 // When cache keys length is 0, we fetch the keys from storage.
-                return Onyx.getAllKeys();
+                return OnyxUtils.getAllKeys();
             })
             .then((keys) => {
-                expect(keys.includes(ONYX_KEYS.OTHER_TEST)).toBe(false);
+                expect(keys.has(ONYX_KEYS.OTHER_TEST)).toBe(false);
             }));
 
     it('should set a simple key', () => {
@@ -1012,6 +1013,32 @@ describe('Onyx', () => {
             });
     });
 
+    it('should merge a non-existing key with a nested null removed', () => {
+        let testKeyValue;
+
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        return Onyx.merge(ONYX_KEYS.TEST_KEY, {
+            waypoints: {
+                1: 'Home',
+                2: 'Work',
+                3: null,
+            },
+        }).then(() => {
+            expect(testKeyValue).toEqual({
+                waypoints: {
+                    1: 'Home',
+                    2: 'Work',
+                },
+            });
+        });
+    });
     it('should apply updates in order with Onyx.update', () => {
         let testKeyValue;
 

@@ -1,92 +1,26 @@
-import utils from '../../utils';
-import type {Key, KeyValuePairList, Value} from '../providers/types';
-import type StorageProvider from '../providers/types';
+import MemoryOnlyProvider, {mockStore, mockSet, setMockStore} from '../providers/MemoryOnlyProvider';
 
-let storageMapInternal: Record<Key, Value> = {};
+const init = jest.fn(MemoryOnlyProvider.init);
 
-const set = jest.fn((key, value) => {
-    storageMapInternal[key] = value;
-    return Promise.resolve(value);
-});
+init();
 
-const idbKeyvalMock: StorageProvider = {
-    setItem(key, value) {
-        return set(key, value);
-    },
-    multiSet(pairs) {
-        const setPromises = pairs.map(([key, value]) => this.setItem(key, value));
-        return new Promise((resolve) => {
-            Promise.all(setPromises).then(() => resolve(storageMapInternal));
-        });
-    },
-    getItem(key) {
-        return Promise.resolve(storageMapInternal[key]);
-    },
-    multiGet(keys) {
-        const getPromises = keys.map(
-            (key) =>
-                new Promise((resolve) => {
-                    this.getItem(key).then((value) => resolve([key, value]));
-                }),
-        );
-        return Promise.all(getPromises) as Promise<KeyValuePairList>;
-    },
-    multiMerge(pairs) {
-        pairs.forEach(([key, value]) => {
-            const existingValue = storageMapInternal[key];
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const newValue = utils.fastMerge(existingValue as any, value);
-
-            set(key, newValue);
-        });
-
-        return Promise.resolve(storageMapInternal);
-    },
-    mergeItem(key, _changes, modifiedData) {
-        return this.setItem(key, modifiedData);
-    },
-    removeItem(key) {
-        delete storageMapInternal[key];
-        return Promise.resolve();
-    },
-    removeItems(keys) {
-        keys.forEach((key) => {
-            delete storageMapInternal[key];
-        });
-        return Promise.resolve();
-    },
-    clear() {
-        storageMapInternal = {};
-        return Promise.resolve();
-    },
-    getAllKeys() {
-        return Promise.resolve(Object.keys(storageMapInternal));
-    },
-    getDatabaseSize() {
-        return Promise.resolve({bytesRemaining: 0, bytesUsed: 99999});
-    },
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
-    setMemoryOnlyKeys() {},
+const StorageMock = {
+    init,
+    getItem: jest.fn(MemoryOnlyProvider.getItem),
+    multiGet: jest.fn(MemoryOnlyProvider.multiGet),
+    setItem: jest.fn(MemoryOnlyProvider.setItem),
+    multiSet: jest.fn(MemoryOnlyProvider.multiSet),
+    mergeItem: jest.fn(MemoryOnlyProvider.mergeItem),
+    multiMerge: jest.fn(MemoryOnlyProvider.multiMerge),
+    removeItem: jest.fn(MemoryOnlyProvider.removeItem),
+    removeItems: jest.fn(MemoryOnlyProvider.removeItems),
+    clear: jest.fn(MemoryOnlyProvider.clear),
+    getAllKeys: jest.fn(MemoryOnlyProvider.getAllKeys),
+    getDatabaseSize: jest.fn(MemoryOnlyProvider.getDatabaseSize),
+    keepInstancesSync: jest.fn(),
+    mockSet,
+    getMockStore: jest.fn(() => mockStore),
+    setMockStore: jest.fn((data) => setMockStore(data)),
 };
 
-const idbKeyvalMockSpy = {
-    idbKeyvalSet: set,
-    setItem: jest.fn(idbKeyvalMock.setItem),
-    getItem: jest.fn(idbKeyvalMock.getItem),
-    removeItem: jest.fn(idbKeyvalMock.removeItem),
-    removeItems: jest.fn(idbKeyvalMock.removeItems),
-    clear: jest.fn(idbKeyvalMock.clear),
-    getAllKeys: jest.fn(idbKeyvalMock.getAllKeys),
-    multiGet: jest.fn(idbKeyvalMock.multiGet),
-    multiSet: jest.fn(idbKeyvalMock.multiSet),
-    multiMerge: jest.fn(idbKeyvalMock.multiMerge),
-    mergeItem: jest.fn(idbKeyvalMock.mergeItem),
-    getStorageMap: jest.fn(() => storageMapInternal),
-    setInitialMockData: jest.fn((data) => {
-        storageMapInternal = data;
-    }),
-    getDatabaseSize: jest.fn(idbKeyvalMock.getDatabaseSize),
-    setMemoryOnlyKeys: jest.fn(idbKeyvalMock.setMemoryOnlyKeys),
-};
-
-export default idbKeyvalMockSpy;
+export default StorageMock;
