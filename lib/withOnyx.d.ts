@@ -1,5 +1,5 @@
 import {IsEqual} from 'type-fest';
-import {CollectionKeyBase, ExtractOnyxCollectionValue, KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey, Selector} from './types';
+import {CollectionKeyBase, ComputedKey, ExtractOnyxCollectionValue, KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey, Selector} from './types';
 
 /**
  * Represents the base mapping options between an Onyx key and the component's prop.
@@ -87,6 +87,25 @@ type BaseMappingFunctionKeyAndSelector<TComponentProps, TOnyxProps, TReturnType,
 };
 
 /**
+ * TODO
+ *
+ * @example
+ * ```ts
+ * // Onyx prop with computed key.
+ * accountName: {
+ *     key: {
+ *         cacheKey: ONYXKEYS.COMPUTED.ACCOUNT_NAME,
+ *         dependencies: {account: ONYXKEYS.ACCOUNT},
+ *         compute: ({account}) => account.name,
+ *     },
+ * },
+ * ```
+ */
+type BaseMappingComputedKey<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps> = {
+    key: ComputedKey<any, TOnyxProps[TOnyxProp]> | ((props: Omit<TComponentProps, keyof TOnyxProps> & Partial<TOnyxProps>) => ComputedKey<any, TOnyxProps[TOnyxProp]>);
+};
+
+/**
  * Represents the mapping options between an Onyx key and the component's prop with all its possibilities.
  */
 type Mapping<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TOnyxKey extends OnyxKey> = BaseMapping<TComponentProps, TOnyxProps> &
@@ -95,6 +114,7 @@ type Mapping<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TO
         | BaseMappingKey<TComponentProps, TOnyxProps, TOnyxProp, TOnyxKey, OnyxEntry<KeyValueMapping[TOnyxKey]>>
         | BaseMappingStringKeyAndSelector<TComponentProps, TOnyxProps, TOnyxProps[TOnyxProp], TOnyxKey>
         | BaseMappingFunctionKeyAndSelector<TComponentProps, TOnyxProps, TOnyxProps[TOnyxProp], TOnyxKey>
+        | BaseMappingComputedKey<TComponentProps, TOnyxProps, TOnyxProp>
     );
 
 /**
@@ -106,6 +126,7 @@ type CollectionMapping<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOny
         | BaseMappingKey<TComponentProps, TOnyxProps, TOnyxProp, TOnyxKey, OnyxCollection<KeyValueMapping[TOnyxKey]>>
         | BaseMappingStringKeyAndSelector<TComponentProps, TOnyxProps, ExtractOnyxCollectionValue<TOnyxProps[TOnyxProp]>, TOnyxKey>
         | BaseMappingFunctionKeyAndSelector<TComponentProps, TOnyxProps, ExtractOnyxCollectionValue<TOnyxProps[TOnyxProp]>, TOnyxKey>
+        | BaseMappingComputedKey<TComponentProps, TOnyxProps, TOnyxProp>
     );
 
 /**

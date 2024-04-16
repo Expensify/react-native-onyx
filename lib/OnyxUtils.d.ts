@@ -1,6 +1,6 @@
 import {Component} from 'react';
 import * as Logger from './Logger';
-import {CollectionKey, CollectionKeyBase, DeepRecord, KeyValueMapping, NullishDeep, OnyxCollection, OnyxEntry, OnyxKey, Selector} from './types';
+import {AnyComputedKey, ComputedKey, CollectionKey, CollectionKeyBase, DeepRecord, KeyValueMapping, NullishDeep, OnyxCollection, OnyxEntry, OnyxKey, Selector} from './types';
 
 declare const METHOD: {
     readonly SET: 'set';
@@ -275,6 +275,21 @@ declare function applyMerge(existingValue: OnyxValue<OnyxKey>, changes: Array<On
  */
 declare function initializeWithDefaultKeyStates(): Promise<void>;
 
+/**
+ * Returns a string cache key for a possible computed key.
+ */
+declare function getCacheKey(key: OnyxKey | AnyComputedKey): string;
+
+/**
+ * Returns if a key is a computed key.
+ */
+declare function isComputedKey(key: OnyxKey | AnyComputedKey): key is AnyComputedKey;
+
+/**
+ * Adds an entry in the dependent cache key map.
+ */
+declare function addDependentCacheKey(key: OnyxKey, dependentKey: OnyxKey): void;
+
 const OnyxUtils = {
     METHOD,
     getMergeQueue,
@@ -315,6 +330,9 @@ const OnyxUtils = {
     prepareKeyValuePairsForStorage,
     applyMerge,
     initializeWithDefaultKeyStates,
+    getCacheKey,
+    isComputedKey,
+    addDependentCacheKey,
 } as const;
 
 export default OnyxUtils;
