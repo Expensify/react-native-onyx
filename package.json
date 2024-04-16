@@ -44,7 +44,9 @@
     "underscore": "^1.13.6"
   },
   "devDependencies": {
+    "@actions/core": "^1.10.1",
     "@lwc/eslint-plugin-lwc": "^1.7.2",
+    "@ngneat/falso": "^7.2.0",
     "@react-native-community/eslint-config": "^3.2.0",
     "@react-native/polyfills": "^2.0.0",
     "@testing-library/jest-native": "^3.4.2",
@@ -80,6 +82,7 @@
     "react-native-performance": "^2.0.0",
     "react-native-quick-sqlite": "^8.0.6",
     "react-test-renderer": "18.1.0",
+    "reassure": "^0.11.0",
     "ts-node": "^10.9.2",
     "type-fest": "^3.12.0",
     "typescript": "^5.3.3"
