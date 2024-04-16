@@ -5,7 +5,7 @@ type KeyValuePair = [OnyxKey, OnyxValue<OnyxKey>];
 type KeyList = OnyxKey[];
 type KeyValuePairList = KeyValuePair[];
 
-type OnStorageKeyChanged = <TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey> | null) => void;
+type OnStorageKeyChanged = <TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>) => void;
 
 type StorageProvider = {
     /**
@@ -19,7 +19,7 @@ type StorageProvider = {
     /**
      * Gets the value of a given key or return `null` if it's not available in storage
      */
-    getItem: <TKey extends OnyxKey>(key: TKey) => Promise<OnyxValue<TKey> | null>;
+    getItem: <TKey extends OnyxKey>(key: TKey) => Promise<OnyxValue<TKey>>;
 
     /**
      * Get multiple key-value pairs for the given array of keys in a batch

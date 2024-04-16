@@ -58,7 +58,7 @@ class DevTools {
      * @param payload - data written to the storage
      * @param stateChanges - partial state that got updated after the changes
      */
-    registerAction(type: string, payload: unknown, stateChanges: Record<string, unknown> = {}) {
+    registerAction(type: string, payload: unknown, stateChanges: Record<string, unknown> | null = {}) {
         try {
             if (!this.remoteDev) {
                 return;

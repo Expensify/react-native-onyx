@@ -265,44 +265,61 @@ type Collection<TKey extends CollectionKeyBase, TMap, TValue> = {
 };
 
 type WithOnyxInstance = Component<unknown, WithOnyxInstanceState<NullableKeyValueMapping>> & {
-    setStateProxy: (cb: (state: NullableKeyValueMapping) => OnyxValue<OnyxKey>) => void;
+    setStateProxy: (cb: (state: Record<string, OnyxCollection<KeyValueMapping[OnyxKey]>>) => OnyxValue<OnyxKey>) => void;
     setWithOnyxState: (statePropertyName: OnyxKey, value: OnyxValue<OnyxKey>) => void;
 };
 
 /** Represents the base options used in `Onyx.connect()` method. */
 type BaseConnectOptions = {
-    statePropertyName?: string;
-    withOnyxInstance?: Component;
     initWithStoredValues?: boolean;
+};
+
+/** Represents additional options used inside withOnyx HOC */
+type WithOnyxConnectOptions<TKey extends OnyxKey> = {
+    withOnyxInstance: WithOnyxInstance;
+    statePropertyName: string;
+    displayName: string;
+    initWithStoredValues?: boolean;
+    selector?: Selector<TKey, unknown, unknown>;
+    canEvict?: boolean;
+};
+
+type DefaultConnectCallback<TKey extends OnyxKey> = (value: OnyxEntry<KeyValueMapping[TKey]>, key: TKey) => void;
+
+type CollectionConnectCallback<TKey extends OnyxKey> = (value: OnyxCollection<KeyValueMapping[TKey]>) => void;
+
+/** Represents the callback function used in `Onyx.connect()` method with a regular key. */
+type DefaultConnectOptions<TKey extends OnyxKey> = {
+    key: TKey;
+    callback?: DefaultConnectCallback<TKey>;
+    waitForCollectionCallback?: false;
+};
+
+/** Represents the callback function used in `Onyx.connect()` method with a collection key. */
+type CollectionConnectOptions<TKey extends OnyxKey> = {
+    key: TKey extends CollectionKeyBase ? TKey : never;
+    callback?: CollectionConnectCallback<TKey>;
+    waitForCollectionCallback: true;
 };
 
 /**
  * Represents the options used in `Onyx.connect()` method.
- * The type is built from `BaseConnectOptions` and extended to handle key/callback related options.
+ * The type is built from `DefaultConnectOptions`/`CollectionConnectOptions` depending on the `waitForCollectionCallback` property.
  * It includes two different forms, depending on whether we are waiting for a collection callback or not.
  *
  * If `waitForCollectionCallback` is `true`, it expects `key` to be a Onyx collection key and `callback` will be triggered with the whole collection
  * and will pass `value` as an `OnyxCollection`.
  *
- *
  * If `waitForCollectionCallback` is `false` or not specified, the `key` can be any Onyx key and `callback` will be triggered with updates of each collection item
  * and will pass `value` as an `OnyxEntry`.
+ *
+ * The type is also extended with `BaseConnectOptions` and `WithOnyxConnectOptions` to include additional options, depending on the context where it's used.
  */
-type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions &
-    (
-        | {
-              key: TKey extends CollectionKeyBase ? TKey : never;
-              callback?: (value: OnyxCollection<KeyValueMapping[TKey]>) => void;
-              waitForCollectionCallback: true;
-          }
-        | {
-              key: TKey;
-              callback?: (value: OnyxEntry<KeyValueMapping[TKey]>, key: TKey) => void;
-              waitForCollectionCallback?: false;
-          }
-    );
+type ConnectOptions<TKey extends OnyxKey> = (CollectionConnectOptions<TKey> | DefaultConnectOptions<TKey>) & (BaseConnectOptions | WithOnyxConnectOptions<TKey>);
 
-type Mapping<TKey extends OnyxKey> = ConnectOptions<TKey> & {connectionID: number; statePropertyName: string; displayName: string};
+type Mapping<TKey extends OnyxKey> = ConnectOptions<TKey> & {
+    connectionID: number;
+};
 
 /**
  * Represents different kinds of updates that can be passed to `Onyx.update()` method. It is a discriminated union of
@@ -392,6 +409,11 @@ export type {
     Collection,
     WithOnyxInstance,
     BaseConnectOptions,
+    WithOnyxConnectOptions,
+    DefaultConnectCallback,
+    CollectionConnectCallback,
+    DefaultConnectOptions,
+    CollectionConnectOptions,
     ConnectOptions,
     Mapping,
     OnyxUpdate,
