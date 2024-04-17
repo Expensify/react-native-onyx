@@ -209,42 +209,41 @@ function disconnect(connectionID: number, keyToRemoveFromEvictionBlocklist?: Ony
  * @param value value to store
  */
 function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[TKey]>): Promise<void> {
+    // check if the value is compatible with the existing value in the storage
+    const existingValue = cache.getValue(key, false);
+    if (!utils.isUpdateCompatibleWithExistingValue(value, existingValue)) {
+        Logger.logAlert(logMessages.incompatibleUpdateAlerts(key, 'set'));
+        return Promise.resolve();
+    }
+
     // If the value is null, we remove the key from storage
-    return OnyxUtils.get(key).then((existingValue) => {
-        if (!utils.isUpdateCompatibleWithExistingValue(value, existingValue)) {
-            Logger.logAlert(logMessages.incompatibleUpdateAlerts(key, 'set'));
-            return Promise.resolve();
-        }
+    const {value: valueAfterRemoving, wasRemoved} = OnyxUtils.removeNullValues(key, value);
+    const valueWithoutNullValues = valueAfterRemoving as OnyxValue<TKey>;
 
-        const {value: valueAfterRemoving, wasRemoved} = OnyxUtils.removeNullValues(key, value);
-        const valueWithoutNullValues = valueAfterRemoving as OnyxValue<TKey>;
+    if (OnyxUtils.hasPendingMergeForKey(key)) {
+        delete OnyxUtils.getMergeQueue()[key];
+    }
 
-        if (OnyxUtils.hasPendingMergeForKey(key)) {
-            delete OnyxUtils.getMergeQueue()[key];
-        }
+    const hasChanged = cache.hasValueChanged(key, valueWithoutNullValues);
 
-        const hasChanged = cache.hasValueChanged(key, valueWithoutNullValues);
+    // Logging properties only since values could be sensitive things we don't want to log
+    Logger.logInfo(`set called for key: ${key}${_.isObject(value) ? ` properties: ${_.keys(value).join(',')}` : ''} hasChanged: ${hasChanged}`);
 
-        // Logging properties only since values could be sensitive things we don't want to log
-        Logger.logInfo(`set called for key: ${key}${_.isObject(value) ? ` properties: ${_.keys(value).join(',')}` : ''} hasChanged: ${hasChanged}`);
+    // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
+    const updatePromise = OnyxUtils.broadcastUpdate(key, valueWithoutNullValues, hasChanged, wasRemoved);
 
-        // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
-        const updatePromise = OnyxUtils.broadcastUpdate(key, valueWithoutNullValues, hasChanged, wasRemoved);
+    // If the value has not changed or the key got removed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
+    if (!hasChanged || wasRemoved) {
+        return updatePromise;
+    }
 
-        // If the value has not changed or the key got removed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
-        if (!hasChanged || wasRemoved) {
+    return Storage.setItem(key, valueWithoutNullValues)
+        .catch((error) => OnyxUtils.evictStorageAndRetry(error, set, key, valueWithoutNullValues))
+        .then(() => {
+            OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNullValues);
             return updatePromise;
-        }
-
-        return Storage.setItem(key, valueWithoutNullValues)
-            .catch((error) => OnyxUtils.evictStorageAndRetry(error, set, key, valueWithoutNullValues))
-            .then(() => {
-                OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNullValues);
-                return updatePromise;
-            });
-    });
+        });
 }
-
 /**
  * Sets multiple keys and values
  *
@@ -424,16 +423,16 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
 
             const existingKeys = keys.filter((key) => persistedKeys.has(key));
 
-            const cachedCollectionForExistingKeys = OnyxUtils.getCachedCollection(collectionKey, existingKeys)
+            const cachedCollectionForExistingKeys = OnyxUtils.getCachedCollection(collectionKey, existingKeys);
 
             const newKeys = keys.filter((key) => !persistedKeys.has(key));
 
             const existingKeyCollection = existingKeys.reduce((obj: NullableKeyValueMapping, key) => {
-                // eslint-disable-next-line no-param-reassign
                 if (!utils.isUpdateCompatibleWithExistingValue(mergedCollection[key], cachedCollectionForExistingKeys[key])) {
                     Logger.logAlert(logMessages.incompatibleUpdateAlerts(key, 'mergeCollection'));
                     return obj;
                 }
+                // eslint-disable-next-line no-param-reassign
                 obj[key] = mergedCollection[key];
                 return obj;
             }, {});
