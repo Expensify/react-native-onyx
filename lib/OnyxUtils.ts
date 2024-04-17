@@ -1014,7 +1014,7 @@ function applyMerge(existingValue: OnyxValue<OnyxKey>, changes: Array<OnyxValue<
         return lastChange;
     }
 
-    if (changes.some((change) => typeof change === 'object')) {
+    if (changes.some((change) => change && typeof change === 'object')) {
         // Object values are then merged one after the other
         return changes.reduce(
             (modifiedData, change) => utils.fastMerge(modifiedData as Record<OnyxKey, unknown>, change as Record<OnyxKey, unknown>, shouldRemoveNullObjectValues),
