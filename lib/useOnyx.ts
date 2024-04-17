@@ -9,13 +9,13 @@ import Onyx from './Onyx';
 
 /**
  * Represents a Onyx value that can be either a single entry or a collection of entries, depending on the `TKey` provided.
- * It's a variation of `OnyxValue` type that excludes the `null` type.
+ * It's a variation of `OnyxValue` type that is read-only and excludes the `null` type.
  */
 type UseOnyxValue<TKey extends OnyxKey> = string extends TKey
     ? unknown
     : TKey extends CollectionKeyBase
-    ? NonNull<OnyxCollection<KeyValueMapping[TKey]>>
-    : NonNull<OnyxEntry<KeyValueMapping[TKey]>>;
+    ? Readonly<NonNull<OnyxCollection<KeyValueMapping[TKey]>>>
+    : Readonly<NonNull<OnyxEntry<KeyValueMapping[TKey]>>>;
 
 type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
     /**
@@ -49,7 +49,11 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
 
 type FetchStatus = 'loading' | 'loaded';
 
-type CachedValue<TKey extends OnyxKey, TValue> = IsEqual<TValue, UseOnyxValue<TKey>> extends true ? TValue : TKey extends CollectionKeyBase ? NonNullable<OnyxCollection<TValue>> : TValue;
+type CachedValue<TKey extends OnyxKey, TValue> = IsEqual<TValue, UseOnyxValue<TKey>> extends true
+    ? TValue
+    : TKey extends CollectionKeyBase
+    ? Readonly<NonNullable<OnyxCollection<TValue>>>
+    : Readonly<TValue>;
 
 type ResultMetadata = {
     status: FetchStatus;
