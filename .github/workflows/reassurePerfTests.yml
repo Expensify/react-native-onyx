@@ -1,6 +1,3 @@
-#   NOTE: After changes to the file it needs to be compiled using [`ncc`](https://github.com/vercel/ncc)
-#   Example: ncc build -t validateReassureOutput.ts -o index.js
-
 name: Reassure Performance Tests
 
 on:

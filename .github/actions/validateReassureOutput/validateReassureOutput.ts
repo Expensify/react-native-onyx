@@ -1,3 +1,8 @@
+/*
+ *  NOTE: After changes to the file it needs to be compiled using [`ncc`](https://github.com/vercel/ncc)
+ *  Example: ncc build -t validateReassureOutput.ts -o index.js
+ */
+
 import * as core from '@actions/core';
 import type {CompareResult, PerformanceEntry} from '@callstack/reassure-compare/src/types';
 import fs from 'fs';
