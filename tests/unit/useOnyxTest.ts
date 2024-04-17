@@ -102,7 +102,7 @@ describe('useOnyx', () => {
 
             const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
 
-            expect(result.current[0]).toEqual(null);
+            expect(result.current[0]).toEqual(undefined);
             expect(result.current[1].status).toEqual('loading');
 
             await act(async () => waitForPromisesToResolve());
@@ -118,7 +118,7 @@ describe('useOnyx', () => {
 
             const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
 
-            expect(result.current[0]).toEqual(null);
+            expect(result.current[0]).toEqual(undefined);
             expect(result.current[1].status).toEqual('loading');
 
             await act(async () => waitForPromisesToResolve());
@@ -257,7 +257,7 @@ describe('useOnyx', () => {
 
             await act(async () => waitForPromisesToResolve());
 
-            expect(result.current[0]).toEqual(null);
+            expect(result.current[0]).toEqual(undefined);
             expect(result.current[1].status).toEqual('loaded');
         });
 
@@ -290,7 +290,7 @@ describe('useOnyx', () => {
 
             const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
 
-            expect(result.current[0]).toEqual(null);
+            expect(result.current[0]).toEqual(undefined);
             expect(result.current[1].status).toEqual('loading');
 
             await act(async () => waitForPromisesToResolve());
@@ -348,7 +348,7 @@ describe('useOnyx', () => {
 
             await act(async () => waitForPromisesToResolve());
 
-            expect(result.current[0]).toEqual(null);
+            expect(result.current[0]).toEqual(undefined);
             expect(result.current[1].status).toEqual('loaded');
 
             await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, 'test2'));
