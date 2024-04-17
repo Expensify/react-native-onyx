@@ -1,0 +1,48 @@
+#   NOTE: After changes to the file it needs to be compiled using [`ncc`](https://github.com/vercel/ncc)
+#   Example: ncc build -t validateReassureOutput.ts -o index.js
+
+name: Reassure Performance Tests
+
+on:
+    pull_request:
+        types: [opened, synchronize]
+        branches-ignore: [staging, production]
+        paths-ignore: [.github/**, tests/**, '**.md', '**.sh']
+jobs:
+    perf-tests:
+        if: ${{ github.actor != 'OSBotify' }}
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version-file: '.nvmrc'
+
+            - name: Set dummy git credentials
+              run: |
+                  git config --global user.email "test@test.com"
+                  git config --global user.name "Test"
+            - name: Run performance testing script
+              shell: bash
+              run: |
+                  set -e
+                  BASELINE_BRANCH=${BASELINE_BRANCH:="main"}
+                  git fetch origin "$BASELINE_BRANCH" --no-tags --depth=1
+                  git switch "$BASELINE_BRANCH"
+                  npm install --force
+                  npm install reassure
+                  npx reassure --baseline
+                  git switch --force --detach -
+                  npm install --force
+                  npm install reassure
+                  npx reassure --branch
+            - name: Validate output.json
+              id: validateReassureOutput
+              uses: ./.github/actions/javascript/validateReassureOutput
+              with:
+                  DURATION_DEVIATION_PERCENTAGE: 20
