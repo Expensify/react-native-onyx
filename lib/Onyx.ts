@@ -442,6 +442,7 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
                 obj[key] = mergedCollection[key];
                 return obj;
             }, {});
+
             const keyValuePairsForExistingCollection = OnyxUtils.prepareKeyValuePairsForStorage(existingKeyCollection);
             const keyValuePairsForNewCollection = OnyxUtils.prepareKeyValuePairsForStorage(newCollection);
 
@@ -457,11 +458,14 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
                 promises.push(Storage.multiSet(keyValuePairsForNewCollection));
             }
 
+            // finalMergedCollection contains all the keys that were merged, without the keys of incompatible updates
+            const finalMergedCollection = {...existingKeyCollection, ...newCollection};
+
             // Prefill cache if necessary by calling get() on any existing keys and then merge original data to cache
             // and update all subscribers
             const promiseUpdate = Promise.all(existingKeys.map(OnyxUtils.get)).then(() => {
-                cache.merge(mergedCollection);
-                return OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, mergedCollection);
+                cache.merge(finalMergedCollection);
+                return OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, finalMergedCollection);
             });
 
             return Promise.all(promises)
