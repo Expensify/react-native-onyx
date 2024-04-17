@@ -21,3 +21,6 @@ dist/
 # Yalc
 .yalc
 yalc.lock
+
+# Perf tests
+.reassure

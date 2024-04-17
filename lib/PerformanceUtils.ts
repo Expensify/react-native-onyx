@@ -57,7 +57,7 @@ function logSetStateCall<TKey extends OnyxKey>(mapping: Mapping<TKey>, previousV
         logParams.newValue = newValue;
     }
 
-    console.debug(`[Onyx-Debug] ${mapping.displayName} setState() called. Subscribed to key '${mapping.key}' (${caller})`, logParams);
+    console.debug(`[Onyx-Debug] ${'displayName' in mapping && mapping.displayName} setState() called. Subscribed to key '${mapping.key}' (${caller})`, logParams);
 }
 
 export {logSetStateCall, setShouldDebugSetState};

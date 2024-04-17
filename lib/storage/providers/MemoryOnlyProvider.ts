@@ -36,7 +36,7 @@ const provider: StorageProvider = {
     getItem(key) {
         const value = store[key] as OnyxValue<typeof key>;
 
-        return Promise.resolve(value === undefined ? null : value);
+        return Promise.resolve(value === undefined ? (null as OnyxValue<typeof key>) : value);
     },
 
     /**
