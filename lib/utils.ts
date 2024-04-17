@@ -117,4 +117,12 @@ function formatActionName(method: string, key?: OnyxKey): string {
     return key ? `${method.toUpperCase()}/${key}` : method.toUpperCase();
 }
 
-export default {isEmptyObject, fastMerge, formatActionName, removeNestedNullValues};
+/** validate that the update and the existing value are compatible */
+function isUpdateCompatibleWithExistingValue(value: unknown, existingValue: unknown): boolean {
+    if (existingValue && value && Array.isArray(existingValue) !== Array.isArray(value)) {
+        return false;
+    }
+    return true;
+}
+
+export default {isEmptyObject, fastMerge, formatActionName, removeNestedNullValues, isUpdateCompatibleWithExistingValue};

@@ -23,6 +23,7 @@ import type {
     OnyxValue,
 } from './types';
 import OnyxUtils from './OnyxUtils';
+import logMessages from './logMessages';
 
 // Keeps track of the last connectionID that was used so we can keep incrementing it
 let lastConnectionID = 0;
@@ -209,32 +210,39 @@ function disconnect(connectionID: number, keyToRemoveFromEvictionBlocklist?: Ony
  */
 function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[TKey]>): Promise<void> {
     // If the value is null, we remove the key from storage
-    const {value: valueAfterRemoving, wasRemoved} = OnyxUtils.removeNullValues(key, value);
-    const valueWithoutNullValues = valueAfterRemoving as OnyxValue<TKey>;
+    return OnyxUtils.get(key).then((existingValue) => {
+        if (!utils.isUpdateCompatibleWithExistingValue(value, existingValue)) {
+            Logger.logAlert(logMessages.incompatibleUpdateAlerts(key, 'set'));
+            return Promise.resolve();
+        }
 
-    if (OnyxUtils.hasPendingMergeForKey(key)) {
-        delete OnyxUtils.getMergeQueue()[key];
-    }
+        const {value: valueAfterRemoving, wasRemoved} = OnyxUtils.removeNullValues(key, value);
+        const valueWithoutNullValues = valueAfterRemoving as OnyxValue<TKey>;
 
-    const hasChanged = cache.hasValueChanged(key, valueWithoutNullValues);
+        if (OnyxUtils.hasPendingMergeForKey(key)) {
+            delete OnyxUtils.getMergeQueue()[key];
+        }
 
-    // Logging properties only since values could be sensitive things we don't want to log
-    Logger.logInfo(`set called for key: ${key}${_.isObject(value) ? ` properties: ${_.keys(value).join(',')}` : ''} hasChanged: ${hasChanged}`);
+        const hasChanged = cache.hasValueChanged(key, valueWithoutNullValues);
 
-    // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
-    const updatePromise = OnyxUtils.broadcastUpdate(key, valueWithoutNullValues, hasChanged, wasRemoved);
+        // Logging properties only since values could be sensitive things we don't want to log
+        Logger.logInfo(`set called for key: ${key}${_.isObject(value) ? ` properties: ${_.keys(value).join(',')}` : ''} hasChanged: ${hasChanged}`);
 
-    // If the value has not changed or the key got removed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
-    if (!hasChanged || wasRemoved) {
-        return updatePromise;
-    }
+        // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
+        const updatePromise = OnyxUtils.broadcastUpdate(key, valueWithoutNullValues, hasChanged, wasRemoved);
 
-    return Storage.setItem(key, valueWithoutNullValues)
-        .catch((error) => OnyxUtils.evictStorageAndRetry(error, set, key, valueWithoutNullValues))
-        .then(() => {
-            OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNullValues);
+        // If the value has not changed or the key got removed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
+        if (!hasChanged || wasRemoved) {
             return updatePromise;
-        });
+        }
+
+        return Storage.setItem(key, valueWithoutNullValues)
+            .catch((error) => OnyxUtils.evictStorageAndRetry(error, set, key, valueWithoutNullValues))
+            .then(() => {
+                OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNullValues);
+                return updatePromise;
+            });
+    });
 }
 
 /**
@@ -307,7 +315,16 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<K
         try {
             // We first only merge the changes, so we can provide these to the native implementation (SQLite uses only delta changes in "JSON_PATCH" to merge)
             // We don't want to remove null values from the "batchedDeltaChanges", because SQLite uses them to remove keys from storage natively.
-            const batchedDeltaChanges = OnyxUtils.applyMerge(undefined, mergeQueue[key], false);
+            const validChanges = mergeQueue[key].filter((change) => utils.isUpdateCompatibleWithExistingValue(change, existingValue));
+
+            if (validChanges.length !== mergeQueue[key].length) {
+                Logger.logAlert(logMessages.incompatibleUpdateAlerts(key, 'merge'));
+            }
+
+            if (!validChanges.length) {
+                return undefined;
+            }
+            const batchedDeltaChanges = OnyxUtils.applyMerge(undefined, validChanges, false);
 
             // Case (1): When there is no existing value in storage, we want to set the value instead of merge it.
             // Case (2): The presence of a top-level `null` in the merge queue instructs us to drop the whole existing value.
@@ -406,10 +423,17 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
             });
 
             const existingKeys = keys.filter((key) => persistedKeys.has(key));
+
+            const cachedCollectionForExistingKeys = OnyxUtils.getCachedCollection(collectionKey, existingKeys)
+
             const newKeys = keys.filter((key) => !persistedKeys.has(key));
 
             const existingKeyCollection = existingKeys.reduce((obj: NullableKeyValueMapping, key) => {
                 // eslint-disable-next-line no-param-reassign
+                if (!utils.isUpdateCompatibleWithExistingValue(mergedCollection[key], cachedCollectionForExistingKeys[key])) {
+                    Logger.logAlert(logMessages.incompatibleUpdateAlerts(key, 'mergeCollection'));
+                    return obj;
+                }
                 obj[key] = mergedCollection[key];
                 return obj;
             }, {});
