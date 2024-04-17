@@ -27,6 +27,8 @@ import type {
     OnyxEntry,
     KeyValueMapping,
     DefaultConnectCallback,
+    Collection,
+    NullishDeep,
 } from './types';
 import type Onyx from './Onyx';
 
@@ -45,7 +47,7 @@ type OnyxMethod = ValueOf<typeof METHOD>;
 const mergeQueue: Record<OnyxKey, Array<OnyxValue<OnyxKey>>> = {};
 const mergeQueuePromise: Record<OnyxKey, Promise<void>> = {};
 
-// Holds a mapping of all the react components that want their state subscribed to a store key
+// Holds a mapping of all the React components that want their state subscribed to a store key
 const callbackToStateMapping: Record<string, Mapping<OnyxKey>> = {};
 
 // Keeps a copy of the values of the onyx collection keys as a map for faster lookups
@@ -107,10 +109,10 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
     // We need the value of the collection keys later for checking if a
     // key is a collection. We store it in a map for faster lookup.
     const collectionValues = Object.values(keys.COLLECTION ?? {});
-    onyxCollectionKeyMap = collectionValues.reduce((acc, val) => {
-        acc.add(val);
+    onyxCollectionKeySet = collectionValues.reduce((acc, val) => {
+        acc.add(val as OnyxKey); // todo
         return acc;
-    }, new Set());
+    }, new Set<OnyxKey>());
 
     // Set our default key states to use when initializing and clearing Onyx data
     defaultKeyStates = initialKeyStates;
@@ -1048,16 +1050,16 @@ function initializeWithDefaultKeyStates(): Promise<void> {
     });
 }
 
-function isValidMergeCollection(collectionKey, collection) {
-    if (!_.isObject(collection) || _.isArray(collection) || _.isEmpty(collection)) {
+function isValidMergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: Collection<TKey, TMap, NullishDeep<KeyValueMapping[TKey]>>) {
+    if (typeof collection !== 'object' || Array.isArray(collection) || utils.isEmptyObject(collection)) {
         Logger.logInfo('mergeCollection() called with invalid or empty value. Skipping this update.');
         return false;
     }
 
     // Confirm all the collection keys belong to the same parent
     let hasCollectionKeyCheckFailed = false;
-    _.each(collection, (_data, dataKey) => {
-        if (isKeyMatch(collectionKey, dataKey)) {
+    Object.keys(collection).forEach((dataKey) => {
+        if (OnyxUtils.isKeyMatch(collectionKey, dataKey)) {
             return;
         }
 
