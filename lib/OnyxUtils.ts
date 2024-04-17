@@ -27,8 +27,6 @@ import type {
     OnyxEntry,
     KeyValueMapping,
     DefaultConnectCallback,
-    Collection,
-    NullishDeep,
 } from './types';
 import type Onyx from './Onyx';
 
@@ -108,9 +106,9 @@ function getDefaultKeyStates(): Record<OnyxKey, OnyxValue<OnyxKey>> {
 function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Partial<NullableKeyValueMapping>, safeEvictionKeys: OnyxKey[]): void {
     // We need the value of the collection keys later for checking if a
     // key is a collection. We store it in a map for faster lookup.
-    const collectionValues = Object.values(keys.COLLECTION ?? {});
+    const collectionValues = Object.values(keys.COLLECTION ?? {}) as string[];
     onyxCollectionKeySet = collectionValues.reduce((acc, val) => {
-        acc.add(val as OnyxKey); // todo
+        acc.add(val);
         return acc;
     }, new Set<OnyxKey>());
 
@@ -258,9 +256,9 @@ function getAllKeys(): Promise<Set<OnyxKey>> {
 }
 
 /**
- * @returns {Set} A set of collection keys.
+ * Returns set of all registered collection keys
  */
-function getCollectionKeys() {
+function getCollectionKeys(): Set<OnyxKey> {
     return onyxCollectionKeySet;
 }
 
@@ -1050,7 +1048,10 @@ function initializeWithDefaultKeyStates(): Promise<void> {
     });
 }
 
-function isValidMergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: Collection<TKey, TMap, NullishDeep<KeyValueMapping[TKey]>>) {
+/**
+ * Verify if the collection is valid for merging into the collection key using mergeCollection()
+ */
+function isValidMergeCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collection: Record<string, unknown>): boolean {
     if (typeof collection !== 'object' || Array.isArray(collection) || utils.isEmptyObject(collection)) {
         Logger.logInfo('mergeCollection() called with invalid or empty value. Skipping this update.');
         return false;

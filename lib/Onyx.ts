@@ -584,8 +584,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
                 enqueueMergeOperation(key, value);
                 break;
             case OnyxUtils.METHOD.MERGE_COLLECTION:
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                if (OnyxUtils.isValidMergeCollection(key, value as any)) {
+                if (OnyxUtils.isValidMergeCollection(key, value)) {
                     Object.entries(value).forEach(([_key, _value]) => enqueueMergeOperation(_key, _value));
                 }
                 break;
