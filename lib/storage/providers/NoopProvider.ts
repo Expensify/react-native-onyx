@@ -1,3 +1,4 @@
+import type {OnyxValue} from '../../types';
 import type StorageProvider from './types';
 
 const provider: StorageProvider = {
@@ -15,11 +16,9 @@ const provider: StorageProvider = {
 
     /**
      * Get the value of a given key or return `null` if it's not available in memory
-     * @param {String} key
-     * @return {Promise<*>}
      */
-    getItem() {
-        return Promise.resolve(null);
+    getItem(key) {
+        return Promise.resolve(null as OnyxValue<typeof key>);
     },
 
     /**
