@@ -390,6 +390,14 @@ type InitOptions = {
     debugSetState?: boolean;
 };
 
+/**
+ * Represents a combination of Merge and Set operations that should be executed in Onyx
+ */
+type MixedOperationsQueue = {
+    merge: NullableKeyValueMapping;
+    set: NullableKeyValueMapping;
+};
+
 export type {
     CollectionKey,
     CollectionKeyBase,
@@ -418,4 +426,5 @@ export type {
     Mapping,
     OnyxUpdate,
     InitOptions,
+    MixedOperationsQueue,
 };

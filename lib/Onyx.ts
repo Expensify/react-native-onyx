@@ -9,11 +9,13 @@ import utils from './utils';
 import DevTools from './DevTools';
 import type {
     Collection,
+    CollectionKey,
     CollectionKeyBase,
     ConnectOptions,
     InitOptions,
     KeyValueMapping,
     Mapping,
+    MixedOperationsQueue,
     NullableKeyValueMapping,
     NullishDeep,
     OnyxCollection,
@@ -584,12 +586,12 @@ function update(data: OnyxUpdate[]): Promise<void> {
                 enqueueMergeOperation(key, value);
                 break;
             case OnyxUtils.METHOD.MERGE_COLLECTION:
-                if (OnyxUtils.isValidMergeCollection(key, value)) {
-                    Object.entries(value).forEach(([_key, _value]) => enqueueMergeOperation(_key, _value));
+                if (OnyxUtils.isValidMergeCollection(key, value as Collection<CollectionKey, unknown, unknown>)) {
+                    Object.entries(value).forEach(([entryKey, entryValue]) => enqueueMergeOperation(entryKey, entryValue));
                 }
                 break;
             case OnyxUtils.METHOD.MULTI_SET:
-                Object.entries(value).forEach(([_key, _value]) => enqueueSetOperation(_key, _value));
+                Object.entries(value).forEach(([entryKey, entryValue]) => enqueueSetOperation(entryKey, entryValue));
                 break;
             case OnyxUtils.METHOD.CLEAR:
                 clearPromise = clear();
@@ -609,7 +611,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
         }
 
         const batchedCollectionUpdates = collectionItemKeys.reduce(
-            (acc: {merge: NullableKeyValueMapping; set: NullableKeyValueMapping}, key: string) => {
+            (acc: MixedOperationsQueue, key: string) => {
                 const operations = updateQueue[key];
 
                 // Remove the collection-related key from the updateQueue so that it won't be processed individually later.
@@ -630,8 +632,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
         );
 
         if (!utils.isEmptyObject(batchedCollectionUpdates.merge)) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            promises.push(() => mergeCollection(collectionKey, batchedCollectionUpdates.merge as any)); // todo: fix this any
+            promises.push(() => mergeCollection(collectionKey, batchedCollectionUpdates.merge as Collection<CollectionKey, unknown, unknown>));
         }
         if (!utils.isEmptyObject(batchedCollectionUpdates.set)) {
             promises.push(() => multiSet(batchedCollectionUpdates.set));
