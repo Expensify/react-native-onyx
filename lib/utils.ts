@@ -118,11 +118,24 @@ function formatActionName(method: string, key?: OnyxKey): string {
 }
 
 /** validate that the update and the existing value are compatible */
-function isUpdateCompatibleWithExistingValue(value: unknown, existingValue: unknown): boolean {
-    if (existingValue && value && Array.isArray(existingValue) !== Array.isArray(value)) {
-        return false;
+function checkCompatibilityWithExistingValue(value: unknown, existingValue: unknown): {compatible: boolean; existingValueType?: string; newValueType?: string} {
+    if (!existingValue || !value) {
+        return {
+            compatible: true,
+        };
     }
-    return true;
+    const existingValueType = Array.isArray(existingValue) ? 'array' : 'non-array';
+    const newValueType = Array.isArray(value) ? 'array' : 'non-array';
+    if (existingValueType !== newValueType) {
+        return {
+            compatible: false,
+            existingValueType,
+            newValueType,
+        };
+    }
+    return {
+        compatible: true,
+    };
 }
 
-export default {isEmptyObject, fastMerge, formatActionName, removeNestedNullValues, isUpdateCompatibleWithExistingValue};
+export default {isEmptyObject, fastMerge, formatActionName, removeNestedNullValues, checkCompatibilityWithExistingValue};

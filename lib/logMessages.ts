@@ -1,5 +1,7 @@
 const logMessages = {
-    incompatibleUpdateAlerts: (key: string, operation: string) => `A warning occurred while applying ${operation} for key: ${key}, Warning: Trying to set array to object or vice versa`,
+    incompatibleUpdateAlert: (key: string, operation: string, existingValueType?: string, newValueType?: string) => {
+        return `Warning: Trying to apply "${operation}" with ${newValueType ?? 'unknown'} type to ${existingValueType ?? 'unknown'} type in the key ${key}`;
+    },
 };
 
 export default logMessages;

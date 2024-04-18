@@ -211,8 +211,9 @@ function disconnect(connectionID: number, keyToRemoveFromEvictionBlocklist?: Ony
 function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[TKey]>): Promise<void> {
     // check if the value is compatible with the existing value in the storage
     const existingValue = cache.getValue(key, false);
-    if (!utils.isUpdateCompatibleWithExistingValue(value, existingValue)) {
-        Logger.logAlert(logMessages.incompatibleUpdateAlerts(key, 'set'));
+    const {compatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(value, existingValue);
+    if (!compatible) {
+        Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'set', existingValueType, newValueType));
         return Promise.resolve();
     }
 
@@ -314,11 +315,13 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<K
         try {
             // We first only merge the changes, so we can provide these to the native implementation (SQLite uses only delta changes in "JSON_PATCH" to merge)
             // We don't want to remove null values from the "batchedDeltaChanges", because SQLite uses them to remove keys from storage natively.
-            const validChanges = mergeQueue[key].filter((change) => utils.isUpdateCompatibleWithExistingValue(change, existingValue));
-
-            if (validChanges.length !== mergeQueue[key].length) {
-                Logger.logAlert(logMessages.incompatibleUpdateAlerts(key, 'merge'));
-            }
+            const validChanges = mergeQueue[key].filter((change) => {
+                const {compatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(change, existingValue);
+                if (!compatible) {
+                    Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'merge', existingValueType, newValueType));
+                }
+                return compatible;
+            });
 
             if (!validChanges.length) {
                 return undefined;
@@ -428,8 +431,9 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
             const newKeys = keys.filter((key) => !persistedKeys.has(key));
 
             const existingKeyCollection = existingKeys.reduce((obj: NullableKeyValueMapping, key) => {
-                if (!utils.isUpdateCompatibleWithExistingValue(mergedCollection[key], cachedCollectionForExistingKeys[key])) {
-                    Logger.logAlert(logMessages.incompatibleUpdateAlerts(key, 'mergeCollection'));
+                const {compatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(mergedCollection[key], cachedCollectionForExistingKeys[key]);
+                if (!compatible) {
+                    Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'mergeCollection', existingValueType, newValueType));
                     return obj;
                 }
                 // eslint-disable-next-line no-param-reassign

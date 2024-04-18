@@ -91,8 +91,7 @@ describe('Onyx', () => {
             .then(() => {
                 expect(testKeyValue).toStrictEqual(['test']);
             });
-
-    })
+    });
 
     it('should merge an object with another object', () => {
         let testKeyValue;
@@ -129,12 +128,12 @@ describe('Onyx', () => {
         return Onyx.merge(ONYX_KEYS.TEST_KEY, ['test'])
             .then(() => {
                 expect(testKeyValue).toStrictEqual(['test']);
-                return Onyx.merge(ONYX_KEYS.TEST_KEY, { test2: 'test2' });
+                return Onyx.merge(ONYX_KEYS.TEST_KEY, {test2: 'test2'});
             })
             .then(() => {
                 expect(testKeyValue).toStrictEqual(['test']);
             });
-    })
+    });
 
     it('should notify subscribers when data has been cleared', () => {
         let testKeyValue;
