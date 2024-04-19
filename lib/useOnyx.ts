@@ -17,7 +17,7 @@ type UseOnyxValue<TKey extends OnyxKey> = string extends TKey
     ? Readonly<NonNull<OnyxCollection<KeyValueMapping[TKey]>>>
     : Readonly<NonNull<OnyxEntry<KeyValueMapping[TKey]>>>;
 
-type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
+type BaseUseOnyxOptions = {
     /**
      * Determines if this key in this subscription is safe to be evicted.
      */
@@ -32,12 +32,16 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
      * If set to true, data will be retrieved from cache during the first render even if there is a pending merge for the key.
      */
     allowStaleData?: boolean;
+};
 
+type UseOnyxInitialValueOption<TInitialValue> = {
     /**
      * This value will be returned by the hook on the first render while the data is being read from Onyx.
      */
-    initialValue?: TReturnValue;
+    initialValue?: TInitialValue;
+};
 
+type UseOnyxSelectorOption<TKey extends OnyxKey, TReturnValue> = {
     /**
      * This will be used to subscribe to a subset of an Onyx key's data.
      * Using this setting on `useOnyx` can have very positive performance benefits because the component will only re-render
@@ -46,6 +50,8 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
      */
     selector?: Selector<TKey, unknown, TReturnValue>;
 };
+
+type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = BaseUseOnyxOptions & UseOnyxInitialValueOption<TReturnValue> & UseOnyxSelectorOption<TKey, TReturnValue>;
 
 type FetchStatus = 'loading' | 'loaded';
 
@@ -65,6 +71,14 @@ function getCachedValue<TKey extends OnyxKey, TValue>(key: TKey, selector?: Sele
     return OnyxUtils.tryGetCachedValue(key, {selector}) as CachedValue<TKey, TValue> | undefined;
 }
 
+function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(
+    key: TKey,
+    options?: BaseUseOnyxOptions & UseOnyxInitialValueOption<TReturnValue> & Required<UseOnyxSelectorOption<TKey, TReturnValue>>,
+): UseOnyxResult<TKey, TReturnValue>;
+function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(
+    key: TKey,
+    options?: BaseUseOnyxOptions & UseOnyxInitialValueOption<NoInfer<TReturnValue>>,
+): UseOnyxResult<TKey, TReturnValue>;
 function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(key: TKey, options?: UseOnyxOptions<TKey, TReturnValue>): UseOnyxResult<TKey, TReturnValue> {
     const connectionIDRef = useRef<number | null>(null);
     const previousKey = usePrevious(key);
