@@ -245,7 +245,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[T
  * @param data object keyed by ONYXKEYS and the values to set
  */
 function multiSet(data: Partial<NullableKeyValueMapping>): Promise<void> {
-    const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(data);
+    const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(data, true);
 
     const updatePromises = keyValuePairs.map(([key, value]) => {
         const prevValue = cache.getValue(key, false);
@@ -419,8 +419,10 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
                 obj[key] = mergedCollection[key];
                 return obj;
             }, {});
-            const keyValuePairsForExistingCollection = OnyxUtils.prepareKeyValuePairsForStorage(existingKeyCollection);
-            const keyValuePairsForNewCollection = OnyxUtils.prepareKeyValuePairsForStorage(newCollection);
+
+            // We don't want to remove null values because the provider's merge method uses them to remove their respective keys
+            const keyValuePairsForExistingCollection = OnyxUtils.prepareKeyValuePairsForStorage(existingKeyCollection, false);
+            const keyValuePairsForNewCollection = OnyxUtils.prepareKeyValuePairsForStorage(newCollection, true);
 
             const promises = [];
 

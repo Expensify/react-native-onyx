@@ -143,6 +143,68 @@ describe('Onyx.mergeCollection() and WebStorage', () => {
             });
     });
 
+    it('merge with null values', () => {
+        // Given empty storage
+        expect(StorageMock.getMockStore().test_1).toBeFalsy();
+        expect(StorageMock.getMockStore().test_2).toBeFalsy();
+        expect(StorageMock.getMockStore().test_3).toBeFalsy();
+
+        // And an empty cache values for the collection keys
+        expect(OnyxCache.getValue('test_1')).toBeFalsy();
+        expect(OnyxCache.getValue('test_2')).toBeFalsy();
+        expect(OnyxCache.getValue('test_3')).toBeFalsy();
+
+        // When we merge additional data and wait for the change
+        const data = {a: 'a', b: 'b'};
+        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+            test_1: data,
+            test_2: data,
+            test_3: data,
+        });
+
+        return waitForPromisesToResolve()
+            .then(() => {
+                // Then the cache and storage should match
+                expect(OnyxCache.getValue('test_1')).toEqual(data);
+                expect(OnyxCache.getValue('test_2')).toEqual(data);
+                expect(OnyxCache.getValue('test_3')).toEqual(data);
+                expect(StorageMock.getMockStore().test_1).toEqual(data);
+                expect(StorageMock.getMockStore().test_2).toEqual(data);
+                expect(StorageMock.getMockStore().test_3).toEqual(data);
+
+                // When we merge additional data containing null values and wait for the change
+                const additionalData = {b: null, c: 'c'};
+                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                    test_1: additionalData,
+                    test_2: additionalData,
+                    test_3: additionalData,
+                });
+
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                const finalObjectCache = {
+                    a: 'a',
+                    b: null,
+                    c: 'c',
+                };
+                const finalObject = {
+                    a: 'a',
+                    c: 'c',
+                };
+
+                // Then our new data should merge with the existing data in the cache
+                expect(OnyxCache.getValue('test_1')).toEqual(finalObjectCache);
+                expect(OnyxCache.getValue('test_2')).toEqual(finalObjectCache);
+                expect(OnyxCache.getValue('test_3')).toEqual(finalObjectCache);
+
+                // And the storage should reflect the same state but with nulled key-values removed
+                expect(StorageMock.getMockStore().test_1).toEqual(finalObject);
+                expect(StorageMock.getMockStore().test_2).toEqual(finalObject);
+                expect(StorageMock.getMockStore().test_3).toEqual(finalObject);
+            });
+    });
+
     it('setItem() and multiMerge()', () => {
         // Onyx should be empty after clear() is called
         expect(StorageMock.getMockStore()).toEqual({});

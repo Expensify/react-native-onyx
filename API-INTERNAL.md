@@ -120,7 +120,7 @@ Otherwise removes all nested null values in objects and returns the object</p>
 <dt><a href="#prepareKeyValuePairsForStorage">prepareKeyValuePairsForStorage()</a> ⇒</dt>
 <dd><p>Storage expects array like: [[&quot;@MyApp_user&quot;, value_1], [&quot;@MyApp_key&quot;, value_2]]
 This method transforms an object like {&#39;@MyApp_user&#39;: myUserValue, &#39;@MyApp_key&#39;: myKeyValue}
-to an array of key-value pairs in the above format and removes key-value pairs that are being set to null</p>
+to an array of key-value pairs in the above format</p>
 </dd>
 <dt><a href="#applyMerge">applyMerge(changes)</a></dt>
 <dd><p>Merges an array of changes with an existing value</p>
@@ -376,7 +376,7 @@ Otherwise removes all nested null values in objects and returns the object
 ## prepareKeyValuePairsForStorage() ⇒
 Storage expects array like: [["@MyApp_user", value_1], ["@MyApp_key", value_2]]
 This method transforms an object like {'@MyApp_user': myUserValue, '@MyApp_key': myKeyValue}
-to an array of key-value pairs in the above format and removes key-value pairs that are being set to null
+to an array of key-value pairs in the above format
 
 **Kind**: global function  
 **Returns**: an array of key - value pairs <[key, value]>  
