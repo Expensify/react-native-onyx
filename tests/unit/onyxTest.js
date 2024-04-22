@@ -1071,4 +1071,76 @@ describe('Onyx', () => {
                 expect(testKeyValue).toEqual(null);
             });
     });
+
+    it('(nested) nullish values should be removed when changes are batched during merge (SQLite)', () => {
+        let result;
+        let valueInStorage;
+
+        const initialData = {
+            a: 'a',
+            b: 'b',
+            c: {
+                d: 'd',
+                e: 'e',
+            },
+        };
+        const change1 = {
+            b: null,
+        };
+        const change2 = null;
+        const change3 = {
+            f: 'f',
+            c: {
+                g: 'g',
+                h: 'h',
+            },
+        };
+        const change4 = {
+            c: {
+                g: null,
+            },
+        };
+        const changes = [change1, change2, change3, change4];
+
+        const batchedChanges = OnyxUtils.applyMerge(undefined, changes, false);
+
+        console.log('Batched changes\n', JSON.stringify(batchedChanges, null, 2));
+
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => (result = value),
+        });
+
+        return Onyx.set(ONYX_KEYS.TEST_KEY, initialData)
+            .then(() => {
+                expect(result).toEqual(initialData);
+
+                return Promise.all(_.map(changes, (change) => Onyx.merge(ONYX_KEYS.TEST_KEY, change)));
+            })
+            .then(waitForPromisesToResolve)
+            .then(() => {
+                StorageMock.getItem(ONYX_KEYS.TEST_KEY).then((v) => (valueInStorage = v));
+            })
+            .then(() => {
+                console.log('Result from Onyx (most likely from cache)\n', JSON.stringify(result, null, 2));
+                console.log('Result in storage\n', JSON.stringify(valueInStorage, null, 2));
+
+                expect(result).toEqual({
+                    f: 'f',
+                    c: {
+                        h: 'h',
+                    },
+                });
+
+                // We would need to mock SQLite here to actually see what happens
+                // The current storage mock will just use the "modifiedData" from Onyx and just set it instead of actually applying the delta change.
+                expect(valueInStorage).toEqual({
+                    f: 'f',
+                    c: {
+                        h: 'h',
+                    },
+                });
+            });
+    });
 });
