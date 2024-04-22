@@ -4,7 +4,7 @@ on:
     pull_request:
         types: [opened, synchronize]
         branches-ignore: [staging, production]
-        paths-ignore: [.github/**, tests/**, '**.md', '**.sh']
+        paths-ignore: [tests/**, '**.md', '**.sh']
 jobs:
     perf-tests:
         if: ${{ github.actor != 'OSBotify' }}
