@@ -211,8 +211,8 @@ function disconnect(connectionID: number, keyToRemoveFromEvictionBlocklist?: Ony
 function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[TKey]>): Promise<void> {
     // check if the value is compatible with the existing value in the storage
     const existingValue = cache.getValue(key, false);
-    const {compatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(value, existingValue);
-    if (!compatible) {
+    const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(value, existingValue);
+    if (!isCompatible) {
         Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'set', existingValueType, newValueType));
         return Promise.resolve();
     }
@@ -245,6 +245,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[T
             return updatePromise;
         });
 }
+
 /**
  * Sets multiple keys and values
  *
@@ -316,11 +317,11 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<K
             // We first only merge the changes, so we can provide these to the native implementation (SQLite uses only delta changes in "JSON_PATCH" to merge)
             // We don't want to remove null values from the "batchedDeltaChanges", because SQLite uses them to remove keys from storage natively.
             const validChanges = mergeQueue[key].filter((change) => {
-                const {compatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(change, existingValue);
-                if (!compatible) {
+                const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(change, existingValue);
+                if (!isCompatible) {
                     Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'merge', existingValueType, newValueType));
                 }
-                return compatible;
+                return isCompatible;
             });
 
             if (!validChanges.length) {
@@ -431,8 +432,8 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
             const newKeys = keys.filter((key) => !persistedKeys.has(key));
 
             const existingKeyCollection = existingKeys.reduce((obj: NullableKeyValueMapping, key) => {
-                const {compatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(mergedCollection[key], cachedCollectionForExistingKeys[key]);
-                if (!compatible) {
+                const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(mergedCollection[key], cachedCollectionForExistingKeys[key]);
+                if (!isCompatible) {
                     Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'mergeCollection', existingValueType, newValueType));
                     return obj;
                 }

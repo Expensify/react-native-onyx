@@ -118,23 +118,23 @@ function formatActionName(method: string, key?: OnyxKey): string {
 }
 
 /** validate that the update and the existing value are compatible */
-function checkCompatibilityWithExistingValue(value: unknown, existingValue: unknown): {compatible: boolean; existingValueType?: string; newValueType?: string} {
+function checkCompatibilityWithExistingValue(value: unknown, existingValue: unknown): {isCompatible: boolean; existingValueType?: string; newValueType?: string} {
     if (!existingValue || !value) {
         return {
-            compatible: true,
+            isCompatible: true,
         };
     }
     const existingValueType = Array.isArray(existingValue) ? 'array' : 'non-array';
     const newValueType = Array.isArray(value) ? 'array' : 'non-array';
     if (existingValueType !== newValueType) {
         return {
-            compatible: false,
+            isCompatible: false,
             existingValueType,
             newValueType,
         };
     }
     return {
-        compatible: true,
+        isCompatible: true,
     };
 }
 
