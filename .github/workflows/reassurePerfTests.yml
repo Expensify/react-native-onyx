@@ -4,7 +4,7 @@ on:
     pull_request:
         types: [opened, synchronize]
         branches-ignore: [staging, production]
-        paths-ignore: [.github/**, tests/**, '**.md', '**.sh']
+        paths-ignore: [tests/**, '**.md', '**.sh']
 jobs:
     perf-tests:
         if: ${{ github.actor != 'OSBotify' }}
@@ -40,6 +40,6 @@ jobs:
                   npx reassure --branch
             - name: Validate output.json
               id: validateReassureOutput
-              uses: ./.github/actions/javascript/validateReassureOutput
+              uses: ./.github/actions/validateReassureOutput
               with:
                   DURATION_DEVIATION_PERCENTAGE: 20
