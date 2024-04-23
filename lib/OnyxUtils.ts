@@ -756,8 +756,8 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, val:
         return;
     }
 
-    const valWithoutNestedNulls = utils.removeNestedNullValues(val);
-    (mapping as DefaultConnectOptions<TKey>).callback?.(valWithoutNestedNulls, matchedKey as TKey);
+    const valuesWithoutNestedNulls = utils.removeNestedNullValues(val);
+    (mapping as DefaultConnectOptions<TKey>).callback?.(valuesWithoutNestedNulls, matchedKey as TKey);
 }
 
 /**
