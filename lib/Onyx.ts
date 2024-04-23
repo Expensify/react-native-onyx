@@ -245,7 +245,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[T
  * @param data object keyed by ONYXKEYS and the values to set
  */
 function multiSet(data: Partial<NullableKeyValueMapping>): Promise<void> {
-    const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(data);
+    const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(data, true);
 
     const updatePromises = keyValuePairs.map(([key, value]) => {
         const prevValue = cache.getValue(key, false);
@@ -285,7 +285,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<K
     const mergeQueuePromise = OnyxUtils.getMergeQueuePromise();
 
     // Top-level undefined values are ignored
-    // Therefore we need to prevent adding them to the merge queue
+    // Therefore, we need to prevent adding them to the merge queue
     if (changes === undefined) {
         return mergeQueue[key] ? mergeQueuePromise[key] : Promise.resolve();
     }
@@ -419,8 +419,15 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
                 obj[key] = mergedCollection[key];
                 return obj;
             }, {});
-            const keyValuePairsForExistingCollection = OnyxUtils.prepareKeyValuePairsForStorage(existingKeyCollection);
-            const keyValuePairsForNewCollection = OnyxUtils.prepareKeyValuePairsForStorage(newCollection);
+
+            // When (multi-)merging the values with the existing values in storage,
+            // we don't want to remove nested null values from the data that we pass to the storage layer,
+            // because the storage layer uses them to remove nested keys from storage natively.
+            const keyValuePairsForExistingCollection = OnyxUtils.prepareKeyValuePairsForStorage(existingKeyCollection, false);
+
+            // We can safely remove nested null values when using (multi-)set,
+            // because we will simply overwrite the existing values in storage.
+            const keyValuePairsForNewCollection = OnyxUtils.prepareKeyValuePairsForStorage(newCollection, true);
 
             const promises = [];
 
