@@ -117,4 +117,25 @@ function formatActionName(method: string, key?: OnyxKey): string {
     return key ? `${method.toUpperCase()}/${key}` : method.toUpperCase();
 }
 
-export default {isEmptyObject, fastMerge, formatActionName, removeNestedNullValues};
+/** validate that the update and the existing value are compatible */
+function checkCompatibilityWithExistingValue(value: unknown, existingValue: unknown): {isCompatible: boolean; existingValueType?: string; newValueType?: string} {
+    if (!existingValue || !value) {
+        return {
+            isCompatible: true,
+        };
+    }
+    const existingValueType = Array.isArray(existingValue) ? 'array' : 'non-array';
+    const newValueType = Array.isArray(value) ? 'array' : 'non-array';
+    if (existingValueType !== newValueType) {
+        return {
+            isCompatible: false,
+            existingValueType,
+            newValueType,
+        };
+    }
+    return {
+        isCompatible: true,
+    };
+}
+
+export default {isEmptyObject, fastMerge, formatActionName, removeNestedNullValues, checkCompatibilityWithExistingValue};

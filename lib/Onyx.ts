@@ -23,6 +23,7 @@ import type {
     OnyxValue,
 } from './types';
 import OnyxUtils from './OnyxUtils';
+import logMessages from './logMessages';
 
 // Keeps track of the last connectionID that was used so we can keep incrementing it
 let lastConnectionID = 0;
@@ -208,6 +209,14 @@ function disconnect(connectionID: number, keyToRemoveFromEvictionBlocklist?: Ony
  * @param value value to store
  */
 function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[TKey]>): Promise<void> {
+    // check if the value is compatible with the existing value in the storage
+    const existingValue = cache.getValue(key, false);
+    const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(value, existingValue);
+    if (!isCompatible) {
+        Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'set', existingValueType, newValueType));
+        return Promise.resolve();
+    }
+
     // If the value is null, we remove the key from storage
     const {value: valueAfterRemoving, wasRemoved} = OnyxUtils.removeNullValues(key, value);
     const valueWithoutNullValues = valueAfterRemoving as OnyxValue<TKey>;
@@ -307,7 +316,18 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<K
         try {
             // We first only merge the changes, so we can provide these to the native implementation (SQLite uses only delta changes in "JSON_PATCH" to merge)
             // We don't want to remove null values from the "batchedDeltaChanges", because SQLite uses them to remove keys from storage natively.
-            const batchedDeltaChanges = OnyxUtils.applyMerge(undefined, mergeQueue[key], false);
+            const validChanges = mergeQueue[key].filter((change) => {
+                const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(change, existingValue);
+                if (!isCompatible) {
+                    Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'merge', existingValueType, newValueType));
+                }
+                return isCompatible;
+            });
+
+            if (!validChanges.length) {
+                return undefined;
+            }
+            const batchedDeltaChanges = OnyxUtils.applyMerge(undefined, validChanges, false);
 
             // Case (1): When there is no existing value in storage, we want to set the value instead of merge it.
             // Case (2): The presence of a top-level `null` in the merge queue instructs us to drop the whole existing value.
@@ -406,9 +426,17 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
             });
 
             const existingKeys = keys.filter((key) => persistedKeys.has(key));
+
+            const cachedCollectionForExistingKeys = OnyxUtils.getCachedCollection(collectionKey, existingKeys);
+
             const newKeys = keys.filter((key) => !persistedKeys.has(key));
 
             const existingKeyCollection = existingKeys.reduce((obj: NullableKeyValueMapping, key) => {
+                const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(mergedCollection[key], cachedCollectionForExistingKeys[key]);
+                if (!isCompatible) {
+                    Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'mergeCollection', existingValueType, newValueType));
+                    return obj;
+                }
                 // eslint-disable-next-line no-param-reassign
                 obj[key] = mergedCollection[key];
                 return obj;
@@ -441,11 +469,14 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
                 promises.push(Storage.multiSet(keyValuePairsForNewCollection));
             }
 
+            // finalMergedCollection contains all the keys that were merged, without the keys of incompatible updates
+            const finalMergedCollection = {...existingKeyCollection, ...newCollection};
+
             // Prefill cache if necessary by calling get() on any existing keys and then merge original data to cache
             // and update all subscribers
             const promiseUpdate = Promise.all(existingKeys.map(OnyxUtils.get)).then(() => {
-                cache.merge(mergedCollection);
-                return OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, mergedCollection);
+                cache.merge(finalMergedCollection);
+                return OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, finalMergedCollection);
             });
 
             return Promise.all(promises)

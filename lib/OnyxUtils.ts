@@ -401,10 +401,10 @@ function addAllSafeEvictionKeysToRecentlyAccessedList(): Promise<void> {
     });
 }
 
-function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey): NonNullable<OnyxCollection<KeyValueMapping[TKey]>> {
-    const collectionMemberKeys = Array.from(cache.getAllKeys()).filter((storedKey) => isCollectionMemberKey(collectionKey, storedKey));
+function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collectionMemberKeys?: string[]): NonNullable<OnyxCollection<KeyValueMapping[TKey]>> {
+    const resolvedCollectionMemberKeys = collectionMemberKeys || Array.from(cache.getAllKeys()).filter((storedKey) => isCollectionMemberKey(collectionKey, storedKey));
 
-    return collectionMemberKeys.reduce((prev: NonNullable<OnyxCollection<KeyValueMapping[TKey]>>, key) => {
+    return resolvedCollectionMemberKeys.reduce((prev: NonNullable<OnyxCollection<KeyValueMapping[TKey]>>, key) => {
         const cachedValue = cache.getValue(key);
         if (!cachedValue) {
             return prev;
