@@ -11,6 +11,7 @@ const ONYX_KEYS = {
         TEST_CONNECT_COLLECTION: 'testConnectCollection_',
         TEST_POLICY: 'testPolicy_',
         TEST_UPDATE: 'testUpdate_',
+        ANIMALS: 'animals_',
     },
 };
 
@@ -1144,5 +1145,48 @@ describe('Onyx', () => {
                 },
             });
         });
+    });
+
+    it('should not call a collection item subscriber if the value did not change', () => {
+        const connectionIDs = [];
+
+        const cat = `${ONYX_KEYS.COLLECTION.ANIMALS}cat`;
+        const dog = `${ONYX_KEYS.COLLECTION.ANIMALS}dog`;
+
+        const collectionCallback = jest.fn();
+        const catCallback = jest.fn();
+        const dogCallback = jest.fn();
+
+        connectionIDs.push(
+            Onyx.connect({
+                key: ONYX_KEYS.COLLECTION.ANIMALS,
+                callback: collectionCallback,
+                waitForCollectionCallback: true,
+            }),
+        );
+        connectionIDs.push(Onyx.connect({key: cat, callback: catCallback}));
+        connectionIDs.push(Onyx.connect({key: dog, callback: dogCallback}));
+
+        const initialValue = {name: 'Fluffy'};
+
+        const collectionDiff = {
+            [cat]: initialValue,
+            [dog]: {name: 'Rex'},
+        };
+
+        return Onyx.set(cat, initialValue)
+            .then(() => {
+                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ANIMALS, collectionDiff);
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                expect(collectionCallback).toHaveBeenCalledTimes(3);
+                expect(collectionCallback).toHaveBeenCalledWith(collectionDiff);
+
+                expect(catCallback).toHaveBeenCalledTimes(2);
+                expect(dogCallback).toHaveBeenCalledTimes(2);
+
+                _.map(connectionIDs, Onyx.disconnect);
+            });
     });
 });
