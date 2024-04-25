@@ -592,14 +592,14 @@ function keysChanged<TKey extends CollectionKeyBase>(
  */
 function keyChanged<TKey extends OnyxKey>(
     key: TKey,
-    data: OnyxValue<TKey>,
-    prevData: OnyxValue<TKey>,
+    value: OnyxValue<TKey>,
+    previousValue: OnyxValue<TKey>,
     canUpdateSubscriber: (subscriber?: Mapping<OnyxKey>) => boolean = () => true,
     notifyRegularSubscibers = true,
     notifyWithOnyxSubscibers = true,
 ): void {
     // Add or remove this key from the recentlyAccessedKeys lists
-    if (data !== null) {
+    if (value !== null) {
         addLastAccessedKey(key);
     } else {
         removeLastAccessedKey(key);
@@ -624,14 +624,14 @@ function keyChanged<TKey extends OnyxKey>(
                 const cachedCollection = getCachedCollection(subscriber.key);
                 const cachedCollectionWithoutNestedNulls = utils.removeNestedNullValues(cachedCollection) as Record<string, unknown>;
 
-                cachedCollectionWithoutNestedNulls[key] = data;
+                cachedCollectionWithoutNestedNulls[key] = value;
                 subscriber.callback(cachedCollectionWithoutNestedNulls);
                 continue;
             }
 
-            const dataWithoutNestedNulls = utils.removeNestedNullValues(data);
+            const valueWithoutNestedNulls = utils.removeNestedNullValues(value);
             const subscriberCallback = subscriber.callback as DefaultConnectCallback<TKey>;
-            subscriberCallback(dataWithoutNestedNulls, key);
+            subscriberCallback(valueWithoutNestedNulls, key);
             continue;
         }
 
@@ -650,7 +650,7 @@ function keyChanged<TKey extends OnyxKey>(
                     subscriber.withOnyxInstance.setStateProxy((prevState) => {
                         const prevWithOnyxData = prevState[subscriber.statePropertyName];
                         const newWithOnyxData = {
-                            [key]: selector(data, subscriber.withOnyxInstance.state),
+                            [key]: selector(value, subscriber.withOnyxInstance.state),
                         };
                         const prevDataWithNewData = {
                             ...prevWithOnyxData,
@@ -671,7 +671,7 @@ function keyChanged<TKey extends OnyxKey>(
                     const collection = prevState[subscriber.statePropertyName] || {};
                     const newCollection = {
                         ...collection,
-                        [key]: data,
+                        [key]: value,
                     };
                     PerformanceUtils.logSetStateCall(subscriber, collection, newCollection, 'keyChanged', key);
                     return {
@@ -685,10 +685,10 @@ function keyChanged<TKey extends OnyxKey>(
             // returned by the selector and only if the selected data has changed.
             if (selector) {
                 subscriber.withOnyxInstance.setStateProxy(() => {
-                    const previousValue = selector(prevData, subscriber.withOnyxInstance.state);
-                    const newValue = selector(data, subscriber.withOnyxInstance.state);
+                    const prevValue = selector(previousValue, subscriber.withOnyxInstance.state);
+                    const newValue = selector(value, subscriber.withOnyxInstance.state);
 
-                    if (!deepEqual(previousValue, newValue)) {
+                    if (!deepEqual(prevValue, newValue)) {
                         return {
                             [subscriber.statePropertyName]: newValue,
                         };
@@ -700,19 +700,19 @@ function keyChanged<TKey extends OnyxKey>(
 
             // If we did not match on a collection key then we just set the new data to the state property
             subscriber.withOnyxInstance.setStateProxy((prevState) => {
-                const prevWithOnyxData = prevState[subscriber.statePropertyName];
+                const prevWithOnyxValue = prevState[subscriber.statePropertyName];
 
                 // Avoids triggering unnecessary re-renders when feeding empty objects
-                if (utils.isEmptyObject(data) && utils.isEmptyObject(prevWithOnyxData)) {
+                if (utils.isEmptyObject(value) && utils.isEmptyObject(prevWithOnyxValue)) {
                     return null;
                 }
-                if (prevWithOnyxData === data) {
+                if (prevWithOnyxValue === value) {
                     return null;
                 }
 
-                PerformanceUtils.logSetStateCall(subscriber, prevData, data, 'keyChanged', key);
+                PerformanceUtils.logSetStateCall(subscriber, previousValue, value, 'keyChanged', key);
                 return {
-                    [subscriber.statePropertyName]: data,
+                    [subscriber.statePropertyName]: value,
                 };
             });
             continue;
@@ -866,11 +866,11 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
 function scheduleSubscriberUpdate<TKey extends OnyxKey>(
     key: TKey,
     value: OnyxValue<TKey>,
-    prevValue: OnyxValue<TKey>,
+    previousValue: OnyxValue<TKey>,
     canUpdateSubscriber: (subscriber?: Mapping<OnyxKey>) => boolean = () => true,
 ): Promise<void> {
-    const promise = Promise.resolve().then(() => keyChanged(key, value, prevValue, canUpdateSubscriber, true, false));
-    batchUpdates(() => keyChanged(key, value, prevValue, canUpdateSubscriber, false, true));
+    const promise = Promise.resolve().then(() => keyChanged(key, value, previousValue, canUpdateSubscriber, true, false));
+    batchUpdates(() => keyChanged(key, value, previousValue, canUpdateSubscriber, false, true));
     return Promise.all([maybeFlushBatchUpdates(), promise]).then(() => undefined);
 }
 
