@@ -117,4 +117,50 @@ function formatActionName(method: string, key?: OnyxKey): string {
     return key ? `${method.toUpperCase()}/${key}` : method.toUpperCase();
 }
 
-export default {isEmptyObject, fastMerge, formatActionName, removeNestedNullValues};
+function pick<T>(obj: Record<string, T>, condition: string | string[] | ((entry: [string, T]) => boolean)): Record<string, T> {
+    const result: Record<string, T> = {};
+
+    const entries = Object.entries(obj);
+    for (let i = 0; i < entries.length; i++) {
+        const [key, value] = entries[i];
+
+        if (Array.isArray(condition)) {
+            if (condition.includes(key)) {
+                result[key] = value;
+            }
+        } else if (typeof condition === 'string') {
+            if (key === condition) {
+                result[key] = value;
+            }
+        } else if (condition(entries[i])) {
+            result[key] = value;
+        }
+    }
+
+    return result;
+}
+
+function omit<T>(obj: Record<string, T>, condition: string | string[] | ((entry: [string, T]) => boolean)): Record<string, T> {
+    const result: Record<string, T> = {};
+
+    const entries = Object.entries(obj);
+    for (let i = 0; i < entries.length; i++) {
+        const [key, value] = entries[i];
+
+        if (Array.isArray(condition)) {
+            if (!condition.includes(key)) {
+                result[key] = value;
+            }
+        } else if (typeof condition === 'string') {
+            if (key !== condition) {
+                result[key] = value;
+            }
+        } else if (!condition(entries[i])) {
+            result[key] = value;
+        }
+    }
+
+    return result;
+}
+
+export default {isEmptyObject, fastMerge, formatActionName, removeNestedNullValues, pick, omit};
