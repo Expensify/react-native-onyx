@@ -927,8 +927,15 @@ describe('Onyx', () => {
                 expect(collectionCallback).toHaveBeenCalledTimes(2);
                 expect(collectionCallback).toHaveBeenNthCalledWith(1, null, undefined);
                 expect(collectionCallback).toHaveBeenNthCalledWith(2, {[itemKey]: {a: 'a'}});
-                expect(testCallback).toHaveBeenNthCalledWith(1, 'taco', ONYX_KEYS.TEST_KEY);
-                expect(otherTestCallback).toHaveBeenNthCalledWith(1, 'pizza', ONYX_KEYS.OTHER_TEST);
+
+                expect(testCallback).toHaveBeenCalledTimes(2);
+                expect(testCallback).toHaveBeenNthCalledWith(1, null, undefined);
+                expect(testCallback).toHaveBeenNthCalledWith(2, 'taco', ONYX_KEYS.TEST_KEY);
+
+                expect(otherTestCallback).toHaveBeenCalledTimes(2);
+                // We set an initial value of 42 for ONYX_KEYS.OTHER_TEST in Onyx.init()
+                expect(otherTestCallback).toHaveBeenNthCalledWith(1, 42, ONYX_KEYS.OTHER_TEST);
+                expect(otherTestCallback).toHaveBeenNthCalledWith(2, 'pizza', ONYX_KEYS.OTHER_TEST);
                 Onyx.disconnect(connectionIDs);
             }),
         );
