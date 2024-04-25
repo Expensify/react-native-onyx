@@ -918,16 +918,20 @@ describe('Onyx', () => {
         connectionIDs.push(Onyx.connect({key: ONYX_KEYS.TEST_KEY, callback: testCallback}));
         connectionIDs.push(Onyx.connect({key: ONYX_KEYS.OTHER_TEST, callback: otherTestCallback}));
         connectionIDs.push(Onyx.connect({key: ONYX_KEYS.COLLECTION.TEST_UPDATE, callback: collectionCallback, waitForCollectionCallback: true}));
-        return Onyx.update([
-            {onyxMethod: Onyx.METHOD.SET, key: ONYX_KEYS.TEST_KEY, value: 'taco'},
-            {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.OTHER_TEST, value: 'pizza'},
-            {onyxMethod: Onyx.METHOD.MERGE_COLLECTION, key: ONYX_KEYS.COLLECTION.TEST_UPDATE, value: {[itemKey]: {a: 'a'}}},
-        ]).then(() => {
-            expect(collectionCallback).toHaveBeenNthCalledWith(1, {[itemKey]: {a: 'a'}});
-            expect(testCallback).toHaveBeenNthCalledWith(1, 'taco', ONYX_KEYS.TEST_KEY);
-            expect(otherTestCallback).toHaveBeenNthCalledWith(1, 'pizza', ONYX_KEYS.OTHER_TEST);
-            Onyx.disconnect(connectionIDs);
-        });
+        return waitForPromisesToResolve().then(() =>
+            Onyx.update([
+                {onyxMethod: Onyx.METHOD.SET, key: ONYX_KEYS.TEST_KEY, value: 'taco'},
+                {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.OTHER_TEST, value: 'pizza'},
+                {onyxMethod: Onyx.METHOD.MERGE_COLLECTION, key: ONYX_KEYS.COLLECTION.TEST_UPDATE, value: {[itemKey]: {a: 'a'}}},
+            ]).then(() => {
+                expect(collectionCallback).toHaveBeenCalledTimes(2);
+                expect(collectionCallback).toHaveBeenNthCalledWith(1, null, undefined);
+                expect(collectionCallback).toHaveBeenNthCalledWith(2, {[itemKey]: {a: 'a'}});
+                expect(testCallback).toHaveBeenNthCalledWith(1, 'taco', ONYX_KEYS.TEST_KEY);
+                expect(otherTestCallback).toHaveBeenNthCalledWith(1, 'pizza', ONYX_KEYS.OTHER_TEST);
+                Onyx.disconnect(connectionIDs);
+            }),
+        );
     });
 
     it('should merge an object with a batch of objects and undefined', () => {
