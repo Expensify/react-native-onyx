@@ -401,10 +401,10 @@ function addAllSafeEvictionKeysToRecentlyAccessedList(): Promise<void> {
     });
 }
 
-function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey): NonNullable<OnyxCollection<KeyValueMapping[TKey]>> {
-    const collectionMemberKeys = Array.from(cache.getAllKeys()).filter((storedKey) => isCollectionMemberKey(collectionKey, storedKey));
+function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collectionMemberKeys?: string[]): NonNullable<OnyxCollection<KeyValueMapping[TKey]>> {
+    const resolvedCollectionMemberKeys = collectionMemberKeys || Array.from(cache.getAllKeys()).filter((storedKey) => isCollectionMemberKey(collectionKey, storedKey));
 
-    return collectionMemberKeys.reduce((prev: NonNullable<OnyxCollection<KeyValueMapping[TKey]>>, key) => {
+    return resolvedCollectionMemberKeys.reduce((prev: NonNullable<OnyxCollection<KeyValueMapping[TKey]>>, key) => {
         const cachedValue = cache.getValue(key);
         if (!cachedValue) {
             return prev;
@@ -453,6 +453,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
         // We prepare the "cached collection" which is the entire collection + the new partial data that
         // was merged in via mergeCollection().
         const cachedCollection = getCachedCollection(collectionKey);
+        const cachedCollectionWithoutNestedNulls = utils.removeNestedNullValues(cachedCollection) as Record<string, unknown>;
 
         // Regular Onyx.connect() subscriber found.
         if (typeof subscriber.callback === 'function') {
@@ -464,7 +465,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
             // send the whole cached collection.
             if (isSubscribedToCollectionKey) {
                 if (subscriber.waitForCollectionCallback) {
-                    subscriber.callback(cachedCollection);
+                    subscriber.callback(cachedCollectionWithoutNestedNulls);
                     continue;
                 }
 
@@ -473,7 +474,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
                 const dataKeys = Object.keys(partialCollection ?? {});
                 for (let j = 0; j < dataKeys.length; j++) {
                     const dataKey = dataKeys[j];
-                    subscriber.callback(cachedCollection[dataKey], dataKey);
+                    subscriber.callback(cachedCollectionWithoutNestedNulls[dataKey], dataKey);
                 }
                 continue;
             }
@@ -482,7 +483,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
             // notify them with the cached data for that key only.
             if (isSubscribedToCollectionMemberKey) {
                 const subscriberCallback = subscriber.callback as DefaultConnectCallback<TKey>;
-                subscriberCallback(cachedCollection[subscriber.key], subscriber.key as TKey);
+                subscriberCallback(cachedCollectionWithoutNestedNulls[subscriber.key], subscriber.key as TKey);
                 continue;
             }
 
@@ -621,13 +622,16 @@ function keyChanged<TKey extends OnyxKey>(
             }
             if (isCollectionKey(subscriber.key) && subscriber.waitForCollectionCallback) {
                 const cachedCollection = getCachedCollection(subscriber.key);
-                cachedCollection[key] = data;
-                subscriber.callback(cachedCollection);
+                const cachedCollectionWithoutNestedNulls = utils.removeNestedNullValues(cachedCollection) as Record<string, unknown>;
+
+                cachedCollectionWithoutNestedNulls[key] = data;
+                subscriber.callback(cachedCollectionWithoutNestedNulls);
                 continue;
             }
 
+            const dataWithoutNestedNulls = utils.removeNestedNullValues(data);
             const subscriberCallback = subscriber.callback as DefaultConnectCallback<TKey>;
-            subscriberCallback(data, key);
+            subscriberCallback(dataWithoutNestedNulls, key);
             continue;
         }
 
@@ -752,7 +756,8 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, val:
         return;
     }
 
-    (mapping as DefaultConnectOptions<TKey>).callback?.(val, matchedKey as TKey);
+    const valuesWithoutNestedNulls = utils.removeNestedNullValues(val);
+    (mapping as DefaultConnectOptions<TKey>).callback?.(valuesWithoutNestedNulls, matchedKey as TKey);
 }
 
 /**
@@ -963,11 +968,12 @@ type RemoveNullValuesOutput = {
 
 /**
  * Removes a key from storage if the value is null.
- * Otherwise removes all nested null values in objects and returns the object
+ * Otherwise removes all nested null values in objects,
+ * if shouldRemoveNestedNulls is true and returns the object.
  *
  * @returns The value without null values and a boolean "wasRemoved", which indicates if the key got removed completely
  */
-function removeNullValues(key: OnyxKey, value: OnyxValue<OnyxKey>): RemoveNullValuesOutput {
+function removeNullValues(key: OnyxKey, value: OnyxValue<OnyxKey>, shouldRemoveNestedNulls = true): RemoveNullValuesOutput {
     if (value === null) {
         remove(key);
         return {value, wasRemoved: true};
@@ -976,7 +982,7 @@ function removeNullValues(key: OnyxKey, value: OnyxValue<OnyxKey>): RemoveNullVa
     // We can remove all null values in an object by merging it with itself
     // utils.fastMerge recursively goes through the object and removes all null values
     // Passing two identical objects as source and target to fastMerge will not change it, but only remove the null values
-    return {value: utils.removeNestedNullValues(value as Record<string, unknown>), wasRemoved: false};
+    return {value: shouldRemoveNestedNulls ? utils.removeNestedNullValues(value as Record<string, unknown>) : (value as Record<string, unknown>), wasRemoved: false};
 }
 
 /**
@@ -986,20 +992,16 @@ function removeNullValues(key: OnyxKey, value: OnyxValue<OnyxKey>): RemoveNullVa
 
 * @return an array of key - value pairs <[key, value]>
  */
-function prepareKeyValuePairsForStorage(data: Record<OnyxKey, OnyxValue<OnyxKey>>): Array<[OnyxKey, OnyxValue<OnyxKey>]> {
-    const keyValuePairs: Array<[OnyxKey, OnyxValue<OnyxKey>]> = [];
+function prepareKeyValuePairsForStorage(data: Record<OnyxKey, OnyxValue<OnyxKey>>, shouldRemoveNestedNulls: boolean): Array<[OnyxKey, OnyxValue<OnyxKey>]> {
+    return Object.entries(data).reduce<Array<[OnyxKey, OnyxValue<OnyxKey>]>>((pairs, [key, value]) => {
+        const {value: valueAfterRemoving, wasRemoved} = removeNullValues(key, value, shouldRemoveNestedNulls);
 
-    Object.entries(data).forEach(([key, value]) => {
-        const {value: valueAfterRemoving, wasRemoved} = removeNullValues(key, value);
-
-        if (wasRemoved) {
-            return;
+        if (!wasRemoved) {
+            pairs.push([key, valueAfterRemoving]);
         }
 
-        keyValuePairs.push([key, valueAfterRemoving]);
-    });
-
-    return keyValuePairs;
+        return pairs;
+    }, []);
 }
 
 /**
@@ -1007,17 +1009,17 @@ function prepareKeyValuePairsForStorage(data: Record<OnyxKey, OnyxValue<OnyxKey>
  *
  * @param changes Array of changes that should be applied to the existing value
  */
-function applyMerge(existingValue: OnyxValue<OnyxKey>, changes: Array<OnyxValue<OnyxKey>>, shouldRemoveNullObjectValues: boolean): OnyxValue<OnyxKey> {
+function applyMerge(existingValue: OnyxValue<OnyxKey>, changes: Array<OnyxValue<OnyxKey>>, shouldRemoveNestedNulls: boolean): OnyxValue<OnyxKey> {
     const lastChange = changes?.at(-1);
 
     if (Array.isArray(lastChange)) {
         return lastChange;
     }
 
-    if (changes.some((change) => typeof change === 'object')) {
+    if (changes.some((change) => change && typeof change === 'object')) {
         // Object values are then merged one after the other
         return changes.reduce(
-            (modifiedData, change) => utils.fastMerge(modifiedData as Record<OnyxKey, unknown>, change as Record<OnyxKey, unknown>, shouldRemoveNullObjectValues),
+            (modifiedData, change) => utils.fastMerge(modifiedData as Record<OnyxKey, unknown>, change as Record<OnyxKey, unknown>, shouldRemoveNestedNulls),
             existingValue || {},
         );
     }

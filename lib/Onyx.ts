@@ -24,6 +24,7 @@ import type {
     OnyxValue,
 } from './types';
 import OnyxUtils from './OnyxUtils';
+import logMessages from './logMessages';
 
 // Keeps track of the last connectionID that was used so we can keep incrementing it
 let lastConnectionID = 0;
@@ -209,6 +210,14 @@ function disconnect(connectionID: number, keyToRemoveFromEvictionBlocklist?: Ony
  * @param value value to store
  */
 function set<TKey extends OnyxKey>(key: TKey, value: NonUndefined<OnyxEntry<KeyValueMapping[TKey]>>): Promise<void> {
+    // check if the value is compatible with the existing value in the storage
+    const existingValue = cache.getValue(key, false);
+    const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(value, existingValue);
+    if (!isCompatible) {
+        Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'set', existingValueType, newValueType));
+        return Promise.resolve();
+    }
+
     // If the value is null, we remove the key from storage
     const {value: valueAfterRemoving, wasRemoved} = OnyxUtils.removeNullValues(key, value);
     const valueWithoutNullValues = valueAfterRemoving as OnyxValue<TKey>;
@@ -246,7 +255,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: NonUndefined<OnyxEntry<KeyV
  * @param data object keyed by ONYXKEYS and the values to set
  */
 function multiSet(data: Partial<NullableKeyValueMapping>): Promise<void> {
-    const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(data);
+    const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(data, true);
 
     const updatePromises = keyValuePairs.map(([key, value]) => {
         const prevValue = cache.getValue(key, false);
@@ -286,7 +295,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: NonUndefined<OnyxEntry<
     const mergeQueuePromise = OnyxUtils.getMergeQueuePromise();
 
     // Top-level undefined values are ignored
-    // Therefore we need to prevent adding them to the merge queue
+    // Therefore, we need to prevent adding them to the merge queue
     if (changes === undefined) {
         return mergeQueue[key] ? mergeQueuePromise[key] : Promise.resolve();
     }
@@ -308,7 +317,18 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: NonUndefined<OnyxEntry<
         try {
             // We first only merge the changes, so we can provide these to the native implementation (SQLite uses only delta changes in "JSON_PATCH" to merge)
             // We don't want to remove null values from the "batchedDeltaChanges", because SQLite uses them to remove keys from storage natively.
-            const batchedDeltaChanges = OnyxUtils.applyMerge(undefined, mergeQueue[key], false);
+            const validChanges = mergeQueue[key].filter((change) => {
+                const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(change, existingValue);
+                if (!isCompatible) {
+                    Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'merge', existingValueType, newValueType));
+                }
+                return isCompatible;
+            });
+
+            if (!validChanges.length) {
+                return undefined;
+            }
+            const batchedDeltaChanges = OnyxUtils.applyMerge(undefined, validChanges, false);
 
             // Case (1): When there is no existing value in storage, we want to set the value instead of merge it.
             // Case (2): The presence of a top-level `null` in the merge queue instructs us to drop the whole existing value.
@@ -407,9 +427,17 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
             });
 
             const existingKeys = keys.filter((key) => persistedKeys.has(key));
+
+            const cachedCollectionForExistingKeys = OnyxUtils.getCachedCollection(collectionKey, existingKeys);
+
             const newKeys = keys.filter((key) => !persistedKeys.has(key));
 
             const existingKeyCollection = existingKeys.reduce((obj: NullableKeyValueMapping, key) => {
+                const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(mergedCollection[key], cachedCollectionForExistingKeys[key]);
+                if (!isCompatible) {
+                    Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'mergeCollection', existingValueType, newValueType));
+                    return obj;
+                }
                 // eslint-disable-next-line no-param-reassign
                 obj[key] = mergedCollection[key];
                 return obj;
@@ -420,8 +448,15 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
                 obj[key] = mergedCollection[key];
                 return obj;
             }, {});
-            const keyValuePairsForExistingCollection = OnyxUtils.prepareKeyValuePairsForStorage(existingKeyCollection);
-            const keyValuePairsForNewCollection = OnyxUtils.prepareKeyValuePairsForStorage(newCollection);
+
+            // When (multi-)merging the values with the existing values in storage,
+            // we don't want to remove nested null values from the data that we pass to the storage layer,
+            // because the storage layer uses them to remove nested keys from storage natively.
+            const keyValuePairsForExistingCollection = OnyxUtils.prepareKeyValuePairsForStorage(existingKeyCollection, false);
+
+            // We can safely remove nested null values when using (multi-)set,
+            // because we will simply overwrite the existing values in storage.
+            const keyValuePairsForNewCollection = OnyxUtils.prepareKeyValuePairsForStorage(newCollection, true);
 
             const promises = [];
 
@@ -435,11 +470,14 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
                 promises.push(Storage.multiSet(keyValuePairsForNewCollection));
             }
 
+            // finalMergedCollection contains all the keys that were merged, without the keys of incompatible updates
+            const finalMergedCollection = {...existingKeyCollection, ...newCollection};
+
             // Prefill cache if necessary by calling get() on any existing keys and then merge original data to cache
             // and update all subscribers
             const promiseUpdate = Promise.all(existingKeys.map(OnyxUtils.get)).then(() => {
-                cache.merge(mergedCollection);
-                return OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, mergedCollection);
+                cache.merge(finalMergedCollection);
+                return OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, finalMergedCollection);
             });
 
             return Promise.all(promises)
