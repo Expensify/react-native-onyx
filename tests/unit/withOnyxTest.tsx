@@ -23,7 +23,6 @@ const ONYX_KEYS = {
 
 Onyx.init({
     keys: ONYX_KEYS,
-    registerStorageEventListener: () => {},
 });
 
 beforeEach(() => Onyx.clear());
