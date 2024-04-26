@@ -459,6 +459,10 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
 
             const promises = [];
 
+            // We need to get the previously existing values so we can compare the new ones
+            // against them, to avoid unnecessary subscriber updates.
+            const previousCollectionPromise = Promise.all(existingKeys.map((key) => OnyxUtils.get(key).then((value) => [key, value]))).then(Object.fromEntries);
+
             // New keys will be added via multiSet while existing keys will be updated using multiMerge
             // This is because setting a key that doesn't exist yet with multiMerge will throw errors
             if (keyValuePairsForExistingCollection.length > 0) {
@@ -474,9 +478,9 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
 
             // Prefill cache if necessary by calling get() on any existing keys and then merge original data to cache
             // and update all subscribers
-            const promiseUpdate = Promise.all(existingKeys.map(OnyxUtils.get)).then(() => {
+            const promiseUpdate = previousCollectionPromise.then((previousCollection) => {
                 cache.merge(finalMergedCollection);
-                return OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, finalMergedCollection);
+                return OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, finalMergedCollection, previousCollection);
             });
 
             return Promise.all(promises)
