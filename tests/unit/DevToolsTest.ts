@@ -1,7 +1,10 @@
+/* eslint-disable dot-notation */
 /* eslint-disable @lwc/lwc/no-async-await */
 /* eslint-disable no-underscore-dangle */
 import Onyx from '../../lib';
+import type {DevtoolsConnection} from '../../lib/DevTools';
 import DevTools from '../../lib/DevTools';
+import type {Collection} from '../../lib/types';
 import utils from '../../lib/utils';
 
 const ONYX_KEYS = {
@@ -21,7 +24,7 @@ const initialKeyStates = {
     [ONYX_KEYS.OBJECT_KEY]: {id: 42},
 };
 
-const exampleCollection = {
+const exampleCollection: Collection<string, unknown, unknown> = {
     [`${ONYX_KEYS.COLLECTION.NUM_KEY}1`]: 1,
     [`${ONYX_KEYS.COLLECTION.NUM_KEY}2`]: 2,
 };
@@ -33,17 +36,16 @@ const mergedCollection = {...initialKeyStates, ...exampleCollection};
 const mergedObject = {...initialKeyStates, [ONYX_KEYS.OBJECT_KEY]: {...exampleObject, id: 42}};
 
 describe('DevTools', () => {
-    let initMock;
-    let sendMock;
+    let initMock: jest.Mock<void>;
+    let sendMock: jest.Mock<void>;
 
     beforeEach(() => {
         // Mock DevTools
         initMock = jest.fn();
         sendMock = jest.fn();
-        DevTools.remoteDev = {init: initMock, send: sendMock};
+        DevTools['remoteDev'] = {init: initMock, send: sendMock} as unknown as DevtoolsConnection;
         Onyx.init({
             keys: ONYX_KEYS,
-            registerStorageEventListener: () => {},
             initialKeyStates,
         });
     });
@@ -56,10 +58,10 @@ describe('DevTools', () => {
             expect(initMock).toHaveBeenCalledWith(initialKeyStates);
         });
         it('Sets the default state correctly', () => {
-            expect(DevTools.defaultState).toEqual(initialKeyStates);
+            expect(DevTools['defaultState']).toEqual(initialKeyStates);
         });
         it('Sets the internal state correctly', () => {
-            expect(DevTools.state).toEqual(initialKeyStates);
+            expect(DevTools['state']).toEqual(initialKeyStates);
         });
     });
 
@@ -70,7 +72,7 @@ describe('DevTools', () => {
         });
         it('Sets the internal state correctly', async () => {
             await Onyx.set(ONYX_KEYS.SOME_KEY, 3);
-            expect(DevTools.state).toEqual({...initialKeyStates, [ONYX_KEYS.SOME_KEY]: 3});
+            expect(DevTools['state']).toEqual({...initialKeyStates, [ONYX_KEYS.SOME_KEY]: 3});
         });
     });
 
@@ -81,7 +83,7 @@ describe('DevTools', () => {
         });
         it('Sets the internal state correctly', async () => {
             await Onyx.merge(ONYX_KEYS.OBJECT_KEY, exampleObject);
-            expect(DevTools.state).toEqual(mergedObject);
+            expect(DevTools['state']).toEqual(mergedObject);
         });
     });
 
@@ -92,7 +94,7 @@ describe('DevTools', () => {
         });
         it('Sets the internal state correctly', async () => {
             await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.NUM_KEY, exampleCollection);
-            expect(DevTools.state).toEqual(mergedCollection);
+            expect(DevTools['state']).toEqual(mergedCollection);
         });
     });
 
@@ -103,7 +105,7 @@ describe('DevTools', () => {
         });
         it('Sets the internal state correctly', async () => {
             await Onyx.multiSet(exampleCollection);
-            expect(DevTools.state).toEqual(mergedCollection);
+            expect(DevTools['state']).toEqual(mergedCollection);
         });
     });
 
@@ -120,7 +122,7 @@ describe('DevTools', () => {
         it('Clears internal state correctly', async () => {
             await Onyx.merge(ONYX_KEYS.NUM_KEY, 2);
             await Onyx.clear([ONYX_KEYS.NUM_KEY]);
-            expect(DevTools.state).toEqual({...initialKeyStates, [ONYX_KEYS.NUM_KEY]: 2});
+            expect(DevTools['state']).toEqual({...initialKeyStates, [ONYX_KEYS.NUM_KEY]: 2});
         });
     });
 });
