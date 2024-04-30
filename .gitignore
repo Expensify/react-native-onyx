@@ -17,3 +17,10 @@ dist/
 
 # Published package
 *.tgz
+
+# Yalc
+.yalc
+yalc.lock
+
+# Perf tests
+.reassure

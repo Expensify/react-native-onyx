@@ -69,6 +69,12 @@ describe('fastMerge', () => {
         });
     });
 
+    it('should merge an object with an empty object and remove deeply nested null values', () => {
+        const result = utils.fastMerge({}, testObjectWithNullishValues);
+
+        expect(result).toEqual(testObjectWithNullValuesRemoved);
+    });
+
     it('should remove null values by merging two identical objects with fastMerge', () => {
         const result = utils.removeNestedNullValues(testObjectWithNullishValues);
 

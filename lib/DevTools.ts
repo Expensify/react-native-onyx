@@ -39,9 +39,9 @@ class DevTools {
         try {
             // We don't want to augment the window type in a library code, so we use type assertion instead
             // eslint-disable-next-line no-underscore-dangle, @typescript-eslint/no-explicit-any
-            const reduxDevtools: ReduxDevtools = (window as any).__REDUX_DEVTOOLS_EXTENSION__;
+            const reduxDevtools: ReduxDevtools = typeof window === 'undefined' ? undefined : (window as any).__REDUX_DEVTOOLS_EXTENSION__;
 
-            if ((options && options.remote) || typeof window === 'undefined' || !reduxDevtools) {
+            if (options?.remote || !reduxDevtools) {
                 return;
             }
 
@@ -58,7 +58,7 @@ class DevTools {
      * @param payload - data written to the storage
      * @param stateChanges - partial state that got updated after the changes
      */
-    registerAction(type: string, payload: unknown, stateChanges: Record<string, unknown> = {}) {
+    registerAction(type: string, payload: unknown, stateChanges: Record<string, unknown> | null = {}) {
         try {
             if (!this.remoteDev) {
                 return;
