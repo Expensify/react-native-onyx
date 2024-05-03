@@ -24,6 +24,7 @@ import type {
 } from './types';
 import OnyxUtils from './OnyxUtils';
 import logMessages from './logMessages';
+import type {KeyValuePairList} from './storage/providers/types';
 
 // Keeps track of the last connectionID that was used so we can keep incrementing it
 let lastConnectionID = 0;
@@ -644,6 +645,15 @@ function update(data: OnyxUpdate[]): Promise<void> {
     return clearPromise.then(() => Promise.all(promises.map((p) => p()))).then(() => undefined);
 }
 
+/**
+ * Get all keys and values from Onyx storage.
+ *
+ * Note: This should only be used for troubleshooting purposes. Do not use this for any production features.
+ */
+function entries(): Promise<KeyValuePairList> {
+    return Storage.getAllEntries();
+}
+
 const Onyx = {
     METHOD: OnyxUtils.METHOD,
     connect,
@@ -656,6 +666,7 @@ const Onyx = {
     clear,
     init,
     registerLogger: Logger.registerLogger,
+    entries,
 } as const;
 
 export default Onyx;
