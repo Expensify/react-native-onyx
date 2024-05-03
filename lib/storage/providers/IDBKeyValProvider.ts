@@ -1,5 +1,5 @@
 import type {UseStore} from 'idb-keyval';
-import {set, keys, getMany, setMany, get, clear, del, delMany, createStore, promisifyRequest} from 'idb-keyval';
+import {set, keys, getMany, setMany, get, clear, del, delMany, createStore, promisifyRequest, entries} from 'idb-keyval';
 import utils from '../../utils';
 import type StorageProvider from './types';
 import type {OnyxKey, OnyxValue} from '../../types';
@@ -47,6 +47,7 @@ const provider: StorageProvider = {
     multiSet: (pairs) => setMany(pairs, idbKeyValStore),
     clear: () => clear(idbKeyValStore),
     getAllKeys: () => keys(idbKeyValStore),
+    getAllEntries: () => entries(idbKeyValStore),
     getItem: (key) =>
         get(key, idbKeyValStore)
             // idb-keyval returns undefined for missing items, but this needs to return null so that idb-keyval does the same thing as SQLiteStorage.

@@ -186,6 +186,11 @@ const Storage: Storage = {
     getAllKeys: () => tryOrDegradePerformance(() => provider.getAllKeys()),
 
     /**
+     * Returns all entries from the database
+     */
+    getAllEntries: () => tryOrDegradePerformance(() => provider.getAllEntries()),
+
+    /**
      * Gets the total bytes of the store
      */
     getDatabaseSize: () => tryOrDegradePerformance(() => provider.getDatabaseSize()),
