@@ -650,7 +650,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
  *
  * Note: This should only be used for troubleshooting purposes. Do not use this for any production features.
  */
-function entries(): Promise<KeyValuePairList> {
+function getAllEntries(): Promise<KeyValuePairList> {
     return Storage.getAllEntries();
 }
 
@@ -666,7 +666,7 @@ const Onyx = {
     clear,
     init,
     registerLogger: Logger.registerLogger,
-    entries,
+    getAllEntries,
 } as const;
 
 export default Onyx;
