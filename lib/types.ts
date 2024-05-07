@@ -4,6 +4,16 @@ import type {BuiltIns} from 'type-fest/source/internal';
 import type OnyxUtils from './OnyxUtils';
 
 /**
+ * Utility type that excludes `null` from the type `TValue`.
+ */
+type NonNull<TValue> = TValue extends null ? never : TValue;
+
+/**
+ * Utility type that excludes `undefined` from the type `TValue`.
+ */
+type NonUndefined<TValue> = TValue extends undefined ? never : TValue;
+
+/**
  * Represents a deeply nested record. It maps keys to values,
  * and those values can either be of type `TValue` or further nested `DeepRecord` instances.
  */
@@ -141,7 +151,7 @@ type NullableKeyValueMapping = {
 type Selector<TKey extends OnyxKey, TOnyxProps, TReturnType> = (value: OnyxEntry<KeyValueMapping[TKey]>, state: WithOnyxInstanceState<TOnyxProps>) => TReturnType;
 
 /**
- * Represents a single Onyx entry, that can be either `TOnyxValue` or `null` if it doesn't exist.
+ * Represents a single Onyx entry, that can be either `TOnyxValue` or `null` / `undefined` if it doesn't exist.
  *
  * It can be used to specify data retrieved from Onyx e.g. `withOnyx` HOC mappings.
  *
@@ -168,10 +178,10 @@ type Selector<TKey extends OnyxKey, TOnyxProps, TReturnType> = (value: OnyxEntry
  * })(Component);
  * ```
  */
-type OnyxEntry<TOnyxValue> = TOnyxValue | null;
+type OnyxEntry<TOnyxValue> = TOnyxValue | null | undefined;
 
 /**
- * Represents an Onyx collection of entries, that can be either a record of `TOnyxValue`s or `null` if it is empty or doesn't exist.
+ * Represents an Onyx collection of entries, that can be either a record of `TOnyxValue`s or `null` / `undefined` if it is empty or doesn't exist.
  *
  * It can be used to specify collection data retrieved from Onyx e.g. `withOnyx` HOC mappings.
  *
@@ -198,7 +208,7 @@ type OnyxEntry<TOnyxValue> = TOnyxValue | null;
  * })(Component);
  * ```
  */
-type OnyxCollection<TOnyxValue> = OnyxEntry<Record<string, TOnyxValue | null>>;
+type OnyxCollection<TOnyxValue> = OnyxEntry<Record<string, TOnyxValue | null | undefined>>;
 
 /** Utility type to extract `TOnyxValue` from `OnyxCollection<TOnyxValue>` */
 type ExtractOnyxCollectionValue<TOnyxCollection> = TOnyxCollection extends NonNullable<OnyxCollection<infer U>> ? U : never;
@@ -284,9 +294,9 @@ type WithOnyxConnectOptions<TKey extends OnyxKey> = {
     canEvict?: boolean;
 };
 
-type DefaultConnectCallback<TKey extends OnyxKey> = (value: OnyxEntry<KeyValueMapping[TKey]>, key: TKey) => void;
+type DefaultConnectCallback<TKey extends OnyxKey> = (value: NonUndefined<OnyxEntry<KeyValueMapping[TKey]>>, key: TKey) => void;
 
-type CollectionConnectCallback<TKey extends OnyxKey> = (value: OnyxCollection<KeyValueMapping[TKey]>) => void;
+type CollectionConnectCallback<TKey extends OnyxKey> = (value: NonUndefined<OnyxCollection<KeyValueMapping[TKey]>>) => void;
 
 /** Represents the callback function used in `Onyx.connect()` method with a regular key. */
 type DefaultConnectOptions<TKey extends OnyxKey> = {
@@ -331,12 +341,12 @@ type OnyxUpdate =
               | {
                     onyxMethod: typeof OnyxUtils.METHOD.SET;
                     key: TKey;
-                    value: OnyxEntry<KeyValueMapping[TKey]>;
+                    value: NonUndefined<OnyxEntry<KeyValueMapping[TKey]>>;
                 }
               | {
                     onyxMethod: typeof OnyxUtils.METHOD.MERGE;
                     key: TKey;
-                    value: OnyxEntry<NullishDeep<KeyValueMapping[TKey]>>;
+                    value: NonUndefined<OnyxEntry<NullishDeep<KeyValueMapping[TKey]>>>;
                 }
               | {
                     onyxMethod: typeof OnyxUtils.METHOD.MULTI_SET;
@@ -391,31 +401,33 @@ type InitOptions = {
 };
 
 export type {
+    BaseConnectOptions,
+    Collection,
+    CollectionConnectCallback,
+    CollectionConnectOptions,
     CollectionKey,
     CollectionKeyBase,
+    ConnectOptions,
     CustomTypeOptions,
     DeepRecord,
+    DefaultConnectCallback,
+    DefaultConnectOptions,
+    ExtractOnyxCollectionValue,
+    InitOptions,
     Key,
     KeyValueMapping,
+    Mapping,
+    NonNull,
+    NonUndefined,
     NullableKeyValueMapping,
+    NullishDeep,
     OnyxCollection,
     OnyxEntry,
     OnyxKey,
+    OnyxUpdate,
     OnyxValue,
     Selector,
-    NullishDeep,
-    WithOnyxInstanceState,
-    ExtractOnyxCollectionValue,
-    Collection,
-    WithOnyxInstance,
-    BaseConnectOptions,
     WithOnyxConnectOptions,
-    DefaultConnectCallback,
-    CollectionConnectCallback,
-    DefaultConnectOptions,
-    CollectionConnectOptions,
-    ConnectOptions,
-    Mapping,
-    OnyxUpdate,
-    InitOptions,
+    WithOnyxInstance,
+    WithOnyxInstanceState,
 };
