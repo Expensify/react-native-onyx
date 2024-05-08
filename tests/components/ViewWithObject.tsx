@@ -16,3 +16,4 @@ function ViewWithObject({onRender, ...rest}: ViewWithObjectProps) {
 }
 
 export default ViewWithObject;
+export type {ViewWithObjectProps};

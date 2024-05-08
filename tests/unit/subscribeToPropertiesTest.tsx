@@ -1,8 +1,10 @@
 /* eslint-disable rulesdir/onyx-props-must-have-default */
+import type {ErrorInfo, ReactNode} from 'react';
 import React from 'react';
 import {render, cleanup} from '@testing-library/react-native';
 import Onyx, {withOnyx} from '../../lib';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
+import type {ViewWithObjectProps} from '../components/ViewWithObject';
 import ViewWithObject from '../components/ViewWithObject';
 
 const ONYX_KEYS = {
@@ -14,19 +16,22 @@ const ONYX_KEYS = {
 
 Onyx.init({
     keys: ONYX_KEYS,
-    registerStorageEventListener: () => {},
 });
+
+interface ErrorBoundaryProps {
+    children?: ReactNode;
+}
 
 // The error boundary is here so that it will catch errors thrown in the selector methods (like syntax errors).
 // Normally, those errors get swallowed up by Jest and are not displayed so there was no indication that a test failed
-class ErrorBoundary extends React.Component {
+class ErrorBoundary extends React.Component<ErrorBoundaryProps> {
     // Error boundaries have to implement this method. It's for providing a fallback UI, but
     // we don't need that for unit testing, so this is basically a no-op.
-    static getDerivedStateFromError(error) {
+    static getDerivedStateFromError(error: Error) {
         return {error};
     }
 
-    componentDidCatch(error, errorInfo) {
+    componentDidCatch(error: Error, errorInfo: ErrorInfo) {
         console.error(error, errorInfo);
     }
 
@@ -46,10 +51,8 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
 
     /**
      * Runs all the assertions needed for withOnyx and using single keys in Onyx
-     * @param {Object} TestComponentWithOnyx
-     * @returns {Promise}
      */
-    const runAssertionsWithComponent = (TestComponentWithOnyx) => {
+    const runAssertionsWithComponent = (TestComponentWithOnyx: React.ComponentType) => {
         let renderedComponent = render(
             <ErrorBoundary>
                 <TestComponentWithOnyx />
@@ -106,7 +109,7 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
 
     it('connecting to a single non-collection key with a selector function', () => {
         const mockedSelector = jest.fn((obj) => obj && obj.a);
-        const TestComponentWithOnyx = withOnyx({
+        const TestComponentWithOnyx = withOnyx<ViewWithObjectProps, ViewWithObjectProps>({
             propertyA: {
                 key: ONYX_KEYS.TEST_KEY,
                 selector: mockedSelector,
@@ -121,11 +124,8 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
 
     /**
      * Runs all the assertions for connecting to a full collection
-     *
-     * @param {Object} TestComponentWithOnyx
-     * @returns {Promise}
      */
-    const runAllAssertionsForCollection = (TestComponentWithOnyx) => {
+    const runAllAssertionsForCollection = (TestComponentWithOnyx: React.ComponentType) => {
         let renderedComponent = render(
             <ErrorBoundary>
                 <TestComponentWithOnyx />
@@ -135,6 +135,7 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
             waitForPromisesToResolve()
                 // When Onyx is updated with an object that has multiple properties
                 .then(() =>
+                    // @ts-expect-error bypass
                     Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                         [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {a: 'one', b: 'two'},
                         [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {c: 'three', d: 'four'},
@@ -165,6 +166,7 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
 
                 // When Onyx is updated with a change to property b using mergeCollection()
                 .then(() =>
+                    // @ts-expect-error bypass
                     Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                         [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {b: 'three'},
                     }),
@@ -179,7 +181,7 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
 
     it('connecting to a collection with a selector function', () => {
         const mockedSelector = jest.fn((obj) => obj && obj.a);
-        const TestComponentWithOnyx = withOnyx({
+        const TestComponentWithOnyx = withOnyx<ViewWithObjectProps, ViewWithObjectProps>({
             collectionWithPropertyA: {
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
                 selector: mockedSelector,
@@ -188,6 +190,7 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
         return runAllAssertionsForCollection(TestComponentWithOnyx).then(() => {
             // Expect that the selector always gets called with the full object
             // from the onyx state, and not with the selector result value (string in this case).
+            // eslint-disable-next-line @typescript-eslint/prefer-for-of
             for (let i = 0; i < mockedSelector.mock.calls.length; i++) {
                 const firstArg = mockedSelector.mock.calls[i][0];
                 expect(firstArg).toBeDefined();
@@ -201,11 +204,8 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
 
     /**
      * Runs all the assertions when connecting to a key that is part of a collection
-     *
-     * @param {Object} TestComponentWithOnyx
-     * @returns {Promise}
      */
-    const runAllAssertionsForCollectionMemberKey = (TestComponentWithOnyx) => {
+    const runAllAssertionsForCollectionMemberKey = (TestComponentWithOnyx: React.ComponentType) => {
         let renderedComponent = render(
             <ErrorBoundary>
                 <TestComponentWithOnyx />
@@ -215,6 +215,7 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
             waitForPromisesToResolve()
                 // When Onyx is updated with an object that has multiple properties
                 .then(() =>
+                    // @ts-expect-error bypass
                     Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                         [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {a: 'one', b: 'two'},
                         [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {c: 'three', d: 'four'},
@@ -245,6 +246,7 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
 
                 // When Onyx is updated with a change to property b using mergeCollection()
                 .then(() =>
+                    // @ts-expect-error bypass
                     Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                         [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {b: 'three'},
                     }),
@@ -258,9 +260,10 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
     };
 
     it('connecting to a collection member with a selector function', () => {
-        const TestComponentWithOnyx = withOnyx({
+        const TestComponentWithOnyx = withOnyx<ViewWithObjectProps, ViewWithObjectProps>({
             itemWithPropertyA: {
                 key: `${ONYX_KEYS.COLLECTION.TEST_KEY}1`,
+                // @ts-expect-error bypass
                 selector: (obj) => obj && obj.a,
             },
         })(ViewWithObject);
