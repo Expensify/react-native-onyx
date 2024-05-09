@@ -3,7 +3,7 @@ import {useCallback, useEffect, useRef, useSyncExternalStore} from 'react';
 import type {IsEqual} from 'type-fest';
 import Onyx from './Onyx';
 import OnyxUtils from './OnyxUtils';
-import type {CollectionKeyBase, KeyValueMapping, NonNull, OnyxCollection, OnyxEntry, OnyxKey, Selector} from './types';
+import type {CollectionKeyBase, KeyValueMapping, NonNull, NonUndefined, OnyxCollection, OnyxEntry, OnyxKey, OnyxValue, Selector} from './types';
 import useLiveRef from './useLiveRef';
 import usePrevious from './usePrevious';
 
@@ -90,6 +90,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(key: T
     // We initialize it to `undefined` to simulate that we don't have any value from cache yet.
     const cachedValueRef = useRef<CachedValue<TKey, TReturnValue> | undefined>(undefined);
 
+    const newValueRef = useRef<CachedValue<TKey, TReturnValue> | undefined>(undefined);
+
     // Stores the previously result returned by the hook, containing the data from cache and the fetch status.
     // We initialize it to `undefined` and `loading` fetch status to simulate the initial result when the hook is loading from the cache.
     // However, if `initWithStoredValues` is `true` we set the fetch status to `loaded` since we want to signal that data is ready.
@@ -134,7 +136,11 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(key: T
         // If `newValue` is `null` or any other value if means that the cache does have a value for that key.
         // This difference between `undefined` and other values is crucial and it's used to address the following
         // conditions and use cases.
-        let newValue = getCachedValue<TKey, TReturnValue>(key, selectorRef.current);
+
+        // let newValue = getCachedValue<TKey, TReturnValue>(key, selectorRef.current);
+        if (isFirstConnectionRef.current) {
+            newValueRef.current = getCachedValue<TKey, TReturnValue>(key, selectorRef.current);
+        }
 
         // Since the fetch status can be different given the use cases below, we define the variable right away.
         let newFetchStatus: FetchStatus | undefined;
@@ -143,28 +149,28 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(key: T
         // and fetch status to `loading` to simulate that it is still being loaded until we have the most updated data.
         // If `allowStaleData` is `true` this logic will be ignored and cached value will be used, even if it's stale data.
         if (isFirstConnectionRef.current && OnyxUtils.hasPendingMergeForKey(key) && !options?.allowStaleData) {
-            newValue = undefined;
+            newValueRef.current = undefined;
             newFetchStatus = 'loading';
         }
 
         // If data is not present in cache (if it's `undefined`) and `initialValue` is set during the first connection,
         // we set the new value to `initialValue` and fetch status to `loaded` since we already have some data to return to the consumer.
-        if (isFirstConnectionRef.current && newValue === undefined && options?.initialValue !== undefined) {
-            newValue = options?.initialValue as CachedValue<TKey, TReturnValue>;
+        if (isFirstConnectionRef.current && newValueRef.current === undefined && options?.initialValue !== undefined) {
+            newValueRef.current = options?.initialValue as CachedValue<TKey, TReturnValue>;
             newFetchStatus = 'loaded';
         }
 
         let areValuesEqual = false;
         if (OnyxUtils.isCollectionKey(key) && selectorRef.current) {
-            areValuesEqual = deepEqual(cachedValueRef.current, newValue);
+            areValuesEqual = deepEqual(cachedValueRef.current, newValueRef.current);
         } else {
-            areValuesEqual = shallowEqual(cachedValueRef.current, newValue);
+            areValuesEqual = shallowEqual(cachedValueRef.current, newValueRef.current);
         }
 
         // If the previously cached value is different from the new value, we update both cached value
         // and the result to be returned by the hook.
         if (!areValuesEqual) {
-            cachedValueRef.current = newValue;
+            cachedValueRef.current = newValueRef.current;
 
             // If the new value is `null` we default it to `undefined` to ensure the consumer get a consistent result from the hook.
             resultRef.current = [(cachedValueRef.current ?? undefined) as CachedValue<TKey, TReturnValue>, {status: newFetchStatus ?? 'loaded'}];
@@ -177,10 +183,17 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(key: T
         (onStoreChange: () => void) => {
             connectionIDRef.current = Onyx.connect<CollectionKeyBase>({
                 key,
-                callback: () => {
+                selector: selectorRef.current,
+                callback: (value: NonUndefined<OnyxValue<OnyxKey>>) => {
                     // We don't need to update the Onyx cache again here, when `callback` is called the cache is already
                     // expected to be updated, so we just signal that the store changed and `getSnapshot()` can be called again.
+
+                    // Should we use removeNestedNullValues()? (it's used on withOnyx)
+                    // const newValue = utils.removeNestedNullValues(value);
+                    const newValue = value;
+
                     isFirstConnectionRef.current = false;
+                    newValueRef.current = newValue as CachedValue<TKey, TReturnValue>;
                     onStoreChange();
                 },
                 initWithStoredValues: options?.initWithStoredValues,
@@ -196,7 +209,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(key: T
                 isFirstConnectionRef.current = false;
             };
         },
-        [key, options?.initWithStoredValues],
+        [key, selectorRef, options?.initWithStoredValues],
     );
 
     // Mimics withOnyx's checkEvictableKeys() behavior.
