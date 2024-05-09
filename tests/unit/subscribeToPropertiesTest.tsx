@@ -6,6 +6,7 @@ import Onyx, {withOnyx} from '../../lib';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import type {ViewWithObjectProps} from '../components/ViewWithObject';
 import ViewWithObject from '../components/ViewWithObject';
+import type {Collection} from '../../lib/types';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
@@ -135,11 +136,10 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
             waitForPromisesToResolve()
                 // When Onyx is updated with an object that has multiple properties
                 .then(() =>
-                    // @ts-expect-error bypass
                     Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                         [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {a: 'one', b: 'two'},
                         [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {c: 'three', d: 'four'},
-                    }),
+                    } as Collection<string, unknown, unknown>),
                 )
                 .then(() => {
                     renderedComponent = render(
@@ -166,10 +166,9 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
 
                 // When Onyx is updated with a change to property b using mergeCollection()
                 .then(() =>
-                    // @ts-expect-error bypass
                     Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                         [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {b: 'three'},
-                    }),
+                    } as Collection<string, unknown, unknown>),
                 )
 
                 // Then the props passed should not have changed
@@ -215,11 +214,10 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
             waitForPromisesToResolve()
                 // When Onyx is updated with an object that has multiple properties
                 .then(() =>
-                    // @ts-expect-error bypass
                     Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                         [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {a: 'one', b: 'two'},
                         [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {c: 'three', d: 'four'},
-                    }),
+                    } as Collection<string, unknown, unknown>),
                 )
                 .then(() => {
                     renderedComponent = render(
@@ -246,10 +244,9 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
 
                 // When Onyx is updated with a change to property b using mergeCollection()
                 .then(() =>
-                    // @ts-expect-error bypass
                     Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                         [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {b: 'three'},
-                    }),
+                    } as Collection<string, unknown, unknown>),
                 )
 
                 // Then the props passed should not have changed

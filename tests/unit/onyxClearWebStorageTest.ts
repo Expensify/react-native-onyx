@@ -2,6 +2,7 @@ import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import StorageMock from '../../lib/storage';
 import Onyx from '../../lib/Onyx';
 import type OnyxCache from '../../lib/OnyxCache';
+import type {Collection} from '../../lib/types';
 
 const ONYX_KEYS = {
     DEFAULT_KEY: 'defaultKey',
@@ -136,13 +137,12 @@ describe('Set data while storage is clearing', () => {
         return (
             waitForPromisesToResolve()
                 .then(() =>
-                    // @ts-expect-error bypass
                     Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST, {
                         [`${ONYX_KEYS.COLLECTION.TEST}1`]: 1,
                         [`${ONYX_KEYS.COLLECTION.TEST}2`]: 2,
                         [`${ONYX_KEYS.COLLECTION.TEST}3`]: 3,
                         [`${ONYX_KEYS.COLLECTION.TEST}4`]: 4,
-                    }),
+                    } as Collection<string, unknown, unknown>),
                 )
 
                 // When onyx is cleared
