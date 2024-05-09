@@ -17,3 +17,4 @@ function ViewWithText({onRender, text}: ViewWithTextProps) {
 }
 
 export default ViewWithText;
+export type {ViewWithTextProps};

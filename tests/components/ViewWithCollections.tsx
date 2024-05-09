@@ -84,3 +84,4 @@ function ViewWithCollections(
 }
 
 export default forwardRef(ViewWithCollections);
+export type {ViewWithCollectionsProps};
