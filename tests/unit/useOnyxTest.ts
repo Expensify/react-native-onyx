@@ -206,7 +206,7 @@ describe('useOnyx', () => {
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.COLLECTION.TEST_KEY, {
                     // @ts-expect-error bypass
-                    selector: (entry: OnyxEntry<{id: string; name: string}>) => entry?.id,
+                    selector: (entry: OnyxEntry<{id: string; name: string}>) => ({id: entry?.id}),
                 }),
             );
 

@@ -1,11 +1,11 @@
-import {deepEqual} from 'fast-equals';
+import {deepEqual, shallowEqual} from 'fast-equals';
 import {useCallback, useEffect, useRef, useSyncExternalStore} from 'react';
 import type {IsEqual} from 'type-fest';
+import Onyx from './Onyx';
 import OnyxUtils from './OnyxUtils';
 import type {CollectionKeyBase, KeyValueMapping, NonNull, OnyxCollection, OnyxEntry, OnyxKey, Selector} from './types';
 import useLiveRef from './useLiveRef';
 import usePrevious from './usePrevious';
-import Onyx from './Onyx';
 
 /**
  * Represents a Onyx value that can be either a single entry or a collection of entries, depending on the `TKey` provided.
@@ -154,9 +154,16 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(key: T
             newFetchStatus = 'loaded';
         }
 
+        let areValuesEqual = false;
+        if (OnyxUtils.isCollectionKey(key) && selectorRef.current) {
+            areValuesEqual = deepEqual(cachedValueRef.current, newValue);
+        } else {
+            areValuesEqual = shallowEqual(cachedValueRef.current, newValue);
+        }
+
         // If the previously cached value is different from the new value, we update both cached value
         // and the result to be returned by the hook.
-        if (!deepEqual(cachedValueRef.current, newValue)) {
+        if (!areValuesEqual) {
             cachedValueRef.current = newValue;
 
             // If the new value is `null` we default it to `undefined` to ensure the consumer get a consistent result from the hook.
@@ -216,4 +223,4 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(key: T
 
 export default useOnyx;
 
-export type {UseOnyxResult, ResultMetadata, FetchStatus};
+export type {FetchStatus, ResultMetadata, UseOnyxResult};
