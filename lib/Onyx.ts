@@ -99,6 +99,9 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): nu
     callbackToStateMapping[connectionID] = mapping as Mapping<OnyxKey>;
     callbackToStateMapping[connectionID].connectionID = connectionID;
 
+    // When keyChanged is called, the key is passed and looks through all the callbackToStateMapping the right key
+    // to avoid having to loop through all the keys all the time (even when just one connection belongs to one key),
+    // we store the key by connectionID, to access the specific list of connectionIDs
     OnyxUtils.storeKeyByConnections(mapping.key, callbackToStateMapping[connectionID].connectionID);
 
     if (mapping.initWithStoredValues === false) {

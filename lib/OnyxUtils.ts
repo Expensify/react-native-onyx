@@ -301,8 +301,8 @@ function isSafeEvictionKey(testKey: OnyxKey): boolean {
 /**
  * Stores a connection ID associated with a given key.
  *
- * @param connectionID connectionID of the subscriber
- * @param key key that the subscriber is connected to
+ * @param connectionID - a connection ID of the subscriber
+ * @param key - a key that the subscriber is connected to
  */
 function storeKeyByConnections(key: OnyxKey, connectionID: number) {
     if (!onyxKeyToConnectionIDs.has(key)) {
@@ -410,7 +410,18 @@ function addToEvictionBlockList(key: OnyxKey, connectionID: number): void {
 
     evictionBlocklist[key].push(connectionID);
 }
-
+/**
+ * It extracts the pure, non-numeric part of a given key.
+ *
+ * For example:
+ * - `getPureKey("report_123")` would return "report_"
+ * - `getPureKey("report")` would return "report"
+ * - `getPureKey("report_")` would return "report_"
+ * - `getPureKey(null)` would return ""
+ *
+ * @param {OnyxKey} key - The key to process.
+ * @return {string} The pure key without any numeric
+ */
 function getPureKey(key: OnyxKey): string {
     if (!key) {
         return '';
@@ -663,13 +674,15 @@ function keyChanged<TKey extends OnyxKey>(
         removeLastAccessedKey(key);
     }
 
-    // We are iterating over all subscribers to see if they are interested in the key that has just changed. If the subscriber's  key is a collection key then we will
+    // We get the subscribers interested in the key that has just changed. If the subscriber's  key is a collection key then we will
     // notify them if the key that changed is a collection member. Or if it is a regular key notify them when there is an exact match. Depending on whether the subscriber
     // was connected via withOnyx we will call setState() directly on the withOnyx instance. If it is a regular connection we will pass the data to the provided callback.
+    // Given the amount of times this function is called we need to make sure we are not iterating over all subscribers every time. On the other hand, we don't need to
+    // do the same in keysChanged, because we only call that function when a collection key changes, and it doesn't happen that often.
     let stateMappingKeys = onyxKeyToConnectionIDs.get(key);
 
     if (!stateMappingKeys) {
-        // Getting the collection key from the specific key 'cos only collection keys were stored in the mapping.
+        // Getting the collection key from the specific key because only collection keys were stored in the mapping.
         stateMappingKeys = onyxKeyToConnectionIDs.get(getPureKey(key));
         if (!stateMappingKeys) {
             return;
