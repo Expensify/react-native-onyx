@@ -2,6 +2,8 @@ import _ from 'underscore';
 import Onyx from '../../lib';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import OnyxUtils from '../../lib/OnyxUtils';
+import type OnyxCache from '../../lib/OnyxCache';
+import type {Collection, OnyxCollection, OnyxUpdate} from '../../lib/types';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
@@ -16,19 +18,19 @@ const ONYX_KEYS = {
 
 Onyx.init({
     keys: ONYX_KEYS,
-    registerStorageEventListener: () => {},
     initialKeyStates: {
         [ONYX_KEYS.OTHER_TEST]: 42,
     },
 });
 
 describe('Onyx', () => {
-    let connectionID;
+    let connectionID: number;
 
     /** @type OnyxCache */
-    let cache;
+    let cache: typeof OnyxCache;
 
     beforeEach(() => {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         cache = require('../../lib/OnyxCache').default;
     });
 
@@ -56,7 +58,7 @@ describe('Onyx', () => {
             }));
 
     it('should set a simple key', () => {
-        let testKeyValue;
+        let testKeyValue: unknown;
 
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
@@ -73,7 +75,7 @@ describe('Onyx', () => {
     });
 
     it('should not set the key if the value is incompatible (array vs object)', () => {
-        let testKeyValue;
+        let testKeyValue: unknown;
 
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
@@ -94,7 +96,7 @@ describe('Onyx', () => {
     });
 
     it('should merge an object with another object', () => {
-        let testKeyValue;
+        let testKeyValue: unknown;
 
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
@@ -115,7 +117,7 @@ describe('Onyx', () => {
     });
 
     it('should not merge if the value is incompatible (array vs object)', () => {
-        let testKeyValue;
+        let testKeyValue: unknown;
 
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
@@ -136,7 +138,7 @@ describe('Onyx', () => {
     });
 
     it('should notify subscribers when data has been cleared', () => {
-        let testKeyValue;
+        let testKeyValue: unknown;
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
@@ -145,7 +147,7 @@ describe('Onyx', () => {
             },
         });
 
-        let otherTestValue;
+        let otherTestValue: unknown;
         const otherTestConnectionID = Onyx.connect({
             key: ONYX_KEYS.OTHER_TEST,
             callback: (value) => {
@@ -171,7 +173,7 @@ describe('Onyx', () => {
     });
 
     it('should not notify subscribers after they have disconnected', () => {
-        let testKeyValue;
+        let testKeyValue: unknown;
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
@@ -193,7 +195,7 @@ describe('Onyx', () => {
     });
 
     it('should merge arrays by replacing previous value with new value', () => {
-        let testKeyValue;
+        let testKeyValue: unknown;
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
@@ -214,7 +216,7 @@ describe('Onyx', () => {
     });
 
     it('should merge 2 objects when it has no initial stored value for test key', () => {
-        let testKeyValue;
+        let testKeyValue: unknown;
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
@@ -230,7 +232,7 @@ describe('Onyx', () => {
     });
 
     it('should merge 2 arrays when it has no initial stored value for test key', () => {
-        let testKeyValue;
+        let testKeyValue: unknown;
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
@@ -246,7 +248,7 @@ describe('Onyx', () => {
     });
 
     it('should ignore top-level undefined values', () => {
-        let testKeyValue;
+        let testKeyValue: unknown;
 
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
@@ -267,7 +269,7 @@ describe('Onyx', () => {
     });
 
     it('should remove keys that are set to null when merging', () => {
-        let testKeyValue;
+        let testKeyValue: unknown;
 
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
@@ -325,7 +327,7 @@ describe('Onyx', () => {
     });
 
     it('should ignore `undefined` values when merging', () => {
-        let testKeyValue;
+        let testKeyValue: unknown;
 
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
@@ -364,7 +366,7 @@ describe('Onyx', () => {
     });
 
     it('should overwrite an array key nested inside an object', () => {
-        let testKeyValue;
+        let testKeyValue: unknown;
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
@@ -380,7 +382,7 @@ describe('Onyx', () => {
     });
 
     it('should overwrite an array key nested inside an object when using merge on a collection', () => {
-        let testKeyValue;
+        let testKeyValue: unknown;
         connectionID = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
             initWithStoredValues: false,
@@ -396,7 +398,7 @@ describe('Onyx', () => {
     });
 
     it('should properly set and merge when using mergeCollection', () => {
-        const valuesReceived = {};
+        const valuesReceived: Record<string, unknown> = {};
         const mockCallback = jest.fn((data) => (valuesReceived[data.ID] = data.value));
         connectionID = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
@@ -418,7 +420,7 @@ describe('Onyx', () => {
                 ID: 345,
                 value: 'three',
             },
-        })
+        } as Collection<string, unknown, unknown>)
             .then(() =>
                 // 2 key values to update and 2 new keys to add.
                 // MergeCollection will perform a mix of multiSet and multiMerge
@@ -440,7 +442,7 @@ describe('Onyx', () => {
                         ID: 567,
                         value: 'one',
                     },
-                }),
+                } as Collection<string, unknown, unknown>),
             )
             .then(() => {
                 // 3 items on the first mergeCollection + 4 items the next mergeCollection
@@ -461,20 +463,20 @@ describe('Onyx', () => {
     });
 
     it('should skip the update when a key not belonging to collection key is present in mergeCollection', () => {
-        const valuesReceived = {};
+        const valuesReceived: Record<string, unknown> = {};
         connectionID = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
             initWithStoredValues: false,
             callback: (data, key) => (valuesReceived[key] = data),
         });
 
-        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, notMyTest: {beep: 'boop'}}).then(() => {
+        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, notMyTest: {beep: 'boop'}} as Collection<string, unknown, unknown>).then(() => {
             expect(valuesReceived).toEqual({});
         });
     });
 
     it('should return full object to callback when calling mergeCollection()', () => {
-        const valuesReceived = {};
+        const valuesReceived: Record<string, unknown> = {};
         connectionID = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
             initWithStoredValues: false,
@@ -499,7 +501,7 @@ describe('Onyx', () => {
                         ID: 234,
                         value: 'two',
                     },
-                }),
+                } as Collection<string, unknown, unknown>),
             )
             .then(() => {
                 expect(valuesReceived).toEqual({
@@ -518,7 +520,7 @@ describe('Onyx', () => {
     });
 
     it('should use update data object to set/merge keys', () => {
-        let testKeyValue;
+        let testKeyValue: unknown;
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
@@ -527,7 +529,7 @@ describe('Onyx', () => {
             },
         });
 
-        let otherTestKeyValue;
+        let otherTestKeyValue: unknown;
         connectionID = Onyx.connect({
             key: ONYX_KEYS.OTHER_TEST,
             initWithStoredValues: false,
@@ -569,7 +571,7 @@ describe('Onyx', () => {
     });
 
     it('should use update data object to merge a collection of keys', () => {
-        const valuesReceived = {};
+        const valuesReceived: Record<string, unknown> = {};
         const mockCallback = jest.fn((data) => (valuesReceived[data.ID] = data.value));
         connectionID = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
@@ -644,15 +646,17 @@ describe('Onyx', () => {
 
     it('should throw an error when the data object is incorrect in Onyx.update', () => {
         // Given the invalid data object with onyxMethod='multiSet'
-        const data = [
+        const data: unknown[] = [
             {onyxMethod: 'set', key: ONYX_KEYS.TEST_KEY, value: 'four'},
             {onyxMethod: 'murge', key: ONYX_KEYS.OTHER_TEST, value: {test2: 'test2'}},
         ];
 
         try {
             // When we pass it to Onyx.update
+            // @ts-expect-error This is an invalid call to Onyx.update
             Onyx.update(data);
-        } catch (error) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (error: any) {
             // Then we should expect the error message below
             expect(error.message).toEqual('Invalid onyxMethod murge in Onyx update.');
         }
@@ -662,15 +666,17 @@ describe('Onyx', () => {
             data[1] = {onyxMethod: 'merge', key: true, value: {test2: 'test2'}};
 
             // When we pass it to Onyx.update
+            // @ts-expect-error This is an invalid call to Onyx.update
             Onyx.update(data);
-        } catch (error) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (error: any) {
             // Then we should expect the error message below
             expect(error.message).toEqual('Invalid boolean key provided in Onyx update. Onyx key must be of type string.');
         }
     });
 
     it('should properly set all keys provided in a multiSet called via update', () => {
-        const valuesReceived = {};
+        const valuesReceived: Record<string, unknown> = {};
         connectionID = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
             initWithStoredValues: false,
@@ -700,7 +706,7 @@ describe('Onyx', () => {
                             },
                         },
                     },
-                ]),
+                ] as unknown as OnyxUpdate[]),
             )
             .then(() => {
                 expect(valuesReceived).toEqual({
@@ -732,8 +738,9 @@ describe('Onyx', () => {
                         },
                     ],
                 },
-            ]);
-        } catch (error) {
+            ] as unknown as OnyxUpdate[]);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (error: any) {
             expect(error.message).toEqual('Invalid value provided in Onyx multiSet. Onyx multiSet value must be of type object.');
         }
     });
@@ -757,7 +764,7 @@ describe('Onyx', () => {
             },
         };
 
-        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION, initialCollectionData)
+        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION, initialCollectionData as Collection<string, unknown, unknown>)
             .then(() => {
                 // When we connect to that collection with waitForCollectionCallback = true
                 connectionID = Onyx.connect({
@@ -790,7 +797,7 @@ describe('Onyx', () => {
         return (
             waitForPromisesToResolve()
                 // When mergeCollection is called with an updated collection
-                .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_POLICY, collectionUpdate))
+                .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_POLICY, collectionUpdate as Collection<string, unknown, unknown>))
                 .then(() => {
                     // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
                     expect(mockCallback).toHaveBeenCalledTimes(2);
@@ -819,7 +826,7 @@ describe('Onyx', () => {
         return (
             waitForPromisesToResolve()
                 // When mergeCollection is called with an updated collection
-                .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_POLICY, collectionUpdate))
+                .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_POLICY, collectionUpdate as Collection<string, unknown, unknown>))
                 .then(() => {
                     // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
                     expect(mockCallback).toHaveBeenCalledTimes(2);
@@ -950,7 +957,7 @@ describe('Onyx', () => {
     });
 
     it('should return a promise that completes when all update() operations are done', () => {
-        const connectionIDs = [];
+        const connectionIDs: number[] = [];
 
         const testCallback = jest.fn();
         const otherTestCallback = jest.fn();
@@ -968,12 +975,12 @@ describe('Onyx', () => {
             expect(collectionCallback).toHaveBeenNthCalledWith(1, {[itemKey]: {a: 'a'}});
             expect(testCallback).toHaveBeenNthCalledWith(1, 'taco', ONYX_KEYS.TEST_KEY);
             expect(otherTestCallback).toHaveBeenNthCalledWith(1, 'pizza', ONYX_KEYS.OTHER_TEST);
-            Onyx.disconnect(connectionIDs);
+            connectionIDs.forEach((id) => Onyx.disconnect(id));
         });
     });
 
     it('should merge an object with a batch of objects and undefined', () => {
-        let testKeyValue;
+        let testKeyValue: unknown;
 
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
@@ -1004,7 +1011,7 @@ describe('Onyx', () => {
     });
 
     it('should merge an object with null and overwrite the value', () => {
-        let testKeyValue;
+        let testKeyValue: unknown;
 
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
@@ -1031,7 +1038,7 @@ describe('Onyx', () => {
     });
 
     it('should merge a key with null and allow subsequent updates', () => {
-        let testKeyValue;
+        let testKeyValue: unknown;
 
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
@@ -1057,7 +1064,7 @@ describe('Onyx', () => {
     });
 
     it('should merge a non-existing key with a nested null removed', () => {
-        let testKeyValue;
+        let testKeyValue: unknown;
 
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
@@ -1083,7 +1090,7 @@ describe('Onyx', () => {
         });
     });
     it('should apply updates in order with Onyx.update', () => {
-        let testKeyValue;
+        let testKeyValue: unknown;
 
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
@@ -1116,7 +1123,7 @@ describe('Onyx', () => {
     });
 
     it('should merge a non-existing key with a nested null removed', () => {
-        let testKeyValue;
+        let testKeyValue: unknown;
 
         connectionID = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
@@ -1143,7 +1150,7 @@ describe('Onyx', () => {
     });
 
     it('mergeCollection should omit nested null values', () => {
-        let result;
+        let result: OnyxCollection<unknown>;
 
         const routineRoute = `${ONYX_KEYS.COLLECTION.TEST_KEY}routine`;
         const holidayRoute = `${ONYX_KEYS.COLLECTION.TEST_KEY}holiday`;
@@ -1170,7 +1177,7 @@ describe('Onyx', () => {
                     3: null,
                 },
             },
-        }).then(() => {
+        } as Collection<string, unknown, unknown>).then(() => {
             expect(result).toEqual({
                 [routineRoute]: {
                     waypoints: {
