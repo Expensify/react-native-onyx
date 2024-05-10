@@ -14,6 +14,7 @@ import type {
     InitOptions,
     KeyValueMapping,
     Mapping,
+    NonUndefined,
     NullableKeyValueMapping,
     NullishDeep,
     OnyxCollection,
@@ -208,7 +209,7 @@ function disconnect(connectionID: number, keyToRemoveFromEvictionBlocklist?: Ony
  * @param key ONYXKEY to set
  * @param value value to store
  */
-function set<TKey extends OnyxKey>(key: TKey, value: OnyxEntry<KeyValueMapping[TKey]>): Promise<void> {
+function set<TKey extends OnyxKey>(key: TKey, value: NonUndefined<OnyxEntry<KeyValueMapping[TKey]>>): Promise<void> {
     // check if the value is compatible with the existing value in the storage
     const existingValue = cache.getValue(key, false);
     const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(value, existingValue);
@@ -289,7 +290,7 @@ function multiSet(data: Partial<NullableKeyValueMapping>): Promise<void> {
  * Onyx.merge(ONYXKEYS.POLICY, {id: 1}); // -> {id: 1}
  * Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Workspace'}
  */
-function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxEntry<NullishDeep<KeyValueMapping[TKey]>>): Promise<void> {
+function merge<TKey extends OnyxKey>(key: TKey, changes: NonUndefined<OnyxEntry<NullishDeep<KeyValueMapping[TKey]>>>): Promise<void> {
     const mergeQueue = OnyxUtils.getMergeQueue();
     const mergeQueuePromise = OnyxUtils.getMergeQueuePromise();
 
@@ -459,6 +460,10 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
 
             const promises = [];
 
+            // We need to get the previously existing values so we can compare the new ones
+            // against them, to avoid unnecessary subscriber updates.
+            const previousCollectionPromise = Promise.all(existingKeys.map((key) => OnyxUtils.get(key).then((value) => [key, value]))).then(Object.fromEntries);
+
             // New keys will be added via multiSet while existing keys will be updated using multiMerge
             // This is because setting a key that doesn't exist yet with multiMerge will throw errors
             if (keyValuePairsForExistingCollection.length > 0) {
@@ -474,9 +479,9 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
 
             // Prefill cache if necessary by calling get() on any existing keys and then merge original data to cache
             // and update all subscribers
-            const promiseUpdate = Promise.all(existingKeys.map(OnyxUtils.get)).then(() => {
+            const promiseUpdate = previousCollectionPromise.then((previousCollection) => {
                 cache.merge(finalMergedCollection);
-                return OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, finalMergedCollection);
+                return OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, finalMergedCollection, previousCollection);
             });
 
             return Promise.all(promises)

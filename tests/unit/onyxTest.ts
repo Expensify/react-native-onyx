@@ -1,4 +1,4 @@
-import _ from 'underscore';
+import lodashClone from 'lodash/clone';
 import Onyx from '../../lib';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import OnyxUtils from '../../lib/OnyxUtils';
@@ -13,6 +13,7 @@ const ONYX_KEYS = {
         TEST_CONNECT_COLLECTION: 'testConnectCollection_',
         TEST_POLICY: 'testPolicy_',
         TEST_UPDATE: 'testUpdate_',
+        ANIMALS: 'animals_',
     },
 };
 
@@ -907,7 +908,7 @@ describe('Onyx', () => {
                 })
 
                 // When merge is called again with an object of equivalent value but not the same reference
-                .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, _.clone(collectionUpdate.testPolicy_1)))
+                .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, lodashClone(collectionUpdate.testPolicy_1)))
                 .then(() => {
                     // Then we should not expect another invocation of the callback
                     expect(mockCallback).toHaveBeenCalledTimes(2);
@@ -948,7 +949,7 @@ describe('Onyx', () => {
                 })
 
                 // When merge is called again with an object of equivalent value but not the same reference
-                .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, _.clone(collectionUpdate.testPolicy_1)))
+                .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, lodashClone(collectionUpdate.testPolicy_1)))
                 .then(() => {
                     // Then we should expect another invocation of the callback because initWithStoredValues = false
                     expect(mockCallback).toHaveBeenCalledTimes(3);
@@ -967,16 +968,27 @@ describe('Onyx', () => {
         connectionIDs.push(Onyx.connect({key: ONYX_KEYS.TEST_KEY, callback: testCallback}));
         connectionIDs.push(Onyx.connect({key: ONYX_KEYS.OTHER_TEST, callback: otherTestCallback}));
         connectionIDs.push(Onyx.connect({key: ONYX_KEYS.COLLECTION.TEST_UPDATE, callback: collectionCallback, waitForCollectionCallback: true}));
-        return Onyx.update([
-            {onyxMethod: Onyx.METHOD.SET, key: ONYX_KEYS.TEST_KEY, value: 'taco'},
-            {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.OTHER_TEST, value: 'pizza'},
-            {onyxMethod: Onyx.METHOD.MERGE_COLLECTION, key: ONYX_KEYS.COLLECTION.TEST_UPDATE, value: {[itemKey]: {a: 'a'}}},
-        ]).then(() => {
-            expect(collectionCallback).toHaveBeenNthCalledWith(1, {[itemKey]: {a: 'a'}});
-            expect(testCallback).toHaveBeenNthCalledWith(1, 'taco', ONYX_KEYS.TEST_KEY);
-            expect(otherTestCallback).toHaveBeenNthCalledWith(1, 'pizza', ONYX_KEYS.OTHER_TEST);
-            connectionIDs.forEach((id) => Onyx.disconnect(id));
-        });
+        return waitForPromisesToResolve().then(() =>
+            Onyx.update([
+                {onyxMethod: Onyx.METHOD.SET, key: ONYX_KEYS.TEST_KEY, value: 'taco'},
+                {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.OTHER_TEST, value: 'pizza'},
+                {onyxMethod: Onyx.METHOD.MERGE_COLLECTION, key: ONYX_KEYS.COLLECTION.TEST_UPDATE, value: {[itemKey]: {a: 'a'}}},
+            ]).then(() => {
+                expect(collectionCallback).toHaveBeenCalledTimes(2);
+                expect(collectionCallback).toHaveBeenNthCalledWith(1, null, undefined);
+                expect(collectionCallback).toHaveBeenNthCalledWith(2, {[itemKey]: {a: 'a'}});
+
+                expect(testCallback).toHaveBeenCalledTimes(2);
+                expect(testCallback).toHaveBeenNthCalledWith(1, null, undefined);
+                expect(testCallback).toHaveBeenNthCalledWith(2, 'taco', ONYX_KEYS.TEST_KEY);
+
+                expect(otherTestCallback).toHaveBeenCalledTimes(2);
+                // We set an initial value of 42 for ONYX_KEYS.OTHER_TEST in Onyx.init()
+                expect(otherTestCallback).toHaveBeenNthCalledWith(1, 42, ONYX_KEYS.OTHER_TEST);
+                expect(otherTestCallback).toHaveBeenNthCalledWith(2, 'pizza', ONYX_KEYS.OTHER_TEST);
+                connectionIDs.forEach((id) => Onyx.disconnect(id));
+            }),
+        );
     });
 
     it('should merge an object with a batch of objects and undefined', () => {
@@ -1194,5 +1206,48 @@ describe('Onyx', () => {
                 },
             });
         });
+    });
+
+    it('should not call a collection item subscriber if the value did not change', () => {
+        const connectionIDs: number[] = [];
+
+        const cat = `${ONYX_KEYS.COLLECTION.ANIMALS}cat`;
+        const dog = `${ONYX_KEYS.COLLECTION.ANIMALS}dog`;
+
+        const collectionCallback = jest.fn();
+        const catCallback = jest.fn();
+        const dogCallback = jest.fn();
+
+        connectionIDs.push(
+            Onyx.connect({
+                key: ONYX_KEYS.COLLECTION.ANIMALS,
+                callback: collectionCallback,
+                waitForCollectionCallback: true,
+            }),
+        );
+        connectionIDs.push(Onyx.connect({key: cat, callback: catCallback}));
+        connectionIDs.push(Onyx.connect({key: dog, callback: dogCallback}));
+
+        const initialValue = {name: 'Fluffy'};
+
+        const collectionDiff: Collection<string, unknown, unknown> = {
+            [cat]: initialValue,
+            [dog]: {name: 'Rex'},
+        };
+
+        return Onyx.set(cat, initialValue)
+            .then(() => {
+                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ANIMALS, collectionDiff);
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                expect(collectionCallback).toHaveBeenCalledTimes(3);
+                expect(collectionCallback).toHaveBeenCalledWith(collectionDiff);
+
+                expect(catCallback).toHaveBeenCalledTimes(2);
+                expect(dogCallback).toHaveBeenCalledTimes(2);
+
+                connectionIDs.map((id) => Onyx.disconnect(id));
+            });
     });
 });
