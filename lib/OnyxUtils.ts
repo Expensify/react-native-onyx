@@ -427,7 +427,7 @@ function getPureKey(key: OnyxKey): string {
     if (!key) {
         return '';
     }
-    return key.replace(/\d+/g, '');
+    return key.replace(/_\w+/g, '_');
 }
 
 /**
