@@ -320,7 +320,8 @@ function deleteKeyByConnections(connectionID: number) {
     const subscriber = callbackToStateMapping[connectionID];
 
     if (subscriber && onyxKeyToConnectionIDs.has(subscriber.key)) {
-        onyxKeyToConnectionIDs.set(subscriber.key, _.without(onyxKeyToConnectionIDs.get(subscriber.key), connectionID));
+        const updatesConnectionIDs = onyxKeyToConnectionIDs.get(subscriber.key).filter((id: number) => id !== connectionID);
+        onyxKeyToConnectionIDs.set(subscriber.key, updatesConnectionIDs);
     }
 }
 
