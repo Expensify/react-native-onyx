@@ -274,7 +274,7 @@ describe('withOnyxTest', () => {
         TestComponentWithOnyx.defaultProps = {
             text: INITIAL_VALUE,
         };
-        Onyx.set('test_key', 'test_text');
+        Onyx.set('test', 'test_text');
         return waitForPromisesToResolve().then(() => {
             const {getByTestId} = render(<TestComponentWithOnyx collectionID="1" />);
             expect(getByTestId('text-element').props.children).toEqual(INITIAL_VALUE);
