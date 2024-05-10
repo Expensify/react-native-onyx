@@ -3,7 +3,7 @@
  * something in Onyx (a key/value store). That way, as soon as data in Onyx changes, the state will be set and the view
  * will automatically change to reflect the new data.
  */
-import PropTypes from 'prop-types';
+import type {ForwardedRef} from 'react';
 import React from 'react';
 import type {IsEqual} from 'type-fest';
 import _ from 'underscore';
@@ -158,7 +158,7 @@ type MapOnyxToState<TComponentProps, TOnyxProps> = {
     [TOnyxProp in keyof TOnyxProps]: OnyxPropMapping<TComponentProps, TOnyxProps, TOnyxProp> | OnyxPropCollectionMapping<TComponentProps, TOnyxProps, TOnyxProp>;
 };
 
-type WithOnyxProps<TComponentProps, TOnyxProps> = Omit<TComponentProps, keyof TOnyxProps>;
+type WithOnyxProps<TComponentProps, TOnyxProps> = Omit<TComponentProps, keyof TOnyxProps> & {forwardedRef?: ForwardedRef<unknown>};
 
 type WithOnyxState<TOnyxProps> = TOnyxProps & {
     loading: boolean;
@@ -200,13 +200,16 @@ export default function <TComponentProps, TOnyxProps>(
         const displayName = getDisplayName(WrappedComponent);
 
         class withOnyx extends React.Component<WithOnyxProps<TComponentProps, TOnyxProps>, WithOnyxState<TOnyxProps>> {
+            // eslint-disable-next-line react/static-property-placement
+            static displayName: string;
+
             pendingSetStates: Array<Partial<WithOnyxState<TOnyxProps>>> = [];
 
             shouldDelayUpdates: boolean;
 
             activeConnectionIDs: Record<string, number>;
 
-            tempState: WithOnyxState<TOnyxProps>;
+            tempState: WithOnyxState<TOnyxProps> | undefined;
 
             constructor(props: WithOnyxProps<TComponentProps, TOnyxProps>) {
                 super(props);
@@ -241,7 +244,7 @@ export default function <TComponentProps, TOnyxProps>(
                      */
                     if ((value !== undefined && !OnyxUtils.hasPendingMergeForKey(key)) || mapping.allowStaleData) {
                         // eslint-disable-next-line no-param-reassign
-                        resultObj[propName as keyof TOnyxProps] = value;
+                        resultObj[propName as keyof TOnyxProps] = value as WithOnyxState<TOnyxProps>[keyof TOnyxProps];
                     }
 
                     return resultObj;
@@ -363,14 +366,14 @@ export default function <TComponentProps, TOnyxProps>(
                         return;
                     }
 
-                    this.setStateProxy({[statePropertyName]: val as WithOnyxState<TOnyxProps>[T]});
+                    this.setStateProxy({[statePropertyName]: val} as WithOnyxState<TOnyxProps>);
                     return;
                 }
 
                 this.tempState[statePropertyName] = val;
 
                 // If some key does not have a value yet, do not update the state yet
-                const tempStateIsMissingKey = requiredKeysForInit.some((key) => this.tempState[key as keyof TOnyxProps] === undefined);
+                const tempStateIsMissingKey = requiredKeysForInit.some((key) => this.tempState?.[key as keyof TOnyxProps] === undefined);
                 if (tempStateIsMissingKey) {
                     return;
                 }
@@ -488,7 +491,7 @@ export default function <TComponentProps, TOnyxProps>(
 
             render() {
                 // Remove any null values so that React replaces them with default props
-                const propsToPass = utils.omit(this.props, (entry) => entry[1] === null);
+                const propsToPass = utils.omit(this.props as Omit<TComponentProps, keyof TOnyxProps>, (entry) => entry[1] === null);
 
                 if (this.state.loading) {
                     return null;
@@ -513,16 +516,6 @@ export default function <TComponentProps, TOnyxProps>(
             }
         }
 
-        withOnyx.propTypes = {
-            forwardedRef: PropTypes.oneOfType([
-                PropTypes.func,
-                // eslint-disable-next-line react/forbid-prop-types
-                PropTypes.shape({current: PropTypes.object}),
-            ]),
-        };
-        withOnyx.defaultProps = {
-            forwardedRef: undefined,
-        };
         withOnyx.displayName = `withOnyx(${displayName})`;
 
         return React.forwardRef((props, ref) => {
