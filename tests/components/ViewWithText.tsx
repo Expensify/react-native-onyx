@@ -3,6 +3,8 @@ import {View, Text} from 'react-native';
 
 type ViewWithTextProps = {
     text: string | null;
+    // eslint-disable-next-line react/no-unused-prop-types
+    collectionID?: string;
     onRender?: () => void;
 };
 
