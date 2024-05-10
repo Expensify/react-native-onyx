@@ -471,7 +471,7 @@ describe('Onyx', () => {
 
         it('Expect a single call to getItem when multiple components use the same key', () => {
             // Given a component connected to Onyx
-            const TestComponentWithOnyx = withOnyx<ViewWithTextProps, Record<string, unknown>>({
+            const TestComponentWithOnyx = withOnyx<ViewWithTextProps, {text: unknown}>({
                 text: {
                     key: ONYX_KEYS.TEST_KEY,
                 },
@@ -500,7 +500,7 @@ describe('Onyx', () => {
 
         it('Expect a single call to getAllKeys when multiple components use the same key', () => {
             // Given a component connected to Onyx
-            const TestComponentWithOnyx = withOnyx<ViewWithTextProps, Record<string, unknown>>({
+            const TestComponentWithOnyx = withOnyx<ViewWithTextProps, {text: unknown}>({
                 text: {
                     key: ONYX_KEYS.TEST_KEY,
                 },
@@ -571,7 +571,7 @@ describe('Onyx', () => {
 
         it('Expect multiple calls to getItem when value cannot be retrieved from cache', () => {
             // Given a component connected to Onyx
-            const TestComponentWithOnyx = withOnyx<ViewWithTextProps, Record<string, unknown>>({
+            const TestComponentWithOnyx = withOnyx<ViewWithTextProps, {text: unknown}>({
                 text: {
                     key: ONYX_KEYS.TEST_KEY,
                 },
@@ -605,13 +605,13 @@ describe('Onyx', () => {
 
         it('Expect multiple calls to getItem when multiple keys are used', () => {
             // Given two component
-            const TestComponentWithOnyx = withOnyx<ViewWithCollectionsProps, Record<string, unknown>>({
+            const TestComponentWithOnyx = withOnyx<ViewWithCollectionsProps, {testObject: unknown}>({
                 testObject: {
                     key: ONYX_KEYS.TEST_KEY,
                 },
             })(ViewWithCollections);
 
-            const OtherTestComponentWithOnyx = withOnyx<ViewWithTextProps, Record<string, unknown>>({
+            const OtherTestComponentWithOnyx = withOnyx<ViewWithTextProps, {text: unknown}>({
                 text: {
                     key: ONYX_KEYS.OTHER_TEST,
                 },
