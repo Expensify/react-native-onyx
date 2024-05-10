@@ -402,18 +402,22 @@ function addAllSafeEvictionKeysToRecentlyAccessedList(): Promise<void> {
 }
 
 function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collectionMemberKeys?: string[]): NonNullable<OnyxCollection<KeyValueMapping[TKey]>> {
-    const resolvedCollectionMemberKeys = collectionMemberKeys || Array.from(cache.getAllKeys()).filter((storedKey) => isCollectionMemberKey(collectionKey, storedKey));
+    const allKeys = collectionMemberKeys || cache.getAllKeys();
+    const collection: OnyxCollection<KeyValueMapping[TKey]> = {};
 
-    return resolvedCollectionMemberKeys.reduce((prev: NonNullable<OnyxCollection<KeyValueMapping[TKey]>>, key) => {
-        const cachedValue = cache.getValue(key);
-        if (!cachedValue) {
-            return prev;
+    // forEach exists on both Set and Array
+    allKeys.forEach((key) => {
+        // If we don't have collectionMemberKeys array then we have to check whether a key is a collection member key.
+        // Because in that case the keys will be coming from `cache.getAllKeys()` and we need to filter out the keys that
+        // are not part of the collection.
+        if (!collectionMemberKeys && !isCollectionMemberKey(collectionKey, key)) {
+            return;
         }
 
-        // eslint-disable-next-line no-param-reassign
-        prev[key] = cachedValue;
-        return prev;
-    }, {});
+        collection[key] = cache.getValue(key);
+    });
+
+    return collection;
 }
 
 /**
