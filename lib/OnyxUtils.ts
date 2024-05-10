@@ -320,8 +320,8 @@ function deleteKeyByConnections(connectionID: number) {
     const subscriber = callbackToStateMapping[connectionID];
 
     if (subscriber && onyxKeyToConnectionIDs.has(subscriber.key)) {
-        const updatesConnectionIDs = onyxKeyToConnectionIDs.get(subscriber.key).filter((id: number) => id !== connectionID);
-        onyxKeyToConnectionIDs.set(subscriber.key, updatesConnectionIDs);
+        const updatedConnectionIDs = onyxKeyToConnectionIDs.get(subscriber.key).filter((id: number) => id !== connectionID);
+        onyxKeyToConnectionIDs.set(subscriber.key, updatedConnectionIDs);
     }
 }
 
@@ -680,6 +680,7 @@ function keyChanged<TKey extends OnyxKey>(
     // was connected via withOnyx we will call setState() directly on the withOnyx instance. If it is a regular connection we will pass the data to the provided callback.
     // Given the amount of times this function is called we need to make sure we are not iterating over all subscribers every time. On the other hand, we don't need to
     // do the same in keysChanged, because we only call that function when a collection key changes, and it doesn't happen that often.
+    // For performance reason, we look for the given key and later if don't find it we look for the collection key, instead of checking if it is a collection key first.
     let stateMappingKeys = onyxKeyToConnectionIDs.get(key);
 
     if (!stateMappingKeys) {
