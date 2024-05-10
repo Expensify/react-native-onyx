@@ -3,7 +3,7 @@ import {useCallback, useEffect, useRef, useSyncExternalStore} from 'react';
 import type {IsEqual} from 'type-fest';
 import Onyx from './Onyx';
 import OnyxUtils from './OnyxUtils';
-import type {CollectionKeyBase, KeyValueMapping, NonNull, NonUndefined, OnyxCollection, OnyxEntry, OnyxKey, OnyxValue, Selector} from './types';
+import type {CollectionKeyBase, KeyValueMapping, NonNull, OnyxCollection, OnyxEntry, OnyxKey, Selector} from './types';
 import useLiveRef from './useLiveRef';
 import usePrevious from './usePrevious';
 
@@ -131,14 +131,14 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(key: T
     }, [previousKey, key]);
 
     const getSnapshot = useCallback(() => {
-        // We get the value from the cache, supplying a selector too in case it's defined.
-        // If `newValue` is `undefined` it means that the cache doesn't have a value for that key yet.
-        // If `newValue` is `null` or any other value if means that the cache does have a value for that key.
-        // This difference between `undefined` and other values is crucial and it's used to address the following
-        // conditions and use cases.
-
-        // let newValue = getCachedValue<TKey, TReturnValue>(key, selectorRef.current);
+        // We get the value from cache while the first connection to Onyx is being made,
+        // so we can return any cached value right away. After the connection is made, we only
+        // update `newValueRef` when `Onyx.connect()` callback is fired.
         if (isFirstConnectionRef.current) {
+            // If `newValueRef.current` is `undefined` it means that the cache doesn't have a value for that key yet.
+            // If `newValueRef.current` is `null` or any other value if means that the cache does have a value for that key.
+            // This difference between `undefined` and other values is crucial and it's used to address the following
+            // conditions and use cases.
             newValueRef.current = getCachedValue<TKey, TReturnValue>(key, selectorRef.current);
         }
 
@@ -160,6 +160,10 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(key: T
             newFetchStatus = 'loaded';
         }
 
+        // We do a deep equality check if we are subscribed to a collection key and `selector` is defined,
+        // since each `OnyxUtils.tryGetCachedValue()` call will generate a plain new collection object with new records as well,
+        // all of them created using the `selector` function.
+        // For the other cases we will only deal with object reference checks, so just a shallow equality check is enough.
         let areValuesEqual = false;
         if (OnyxUtils.isCollectionKey(key) && selectorRef.current) {
             areValuesEqual = deepEqual(cachedValueRef.current, newValueRef.current);
@@ -183,17 +187,12 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(key: T
         (onStoreChange: () => void) => {
             connectionIDRef.current = Onyx.connect<CollectionKeyBase>({
                 key,
-                selector: selectorRef.current,
-                callback: (value: NonUndefined<OnyxValue<OnyxKey>>) => {
+                callback: () => {
                     // We don't need to update the Onyx cache again here, when `callback` is called the cache is already
-                    // expected to be updated, so we just signal that the store changed and `getSnapshot()` can be called again.
-
-                    // Should we use removeNestedNullValues()? (it's used on withOnyx)
-                    // const newValue = utils.removeNestedNullValues(value);
-                    const newValue = value;
-
+                    // expected to be updated, so we just get the new value from cache and signal that the store changed,
+                    // making `getSnapshot()` be called again.
                     isFirstConnectionRef.current = false;
-                    newValueRef.current = newValue as CachedValue<TKey, TReturnValue>;
+                    newValueRef.current = getCachedValue<TKey, TReturnValue>(key, selectorRef.current);
                     onStoreChange();
                 },
                 initWithStoredValues: options?.initWithStoredValues,
