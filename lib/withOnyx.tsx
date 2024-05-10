@@ -10,7 +10,19 @@ import _ from 'underscore';
 import Onyx from './Onyx';
 import OnyxUtils from './OnyxUtils';
 import * as Str from './Str';
-import type {CollectionKeyBase, ExtractOnyxCollectionValue, KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey, OnyxValue, Selector, WithOnyxConnectOptions} from './types';
+import type {
+    CollectionKeyBase,
+    ExtractOnyxCollectionValue,
+    GenericFunction,
+    KeyValueMapping,
+    OnyxCollection,
+    OnyxEntry,
+    OnyxKey,
+    OnyxValue,
+    Selector,
+    WithOnyxConnectOptions,
+    WithOnyxInstance,
+} from './types';
 import utils from './utils';
 
 /**
@@ -110,6 +122,11 @@ type Mapping<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TO
         | BaseMappingFunctionKeyAndSelector<TComponentProps, TOnyxProps, TOnyxProps[TOnyxProp], TOnyxKey>
     );
 
+type WithOnyxMapping<TComponentProps, TOnyxProps> = Mapping<TComponentProps, TOnyxProps, keyof TOnyxProps, OnyxKey> & {
+    connectionID: number;
+    previousKey?: OnyxKey;
+};
+
 /**
  * Represents the mapping options between an Onyx collection key without suffix and the component's prop with all its possibilities.
  */
@@ -172,14 +189,12 @@ export default function <TComponentProps, TOnyxProps>(
     shouldDelayUpdates = false,
 ): React.ComponentType<Omit<TComponentProps, keyof TOnyxProps>> {
     // A list of keys that must be present in tempState before we can render the WrappedComponent
-    const requiredKeysForInit = utils
-        .omit(mapOnyxToState, (entry) => entry[1].initWithStoredValues === false)
-        .keys()
-        .value();
-    // const requiredKeysForInit = _.chain(mapOnyxToState)
-    //     .omit((config) => config.initWithStoredValues === false)
-    //     .keys()
-    //     .value();
+    const requiredKeysForInit = Object.keys(
+        utils.omit(
+            mapOnyxToState as Record<string, MapOnyxToState<TComponentProps, TOnyxProps>[keyof TOnyxProps]>,
+            (entry: [string, MapOnyxToState<TComponentProps, TOnyxProps>[keyof TOnyxProps]]) => entry[1].initWithStoredValues === false,
+        ),
+    );
 
     return (WrappedComponent: React.ComponentType<TComponentProps>): React.ComponentType<Omit<TComponentProps, keyof TOnyxProps>> => {
         const displayName = getDisplayName(WrappedComponent);
@@ -205,9 +220,9 @@ export default function <TComponentProps, TOnyxProps>(
                 this.activeConnectionIDs = {};
 
                 const cachedState = Object.keys(mapOnyxToState).reduce<WithOnyxState<TOnyxProps>>((resultObj, propName) => {
-                    const mapping = mapOnyxToState[propName as keyof TOnyxProps];
+                    const mapping = mapOnyxToState[propName as keyof TOnyxProps] as WithOnyxMapping<TComponentProps, TOnyxProps>;
 
-                    const key = Str.result(mapping.key, props) as OnyxKey;
+                    const key = Str.result(mapping.key as GenericFunction, props) as OnyxKey;
                     let value = OnyxUtils.tryGetCachedValue(key, mapping as Partial<WithOnyxConnectOptions<OnyxKey>>) as OnyxValue<OnyxKey>;
                     if (!value && mapping.initialValue) {
                         value = mapping.initialValue;
@@ -246,13 +261,13 @@ export default function <TComponentProps, TOnyxProps>(
 
                 // Subscribe each of the state properties to the proper Onyx key
                 Object.keys(mapOnyxToState).forEach((propName) => {
-                    const mapping = mapOnyxToState[propName as keyof TOnyxProps];
+                    const mapping = mapOnyxToState[propName as keyof TOnyxProps] as WithOnyxMapping<TComponentProps, TOnyxProps>;
 
                     if (_.includes(mappingPropertiesToIgnoreChangesTo, propName)) {
                         return;
                     }
 
-                    const key = Str.result(mapping.key, {...this.props, ...onyxDataFromState}) as OnyxKey;
+                    const key = Str.result(mapping.key as GenericFunction, {...this.props, ...onyxDataFromState}) as OnyxKey;
                     this.connectMappingToOnyx(mapping, propName as keyof TOnyxProps, key);
                 });
 
@@ -268,7 +283,7 @@ export default function <TComponentProps, TOnyxProps>(
                 const prevOnyxDataFromState = getOnyxDataFromState(prevState, mapOnyxToState);
 
                 Object.keys(mapOnyxToState).forEach((propName) => {
-                    const mapping = mapOnyxToState[propName as keyof TOnyxProps];
+                    const mapping = mapOnyxToState[propName as keyof TOnyxProps] as WithOnyxMapping<TComponentProps, TOnyxProps>;
 
                     // Some properties can be ignored because they aren't related to onyx keys and they will never change
                     if (mappingPropertiesToIgnoreChangesTo.includes(propName)) {
@@ -282,8 +297,10 @@ export default function <TComponentProps, TOnyxProps>(
                     // (eg. if a user switches chats really quickly). In this case, it's much more stable to always look at the changes to prevProp and prevState to derive the key.
                     // The second case cannot be used all the time because the onyx data doesn't change the first time that `componentDidUpdate()` runs after loading. In this case,
                     // the `mapping.previousKey` must be used for the comparison or else this logic never detects that onyx data could have changed during the loading process.
-                    const previousKey = (isFirstTimeUpdatingAfterLoading ? mapping.previousKey : Str.result(mapping.key, {...prevProps, ...prevOnyxDataFromState})) as OnyxKey;
-                    const newKey = Str.result(mapping.key, {...this.props, ...onyxDataFromState}) as OnyxKey;
+                    const previousKey = (
+                        isFirstTimeUpdatingAfterLoading ? mapping.previousKey : Str.result(mapping.key as GenericFunction, {...prevProps, ...prevOnyxDataFromState})
+                    ) as OnyxKey;
+                    const newKey = Str.result(mapping.key as GenericFunction, {...this.props, ...onyxDataFromState}) as OnyxKey;
                     if (previousKey !== newKey) {
                         Onyx.disconnect(this.activeConnectionIDs[previousKey], previousKey);
                         delete this.activeConnectionIDs[previousKey];
@@ -297,9 +314,9 @@ export default function <TComponentProps, TOnyxProps>(
             componentWillUnmount() {
                 // Disconnect everything from Onyx
                 Object.keys(mapOnyxToState).forEach((propName) => {
-                    const mapping = mapOnyxToState[propName as keyof TOnyxProps];
+                    const mapping = mapOnyxToState[propName as keyof TOnyxProps] as WithOnyxMapping<TComponentProps, TOnyxProps>;
 
-                    const key = Str.result(mapping.key, {...this.props, ...getOnyxDataFromState(this.state, mapOnyxToState)}) as OnyxKey;
+                    const key = Str.result(mapping.key as GenericFunction, {...this.props, ...getOnyxDataFromState(this.state, mapOnyxToState)}) as OnyxKey;
                     Onyx.disconnect(this.activeConnectionIDs[key], key);
                 });
             }
@@ -406,14 +423,14 @@ export default function <TComponentProps, TOnyxProps>(
                 // if the canEvict function returns true. This is necessary criteria
                 // we MUST use to specify if a key can be removed or not.
                 Object.keys(mapOnyxToState).forEach((propName) => {
-                    const mapping = mapOnyxToState[propName as keyof TOnyxProps];
+                    const mapping = mapOnyxToState[propName as keyof TOnyxProps] as WithOnyxMapping<TComponentProps, TOnyxProps>;
 
                     if (mapping.canEvict === undefined) {
                         return;
                     }
 
-                    const canEvict = Str.result(mapping.canEvict, this.props) as boolean;
-                    const key = Str.result(mapping.key, this.props) as OnyxKey;
+                    const canEvict = Str.result(mapping.canEvict as GenericFunction, this.props) as boolean;
+                    const key = Str.result(mapping.key as GenericFunction, this.props) as OnyxKey;
 
                     if (!OnyxUtils.isSafeEvictionKey(key)) {
                         throw new Error(`canEvict can't be used on key '${key}'. This key must explicitly be flagged as safe for removal by adding it to Onyx.init({safeEvictionKeys: []}).`);
@@ -438,17 +455,19 @@ export default function <TComponentProps, TOnyxProps>(
              * @param key to connect to Onyx with
              */
             connectMappingToOnyx(mapping: MapOnyxToState<TComponentProps, TOnyxProps>[keyof TOnyxProps], statePropertyName: keyof TOnyxProps, key: OnyxKey) {
+                const onyxMapping = mapOnyxToState[statePropertyName as keyof TOnyxProps] as WithOnyxMapping<TComponentProps, TOnyxProps>;
+
                 // Remember what the previous key was so that key changes can be detected when data is being loaded from Onyx. This will allow
                 // dependent keys to finish loading their data.
                 // eslint-disable-next-line no-param-reassign
-                mapOnyxToState[statePropertyName].previousKey = key;
+                onyxMapping.previousKey = key;
 
                 // eslint-disable-next-line rulesdir/prefer-onyx-connect-in-libs
                 this.activeConnectionIDs[key] = Onyx.connect({
                     ...mapping,
                     key,
                     statePropertyName: statePropertyName as string,
-                    withOnyxInstance: this,
+                    withOnyxInstance: this as unknown as WithOnyxInstance,
                     displayName,
                 });
             }
