@@ -658,9 +658,13 @@ describe('Onyx', () => {
             // @ts-expect-error This is an invalid call to Onyx.update
             Onyx.update(data);
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } catch (error: any) {
-            // Then we should expect the error message below
-            expect(error.message).toEqual('Invalid onyxMethod murge in Onyx update.');
+        } catch (error) {
+            if (error instanceof Error) {
+                // Then we should expect the error message below
+                expect(error.message).toEqual('Invalid onyxMethod murge in Onyx update.');
+            } else {
+                throw error;
+            }
         }
 
         try {
