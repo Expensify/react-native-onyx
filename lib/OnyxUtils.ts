@@ -423,7 +423,7 @@ function addToEvictionBlockList(key: OnyxKey, connectionID: number): void {
  * @param {OnyxKey} key - The key to process.
  * @return {string} The pure key without any numeric
  */
-function getPureKey(key: OnyxKey): string {
+function getCollectionKey(key: OnyxKey): string {
     if (!key) {
         return '';
     }
@@ -681,12 +681,14 @@ function keyChanged<TKey extends OnyxKey>(
     // Given the amount of times this function is called we need to make sure we are not iterating over all subscribers every time. On the other hand, we don't need to
     // do the same in keysChanged, because we only call that function when a collection key changes, and it doesn't happen that often.
     // For performance reason, we look for the given key and later if don't find it we look for the collection key, instead of checking if it is a collection key first.
-    let stateMappingKeys = onyxKeyToConnectionIDs.get(key);
+    let stateMappingKeys = onyxKeyToConnectionIDs.get(key) ?? [];
+    const collectionKey = getCollectionKey(key);
+    const plainCollectionKey = collectionKey.lastIndexOf('_') !== -1 ? collectionKey : undefined;
 
-    if (!stateMappingKeys) {
+    if (plainCollectionKey) {
         // Getting the collection key from the specific key because only collection keys were stored in the mapping.
-        stateMappingKeys = onyxKeyToConnectionIDs.get(getPureKey(key));
-        if (!stateMappingKeys) {
+        stateMappingKeys = [...stateMappingKeys, ...(onyxKeyToConnectionIDs.get(plainCollectionKey) ?? [])];
+        if (stateMappingKeys.length === 0) {
             return;
         }
     }
