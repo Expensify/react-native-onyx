@@ -1,20 +1,28 @@
 /* eslint-disable rulesdir/onyx-props-must-have-default */
 import React from 'react';
 import {render} from '@testing-library/react-native';
-import _ from 'underscore';
 
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
+import type {ViewWithTextOnyxProps, ViewWithTextProps} from '../components/ViewWithText';
 import ViewWithText from '../components/ViewWithText';
+import type {ViewWithCollectionsProps} from '../components/ViewWithCollections';
 import ViewWithCollections from '../components/ViewWithCollections';
+import type OnyxCache from '../../lib/OnyxCache';
+import type MockedStorage from '../../lib/storage/__mocks__';
+import type OnyxInstance from '../../lib/Onyx';
+import type withOnyxType from '../../lib/withOnyx';
+import type {InitOptions} from '../../lib/types';
+import generateRange from '../utils/generateRange';
 
 describe('Onyx', () => {
     describe('Cache Service', () => {
         /** @type OnyxCache */
-        let cache;
+        let cache: typeof OnyxCache;
 
         // Always use a "fresh" instance
         beforeEach(() => {
             jest.resetModules();
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
             cache = require('../../lib/OnyxCache').default;
         });
 
@@ -42,9 +50,9 @@ describe('Onyx', () => {
 
             it('Should keep storage keys even when no values are provided', () => {
                 // Given cache with some items
-                cache.set('mockKey');
-                cache.set('mockKey2');
-                cache.set('mockKey3');
+                cache.set('mockKey', undefined);
+                cache.set('mockKey2', undefined);
+                cache.set('mockKey3', undefined);
 
                 // Then the keys should be stored in cache
                 const allKeys = cache.getAllKeys();
@@ -186,7 +194,7 @@ describe('Onyx', () => {
                 // Then a value should not be available in cache
                 expect(cache.hasCacheForKey('mockKey')).toBe(false);
                 expect(cache.getValue('mockKey')).not.toBeDefined();
-                expect(cache.getAllKeys('mockKey').has('mockKey')).toBe(false);
+                expect(cache.getAllKeys().has('mockKey')).toBe(false);
             });
         });
 
@@ -340,8 +348,11 @@ describe('Onyx', () => {
             });
 
             it('Should throw if called with anything that is not an object', () => {
+                // @ts-expect-error -- intentionally testing invalid input
                 expect(() => cache.merge([])).toThrow();
+                // @ts-expect-error -- intentionally testing invalid input
                 expect(() => cache.merge('')).toThrow();
+                // @ts-expect-error -- intentionally testing invalid input
                 expect(() => cache.merge(0)).toThrow();
                 expect(() => cache.merge({})).not.toThrow();
             });
@@ -405,7 +416,7 @@ describe('Onyx', () => {
                 const taskPromise = cache.getTaskPromise('mockTask');
 
                 // Then it should resolve with the same result as the captured task
-                return taskPromise.then((result) => {
+                return taskPromise!.then((result) => {
                     expect(result).toEqual({mockResult: true});
                 });
             });
@@ -413,12 +424,12 @@ describe('Onyx', () => {
     });
 
     describe('Onyx with Cache', () => {
-        let Onyx;
-        let StorageMock;
-        let withOnyx;
+        let Onyx: typeof OnyxInstance;
+        let StorageMock: typeof MockedStorage;
+        let withOnyx: typeof withOnyxType;
 
         /** @type OnyxCache */
-        let cache;
+        let cache: typeof OnyxCache;
 
         const ONYX_KEYS = {
             TEST_KEY: 'test',
@@ -428,11 +439,10 @@ describe('Onyx', () => {
             },
         };
 
-        function initOnyx(overrides) {
+        function initOnyx(overrides?: Partial<InitOptions>) {
             Onyx.init({
                 keys: ONYX_KEYS,
                 safeEvictionKeys: [ONYX_KEYS.COLLECTION.MOCK_COLLECTION],
-                registerStorageEventListener: jest.fn(),
                 maxCachedKeysCount: 10,
                 ...overrides,
             });
@@ -446,16 +456,19 @@ describe('Onyx', () => {
         // This reset top level static variables (in Onyx.js, OnyxCache.js, etc.)
         beforeEach(() => {
             jest.resetModules();
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
             const OnyxModule = require('../../lib');
             Onyx = OnyxModule.default;
             withOnyx = OnyxModule.withOnyx;
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
             StorageMock = require('../../lib/storage').default;
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
             cache = require('../../lib/OnyxCache').default;
         });
 
         it('Expect a single call to getItem when multiple components use the same key', () => {
             // Given a component connected to Onyx
-            const TestComponentWithOnyx = withOnyx({
+            const TestComponentWithOnyx = withOnyx<ViewWithTextProps, ViewWithTextOnyxProps>({
                 text: {
                     key: ONYX_KEYS.TEST_KEY,
                 },
@@ -484,7 +497,7 @@ describe('Onyx', () => {
 
         it('Expect a single call to getAllKeys when multiple components use the same key', () => {
             // Given a component connected to Onyx
-            const TestComponentWithOnyx = withOnyx({
+            const TestComponentWithOnyx = withOnyx<ViewWithTextProps, ViewWithTextOnyxProps>({
                 text: {
                     key: ONYX_KEYS.TEST_KEY,
                 },
@@ -515,9 +528,9 @@ describe('Onyx', () => {
         it('Should keep recently accessed items in cache', () => {
             // Given Storage with 10 different keys
             StorageMock.getItem.mockResolvedValue('"mockValue"');
-            const range = _.range(10);
-            StorageMock.getAllKeys.mockResolvedValue(_.map(range, (number) => `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}${number}`));
-            let connections;
+            const range = generateRange(0, 10);
+            StorageMock.getAllKeys.mockResolvedValue(range.map((number) => `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}${number}`));
+            let connections: Array<{key: string; connectionId: number}> = [];
 
             // Given Onyx is configured with max 5 keys in cache
             return initOnyx({
@@ -525,7 +538,7 @@ describe('Onyx', () => {
             })
                 .then(() => {
                     // Given 10 connections for different keys
-                    connections = _.map(range, (number) => {
+                    connections = range.map((number) => {
                         const key = `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}${number}`;
                         return {
                             key,
@@ -540,13 +553,13 @@ describe('Onyx', () => {
                 })
                 .then(() => {
                     // Then the most recent 5 keys should remain in cache
-                    _.range(5, 10).forEach((number) => {
+                    generateRange(5, 10).forEach((number) => {
                         const key = connections[number].key;
                         expect(cache.hasCacheForKey(key)).toBe(true);
                     });
 
                     // AND the least recent 5 should be dropped
-                    _.range(0, 5).forEach((number) => {
+                    generateRange(0, 5).forEach((number) => {
                         const key = connections[number].key;
                         expect(cache.hasCacheForKey(key)).toBe(false);
                     });
@@ -555,7 +568,7 @@ describe('Onyx', () => {
 
         it('Expect multiple calls to getItem when value cannot be retrieved from cache', () => {
             // Given a component connected to Onyx
-            const TestComponentWithOnyx = withOnyx({
+            const TestComponentWithOnyx = withOnyx<ViewWithTextProps, ViewWithTextOnyxProps>({
                 text: {
                     key: ONYX_KEYS.TEST_KEY,
                 },
@@ -589,13 +602,13 @@ describe('Onyx', () => {
 
         it('Expect multiple calls to getItem when multiple keys are used', () => {
             // Given two component
-            const TestComponentWithOnyx = withOnyx({
+            const TestComponentWithOnyx = withOnyx<ViewWithCollectionsProps, {testObject: unknown}>({
                 testObject: {
                     key: ONYX_KEYS.TEST_KEY,
                 },
             })(ViewWithCollections);
 
-            const OtherTestComponentWithOnyx = withOnyx({
+            const OtherTestComponentWithOnyx = withOnyx<ViewWithTextProps, ViewWithTextOnyxProps>({
                 text: {
                     key: ONYX_KEYS.OTHER_TEST,
                 },
@@ -627,8 +640,8 @@ describe('Onyx', () => {
         it('Should clean cache when connections to eviction keys happen', () => {
             // Given storage with some data
             StorageMock.getItem.mockResolvedValue('"mockValue"');
-            const range = _.range(1, 10);
-            StorageMock.getAllKeys.mockResolvedValue(_.map(range, (n) => `key${n}`));
+            const range = generateRange(1, 10);
+            StorageMock.getAllKeys.mockResolvedValue(range.map((n) => `key${n}`));
 
             // Given Onyx with LRU size of 3
             return initOnyx({maxCachedKeysCount: 3})

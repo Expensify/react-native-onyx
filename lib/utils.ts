@@ -117,6 +117,27 @@ function formatActionName(method: string, key?: OnyxKey): string {
     return key ? `${method.toUpperCase()}/${key}` : method.toUpperCase();
 }
 
+/** validate that the update and the existing value are compatible */
+function checkCompatibilityWithExistingValue(value: unknown, existingValue: unknown): {isCompatible: boolean; existingValueType?: string; newValueType?: string} {
+    if (!existingValue || !value) {
+        return {
+            isCompatible: true,
+        };
+    }
+    const existingValueType = Array.isArray(existingValue) ? 'array' : 'non-array';
+    const newValueType = Array.isArray(value) ? 'array' : 'non-array';
+    if (existingValueType !== newValueType) {
+        return {
+            isCompatible: false,
+            existingValueType,
+            newValueType,
+        };
+    }
+    return {
+        isCompatible: true,
+    };
+}
+
 function pick<T>(obj: Record<string, T>, condition: string | string[] | ((entry: [string, T]) => boolean)): Record<string, T> {
     const result: Record<string, T> = {};
 
@@ -163,4 +184,4 @@ function omit<T>(obj: Record<string, T>, condition: string | string[] | ((entry:
     return result;
 }
 
-export default {isEmptyObject, fastMerge, formatActionName, removeNestedNullValues, pick, omit};
+export default {isEmptyObject, fastMerge, formatActionName, removeNestedNullValues, checkCompatibilityWithExistingValue, pick, omit};

@@ -1,5 +1,6 @@
 module.exports = {
     preset: 'react-native',
+    roots: ['<rootDir>/lib', '<rootDir>/tests'],
     transform: {
         '\\.[jt]sx?$': 'babel-jest',
     },

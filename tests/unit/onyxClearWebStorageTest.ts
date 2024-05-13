@@ -1,6 +1,8 @@
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import StorageMock from '../../lib/storage';
 import Onyx from '../../lib/Onyx';
+import type OnyxCache from '../../lib/OnyxCache';
+import type GenericCollection from '../utils/GenericCollection';
 
 const ONYX_KEYS = {
     DEFAULT_KEY: 'defaultKey',
@@ -14,19 +16,19 @@ const MERGED_VALUE = 'merged';
 const DEFAULT_VALUE = 'default';
 
 describe('Set data while storage is clearing', () => {
-    let connectionID;
-    let onyxValue;
+    let connectionID: number;
+    let onyxValue: unknown;
 
     /** @type OnyxCache */
-    let cache;
+    let cache: typeof OnyxCache;
 
     // Always use a "fresh" cache instance
     beforeEach(() => {
         onyxValue = null;
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         cache = require('../../lib/OnyxCache').default;
         Onyx.init({
             keys: ONYX_KEYS,
-            registerStorageEventListener: () => {},
             initialKeyStates: {
                 [ONYX_KEYS.DEFAULT_KEY]: DEFAULT_VALUE,
             },
@@ -82,7 +84,7 @@ describe('Set data while storage is clearing', () => {
         expect.assertions(3);
 
         // Given that Onyx has a value, and we have a variable listening to that value
-        let regularKeyOnyxValue;
+        let regularKeyOnyxValue: unknown;
         Onyx.connect({
             key: ONYX_KEYS.REGULAR_KEY,
             initWithStoredValues: false,
@@ -140,11 +142,11 @@ describe('Set data while storage is clearing', () => {
                         [`${ONYX_KEYS.COLLECTION.TEST}2`]: 2,
                         [`${ONYX_KEYS.COLLECTION.TEST}3`]: 3,
                         [`${ONYX_KEYS.COLLECTION.TEST}4`]: 4,
-                    }),
+                    } as GenericCollection),
                 )
 
                 // When onyx is cleared
-                .then(Onyx.clear)
+                .then(() => Onyx.clear())
                 .then(() => {
                     Onyx.disconnect(testConnectionID);
                 })

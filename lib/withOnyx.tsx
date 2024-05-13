@@ -242,7 +242,7 @@ export default function <TComponentProps, TOnyxProps>(
                      * In reality, Onyx.merge() will only update the subscriber after all merges have been batched and the previous value is retrieved via a get() (returns a promise).
                      * So, we won't use the cache optimization here as it will lead us to arbitrarily defer various actions in the application code.
                      */
-                    if ((value !== undefined && !OnyxUtils.hasPendingMergeForKey(key)) || mapping.allowStaleData) {
+                    if (mapping.initWithStoredValues !== false && ((value !== undefined && !OnyxUtils.hasPendingMergeForKey(key)) || mapping.allowStaleData)) {
                         // eslint-disable-next-line no-param-reassign
                         resultObj[propName as keyof TOnyxProps] = value as WithOnyxState<TOnyxProps>[keyof TOnyxProps];
                     }
