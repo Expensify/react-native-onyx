@@ -1,11 +1,12 @@
-import _ from 'underscore';
-
-import IDBKeyValProviderMock from '../../../../lib/storage/providers/IDBKeyValProvider';
+import IDBKeyValProvider from '../../../../lib/storage/providers/IDBKeyValProvider';
 import createDeferredTask from '../../../../lib/createDeferredTask';
 import waitForPromisesToResolve from '../../../utils/waitForPromisesToResolve';
+import type StorageMock from '../../../../lib/storage/__mocks__';
+
+const IDBKeyValProviderMock = IDBKeyValProvider as unknown as typeof StorageMock;
 
 describe('storage/providers/IDBKeyVal', () => {
-    const SAMPLE_ITEMS = [
+    const SAMPLE_ITEMS: Array<[string, unknown]> = [
         ['string', 'Plain String'],
         ['array', ['Mixed', {array: [{id: 1}, {id: 2}]}]],
         ['true', true],
@@ -29,7 +30,7 @@ describe('storage/providers/IDBKeyVal', () => {
         // When they are saved
         return IDBKeyValProviderMock.multiSet(pairs).then(() => {
             // We expect a call to idbKeyval.setItem for each pair
-            _.each(pairs, ([key, value]) => expect(IDBKeyValProviderMock.setItem).toHaveBeenCalledWith(key, value));
+            pairs.forEach(([key, value]) => expect(IDBKeyValProviderMock.setItem).toHaveBeenCalledWith(key, value));
         });
     });
 
@@ -39,7 +40,7 @@ describe('storage/providers/IDBKeyVal', () => {
 
         return waitForPromisesToResolve().then(() => {
             // Then multi get should retrieve them
-            const keys = _.map(SAMPLE_ITEMS, _.head);
+            const keys = SAMPLE_ITEMS.map(([key]) => key);
             return IDBKeyValProviderMock.multiGet(keys).then((pairs) => expect(pairs).toEqual(expect.arrayContaining(SAMPLE_ITEMS)));
         });
     });
@@ -64,7 +65,7 @@ describe('storage/providers/IDBKeyVal', () => {
         ]);
 
         return waitForPromisesToResolve().then(() => {
-            IDBKeyValProviderMock.mockSet.mockClear();
+            (IDBKeyValProviderMock.mockSet as jest.Mock).mockClear();
 
             // Given deltas matching existing structure
             const USER_1_DELTA = {
@@ -125,7 +126,7 @@ describe('storage/providers/IDBKeyVal', () => {
 
         // Any calls that follow this would have been queued - so we don't expect more than 1 `idbKeyval.setItem` call after the
         // first one resolves.
-        task.resolve();
+        task.resolve?.();
 
         // waitForPromisesToResolve() makes jest wait for any promises (even promises returned as the result of a promise) to resolve.
         // If StorageProvider.clear() does not abort the queue, more idbKeyval.setItem calls would be executed because they would

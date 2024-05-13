@@ -102,7 +102,7 @@ describe('useOnyx', () => {
 
             const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
 
-            expect(result.current[0]).toEqual(null);
+            expect(result.current[0]).toBeUndefined();
             expect(result.current[1].status).toEqual('loading');
 
             await act(async () => waitForPromisesToResolve());
@@ -118,7 +118,7 @@ describe('useOnyx', () => {
 
             const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
 
-            expect(result.current[0]).toEqual(null);
+            expect(result.current[0]).toBeUndefined();
             expect(result.current[1].status).toEqual('loading');
 
             await act(async () => waitForPromisesToResolve());
@@ -242,6 +242,26 @@ describe('useOnyx', () => {
             expect(result.current[0]).toEqual('id - changed_id, name - changed_name - selector changed');
             expect(result.current[1].status).toEqual('loaded');
         });
+
+        it('should return initial value if selected data is undefined', async () => {
+            Onyx.set(ONYXKEYS.TEST_KEY, 'test_id_1');
+
+            const {result} = renderHook(() =>
+                useOnyx(ONYXKEYS.TEST_KEY, {
+                    // @ts-expect-error bypass
+                    selector: (_entry: OnyxEntry<string>) => undefined,
+                    initialValue: 'initial value',
+                }),
+            );
+
+            expect(result.current[0]).toEqual('initial value');
+            expect(result.current[1].status).toEqual('loaded');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+        });
     });
 
     describe('initialValue', () => {
@@ -257,7 +277,7 @@ describe('useOnyx', () => {
 
             await act(async () => waitForPromisesToResolve());
 
-            expect(result.current[0]).toEqual(null);
+            expect(result.current[0]).toBeUndefined();
             expect(result.current[1].status).toEqual('loaded');
         });
 
@@ -290,7 +310,7 @@ describe('useOnyx', () => {
 
             const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
 
-            expect(result.current[0]).toEqual(null);
+            expect(result.current[0]).toBeUndefined();
             expect(result.current[1].status).toEqual('loading');
 
             await act(async () => waitForPromisesToResolve());
@@ -348,7 +368,7 @@ describe('useOnyx', () => {
 
             await act(async () => waitForPromisesToResolve());
 
-            expect(result.current[0]).toEqual(null);
+            expect(result.current[0]).toBeUndefined();
             expect(result.current[1].status).toEqual('loaded');
 
             await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, 'test2'));
