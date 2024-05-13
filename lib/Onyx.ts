@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /* eslint-disable no-continue */
 import _ from 'underscore';
 import * as Logger from './Logger';
@@ -164,6 +165,14 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): nu
             // group collection key member data into an object.
             if ('withOnyxInstance' in mapping && mapping.withOnyxInstance) {
                 if (OnyxUtils.isCollectionKey(mapping.key)) {
+                    if (mapping.displayName === 'LHNOptionsList') {
+                        console.log('[withOnyx] Filter matching keys from connection', mapping, keys);
+                    }
+
+                    // for withOnyxInstance, we'll just need to call the `setWithOnyxState` directly and the HOC will fetch the data from OnyxCache
+                    mapping.withOnyxInstance.getWithOnyxState(mapping);
+                    return;
+
                     OnyxUtils.getCollectionDataAndSendAsObject(matchingKeys, mapping);
                     return;
                 }

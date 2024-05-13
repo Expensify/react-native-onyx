@@ -277,6 +277,7 @@ type Collection<TKey extends CollectionKeyBase, TMap, TValue> = {
 type WithOnyxInstance = Component<unknown, WithOnyxInstanceState<NullableKeyValueMapping>> & {
     setStateProxy: (cb: (state: Record<string, OnyxCollection<KeyValueMapping[OnyxKey]>>) => OnyxValue<OnyxKey>) => void;
     setWithOnyxState: (statePropertyName: OnyxKey, value: OnyxValue<OnyxKey>) => void;
+    getWithOnyxState: (mapping: NullableKeyValueMapping) => void;
 };
 
 /** Represents the base options used in `Onyx.connect()` method. */
