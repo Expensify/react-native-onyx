@@ -11,7 +11,7 @@ const ONYX_KEYS = {
 test('Cache eviction', () => {
     const RECORD_TO_EVICT = 'evict';
     const RECORD_TO_ADD = 'add';
-    const collection = {};
+    const collection: Record<string, unknown> = {};
 
     // Given an evictable key previously set in storage
     return StorageMock.setItem(`${ONYX_KEYS.COLLECTION.TEST_KEY}${RECORD_TO_EVICT}`, {test: 'evict'})
@@ -19,7 +19,6 @@ test('Cache eviction', () => {
             // When we initialize Onyx and mark the set collection key as a safeEvictionKey
             Onyx.init({
                 keys: ONYX_KEYS,
-                registerStorageEventListener: () => {},
                 safeEvictionKeys: [ONYX_KEYS.COLLECTION.TEST_KEY],
             });
 
