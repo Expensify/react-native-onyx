@@ -6,7 +6,6 @@
 import type {ForwardedRef} from 'react';
 import React from 'react';
 import type {IsEqual} from 'type-fest';
-import _ from 'underscore';
 import Onyx from './Onyx';
 import OnyxUtils from './OnyxUtils';
 import * as Str from './Str';
@@ -251,7 +250,7 @@ export default function <TComponentProps, TOnyxProps>(
                 }, {} as WithOnyxState<TOnyxProps>);
 
                 // If we have all the data we need, then we can render the component immediately
-                cachedState.loading = _.size(cachedState) < requiredKeysForInit.length;
+                cachedState.loading = Object.keys(cachedState).length < requiredKeysForInit.length;
 
                 // Object holding the temporary initial state for the component while we load the various Onyx keys
                 this.tempState = cachedState;
@@ -266,7 +265,7 @@ export default function <TComponentProps, TOnyxProps>(
                 Object.keys(mapOnyxToState).forEach((propName) => {
                     const mapping = mapOnyxToState[propName as keyof TOnyxProps] as WithOnyxMapping<TComponentProps, TOnyxProps>;
 
-                    if (_.includes(mappingPropertiesToIgnoreChangesTo, propName)) {
+                    if (mappingPropertiesToIgnoreChangesTo.includes(propName)) {
                         return;
                     }
 
@@ -399,7 +398,7 @@ export default function <TComponentProps, TOnyxProps>(
                             result[key] = prevState[key];
 
                             // if value is already there (without initial value) then we can discard the value we are trying to hydrate
-                        } else if (!_.isUndefined(prevState[key])) {
+                        } else if (prevState[key] !== undefined) {
                             // eslint-disable-next-line no-param-reassign
                             result[key] = prevState[key];
                         } else {
