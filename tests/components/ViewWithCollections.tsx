@@ -1,5 +1,6 @@
 import React, {forwardRef, useImperativeHandle} from 'react';
 import {View, Text} from 'react-native';
+import utils from '../../lib/utils';
 
 type ViewWithCollectionsProps = {
     collections: Record<string, {ID: number}>;
@@ -17,8 +18,7 @@ function ViewWithCollections(
     }));
 
     onRender?.({collections, testObject, onRender, markReadyForHydration, ...rest});
-
-    if (Object.keys(collections).length === 0) {
+    if (utils.isEmptyObject(collections)) {
         return <Text>empty</Text>;
     }
 

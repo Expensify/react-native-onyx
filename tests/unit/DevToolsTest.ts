@@ -4,8 +4,8 @@
 import Onyx from '../../lib';
 import type {DevtoolsConnection} from '../../lib/DevTools';
 import DevTools from '../../lib/DevTools';
-import type {Collection} from '../../lib/types';
 import utils from '../../lib/utils';
+import type GenericCollection from '../utils/GenericCollection';
 
 const ONYX_KEYS = {
     NUM_KEY: 'numKey',
@@ -24,7 +24,7 @@ const initialKeyStates = {
     [ONYX_KEYS.OBJECT_KEY]: {id: 42},
 };
 
-const exampleCollection: Collection<string, unknown, unknown> = {
+const exampleCollection: GenericCollection = {
     [`${ONYX_KEYS.COLLECTION.NUM_KEY}1`]: 1,
     [`${ONYX_KEYS.COLLECTION.NUM_KEY}2`]: 2,
 };

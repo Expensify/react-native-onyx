@@ -3,7 +3,8 @@ import Onyx from '../../lib';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import OnyxUtils from '../../lib/OnyxUtils';
 import type OnyxCache from '../../lib/OnyxCache';
-import type {Collection, OnyxCollection, OnyxUpdate} from '../../lib/types';
+import type {OnyxCollection, OnyxUpdate} from '../../lib/types';
+import type GenericCollection from '../utils/GenericCollection';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
@@ -421,7 +422,7 @@ describe('Onyx', () => {
                 ID: 345,
                 value: 'three',
             },
-        } as Collection<string, unknown, unknown>)
+        } as GenericCollection)
             .then(() =>
                 // 2 key values to update and 2 new keys to add.
                 // MergeCollection will perform a mix of multiSet and multiMerge
@@ -443,7 +444,7 @@ describe('Onyx', () => {
                         ID: 567,
                         value: 'one',
                     },
-                } as Collection<string, unknown, unknown>),
+                } as GenericCollection),
             )
             .then(() => {
                 // 3 items on the first mergeCollection + 4 items the next mergeCollection
@@ -471,7 +472,7 @@ describe('Onyx', () => {
             callback: (data, key) => (valuesReceived[key] = data),
         });
 
-        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, notMyTest: {beep: 'boop'}} as Collection<string, unknown, unknown>).then(() => {
+        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, notMyTest: {beep: 'boop'}} as GenericCollection).then(() => {
             expect(valuesReceived).toEqual({});
         });
     });
@@ -502,7 +503,7 @@ describe('Onyx', () => {
                         ID: 234,
                         value: 'two',
                     },
-                } as Collection<string, unknown, unknown>),
+                } as GenericCollection),
             )
             .then(() => {
                 expect(valuesReceived).toEqual({
@@ -670,9 +671,13 @@ describe('Onyx', () => {
             // @ts-expect-error This is an invalid call to Onyx.update
             Onyx.update(data);
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } catch (error: any) {
-            // Then we should expect the error message below
-            expect(error.message).toEqual('Invalid boolean key provided in Onyx update. Onyx key must be of type string.');
+        } catch (error) {
+            if (error instanceof Error) {
+                // Then we should expect the error message below
+                expect(error.message).toEqual('Invalid boolean key provided in Onyx update. Onyx key must be of type string.');
+            } else {
+                throw error;
+            }
         }
     });
 
@@ -740,9 +745,12 @@ describe('Onyx', () => {
                     ],
                 },
             ] as unknown as OnyxUpdate[]);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } catch (error: any) {
-            expect(error.message).toEqual('Invalid value provided in Onyx multiSet. Onyx multiSet value must be of type object.');
+        } catch (error) {
+            if (error instanceof Error) {
+                expect(error.message).toEqual('Invalid value provided in Onyx multiSet. Onyx multiSet value must be of type object.');
+            } else {
+                throw error;
+            }
         }
     });
 
@@ -765,7 +773,7 @@ describe('Onyx', () => {
             },
         };
 
-        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION, initialCollectionData as Collection<string, unknown, unknown>)
+        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION, initialCollectionData as GenericCollection)
             .then(() => {
                 // When we connect to that collection with waitForCollectionCallback = true
                 connectionID = Onyx.connect({
@@ -798,7 +806,7 @@ describe('Onyx', () => {
         return (
             waitForPromisesToResolve()
                 // When mergeCollection is called with an updated collection
-                .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_POLICY, collectionUpdate as Collection<string, unknown, unknown>))
+                .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_POLICY, collectionUpdate as GenericCollection))
                 .then(() => {
                     // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
                     expect(mockCallback).toHaveBeenCalledTimes(2);
@@ -827,7 +835,7 @@ describe('Onyx', () => {
         return (
             waitForPromisesToResolve()
                 // When mergeCollection is called with an updated collection
-                .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_POLICY, collectionUpdate as Collection<string, unknown, unknown>))
+                .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_POLICY, collectionUpdate as GenericCollection))
                 .then(() => {
                     // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
                     expect(mockCallback).toHaveBeenCalledTimes(2);
@@ -1189,7 +1197,7 @@ describe('Onyx', () => {
                     3: null,
                 },
             },
-        } as Collection<string, unknown, unknown>).then(() => {
+        } as GenericCollection).then(() => {
             expect(result).toEqual({
                 [routineRoute]: {
                     waypoints: {
@@ -1230,7 +1238,7 @@ describe('Onyx', () => {
 
         const initialValue = {name: 'Fluffy'};
 
-        const collectionDiff: Collection<string, unknown, unknown> = {
+        const collectionDiff: GenericCollection = {
             [cat]: initialValue,
             [dog]: {name: 'Rex'},
         };

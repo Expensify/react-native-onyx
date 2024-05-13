@@ -3,7 +3,7 @@ import React from 'react';
 import {render} from '@testing-library/react-native';
 
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
-import type {ViewWithTextProps} from '../components/ViewWithText';
+import type {ViewWithTextOnyxProps, ViewWithTextProps} from '../components/ViewWithText';
 import ViewWithText from '../components/ViewWithText';
 import type {ViewWithCollectionsProps} from '../components/ViewWithCollections';
 import ViewWithCollections from '../components/ViewWithCollections';
@@ -12,10 +12,7 @@ import type MockedStorage from '../../lib/storage/__mocks__';
 import type OnyxInstance from '../../lib/Onyx';
 import type withOnyxType from '../../lib/withOnyx';
 import type {InitOptions} from '../../lib/types';
-
-function generateRange(start: number, end: number) {
-    return Array.from({length: end - start}, (_, i) => i + start);
-}
+import generateRange from '../utils/generateRange';
 
 describe('Onyx', () => {
     describe('Cache Service', () => {
@@ -471,7 +468,7 @@ describe('Onyx', () => {
 
         it('Expect a single call to getItem when multiple components use the same key', () => {
             // Given a component connected to Onyx
-            const TestComponentWithOnyx = withOnyx<ViewWithTextProps, {text: unknown}>({
+            const TestComponentWithOnyx = withOnyx<ViewWithTextProps, ViewWithTextOnyxProps>({
                 text: {
                     key: ONYX_KEYS.TEST_KEY,
                 },
@@ -500,7 +497,7 @@ describe('Onyx', () => {
 
         it('Expect a single call to getAllKeys when multiple components use the same key', () => {
             // Given a component connected to Onyx
-            const TestComponentWithOnyx = withOnyx<ViewWithTextProps, {text: unknown}>({
+            const TestComponentWithOnyx = withOnyx<ViewWithTextProps, ViewWithTextOnyxProps>({
                 text: {
                     key: ONYX_KEYS.TEST_KEY,
                 },
@@ -571,7 +568,7 @@ describe('Onyx', () => {
 
         it('Expect multiple calls to getItem when value cannot be retrieved from cache', () => {
             // Given a component connected to Onyx
-            const TestComponentWithOnyx = withOnyx<ViewWithTextProps, {text: unknown}>({
+            const TestComponentWithOnyx = withOnyx<ViewWithTextProps, ViewWithTextOnyxProps>({
                 text: {
                     key: ONYX_KEYS.TEST_KEY,
                 },
@@ -611,7 +608,7 @@ describe('Onyx', () => {
                 },
             })(ViewWithCollections);
 
-            const OtherTestComponentWithOnyx = withOnyx<ViewWithTextProps, {text: unknown}>({
+            const OtherTestComponentWithOnyx = withOnyx<ViewWithTextProps, ViewWithTextOnyxProps>({
                 text: {
                     key: ONYX_KEYS.OTHER_TEST,
                 },

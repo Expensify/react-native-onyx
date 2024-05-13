@@ -2,7 +2,7 @@ import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import StorageMock from '../../lib/storage';
 import Onyx from '../../lib/Onyx';
 import type OnyxCache from '../../lib/OnyxCache';
-import type {Collection} from '../../lib/types';
+import type GenericCollection from '../utils/GenericCollection';
 
 const ONYX_KEYS = {
     DEFAULT_KEY: 'defaultKey',
@@ -142,7 +142,7 @@ describe('Set data while storage is clearing', () => {
                         [`${ONYX_KEYS.COLLECTION.TEST}2`]: 2,
                         [`${ONYX_KEYS.COLLECTION.TEST}3`]: 3,
                         [`${ONYX_KEYS.COLLECTION.TEST}4`]: 4,
-                    } as Collection<string, unknown, unknown>),
+                    } as GenericCollection),
                 )
 
                 // When onyx is cleared

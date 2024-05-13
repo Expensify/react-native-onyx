@@ -1,9 +1,9 @@
 import React from 'react';
 import {View, Text} from 'react-native';
 
-type ViewWithTextProps = {
-    text: string | null;
-    // eslint-disable-next-line react/no-unused-prop-types
+type ViewWithTextOnyxProps = {text: unknown};
+type ViewWithTextProps = ViewWithTextOnyxProps & {
+    // eslint-disable-next-line react/no-unused-prop-types -- it's used in withOnyx in the tests
     collectionID?: string;
     onRender?: () => void;
 };
@@ -13,10 +13,10 @@ function ViewWithText({onRender, text}: ViewWithTextProps) {
 
     return (
         <View>
-            <Text testID="text-element">{text || 'null'}</Text>
+            <Text testID="text-element">{(text as string) || 'null'}</Text>
         </View>
     );
 }
 
 export default ViewWithText;
-export type {ViewWithTextProps};
+export type {ViewWithTextProps, ViewWithTextOnyxProps};

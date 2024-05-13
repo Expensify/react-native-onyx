@@ -1,4 +1,4 @@
-export default (): Promise<unknown> =>
+export default (): Promise<void> =>
     new Promise((resolve) => {
         setTimeout(resolve, 0);
     });

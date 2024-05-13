@@ -6,7 +6,7 @@ import Onyx, {withOnyx} from '../../lib';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import type {ViewWithObjectProps} from '../components/ViewWithObject';
 import ViewWithObject from '../components/ViewWithObject';
-import type {Collection} from '../../lib/types';
+import type GenericCollection from '../utils/GenericCollection';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
@@ -139,7 +139,7 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
                     Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                         [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {a: 'one', b: 'two'},
                         [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {c: 'three', d: 'four'},
-                    } as Collection<string, unknown, unknown>),
+                    } as GenericCollection),
                 )
                 .then(() => {
                     renderedComponent = render(
@@ -168,7 +168,7 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
                 .then(() =>
                     Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                         [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {b: 'three'},
-                    } as Collection<string, unknown, unknown>),
+                    } as GenericCollection),
                 )
 
                 // Then the props passed should not have changed
@@ -217,7 +217,7 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
                     Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                         [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {a: 'one', b: 'two'},
                         [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {c: 'three', d: 'four'},
-                    } as Collection<string, unknown, unknown>),
+                    } as GenericCollection),
                 )
                 .then(() => {
                     renderedComponent = render(
@@ -246,7 +246,7 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
                 .then(() =>
                     Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                         [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {b: 'three'},
-                    } as Collection<string, unknown, unknown>),
+                    } as GenericCollection),
                 )
 
                 // Then the props passed should not have changed
