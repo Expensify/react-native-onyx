@@ -276,9 +276,8 @@ describe('withOnyxTest', () => {
         })(ViewWithText);
         TestComponentWithOnyx.defaultProps = {
             text: INITIAL_VALUE,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any;
-        Onyx.set('test_key', 'test_text');
+        } as ViewWithTextProps;
+        Onyx.set('test', 'test_text');
         return waitForPromisesToResolve().then(() => {
             const {getByTestId} = render(<TestComponentWithOnyx collectionID="1" />);
             expect(getByTestId('text-element').props.children).toEqual(INITIAL_VALUE);
