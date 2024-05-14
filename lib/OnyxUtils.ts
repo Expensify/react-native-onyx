@@ -876,6 +876,23 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
             cache.merge(temp);
             return Promise.resolve();
         })
+        .then(() => {
+            const allCacheKeys = cache.getAllKeys();
+            const cacheKeys = Array.from(allCacheKeys).filter((k) => k.startsWith(mapping.key));
+            const diff = lodashDifference(cacheKeys, Object.keys(data || {}));
+
+            if (diff.length === 0) {
+                return Promise.resolve();
+            }
+
+            diff.forEach((key) => {
+                const cachedValue = cache.getValue(key);
+
+                data[key] = cachedValue as OnyxValue<TKey>;
+            });
+
+            return Promise.resolve();
+        })
         // We are going to send the data to the subscriber.
         .finally(() => {
             sendDataToConnection(mapping, data as OnyxValue<TKey>, undefined, true);
