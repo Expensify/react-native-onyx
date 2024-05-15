@@ -84,7 +84,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(key: T
 
     // Stores the previous cached value as it's necessary to compare with the new value in `getSnapshot()`.
     // We initialize it to `undefined` to simulate that we don't have any value from cache yet.
-    const cachedValueRef = useRef<CachedValue<TKey, TReturnValue> | undefined>(undefined);
+    const previousValueRef = useRef<CachedValue<TKey, TReturnValue> | undefined>(undefined);
 
     // Stores the newest cached value in order to compare with the previous one and optimize `getSnapshot()` execution.
     const newValueRef = useRef<CachedValue<TKey, TReturnValue> | undefined>(undefined);
@@ -170,18 +170,18 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(key: T
         // For the other cases we will only deal with object reference checks, so just a shallow equality check is enough.
         let areValuesEqual = false;
         if (OnyxUtils.isCollectionKey(key) && selectorRef.current) {
-            areValuesEqual = deepEqual(cachedValueRef.current, newValueRef.current);
+            areValuesEqual = deepEqual(previousValueRef.current, newValueRef.current);
         } else {
-            areValuesEqual = shallowEqual(cachedValueRef.current, newValueRef.current);
+            areValuesEqual = shallowEqual(previousValueRef.current, newValueRef.current);
         }
 
         // If the previously cached value is different from the new value, we update both cached value
         // and the result to be returned by the hook.
         if (!areValuesEqual) {
-            cachedValueRef.current = newValueRef.current;
+            previousValueRef.current = newValueRef.current;
 
             // If the new value is `null` we default it to `undefined` to ensure the consumer get a consistent result from the hook.
-            resultRef.current = [(cachedValueRef.current ?? undefined) as CachedValue<TKey, TReturnValue>, {status: newFetchStatus ?? 'loaded'}];
+            resultRef.current = [(previousValueRef.current ?? undefined) as CachedValue<TKey, TReturnValue>, {status: newFetchStatus ?? 'loaded'}];
         }
 
         return resultRef.current;
