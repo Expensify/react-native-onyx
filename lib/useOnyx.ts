@@ -90,6 +90,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(key: T
     // We initialize it to `undefined` to simulate that we don't have any value from cache yet.
     const cachedValueRef = useRef<CachedValue<TKey, TReturnValue> | undefined>(undefined);
 
+    // Stores the newest cached value in order to compare with the previous one and optimize `getSnapshot()` execution.
     const newValueRef = useRef<CachedValue<TKey, TReturnValue> | undefined>(undefined);
 
     // Stores the previously result returned by the hook, containing the data from cache and the fetch status.
