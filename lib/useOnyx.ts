@@ -14,8 +14,8 @@ import usePrevious from './usePrevious';
 type UseOnyxValue<TKey extends OnyxKey> = string extends TKey
     ? unknown
     : TKey extends CollectionKeyBase
-    ? Readonly<NonNull<OnyxCollection<KeyValueMapping[TKey]>>>
-    : Readonly<NonNull<OnyxEntry<KeyValueMapping[TKey]>>>;
+    ? NonNull<OnyxCollection<KeyValueMapping[TKey]>>
+    : NonNull<OnyxEntry<KeyValueMapping[TKey]>>;
 
 type BaseUseOnyxOptions = {
     /**
@@ -55,11 +55,7 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = BaseUseOnyxOptions & U
 
 type FetchStatus = 'loading' | 'loaded';
 
-type CachedValue<TKey extends OnyxKey, TValue> = IsEqual<TValue, UseOnyxValue<TKey>> extends true
-    ? TValue
-    : TKey extends CollectionKeyBase
-    ? Readonly<NonNullable<OnyxCollection<TValue>>>
-    : Readonly<TValue>;
+type CachedValue<TKey extends OnyxKey, TValue> = IsEqual<TValue, UseOnyxValue<TKey>> extends true ? TValue : TKey extends CollectionKeyBase ? NonNullable<OnyxCollection<TValue>> : TValue;
 
 type ResultMetadata = {
     status: FetchStatus;

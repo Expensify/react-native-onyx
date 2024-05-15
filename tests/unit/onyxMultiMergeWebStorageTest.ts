@@ -1,6 +1,11 @@
 import OnyxCache from '../../lib/OnyxCache';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
-import StorageMock from '../../lib/storage';
+import Storage from '../../lib/storage';
+import type MockedStorage from '../../lib/storage/__mocks__';
+import type OnyxInstance from '../../lib/Onyx';
+import type GenericCollection from '../utils/GenericCollection';
+
+const StorageMock = Storage as unknown as typeof MockedStorage;
 
 const ONYX_KEYS = {
     COLLECTION: {
@@ -16,15 +21,15 @@ const initialData = {
 };
 
 describe('Onyx.mergeCollection() and WebStorage', () => {
-    let Onyx;
+    let Onyx: typeof OnyxInstance;
 
     beforeAll(() => {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         Onyx = require('../../lib').default;
         jest.useRealTimers();
 
         Onyx.init({
             keys: ONYX_KEYS,
-            registerStorageEventListener: () => {},
             initialKeyStates: {},
         });
     });
@@ -50,7 +55,7 @@ describe('Onyx.mergeCollection() and WebStorage', () => {
             test_1: additionalDataOne,
             test_2: additionalDataOne,
             test_3: additionalDataOne,
-        });
+        } as GenericCollection);
 
         // And call again consecutively with different data
         const additionalDataTwo = {d: 'd', e: [2]};
@@ -58,7 +63,7 @@ describe('Onyx.mergeCollection() and WebStorage', () => {
             test_1: additionalDataTwo,
             test_2: additionalDataTwo,
             test_3: additionalDataTwo,
-        });
+        } as GenericCollection);
 
         return waitForPromisesToResolve().then(() => {
             const finalObject = {
@@ -98,7 +103,7 @@ describe('Onyx.mergeCollection() and WebStorage', () => {
             test_1: data,
             test_2: data,
             test_3: data,
-        });
+        } as GenericCollection);
 
         return waitForPromisesToResolve()
             .then(() => {
@@ -120,7 +125,7 @@ describe('Onyx.mergeCollection() and WebStorage', () => {
                     test_1: additionalData,
                     test_2: additionalData,
                     test_3: additionalData,
-                });
+                } as GenericCollection);
 
                 return waitForPromisesToResolve();
             })
@@ -159,7 +164,7 @@ describe('Onyx.mergeCollection() and WebStorage', () => {
         // 2nd call
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
             test_1: {d: 'd', e: 'e'},
-        });
+        } as GenericCollection);
 
         // Last call
         Onyx.merge('test_1', {f: 'f'});

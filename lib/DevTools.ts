@@ -102,3 +102,4 @@ class DevTools {
 }
 
 export default new DevTools();
+export type {DevtoolsConnection};
