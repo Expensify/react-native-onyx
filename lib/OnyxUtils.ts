@@ -311,17 +311,14 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Partial<Wi
             return;
         }
 
-        const matchingKeys = Array.from(allCacheKeys).filter((k) => k.startsWith(key));
-        const values = matchingKeys.reduce((finalObject: NonNullable<OnyxCollection<KeyValueMapping[TKey]>>, matchedKey) => {
-            const cachedValue = cache.getValue(matchedKey);
-            if (cachedValue) {
-                // This is permissible because we're in the process of constructing the final object in a reduce function.
-                // eslint-disable-next-line no-param-reassign
-                finalObject[matchedKey] = cachedValue;
+        const values: Record<string, unknown> = {};
+        allCacheKeys.forEach((cacheKey) => {
+            if (!cacheKey.startsWith(key)) {
+                return;
             }
-            return finalObject;
-        }, {});
 
+            values[cacheKey] = cache.getValue(cacheKey);
+        });
         val = values;
     }
 
