@@ -104,7 +104,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(key: T
     const isFirstConnectionRef = useRef(true);
 
     // Indicates if we should get the newest cached value from Onyx during `getSnapshot()` execution.
-    const shouldGetCachedValue = useRef(true);
+    const shouldGetCachedValueRef = useRef(true);
 
     useEffect(() => {
         // These conditions will ensure we can only handle dynamic collection member keys from the same collection.
@@ -134,7 +134,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(key: T
         // We get the value from cache while the first connection to Onyx is being made,
         // so we can return any cached value right away. After the connection is made, we only
         // update `newValueRef` when `Onyx.connect()` callback is fired.
-        if (isFirstConnectionRef.current || shouldGetCachedValue.current) {
+        if (isFirstConnectionRef.current || shouldGetCachedValueRef.current) {
             // If `newValueRef.current` is `undefined` it means that the cache doesn't have a value for that key yet.
             // If `newValueRef.current` is `null` or any other value if means that the cache does have a value for that key.
             // This difference between `undefined` and other values is crucial and it's used to address the following
@@ -143,7 +143,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(key: T
 
             // We set this flag to `false` again since we don't want to get the newest cached value every time `getSnapshot()` is executed,
             // and only when `Onyx.connect()` callback is fired.
-            shouldGetCachedValue.current = false;
+            shouldGetCachedValueRef.current = false;
         }
 
         // Since the fetch status can be different given the use cases below, we define the variable right away.
@@ -197,7 +197,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(key: T
                     isFirstConnectionRef.current = false;
 
                     // Signals that we want to get the newest cached value again in `getSnapshot()`.
-                    shouldGetCachedValue.current = true;
+                    shouldGetCachedValueRef.current = true;
 
                     // Finally, we signal that the store changed, making `getSnapshot()` be called again.
                     onStoreChange();
