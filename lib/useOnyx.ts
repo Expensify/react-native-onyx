@@ -141,7 +141,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(key: T
             // conditions and use cases.
             newValueRef.current = getCachedValue<TKey, TReturnValue>(key, selectorRef.current);
 
-            // We set this flag to `false` again since we don't want to get the newest cached value every time `getSnapshop()` is executed,
+            // We set this flag to `false` again since we don't want to get the newest cached value every time `getSnapshot()` is executed,
             // and only when `Onyx.connect()` callback is fired.
             shouldGetCachedValue.current = false;
         }
