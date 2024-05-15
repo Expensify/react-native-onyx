@@ -106,6 +106,9 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(key: T
     // in `getSnapshot()` to be satisfied several times.
     const isFirstConnectionRef = useRef(true);
 
+    // Indicates if we should get the newest cached value from Onyx during `getSnapshot()` execution.
+    const shouldGetCachedValue = useRef(true);
+
     useEffect(() => {
         // These conditions will ensure we can only handle dynamic collection member keys from the same collection.
         if (previousKey === key) {
@@ -134,12 +137,16 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(key: T
         // We get the value from cache while the first connection to Onyx is being made,
         // so we can return any cached value right away. After the connection is made, we only
         // update `newValueRef` when `Onyx.connect()` callback is fired.
-        if (isFirstConnectionRef.current) {
+        if (isFirstConnectionRef.current || shouldGetCachedValue.current) {
             // If `newValueRef.current` is `undefined` it means that the cache doesn't have a value for that key yet.
             // If `newValueRef.current` is `null` or any other value if means that the cache does have a value for that key.
             // This difference between `undefined` and other values is crucial and it's used to address the following
             // conditions and use cases.
             newValueRef.current = getCachedValue<TKey, TReturnValue>(key, selectorRef.current);
+
+            // We set this flag to `false` again since we don't want to get the newest cached value every time `getSnapshop()` is executed,
+            // and only when `Onyx.connect()` callback is fired.
+            shouldGetCachedValue.current = false;
         }
 
         // Since the fetch status can be different given the use cases below, we define the variable right away.
@@ -188,11 +195,14 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(key: T
             connectionIDRef.current = Onyx.connect<CollectionKeyBase>({
                 key,
                 callback: () => {
-                    // We don't need to update the Onyx cache again here, when `callback` is called the cache is already
-                    // expected to be updated, so we just get the new value from cache and signal that the store changed,
-                    // making `getSnapshot()` be called again.
+                    // Signals that the first connection was made, so some logics in `getSnapshot()`
+                    // won't be executed anymore.
                     isFirstConnectionRef.current = false;
-                    newValueRef.current = getCachedValue<TKey, TReturnValue>(key, selectorRef.current);
+
+                    // Signals that we want to get the newest cached value again in `getSnapshot()`.
+                    shouldGetCachedValue.current = true;
+
+                    // Finally, we signal that the store changed, making `getSnapshot()` be called again.
                     onStoreChange();
                 },
                 initWithStoredValues: options?.initWithStoredValues,
@@ -208,7 +218,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(key: T
                 isFirstConnectionRef.current = false;
             };
         },
-        [key, selectorRef, options?.initWithStoredValues],
+        [key, options?.initWithStoredValues],
     );
 
     // Mimics withOnyx's checkEvictableKeys() behavior.
