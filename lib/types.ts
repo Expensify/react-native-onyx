@@ -1,7 +1,7 @@
-import type {Component} from 'react';
 import type {Merge} from 'type-fest';
 import type {BuiltIns} from 'type-fest/source/internal';
 import type OnyxUtils from './OnyxUtils';
+import type {WithOnyxInstance, WithOnyxState} from './withOnyx';
 
 /**
  * Utility type that excludes `null` from the type `TValue`.
@@ -148,7 +148,7 @@ type NullableKeyValueMapping = {
  * The type `TKey` extends `OnyxKey` and it is the key used to access a value in `KeyValueMapping`.
  * `TReturnType` is the type of the returned value from the selector function.
  */
-type Selector<TKey extends OnyxKey, TOnyxProps, TReturnType> = (value: OnyxEntry<KeyValueMapping[TKey]>, state: WithOnyxInstanceState<TOnyxProps>) => TReturnType;
+type Selector<TKey extends OnyxKey, TOnyxProps, TReturnType> = (value: OnyxEntry<KeyValueMapping[TKey]>, state?: WithOnyxState<TOnyxProps>) => TReturnType;
 
 /**
  * Represents a single Onyx entry, that can be either `TOnyxValue` or `null` / `undefined` if it doesn't exist.
@@ -253,11 +253,6 @@ type NullishObjectDeep<ObjectType extends object> = {
 };
 
 /**
- * Represents withOnyx's internal state, containing the Onyx props and a `loading` flag.
- */
-type WithOnyxInstanceState<TOnyxProps> = (TOnyxProps & {loading: boolean}) | undefined;
-
-/**
  * Represents a mapping between Onyx collection keys and their respective values.
  *
  * It helps to enforce that a Onyx collection key should not be without suffix (e.g. should always be of the form `${TKey}${string}`),
@@ -272,11 +267,6 @@ type Collection<TKey extends CollectionKeyBase, TMap, TValue> = {
             ? never // forbids empty id
             : TValue
         : never;
-};
-
-type WithOnyxInstance = Component<unknown, WithOnyxInstanceState<NullableKeyValueMapping>> & {
-    setStateProxy: (cb: (state: Record<string, OnyxCollection<KeyValueMapping[OnyxKey]>>) => OnyxValue<OnyxKey>) => void;
-    setWithOnyxState: (statePropertyName: OnyxKey, value: OnyxValue<OnyxKey>) => void;
 };
 
 /** Represents the base options used in `Onyx.connect()` method. */
@@ -432,6 +422,4 @@ export type {
     OnyxValue,
     Selector,
     WithOnyxConnectOptions,
-    WithOnyxInstance,
-    WithOnyxInstanceState,
 };

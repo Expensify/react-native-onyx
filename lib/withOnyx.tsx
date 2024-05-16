@@ -14,12 +14,13 @@ import type {
     ExtractOnyxCollectionValue,
     GenericFunction,
     KeyValueMapping,
+    NullableKeyValueMapping,
     OnyxCollection,
     OnyxEntry,
     OnyxKey,
+    OnyxValue,
     Selector,
     WithOnyxConnectOptions,
-    WithOnyxInstance,
 } from './types';
 import utils from './utils';
 
@@ -180,6 +181,14 @@ type WithOnyxState<TOnyxProps> = TOnyxProps & {
     loading: boolean;
 };
 
+/**
+ * Represents the `withOnyx` internal component instance.
+ */
+type WithOnyxInstance = React.Component<unknown, WithOnyxState<NullableKeyValueMapping>> & {
+    setStateProxy: (modifier: Record<string, OnyxCollection<KeyValueMapping[OnyxKey]>> | ((state: Record<string, OnyxCollection<KeyValueMapping[OnyxKey]>>) => OnyxValue<OnyxKey>)) => void;
+    setWithOnyxState: (statePropertyName: OnyxKey, value: OnyxValue<OnyxKey>) => void;
+};
+
 // This is a list of keys that can exist on a `mapping`, but are not directly related to loading data from Onyx. When the keys of a mapping are looped over to check
 // if a key has changed, it's a good idea to skip looking at these properties since they would have unexpected results.
 const mappingPropertiesToIgnoreChangesTo: Array<string | number | symbol> = ['initialValue', 'allowStaleData'];
@@ -224,7 +233,7 @@ export default function <TComponentProps, TOnyxProps>(
             // eslint-disable-next-line react/static-property-placement
             static displayName: string;
 
-            pendingSetStates: Array<Partial<WithOnyxState<TOnyxProps>>> = [];
+            pendingSetStates: Array<WithOnyxState<TOnyxProps> | ((state: WithOnyxState<TOnyxProps>) => WithOnyxState<TOnyxProps> | null)> = [];
 
             shouldDelayUpdates: boolean;
 
@@ -335,7 +344,7 @@ export default function <TComponentProps, TOnyxProps>(
                 });
             }
 
-            setStateProxy(modifier: WithOnyxState<TOnyxProps>) {
+            setStateProxy(modifier: WithOnyxState<TOnyxProps> | ((state: WithOnyxState<TOnyxProps>) => WithOnyxState<TOnyxProps> | null)) {
                 if (this.shouldDelayUpdates) {
                     this.pendingSetStates.push(modifier);
                 } else {
@@ -536,3 +545,5 @@ export default function <TComponentProps, TOnyxProps>(
         });
     };
 }
+
+export type {WithOnyxState, WithOnyxInstance};

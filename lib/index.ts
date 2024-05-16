@@ -1,25 +1,26 @@
+import type {ConnectOptions, OnyxUpdate} from './Onyx';
 import Onyx from './Onyx';
-import type {OnyxUpdate, ConnectOptions} from './Onyx';
-import type {CustomTypeOptions, OnyxCollection, OnyxEntry, NullishDeep, KeyValueMapping, OnyxKey, Selector, WithOnyxInstanceState, OnyxValue} from './types';
-import type {UseOnyxResult, FetchStatus, ResultMetadata} from './useOnyx';
+import type {CustomTypeOptions, KeyValueMapping, NullishDeep, OnyxCollection, OnyxEntry, OnyxKey, OnyxValue, Selector} from './types';
+import type {FetchStatus, ResultMetadata, UseOnyxResult} from './useOnyx';
 import useOnyx from './useOnyx';
+import type {WithOnyxState} from './withOnyx';
 import withOnyx from './withOnyx';
 
 export default Onyx;
-export {withOnyx, useOnyx};
+export {useOnyx, withOnyx};
 export type {
+    ConnectOptions,
     CustomTypeOptions,
+    FetchStatus,
+    KeyValueMapping,
+    NullishDeep,
     OnyxCollection,
     OnyxEntry,
-    OnyxUpdate,
-    ConnectOptions,
-    NullishDeep,
-    KeyValueMapping,
     OnyxKey,
-    Selector,
-    WithOnyxInstanceState,
-    UseOnyxResult,
+    OnyxUpdate,
     OnyxValue,
-    FetchStatus,
     ResultMetadata,
+    Selector,
+    UseOnyxResult,
+    WithOnyxState,
 };
