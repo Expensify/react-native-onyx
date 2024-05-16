@@ -28,7 +28,7 @@ import type {
     WithOnyxConnectOptions,
 } from './types';
 import utils from './utils';
-import type {WithOnyxState} from './withOnyx';
+import type {WithOnyxState} from './withOnyx/types';
 
 // Method constants
 const METHOD = {

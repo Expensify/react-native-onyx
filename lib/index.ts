@@ -3,8 +3,8 @@ import Onyx from './Onyx';
 import type {CustomTypeOptions, KeyValueMapping, NullishDeep, OnyxCollection, OnyxEntry, OnyxKey, OnyxValue, Selector} from './types';
 import type {FetchStatus, ResultMetadata, UseOnyxResult} from './useOnyx';
 import useOnyx from './useOnyx';
-import type {WithOnyxState} from './withOnyx';
 import withOnyx from './withOnyx';
+import type {WithOnyxState} from './withOnyx/types';
 
 export default Onyx;
 export {useOnyx, withOnyx};

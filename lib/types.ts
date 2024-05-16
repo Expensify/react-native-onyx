@@ -1,7 +1,7 @@
 import type {Merge} from 'type-fest';
 import type {BuiltIns} from 'type-fest/source/internal';
 import type OnyxUtils from './OnyxUtils';
-import type {WithOnyxInstance, WithOnyxState} from './withOnyx';
+import type {WithOnyxInstance, WithOnyxState} from './withOnyx/types';
 
 /**
  * Utility type that excludes `null` from the type `TValue`.
