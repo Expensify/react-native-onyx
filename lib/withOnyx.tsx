@@ -244,7 +244,7 @@ export default function <TComponentProps, TOnyxProps>(
                 this.activeConnectionIDs = {};
 
                 const cachedState = mapOnyxToStateEntries(mapOnyxToState).reduce<WithOnyxState<TOnyxProps>>((resultObj, [propName, mapping]) => {
-                    const key = Str.result(mapping.key as GenericFunction, props) as OnyxKey;
+                    const key = Str.result(mapping.key as GenericFunction, props);
                     let value = OnyxUtils.tryGetCachedValue(key, mapping as Partial<WithOnyxConnectOptions<OnyxKey>>);
                     if (!value && mapping.initialValue) {
                         value = mapping.initialValue;
@@ -287,7 +287,7 @@ export default function <TComponentProps, TOnyxProps>(
                         return;
                     }
 
-                    const key = Str.result(mapping.key as GenericFunction, {...this.props, ...onyxDataFromState}) as OnyxKey;
+                    const key = Str.result(mapping.key as GenericFunction, {...this.props, ...onyxDataFromState});
                     this.connectMappingToOnyx(mapping, propName, key);
                 });
 
@@ -315,10 +315,8 @@ export default function <TComponentProps, TOnyxProps>(
                     // (eg. if a user switches chats really quickly). In this case, it's much more stable to always look at the changes to prevProp and prevState to derive the key.
                     // The second case cannot be used all the time because the onyx data doesn't change the first time that `componentDidUpdate()` runs after loading. In this case,
                     // the `mapping.previousKey` must be used for the comparison or else this logic never detects that onyx data could have changed during the loading process.
-                    const previousKey = (
-                        isFirstTimeUpdatingAfterLoading ? mapping.previousKey : Str.result(mapping.key as GenericFunction, {...prevProps, ...prevOnyxDataFromState})
-                    ) as OnyxKey;
-                    const newKey = Str.result(mapping.key as GenericFunction, {...this.props, ...onyxDataFromState}) as OnyxKey;
+                    const previousKey = isFirstTimeUpdatingAfterLoading ? mapping.previousKey : Str.result(mapping.key as GenericFunction, {...prevProps, ...prevOnyxDataFromState});
+                    const newKey = Str.result(mapping.key as GenericFunction, {...this.props, ...onyxDataFromState});
                     if (previousKey !== newKey) {
                         Onyx.disconnect(this.activeConnectionIDs[previousKey], previousKey);
                         delete this.activeConnectionIDs[previousKey];
@@ -332,16 +330,16 @@ export default function <TComponentProps, TOnyxProps>(
             componentWillUnmount() {
                 // Disconnect everything from Onyx
                 mapOnyxToStateEntries(mapOnyxToState).forEach(([, mapping]) => {
-                    const key = Str.result(mapping.key as GenericFunction, {...this.props, ...getOnyxDataFromState(this.state, mapOnyxToState)}) as OnyxKey;
+                    const key = Str.result(mapping.key as GenericFunction, {...this.props, ...getOnyxDataFromState(this.state, mapOnyxToState)});
                     Onyx.disconnect(this.activeConnectionIDs[key], key);
                 });
             }
 
-            setStateProxy(modifier: Partial<WithOnyxState<TOnyxProps>>) {
+            setStateProxy(modifier: WithOnyxState<TOnyxProps>) {
                 if (this.shouldDelayUpdates) {
                     this.pendingSetStates.push(modifier);
                 } else {
-                    this.setState(modifier as WithOnyxState<TOnyxProps>);
+                    this.setState(modifier);
                 }
             }
 
@@ -441,7 +439,7 @@ export default function <TComponentProps, TOnyxProps>(
                     }
 
                     const canEvict = Str.result(mapping.canEvict as GenericFunction, this.props) as boolean;
-                    const key = Str.result(mapping.key as GenericFunction, this.props) as OnyxKey;
+                    const key = Str.result(mapping.key as GenericFunction, this.props);
 
                     if (!OnyxUtils.isSafeEvictionKey(key)) {
                         throw new Error(`canEvict can't be used on key '${key}'. This key must explicitly be flagged as safe for removal by adding it to Onyx.init({safeEvictionKeys: []}).`);
