@@ -335,7 +335,7 @@ export default function <TComponentProps, TOnyxProps>(
 
             render() {
                 // Remove any null values so that React replaces them with default props
-                const propsToPass = utils.omit(this.props as Omit<TComponentProps, keyof TOnyxProps>, (entry) => entry[1] === null);
+                const propsToPass = utils.omit(this.props as Omit<TComponentProps, keyof TOnyxProps>, ([, propValue]) => propValue === null);
 
                 if (this.state.loading) {
                     return null;
@@ -343,7 +343,7 @@ export default function <TComponentProps, TOnyxProps>(
 
                 // Remove any internal state properties used by withOnyx
                 // that should not be passed to a wrapped component
-                const stateToPass = utils.omit(this.state as WithOnyxState<TOnyxProps>, (entry) => entry[0] === 'loading' || entry[1] === null);
+                const stateToPass = utils.omit(this.state as WithOnyxState<TOnyxProps>, ([stateKey, stateValue]) => stateKey === 'loading' || stateValue === null);
                 const stateToPassWithoutNestedNulls = utils.removeNestedNullValues(stateToPass);
 
                 // Spreading props and state is necessary in an HOC where the data cannot be predicted
