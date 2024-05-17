@@ -276,7 +276,7 @@ export default function <TComponentProps, TOnyxProps>(
                         return;
                     }
 
-                    const canEvict = Str.result(mapping.canEvict as GenericFunction, this.props) as boolean;
+                    const canEvict = !!Str.result(mapping.canEvict as GenericFunction, this.props);
                     const key = Str.result(mapping.key as GenericFunction, this.props);
 
                     if (!OnyxUtils.isSafeEvictionKey(key)) {
