@@ -311,7 +311,7 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Partial<Wi
             return;
         }
 
-        const values: Record<string, unknown> = {};
+        const values: OnyxCollection<KeyValueMapping[TKey]> = {};
         allCacheKeys.forEach((cacheKey) => {
             if (!cacheKey.startsWith(key)) {
                 return;
