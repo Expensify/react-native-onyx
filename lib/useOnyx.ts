@@ -9,7 +9,7 @@ import usePrevious from './usePrevious';
 
 /**
  * Represents a Onyx value that can be either a single entry or a collection of entries, depending on the `TKey` provided.
- * It's a variation of `OnyxValue` type that is read-only and excludes the `null` type.
+ * It's a variation of `OnyxValue` type that excludes the `null` type.
  */
 type UseOnyxValue<TKey extends OnyxKey> = string extends TKey
     ? unknown
