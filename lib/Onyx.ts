@@ -595,26 +595,33 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
 }
 
 function updateSnapshots(data: OnyxUpdate[]) {
-    const snapshotKey = OnyxUtils.getSnapshotKey();
+    const snapshotCollectionKey = OnyxUtils.getSnapshotKey();
 
-    if (!snapshotKey) return;
+    if (!snapshotCollectionKey) return;
     const promises: Array<() => Promise<void>> = [];
     const finalPromise = Promise.resolve();
 
-    const snapshotCollection = OnyxUtils.getCachedCollection(snapshotKey);
+    const snapshotCollection = OnyxUtils.getCachedCollection(snapshotCollectionKey);
 
     data.forEach(({key, value}) => {
-        Object.keys(snapshotCollection).forEach((snapshotCollectionKey) => {
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-expect-error
-            if (!snapshotCollection[snapshotCollectionKey].data[key]) {
+        if (OnyxUtils.isCollectionMemberKey(snapshotCollectionKey, key)) {
+            return;
+        }
+
+        Object.entries(snapshotCollection).forEach(([snapshotKey, snapshotValue]) => {
+            if (!snapshotValue) {
                 return;
             }
 
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-expect-error
-            const toUpdate = _.pick(value, Object.keys(snapshotCollection[snapshotCollectionKey].data[key]));
-            promises.push(() => merge(snapshotCollectionKey, {data: {[key]: toUpdate}}));
+            const {data: snapshotData} = snapshotValue;
+            if (!snapshotData || !snapshotData[key]) {
+                return;
+            }
+
+            const updated = _.pick(value, Object.keys(snapshotData[key]));
+            promises.push(() => merge(snapshotKey, {data: {[key]: updated}}));
         });
     });
 
