@@ -599,6 +599,8 @@ function update(data: OnyxUpdate[]): Promise<void> {
         }
     });
 
+    // The queue of operations within a single `update` call in the format of <item key - list of operations updating the item>.
+    // This allows us to batch the operations per item and merge them into one operation in the order they were requested.
     const updateQueue: Record<OnyxKey, Array<OnyxValue<OnyxKey>>> = {};
     const enqueueSetOperation = (key: OnyxKey, value: OnyxValue<OnyxKey>) => {
         // If a `set` operation is enqueued, we should clear the whole queue.
@@ -644,7 +646,9 @@ function update(data: OnyxUpdate[]): Promise<void> {
         }
     });
 
-    // Group all the collection-related keys and update each collection in a single `mergeCollection` call
+    // Group all the collection-related keys and update each collection in a single `mergeCollection` call.
+    // This is needed to prevent multiple `mergeCollection` calls for the same collection and `merge` calls for the individual items of the said collection.
+    // This way, we ensure there is no race condition in the queued updates of the same key.
     OnyxUtils.getCollectionKeys().forEach((collectionKey) => {
         const collectionItemKeys = Object.keys(updateQueue).filter((key) => OnyxUtils.isKeyMatch(collectionKey, key));
         if (collectionItemKeys.length <= 1) {
@@ -654,19 +658,21 @@ function update(data: OnyxUpdate[]): Promise<void> {
         }
 
         const batchedCollectionUpdates = collectionItemKeys.reduce(
-            (acc: MixedOperationsQueue, key: string) => {
+            (queue: MixedOperationsQueue, key: string) => {
                 const operations = updateQueue[key];
 
-                // Remove the collection-related key from the updateQueue so that it won't be processed individually later.
+                // Remove the collection-related key from the updateQueue so that it won't be processed individually.
                 delete updateQueue[key];
 
                 const updatedValue = OnyxUtils.applyMerge(undefined, operations, false);
                 if (operations[0] === null) {
-                    acc.set[key] = updatedValue;
+                    // eslint-disable-next-line no-param-reassign
+                    queue.set[key] = updatedValue;
                 } else {
-                    acc.merge[key] = updatedValue;
+                    // eslint-disable-next-line no-param-reassign
+                    queue.merge[key] = updatedValue;
                 }
-                return acc;
+                return queue;
             },
             {
                 merge: {},
