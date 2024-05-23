@@ -594,6 +594,33 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
         .then(() => undefined);
 }
 
+function updateSnapshots(data: OnyxUpdate[]) {
+    const snapshotKey = OnyxUtils.getSnapshotKey();
+
+    if (!snapshotKey) return;
+    const promises: Array<() => Promise<void>> = [];
+    const finalPromise = Promise.resolve();
+
+    const snapshotCollection = OnyxUtils.getCachedCollection(snapshotKey);
+
+    data.forEach(({key, value}) => {
+        Object.keys(snapshotCollection).forEach((snapshotCollectionKey) => {
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-expect-error
+            if (!snapshotCollection[snapshotCollectionKey].data[key]) {
+                return;
+            }
+
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-expect-error
+            const toUpdate = _.pick(value, Object.keys(snapshotCollection[snapshotCollectionKey].data[key]));
+            promises.push(() => merge(snapshotCollectionKey, {data: {[key]: toUpdate}}));
+        });
+    });
+
+    return finalPromise.then(() => Promise.all(promises.map((p) => p())));
+}
+
 /**
  * Insert API responses and lifecycle data into Onyx
  *
@@ -642,7 +669,10 @@ function update(data: OnyxUpdate[]): Promise<void> {
         }
     });
 
-    return clearPromise.then(() => Promise.all(promises.map((p) => p()))).then(() => undefined);
+    return clearPromise
+        .then(() => Promise.all(promises.map((p) => p())))
+        .then(() => updateSnapshots(data))
+        .then(() => undefined);
 }
 
 const Onyx = {
