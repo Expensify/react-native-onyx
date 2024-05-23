@@ -604,11 +604,13 @@ function updateSnapshots(data: OnyxUpdate[]) {
     const snapshotCollection = OnyxUtils.getCachedCollection(snapshotCollectionKey);
 
     data.forEach(({key, value}) => {
+        // snapshots are normal keys so we want to skip update if they are written to Onyx
         if (OnyxUtils.isCollectionMemberKey(snapshotCollectionKey, key)) {
             return;
         }
 
         Object.entries(snapshotCollection).forEach(([snapshotKey, snapshotValue]) => {
+            // Snapshots may not be present in cache. We don't know how to update them so we skip.
             if (!snapshotValue) {
                 return;
             }
