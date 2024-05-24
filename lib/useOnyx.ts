@@ -168,7 +168,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(key: T
         // since each `OnyxUtils.tryGetCachedValue()` call will generate a plain new collection object with new records as well,
         // all of them created using the `selector` function.
         // For the other cases we will only deal with object reference checks, so just a shallow equality check is enough.
-        let areValuesEqual = false;
+        let areValuesEqual: boolean;
         if (OnyxUtils.isCollectionKey(key) && selectorRef.current) {
             areValuesEqual = deepEqual(previousValueRef.current, newValueRef.current);
         } else {

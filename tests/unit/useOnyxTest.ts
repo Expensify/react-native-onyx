@@ -195,7 +195,7 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
         });
 
-        it('should not change selected data if a property outside tha data was changed', async () => {
+        it('should not change selected data if a property outside that data was changed', async () => {
             Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name'});
 
             const {result} = renderHook(() =>
