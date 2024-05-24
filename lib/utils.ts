@@ -104,7 +104,7 @@ function fastMerge<TObject extends Record<string, unknown>>(target: TObject | nu
 }
 
 /** Deep removes the nested null values from the given value. */
-function removeNestedNullValues<TObject extends Record<string, unknown>>(value: TObject | unknown | unknown[]): TObject | unknown | unknown[] {
+function removeNestedNullValues<TObject extends Record<string, unknown>>(value: TObject | unknown | unknown[] | null): TObject | unknown | unknown[] | null {
     if (typeof value === 'object' && !Array.isArray(value)) {
         const objectValue = value as Record<string, unknown> | null;
         return fastMerge(objectValue, objectValue);
