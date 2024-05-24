@@ -86,8 +86,13 @@ class OnyxCache {
     set(key: OnyxKey, value: OnyxValue<OnyxKey>): OnyxValue<OnyxKey> {
         this.addKey(key);
         this.addToAccessedKeys(key);
-        this.storageMap[key] = value;
 
+        if (value === null) {
+            delete this.storageMap[key];
+            return undefined;
+        }
+
+        this.storageMap[key] = utils.removeNestedNullValues(value);
         return value;
     }
 
@@ -107,7 +112,7 @@ class OnyxCache {
             throw new Error('data passed to cache.merge() must be an Object of onyx key/value pairs');
         }
 
-        this.storageMap = {...utils.fastMerge(this.storageMap, data, false)};
+        this.storageMap = {...utils.fastMerge(this.storageMap, data)};
 
         const storageKeys = this.getAllKeys();
         const mergedKeys = Object.keys(data);
