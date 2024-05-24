@@ -88,7 +88,7 @@ class OnyxCache {
         this.addToAccessedKeys(key);
 
         if (value === null) {
-            delete this.storageMap[key];
+            this.drop(key);
             return undefined;
         }
 
