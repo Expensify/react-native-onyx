@@ -427,17 +427,17 @@ function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey
 function keysChanged<TKey extends CollectionKeyBase>(
     collectionKey: TKey,
     partialCollection: OnyxCollection<KeyValueMapping[TKey]>,
-    previousPartialCollection: OnyxCollection<KeyValueMapping[TKey]>,
+    partialPreviousCollection: OnyxCollection<KeyValueMapping[TKey]>,
     notifyRegularSubscibers = true,
     notifyWithOnyxSubscibers = true,
 ): void {
     // We prepare the "cached collection" which is the entire collection + the new partial data that
     // was merged in via mergeCollection().
     const cachedCollection = getCachedCollection(collectionKey);
-    const previousCollection = previousPartialCollection ?? {};
+    const previousCollection = partialPreviousCollection ?? {};
 
     // If the previous collection equals the new collection then we do not need to notify any subscribers.
-    if (previousPartialCollection !== undefined && deepEqual(cachedCollection, previousPartialCollection)) {
+    if (partialPreviousCollection !== undefined && deepEqual(cachedCollection, partialPreviousCollection)) {
         return;
     }
 
