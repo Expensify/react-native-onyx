@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/prefer-for-of */
 
-import type {OnyxKey} from './types';
+import type {OnyxKey, OnyxValue} from './types';
 
 type EmptyObject = Record<string, never>;
 type EmptyValue = EmptyObject | null | undefined;
@@ -104,10 +104,10 @@ function fastMerge<TObject extends Record<string, unknown>>(target: TObject | nu
 }
 
 /** Deep removes the nested null values from the given value. */
-function removeNestedNullValues<TObject extends Record<string, unknown>>(value: TObject | unknown | unknown[] | null): TObject | unknown | unknown[] | null {
+function removeNestedNullValues<TValue extends OnyxValue<OnyxKey> | unknown | unknown[]>(value: TValue | null): TValue | null {
     if (typeof value === 'object' && !Array.isArray(value)) {
         const objectValue = value as Record<string, unknown> | null;
-        return fastMerge(objectValue, objectValue);
+        return fastMerge(objectValue, objectValue) as TValue | null;
     }
 
     return value;

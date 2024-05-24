@@ -207,7 +207,8 @@ function reduceCollectionWithSelector<TKey extends CollectionKeyBase, TMap, TRet
 
 /** Get some data from the store */
 function get(key: OnyxKey): Promise<OnyxValue<OnyxKey>> {
-    // When we already have the value in cache - resolve right away
+    // When we already have the value in cache (or the key has been set to null,
+    // and therefore no data is set in cache), resolve right away.
     if (cache.hasCacheForKey(key)) {
         return Promise.resolve(cache.getValue(key));
     }
@@ -967,12 +968,12 @@ function evictStorageAndRetry<TMethod extends typeof Onyx.set | typeof Onyx.mult
 /**
  * Notifies subscribers and writes current value to cache
  */
-function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>, hasChanged?: boolean, wasRemoved = false): Promise<void> {
+function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>, hasChanged?: boolean): Promise<void> {
     const prevValue = cache.getValue(key, false) as OnyxValue<TKey>;
 
     // Update subscribers if the cached value has changed, or when the subscriber specifically requires
     // all updates regardless of value changes (indicated by initWithStoredValues set to false).
-    if (hasChanged && !wasRemoved) {
+    if (hasChanged) {
         cache.set(key, value);
     } else {
         cache.addToAccessedKeys(key);
@@ -985,8 +986,8 @@ function hasPendingMergeForKey(key: OnyxKey): boolean {
     return !!mergeQueue[key];
 }
 
-type RemoveNullValuesOutput = {
-    value: Record<string, unknown> | unknown | unknown[] | null;
+type RemoveNullValuesOutput<Value extends OnyxValue<OnyxKey> | null> = {
+    value: Value | null;
     wasRemoved: boolean;
 };
 
@@ -997,16 +998,16 @@ type RemoveNullValuesOutput = {
  *
  * @returns The value without null values and a boolean "wasRemoved", which indicates if the key got removed completely
  */
-function removeNullValues(key: OnyxKey, value: OnyxValue<OnyxKey>, shouldRemoveNestedNulls = true): RemoveNullValuesOutput {
+function removeNullValues<Value extends OnyxValue<OnyxKey>>(key: OnyxKey, value: Value | null, shouldRemoveNestedNulls = true): RemoveNullValuesOutput<Value> {
     if (value === null) {
         remove(key);
-        return {value, wasRemoved: true};
+        return {value: null, wasRemoved: true};
     }
 
     // We can remove all null values in an object by merging it with itself
     // utils.fastMerge recursively goes through the object and removes all null values
     // Passing two identical objects as source and target to fastMerge will not change it, but only remove the null values
-    return {value: shouldRemoveNestedNulls ? utils.removeNestedNullValues(value as Record<string, unknown>) : (value as Record<string, unknown>), wasRemoved: false};
+    return {value: shouldRemoveNestedNulls ? utils.removeNestedNullValues(value) : value, wasRemoved: false};
 }
 
 /**

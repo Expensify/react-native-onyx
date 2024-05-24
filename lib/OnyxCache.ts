@@ -69,7 +69,7 @@ class OnyxCache {
 
     /** Check whether cache has data for the given key */
     hasCacheForKey(key: OnyxKey): boolean {
-        return this.storageMap[key] !== undefined;
+        return this.storageKeys.has(key);
     }
 
     /** Saves a key in the storage keys list
