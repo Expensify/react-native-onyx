@@ -596,8 +596,8 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
 
 function updateSnapshots(data: OnyxUpdate[]) {
     const snapshotCollectionKey = OnyxUtils.getSnapshotKey();
-
     if (!snapshotCollectionKey) return;
+
     const promises: Array<() => Promise<void>> = [];
     const finalPromise = Promise.resolve();
 
@@ -615,9 +615,9 @@ function updateSnapshots(data: OnyxUpdate[]) {
                 return;
             }
 
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-expect-error
-            const {data: snapshotData} = snapshotValue;
+            if (typeof snapshotValue !== 'object' || !('data' in snapshotValue)) return;
+
+            const snapshotData = snapshotValue.data;
             if (!snapshotData || !snapshotData[key]) {
                 return;
             }

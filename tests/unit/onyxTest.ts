@@ -15,6 +15,7 @@ const ONYX_KEYS = {
         TEST_POLICY: 'testPolicy_',
         TEST_UPDATE: 'testUpdate_',
         ANIMALS: 'animals_',
+        SNAPSHOT: 'snapshot_',
     },
 };
 
@@ -1261,5 +1262,29 @@ describe('Onyx', () => {
 
                 connectionIDs.map((id) => Onyx.disconnect(id));
             });
+    });
+
+    it('should upate Snapshot when its data changed', async () => {
+        const cat = `${ONYX_KEYS.COLLECTION.ANIMALS}cat`;
+        const snapshot1 = `${ONYX_KEYS.COLLECTION.SNAPSHOT}1`;
+
+        const initialValue = {name: 'Fluffy'};
+        const finalValue = {name: 'Kitty'};
+
+        await Onyx.set(cat, initialValue);
+        await Onyx.set(snapshot1, {data: {[cat]: initialValue}});
+
+        const callback = jest.fn();
+
+        Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.SNAPSHOT,
+            callback,
+        });
+
+        await Onyx.update([{key: cat, value: finalValue, onyxMethod: Onyx.METHOD.MERGE}]);
+
+        expect(callback).toBeCalledTimes(2);
+        expect(callback).toHaveBeenNthCalledWith(1, {data: {[cat]: initialValue}}, snapshot1);
+        expect(callback).toHaveBeenNthCalledWith(2, {data: {[cat]: finalValue}}, snapshot1);
     });
 });

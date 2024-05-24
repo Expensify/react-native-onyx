@@ -126,12 +126,8 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
     // Let Onyx know about which keys are safe to evict
     evictionAllowList = safeEvictionKeys;
 
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-expect-error
-    if (keys.COLLECTION?.SNAPSHOT) {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-expect-error
-        snapshotKey = keys.COLLECTION?.SNAPSHOT;
+    if (typeof keys.COLLECTION === 'object' && typeof keys.COLLECTION.SNAPSHOT === 'string') {
+        snapshotKey = keys.COLLECTION.SNAPSHOT;
     }
 }
 
