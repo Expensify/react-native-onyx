@@ -115,9 +115,14 @@ class OnyxCache {
         this.storageMap = {...utils.fastMerge(this.storageMap, data)};
 
         const storageKeys = this.getAllKeys();
-        const mergedKeys = Object.keys(data);
-        this.storageKeys = new Set([...storageKeys, ...mergedKeys]);
-        mergedKeys.forEach((key) => this.addToAccessedKeys(key));
+        const updatedKeys: string[] = [];
+        Object.entries(data).forEach(([key, value]) => {
+            this.addToAccessedKeys(key);
+
+            if (value === null) this.storageKeys.delete(key);
+            else updatedKeys.push(key);
+        });
+        this.storageKeys = new Set([...storageKeys, ...updatedKeys]);
     }
 
     /**
