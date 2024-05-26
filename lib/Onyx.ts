@@ -328,7 +328,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: NonUndefined<OnyxEntry<
     mergeQueuePromise[key] = OnyxUtils.get(key).then((existingValue) => {
         // Calls to Onyx.set after a merge will terminate the current merge process and clear the merge queue
         if (mergeQueue[key] == null) {
-            return undefined;
+            return Promise.resolve();
         }
 
         try {
@@ -343,7 +343,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: NonUndefined<OnyxEntry<
             });
 
             if (!validChanges.length) {
-                return undefined;
+                return Promise.resolve();
             }
             const batchedDeltaChanges = OnyxUtils.applyMerge(undefined, validChanges, false);
 
