@@ -84,7 +84,6 @@ class OnyxCache {
      * Adds the key to the storage keys list as well
      */
     set(key: OnyxKey, value: OnyxValue<OnyxKey>): OnyxValue<OnyxKey> {
-        this.addKey(key);
         this.addToAccessedKeys(key);
 
         if (value === null) {
@@ -92,7 +91,8 @@ class OnyxCache {
             return undefined;
         }
 
-        this.storageMap[key] = utils.removeNestedNullValues(value);
+        this.addKey(key);
+        this.storageMap[key] = value;
         return value;
     }
 
