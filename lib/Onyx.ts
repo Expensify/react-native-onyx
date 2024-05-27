@@ -272,9 +272,19 @@ function set<TKey extends OnyxKey>(key: TKey, value: NonUndefined<OnyxEntry<KeyV
  * @param data object keyed by ONYXKEYS and the values to set
  */
 function multiSet(data: Partial<NullableKeyValueMapping>): Promise<void> {
-    const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(data, true);
+    const allKeyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(data, true);
 
-    const updatePromises = keyValuePairs.map(([key, value]) => {
+    const removePromises: Array<Promise<void>> = [];
+    const keyValuePairsToUpdate = allKeyValuePairs.filter(([key, value]) => {
+        if (value === null) {
+            removePromises.push(OnyxUtils.remove(key));
+            return false;
+        }
+
+        return true;
+    });
+
+    const updatePromises = keyValuePairsToUpdate.map(([key, value]) => {
         const prevValue = cache.getValue(key, false);
 
         // Update cache and optimistically inform subscribers on the next tick
@@ -282,11 +292,11 @@ function multiSet(data: Partial<NullableKeyValueMapping>): Promise<void> {
         return OnyxUtils.scheduleSubscriberUpdate(key, value, prevValue);
     });
 
-    return Storage.multiSet(keyValuePairs)
+    return Storage.multiSet(allKeyValuePairs)
         .catch((error) => OnyxUtils.evictStorageAndRetry(error, multiSet, data))
         .then(() => {
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MULTI_SET, undefined, data);
-            return Promise.all(updatePromises);
+            return Promise.all([removePromises, updatePromises]);
         })
         .then(() => undefined);
 }
