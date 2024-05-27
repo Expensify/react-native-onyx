@@ -40,7 +40,7 @@ class OnyxCache {
         bindAll(
             this,
             'getAllKeys',
-            'getValue',
+            'get',
             'hasCacheForKey',
             'addKey',
             'set',
