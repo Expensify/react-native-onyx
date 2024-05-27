@@ -37,6 +37,7 @@ function init({
     keys = {},
     initialKeyStates = {},
     safeEvictionKeys = [],
+    snapshotOptions = [],
     maxCachedKeysCount = 1000,
     shouldSyncMultipleInstances = Boolean(global.localStorage),
     debugSetState = false,
@@ -59,7 +60,7 @@ function init({
         cache.setRecentKeysLimit(maxCachedKeysCount);
     }
 
-    OnyxUtils.initStoreValues(keys, initialKeyStates, safeEvictionKeys);
+    OnyxUtils.initStoreValues(keys, initialKeyStates, safeEvictionKeys, snapshotOptions);
 
     // Initialize all of our keys with data provided then give green light to any pending connections
     Promise.all([OnyxUtils.addAllSafeEvictionKeysToRecentlyAccessedList(), OnyxUtils.initializeWithDefaultKeyStates()]).then(deferredInitTask.resolve);
@@ -595,35 +596,41 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
 }
 
 function updateSnapshots(data: OnyxUpdate[]) {
-    const snapshotCollectionKey = OnyxUtils.getSnapshotKey();
-    if (!snapshotCollectionKey) return;
+    const snapshotOptions = OnyxUtils.getSnapshotOptions();
+    if (!snapshotOptions.length) return;
 
     const promises: Array<() => Promise<void>> = [];
     const finalPromise = Promise.resolve();
 
-    const snapshotCollection = OnyxUtils.getCachedCollection(snapshotCollectionKey);
+    snapshotOptions.forEach(({key: snapshotCollectionKey, dataField}) => {
+        const snapshotCollection = OnyxUtils.getCachedCollection(snapshotCollectionKey);
 
-    data.forEach(({key, value}) => {
-        // snapshots are normal keys so we want to skip update if they are written to Onyx
-        if (OnyxUtils.isCollectionMemberKey(snapshotCollectionKey, key)) {
-            return;
-        }
-
-        Object.entries(snapshotCollection).forEach(([snapshotKey, snapshotValue]) => {
-            // Snapshots may not be present in cache. We don't know how to update them so we skip.
-            if (!snapshotValue) {
+        data.forEach(({key, value}) => {
+            // snapshots are normal keys so we want to skip update if they are written to Onyx
+            if (OnyxUtils.isCollectionMemberKey(snapshotCollectionKey, key)) {
                 return;
             }
 
-            if (typeof snapshotValue !== 'object' || !('data' in snapshotValue)) return;
+            Object.entries(snapshotCollection).forEach(([snapshotKey, snapshotValue]) => {
+                // Snapshots may not be present in cache. We don't know how to update them so we skip.
+                if (!snapshotValue) {
+                    return;
+                }
 
-            const snapshotData = snapshotValue.data;
-            if (!snapshotData || !snapshotData[key]) {
-                return;
-            }
+                if (typeof snapshotValue !== 'object') return;
 
-            const updated = _.pick(value, Object.keys(snapshotData[key]));
-            promises.push(() => merge(snapshotKey, {data: {[key]: updated}}));
+                if (dataField && !(dataField in snapshotValue)) return;
+
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-expect-error
+                const snapshotData = dataField ? snapshotValue[dataField] : snapshotValue;
+                if (!snapshotData || !snapshotData[key]) {
+                    return;
+                }
+
+                const updated = _.pick(value, Object.keys(snapshotData[key]));
+                promises.push(() => merge(snapshotKey, dataField ? {[dataField]: {[key]: updated}} : {[key]: updated}));
+            });
         });
     });
 

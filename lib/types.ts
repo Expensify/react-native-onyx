@@ -367,6 +367,7 @@ type OnyxUpdate =
           };
       }[CollectionKeyBase];
 
+type SnapshotOptions = Array<{key: OnyxKey; dataField: string}>;
 /**
  * Represents the options used in `Onyx.init()` method.
  */
@@ -376,6 +377,8 @@ type InitOptions = {
 
     /** initial data to set when `init()` and `clear()` is called */
     initialKeyStates?: Partial<NullableKeyValueMapping>;
+
+    snapshotOptions?: SnapshotOptions;
 
     /**
      * This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged
@@ -427,6 +430,7 @@ export type {
     OnyxUpdate,
     OnyxValue,
     Selector,
+    SnapshotOptions,
     WithOnyxConnectOptions,
     WithOnyxInstance,
     WithOnyxInstanceState,

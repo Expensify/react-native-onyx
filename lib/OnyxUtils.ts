@@ -27,6 +27,7 @@ import type {
     OnyxEntry,
     KeyValueMapping,
     DefaultConnectCallback,
+    SnapshotOptions,
 } from './types';
 import type Onyx from './Onyx';
 
@@ -70,6 +71,12 @@ let batchUpdatesQueue: Array<() => void> = [];
 
 let snapshotKey: OnyxKey | null = null;
 
+let snapshotOptions: SnapshotOptions = [];
+
+function getSnapshotOptions(): SnapshotOptions {
+    return snapshotOptions;
+}
+
 function getSnapshotKey(): OnyxKey | null {
     return snapshotKey;
 }
@@ -109,7 +116,7 @@ function getDefaultKeyStates(): Record<OnyxKey, OnyxValue<OnyxKey>> {
  * @param initialKeyStates - initial data to set when `init()` and `clear()` are called
  * @param safeEvictionKeys - This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal.
  */
-function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Partial<NullableKeyValueMapping>, safeEvictionKeys: OnyxKey[]): void {
+function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Partial<NullableKeyValueMapping>, safeEvictionKeys: OnyxKey[], _snapshotOptions: SnapshotOptions): void {
     // We need the value of the collection keys later for checking if a
     // key is a collection. We store it in a map for faster lookup.
     const collectionValues = Object.values(keys.COLLECTION ?? {});
@@ -125,6 +132,8 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
 
     // Let Onyx know about which keys are safe to evict
     evictionAllowList = safeEvictionKeys;
+
+    snapshotOptions = _snapshotOptions;
 
     if (typeof keys.COLLECTION === 'object' && typeof keys.COLLECTION.SNAPSHOT === 'string') {
         snapshotKey = keys.COLLECTION.SNAPSHOT;
@@ -1123,6 +1132,7 @@ const OnyxUtils = {
     applyMerge,
     initializeWithDefaultKeyStates,
     getSnapshotKey,
+    getSnapshotOptions,
 };
 
 export default OnyxUtils;
