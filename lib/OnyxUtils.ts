@@ -755,7 +755,7 @@ function keyChanged<TKey extends OnyxKey>(
  *     - sets state on the withOnyxInstances
  *     - triggers the callback function
  */
-function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, value: OnyxValue<TKey>, matchedKey: TKey | undefined, isBatched: boolean): void {
+function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, value: OnyxValue<TKey> | null, matchedKey: TKey | undefined, isBatched: boolean): void {
     // If the mapping no longer exists then we should not send any data.
     // This means our subscriber disconnected or withOnyx wrapped component unmounted.
     if (!callbackToStateMapping[mapping.connectionID]) {
@@ -784,7 +784,7 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, valu
         return;
     }
 
-    (mapping as DefaultConnectOptions<TKey>).callback?.(value, matchedKey as TKey);
+    (mapping as DefaultConnectOptions<TKey>).callback?.(value === null ? undefined : value, matchedKey as TKey);
 }
 
 /**
