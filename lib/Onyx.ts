@@ -111,7 +111,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): nu
             // Performance improvement
             // If the mapping is connected to an onyx key that is not a collection
             // we can skip the call to getAllKeys() and return an array with a single item
-            if (Boolean(mapping.key) && typeof mapping.key === 'string' && !mapping.key.endsWith('_') && cache.storageKeys.has(mapping.key)) {
+            if (Boolean(mapping.key) && typeof mapping.key === 'string' && !mapping.key.endsWith('_') && cache.getAllKeys().has(mapping.key)) {
                 return new Set([mapping.key]);
             }
             return OnyxUtils.getAllKeys();
