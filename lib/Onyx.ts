@@ -128,10 +128,10 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): nu
             // component. This null value will be filtered out so that the connected component can utilize defaultProps.
             if (matchingKeys.length === 0) {
                 if (mapping.key && !OnyxUtils.isCollectionKey(mapping.key)) {
-                    cache.addKey(mapping.key);
+                    cache.addNullishStorageKey(mapping.key);
                 }
 
-                // Here we cannot use batching because the null value is expected to be set immediately for default props
+                // Here we cannot use batching because the nullish value is expected to be set immediately for default props
                 // or they will be undefined.
                 OnyxUtils.sendDataToConnection(mapping, undefined as OnyxValue<TKey>, undefined, false);
                 return;
