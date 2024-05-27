@@ -367,7 +367,7 @@ type OnyxUpdate =
           };
       }[CollectionKeyBase];
 
-type SnapshotOptions = Array<{key: OnyxKey; dataField: string}>;
+type SnapshotOptions = Array<{key: OnyxKey; dataField?: string}>;
 /**
  * Represents the options used in `Onyx.init()` method.
  */

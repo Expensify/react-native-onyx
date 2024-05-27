@@ -16,6 +16,7 @@ const ONYX_KEYS = {
         TEST_UPDATE: 'testUpdate_',
         ANIMALS: 'animals_',
         SNAPSHOT: 'snapshot_',
+        SECOND_SNAPSHOT: 'second_snapshot_',
     },
 };
 
@@ -24,6 +25,7 @@ Onyx.init({
     initialKeyStates: {
         [ONYX_KEYS.OTHER_TEST]: 42,
     },
+    snapshotOptions: [{key: ONYX_KEYS.COLLECTION.SNAPSHOT, dataField: 'data'}, {key: ONYX_KEYS.COLLECTION.SECOND_SNAPSHOT}],
 });
 
 describe('Onyx', () => {
@@ -1264,15 +1266,15 @@ describe('Onyx', () => {
             });
     });
 
-    it('should upate Snapshot when its data changed', async () => {
+    it('should upate Snapshot with defined field', async () => {
         const cat = `${ONYX_KEYS.COLLECTION.ANIMALS}cat`;
-        const snapshot1 = `${ONYX_KEYS.COLLECTION.SNAPSHOT}1`;
+        const snapshot = `${ONYX_KEYS.COLLECTION.SNAPSHOT}1`;
 
         const initialValue = {name: 'Fluffy'};
         const finalValue = {name: 'Kitty'};
 
         await Onyx.set(cat, initialValue);
-        await Onyx.set(snapshot1, {data: {[cat]: initialValue}});
+        await Onyx.set(snapshot, {data: {[cat]: initialValue}});
 
         const callback = jest.fn();
 
@@ -1284,7 +1286,31 @@ describe('Onyx', () => {
         await Onyx.update([{key: cat, value: finalValue, onyxMethod: Onyx.METHOD.MERGE}]);
 
         expect(callback).toBeCalledTimes(2);
-        expect(callback).toHaveBeenNthCalledWith(1, {data: {[cat]: initialValue}}, snapshot1);
-        expect(callback).toHaveBeenNthCalledWith(2, {data: {[cat]: finalValue}}, snapshot1);
+        expect(callback).toHaveBeenNthCalledWith(1, {data: {[cat]: initialValue}}, snapshot);
+        expect(callback).toHaveBeenNthCalledWith(2, {data: {[cat]: finalValue}}, snapshot);
+    });
+
+    it('should upate Snapshot without defined field', async () => {
+        const cat = `${ONYX_KEYS.COLLECTION.ANIMALS}cat`;
+        const snapshot = `${ONYX_KEYS.COLLECTION.SECOND_SNAPSHOT}1`;
+
+        const initialValue = {name: 'Fluffy'};
+        const finalValue = {name: 'Kitty'};
+
+        await Onyx.set(cat, initialValue);
+        await Onyx.set(snapshot, {[cat]: initialValue});
+
+        const callback = jest.fn();
+
+        Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.SECOND_SNAPSHOT,
+            callback,
+        });
+
+        await Onyx.update([{key: cat, value: finalValue, onyxMethod: Onyx.METHOD.MERGE}]);
+
+        expect(callback).toBeCalledTimes(2);
+        expect(callback).toHaveBeenNthCalledWith(1, {[cat]: initialValue}, snapshot);
+        expect(callback).toHaveBeenNthCalledWith(2, {[cat]: finalValue}, snapshot);
     });
 });
