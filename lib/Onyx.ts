@@ -615,7 +615,9 @@ function updateSnapshots(data: OnyxUpdate[]) {
                 return;
             }
 
-            if (typeof snapshotValue !== 'object' || !('data' in snapshotValue)) return;
+            if (typeof snapshotValue !== 'object' || !('data' in snapshotValue)) {
+                return;
+            }
 
             const snapshotData = snapshotValue.data;
             if (!snapshotData || !snapshotData[key]) {
