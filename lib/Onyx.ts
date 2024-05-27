@@ -1,5 +1,6 @@
 /* eslint-disable no-continue */
 import _ from 'underscore';
+import lodashPick from 'lodash/pick';
 import * as Logger from './Logger';
 import cache from './OnyxCache';
 import createDeferredTask from './createDeferredTask';
@@ -626,7 +627,7 @@ function updateSnapshots(data: OnyxUpdate[]) {
                 return;
             }
 
-            updatedData = {...updatedData, [key]: _.pick(value, Object.keys(snapshotData[key]))};
+            updatedData = {...updatedData, [key]: lodashPick(value, Object.keys(snapshotData[key]))};
         });
 
         promises.push(() => merge(snapshotKey, {data: updatedData}));
