@@ -223,6 +223,11 @@ function get(key: OnyxKey): Promise<OnyxValue<OnyxKey>> {
     // Otherwise retrieve the value from storage and capture a promise to aid concurrent usages
     const promise = Storage.getItem(key)
         .then((val) => {
+            if (val === undefined) {
+                cache.addNullishStorageKey(key);
+                return val;
+            }
+
             cache.set(key, val);
             return val;
         })
