@@ -239,9 +239,9 @@ function get(key: OnyxKey): Promise<OnyxValue<OnyxKey>> {
 /** Returns current key names stored in persisted storage */
 function getAllKeys(): Promise<Set<OnyxKey>> {
     // When we've already read stored keys, resolve right away
-    const storedKeys = cache.getAllKeys();
-    if (storedKeys.size > 0) {
-        return Promise.resolve(storedKeys);
+    const cachedKeys = cache.getAllKeys();
+    if (cachedKeys.size > 0) {
+        return Promise.resolve(cachedKeys);
     }
 
     const taskName = 'getAllKeys';
@@ -254,6 +254,7 @@ function getAllKeys(): Promise<Set<OnyxKey>> {
     // Otherwise retrieve the keys from storage and capture a promise to aid concurrent usages
     const promise = Storage.getAllKeys().then((keys) => {
         cache.setAllKeys(keys);
+
         // return the updated set of keys
         return cache.getAllKeys();
     });
