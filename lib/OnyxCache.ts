@@ -9,7 +9,10 @@ import type {OnyxKey, OnyxValue} from './types';
  */
 class OnyxCache {
     /** Cache of all the storage keys available in persistent storage */
-    storageKeys: Set<OnyxKey>;
+    private storageKeys: Set<OnyxKey>;
+
+    /** Cache of all the storage keys that have been fetched before and were not set */
+    private nullishStorageKeys: Set<OnyxKey>;
 
     /** Unique list of keys maintained in access order (most recent at the end) */
     private recentKeys: Set<OnyxKey>;
@@ -28,6 +31,7 @@ class OnyxCache {
 
     constructor() {
         this.storageKeys = new Set();
+        this.nullishStorageKeys = new Set();
         this.recentKeys = new Set();
         this.storageMap = {};
         this.pendingPromises = new Map();
@@ -57,6 +61,39 @@ class OnyxCache {
     }
 
     /**
+     * Allows to set all the keys at once.
+     * This is useful when we are getting
+     * all the keys from the storage provider
+     * and we want to keep the cache in sync.
+     *
+     * Previously, we had to call `addKey` in a loop
+     * to achieve the same result.
+     *
+     * @param keys - an array of keys
+     */
+    setAllKeys(keys: OnyxKey[]) {
+        this.storageKeys = new Set(keys);
+    }
+
+    /** Saves a key in the storage keys list
+     * Serves to keep the result of `getAllKeys` up to date
+     */
+    addKey(key: OnyxKey): void {
+        this.storageKeys.add(key);
+    }
+
+    /** Used to set keys that have been fetched before and were null
+     */
+    addNullishStorageKey(key: OnyxKey): void {
+        this.nullishStorageKeys.add(key);
+    }
+
+    /** Check whether cache has data for the given key */
+    hasCacheForKey(key: OnyxKey): boolean {
+        return this.storageMap[key] !== undefined || this.nullishStorageKeys.has(key);
+    }
+
+    /**
      * Get a cached value from storage
      * @param [shouldReindexCache] – This is an LRU cache, and by default accessing a value will make it become last in line to be evicted. This flag can be used to skip that and just access the value directly without side-effects.
      */
@@ -65,18 +102,6 @@ class OnyxCache {
             this.addToAccessedKeys(key);
         }
         return this.storageMap[key];
-    }
-
-    /** Check whether cache has data for the given key */
-    hasCacheForKey(key: OnyxKey): boolean {
-        return this.storageKeys.has(key);
-    }
-
-    /** Saves a key in the storage keys list
-     * Serves to keep the result of `getAllKeys` up to date
-     */
-    addKey(key: OnyxKey): void {
-        this.storageKeys.add(key);
     }
 
     /**
