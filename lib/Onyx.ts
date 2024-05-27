@@ -45,7 +45,7 @@ function init({
 
     if (shouldSyncMultipleInstances) {
         Storage.keepInstancesSync?.((key, value) => {
-            const prevValue = cache.getValue(key, false) as OnyxValue<typeof key>;
+            const prevValue = cache.get(key, false) as OnyxValue<typeof key>;
             cache.set(key, value);
             OnyxUtils.keyChanged(key, value as OnyxValue<typeof key>, prevValue);
         });
@@ -214,7 +214,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: NonUndefined<OnyxEntry<KeyV
         delete OnyxUtils.getMergeQueue()[key];
     }
 
-    const existingValue = cache.getValue(key, false);
+    const existingValue = cache.get(key, false);
 
     // If the existing value as well as the new value are null, we can return early.
     if (value === null && existingValue === null) {
@@ -285,7 +285,7 @@ function multiSet(data: Partial<NullableKeyValueMapping>): Promise<void> {
     });
 
     const updatePromises = keyValuePairsToUpdate.map(([key, value]) => {
-        const prevValue = cache.getValue(key, false);
+        const prevValue = cache.get(key, false);
 
         // Update cache and optimistically inform subscribers on the next tick
         cache.set(key, value);
@@ -575,7 +575,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                 // 2. Figure out whether it is a collection key or not,
                 //      since collection key subscribers need to be updated differently
                 if (!isKeyToPreserve) {
-                    const oldValue = cache.getValue(key);
+                    const oldValue = cache.get(key);
                     const newValue = defaultKeyStates[key] ?? null;
                     if (newValue !== oldValue) {
                         cache.set(key, newValue);
@@ -603,7 +603,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
 
             // Notify the subscribers for each key/value group so they can receive the new values
             Object.entries(keyValuesToResetIndividually).forEach(([key, value]) => {
-                updatePromises.push(OnyxUtils.scheduleSubscriberUpdate(key, value, cache.getValue(key, false)));
+                updatePromises.push(OnyxUtils.scheduleSubscriberUpdate(key, value, cache.get(key, false)));
             });
             Object.entries(keyValuesToResetAsCollection).forEach(([key, value]) => {
                 updatePromises.push(OnyxUtils.scheduleNotifyCollectionSubscribers(key, value));

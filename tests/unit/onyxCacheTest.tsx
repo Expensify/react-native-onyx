@@ -79,7 +79,7 @@ describe('Onyx', () => {
                 // Given empty cache
 
                 // When a value is retrieved
-                const result = cache.getValue('mockKey');
+                const result = cache.get('mockKey');
 
                 // Then it should be undefined
                 expect(result).not.toBeDefined();
@@ -92,8 +92,8 @@ describe('Onyx', () => {
 
                 // When a value is retrieved
                 // Then it should be the correct value
-                expect(cache.getValue('mockKey')).toEqual({items: ['mockValue', 'mockValue2']});
-                expect(cache.getValue('mockKey2')).toEqual('mockValue3');
+                expect(cache.get('mockKey')).toEqual({items: ['mockValue', 'mockValue2']});
+                expect(cache.get('mockKey2')).toEqual('mockValue3');
             });
         });
 
@@ -155,7 +155,7 @@ describe('Onyx', () => {
                 cache.set('mockKey', {value: 'mockValue'});
 
                 // Then data should be cached
-                const data = cache.getValue('mockKey');
+                const data = cache.get('mockKey');
                 expect(data).toEqual({value: 'mockValue'});
             });
 
@@ -178,7 +178,7 @@ describe('Onyx', () => {
                 cache.set('mockKey2', {value: []});
 
                 // Then the value should be overwritten
-                expect(cache.getValue('mockKey2')).toEqual({value: []});
+                expect(cache.get('mockKey2')).toEqual({value: []});
             });
         });
 
@@ -193,7 +193,7 @@ describe('Onyx', () => {
 
                 // Then a value should not be available in cache
                 expect(cache.hasCacheForKey('mockKey')).toBe(false);
-                expect(cache.getValue('mockKey')).not.toBeDefined();
+                expect(cache.get('mockKey')).not.toBeDefined();
                 expect(cache.getAllKeys().has('mockKey')).toBe(false);
             });
         });
@@ -209,8 +209,8 @@ describe('Onyx', () => {
                 });
 
                 // Then data should be created in cache
-                expect(cache.getValue('mockKey')).toEqual({value: 'mockValue'});
-                expect(cache.getValue('mockKey2')).toEqual({value: 'mockValue2'});
+                expect(cache.get('mockKey')).toEqual({value: 'mockValue'});
+                expect(cache.get('mockKey2')).toEqual({value: 'mockValue2'});
             });
 
             it('Should merge data to existing cache value', () => {
@@ -225,12 +225,12 @@ describe('Onyx', () => {
                 });
 
                 // Then the values should be merged together in cache
-                expect(cache.getValue('mockKey')).toEqual({
+                expect(cache.get('mockKey')).toEqual({
                     value: 'mockValue',
                     mockItems: [],
                 });
 
-                expect(cache.getValue('mockKey2')).toEqual({
+                expect(cache.get('mockKey2')).toEqual({
                     other: 'overwrittenMockValue',
                     items: [1, 2],
                     mock: 'mock',
@@ -247,7 +247,7 @@ describe('Onyx', () => {
                 });
 
                 // Then the values should be merged together in cache
-                expect(cache.getValue('mockKey')).toEqual({
+                expect(cache.get('mockKey')).toEqual({
                     value: 'mockValue',
                     mockItems: [],
                     otherValue: 'overwritten',
@@ -264,7 +264,7 @@ describe('Onyx', () => {
                 });
 
                 // Then the arrays should be replaced as expected
-                expect(cache.getValue('mockKey')).toEqual([{ID: 3}, {added: 'field'}, {}, {ID: 1000}]);
+                expect(cache.get('mockKey')).toEqual([{ID: 3}, {added: 'field'}, {}, {ID: 1000}]);
             });
 
             it('Should merge arrays inside objects correctly', () => {
@@ -277,7 +277,7 @@ describe('Onyx', () => {
                 });
 
                 // Then the first array is completely replaced by the second array
-                expect(cache.getValue('mockKey')).toEqual({ID: [2]});
+                expect(cache.get('mockKey')).toEqual({ID: [2]});
             });
 
             it('Should work with primitive values', () => {
@@ -288,31 +288,31 @@ describe('Onyx', () => {
                 cache.merge({mockKey: false});
 
                 // Then the object should be overwritten with a bool value
-                expect(cache.getValue('mockKey')).toEqual(false);
+                expect(cache.get('mockKey')).toEqual(false);
 
                 // When merge is called with number
                 cache.merge({mockKey: 0});
 
                 // Then the value should be overwritten
-                expect(cache.getValue('mockKey')).toEqual(0);
+                expect(cache.get('mockKey')).toEqual(0);
 
                 // When merge is called with string
                 cache.merge({mockKey: '123'});
 
                 // Then the value should be overwritten
-                expect(cache.getValue('mockKey')).toEqual('123');
+                expect(cache.get('mockKey')).toEqual('123');
 
                 // When merge is called with string again
                 cache.merge({mockKey: '123'});
 
                 // Then strings should not have been concatenated
-                expect(cache.getValue('mockKey')).toEqual('123');
+                expect(cache.get('mockKey')).toEqual('123');
 
                 // When merge is called with an object
                 cache.merge({mockKey: {value: 'myMockObject'}});
 
                 // Then the old primitive value should be overwritten with the object
-                expect(cache.getValue('mockKey')).toEqual({value: 'myMockObject'});
+                expect(cache.get('mockKey')).toEqual({value: 'myMockObject'});
             });
 
             it('Should ignore `undefined` values', () => {
@@ -323,12 +323,12 @@ describe('Onyx', () => {
                 cache.merge({mockKey: {ID: undefined}});
 
                 // Then the key should still be in cache and the value unchanged
-                expect(cache.getValue('mockKey')).toEqual({ID: 5});
+                expect(cache.get('mockKey')).toEqual({ID: 5});
 
                 cache.merge({mockKey: undefined});
 
                 // Then the key should still be in cache and the value unchanged
-                expect(cache.getValue('mockKey')).toEqual({ID: 5});
+                expect(cache.get('mockKey')).toEqual({ID: 5});
             });
 
             it('Should update storageKeys when new keys are created', () => {
@@ -363,8 +363,8 @@ describe('Onyx', () => {
 
                 cache.merge({mockKey: null});
 
-                expect(cache.getValue('mockKey')).toEqual(undefined);
-                expect(cache.getValue('mockNullKey')).toEqual(undefined);
+                expect(cache.get('mockKey')).toEqual(undefined);
+                expect(cache.get('mockNullKey')).toEqual(undefined);
             });
         });
 

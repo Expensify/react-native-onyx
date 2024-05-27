@@ -97,7 +97,7 @@ class OnyxCache {
      * Get a cached value from storage
      * @param [shouldReindexCache] – This is an LRU cache, and by default accessing a value will make it become last in line to be evicted. This flag can be used to skip that and just access the value directly without side-effects.
      */
-    getValue(key: OnyxKey, shouldReindexCache = true): OnyxValue<OnyxKey> {
+    get(key: OnyxKey, shouldReindexCache = true): OnyxValue<OnyxKey> {
         if (shouldReindexCache) {
             this.addToAccessedKeys(key);
         }

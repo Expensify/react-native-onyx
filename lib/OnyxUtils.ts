@@ -210,7 +210,7 @@ function get(key: OnyxKey): Promise<OnyxValue<OnyxKey>> {
     // When we already have the value in cache (or the key has been set to null,
     // and therefore no data is set in cache), resolve right away.
     if (cache.hasCacheForKey(key)) {
-        return Promise.resolve(cache.getValue(key));
+        return Promise.resolve(cache.get(key));
     }
 
     const taskName = `get:${key}`;
@@ -225,7 +225,7 @@ function get(key: OnyxKey): Promise<OnyxValue<OnyxKey>> {
         .then((val) => {
             if (val === undefined) {
                 cache.addNullishStorageKey(key);
-                return val;
+                return undefined;
             }
 
             cache.set(key, val);
@@ -307,7 +307,7 @@ function isSafeEvictionKey(testKey: OnyxKey): boolean {
  * If the requested key is a collection, it will return an object with all the collection members.
  */
 function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Partial<WithOnyxConnectOptions<TKey>>): OnyxValue<OnyxKey> {
-    let val = cache.getValue(key);
+    let val = cache.get(key);
 
     if (isCollectionKey(key)) {
         const allCacheKeys = cache.getAllKeys();
@@ -320,7 +320,7 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Partial<Wi
 
         const matchingKeys = Array.from(allCacheKeys).filter((k) => k.startsWith(key));
         const values = matchingKeys.reduce((finalObject: NonNullable<OnyxCollection<KeyValueMapping[TKey]>>, matchedKey) => {
-            const cachedValue = cache.getValue(matchedKey);
+            const cachedValue = cache.get(matchedKey);
             if (cachedValue) {
                 // This is permissible because we're in the process of constructing the final object in a reduce function.
                 // eslint-disable-next-line no-param-reassign
@@ -421,7 +421,7 @@ function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey
             return;
         }
 
-        collection[key] = cache.getValue(key);
+        collection[key] = cache.get(key);
     });
 
     return collection;
@@ -832,7 +832,7 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
      * These missingKeys will be later to use to multiGet the data from the storage.
      */
     matchingKeys.forEach((key) => {
-        const cacheValue = cache.getValue(key) as OnyxValue<TKey>;
+        const cacheValue = cache.get(key) as OnyxValue<TKey>;
         if (cacheValue) {
             data[key] = cacheValue;
             return;
@@ -920,7 +920,7 @@ function scheduleNotifyCollectionSubscribers<TKey extends OnyxKey>(
  * Remove a key from Onyx and update the subscribers
  */
 function remove<TKey extends OnyxKey>(key: TKey): Promise<void> {
-    const prevValue = cache.getValue(key, false) as OnyxValue<TKey>;
+    const prevValue = cache.get(key, false) as OnyxValue<TKey>;
     cache.drop(key);
     scheduleSubscriberUpdate(key, null as OnyxValue<TKey>, prevValue);
     return Storage.removeItem(key).then(() => undefined);
@@ -975,7 +975,7 @@ function evictStorageAndRetry<TMethod extends typeof Onyx.set | typeof Onyx.mult
  * Notifies subscribers and writes current value to cache
  */
 function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>, hasChanged?: boolean): Promise<void> {
-    const prevValue = cache.getValue(key, false) as OnyxValue<TKey>;
+    const prevValue = cache.get(key, false) as OnyxValue<TKey>;
 
     // Update subscribers if the cached value has changed, or when the subscriber specifically requires
     // all updates regardless of value changes (indicated by initWithStoredValues set to false).
