@@ -178,7 +178,7 @@ type Selector<TKey extends OnyxKey, TOnyxProps, TReturnType> = (value: OnyxEntry
  * })(Component);
  * ```
  */
-type OnyxEntry<TOnyxValue> = TOnyxValue | null | undefined;
+type OnyxEntry<TOnyxValue> = TOnyxValue | undefined;
 
 /**
  * Represents an Onyx collection of entries, that can be either a record of `TOnyxValue`s or `null` / `undefined` if it is empty or doesn't exist.
@@ -208,7 +208,7 @@ type OnyxEntry<TOnyxValue> = TOnyxValue | null | undefined;
  * })(Component);
  * ```
  */
-type OnyxCollection<TOnyxValue> = OnyxEntry<Record<string, TOnyxValue | null | undefined>>;
+type OnyxCollection<TOnyxValue> = OnyxEntry<Record<string, TOnyxValue | undefined>>;
 
 /** Utility type to extract `TOnyxValue` from `OnyxCollection<TOnyxValue>` */
 type ExtractOnyxCollectionValue<TOnyxCollection> = TOnyxCollection extends NonNullable<OnyxCollection<infer U>> ? U : never;
