@@ -1264,7 +1264,7 @@ describe('Onyx', () => {
             });
     });
 
-    it('should upate Snapshot when its data changed', async () => {
+    it('should update Snapshot when its data changed', async () => {
         const cat = `${ONYX_KEYS.COLLECTION.ANIMALS}cat`;
         const snapshot1 = `${ONYX_KEYS.COLLECTION.SNAPSHOT}1`;
 
