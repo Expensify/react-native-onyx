@@ -556,6 +556,8 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
 function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
     return OnyxUtils.getAllKeys()
         .then((keys) => {
+            cache.clearNullishStorageKeys();
+
             const keysToBeClearedFromStorage: OnyxKey[] = [];
             const keyValuesToResetAsCollection: Record<OnyxKey, OnyxCollection<KeyValueMapping[OnyxKey]>> = {};
             const keyValuesToResetIndividually: NullableKeyValueMapping = {};

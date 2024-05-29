@@ -44,6 +44,7 @@ class OnyxCache {
             'hasCacheForKey',
             'addKey',
             'addNullishStorageKey',
+            'clearNullishStorageKeys',
             'set',
             'drop',
             'merge',
@@ -87,6 +88,12 @@ class OnyxCache {
      */
     addNullishStorageKey(key: OnyxKey): void {
         this.nullishStorageKeys.add(key);
+    }
+
+    /** Used to clear keys that are null/undefined in cache
+     */
+    clearNullishStorageKeys(): void {
+        this.nullishStorageKeys = new Set();
     }
 
     /** Check whether cache has data for the given key */
