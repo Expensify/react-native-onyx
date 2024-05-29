@@ -158,7 +158,7 @@ describe('Set data while storage is clearing', () => {
                     expect(collectionCallback).toHaveBeenCalledTimes(3);
 
                     // And it should be called with the expected parameters each time
-                    expect(collectionCallback).toHaveBeenNthCalledWith(1, null, undefined);
+                    expect(collectionCallback).toHaveBeenNthCalledWith(1, undefined, undefined);
                     expect(collectionCallback).toHaveBeenNthCalledWith(2, {
                         test_1: 1,
                         test_2: 2,
