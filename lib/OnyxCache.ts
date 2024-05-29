@@ -43,6 +43,7 @@ class OnyxCache {
             'get',
             'hasCacheForKey',
             'addKey',
+            'addNullishStorageKey',
             'set',
             'drop',
             'merge',
@@ -82,7 +83,7 @@ class OnyxCache {
         this.storageKeys.add(key);
     }
 
-    /** Used to set keys that have been fetched before and were null
+    /** Used to set keys that are null/undefined in storage without addding null to the storage map
      */
     addNullishStorageKey(key: OnyxKey): void {
         this.nullishStorageKeys.add(key);
