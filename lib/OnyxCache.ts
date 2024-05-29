@@ -115,7 +115,7 @@ class OnyxCache {
         this.nullishStorageKeys.delete(key);
 
         if (value === null || value === undefined) {
-            this.drop(key);
+            delete this.storageMap[key];
             return undefined;
         }
 
@@ -142,12 +142,15 @@ class OnyxCache {
 
         this.storageMap = {...utils.fastMerge(this.storageMap, data)};
 
-        const storageKeys = this.getAllKeys();
-        const mergedKeys = Object.keys(data);
-        this.storageKeys = new Set([...storageKeys, ...mergedKeys]);
-        mergedKeys.forEach((key) => {
+        Object.entries(data).forEach(([key, value]) => {
+            this.addKey(key);
             this.addToAccessedKeys(key);
-            this.nullishStorageKeys.delete(key);
+
+            if (value === null || value === undefined) {
+                this.nullishStorageKeys.add(key);
+            } else {
+                this.nullishStorageKeys.delete(key);
+            }
         });
     }
 
