@@ -207,8 +207,7 @@ function reduceCollectionWithSelector<TKey extends CollectionKeyBase, TMap, TRet
 
 /** Get some data from the store */
 function get(key: OnyxKey): Promise<OnyxValue<OnyxKey>> {
-    // When we already have the value in cache (or the key has been set to null,
-    // and therefore no data is set in cache), resolve right away.
+    // When we already have the value in cache - resolve right away
     if (cache.hasCacheForKey(key)) {
         return Promise.resolve(cache.get(key));
     }
