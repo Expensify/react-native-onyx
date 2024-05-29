@@ -2,6 +2,7 @@ import {deepEqual} from 'fast-equals';
 import bindAll from 'lodash/bindAll';
 import utils from './utils';
 import type {OnyxKey, OnyxValue} from './types';
+
 /**
  * In memory cache providing data by reference
  * Encapsulates Onyx cache related functionality
