@@ -3,32 +3,32 @@
 import {deepEqual} from 'fast-equals';
 import lodashClone from 'lodash/clone';
 import type {ValueOf} from 'type-fest';
-import * as Logger from './Logger';
-import cache from './OnyxCache';
-import * as Str from './Str';
-import * as PerformanceUtils from './PerformanceUtils';
-import Storage from './storage';
-import utils from './utils';
-import unstable_batchedUpdates from './batch';
 import DevTools from './DevTools';
+import * as Logger from './Logger';
+import type Onyx from './Onyx';
+import cache from './OnyxCache';
+import * as PerformanceUtils from './PerformanceUtils';
+import * as Str from './Str';
+import unstable_batchedUpdates from './batch';
+import Storage from './storage';
 import type {
-    DeepRecord,
-    Mapping,
     CollectionKey,
     CollectionKeyBase,
+    DeepRecord,
+    DefaultConnectCallback,
+    DefaultConnectOptions,
+    KeyValueMapping,
+    Mapping,
     NullableKeyValueMapping,
+    OnyxCollection,
+    OnyxEntry,
     OnyxKey,
     OnyxValue,
     Selector,
-    WithOnyxInstanceState,
-    OnyxCollection,
     WithOnyxConnectOptions,
-    DefaultConnectOptions,
-    OnyxEntry,
-    KeyValueMapping,
-    DefaultConnectCallback,
 } from './types';
-import type Onyx from './Onyx';
+import utils from './utils';
+import type {WithOnyxState} from './withOnyx/types';
 
 // Method constants
 const METHOD = {
@@ -195,7 +195,7 @@ function batchUpdates(updates: () => void): Promise<void> {
 function reduceCollectionWithSelector<TKey extends CollectionKeyBase, TMap, TReturn>(
     collection: OnyxCollection<KeyValueMapping[TKey]>,
     selector: Selector<TKey, TMap, TReturn>,
-    withOnyxInstanceState: WithOnyxInstanceState<TMap> | undefined,
+    withOnyxInstanceState: WithOnyxState<TMap> | undefined,
 ): Record<string, TReturn> {
     return Object.entries(collection ?? {}).reduce((finalCollection: Record<string, TReturn>, [key, item]) => {
         // eslint-disable-next-line no-param-reassign

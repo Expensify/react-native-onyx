@@ -31,7 +31,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "jest",
-    "build": "tsc -p tsconfig.build.json && cp ./lib/*.d.ts ./dist",
+    "build": "tsc -p tsconfig.build.json",
     "build:watch": "nodemon --watch lib --ext js,json,ts,tsx --exec \"npm run build && npm pack\"",
     "prebuild:docs": "npm run build",
     "build:docs": "ts-node buildDocs.ts",

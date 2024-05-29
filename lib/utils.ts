@@ -138,4 +138,58 @@ function checkCompatibilityWithExistingValue(value: unknown, existingValue: unkn
     };
 }
 
-export default {isEmptyObject, fastMerge, formatActionName, removeNestedNullValues, checkCompatibilityWithExistingValue};
+/**
+ * Filters an object based on a condition and an inclusion flag.
+ *
+ * @param obj - The object to filter.
+ * @param condition - The condition to apply.
+ * @param include - If true, include entries that match the condition; otherwise, exclude them.
+ * @returns The filtered object.
+ */
+function filterObject<TValue>(obj: Record<string, TValue>, condition: string | string[] | ((entry: [string, TValue]) => boolean), include: boolean): Record<string, TValue> {
+    const result: Record<string, TValue> = {};
+    const entries = Object.entries(obj);
+
+    for (let i = 0; i < entries.length; i++) {
+        const [key, value] = entries[i];
+        let shouldInclude: boolean;
+
+        if (Array.isArray(condition)) {
+            shouldInclude = condition.includes(key);
+        } else if (typeof condition === 'string') {
+            shouldInclude = key === condition;
+        } else {
+            shouldInclude = condition(entries[i]);
+        }
+
+        if (include ? shouldInclude : !shouldInclude) {
+            result[key] = value;
+        }
+    }
+
+    return result;
+}
+
+/**
+ * Picks entries from an object based on a condition.
+ *
+ * @param obj - The object to pick entries from.
+ * @param condition - The condition to determine which entries to pick.
+ * @returns The object containing only the picked entries.
+ */
+function pick<TValue>(obj: Record<string, TValue>, condition: string | string[] | ((entry: [string, TValue]) => boolean)): Record<string, TValue> {
+    return filterObject(obj, condition, true);
+}
+
+/**
+ * Omits entries from an object based on a condition.
+ *
+ * @param obj - The object to omit entries from.
+ * @param condition - The condition to determine which entries to omit.
+ * @returns The object containing only the remaining entries after omission.
+ */
+function omit<TValue>(obj: Record<string, TValue>, condition: string | string[] | ((entry: [string, TValue]) => boolean)): Record<string, TValue> {
+    return filterObject(obj, condition, false);
+}
+
+export default {isEmptyObject, fastMerge, formatActionName, removeNestedNullValues, checkCompatibilityWithExistingValue, pick, omit};
