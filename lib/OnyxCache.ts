@@ -84,8 +84,7 @@ class OnyxCache {
         this.storageKeys.add(key);
     }
 
-    /** Used to set keys that are null/undefined in storage without addding null to the storage map
-     */
+    /** Used to set keys that are null/undefined in storage without adding null to the storage map */
     addNullishStorageKey(key: OnyxKey): void {
         this.nullishStorageKeys.add(key);
     }
