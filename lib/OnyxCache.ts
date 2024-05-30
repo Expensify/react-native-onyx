@@ -90,8 +90,7 @@ class OnyxCache {
         this.nullishStorageKeys.add(key);
     }
 
-    /** Used to clear keys that are null/undefined in cache
-     */
+    /** Used to clear keys that are null/undefined in cache */
     clearNullishStorageKeys(): void {
         this.nullishStorageKeys = new Set();
     }
