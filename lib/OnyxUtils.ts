@@ -209,7 +209,7 @@ function reduceCollectionWithSelector<TKey extends CollectionKeyBase, TMap, TRet
 function get(key: OnyxKey): Promise<OnyxValue<OnyxKey>> {
     // When we already have the value in cache - resolve right away
     if (cache.hasCacheForKey(key)) {
-        return Promise.resolve(cache.getValue(key));
+        return Promise.resolve(cache.get(key));
     }
 
     const taskName = `get:${key}`;
@@ -222,6 +222,11 @@ function get(key: OnyxKey): Promise<OnyxValue<OnyxKey>> {
     // Otherwise retrieve the value from storage and capture a promise to aid concurrent usages
     const promise = Storage.getItem(key)
         .then((val) => {
+            if (val === undefined) {
+                cache.addNullishStorageKey(key);
+                return undefined;
+            }
+
             cache.set(key, val);
             return val;
         })
@@ -233,9 +238,9 @@ function get(key: OnyxKey): Promise<OnyxValue<OnyxKey>> {
 /** Returns current key names stored in persisted storage */
 function getAllKeys(): Promise<Set<OnyxKey>> {
     // When we've already read stored keys, resolve right away
-    const storedKeys = cache.getAllKeys();
-    if (storedKeys.size > 0) {
-        return Promise.resolve(storedKeys);
+    const cachedKeys = cache.getAllKeys();
+    if (cachedKeys.size > 0) {
+        return Promise.resolve(cachedKeys);
     }
 
     const taskName = 'getAllKeys';
@@ -248,6 +253,7 @@ function getAllKeys(): Promise<Set<OnyxKey>> {
     // Otherwise retrieve the keys from storage and capture a promise to aid concurrent usages
     const promise = Storage.getAllKeys().then((keys) => {
         cache.setAllKeys(keys);
+
         // return the updated set of keys
         return cache.getAllKeys();
     });
@@ -300,7 +306,7 @@ function isSafeEvictionKey(testKey: OnyxKey): boolean {
  * If the requested key is a collection, it will return an object with all the collection members.
  */
 function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Partial<WithOnyxConnectOptions<TKey>>): OnyxValue<OnyxKey> {
-    let val = cache.getValue(key);
+    let val = cache.get(key);
 
     if (isCollectionKey(key)) {
         const allCacheKeys = cache.getAllKeys();
@@ -313,7 +319,7 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Partial<Wi
 
         const matchingKeys = Array.from(allCacheKeys).filter((k) => k.startsWith(key));
         const values = matchingKeys.reduce((finalObject: NonNullable<OnyxCollection<KeyValueMapping[TKey]>>, matchedKey) => {
-            const cachedValue = cache.getValue(matchedKey);
+            const cachedValue = cache.get(matchedKey);
             if (cachedValue) {
                 // This is permissible because we're in the process of constructing the final object in a reduce function.
                 // eslint-disable-next-line no-param-reassign
@@ -414,7 +420,7 @@ function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey
             return;
         }
 
-        collection[key] = cache.getValue(key);
+        collection[key] = cache.get(key);
     });
 
     return collection;
@@ -426,21 +432,20 @@ function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey
 function keysChanged<TKey extends CollectionKeyBase>(
     collectionKey: TKey,
     partialCollection: OnyxCollection<KeyValueMapping[TKey]>,
-    previousPartialCollection: OnyxCollection<KeyValueMapping[TKey]> | undefined,
+    partialPreviousCollection: OnyxCollection<KeyValueMapping[TKey]> | undefined,
     notifyRegularSubscibers = true,
     notifyWithOnyxSubscibers = true,
 ): void {
-    const previousCollectionWithoutNestedNulls = previousPartialCollection === undefined ? {} : (utils.removeNestedNullValues(previousPartialCollection) as Record<string, unknown>);
-
     // We prepare the "cached collection" which is the entire collection + the new partial data that
     // was merged in via mergeCollection().
     const cachedCollection = getCachedCollection(collectionKey);
-    const cachedCollectionWithoutNestedNulls = utils.removeNestedNullValues(cachedCollection) as Record<string, unknown>;
 
     // If the previous collection equals the new collection then we do not need to notify any subscribers.
-    if (previousPartialCollection !== undefined && deepEqual(cachedCollectionWithoutNestedNulls, previousCollectionWithoutNestedNulls)) {
+    if (partialPreviousCollection !== undefined && deepEqual(cachedCollection, partialPreviousCollection)) {
         return;
     }
+
+    const previousCollection = partialPreviousCollection ?? {};
 
     // We are iterating over all subscribers similar to keyChanged(). However, we are looking for subscribers who are subscribing to either a collection key or
     // individual collection key member for the collection that is being updated. It is important to note that the collection parameter cane be a PARTIAL collection
@@ -477,7 +482,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
             // send the whole cached collection.
             if (isSubscribedToCollectionKey) {
                 if (subscriber.waitForCollectionCallback) {
-                    subscriber.callback(cachedCollectionWithoutNestedNulls);
+                    subscriber.callback(cachedCollection);
                     continue;
                 }
 
@@ -487,11 +492,11 @@ function keysChanged<TKey extends CollectionKeyBase>(
                 for (let j = 0; j < dataKeys.length; j++) {
                     const dataKey = dataKeys[j];
 
-                    if (deepEqual(cachedCollectionWithoutNestedNulls[dataKey], previousCollectionWithoutNestedNulls[dataKey])) {
+                    if (deepEqual(cachedCollection[dataKey], previousCollection[dataKey])) {
                         continue;
                     }
 
-                    subscriber.callback(cachedCollectionWithoutNestedNulls[dataKey], dataKey);
+                    subscriber.callback(cachedCollection[dataKey], dataKey);
                 }
                 continue;
             }
@@ -499,12 +504,12 @@ function keysChanged<TKey extends CollectionKeyBase>(
             // And if the subscriber is specifically only tracking a particular collection member key then we will
             // notify them with the cached data for that key only.
             if (isSubscribedToCollectionMemberKey) {
-                if (deepEqual(cachedCollectionWithoutNestedNulls[subscriber.key], previousCollectionWithoutNestedNulls[subscriber.key])) {
+                if (deepEqual(cachedCollection[subscriber.key], previousCollection[subscriber.key])) {
                     continue;
                 }
 
                 const subscriberCallback = subscriber.callback as DefaultConnectCallback<TKey>;
-                subscriberCallback(cachedCollectionWithoutNestedNulls[subscriber.key], subscriber.key as TKey);
+                subscriberCallback(cachedCollection[subscriber.key], subscriber.key as TKey);
                 continue;
             }
 
@@ -556,7 +561,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
 
             // If a React component is only interested in a single key then we can set the cached value directly to the state name.
             if (isSubscribedToCollectionMemberKey) {
-                if (deepEqual(cachedCollectionWithoutNestedNulls[subscriber.key], previousCollectionWithoutNestedNulls[subscriber.key])) {
+                if (deepEqual(cachedCollection[subscriber.key], previousCollection[subscriber.key])) {
                     continue;
                 }
 
@@ -647,16 +652,14 @@ function keyChanged<TKey extends OnyxKey>(
             }
             if (isCollectionKey(subscriber.key) && subscriber.waitForCollectionCallback) {
                 const cachedCollection = getCachedCollection(subscriber.key);
-                const cachedCollectionWithoutNestedNulls = utils.removeNestedNullValues(cachedCollection) as Record<string, unknown>;
 
-                cachedCollectionWithoutNestedNulls[key] = value;
-                subscriber.callback(cachedCollectionWithoutNestedNulls);
+                cachedCollection[key] = value;
+                subscriber.callback(cachedCollection);
                 continue;
             }
 
-            const valueWithoutNestedNulls = utils.removeNestedNullValues(value);
             const subscriberCallback = subscriber.callback as DefaultConnectCallback<TKey>;
-            subscriberCallback(valueWithoutNestedNulls, key);
+            subscriberCallback(value, key);
             continue;
         }
 
@@ -752,7 +755,7 @@ function keyChanged<TKey extends OnyxKey>(
  *     - sets state on the withOnyxInstances
  *     - triggers the callback function
  */
-function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, val: OnyxValue<TKey>, matchedKey: TKey | undefined, isBatched: boolean): void {
+function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, value: OnyxValue<TKey> | null, matchedKey: TKey | undefined, isBatched: boolean): void {
     // If the mapping no longer exists then we should not send any data.
     // This means our subscriber disconnected or withOnyx wrapped component unmounted.
     if (!callbackToStateMapping[mapping.connectionID]) {
@@ -760,15 +763,15 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, val:
     }
 
     if ('withOnyxInstance' in mapping && mapping.withOnyxInstance) {
-        let newData: OnyxValue<OnyxKey> = val;
+        let newData: OnyxValue<OnyxKey> = value;
 
         // If the mapping has a selector, then the component's state must only be updated with the data
         // returned by the selector.
         if (mapping.selector) {
             if (isCollectionKey(mapping.key)) {
-                newData = reduceCollectionWithSelector(val as OnyxCollection<KeyValueMapping[TKey]>, mapping.selector, mapping.withOnyxInstance.state);
+                newData = reduceCollectionWithSelector(value as OnyxCollection<KeyValueMapping[TKey]>, mapping.selector, mapping.withOnyxInstance.state);
             } else {
-                newData = mapping.selector(val, mapping.withOnyxInstance.state);
+                newData = mapping.selector(value, mapping.withOnyxInstance.state);
             }
         }
 
@@ -781,8 +784,13 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, val:
         return;
     }
 
-    const valuesWithoutNestedNulls = utils.removeNestedNullValues(val);
-    (mapping as DefaultConnectOptions<TKey>).callback?.(valuesWithoutNestedNulls, matchedKey as TKey);
+    // When there are no matching keys in "Onyx.connect", we pass null to "sendDataToConnection" explicitly,
+    // to allow the withOnyx instance to set the value in the state initially and therefore stop the loading state once all
+    // required keys have been set.
+    // If we would pass undefined to setWithOnyxInstance instead, withOnyx would not set the value in the state.
+    // withOnyx will internally replace null values with undefined and never pass null values to wrapped components.
+    // For regular callbacks, we never want to pass null values, but always just undefined if a value is not set in cache or storage.
+    (mapping as DefaultConnectOptions<TKey>).callback?.(value === null ? undefined : value, matchedKey as TKey);
 }
 
 /**
@@ -830,7 +838,7 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
      * These missingKeys will be later to use to multiGet the data from the storage.
      */
     matchingKeys.forEach((key) => {
-        const cacheValue = cache.getValue(key) as OnyxValue<TKey>;
+        const cacheValue = cache.get(key) as OnyxValue<TKey>;
         if (cacheValue) {
             data[key] = cacheValue;
             return;
@@ -918,7 +926,7 @@ function scheduleNotifyCollectionSubscribers<TKey extends OnyxKey>(
  * Remove a key from Onyx and update the subscribers
  */
 function remove<TKey extends OnyxKey>(key: TKey): Promise<void> {
-    const prevValue = cache.getValue(key, false) as OnyxValue<TKey>;
+    const prevValue = cache.get(key, false) as OnyxValue<TKey>;
     cache.drop(key);
     scheduleSubscriberUpdate(key, null as OnyxValue<TKey>, prevValue);
     return Storage.removeItem(key).then(() => undefined);
@@ -972,12 +980,12 @@ function evictStorageAndRetry<TMethod extends typeof Onyx.set | typeof Onyx.mult
 /**
  * Notifies subscribers and writes current value to cache
  */
-function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>, hasChanged?: boolean, wasRemoved = false): Promise<void> {
-    const prevValue = cache.getValue(key, false) as OnyxValue<TKey>;
+function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>, hasChanged?: boolean): Promise<void> {
+    const prevValue = cache.get(key, false) as OnyxValue<TKey>;
 
     // Update subscribers if the cached value has changed, or when the subscriber specifically requires
     // all updates regardless of value changes (indicated by initWithStoredValues set to false).
-    if (hasChanged && !wasRemoved) {
+    if (hasChanged) {
         cache.set(key, value);
     } else {
         cache.addToAccessedKeys(key);
@@ -990,8 +998,8 @@ function hasPendingMergeForKey(key: OnyxKey): boolean {
     return !!mergeQueue[key];
 }
 
-type RemoveNullValuesOutput = {
-    value: Record<string, unknown> | unknown[] | null;
+type RemoveNullValuesOutput<Value extends OnyxValue<OnyxKey> | null> = {
+    value: Value | null;
     wasRemoved: boolean;
 };
 
@@ -1002,16 +1010,16 @@ type RemoveNullValuesOutput = {
  *
  * @returns The value without null values and a boolean "wasRemoved", which indicates if the key got removed completely
  */
-function removeNullValues(key: OnyxKey, value: OnyxValue<OnyxKey>, shouldRemoveNestedNulls = true): RemoveNullValuesOutput {
+function removeNullValues<Value extends OnyxValue<OnyxKey>>(key: OnyxKey, value: Value | null, shouldRemoveNestedNulls = true): RemoveNullValuesOutput<Value> {
     if (value === null) {
         remove(key);
-        return {value, wasRemoved: true};
+        return {value: null, wasRemoved: true};
     }
 
     // We can remove all null values in an object by merging it with itself
     // utils.fastMerge recursively goes through the object and removes all null values
     // Passing two identical objects as source and target to fastMerge will not change it, but only remove the null values
-    return {value: shouldRemoveNestedNulls ? utils.removeNestedNullValues(value as Record<string, unknown>) : (value as Record<string, unknown>), wasRemoved: false};
+    return {value: shouldRemoveNestedNulls ? utils.removeNestedNullValues(value) : value, wasRemoved: false};
 }
 
 /**

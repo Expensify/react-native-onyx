@@ -9,7 +9,10 @@ import type {OnyxKey, OnyxValue} from './types';
  */
 class OnyxCache {
     /** Cache of all the storage keys available in persistent storage */
-    storageKeys: Set<OnyxKey>;
+    private storageKeys: Set<OnyxKey>;
+
+    /** A list of keys where a nullish value has been fetched from storage before, but the key still exists in cache */
+    private nullishStorageKeys: Set<OnyxKey>;
 
     /** Unique list of keys maintained in access order (most recent at the end) */
     private recentKeys: Set<OnyxKey>;
@@ -28,6 +31,7 @@ class OnyxCache {
 
     constructor() {
         this.storageKeys = new Set();
+        this.nullishStorageKeys = new Set();
         this.recentKeys = new Set();
         this.storageMap = {};
         this.pendingPromises = new Map();
@@ -36,9 +40,11 @@ class OnyxCache {
         bindAll(
             this,
             'getAllKeys',
-            'getValue',
+            'get',
             'hasCacheForKey',
             'addKey',
+            'addNullishStorageKey',
+            'clearNullishStorageKeys',
             'set',
             'drop',
             'merge',
@@ -57,19 +63,18 @@ class OnyxCache {
     }
 
     /**
-     * Get a cached value from storage
-     * @param [shouldReindexCache] – This is an LRU cache, and by default accessing a value will make it become last in line to be evicted. This flag can be used to skip that and just access the value directly without side-effects.
+     * Allows to set all the keys at once.
+     * This is useful when we are getting
+     * all the keys from the storage provider
+     * and we want to keep the cache in sync.
+     *
+     * Previously, we had to call `addKey` in a loop
+     * to achieve the same result.
+     *
+     * @param keys - an array of keys
      */
-    getValue(key: OnyxKey, shouldReindexCache = true): OnyxValue<OnyxKey> {
-        if (shouldReindexCache) {
-            this.addToAccessedKeys(key);
-        }
-        return this.storageMap[key];
-    }
-
-    /** Check whether cache has data for the given key */
-    hasCacheForKey(key: OnyxKey): boolean {
-        return this.storageMap[key] !== undefined;
+    setAllKeys(keys: OnyxKey[]) {
+        this.storageKeys = new Set(keys);
     }
 
     /** Saves a key in the storage keys list
@@ -79,6 +84,32 @@ class OnyxCache {
         this.storageKeys.add(key);
     }
 
+    /** Used to set keys that are null/undefined in storage without adding null to the storage map */
+    addNullishStorageKey(key: OnyxKey): void {
+        this.nullishStorageKeys.add(key);
+    }
+
+    /** Used to clear keys that are null/undefined in cache */
+    clearNullishStorageKeys(): void {
+        this.nullishStorageKeys = new Set();
+    }
+
+    /** Check whether cache has data for the given key */
+    hasCacheForKey(key: OnyxKey): boolean {
+        return this.storageMap[key] !== undefined || this.nullishStorageKeys.has(key);
+    }
+
+    /**
+     * Get a cached value from storage
+     * @param [shouldReindexCache] – This is an LRU cache, and by default accessing a value will make it become last in line to be evicted. This flag can be used to skip that and just access the value directly without side-effects.
+     */
+    get(key: OnyxKey, shouldReindexCache = true): OnyxValue<OnyxKey> {
+        if (shouldReindexCache) {
+            this.addToAccessedKeys(key);
+        }
+        return this.storageMap[key];
+    }
+
     /**
      * Set's a key value in cache
      * Adds the key to the storage keys list as well
@@ -86,6 +117,16 @@ class OnyxCache {
     set(key: OnyxKey, value: OnyxValue<OnyxKey>): OnyxValue<OnyxKey> {
         this.addKey(key);
         this.addToAccessedKeys(key);
+
+        // When a key is explicitly set in cache, we can remove it from the list of nullish keys,
+        // since it will either be set to a non nullish value or removed from the cache completely.
+        this.nullishStorageKeys.delete(key);
+
+        if (value === null || value === undefined) {
+            delete this.storageMap[key];
+            return undefined;
+        }
+
         this.storageMap[key] = value;
 
         return value;
@@ -107,27 +148,18 @@ class OnyxCache {
             throw new Error('data passed to cache.merge() must be an Object of onyx key/value pairs');
         }
 
-        this.storageMap = {...utils.fastMerge(this.storageMap, data, false)};
+        this.storageMap = {...utils.fastMerge(this.storageMap, data)};
 
-        const storageKeys = this.getAllKeys();
-        const mergedKeys = Object.keys(data);
-        this.storageKeys = new Set([...storageKeys, ...mergedKeys]);
-        mergedKeys.forEach((key) => this.addToAccessedKeys(key));
-    }
+        Object.entries(data).forEach(([key, value]) => {
+            this.addKey(key);
+            this.addToAccessedKeys(key);
 
-    /**
-     * Allows to set all the keys at once.
-     * This is useful when we are getting
-     * all the keys from the storage provider
-     * and we want to keep the cache in sync.
-     *
-     * Previously, we had to call `addKey` in a loop
-     * to achieve the same result.
-     *
-     * @param keys - an array of keys
-     */
-    setAllKeys(keys: OnyxKey[]) {
-        this.storageKeys = new Set(keys);
+            if (value === null || value === undefined) {
+                this.addNullishStorageKey(key);
+            } else {
+                this.nullishStorageKeys.delete(key);
+            }
+        });
     }
 
     /**

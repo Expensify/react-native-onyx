@@ -10,6 +10,7 @@ import * as Str from '../Str';
 import type {GenericFunction, OnyxKey, WithOnyxConnectOptions} from '../types';
 import utils from '../utils';
 import type {MapOnyxToState, WithOnyxInstance, WithOnyxMapping, WithOnyxProps, WithOnyxState} from './types';
+import cache from '../OnyxCache';
 
 // This is a list of keys that can exist on a `mapping`, but are not directly related to loading data from Onyx. When the keys of a mapping are looped over to check
 // if a key has changed, it's a good idea to skip looking at these properties since they would have unexpected results.
@@ -84,7 +85,9 @@ export default function <TComponentProps, TOnyxProps>(
                 const cachedState = mapOnyxToStateEntries(mapOnyxToState).reduce<WithOnyxState<TOnyxProps>>((resultObj, [propName, mapping]) => {
                     const key = Str.result(mapping.key as GenericFunction, props);
                     let value = OnyxUtils.tryGetCachedValue(key, mapping as Partial<WithOnyxConnectOptions<OnyxKey>>);
-                    if (!value && mapping.initialValue) {
+                    const hasCacheForKey = cache.hasCacheForKey(key);
+
+                    if (!hasCacheForKey && !value && mapping.initialValue) {
                         value = mapping.initialValue;
                     }
 
@@ -99,7 +102,11 @@ export default function <TComponentProps, TOnyxProps>(
                      * In reality, Onyx.merge() will only update the subscriber after all merges have been batched and the previous value is retrieved via a get() (returns a promise).
                      * So, we won't use the cache optimization here as it will lead us to arbitrarily defer various actions in the application code.
                      */
-                    if (mapping.initWithStoredValues !== false && ((value !== undefined && !OnyxUtils.hasPendingMergeForKey(key)) || mapping.allowStaleData)) {
+                    const hasPendingMergeForKey = OnyxUtils.hasPendingMergeForKey(key);
+                    const hasValueInCache = hasCacheForKey || value !== undefined;
+                    const shouldSetState = mapping.initWithStoredValues !== false && ((hasValueInCache && !hasPendingMergeForKey) || !!mapping.allowStaleData);
+
+                    if (shouldSetState) {
                         // eslint-disable-next-line no-param-reassign
                         resultObj[propName] = value as WithOnyxState<TOnyxProps>[keyof TOnyxProps];
                     }
@@ -197,7 +204,7 @@ export default function <TComponentProps, TOnyxProps>(
              * initialValue is there, we just check if the update is different than that and then try to handle it as best as we can.
              */
             setWithOnyxState<T extends keyof TOnyxProps>(statePropertyName: T, val: WithOnyxState<TOnyxProps>[T]) {
-                const prevValue = this.state[statePropertyName];
+                const prevVal = this.state[statePropertyName];
 
                 // If the component is not loading (read "mounting"), then we can just update the state
                 // There is a small race condition.
@@ -208,11 +215,13 @@ export default function <TComponentProps, TOnyxProps>(
                 // This simply bypasses the loading check if the tempState is gone and the update can be safely queued with a normal setStateProxy.
                 if (!this.state.loading || !this.tempState) {
                     // Performance optimization, do not trigger update with same values
-                    if (prevValue === val || (utils.isEmptyObject(prevValue) && utils.isEmptyObject(val))) {
+                    if (prevVal === val || (utils.isEmptyObject(prevVal) && utils.isEmptyObject(val))) {
                         return;
                     }
 
-                    this.setStateProxy({[statePropertyName]: val} as WithOnyxState<TOnyxProps>);
+                    const valueWithoutNull = val === null ? undefined : val;
+
+                    this.setStateProxy({[statePropertyName]: valueWithoutNull} as WithOnyxState<TOnyxProps>);
                     return;
                 }
 
@@ -240,15 +249,14 @@ export default function <TComponentProps, TOnyxProps>(
 
                         // If initialValue is there and the state contains something different it means
                         // an update has already been received and we can discard the value we are trying to hydrate
-                        if (initialValue !== undefined && prevState[key] !== undefined && prevState[key] !== initialValue) {
+                        if (initialValue !== undefined && prevState[key] !== undefined && prevState[key] !== initialValue && prevState[key] !== null) {
                             // eslint-disable-next-line no-param-reassign
                             result[key] = prevState[key];
-
+                        } else if (prevState[key] !== undefined && prevState[key] !== null) {
                             // if value is already there (without initial value) then we can discard the value we are trying to hydrate
-                        } else if (prevState[key] !== undefined) {
                             // eslint-disable-next-line no-param-reassign
                             result[key] = prevState[key];
-                        } else {
+                        } else if (stateUpdate[key] !== null) {
                             // eslint-disable-next-line no-param-reassign
                             result[key] = stateUpdate[key];
                         }
@@ -344,7 +352,6 @@ export default function <TComponentProps, TOnyxProps>(
                 // Remove any internal state properties used by withOnyx
                 // that should not be passed to a wrapped component
                 const stateToPass = utils.omit(this.state as WithOnyxState<TOnyxProps>, ([stateKey, stateValue]) => stateKey === 'loading' || stateValue === null);
-                const stateToPassWithoutNestedNulls = utils.removeNestedNullValues(stateToPass);
 
                 // Spreading props and state is necessary in an HOC where the data cannot be predicted
                 return (
@@ -353,7 +360,7 @@ export default function <TComponentProps, TOnyxProps>(
                         // eslint-disable-next-line react/jsx-props-no-spreading
                         {...(propsToPass as TComponentProps)}
                         // eslint-disable-next-line react/jsx-props-no-spreading
-                        {...stateToPassWithoutNestedNulls}
+                        {...stateToPass}
                         ref={this.props.forwardedRef}
                     />
                 );
