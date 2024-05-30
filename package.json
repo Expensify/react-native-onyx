@@ -1,6 +1,6 @@
 {
   "name": "react-native-onyx",
-  "version": "2.0.41",
+  "version": "2.0.42",
   "author": "Expensify, Inc.",
   "homepage": "https://expensify.com",
   "description": "State management for React Native",
@@ -31,7 +31,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "jest",
-    "build": "tsc -p tsconfig.build.json && cp ./lib/*.d.ts ./dist",
+    "build": "tsc -p tsconfig.build.json",
     "build:watch": "nodemon --watch lib --ext js,json,ts,tsx --exec \"npm run build && npm pack\"",
     "prebuild:docs": "npm run build",
     "build:docs": "ts-node buildDocs.ts",
