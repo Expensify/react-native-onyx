@@ -11,7 +11,7 @@ class OnyxCache {
     /** Cache of all the storage keys available in persistent storage */
     private storageKeys: Set<OnyxKey>;
 
-    /** Cache of all the storage keys that have been fetched before and were not set */
+    /** A list of keys where a nullish value has been fetched from storage before, but the key still exists in cache */
     private nullishStorageKeys: Set<OnyxKey>;
 
     /** Unique list of keys maintained in access order (most recent at the end) */
@@ -117,6 +117,9 @@ class OnyxCache {
     set(key: OnyxKey, value: OnyxValue<OnyxKey>): OnyxValue<OnyxKey> {
         this.addKey(key);
         this.addToAccessedKeys(key);
+
+        // When a key is explicitly set in cache, we can remove it from the list of nullish keys,
+        // since it will either be set to a non nullish value or removed from the cache completely.
         this.nullishStorageKeys.delete(key);
 
         if (value === null || value === undefined) {
@@ -152,7 +155,7 @@ class OnyxCache {
             this.addToAccessedKeys(key);
 
             if (value === null || value === undefined) {
-                this.nullishStorageKeys.add(key);
+                this.addNullishStorageKey(key);
             } else {
                 this.nullishStorageKeys.delete(key);
             }

@@ -432,19 +432,20 @@ function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey
 function keysChanged<TKey extends CollectionKeyBase>(
     collectionKey: TKey,
     partialCollection: OnyxCollection<KeyValueMapping[TKey]>,
-    partialPreviousCollection: OnyxCollection<KeyValueMapping[TKey]>,
+    partialPreviousCollection: OnyxCollection<KeyValueMapping[TKey]> | undefined,
     notifyRegularSubscibers = true,
     notifyWithOnyxSubscibers = true,
 ): void {
     // We prepare the "cached collection" which is the entire collection + the new partial data that
     // was merged in via mergeCollection().
     const cachedCollection = getCachedCollection(collectionKey);
-    const previousCollection = partialPreviousCollection ?? {};
 
     // If the previous collection equals the new collection then we do not need to notify any subscribers.
     if (partialPreviousCollection !== undefined && deepEqual(cachedCollection, partialPreviousCollection)) {
         return;
     }
+
+    const previousCollection = partialPreviousCollection ?? {};
 
     // We are iterating over all subscribers similar to keyChanged(). However, we are looking for subscribers who are subscribing to either a collection key or
     // individual collection key member for the collection that is being updated. It is important to note that the collection parameter cane be a PARTIAL collection
@@ -783,6 +784,12 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, valu
         return;
     }
 
+    // When there are no matching keys in "Onyx.connect", we pass null to "sendDataToConnection" explicitly,
+    // to allow the withOnyx instance to set the value in the state initially and therefore stop the loading state once all
+    // required keys have been set.
+    // If we would pass undefined to setWithOnyxInstance instead, withOnyx would not set the value in the state.
+    // withOnyx will internally replace null values with undefined and never pass null values to wrapped components.
+    // For regular callbacks, we never want to pass null values, but always just undefined if a value is not set in cache or storage.
     (mapping as DefaultConnectOptions<TKey>).callback?.(value === null ? undefined : value, matchedKey as TKey);
 }
 

@@ -210,6 +210,8 @@ function disconnect(connectionID: number, keyToRemoveFromEvictionBlocklist?: Ony
  * @param value value to store
  */
 function set<TKey extends OnyxKey>(key: TKey, value: NonUndefined<OnyxEntry<KeyValueMapping[TKey]>>): Promise<void> {
+    // When we use Onyx.set to set a key we want to clear the current delta changes from Onyx.merge that were queued
+    // before the value was set. If Onyx.merge is currently reading the old value from storage, it will then not apply the changes.
     if (OnyxUtils.hasPendingMergeForKey(key)) {
         delete OnyxUtils.getMergeQueue()[key];
     }
@@ -274,6 +276,8 @@ function set<TKey extends OnyxKey>(key: TKey, value: NonUndefined<OnyxEntry<KeyV
 function multiSet(data: Partial<NullableKeyValueMapping>): Promise<void> {
     const allKeyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(data, true);
 
+    // When a key is set to null, we need to remove the remove the key from storage using "OnyxUtils.remove".
+    // Therefore, we filter the key value pairs to exclude null values and remove those keys explicitly.
     const removePromises: Array<Promise<void>> = [];
     const keyValuePairsToUpdate = allKeyValuePairs.filter(([key, value]) => {
         if (value === null) {
