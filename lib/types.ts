@@ -136,7 +136,7 @@ type KeyValueMapping = {
  * It's very similar to `KeyValueMapping` but this type accepts using `null` as well.
  */
 type NullableKeyValueMapping = {
-    [TKey in OnyxKey]: OnyxValue<TKey>;
+    [TKey in OnyxKey]: NonUndefined<OnyxValue<TKey>> | null;
 };
 
 /**
@@ -179,6 +179,13 @@ type Selector<TKey extends OnyxKey, TOnyxProps, TReturnType> = (value: OnyxEntry
  * ```
  */
 type OnyxEntry<TOnyxValue> = TOnyxValue | undefined;
+
+/**
+ * Represents an input value that can be passed to Onyx methods, that can be either `TOnyxValue` or `null`.
+ * Setting a key to `null` will remove the key from the store.
+ * `undefined` is not allowed for setting values, because it will have no effect on the data.
+ */
+type OnyxInput<TOnyxValue> = TOnyxValue | null;
 
 /**
  * Represents an Onyx collection of entries, that can be either a record of `TOnyxValue`s or `null` / `undefined` if it is empty or doesn't exist.
@@ -261,7 +268,7 @@ type NullishObjectDeep<ObjectType extends object> = {
  * Also, the `TMap` type is inferred automatically in `mergeCollection()` method and represents
  * the object of collection keys/values specified in the second parameter of the method.
  */
-type Collection<TKey extends CollectionKeyBase, TMap, TValue> = {
+type Collection<TKey extends CollectionKeyBase, TValue, TMap = never> = {
     [MapK in keyof TMap]: MapK extends `${TKey}${string}`
         ? MapK extends `${TKey}`
             ? never // forbids empty id
@@ -322,6 +329,26 @@ type Mapping<TKey extends OnyxKey> = ConnectOptions<TKey> & {
 };
 
 /**
+ * This represents the value that can be passed to `Onyx.set` and to `Onyx.update` with the method "SET"
+ */
+type OnyxSetInput<TKey extends OnyxKey> = OnyxInput<KeyValueMapping[TKey]>;
+
+/**
+ * This represents the value that can be passed to `Onyx.multiSet` and to `Onyx.update` with the method "MULTI_SET"
+ */
+type OnyxMultiSetInput = Partial<NullableKeyValueMapping>;
+
+/**
+ * This represents the value that can be passed to `Onyx.merge` and to `Onyx.update` with the method "MERGE"
+ */
+type OnyxMergeInput<TKey extends OnyxKey> = OnyxInput<NullishDeep<KeyValueMapping[TKey]>>;
+
+/**
+ * This represents the value that can be passed to `Onyx.merge` and to `Onyx.update` with the method "MERGE"
+ */
+type OnyxMergeCollectionInput<TKey extends OnyxKey, TMap = never> = Collection<TKey, NullishDeep<KeyValueMapping[TKey]>, TMap>;
+
+/**
  * Represents different kinds of updates that can be passed to `Onyx.update()` method. It is a discriminated union of
  * different update methods (`SET`, `MERGE`, `MERGE_COLLECTION`), each with their own key and value structure.
  */
@@ -331,17 +358,17 @@ type OnyxUpdate =
               | {
                     onyxMethod: typeof OnyxUtils.METHOD.SET;
                     key: TKey;
-                    value: NonUndefined<OnyxEntry<KeyValueMapping[TKey]>>;
-                }
-              | {
-                    onyxMethod: typeof OnyxUtils.METHOD.MERGE;
-                    key: TKey;
-                    value: NonUndefined<OnyxEntry<NullishDeep<KeyValueMapping[TKey]>>>;
+                    value: OnyxSetInput<TKey>;
                 }
               | {
                     onyxMethod: typeof OnyxUtils.METHOD.MULTI_SET;
                     key: TKey;
-                    value: Partial<NullableKeyValueMapping>;
+                    value: OnyxMultiSetInput;
+                }
+              | {
+                    onyxMethod: typeof OnyxUtils.METHOD.MERGE;
+                    key: TKey;
+                    value: OnyxMergeInput<TKey>;
                 }
               | {
                     onyxMethod: typeof OnyxUtils.METHOD.CLEAR;
@@ -353,7 +380,7 @@ type OnyxUpdate =
           [TKey in CollectionKeyBase]: {
               onyxMethod: typeof OnyxUtils.METHOD.MERGE_COLLECTION;
               key: TKey;
-              value: Record<`${TKey}${string}`, NullishDeep<KeyValueMapping[TKey]>>;
+              value: OnyxMergeCollectionInput<TKey>;
           };
       }[CollectionKeyBase];
 
@@ -417,7 +444,12 @@ export type {
     NullishDeep,
     OnyxCollection,
     OnyxEntry,
+    OnyxInput,
     OnyxKey,
+    OnyxSetInput,
+    OnyxMultiSetInput,
+    OnyxMergeInput,
+    OnyxMergeCollectionInput,
     OnyxUpdate,
     OnyxValue,
     Selector,
