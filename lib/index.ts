@@ -1,6 +1,20 @@
 import type {ConnectOptions, OnyxUpdate} from './Onyx';
 import Onyx from './Onyx';
-import type {CustomTypeOptions, KeyValueMapping, NullishDeep, OnyxCollection, OnyxEntry, OnyxKey, OnyxValue, Selector} from './types';
+import type {
+    CustomTypeOptions,
+    KeyValueMapping,
+    NullishDeep,
+    OnyxCollection,
+    OnyxEntry,
+    OnyxInput,
+    OnyxKey,
+    OnyxValue,
+    Selector,
+    OnyxSetInput,
+    OnyxMultiSetInput,
+    OnyxMergeInput,
+    OnyxMergeCollectionInput,
+} from './types';
 import type {FetchStatus, ResultMetadata, UseOnyxResult} from './useOnyx';
 import useOnyx from './useOnyx';
 import withOnyx from './withOnyx';
@@ -16,7 +30,12 @@ export type {
     NullishDeep,
     OnyxCollection,
     OnyxEntry,
+    OnyxInput,
     OnyxKey,
+    OnyxSetInput,
+    OnyxMultiSetInput,
+    OnyxMergeInput,
+    OnyxMergeCollectionInput,
     OnyxUpdate,
     OnyxValue,
     ResultMetadata,

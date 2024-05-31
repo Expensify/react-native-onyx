@@ -1,6 +1,6 @@
 import type {ForwardedRef} from 'react';
 import type {IsEqual} from 'type-fest';
-import type {CollectionKeyBase, ExtractOnyxCollectionValue, KeyValueMapping, NullableKeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey, OnyxValue, Selector} from '../types';
+import type {CollectionKeyBase, ExtractOnyxCollectionValue, KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey, OnyxValue, Selector} from '../types';
 
 /**
  * Represents the base mapping options between an Onyx key and the component's prop.
@@ -162,7 +162,7 @@ type WithOnyxState<TOnyxProps> = TOnyxProps & {
 /**
  * Represents the `withOnyx` internal component instance.
  */
-type WithOnyxInstance = React.Component<unknown, WithOnyxState<NullableKeyValueMapping>> & {
+type WithOnyxInstance = React.Component<unknown, WithOnyxState<KeyValueMapping>> & {
     setStateProxy: (modifier: Record<string, OnyxCollection<KeyValueMapping[OnyxKey]>> | ((state: Record<string, OnyxCollection<KeyValueMapping[OnyxKey]>>) => OnyxValue<OnyxKey>)) => void;
     setWithOnyxState: (statePropertyName: OnyxKey, value: OnyxValue<OnyxKey>) => void;
 };

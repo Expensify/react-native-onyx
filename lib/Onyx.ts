@@ -8,18 +8,18 @@ import Storage from './storage';
 import utils from './utils';
 import DevTools from './DevTools';
 import type {
-    Collection,
     CollectionKeyBase,
     ConnectOptions,
     InitOptions,
     KeyValueMapping,
     Mapping,
-    NonUndefined,
     NullableKeyValueMapping,
-    NullishDeep,
     OnyxCollection,
-    OnyxEntry,
     OnyxKey,
+    OnyxMergeCollectionInput,
+    OnyxMergeInput,
+    OnyxMultiSetInput,
+    OnyxSetInput,
     OnyxUpdate,
     OnyxValue,
 } from './types';
@@ -209,7 +209,7 @@ function disconnect(connectionID: number, keyToRemoveFromEvictionBlocklist?: Ony
  * @param key ONYXKEY to set
  * @param value value to store
  */
-function set<TKey extends OnyxKey>(key: TKey, value: NonUndefined<OnyxEntry<KeyValueMapping[TKey]>>): Promise<void> {
+function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>): Promise<void> {
     // When we use Onyx.set to set a key we want to clear the current delta changes from Onyx.merge that were queued
     // before the value was set. If Onyx.merge is currently reading the old value from storage, it will then not apply the changes.
     if (OnyxUtils.hasPendingMergeForKey(key)) {
@@ -273,7 +273,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: NonUndefined<OnyxEntry<KeyV
  *
  * @param data object keyed by ONYXKEYS and the values to set
  */
-function multiSet(data: Partial<NullableKeyValueMapping>): Promise<void> {
+function multiSet(data: OnyxMultiSetInput): Promise<void> {
     const allKeyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(data, true);
 
     // When a key is set to null, we need to remove the remove the key from storage using "OnyxUtils.remove".
@@ -321,7 +321,7 @@ function multiSet(data: Partial<NullableKeyValueMapping>): Promise<void> {
  * Onyx.merge(ONYXKEYS.POLICY, {id: 1}); // -> {id: 1}
  * Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Workspace'}
  */
-function merge<TKey extends OnyxKey>(key: TKey, changes: NonUndefined<OnyxEntry<NullishDeep<KeyValueMapping[TKey]>>>): Promise<void> {
+function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): Promise<void> {
     const mergeQueue = OnyxUtils.getMergeQueue();
     const mergeQueuePromise = OnyxUtils.getMergeQueuePromise();
 
@@ -430,7 +430,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: NonUndefined<OnyxEntry<
  * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
  * @param collection Object collection keyed by individual collection member keys and values
  */
-function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: Collection<TKey, TMap, NullishDeep<KeyValueMapping[TKey]>>): Promise<void> {
+function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
     if (typeof collection !== 'object' || Array.isArray(collection) || utils.isEmptyObject(collection)) {
         Logger.logInfo('mergeCollection() called with invalid or empty value. Skipping this update.');
         return Promise.resolve();
@@ -564,7 +564,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
 
             const keysToBeClearedFromStorage: OnyxKey[] = [];
             const keyValuesToResetAsCollection: Record<OnyxKey, OnyxCollection<KeyValueMapping[OnyxKey]>> = {};
-            const keyValuesToResetIndividually: NullableKeyValueMapping = {};
+            const keyValuesToResetIndividually: KeyValueMapping = {};
 
             // The only keys that should not be cleared are:
             // 1. Anything specifically passed in keysToPreserve (because some keys like language preferences, offline
@@ -619,7 +619,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
             const defaultKeyValuePairs = Object.entries(
                 Object.keys(defaultKeyStates)
                     .filter((key) => !keysToPreserve.includes(key))
-                    .reduce((obj: NullableKeyValueMapping, key) => {
+                    .reduce((obj: KeyValueMapping, key) => {
                         // eslint-disable-next-line no-param-reassign
                         obj[key] = defaultKeyStates[key];
                         return obj;
