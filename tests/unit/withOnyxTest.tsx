@@ -817,4 +817,65 @@ describe('withOnyxTest', () => {
         textComponent = renderResult.getByText('null');
         expect(textComponent).not.toBeNull();
     });
+
+    it.only('sends up-to-date data to the component', async () => {
+        const TestComponentWithOnyx = withOnyx<ViewWithCollectionsProps, {text: unknown}>({
+            text: {
+                key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            },
+        })(ViewWithCollections);
+        const onRender = jest.fn();
+        const markReadyForHydration = jest.fn();
+
+        // Given there is a simple key that is not an array or object value
+        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {ID: 999},
+        } as GenericCollection);
+
+        return waitForPromisesToResolve().then(() => {
+            render(
+                <TestComponentWithOnyx
+                    onRender={onRender}
+                    markReadyForHydration={markReadyForHydration}
+                />,
+            );
+
+            expect(onRender).toHaveBeenCalledTimes(1);
+            expect(onRender).toHaveBeenLastCalledWith({
+                collections: {},
+                testObject: {isDefaultProp: true},
+                text: {
+                    test_1: {
+                        ID: 999,
+                    },
+                },
+                onRender,
+                markReadyForHydration,
+            });
+
+            Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}2`, {ID: 998} as GenericCollection);
+            Onyx.merge(ONYX_KEYS.SIMPLE_KEY, 'prev_string');
+
+            return waitForPromisesToResolve().then(() => {
+                Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}3`, {ID: 997} as GenericCollection);
+                Onyx.merge(ONYX_KEYS.SIMPLE_KEY, 'prev_string_2');
+
+                expect(onRender).toHaveBeenCalledTimes(2);
+                // expect(onRender).toHaveBeenLastCalledWith({
+                //     collections: {},
+                //     testObject: {isDefaultProp: true},
+                //     text: {
+                //         test_1: {
+                //             ID: 999,
+                //         },
+                //         test_2: {
+                //             ID: 998,
+                //         },
+                //     },
+                //     onRender,
+                //     markReadyForHydration,
+                // });
+            });
+        });
+    });
 });

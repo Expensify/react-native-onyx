@@ -17,6 +17,8 @@ function ViewWithCollections(
         markReadyForHydration,
     }));
 
+    console.log('{collections, testObject, onRender, markReadyForHydration, ...rest}', {collections, testObject, onRender, markReadyForHydration, ...rest});
+
     onRender?.({collections, testObject, onRender, markReadyForHydration, ...rest});
     if (utils.isEmptyObject(collections)) {
         return <Text>empty</Text>;
