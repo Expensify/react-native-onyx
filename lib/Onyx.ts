@@ -600,7 +600,6 @@ function updateSnapshots(data: OnyxUpdate[]) {
     if (!snapshotCollectionKey) return;
 
     const promises: Array<() => Promise<void>> = [];
-    const finalPromise = Promise.resolve();
 
     const snapshotCollection = OnyxUtils.getCachedCollection(snapshotCollectionKey);
 
@@ -633,7 +632,7 @@ function updateSnapshots(data: OnyxUpdate[]) {
         promises.push(() => merge(snapshotKey, {data: updatedData}));
     });
 
-    return finalPromise.then(() => Promise.all(promises.map((p) => p())));
+    return Promise.all(promises.map((p) => p()));
 }
 
 /**
