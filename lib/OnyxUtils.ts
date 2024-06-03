@@ -2,6 +2,7 @@
 /* eslint-disable no-continue */
 import {deepEqual} from 'fast-equals';
 import lodashClone from 'lodash/clone';
+import lodashDifference from 'lodash/difference';
 import type {ValueOf} from 'type-fest';
 import * as Logger from './Logger';
 import cache from './OnyxCache';
