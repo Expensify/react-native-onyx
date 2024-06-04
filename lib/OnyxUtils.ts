@@ -419,6 +419,12 @@ function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey
             return;
         }
 
+        const cachedValue = cache.get(key);
+
+        if (cachedValue === undefined && !cache.hasNullishStorageKey(key)) {
+            return;
+        }
+
         collection[key] = cache.get(key);
     });
 
@@ -438,11 +444,6 @@ function keysChanged<TKey extends CollectionKeyBase>(
     // We prepare the "cached collection" which is the entire collection + the new partial data that
     // was merged in via mergeCollection().
     const cachedCollection = getCachedCollection(collectionKey);
-
-    // If the previous collection equals the new collection then we do not need to notify any subscribers.
-    if (partialPreviousCollection !== undefined && deepEqual(cachedCollection, partialPreviousCollection)) {
-        return;
-    }
 
     const previousCollection = partialPreviousCollection ?? {};
 
@@ -532,12 +533,13 @@ function keysChanged<TKey extends CollectionKeyBase>(
                         const previousData = prevState[subscriber.statePropertyName];
                         const newData = reduceCollectionWithSelector(cachedCollection, collectionSelector, subscriber.withOnyxInstance.state);
 
-                        if (!deepEqual(previousData, newData)) {
-                            return {
-                                [subscriber.statePropertyName]: newData,
-                            };
+                        if (deepEqual(previousData, newData)) {
+                            return null;
                         }
-                        return null;
+
+                        return {
+                            [subscriber.statePropertyName]: newData,
+                        };
                     });
                     continue;
                 }
@@ -548,6 +550,10 @@ function keysChanged<TKey extends CollectionKeyBase>(
                     for (let j = 0; j < dataKeys.length; j++) {
                         const dataKey = dataKeys[j];
                         finalCollection[dataKey] = cachedCollection[dataKey];
+                    }
+
+                    if (!prevState.loading && deepEqual(cachedCollection, finalCollection)) {
+                        return null;
                     }
 
                     PerformanceUtils.logSetStateCall(subscriber, prevState?.[subscriber.statePropertyName], finalCollection, 'keysChanged', collectionKey);
@@ -579,14 +585,15 @@ function keysChanged<TKey extends CollectionKeyBase>(
                     subscriber.withOnyxInstance.setStateProxy((prevState) => {
                         const prevData = prevState[subscriber.statePropertyName];
                         const newData = selector(cachedCollection[subscriber.key], subscriber.withOnyxInstance.state);
-                        if (!deepEqual(prevData, newData)) {
-                            PerformanceUtils.logSetStateCall(subscriber, prevData, newData, 'keysChanged', collectionKey);
-                            return {
-                                [subscriber.statePropertyName]: newData,
-                            };
+
+                        if (deepEqual(prevData, newData)) {
+                            return null;
                         }
 
-                        return null;
+                        PerformanceUtils.logSetStateCall(subscriber, prevData, newData, 'keysChanged', collectionKey);
+                        return {
+                            [subscriber.statePropertyName]: newData,
+                        };
                     });
                     continue;
                 }
@@ -683,13 +690,15 @@ function keyChanged<TKey extends OnyxKey>(
                             ...prevWithOnyxData,
                             ...newWithOnyxData,
                         };
-                        if (!deepEqual(prevWithOnyxData, prevDataWithNewData)) {
-                            PerformanceUtils.logSetStateCall(subscriber, prevWithOnyxData, newWithOnyxData, 'keyChanged', key);
-                            return {
-                                [subscriber.statePropertyName]: prevDataWithNewData,
-                            };
+
+                        if (deepEqual(prevWithOnyxData, prevDataWithNewData)) {
+                            return null;
                         }
-                        return null;
+
+                        PerformanceUtils.logSetStateCall(subscriber, prevWithOnyxData, newWithOnyxData, 'keyChanged', key);
+                        return {
+                            [subscriber.statePropertyName]: prevDataWithNewData,
+                        };
                     });
                     continue;
                 }
@@ -711,16 +720,17 @@ function keyChanged<TKey extends OnyxKey>(
             // If the subscriber has a selector, then the component's state must only be updated with the data
             // returned by the selector and only if the selected data has changed.
             if (selector) {
-                subscriber.withOnyxInstance.setStateProxy(() => {
+                subscriber.withOnyxInstance.setStateProxy((prevState) => {
                     const prevValue = selector(previousValue, subscriber.withOnyxInstance.state);
                     const newValue = selector(value, subscriber.withOnyxInstance.state);
 
-                    if (!deepEqual(prevValue, newValue)) {
-                        return {
-                            [subscriber.statePropertyName]: newValue,
-                        };
+                    if (!prevState.loading && deepEqual(prevValue, newValue)) {
+                        return null;
                     }
-                    return null;
+
+                    return {
+                        [subscriber.statePropertyName]: newValue,
+                    };
                 });
                 continue;
             }
