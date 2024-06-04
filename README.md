@@ -167,7 +167,7 @@ export default withOnyx({
 })(App);
 ```
 
-While `Onyx.connect()` gives you more control on how your component reacts as data is fetched from disk, `withOnyx()` will delay the rendering of the wrapped component until all keys/entities have been fetched and passed to the component, this can be convenient for simple cases. This however, can really delay your application if many entities are connected to the same component, you can pass an `initialValue` to each key to allow Onyx to eagerly render your component with this value.
+Differently from `useOnyx()`, `withOnyx()` will delay the rendering of the wrapped component until all keys/entities have been fetched and passed to the component, this can be convenient for simple cases. This however, can really delay your application if many entities are connected to the same component, you can pass an `initialValue` to each key to allow Onyx to eagerly render your component with this value.
 
 ```javascript
 export default withOnyx({
