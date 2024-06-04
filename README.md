@@ -407,9 +407,9 @@ Onyx.init({
 ```
 
 ```js
-const ReportActionsView = ({isActiveReport}) => {
+const ReportActionsView = ({reportID, isActiveReport}) => {
     const [reportActions] = useOnyx(
-        ({reportID}) => `${ONYXKEYS.COLLECTION.REPORT_ACTIONS}${reportID}_`,
+        `${ONYXKEYS.COLLECTION.REPORT_ACTIONS}${reportID}_`,
         {canEvict: () => !isActiveReport}
     );
 
