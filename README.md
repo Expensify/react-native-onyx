@@ -202,32 +202,6 @@ Some components need to subscribe to multiple Onyx keys at once and sometimes, o
 Example: To get the policy of a report, the `policy` key depends on the `report` key.
 
 ```javascript
-import React from 'react';
-import {useOnyx} from 'react-native-onyx';
-const ONYXKEYS = {
-    REPORT: 'report_1234',
-    POLICY: 'policy_'
-};
-
-const App = () => {
-    const [report] = useOnyx(ONYXKEYS.REPORT);
-    const [policy] = useOnyx(`${ONYXKEYS.POLICY}${report.policyID}`);
-    
-    return (
-        <View>
-            {/* Render with policy data */}
-        </View>
-    );
-};
-
-export default App;
-```
-
-Background info:
-- The `key` value can be a function that returns the key that Onyx subscribes to
-- The first argument to the `key` function is the `props` from the component
-
-```javascript
 const App = ({reportID}) => {
     const [report] = useOnyx(`${ONYXKEYS.COLLECTION.REPORT}${reportID}`);
     const [policy] = useOnyx(`${ONYXKEYS.COLLECTION.POLICY}${report.policyID}`);
