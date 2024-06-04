@@ -247,7 +247,7 @@ export default App;
 1. The component mounts with a `reportID={1234}` prop.
 2. The `useOnyx` hook evaluates the mapping and subscribes to the key `reports_1234` using the `reportID` prop.
 3. The `useOnyx` hook fetches the data for the key `reports_1234` from Onyx and sets the state with the initial value (if provided).
-4. Since `policyID` is not defined yet, it defaults to `undefined`. The `useOnyx` hook subscribes to the key `policies_undefined`.
+4. Since `report` is not defined yet, `report?.policyID` defaults to `undefined`. The `useOnyx` hook subscribes to the key `policies_undefined`.
 5. The `useOnyx` hook reads the data and updates the state of the component:
    - `report={{reportID: 1234, policyID: 1, ...rest of the object...}}`   - `policy={undefined}` (since there is no policy with ID `undefined`)
 6. As there is still an `undefined` key, the `useOnyx` hook again evaluates the key `policies_1` after fetching the updated `report` object which has `policyID: 1`.
