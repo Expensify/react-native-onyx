@@ -137,7 +137,7 @@ export default App;
 
 The `useOnyx()` hook won't delay the rendering of the component using it while the key/entity is being fetched and passed to the component. However, you can simulate this behavior by checking if the `status` of the hook's result metadata is `loading`. When `status` is `loading` it means that the Onyx data is being loaded into cache and thus is not immediately available, while `loaded` means that the data is already loaded and available to be consumed.
 
-\```javascript
+```javascript
 const [reports, reportsResult] = useOnyx(ONYXKEYS.COLLECTION.REPORT);
 const [session, sessionResult] = useOnyx(ONYXKEYS.SESSION);
 
@@ -146,7 +146,7 @@ if (reportsResult.status === 'loading' || sessionResult.status === 'loading') {
 }
 
 // rest of the component's code.
-\```
+```
 
 > **Deprecated Note**: Please note, `withOnyx()` Higher Order Component (HOC) is now considered deprecated. Use `useOnyx()` hook instead.
 
