@@ -546,14 +546,15 @@ function keysChanged<TKey extends CollectionKeyBase>(
                 }
 
                 subscriber.withOnyxInstance.setStateProxy((prevState) => {
-                    const finalCollection = lodashClone(prevState?.[subscriber.statePropertyName] ?? {});
+                    const prevCollection = prevState?.[subscriber.statePropertyName] ?? {};
+                    const finalCollection = lodashClone(prevCollection);
                     const dataKeys = Object.keys(partialCollection ?? {});
                     for (let j = 0; j < dataKeys.length; j++) {
                         const dataKey = dataKeys[j];
                         finalCollection[dataKey] = cachedCollection[dataKey];
                     }
 
-                    if (!prevState.loading && deepEqual(cachedCollection, finalCollection)) {
+                    if (deepEqual(prevCollection, finalCollection)) {
                         return null;
                     }
 
@@ -600,20 +601,21 @@ function keysChanged<TKey extends CollectionKeyBase>(
                 }
 
                 subscriber.withOnyxInstance.setStateProxy((prevState) => {
-                    const data = cachedCollection[subscriber.key];
-                    const previousData = prevState[subscriber.statePropertyName];
+                    const prevData = prevState[subscriber.statePropertyName];
+                    const newData = cachedCollection[subscriber.key];
 
                     // Avoids triggering unnecessary re-renders when feeding empty objects
-                    if (utils.isEmptyObject(data) && utils.isEmptyObject(previousData)) {
-                        return null;
-                    }
-                    if (data === previousData) {
+                    if (utils.isEmptyObject(newData) && utils.isEmptyObject(prevData)) {
                         return null;
                     }
 
-                    PerformanceUtils.logSetStateCall(subscriber, previousData, data, 'keysChanged', collectionKey);
+                    if (deepEqual(prevData, newData)) {
+                        return null;
+                    }
+
+                    PerformanceUtils.logSetStateCall(subscriber, prevData, newData, 'keysChanged', collectionKey);
                     return {
-                        [subscriber.statePropertyName]: data,
+                        [subscriber.statePropertyName]: newData,
                     };
                 });
             }
@@ -705,12 +707,17 @@ function keyChanged<TKey extends OnyxKey>(
                 }
 
                 subscriber.withOnyxInstance.setStateProxy((prevState) => {
-                    const collection = prevState[subscriber.statePropertyName] || {};
+                    const prevCollection = prevState[subscriber.statePropertyName] || {};
                     const newCollection = {
-                        ...collection,
+                        ...prevCollection,
                         [key]: value,
                     };
-                    PerformanceUtils.logSetStateCall(subscriber, collection, newCollection, 'keyChanged', key);
+
+                    if (deepEqual(prevCollection, newCollection)) {
+                        return null;
+                    }
+
+                    PerformanceUtils.logSetStateCall(subscriber, prevCollection, newCollection, 'keyChanged', key);
                     return {
                         [subscriber.statePropertyName]: newCollection,
                     };
@@ -721,11 +728,11 @@ function keyChanged<TKey extends OnyxKey>(
             // If the subscriber has a selector, then the component's state must only be updated with the data
             // returned by the selector and only if the selected data has changed.
             if (selector) {
-                subscriber.withOnyxInstance.setStateProxy((prevState) => {
+                subscriber.withOnyxInstance.setStateProxy(() => {
                     const prevValue = selector(previousValue, subscriber.withOnyxInstance.state);
                     const newValue = selector(value, subscriber.withOnyxInstance.state);
 
-                    if (!prevState.loading && deepEqual(prevValue, newValue)) {
+                    if (deepEqual(prevValue, newValue)) {
                         return null;
                     }
 
