@@ -1060,7 +1060,11 @@ function prepareKeyValuePairsForStorage(data: Record<OnyxKey, OnyxInput<OnyxKey>
  *
  * @param changes Array of changes that should be applied to the existing value
  */
-function applyMerge<TValue extends OnyxInput<OnyxKey> | undefined>(existingValue: TValue, changes: TValue[], shouldRemoveNestedNulls: boolean): TValue {
+function applyMerge<TValue extends OnyxInput<OnyxKey> | undefined, TChange extends OnyxInput<OnyxKey> | undefined>(
+    existingValue: TValue,
+    changes: TChange[],
+    shouldRemoveNestedNulls: boolean,
+): TChange {
     const lastChange = changes?.at(-1);
 
     if (Array.isArray(lastChange)) {
@@ -1069,12 +1073,12 @@ function applyMerge<TValue extends OnyxInput<OnyxKey> | undefined>(existingValue
 
     if (changes.some((change) => change && typeof change === 'object')) {
         // Object values are then merged one after the other
-        return changes.reduce((modifiedData, change) => utils.fastMerge(modifiedData, change, shouldRemoveNestedNulls), (existingValue || {}) as TValue);
+        return changes.reduce((modifiedData, change) => utils.fastMerge(modifiedData, change, shouldRemoveNestedNulls), (existingValue || {}) as TChange);
     }
 
     // If we have anything else we can't merge it so we'll
     // simply return the last value that was queued
-    return lastChange as TValue;
+    return lastChange as TChange;
 }
 
 /**
