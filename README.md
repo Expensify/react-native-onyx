@@ -148,7 +148,9 @@ if (reportsResult.status === 'loading' || sessionResult.status === 'loading') {
 // rest of the component's code.
 ```
 
-> **Deprecated Note**: Please note, `withOnyx()` Higher Order Component (HOC) is now considered deprecated. Use `useOnyx()` hook instead.
+> [!warning]
+> ## Deprecated Note
+> Please note that the `withOnyx()` Higher Order Component (HOC) is now considered deprecated. Use `useOnyx()` hook instead.
 
 ```javascript
 import React from 'react';
