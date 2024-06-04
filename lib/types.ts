@@ -124,7 +124,7 @@ type OnyxKey = Key | CollectionKey;
 type Selector<TKey extends OnyxKey, TOnyxProps, TReturnType> = (value: OnyxEntry<KeyValueMapping[TKey]>, state?: WithOnyxState<TOnyxProps>) => TReturnType;
 
 /**
- * Represents a single Onyx entry, that can be either `TOnyxValue` or `null` / `undefined` if it doesn't exist.
+ * Represents a single Onyx entry, that can be either `TOnyxValue` or `undefined` if it doesn't exist.
  *
  * It can be used to specify data retrieved from Onyx e.g. `withOnyx` HOC mappings.
  *
@@ -154,15 +154,7 @@ type Selector<TKey extends OnyxKey, TOnyxProps, TReturnType> = (value: OnyxEntry
 type OnyxEntry<TOnyxValue> = TOnyxValue | undefined;
 
 /**
- * Represents an input value that can be passed to Onyx methods, that can be either `TOnyxValue` or `null`.
- * Setting a key to `null` will remove the key from the store.
- * `undefined` is not allowed for setting values, because it will have no effect on the data.
- */
-// type OnyxInput<TOnyxValue> = TOnyxValue | null;
-type OnyxInput<TKey extends OnyxKey> = string extends TKey ? unknown : TKey extends CollectionKeyBase ? OnyxCollection<KeyValueMapping[TKey]> : NullishDeep<KeyValueMapping[TKey]> | null;
-
-/**
- * Represents an Onyx collection of entries, that can be either a record of `TOnyxValue`s or `null` / `undefined` if it is empty or doesn't exist.
+ * Represents an Onyx collection of entries, that can be either a record of `TOnyxValue`s or `undefined` if it is empty or doesn't exist.
  *
  * It can be used to specify collection data retrieved from Onyx e.g. `withOnyx` HOC mappings.
  *
@@ -321,10 +313,82 @@ type Mapping<TKey extends OnyxKey> = ConnectOptions<TKey> & {
 };
 
 /**
+ * Represents a single Onyx input value, that can be either `TOnyxValue` or `null` if the key should be deleted.
+ *
+ * It can be used to specify data retrieved from Onyx e.g. `withOnyx` HOC mappings.
+ *
+ * @example
+ * ```ts
+ * import Onyx, {OnyxEntry, withOnyx} from 'react-native-onyx';
+ *
+ * type OnyxProps = {
+ *     userAccount: OnyxEntry<Account>;
+ * };
+ *
+ * type Props = OnyxProps & {
+ *     prop1: string;
+ * };
+ *
+ * function Component({prop1, userAccount}: Props) {
+ *     // ...
+ * }
+ *
+ * export default withOnyx<Props, OnyxProps>({
+ *     userAccount: {
+ *         key: ONYXKEYS.ACCOUNT,
+ *     },
+ * })(Component);
+ * ```
+ */
+type OnyxInputValue<TOnyxValue> = TOnyxValue | null;
+
+/**
+ * Represents an Onyx collection of inputs, that can be either a record of `TOnyxValue`s or `null` if the key should be deleted.
+ *
+ * It can be used to specify collection data retrieved from Onyx e.g. `withOnyx` HOC mappings.
+ *
+ * @example
+ * ```ts
+ * import Onyx, {OnyxCollection, withOnyx} from 'react-native-onyx';
+ *
+ * type OnyxProps = {
+ *     reports: OnyxCollection<Report>;
+ * };
+ *
+ * type Props = OnyxProps & {
+ *     prop1: string;
+ * };
+ *
+ * function Component({prop1, reports}: Props) {
+ *     // ...
+ * }
+ *
+ * export default withOnyx<Props, OnyxProps>({
+ *     reports: {
+ *         key: ONYXKEYS.COLLECTION.REPORT,
+ *     },
+ * })(Component);
+ * ```
+ */
+type OnyxCollectionInput<TOnyxValue> = OnyxInputValue<Record<string, TOnyxValue | null>>;
+
+/**
+ * Represents an input value that can be passed to Onyx methods, that can be either `TOnyxValue` or `null`.
+ * Setting a key to `null` will remove the key from the store.
+ * `undefined` is not allowed for setting values, because it will have no effect on the data.
+ */
+// type OnyxInput<TOnyxValue> = TOnyxValue | null;
+type OnyxInput<TKey extends OnyxKey> = string extends TKey
+    ? unknown
+    : TKey extends CollectionKeyBase
+    ? OnyxCollectionInput<KeyValueMapping[TKey]>
+    : OnyxInputValue<NullishDeep<KeyValueMapping[TKey]>>;
+
+/**
  * Represents a mapping object where each `OnyxKey` maps to either a value of its corresponding type in `KeyValueMapping` or `null`.
  *
  * It's very similar to `KeyValueMapping` but this type is used for inputs to Onyx
- * (set, merge, mergeCollection)  and therefore accepts using `null` as well.
+ * (set, merge, mergeCollection) and therefore accepts using `null` to remove a key from Onyx.
  */
 type OnyxInputKeyValueMapping = {
     [TKey in OnyxKey]: OnyxInput<TKey>;
@@ -446,8 +510,10 @@ export type {
     NullishDeep,
     OnyxCollection,
     OnyxEntry,
-    OnyxInput,
     OnyxKey,
+    OnyxInputValue,
+    OnyxCollectionInput,
+    OnyxInput,
     OnyxSetInput,
     OnyxMultiSetInput,
     OnyxMergeInput,
