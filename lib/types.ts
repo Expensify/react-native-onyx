@@ -283,7 +283,7 @@ type WithOnyxConnectOptions<TKey extends OnyxKey> = {
     canEvict?: boolean;
 };
 
-type DefaultConnectCallback<TKey extends OnyxKey> = (value: NonUndefined<OnyxEntry<KeyValueMapping[TKey]>>, key: TKey) => void;
+type DefaultConnectCallback<TKey extends OnyxKey> = (value: OnyxEntry<KeyValueMapping[TKey]>, key: TKey) => void;
 
 type CollectionConnectCallback<TKey extends OnyxKey> = (value: NonUndefined<OnyxCollection<KeyValueMapping[TKey]>>) => void;
 
