@@ -116,7 +116,7 @@ To teardown the subscription call `Onyx.disconnect()` with the `connectionID` re
 Onyx.disconnect(connectionID);
 ```
 
-We can also access values inside React functional components via the `useOnyx()` [hook](https://react.dev/reference/react/hooks) (recommended) or class components via the `withOnyx()` [higher order component](https://reactjs.org/docs/higher-order-components.html) (deprecated, not-recommended). When the data changes the component will re-render.
+We can also access values inside React function components via the `useOnyx()` [hook](https://react.dev/reference/react/hooks) (recommended) or class and function components via the `withOnyx()` [higher order component](https://reactjs.org/docs/higher-order-components.html) (deprecated, not-recommended). When the data changes the component will re-render.
 
 ```javascript
 import React from 'react';
