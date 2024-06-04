@@ -135,11 +135,18 @@ const App = () => {
 export default App;
 ```
 
-While `Onyx.connect()` gives you more control on how your component reacts as data is fetched from disk, `useOnyx()` will delay the rendering of the wrapped component until all keys/entities have been fetched and passed to the component, this can be convenient for simple cases. This however, can really delay your application if many entities are connected to the same component, you can pass an `initialValue` to each key to allow Onyx to eagerly render your component with this value.
+The `useOnyx()` hook won't delay the rendering of the component using it while the key/entity is being fetched and passed to the component. However, you can simulate this behavior by checking if the `status` of the hook's result metadata is `loading`. When `status` is `loading` it means that the Onyx data is being loaded into cache and thus is not immediately available, while `loaded` means that the data is already loaded and available to be consumed.
 
-```javascript
-const [session] = useOnyx('session', {initialValue: {}});
-```
+\```javascript
+const [reports, reportsResult] = useOnyx(ONYXKEYS.COLLECTION.REPORT);
+const [session, sessionResult] = useOnyx(ONYXKEYS.SESSION);
+
+if (reportsResult.status === 'loading' || sessionResult.status === 'loading') {
+    return <Placeholder />; // or `null` if you don't want to render anything.
+}
+
+// rest of the component's code.
+\```
 
 > **Deprecated Note**: Please note, `withOnyx()` Higher Order Component (HOC) is now considered deprecated. Use `useOnyx()` hook instead.
 
