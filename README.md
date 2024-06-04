@@ -251,7 +251,7 @@ export default App;
 5. The `useOnyx` hook reads the data and updates the state of the component:
    - `report={{reportID: 1234, policyID: 1, ...rest of the object...}}`
    - `policy={undefined}` (since there is no policy with ID `undefined`)
-6. As there is still an `undefined` key, the `useOnyx` hook again evaluates the key `policies_1` after fetching the updated `report` object which has `policyID: 1`.
+6. The `useOnyx` hook again evaluates the key `policies_1` after fetching the updated `report` object which has `policyID: 1`.
 7. The `useOnyx` hook reads the data and updates the state with:
    - `policy={{policyID: 1, ...rest of the object...}}`
 8. Now, all mappings have values that are defined (not undefined), and the component is rendered with all necessary data.
