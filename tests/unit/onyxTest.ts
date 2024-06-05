@@ -165,7 +165,7 @@ describe('Onyx', () => {
             })
             .then(() => {
                 // Test key should be cleared
-                expect(testKeyValue).toBeNull();
+                expect(testKeyValue).toBeUndefined();
 
                 // Other test key should be returned to its default state
                 expect(otherTestValue).toBe(42);
@@ -1212,7 +1212,7 @@ describe('Onyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                expect(testKeyValue).toEqual(null);
+                expect(testKeyValue).toEqual(undefined);
                 return Onyx.merge(ONYX_KEYS.TEST_KEY, 2);
             })
             .then(() => {
@@ -1275,7 +1275,7 @@ describe('Onyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                expect(testKeyValue).toEqual(null);
+                expect(testKeyValue).toEqual(undefined);
             });
     });
 
