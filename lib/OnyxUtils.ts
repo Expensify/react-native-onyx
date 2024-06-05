@@ -945,7 +945,7 @@ function scheduleNotifyCollectionSubscribers<TKey extends OnyxKey>(
 function remove<TKey extends OnyxKey>(key: TKey): Promise<void> {
     const prevValue = cache.get(key, false) as OnyxValue<TKey>;
     cache.drop(key);
-    scheduleSubscriberUpdate(key, null as OnyxValue<TKey>, prevValue);
+    scheduleSubscriberUpdate(key, undefined as OnyxValue<TKey>, prevValue);
     return Storage.removeItem(key).then(() => undefined);
 }
 
