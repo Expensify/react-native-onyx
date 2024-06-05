@@ -423,12 +423,12 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
  * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
  * @param collection Object collection keyed by individual collection member keys and values
  */
-function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
+function mergeCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey>): Promise<void> {
     if (typeof collection !== 'object' || Array.isArray(collection) || utils.isEmptyObject(collection)) {
         Logger.logInfo('mergeCollection() called with invalid or empty value. Skipping this update.');
         return Promise.resolve();
     }
-    const mergedCollection: OnyxInputKeyValueMapping = collection;
+    const mergedCollection = collection;
 
     // Confirm all the collection keys belong to the same parent
     let hasCollectionKeyCheckFailed = false;
