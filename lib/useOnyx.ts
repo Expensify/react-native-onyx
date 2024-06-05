@@ -2,20 +2,10 @@ import {deepEqual} from 'fast-equals';
 import {useCallback, useEffect, useRef, useSyncExternalStore} from 'react';
 import type {IsEqual} from 'type-fest';
 import OnyxUtils from './OnyxUtils';
-import type {CollectionKeyBase, KeyValueMapping, NonNull, OnyxCollection, OnyxEntry, OnyxKey, Selector} from './types';
+import type {CollectionKeyBase, OnyxCollection, OnyxKey, OnyxValue, Selector} from './types';
 import useLiveRef from './useLiveRef';
 import usePrevious from './usePrevious';
 import Onyx from './Onyx';
-
-/**
- * Represents a Onyx value that can be either a single entry or a collection of entries, depending on the `TKey` provided.
- * It's a variation of `OnyxValue` type that is read-only and excludes the `null` type.
- */
-type UseOnyxValue<TKey extends OnyxKey> = string extends TKey
-    ? unknown
-    : TKey extends CollectionKeyBase
-    ? NonNull<OnyxCollection<KeyValueMapping[TKey]>>
-    : NonNull<OnyxEntry<KeyValueMapping[TKey]>>;
 
 type BaseUseOnyxOptions = {
     /**
@@ -55,7 +45,7 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = BaseUseOnyxOptions & U
 
 type FetchStatus = 'loading' | 'loaded';
 
-type CachedValue<TKey extends OnyxKey, TValue> = IsEqual<TValue, UseOnyxValue<TKey>> extends true ? TValue : TKey extends CollectionKeyBase ? NonNullable<OnyxCollection<TValue>> : TValue;
+type CachedValue<TKey extends OnyxKey, TValue> = IsEqual<TValue, OnyxValue<TKey>> extends true ? TValue : TKey extends CollectionKeyBase ? NonNullable<OnyxCollection<TValue>> : TValue;
 
 type ResultMetadata = {
     status: FetchStatus;
@@ -67,15 +57,15 @@ function getCachedValue<TKey extends OnyxKey, TValue>(key: TKey, selector?: Sele
     return OnyxUtils.tryGetCachedValue(key, {selector}) as CachedValue<TKey, TValue> | undefined;
 }
 
-function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(
+function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     key: TKey,
     options?: BaseUseOnyxOptions & UseOnyxInitialValueOption<TReturnValue> & Required<UseOnyxSelectorOption<TKey, TReturnValue>>,
 ): UseOnyxResult<TKey, TReturnValue>;
-function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(
+function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     key: TKey,
     options?: BaseUseOnyxOptions & UseOnyxInitialValueOption<NoInfer<TReturnValue>>,
 ): UseOnyxResult<TKey, TReturnValue>;
-function useOnyx<TKey extends OnyxKey, TReturnValue = UseOnyxValue<TKey>>(key: TKey, options?: UseOnyxOptions<TKey, TReturnValue>): UseOnyxResult<TKey, TReturnValue> {
+function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey, options?: UseOnyxOptions<TKey, TReturnValue>): UseOnyxResult<TKey, TReturnValue> {
     const connectionIDRef = useRef<number | null>(null);
     const previousKey = usePrevious(key);
 
