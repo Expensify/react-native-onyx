@@ -321,7 +321,7 @@ type OnyxInputValue<TOnyxValue> = TOnyxValue | null;
 /**
  * Represents an Onyx collection input, that can be either a record of `TOnyxValue`s or `null` if the key should be deleted.
  */
-type OnyxCollectionInput<TOnyxValue> = OnyxInputValue<Record<string, TOnyxValue | null>>;
+type OnyxCollectionInputValue<TOnyxValue> = OnyxInputValue<Record<string, TOnyxValue | null>>;
 
 /**
  * Represents an input value that can be passed to Onyx methods, that can be either `TOnyxValue` or `null`.
@@ -358,7 +358,7 @@ type OnyxMergeInput<TKey extends OnyxKey> = OnyxInput<TKey>;
 /**
  * This represents the value that can be passed to `Onyx.merge` and to `Onyx.update` with the method "MERGE"
  */
-type OnyxMergeCollectionInput<TKey extends OnyxKey> = OnyxCollectionInput<NullishDeep<KeyValueMapping[TKey]>>;
+type OnyxMergeCollectionInput<TKey extends OnyxKey> = OnyxCollectionInputValue<NullishDeep<KeyValueMapping[TKey]>>;
 
 /**
  * Represents different kinds of updates that can be passed to `Onyx.update()` method. It is a discriminated union of
@@ -458,7 +458,7 @@ export type {
     OnyxEntry,
     OnyxKey,
     OnyxInputValue,
-    OnyxCollectionInput,
+    OnyxCollectionInputValue,
     OnyxInput,
     OnyxSetInput,
     OnyxMultiSetInput,
