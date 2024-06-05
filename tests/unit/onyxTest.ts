@@ -249,27 +249,6 @@ describe('Onyx', () => {
         });
     });
 
-    it('should ignore top-level undefined values', () => {
-        let testKeyValue: unknown;
-
-        connectionID = Onyx.connect({
-            key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
-            callback: (value) => {
-                testKeyValue = value;
-            },
-        });
-
-        return Onyx.set(ONYX_KEYS.TEST_KEY, {test1: 'test1'})
-            .then(() => {
-                expect(testKeyValue).toEqual({test1: 'test1'});
-                return Onyx.merge(ONYX_KEYS.TEST_KEY, undefined);
-            })
-            .then(() => {
-                expect(testKeyValue).toEqual({test1: 'test1'});
-            });
-    });
-
     it('should remove keys that are set to null when merging', () => {
         let testKeyValue: unknown;
 
@@ -478,8 +457,47 @@ describe('Onyx', () => {
             })
             .then(() => {
                 expect(testKeyValue).toEqual({test1: {test2: 'test2', test3: 'test3'}});
-                return Onyx.merge(ONYX_KEYS.TEST_KEY, undefined);
             });
+    });
+
+    it('should ignore top-level and remove nested `undefined` values in Onyx.mergeCollection', () => {
+        let result: OnyxCollection<unknown>;
+
+        const routineRoute = `${ONYX_KEYS.COLLECTION.TEST_KEY}routine`;
+        const holidayRoute = `${ONYX_KEYS.COLLECTION.TEST_KEY}holiday`;
+        const workRoute = `${ONYX_KEYS.COLLECTION.TEST_KEY}work`;
+
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => (result = value),
+            waitForCollectionCallback: true,
+        });
+
+        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+            [routineRoute]: {
+                waypoints: {
+                    1: 'Home',
+                    2: 'Work',
+                    3: undefined,
+                },
+            },
+            [holidayRoute]: {
+                waypoints: undefined,
+            },
+            [workRoute]: undefined,
+        } as GenericCollection).then(() => {
+            expect(result).toEqual({
+                [routineRoute]: {
+                    waypoints: {
+                        1: 'Home',
+                        2: 'Work',
+                    },
+                },
+                [holidayRoute]: {},
+                [workRoute]: undefined,
+            });
+        });
     });
 
     it('should overwrite an array key nested inside an object', () => {
@@ -1202,7 +1220,7 @@ describe('Onyx', () => {
             });
     });
 
-    it('should merge a non-existing key with a nested null removed', () => {
+    it("should not set null values in Onyx.merge, when the key doesn't exist yet", () => {
         let testKeyValue: unknown;
 
         connectionID = Onyx.connect({
@@ -1259,33 +1277,6 @@ describe('Onyx', () => {
             .then(() => {
                 expect(testKeyValue).toEqual(null);
             });
-    });
-
-    it('should merge a non-existing key with a nested null removed', () => {
-        let testKeyValue: unknown;
-
-        connectionID = Onyx.connect({
-            key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
-            callback: (value) => {
-                testKeyValue = value;
-            },
-        });
-
-        return Onyx.merge(ONYX_KEYS.TEST_KEY, {
-            waypoints: {
-                1: 'Home',
-                2: 'Work',
-                3: null,
-            },
-        }).then(() => {
-            expect(testKeyValue).toEqual({
-                waypoints: {
-                    1: 'Home',
-                    2: 'Work',
-                },
-            });
-        });
     });
 
     it('mergeCollection should omit nested null values', () => {
