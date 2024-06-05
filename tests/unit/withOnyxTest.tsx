@@ -810,7 +810,7 @@ describe('withOnyxTest', () => {
         // Correct data has been passed to the selector
         expect(selector).not.toHaveBeenCalledWith('world', expect.anything());
         expect(selector).not.toHaveBeenCalledWith('dougal', expect.anything());
-        expect(selector).toHaveBeenLastCalledWith(sourceData, {loading: false, text: 'world'});
+        expect(selector).toHaveBeenLastCalledWith(undefined, {loading: false, text: 'world'});
 
         // Default text has been rendered
         expect(onRender).toHaveBeenCalledTimes(1);
