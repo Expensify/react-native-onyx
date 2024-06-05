@@ -314,31 +314,7 @@ type Mapping<TKey extends OnyxKey> = ConnectOptions<TKey> & {
 
 /**
  * Represents a single Onyx input value, that can be either `TOnyxValue` or `null` if the key should be deleted.
- *
- * It can be used to specify data retrieved from Onyx e.g. `withOnyx` HOC mappings.
- *
- * @example
- * ```ts
- * import Onyx, {OnyxEntry, withOnyx} from 'react-native-onyx';
- *
- * type OnyxProps = {
- *     userAccount: OnyxEntry<Account>;
- * };
- *
- * type Props = OnyxProps & {
- *     prop1: string;
- * };
- *
- * function Component({prop1, userAccount}: Props) {
- *     // ...
- * }
- *
- * export default withOnyx<Props, OnyxProps>({
- *     userAccount: {
- *         key: ONYXKEYS.ACCOUNT,
- *     },
- * })(Component);
- * ```
+ * This type is used for data passed to Onyx e.g. in `Onyx.merge` and `Onyx.set`.
  */
 type OnyxInputValue<TOnyxValue> = TOnyxValue | null;
 
@@ -347,7 +323,6 @@ type OnyxInputValue<TOnyxValue> = TOnyxValue | null;
  * Setting a key to `null` will remove the key from the store.
  * `undefined` is not allowed for setting values, because it will have no effect on the data.
  */
-// type OnyxInput<TOnyxValue> = TOnyxValue | null;
 type OnyxInput<TKey extends OnyxKey> = OnyxInputValue<NullishDeep<KeyValueMapping[TKey]>>;
 
 /**
