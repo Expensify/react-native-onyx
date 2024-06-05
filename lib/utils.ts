@@ -45,7 +45,10 @@ function mergeObject<TObject extends Record<string, unknown>>(target: TObject | 
 
             // If "shouldRemoveNestedNulls" is true, we want to remove null values from the merged object.
             // Therefore, if either target or source value is null, we want to prevent the key from being set.
-            const isSourceOrTargetNull = targetValue === null || sourceValue === null;
+            // targetValue should techincally never be "undefined", because it will always be a value from cache or storage
+            // and we never set "undefined" there. Still, if there targetValue is undefined we don't want to set
+            // the key explicitly to prevent loose undefined values in objects in cache and storage.
+            const isSourceOrTargetNull = targetValue === undefined || targetValue === null || sourceValue === null;
             const shouldOmitTargetKey = shouldRemoveNestedNulls && isSourceOrTargetNull;
 
             if (!shouldOmitTargetKey) {
