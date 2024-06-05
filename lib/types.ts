@@ -319,11 +319,17 @@ type Mapping<TKey extends OnyxKey> = ConnectOptions<TKey> & {
 type OnyxInputValue<TOnyxValue> = TOnyxValue | null;
 
 /**
+ * Represents an Onyx collection input, that can be either a record of `TOnyxValue`s or `null` if the key should be deleted.
+ */
+type OnyxCollectionInput<TOnyxValue> = OnyxInputValue<Record<string, TOnyxValue | null>>;
+
+/**
  * Represents an input value that can be passed to Onyx methods, that can be either `TOnyxValue` or `null`.
  * Setting a key to `null` will remove the key from the store.
  * `undefined` is not allowed for setting values, because it will have no effect on the data.
  */
-type OnyxInput<TKey extends OnyxKey> = OnyxInputValue<NullishDeep<KeyValueMapping[TKey]>>;
+// type OnyxInput<TKey extends OnyxKey> = OnyxInputValue<NullishDeep<KeyValueMapping[TKey]>>;
+type OnyxInput<TKey extends OnyxKey> = string extends TKey ? unknown : TKey extends CollectionKeyBase ? OnyxCollectionInput<KeyValueMapping[TKey]> : OnyxInputValue<KeyValueMapping[TKey]>;
 
 /**
  * Represents a mapping object where each `OnyxKey` maps to either a value of its corresponding type in `KeyValueMapping` or `null`.
@@ -453,6 +459,7 @@ export type {
     OnyxEntry,
     OnyxKey,
     OnyxInputValue,
+    OnyxCollectionInput,
     OnyxInput,
     OnyxSetInput,
     OnyxMultiSetInput,
