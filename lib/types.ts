@@ -328,8 +328,7 @@ type OnyxCollectionInput<TOnyxValue> = OnyxInputValue<Record<string, TOnyxValue 
  * Setting a key to `null` will remove the key from the store.
  * `undefined` is not allowed for setting values, because it will have no effect on the data.
  */
-// type OnyxInput<TKey extends OnyxKey> = OnyxInputValue<NullishDeep<KeyValueMapping[TKey]>>;
-type OnyxInput<TKey extends OnyxKey> = string extends TKey ? unknown : TKey extends CollectionKeyBase ? OnyxCollectionInput<KeyValueMapping[TKey]> : OnyxInputValue<KeyValueMapping[TKey]>;
+type OnyxInput<TKey extends OnyxKey> = OnyxInputValue<NullishDeep<KeyValueMapping[TKey]>>;
 
 /**
  * Represents a mapping object where each `OnyxKey` maps to either a value of its corresponding type in `KeyValueMapping` or `null`.
