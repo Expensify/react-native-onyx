@@ -358,7 +358,7 @@ type OnyxMergeInput<TKey extends OnyxKey> = OnyxInput<TKey>;
 /**
  * This represents the value that can be passed to `Onyx.merge` and to `Onyx.update` with the method "MERGE"
  */
-type OnyxMergeCollectionInput<TKey extends OnyxKey> = OnyxCollectionInputValue<NullishDeep<KeyValueMapping[TKey]>>;
+type OnyxMergeCollectionInput<TKey extends OnyxKey, TMap = object> = Collection<TKey, NonNullable<OnyxInput<TKey>>, TMap>;
 
 /**
  * Represents different kinds of updates that can be passed to `Onyx.update()` method. It is a discriminated union of
