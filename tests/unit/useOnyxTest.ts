@@ -163,6 +163,7 @@ describe('useOnyx', () => {
         });
 
         it('should return selected data from a collection key', async () => {
+            // @ts-expect-error bypass
             Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, {
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
@@ -195,6 +196,7 @@ describe('useOnyx', () => {
         });
 
         it('should not change selected data if a property outside the selector was changed', async () => {
+            // @ts-expect-error bypass
             Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, {
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
