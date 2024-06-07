@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/prefer-for-of */
 
-import type {OnyxKey, OnyxValue} from './types';
+import type {OnyxInput, OnyxKey} from './types';
 
 type EmptyObject = Record<string, never>;
 type EmptyValue = EmptyObject | null | undefined;
@@ -27,23 +27,28 @@ function isMergeableObject(value: unknown): value is Record<string, unknown> {
  * @param shouldRemoveNestedNulls - If true, null object values will be removed.
  * @returns - The merged object.
  */
-function mergeObject<TObject extends Record<string, unknown>>(target: TObject | null, source: TObject, shouldRemoveNestedNulls = true): TObject {
+function mergeObject<TObject extends Record<string, unknown>>(target: TObject | unknown | null | undefined, source: TObject, shouldRemoveNestedNulls = true): TObject {
     const destination: Record<string, unknown> = {};
+
+    const targetObject = isMergeableObject(target) ? target : undefined;
 
     // First we want to copy over all keys from the target into the destination object,
     // in case "target" is a mergable object.
     // If "shouldRemoveNestedNulls" is true, we want to remove null values from the merged object
     // and therefore we need to omit keys where either the source or target value is null.
-    if (isMergeableObject(target)) {
-        const targetKeys = Object.keys(target);
+    if (targetObject) {
+        const targetKeys = Object.keys(targetObject);
         for (let i = 0; i < targetKeys.length; ++i) {
             const key = targetKeys[i];
             const sourceValue = source?.[key];
-            const targetValue = target?.[key];
+            const targetValue = targetObject?.[key];
 
             // If "shouldRemoveNestedNulls" is true, we want to remove null values from the merged object.
             // Therefore, if either target or source value is null, we want to prevent the key from being set.
-            const isSourceOrTargetNull = targetValue === null || sourceValue === null;
+            // targetValue should techincally never be "undefined", because it will always be a value from cache or storage
+            // and we never set "undefined" there. Still, if there targetValue is undefined we don't want to set
+            // the key explicitly to prevent loose undefined values in objects in cache and storage.
+            const isSourceOrTargetNull = targetValue === undefined || targetValue === null || sourceValue === null;
             const shouldOmitTargetKey = shouldRemoveNestedNulls && isSourceOrTargetNull;
 
             if (!shouldOmitTargetKey) {
@@ -57,7 +62,7 @@ function mergeObject<TObject extends Record<string, unknown>>(target: TObject | 
     for (let i = 0; i < sourceKeys.length; ++i) {
         const key = sourceKeys[i];
         const sourceValue = source?.[key];
-        const targetValue = target?.[key];
+        const targetValue = targetObject?.[key];
 
         // If undefined is passed as the source value for a key, we want to generally ignore it.
         // If "shouldRemoveNestedNulls" is set to true and the source value is null,
@@ -92,7 +97,7 @@ function mergeObject<TObject extends Record<string, unknown>>(target: TObject | 
  * On native, when merging an existing value with new changes, SQLite will use JSON_PATCH, which removes top-level nullish values.
  * To be consistent with the behaviour for merge, we'll also want to remove null values for "set" operations.
  */
-function fastMerge<TObject extends Record<string, unknown>>(target: TObject | null, source: TObject | null, shouldRemoveNestedNulls = true): TObject | null {
+function fastMerge<TValue>(target: TValue, source: TValue, shouldRemoveNestedNulls = true): TValue {
     // We have to ignore arrays and nullish values here,
     // otherwise "mergeObject" will throw an error,
     // because it expects an object as "source"
@@ -100,14 +105,14 @@ function fastMerge<TObject extends Record<string, unknown>>(target: TObject | nu
         return source;
     }
 
-    return mergeObject(target, source, shouldRemoveNestedNulls);
+    return mergeObject(target, source as Record<string, unknown>, shouldRemoveNestedNulls) as TValue;
 }
 
 /** Deep removes the nested null values from the given value. */
-function removeNestedNullValues<TValue extends OnyxValue<OnyxKey> | unknown | unknown[]>(value: TValue | null): TValue | null {
+function removeNestedNullValues<TValue extends OnyxInput<OnyxKey> | null>(value: TValue): TValue {
     if (typeof value === 'object' && !Array.isArray(value)) {
-        const objectValue = value as Record<string, unknown> | null;
-        return fastMerge(objectValue, objectValue) as TValue | null;
+        const objectValue = value as Record<string, unknown>;
+        return fastMerge(objectValue, objectValue) as TValue;
     }
 
     return value;

@@ -228,7 +228,8 @@ export default function <TComponentProps, TOnyxProps>(
                 this.tempState[statePropertyName] = val;
 
                 // If some key does not have a value yet, do not update the state yet
-                const tempStateIsMissingKey = requiredKeysForInit.some((key) => this.tempState?.[key as keyof TOnyxProps] === undefined);
+                const tempStateIsMissingKey = requiredKeysForInit.some((key) => !(key in (this.tempState ?? {})));
+
                 if (tempStateIsMissingKey) {
                     return;
                 }

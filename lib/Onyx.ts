@@ -13,7 +13,7 @@ import type {
     InitOptions,
     KeyValueMapping,
     Mapping,
-    NullableKeyValueMapping,
+    OnyxInputKeyValueMapping,
     OnyxCollection,
     OnyxKey,
     OnyxMergeCollectionInput,
@@ -22,6 +22,7 @@ import type {
     OnyxSetInput,
     OnyxUpdate,
     OnyxValue,
+    OnyxInput,
 } from './types';
 import OnyxUtils from './OnyxUtils';
 import logMessages from './logMessages';
@@ -216,10 +217,14 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>): Promis
         delete OnyxUtils.getMergeQueue()[key];
     }
 
-    const existingValue = cache.get(key, false);
+    // Onyx.set will ignore `undefined` values as inputs, therefore we can return early.
+    if (value === undefined) {
+        return Promise.resolve();
+    }
 
+    const existingValue = cache.get(key, false);
     // If the existing value as well as the new value are null, we can return early.
-    if (value === null && existingValue === null) {
+    if (existingValue === undefined && value === null) {
         return Promise.resolve();
     }
 
@@ -274,21 +279,9 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>): Promis
  * @param data object keyed by ONYXKEYS and the values to set
  */
 function multiSet(data: OnyxMultiSetInput): Promise<void> {
-    const allKeyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(data, true);
+    const keyValuePairsToSet = OnyxUtils.prepareKeyValuePairsForStorage(data, true);
 
-    // When a key is set to null, we need to remove the remove the key from storage using "OnyxUtils.remove".
-    // Therefore, we filter the key value pairs to exclude null values and remove those keys explicitly.
-    const removePromises: Array<Promise<void>> = [];
-    const keyValuePairsToUpdate = allKeyValuePairs.filter(([key, value]) => {
-        if (value === null) {
-            removePromises.push(OnyxUtils.remove(key));
-            return false;
-        }
-
-        return true;
-    });
-
-    const updatePromises = keyValuePairsToUpdate.map(([key, value]) => {
+    const updatePromises = keyValuePairsToSet.map(([key, value]) => {
         const prevValue = cache.get(key, false);
 
         // Update cache and optimistically inform subscribers on the next tick
@@ -296,11 +289,11 @@ function multiSet(data: OnyxMultiSetInput): Promise<void> {
         return OnyxUtils.scheduleSubscriberUpdate(key, value, prevValue);
     });
 
-    return Storage.multiSet(allKeyValuePairs)
+    return Storage.multiSet(keyValuePairsToSet)
         .catch((error) => OnyxUtils.evictStorageAndRetry(error, multiSet, data))
         .then(() => {
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MULTI_SET, undefined, data);
-            return Promise.all([removePromises, updatePromises]);
+            return Promise.all(updatePromises);
         })
         .then(() => undefined);
 }
@@ -354,7 +347,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
                     Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'merge', existingValueType, newValueType));
                 }
                 return isCompatible;
-            });
+            }) as Array<OnyxInput<TKey>>;
 
             if (!validChanges.length) {
                 return Promise.resolve();
@@ -435,7 +428,7 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
         Logger.logInfo('mergeCollection() called with invalid or empty value. Skipping this update.');
         return Promise.resolve();
     }
-    const mergedCollection: NullableKeyValueMapping = collection;
+    const mergedCollection: OnyxInputKeyValueMapping = collection;
 
     // Confirm all the collection keys belong to the same parent
     let hasCollectionKeyCheckFailed = false;
@@ -474,7 +467,7 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
 
             const newKeys = keys.filter((key) => !persistedKeys.has(key));
 
-            const existingKeyCollection = existingKeys.reduce((obj: NullableKeyValueMapping, key) => {
+            const existingKeyCollection = existingKeys.reduce((obj: OnyxInputKeyValueMapping, key) => {
                 const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(mergedCollection[key], cachedCollectionForExistingKeys[key]);
                 if (!isCompatible) {
                     Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'mergeCollection', existingValueType, newValueType));
@@ -483,13 +476,13 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
                 // eslint-disable-next-line no-param-reassign
                 obj[key] = mergedCollection[key];
                 return obj;
-            }, {});
+            }, {}) as Record<OnyxKey, OnyxInput<TKey>>;
 
-            const newCollection = newKeys.reduce((obj: NullableKeyValueMapping, key) => {
+            const newCollection = newKeys.reduce((obj: OnyxInputKeyValueMapping, key) => {
                 // eslint-disable-next-line no-param-reassign
                 obj[key] = mergedCollection[key];
                 return obj;
-            }, {});
+            }, {}) as Record<OnyxKey, OnyxInput<TKey>>;
 
             // When (multi-)merging the values with the existing values in storage,
             // we don't want to remove nested null values from the data that we pass to the storage layer,
@@ -582,7 +575,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                 //      since collection key subscribers need to be updated differently
                 if (!isKeyToPreserve) {
                     const oldValue = cache.get(key);
-                    const newValue = defaultKeyStates[key] ?? null;
+                    const newValue = defaultKeyStates[key] ?? undefined;
                     if (newValue !== oldValue) {
                         cache.set(key, newValue);
                         const collectionKey = key.substring(0, key.indexOf('_') + 1);

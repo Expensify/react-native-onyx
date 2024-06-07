@@ -113,33 +113,6 @@ type CollectionKey = `${CollectionKeyBase}${string}`;
 type OnyxKey = Key | CollectionKey;
 
 /**
- * Represents a Onyx value that can be either a single entry or a collection of entries, depending on the `TKey` provided.
- */
-type OnyxValue<TKey extends OnyxKey> = string extends TKey ? unknown : TKey extends CollectionKeyBase ? OnyxCollection<KeyValueMapping[TKey]> : OnyxEntry<KeyValueMapping[TKey]>;
-
-/**
- * Represents a mapping of Onyx keys to values, where keys are either normal or collection Onyx keys
- * and values are the corresponding values in Onyx's state.
- *
- * For collection keys, `KeyValueMapping` allows any string to be appended
- * to the key (e.g., 'report_some-id', 'download_some-id').
- *
- * The mapping is derived from the `values` property of the `TypeOptions` type.
- */
-type KeyValueMapping = {
-    [TKey in keyof TypeOptions['values'] as TKey extends CollectionKeyBase ? `${TKey}${string}` : TKey]: TypeOptions['values'][TKey];
-};
-
-/**
- * Represents a mapping object where each `OnyxKey` maps to either a value of its corresponding type in `KeyValueMapping` or `null`.
- *
- * It's very similar to `KeyValueMapping` but this type accepts using `null` as well.
- */
-type NullableKeyValueMapping = {
-    [TKey in OnyxKey]: NonUndefined<OnyxValue<TKey>> | null;
-};
-
-/**
  * Represents a selector function type which operates based on the provided `TKey` and `ReturnType`.
  *
  * A `Selector` is a function that accepts a value, the withOnyx's internal state and returns a processed value.
@@ -151,7 +124,7 @@ type NullableKeyValueMapping = {
 type Selector<TKey extends OnyxKey, TOnyxProps, TReturnType> = (value: OnyxEntry<KeyValueMapping[TKey]>, state?: WithOnyxState<TOnyxProps>) => TReturnType;
 
 /**
- * Represents a single Onyx entry, that can be either `TOnyxValue` or `null` / `undefined` if it doesn't exist.
+ * Represents a single Onyx entry, that can be either `TOnyxValue` or `undefined` if it doesn't exist.
  *
  * It can be used to specify data retrieved from Onyx e.g. `withOnyx` HOC mappings.
  *
@@ -181,14 +154,7 @@ type Selector<TKey extends OnyxKey, TOnyxProps, TReturnType> = (value: OnyxEntry
 type OnyxEntry<TOnyxValue> = TOnyxValue | undefined;
 
 /**
- * Represents an input value that can be passed to Onyx methods, that can be either `TOnyxValue` or `null`.
- * Setting a key to `null` will remove the key from the store.
- * `undefined` is not allowed for setting values, because it will have no effect on the data.
- */
-type OnyxInput<TOnyxValue> = TOnyxValue | null;
-
-/**
- * Represents an Onyx collection of entries, that can be either a record of `TOnyxValue`s or `null` / `undefined` if it is empty or doesn't exist.
+ * Represents an Onyx collection of entries, that can be either a record of `TOnyxValue`s or `undefined` if it is empty or doesn't exist.
  *
  * It can be used to specify collection data retrieved from Onyx e.g. `withOnyx` HOC mappings.
  *
@@ -216,6 +182,24 @@ type OnyxInput<TOnyxValue> = TOnyxValue | null;
  * ```
  */
 type OnyxCollection<TOnyxValue> = OnyxEntry<Record<string, TOnyxValue | undefined>>;
+
+/**
+ * Represents a mapping of Onyx keys to values, where keys are either normal or collection Onyx keys
+ * and values are the corresponding values in Onyx's state.
+ *
+ * For collection keys, `KeyValueMapping` allows any string to be appended
+ * to the key (e.g., 'report_some-id', 'download_some-id').
+ *
+ * The mapping is derived from the `values` property of the `TypeOptions` type.
+ */
+type KeyValueMapping = {
+    [TKey in keyof TypeOptions['values'] as TKey extends CollectionKeyBase ? `${TKey}${string}` : TKey]: TypeOptions['values'][TKey];
+};
+
+/**
+ * Represents a Onyx value that can be either a single entry or a collection of entries, depending on the `TKey` provided.
+ */
+type OnyxValue<TKey extends OnyxKey> = string extends TKey ? unknown : TKey extends CollectionKeyBase ? OnyxCollection<KeyValueMapping[TKey]> : OnyxEntry<KeyValueMapping[TKey]>;
 
 /** Utility type to extract `TOnyxValue` from `OnyxCollection<TOnyxValue>` */
 type ExtractOnyxCollectionValue<TOnyxCollection> = TOnyxCollection extends NonNullable<OnyxCollection<infer U>> ? U : never;
@@ -291,7 +275,7 @@ type WithOnyxConnectOptions<TKey extends OnyxKey> = {
     canEvict?: boolean;
 };
 
-type DefaultConnectCallback<TKey extends OnyxKey> = (value: NonUndefined<OnyxEntry<KeyValueMapping[TKey]>>, key: TKey) => void;
+type DefaultConnectCallback<TKey extends OnyxKey> = (value: OnyxEntry<KeyValueMapping[TKey]>, key: TKey) => void;
 
 type CollectionConnectCallback<TKey extends OnyxKey> = (value: NonUndefined<OnyxCollection<KeyValueMapping[TKey]>>) => void;
 
@@ -329,24 +313,52 @@ type Mapping<TKey extends OnyxKey> = ConnectOptions<TKey> & {
 };
 
 /**
+ * Represents a single Onyx input value, that can be either `TOnyxValue` or `null` if the key should be deleted.
+ * This type is used for data passed to Onyx e.g. in `Onyx.merge` and `Onyx.set`.
+ */
+type OnyxInputValue<TOnyxValue> = TOnyxValue | null;
+
+/**
+ * Represents an Onyx collection input, that can be either a record of `TOnyxValue`s or `null` if the key should be deleted.
+ */
+type OnyxCollectionInputValue<TOnyxValue> = OnyxInputValue<Record<string, TOnyxValue | null>>;
+
+/**
+ * Represents an input value that can be passed to Onyx methods, that can be either `TOnyxValue` or `null`.
+ * Setting a key to `null` will remove the key from the store.
+ * `undefined` is not allowed for setting values, because it will have no effect on the data.
+ */
+type OnyxInput<TKey extends OnyxKey> = OnyxInputValue<NullishDeep<KeyValueMapping[TKey]>>;
+
+/**
+ * Represents a mapping object where each `OnyxKey` maps to either a value of its corresponding type in `KeyValueMapping` or `null`.
+ *
+ * It's very similar to `KeyValueMapping` but this type is used for inputs to Onyx
+ * (set, merge, mergeCollection) and therefore accepts using `null` to remove a key from Onyx.
+ */
+type OnyxInputKeyValueMapping = {
+    [TKey in OnyxKey]: OnyxInput<TKey>;
+};
+
+/**
  * This represents the value that can be passed to `Onyx.set` and to `Onyx.update` with the method "SET"
  */
-type OnyxSetInput<TKey extends OnyxKey> = OnyxInput<KeyValueMapping[TKey]>;
+type OnyxSetInput<TKey extends OnyxKey> = OnyxInput<TKey>;
 
 /**
  * This represents the value that can be passed to `Onyx.multiSet` and to `Onyx.update` with the method "MULTI_SET"
  */
-type OnyxMultiSetInput = Partial<NullableKeyValueMapping>;
+type OnyxMultiSetInput = Partial<OnyxInputKeyValueMapping>;
 
 /**
  * This represents the value that can be passed to `Onyx.merge` and to `Onyx.update` with the method "MERGE"
  */
-type OnyxMergeInput<TKey extends OnyxKey> = OnyxInput<NullishDeep<KeyValueMapping[TKey]>>;
+type OnyxMergeInput<TKey extends OnyxKey> = OnyxInput<TKey>;
 
 /**
  * This represents the value that can be passed to `Onyx.merge` and to `Onyx.update` with the method "MERGE"
  */
-type OnyxMergeCollectionInput<TKey extends OnyxKey, TMap = object> = Collection<TKey, NullishDeep<KeyValueMapping[TKey]>, TMap>;
+type OnyxMergeCollectionInput<TKey extends OnyxKey, TMap = object> = Collection<TKey, NonNullable<OnyxInput<TKey>>, TMap>;
 
 /**
  * Represents different kinds of updates that can be passed to `Onyx.update()` method. It is a discriminated union of
@@ -392,7 +404,7 @@ type InitOptions = {
     keys?: DeepRecord<string, OnyxKey>;
 
     /** initial data to set when `init()` and `clear()` is called */
-    initialKeyStates?: Partial<NullableKeyValueMapping>;
+    initialKeyStates?: Partial<OnyxInputKeyValueMapping>;
 
     /**
      * This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged
@@ -440,12 +452,14 @@ export type {
     Mapping,
     NonNull,
     NonUndefined,
-    NullableKeyValueMapping,
+    OnyxInputKeyValueMapping,
     NullishDeep,
     OnyxCollection,
     OnyxEntry,
-    OnyxInput,
     OnyxKey,
+    OnyxInputValue,
+    OnyxCollectionInputValue,
+    OnyxInput,
     OnyxSetInput,
     OnyxMultiSetInput,
     OnyxMergeInput,
