@@ -25,7 +25,6 @@ import type {
     OnyxKey,
     OnyxValue,
     Selector,
-    WithOnyxConnectOptions,
 } from './types';
 import utils from './utils';
 import type {WithOnyxState} from './withOnyx/types';
@@ -305,7 +304,7 @@ function isSafeEvictionKey(testKey: OnyxKey): boolean {
  * Tries to get a value from the cache. If the value is not present in cache it will return the default value or undefined.
  * If the requested key is a collection, it will return an object with all the collection members.
  */
-function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Partial<WithOnyxConnectOptions<TKey>>): OnyxValue<OnyxKey> {
+function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Partial<Mapping<TKey>>): OnyxValue<OnyxKey> {
     let val = cache.get(key);
 
     if (isCollectionKey(key)) {

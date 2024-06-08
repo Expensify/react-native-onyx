@@ -265,29 +265,21 @@ type BaseConnectOptions = {
     initWithStoredValues?: boolean;
 };
 
-/** Represents additional options used inside withOnyx HOC */
-type WithOnyxConnectOptions<TKey extends OnyxKey> = {
-    withOnyxInstance: WithOnyxInstance;
-    statePropertyName: string;
-    displayName: string;
-    initWithStoredValues?: boolean;
-    selector?: Selector<TKey, unknown, unknown>;
-    canEvict?: boolean;
-};
-
+/** Represents the callback function used in `Onyx.connect()` method with a regular key. */
 type DefaultConnectCallback<TKey extends OnyxKey> = (value: OnyxEntry<KeyValueMapping[TKey]>, key: TKey) => void;
 
+/** Represents the callback function used in `Onyx.connect()` method with a collection key. */
 type CollectionConnectCallback<TKey extends OnyxKey> = (value: NonUndefined<OnyxCollection<KeyValueMapping[TKey]>>) => void;
 
-/** Represents the callback function used in `Onyx.connect()` method with a regular key. */
-type DefaultConnectOptions<TKey extends OnyxKey> = {
+/** Represents the options used in `Onyx.connect()` method with a regular key. */
+type DefaultConnectOptions<TKey extends OnyxKey> = BaseConnectOptions & {
     key: TKey;
     callback?: DefaultConnectCallback<TKey>;
     waitForCollectionCallback?: false;
 };
 
-/** Represents the callback function used in `Onyx.connect()` method with a collection key. */
-type CollectionConnectOptions<TKey extends OnyxKey> = {
+/** Represents the options used in `Onyx.connect()` method with a collection key. */
+type CollectionConnectOptions<TKey extends OnyxKey> = BaseConnectOptions & {
     key: TKey extends CollectionKeyBase ? TKey : never;
     callback?: CollectionConnectCallback<TKey>;
     waitForCollectionCallback: true;
@@ -303,12 +295,19 @@ type CollectionConnectOptions<TKey extends OnyxKey> = {
  *
  * If `waitForCollectionCallback` is `false` or not specified, the `key` can be any Onyx key and `callback` will be triggered with updates of each collection item
  * and will pass `value` as an `OnyxEntry`.
- *
- * The type is also extended with `BaseConnectOptions` and `WithOnyxConnectOptions` to include additional options, depending on the context where it's used.
  */
-type ConnectOptions<TKey extends OnyxKey> = (CollectionConnectOptions<TKey> | DefaultConnectOptions<TKey>) & (BaseConnectOptions | WithOnyxConnectOptions<TKey>);
+type ConnectOptions<TKey extends OnyxKey> = DefaultConnectOptions<TKey> | CollectionConnectOptions<TKey>;
 
-type Mapping<TKey extends OnyxKey> = ConnectOptions<TKey> & {
+/** Represents additional `Onyx.connect()` options used inside withOnyx HOC. */
+type WithOnyxConnectOptions<TKey extends OnyxKey> = ConnectOptions<TKey> & {
+    withOnyxInstance: WithOnyxInstance;
+    statePropertyName: string;
+    displayName: string;
+    selector?: Selector<TKey, unknown, unknown>;
+    canEvict?: boolean;
+};
+
+type Mapping<TKey extends OnyxKey> = WithOnyxConnectOptions<TKey> & {
     connectionID: number;
 };
 

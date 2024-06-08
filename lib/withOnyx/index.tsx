@@ -7,7 +7,7 @@ import React from 'react';
 import Onyx from '../Onyx';
 import OnyxUtils from '../OnyxUtils';
 import * as Str from '../Str';
-import type {GenericFunction, OnyxKey, WithOnyxConnectOptions} from '../types';
+import type {GenericFunction, Mapping, OnyxKey, WithOnyxConnectOptions} from '../types';
 import utils from '../utils';
 import type {MapOnyxToState, WithOnyxInstance, WithOnyxMapping, WithOnyxProps, WithOnyxState} from './types';
 import cache from '../OnyxCache';
@@ -84,7 +84,7 @@ export default function <TComponentProps, TOnyxProps>(
 
                 const cachedState = mapOnyxToStateEntries(mapOnyxToState).reduce<WithOnyxState<TOnyxProps>>((resultObj, [propName, mapping]) => {
                     const key = Str.result(mapping.key as GenericFunction, props);
-                    let value = OnyxUtils.tryGetCachedValue(key, mapping as Partial<WithOnyxConnectOptions<OnyxKey>>);
+                    let value = OnyxUtils.tryGetCachedValue(key, mapping as Mapping<OnyxKey>);
                     const hasCacheForKey = cache.hasCacheForKey(key);
 
                     if (!hasCacheForKey && !value && mapping.initialValue) {
@@ -325,7 +325,7 @@ export default function <TComponentProps, TOnyxProps>(
                     statePropertyName: statePropertyName as string,
                     withOnyxInstance: this as unknown as WithOnyxInstance,
                     displayName,
-                });
+                } as WithOnyxConnectOptions<OnyxKey>);
             }
 
             flushPendingSetStates() {
