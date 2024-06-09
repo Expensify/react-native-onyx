@@ -23,6 +23,7 @@ import type {
     OnyxEntry,
     OnyxInput,
     OnyxKey,
+    OnyxMergeCollectionInput,
     OnyxValue,
     Selector,
     WithOnyxConnectOptions,
@@ -1112,7 +1113,7 @@ function initializeWithDefaultKeyStates(): Promise<void> {
 /**
  * Verify if the collection is valid for merging into the collection key using mergeCollection()
  */
-function isValidMergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: Collection<TKey, TMap, NullishDeep<KeyValueMapping[TKey]>>): boolean {
+function isValidMergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): boolean {
     if (typeof collection !== 'object' || Array.isArray(collection) || utils.isEmptyObject(collection)) {
         Logger.logInfo('mergeCollection() called with invalid or empty value. Skipping this update.');
         return false;

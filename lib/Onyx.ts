@@ -427,7 +427,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
  * @param collection Object collection keyed by individual collection member keys and values
  */
 function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
-    // Gracefully handle bad mergeCollection updates so it doesn't block the merge queue
+    // Gracefully handle bad mergeCollection updates, so it doesn't block the merge queue
     if (!OnyxUtils.isValidMergeCollection(collectionKey, collection)) {
         return Promise.resolve();
     }

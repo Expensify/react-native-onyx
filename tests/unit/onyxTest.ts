@@ -1445,7 +1445,7 @@ describe('Onyx', () => {
                     },
                 },
             ]).then(() => {
-                expect(routesCollectionCallback).toHaveBeenNthCalledWith(2, {
+                expect(routesCollectionCallback).toHaveBeenNthCalledWith(1, {
                     [holidayRoute]: {
                         waypoints: {
                             0: 'Bed',
@@ -1537,7 +1537,7 @@ describe('Onyx', () => {
 
                 expect(catCallback).toHaveBeenNthCalledWith(1, {age: 3, sound: 'meow'}, cat);
 
-                expect(peopleCollectionCallback).toHaveBeenNthCalledWith(2, {
+                expect(peopleCollectionCallback).toHaveBeenNthCalledWith(1, {
                     [bob]: {age: 25, car: 'sedan'},
                     [lisa]: {age: 21, car: 'SUV'},
                 });
@@ -1575,7 +1575,7 @@ describe('Onyx', () => {
                     return waitForPromisesToResolve();
                 })
                 .then(() => {
-                    expect(testKeyValue).toEqual(null);
+                    expect(testKeyValue).toBeUndefined();
                 });
         });
 

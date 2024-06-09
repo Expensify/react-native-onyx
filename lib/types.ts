@@ -436,8 +436,8 @@ type GenericFunction = (...args: any[]) => any;
  * Represents a combination of Merge and Set operations that should be executed in Onyx
  */
 type MixedOperationsQueue = {
-    merge: NullableKeyValueMapping;
-    set: NullableKeyValueMapping;
+    merge: OnyxInputKeyValueMapping;
+    set: OnyxInputKeyValueMapping;
 };
 
 export type {
