@@ -74,7 +74,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
 
     // Stores the previous cached value as it's necessary to compare with the new value in `getSnapshot()`.
     // We initialize it to `undefined` to simulate that we don't have any value from cache yet.
-    const cachedValueRef = useRef<CachedValue<TKey, TReturnValue> | undefined>(undefined);
+    const cachedValueRef = useRef<CachedValue<TKey, TReturnValue> | undefined | null>(null);
 
     // Stores the previously result returned by the hook, containing the data from cache and the fetch status.
     // We initialize it to `undefined` and `loading` fetch status to simulate the initial result when the hook is loading from the cache.
@@ -142,11 +142,11 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
 
         // If the previously cached value is different from the new value, we update both cached value
         // and the result to be returned by the hook.
-        if (!deepEqual(cachedValueRef.current, newValue)) {
+        // If `cachedValueRef.current` is null, it means that we don't have any value from cache yet. In this case, we will always update the result as part of the the initial update.
+        if (cachedValueRef.current === null || !deepEqual(cachedValueRef.current, newValue)) {
             cachedValueRef.current = newValue;
 
-            // If the new value is `null` we default it to `undefined` to ensure the consumer get a consistent result from the hook.
-            resultRef.current = [(cachedValueRef.current ?? undefined) as CachedValue<TKey, TReturnValue>, {status: newFetchStatus ?? 'loaded'}];
+            resultRef.current = [cachedValueRef.current as CachedValue<TKey, TReturnValue>, {status: newFetchStatus ?? 'loaded'}];
         }
 
         return resultRef.current;
