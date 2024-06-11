@@ -54,10 +54,6 @@ type ResultMetadata = {
 
 type UseOnyxResult<TKey extends OnyxKey, TValue> = [CachedValue<TKey, TValue>, ResultMetadata];
 
-function getCachedValue<TKey extends OnyxKey, TValue>(key: TKey, selector?: Selector<TKey, unknown, unknown>): CachedValue<TKey, TValue> | undefined {
-    return OnyxUtils.tryGetCachedValue(key, {selector}) as CachedValue<TKey, TValue> | undefined;
-}
-
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     key: TKey,
     options?: BaseUseOnyxOptions & UseOnyxInitialValueOption<TReturnValue> & Required<UseOnyxSelectorOption<TKey, TReturnValue>>,
@@ -121,7 +117,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
         // If `newValue` is `null` or any other value if means that the cache does have a value for that key.
         // This difference between `undefined` and other values is crucial and it's used to address the following
         // conditions and use cases.
-        let newValue = getCachedValue<TKey, TReturnValue>(key, selectorRef.current);
+        let newValue = OnyxUtils.tryGetCachedValue(key, {selector: selectorRef.current}) as CachedValue<TKey, TReturnValue> | undefined;
         const hasCacheForKey = cache.hasCacheForKey(key);
 
         // Since the fetch status can be different given the use cases below, we define the variable right away.
@@ -137,18 +133,23 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
 
         // If data is not present in cache and `initialValue` is set during the first connection,
         // we set the new value to `initialValue` and fetch status to `loaded` since we already have some data to return to the consumer.
-        if (isFirstConnectionRef.current && !hasCacheForKey && options?.initialValue !== undefined) {
+        const hasInitialValue = isFirstConnectionRef.current && !hasCacheForKey && options?.initialValue !== undefined;
+        if (hasInitialValue) {
             newValue = options?.initialValue as CachedValue<TKey, TReturnValue>;
+            newFetchStatus = 'loaded';
+        }
+
+        // If `options.initiWithStoredValues` is explicitly set to `false`, the fetch status should always be `loaded`.
+        if (options?.initWithStoredValues === false) {
             newFetchStatus = 'loaded';
         }
 
         // If the previously cached value is different from the new value, we update both cached value
         // and the result to be returned by the hook.
         if (!deepEqual(cachedValueRef.current, newValue)) {
-            // If there is no cached value yet and the value read from cache is `undefined`, we set the fetch status to `loading`.
-            if (cachedValueRef.current === null && newValue === undefined) newFetchStatus = 'loading';
-            // If `options.initiWithStoredValues` is explicitly set to `false`, the fetch status should always be `loaded`.
-            if (options?.initWithStoredValues === false) newFetchStatus = 'loaded';
+            // If there is no cached value yet, the value read from cache is `undefined` and the fetch status hasn't already been set,
+            // we set the fetch status to `loading`.
+            if (!newFetchStatus && cachedValueRef.current === null && !hasCacheForKey) newFetchStatus = 'loading';
 
             cachedValueRef.current = newValue;
             resultRef.current = [cachedValueRef.current as CachedValue<TKey, TReturnValue>, {status: newFetchStatus ?? 'loaded'}];
