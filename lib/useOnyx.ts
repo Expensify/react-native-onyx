@@ -131,11 +131,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
             newFetchStatus = 'loading';
         }
 
-        // If `options.initWithStoredValues` is explicitly set to `false`, the fetch status should always be `loaded`.
-        if (options?.initWithStoredValues === false) {
-            newFetchStatus = 'loaded';
-        }
-
         // If data is not present in cache and `initialValue` is set during the first connection,
         // we set the new value to `initialValue` and fetch status to `loaded` since we already have some data to return to the consumer.
         if (isFirstConnectionRef.current && !hasCacheForKey && options?.initialValue !== null && options?.initialValue !== undefined) {
