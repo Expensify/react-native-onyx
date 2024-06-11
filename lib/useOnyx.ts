@@ -54,6 +54,10 @@ type ResultMetadata = {
 
 type UseOnyxResult<TKey extends OnyxKey, TValue> = [CachedValue<TKey, TValue>, ResultMetadata];
 
+function getCachedValue<TKey extends OnyxKey, TValue>(key: TKey, selector?: Selector<TKey, unknown, unknown>): CachedValue<TKey, TValue> | undefined {
+    return (OnyxUtils.tryGetCachedValue(key, {selector}) ?? undefined) as CachedValue<TKey, TValue> | undefined;
+}
+
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     key: TKey,
     options?: BaseUseOnyxOptions & UseOnyxInitialValueOption<TReturnValue> & Required<UseOnyxSelectorOption<TKey, TReturnValue>>,
@@ -117,7 +121,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
         // If `newValue` is `null` or any other value if means that the cache does have a value for that key.
         // This difference between `undefined` and other values is crucial and it's used to address the following
         // conditions and use cases.
-        let newValue = (OnyxUtils.tryGetCachedValue(key, {selector: selectorRef.current}) ?? undefined) as CachedValue<TKey, TReturnValue> | undefined;
+        let newValue = getCachedValue<TKey, TReturnValue>(key, selectorRef.current);
         const hasCacheForKey = cache.hasCacheForKey(key);
 
         // Since the fetch status can be different given the use cases below, we define the variable right away.
@@ -148,7 +152,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
         }
 
         return resultRef.current;
-    }, [key, selectorRef, options?.allowStaleData, options?.initialValue, options?.initWithStoredValues]);
+    }, [key, selectorRef, options?.allowStaleData, options?.initialValue]);
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
