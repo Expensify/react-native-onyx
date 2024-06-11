@@ -97,7 +97,7 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
         });
 
-        it('should initially return null while loading non-cached key, and then return value and loaded state', async () => {
+        it('should initially return `undefined` while loading non-cached key, and then return value and loaded state', async () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
 
             const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
