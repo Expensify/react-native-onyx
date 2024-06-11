@@ -118,7 +118,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
     const getSnapshot = useCallback(() => {
         // We get the value from the cache, supplying a selector too in case it's defined.
         // If `newValue` is `undefined` it means that the cache doesn't have a value for that key yet.
-        // If `newValue` is `null` or any other value if means that the cache does have a value for that key.
+        // If `newValue` is `null` or any other value it means that the cache does have a value for that key.
         // This difference between `undefined` and other values is crucial and it's used to address the following
         // conditions and use cases.
         let newValue = getCachedValue<TKey, TReturnValue>(key, selectorRef.current);
