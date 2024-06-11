@@ -6,6 +6,7 @@ import type {CollectionKeyBase, OnyxCollection, OnyxKey, OnyxValue, Selector} fr
 import useLiveRef from './useLiveRef';
 import usePrevious from './usePrevious';
 import Onyx from './Onyx';
+import cache from './OnyxCache';
 
 type BaseUseOnyxOptions = {
     /**
@@ -54,7 +55,7 @@ type ResultMetadata = {
 type UseOnyxResult<TKey extends OnyxKey, TValue> = [CachedValue<TKey, TValue>, ResultMetadata];
 
 function getCachedValue<TKey extends OnyxKey, TValue>(key: TKey, selector?: Selector<TKey, unknown, unknown>): CachedValue<TKey, TValue> | undefined {
-    return OnyxUtils.tryGetCachedValue(key, {selector}) as CachedValue<TKey, TValue> | undefined;
+    return (OnyxUtils.tryGetCachedValue(key, {selector}) ?? undefined) as CachedValue<TKey, TValue> | undefined;
 }
 
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
@@ -73,8 +74,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
     const selectorRef = useLiveRef(options?.selector);
 
     // Stores the previous cached value as it's necessary to compare with the new value in `getSnapshot()`.
-    // We initialize it to `undefined` to simulate that we don't have any value from cache yet.
-    const cachedValueRef = useRef<CachedValue<TKey, TReturnValue> | undefined>(undefined);
+    // We initialize it to `null` to simulate that we don't have any value from cache yet.
+    const cachedValueRef = useRef<CachedValue<TKey, TReturnValue> | undefined | null>(null);
 
     // Stores the previously result returned by the hook, containing the data from cache and the fetch status.
     // We initialize it to `undefined` and `loading` fetch status to simulate the initial result when the hook is loading from the cache.
@@ -117,10 +118,11 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
     const getSnapshot = useCallback(() => {
         // We get the value from the cache, supplying a selector too in case it's defined.
         // If `newValue` is `undefined` it means that the cache doesn't have a value for that key yet.
-        // If `newValue` is `null` or any other value if means that the cache does have a value for that key.
+        // If `newValue` is `null` or any other value it means that the cache does have a value for that key.
         // This difference between `undefined` and other values is crucial and it's used to address the following
         // conditions and use cases.
         let newValue = getCachedValue<TKey, TReturnValue>(key, selectorRef.current);
+        const hasCacheForKey = cache.hasCacheForKey(key);
 
         // Since the fetch status can be different given the use cases below, we define the variable right away.
         let newFetchStatus: FetchStatus | undefined;
@@ -133,20 +135,20 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
             newFetchStatus = 'loading';
         }
 
-        // If data is not present in cache (if it's `undefined`) and `initialValue` is set during the first connection,
+        // If data is not present in cache and `initialValue` is set during the first connection,
         // we set the new value to `initialValue` and fetch status to `loaded` since we already have some data to return to the consumer.
-        if (isFirstConnectionRef.current && newValue === undefined && options?.initialValue !== undefined) {
-            newValue = options?.initialValue as CachedValue<TKey, TReturnValue>;
+        if (isFirstConnectionRef.current && !hasCacheForKey && options?.initialValue !== undefined) {
+            newValue = (options?.initialValue ?? undefined) as CachedValue<TKey, TReturnValue>;
             newFetchStatus = 'loaded';
         }
 
         // If the previously cached value is different from the new value, we update both cached value
         // and the result to be returned by the hook.
-        if (!deepEqual(cachedValueRef.current, newValue)) {
+        // If the cache was set for the first time, we also update the cached value and the result.
+        const isCacheSetFirstTime = cachedValueRef.current === null && hasCacheForKey;
+        if (isCacheSetFirstTime || !deepEqual(cachedValueRef.current ?? undefined, newValue)) {
             cachedValueRef.current = newValue;
-
-            // If the new value is `null` we default it to `undefined` to ensure the consumer get a consistent result from the hook.
-            resultRef.current = [(cachedValueRef.current ?? undefined) as CachedValue<TKey, TReturnValue>, {status: newFetchStatus ?? 'loaded'}];
+            resultRef.current = [cachedValueRef.current as CachedValue<TKey, TReturnValue>, {status: newFetchStatus ?? 'loaded'}];
         }
 
         return resultRef.current;
