@@ -575,7 +575,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                 //      since collection key subscribers need to be updated differently
                 if (!isKeyToPreserve) {
                     const oldValue = cache.get(key);
-                    const newValue = defaultKeyStates[key] ?? undefined;
+                    const newValue = defaultKeyStates[key] ?? null;
                     if (newValue !== oldValue) {
                         cache.set(key, newValue);
                         const collectionKey = key.substring(0, key.indexOf('_') + 1);
@@ -583,9 +583,9 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                             if (!keyValuesToResetAsCollection[collectionKey]) {
                                 keyValuesToResetAsCollection[collectionKey] = {};
                             }
-                            keyValuesToResetAsCollection[collectionKey]![key] = newValue;
+                            keyValuesToResetAsCollection[collectionKey]![key] = newValue ?? undefined;
                         } else {
-                            keyValuesToResetIndividually[key] = newValue;
+                            keyValuesToResetIndividually[key] = newValue ?? undefined;
                         }
                     }
                 }
