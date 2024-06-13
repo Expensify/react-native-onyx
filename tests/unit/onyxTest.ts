@@ -165,7 +165,7 @@ describe('Onyx', () => {
             })
             .then(() => {
                 // Test key should be cleared
-                expect(testKeyValue).toBeNull();
+                expect(testKeyValue).toBeUndefined();
 
                 // Other test key should be returned to its default state
                 expect(otherTestValue).toBe(42);
@@ -249,27 +249,6 @@ describe('Onyx', () => {
         });
     });
 
-    it('should ignore top-level undefined values', () => {
-        let testKeyValue: unknown;
-
-        connectionID = Onyx.connect({
-            key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
-            callback: (value) => {
-                testKeyValue = value;
-            },
-        });
-
-        return Onyx.set(ONYX_KEYS.TEST_KEY, {test1: 'test1'})
-            .then(() => {
-                expect(testKeyValue).toEqual({test1: 'test1'});
-                return Onyx.merge(ONYX_KEYS.TEST_KEY, undefined);
-            })
-            .then(() => {
-                expect(testKeyValue).toEqual({test1: 'test1'});
-            });
-    });
-
     it('should remove keys that are set to null when merging', () => {
         let testKeyValue: unknown;
 
@@ -298,6 +277,7 @@ describe('Onyx', () => {
                         },
                     },
                 });
+
                 return Onyx.merge(ONYX_KEYS.TEST_KEY, {
                     test1: {
                         test3: {
@@ -313,6 +293,7 @@ describe('Onyx', () => {
                         test3: {},
                     },
                 });
+
                 return Onyx.merge(ONYX_KEYS.TEST_KEY, {
                     test1: {
                         test3: null,
@@ -321,6 +302,7 @@ describe('Onyx', () => {
             })
             .then(() => {
                 expect(testKeyValue).toEqual({test1: {test2: 'test2'}});
+
                 return Onyx.merge(ONYX_KEYS.TEST_KEY, {test1: null});
             })
             .then(() => {
@@ -328,7 +310,114 @@ describe('Onyx', () => {
             });
     });
 
-    it('should ignore `undefined` values when merging', () => {
+    it('should ignore top-level and remove nested `undefined` values in Onyx.set', () => {
+        let testKeyValue: unknown;
+
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        return Onyx.set(ONYX_KEYS.TEST_KEY, {
+            test1: {
+                test2: 'test2',
+                test3: 'test3',
+            },
+        })
+            .then(() => {
+                expect(testKeyValue).toEqual({
+                    test1: {
+                        test2: 'test2',
+                        test3: 'test3',
+                    },
+                });
+
+                return Onyx.set(ONYX_KEYS.TEST_KEY, {
+                    test1: {
+                        test2: undefined,
+                        test3: 'test3',
+                    },
+                });
+            })
+            .then(() => {
+                expect(testKeyValue).toEqual({test1: {test3: 'test3'}});
+
+                return Onyx.set(ONYX_KEYS.TEST_KEY, {test1: undefined});
+            })
+            .then(() => {
+                expect(testKeyValue).toEqual({});
+
+                return Onyx.set(ONYX_KEYS.TEST_KEY, undefined);
+            })
+            .then(() => {
+                expect(testKeyValue).toEqual({});
+
+                return Onyx.set(ONYX_KEYS.TEST_KEY, {test1: undefined});
+            });
+    });
+
+    it('should ignore top-level and remove nested `undefined` values in Onyx.multiSet', () => {
+        let testKeyValue: unknown;
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        let otherTestKeyValue: unknown;
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.OTHER_TEST,
+            initWithStoredValues: false,
+            callback: (value) => {
+                otherTestKeyValue = value;
+            },
+        });
+
+        return Onyx.multiSet({
+            [ONYX_KEYS.TEST_KEY]: {
+                test1: 'test1',
+                test2: 'test2',
+            },
+            [ONYX_KEYS.OTHER_TEST]: 'otherTest',
+        })
+            .then(() => {
+                expect(testKeyValue).toEqual({
+                    test1: 'test1',
+                    test2: 'test2',
+                });
+                expect(otherTestKeyValue).toEqual('otherTest');
+
+                return Onyx.multiSet({
+                    [ONYX_KEYS.TEST_KEY]: {
+                        test1: 'test1',
+                        test2: undefined,
+                    },
+                    [ONYX_KEYS.OTHER_TEST]: undefined,
+                });
+            })
+            .then(() => {
+                expect(testKeyValue).toEqual({
+                    test1: 'test1',
+                });
+                expect(otherTestKeyValue).toEqual('otherTest');
+
+                return Onyx.multiSet({
+                    [ONYX_KEYS.TEST_KEY]: null,
+                    [ONYX_KEYS.OTHER_TEST]: null,
+                });
+            })
+            .then(() => {
+                expect(testKeyValue).toEqual(undefined);
+                expect(otherTestKeyValue).toEqual(undefined);
+            });
+    });
+
+    it('should ignore top-level and remove nested `undefined` values in Onyx.merge', () => {
         let testKeyValue: unknown;
 
         connectionID = Onyx.connect({
@@ -364,7 +453,51 @@ describe('Onyx', () => {
             })
             .then(() => {
                 expect(testKeyValue).toEqual({test1: {test2: 'test2', test3: 'test3'}});
+                return Onyx.merge(ONYX_KEYS.TEST_KEY, undefined);
+            })
+            .then(() => {
+                expect(testKeyValue).toEqual({test1: {test2: 'test2', test3: 'test3'}});
             });
+    });
+
+    it('should ignore top-level and remove nested `undefined` values in Onyx.mergeCollection', () => {
+        let result: OnyxCollection<unknown>;
+
+        const routineRoute = `${ONYX_KEYS.COLLECTION.TEST_KEY}routine`;
+        const holidayRoute = `${ONYX_KEYS.COLLECTION.TEST_KEY}holiday`;
+        const workRoute = `${ONYX_KEYS.COLLECTION.TEST_KEY}work`;
+
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => (result = value),
+            waitForCollectionCallback: true,
+        });
+
+        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+            [routineRoute]: {
+                waypoints: {
+                    1: 'Home',
+                    2: 'Work',
+                    3: undefined,
+                },
+            },
+            [holidayRoute]: {
+                waypoints: undefined,
+            },
+            [workRoute]: undefined,
+        } as GenericCollection).then(() => {
+            expect(result).toEqual({
+                [routineRoute]: {
+                    waypoints: {
+                        1: 'Home',
+                        2: 'Work',
+                    },
+                },
+                [holidayRoute]: {},
+                [workRoute]: undefined,
+            });
+        });
     });
 
     it('should overwrite an array key nested inside an object', () => {
@@ -816,7 +949,7 @@ describe('Onyx', () => {
                     expect(mockCallback).toHaveBeenCalledTimes(2);
 
                     // AND the value for the first call should be null since the collection was not initialized at that point
-                    expect(mockCallback).toHaveBeenNthCalledWith(1, null, undefined);
+                    expect(mockCallback).toHaveBeenNthCalledWith(1, undefined, undefined);
 
                     // AND the value for the second call should be collectionUpdate since the collection was updated
                     expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate);
@@ -845,7 +978,7 @@ describe('Onyx', () => {
                     expect(mockCallback).toHaveBeenCalledTimes(2);
 
                     // AND the value for the first call should be null since the collection was not initialized at that point
-                    expect(mockCallback).toHaveBeenNthCalledWith(1, null, undefined);
+                    expect(mockCallback).toHaveBeenNthCalledWith(1, undefined, undefined);
 
                     // AND the value for the second call should be collectionUpdate since the collection was updated
                     expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate.testPolicy_1, 'testPolicy_1');
@@ -987,11 +1120,11 @@ describe('Onyx', () => {
                 {onyxMethod: Onyx.METHOD.MERGE_COLLECTION, key: ONYX_KEYS.COLLECTION.TEST_UPDATE, value: {[itemKey]: {a: 'a'}}},
             ]).then(() => {
                 expect(collectionCallback).toHaveBeenCalledTimes(2);
-                expect(collectionCallback).toHaveBeenNthCalledWith(1, null, undefined);
+                expect(collectionCallback).toHaveBeenNthCalledWith(1, undefined, undefined);
                 expect(collectionCallback).toHaveBeenNthCalledWith(2, {[itemKey]: {a: 'a'}});
 
                 expect(testCallback).toHaveBeenCalledTimes(2);
-                expect(testCallback).toHaveBeenNthCalledWith(1, null, undefined);
+                expect(testCallback).toHaveBeenNthCalledWith(1, undefined, undefined);
                 expect(testCallback).toHaveBeenNthCalledWith(2, 'taco', ONYX_KEYS.TEST_KEY);
 
                 expect(otherTestCallback).toHaveBeenCalledTimes(2);
@@ -1079,7 +1212,7 @@ describe('Onyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                expect(testKeyValue).toEqual(null);
+                expect(testKeyValue).toEqual(undefined);
                 return Onyx.merge(ONYX_KEYS.TEST_KEY, 2);
             })
             .then(() => {
@@ -1087,7 +1220,7 @@ describe('Onyx', () => {
             });
     });
 
-    it('should merge a non-existing key with a nested null removed', () => {
+    it("should not set null values in Onyx.merge, when the key doesn't exist yet", () => {
         let testKeyValue: unknown;
 
         connectionID = Onyx.connect({
@@ -1142,35 +1275,8 @@ describe('Onyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                expect(testKeyValue).toEqual(null);
+                expect(testKeyValue).toEqual(undefined);
             });
-    });
-
-    it('should merge a non-existing key with a nested null removed', () => {
-        let testKeyValue: unknown;
-
-        connectionID = Onyx.connect({
-            key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
-            callback: (value) => {
-                testKeyValue = value;
-            },
-        });
-
-        return Onyx.merge(ONYX_KEYS.TEST_KEY, {
-            waypoints: {
-                1: 'Home',
-                2: 'Work',
-                3: null,
-            },
-        }).then(() => {
-            expect(testKeyValue).toEqual({
-                waypoints: {
-                    1: 'Home',
-                    2: 'Work',
-                },
-            });
-        });
     });
 
     it('mergeCollection should omit nested null values', () => {

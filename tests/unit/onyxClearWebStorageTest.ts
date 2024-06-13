@@ -56,7 +56,7 @@ describe('Set data while storage is clearing', () => {
         return waitForPromisesToResolve().then(() => {
             // Then the value in Onyx, the cache, and Storage is the default key state
             expect(onyxValue).toBe(DEFAULT_VALUE);
-            const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
+            const cachedValue = cache.get(ONYX_KEYS.DEFAULT_KEY);
             expect(cachedValue).toBe(DEFAULT_VALUE);
             const storedValue = StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY);
             return expect(storedValue).resolves.toBe(DEFAULT_VALUE);
@@ -73,7 +73,7 @@ describe('Set data while storage is clearing', () => {
         return waitForPromisesToResolve().then(() => {
             // Then the value in Onyx, the cache, and Storage is the default key state
             expect(onyxValue).toBe(DEFAULT_VALUE);
-            const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
+            const cachedValue = cache.get(ONYX_KEYS.DEFAULT_KEY);
             expect(cachedValue).toBe(DEFAULT_VALUE);
             const storedValue = StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY);
             return expect(storedValue).resolves.toBe(DEFAULT_VALUE);
@@ -98,7 +98,7 @@ describe('Set data while storage is clearing', () => {
         return waitForPromisesToResolve().then(() => {
             // Then the value of the preserved key is also still set in both the cache and storage
             expect(regularKeyOnyxValue).toBe(SET_VALUE);
-            const regularKeyCachedValue = cache.getValue(ONYX_KEYS.REGULAR_KEY);
+            const regularKeyCachedValue = cache.get(ONYX_KEYS.REGULAR_KEY);
             expect(regularKeyCachedValue).toBe(SET_VALUE);
             const regularKeyStoredValue = StorageMock.getItem(ONYX_KEYS.REGULAR_KEY);
             return expect(regularKeyStoredValue).resolves.toBe(SET_VALUE);
@@ -117,7 +117,7 @@ describe('Set data while storage is clearing', () => {
         return waitForPromisesToResolve().then(() => {
             // Then the value in Onyx, the cache, and Storage is the set value
             expect(onyxValue).toBe(SET_VALUE);
-            const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
+            const cachedValue = cache.get(ONYX_KEYS.DEFAULT_KEY);
             expect(cachedValue).toBe(SET_VALUE);
             const storedValue = StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY);
             return expect(storedValue).resolves.toBe(SET_VALUE);
@@ -158,7 +158,7 @@ describe('Set data while storage is clearing', () => {
                     expect(collectionCallback).toHaveBeenCalledTimes(3);
 
                     // And it should be called with the expected parameters each time
-                    expect(collectionCallback).toHaveBeenNthCalledWith(1, null, undefined);
+                    expect(collectionCallback).toHaveBeenNthCalledWith(1, undefined, undefined);
                     expect(collectionCallback).toHaveBeenNthCalledWith(2, {
                         test_1: 1,
                         test_2: 2,
