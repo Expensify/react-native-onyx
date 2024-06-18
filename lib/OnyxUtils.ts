@@ -69,6 +69,12 @@ let defaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
 let batchUpdatesPromise: Promise<void> | null = null;
 let batchUpdatesQueue: Array<() => void> = [];
 
+let snapshotKey: OnyxKey | null = null;
+
+function getSnapshotKey(): OnyxKey | null {
+    return snapshotKey;
+}
+
 /**
  * Getter - returns the merge queue.
  */
@@ -120,6 +126,10 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
 
     // Let Onyx know about which keys are safe to evict
     evictionAllowList = safeEvictionKeys;
+
+    if (typeof keys.COLLECTION === 'object' && typeof keys.COLLECTION.SNAPSHOT === 'string') {
+        snapshotKey = keys.COLLECTION.SNAPSHOT;
+    }
 }
 
 /**
@@ -1178,6 +1188,7 @@ const OnyxUtils = {
     prepareKeyValuePairsForStorage,
     applyMerge,
     initializeWithDefaultKeyStates,
+    getSnapshotKey,
     isValidMergeCollection,
 };
 

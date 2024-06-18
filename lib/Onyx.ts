@@ -1,5 +1,6 @@
 /* eslint-disable no-continue */
 import _ from 'underscore';
+import lodashPick from 'lodash/pick';
 import * as Logger from './Logger';
 import cache from './OnyxCache';
 import createDeferredTask from './createDeferredTask';
@@ -559,7 +560,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                 //      since collection key subscribers need to be updated differently
                 if (!isKeyToPreserve) {
                     const oldValue = cache.get(key);
-                    const newValue = defaultKeyStates[key] ?? undefined;
+                    const newValue = defaultKeyStates[key] ?? null;
                     if (newValue !== oldValue) {
                         cache.set(key, newValue);
                         const collectionKey = key.substring(0, key.indexOf('_') + 1);
@@ -567,9 +568,9 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                             if (!keyValuesToResetAsCollection[collectionKey]) {
                                 keyValuesToResetAsCollection[collectionKey] = {};
                             }
-                            keyValuesToResetAsCollection[collectionKey]![key] = newValue;
+                            keyValuesToResetAsCollection[collectionKey]![key] = newValue ?? undefined;
                         } else {
-                            keyValuesToResetIndividually[key] = newValue;
+                            keyValuesToResetIndividually[key] = newValue ?? undefined;
                         }
                     }
                 }
@@ -613,6 +614,46 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                 });
         })
         .then(() => undefined);
+}
+
+function updateSnapshots(data: OnyxUpdate[]) {
+    const snapshotCollectionKey = OnyxUtils.getSnapshotKey();
+    if (!snapshotCollectionKey) return;
+
+    const promises: Array<() => Promise<void>> = [];
+
+    const snapshotCollection = OnyxUtils.getCachedCollection(snapshotCollectionKey);
+
+    Object.entries(snapshotCollection).forEach(([snapshotKey, snapshotValue]) => {
+        // Snapshots may not be present in cache. We don't know how to update them so we skip.
+        if (!snapshotValue) {
+            return;
+        }
+
+        let updatedData = {};
+
+        data.forEach(({key, value}) => {
+            // snapshots are normal keys so we want to skip update if they are written to Onyx
+            if (OnyxUtils.isCollectionMemberKey(snapshotCollectionKey, key)) {
+                return;
+            }
+
+            if (typeof snapshotValue !== 'object' || !('data' in snapshotValue)) {
+                return;
+            }
+
+            const snapshotData = snapshotValue.data;
+            if (!snapshotData || !snapshotData[key]) {
+                return;
+            }
+
+            updatedData = {...updatedData, [key]: lodashPick(value, Object.keys(snapshotData[key]))};
+        });
+
+        promises.push(() => merge(snapshotKey, {data: updatedData}));
+    });
+
+    return Promise.all(promises.map((p) => p()));
 }
 
 /**
@@ -736,7 +777,10 @@ function update(data: OnyxUpdate[]): Promise<void> {
         }
     });
 
-    return clearPromise.then(() => Promise.all(promises.map((p) => p()))).then(() => undefined);
+    return clearPromise
+        .then(() => Promise.all(promises.map((p) => p())))
+        .then(() => updateSnapshots(data))
+        .then(() => undefined);
 }
 
 const Onyx = {
