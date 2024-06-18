@@ -666,6 +666,11 @@ function updateSnapshots(data: OnyxUpdate[]) {
             updatedData = {...updatedData, [key]: lodashPick(value, Object.keys(snapshotData[key]))};
         });
 
+        // Skip the update if there's no data to be merged
+        if (utils.isEmptyObject(updatedData)) {
+            return;
+        }
+
         promises.push(() => merge(snapshotKey, {data: updatedData}));
     });
 
