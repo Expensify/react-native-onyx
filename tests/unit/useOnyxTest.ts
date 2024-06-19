@@ -195,7 +195,27 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
         });
 
-        it('should not change selected data if a property outside the selector was changed', async () => {
+        it('should not change selected data if a property outside that data was changed', async () => {
+            Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name'});
+
+            const {result} = renderHook(() =>
+                useOnyx(ONYXKEYS.TEST_KEY, {
+                    // @ts-expect-error bypass
+                    selector: (entry: OnyxEntry<{id: string; name: string}>) => ({id: entry?.id}),
+                }),
+            );
+
+            await act(async () => waitForPromisesToResolve());
+
+            const oldResult = result.current;
+
+            await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, {name: 'test_name_changed'}));
+
+            // must be the same reference
+            expect(oldResult).toBe(result.current);
+        });
+
+        it('should not change selected collection data if a property outside that data was changed', async () => {
             // @ts-expect-error bypass
             Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, {
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
@@ -206,7 +226,7 @@ describe('useOnyx', () => {
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.COLLECTION.TEST_KEY, {
                     // @ts-expect-error bypass
-                    selector: (entry: OnyxEntry<{id: string; name: string}>) => entry?.id,
+                    selector: (entry: OnyxEntry<{id: string; name: string}>) => ({id: entry?.id}),
                 }),
             );
 
