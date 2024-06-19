@@ -1,6 +1,7 @@
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import StorageMock from '../../lib/storage';
 import Onyx from '../../lib/Onyx';
+import type OnyxCache from '../../lib/OnyxCache';
 
 const ONYX_KEYS = {
     DEFAULT_KEY: 'defaultKey',
@@ -13,19 +14,19 @@ const MERGED_VALUE = 1;
 const DEFAULT_VALUE = 0;
 
 describe('Set data while storage is clearing', () => {
-    let connectionID;
-    let onyxValue;
+    let connectionID: number;
+    let onyxValue: unknown;
 
     /** @type OnyxCache */
-    let cache;
+    let cache: typeof OnyxCache;
 
     // Always use a "fresh" cache instance
     beforeEach(() => {
         onyxValue = null;
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         cache = require('../../lib/OnyxCache').default;
         Onyx.init({
             keys: ONYX_KEYS,
-            registerStorageEventListener: () => {},
             initialKeyStates: {
                 [ONYX_KEYS.DEFAULT_KEY]: DEFAULT_VALUE,
             },
@@ -53,9 +54,9 @@ describe('Set data while storage is clearing', () => {
         return waitForPromisesToResolve().then(() => {
             // Then the value in Onyx, the cache, and Storage is the default key state
             expect(onyxValue).toBe(DEFAULT_VALUE);
-            const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
+            const cachedValue = cache.get(ONYX_KEYS.DEFAULT_KEY);
             expect(cachedValue).toBe(DEFAULT_VALUE);
-            return StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY).then((storedValue) => expect(parseInt(storedValue, 10)).toBe(DEFAULT_VALUE));
+            return StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY).then((storedValue) => expect(parseInt(storedValue as string, 10)).toBe(DEFAULT_VALUE));
         });
     });
 
@@ -69,9 +70,9 @@ describe('Set data while storage is clearing', () => {
         return waitForPromisesToResolve().then(() => {
             // Then the value in Onyx, the cache, and Storage is the default key state
             expect(onyxValue).toBe(DEFAULT_VALUE);
-            const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
+            const cachedValue = cache.get(ONYX_KEYS.DEFAULT_KEY);
             expect(cachedValue).toBe(DEFAULT_VALUE);
-            return StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY).then((storedValue) => expect(parseInt(storedValue, 10)).toBe(DEFAULT_VALUE));
+            return StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY).then((storedValue) => expect(parseInt(storedValue as string, 10)).toBe(DEFAULT_VALUE));
         });
     });
 
@@ -79,7 +80,7 @@ describe('Set data while storage is clearing', () => {
         expect.assertions(3);
 
         // Given that Onyx has a value, and we have a variable listening to that value
-        let regularKeyOnyxValue;
+        let regularKeyOnyxValue: unknown;
         Onyx.connect({
             key: ONYX_KEYS.REGULAR_KEY,
             initWithStoredValues: false,
@@ -93,8 +94,8 @@ describe('Set data while storage is clearing', () => {
         return waitForPromisesToResolve().then(() => {
             // Then the value of the preserved key is also still set in both the cache and storage
             expect(regularKeyOnyxValue).toBe(SET_VALUE);
-            expect(cache.getValue(ONYX_KEYS.REGULAR_KEY)).toBe(SET_VALUE);
-            return StorageMock.getItem(ONYX_KEYS.REGULAR_KEY).then((storedValue) => expect(parseInt(storedValue, 10)).toBe(SET_VALUE));
+            expect(cache.get(ONYX_KEYS.REGULAR_KEY)).toBe(SET_VALUE);
+            return StorageMock.getItem(ONYX_KEYS.REGULAR_KEY).then((storedValue) => expect(parseInt(storedValue as string, 10)).toBe(SET_VALUE));
         });
     });
 
@@ -110,9 +111,9 @@ describe('Set data while storage is clearing', () => {
         return waitForPromisesToResolve().then(() => {
             // Then the value in Onyx, the cache, and Storage is the set value
             expect(onyxValue).toBe(SET_VALUE);
-            const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
+            const cachedValue = cache.get(ONYX_KEYS.DEFAULT_KEY);
             expect(cachedValue).toBe(SET_VALUE);
-            return StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY).then((storedValue) => expect(parseInt(storedValue, 10)).toBe(SET_VALUE));
+            return StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY).then((storedValue) => expect(parseInt(storedValue as string, 10)).toBe(SET_VALUE));
         });
     });
 });

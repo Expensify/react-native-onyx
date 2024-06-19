@@ -97,7 +97,7 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
         });
 
-        it('should initially return null while loading non-cached key, and then return value and loaded state', async () => {
+        it('should initially return `undefined` while loading non-cached key, and then return value and loaded state', async () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
 
             const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
@@ -244,8 +244,6 @@ describe('useOnyx', () => {
         });
 
         it('should return initial value if selected data is undefined', async () => {
-            Onyx.set(ONYXKEYS.TEST_KEY, 'test_id_1');
-
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
                     // @ts-expect-error bypass
@@ -256,6 +254,8 @@ describe('useOnyx', () => {
 
             expect(result.current[0]).toEqual('initial value');
             expect(result.current[1].status).toEqual('loaded');
+
+            Onyx.set(ONYXKEYS.TEST_KEY, 'test_id_1');
 
             await act(async () => waitForPromisesToResolve());
 
@@ -320,12 +320,6 @@ describe('useOnyx', () => {
         });
 
         it('should return initial value and loaded state while we have pending merges for the key, and then return updated value and loaded state', async () => {
-            Onyx.set(ONYXKEYS.TEST_KEY, 'test1');
-
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test3');
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test4');
-
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
                     initialValue: 'initial value',
@@ -334,6 +328,12 @@ describe('useOnyx', () => {
 
             expect(result.current[0]).toEqual('initial value');
             expect(result.current[1].status).toEqual('loaded');
+
+            Onyx.set(ONYXKEYS.TEST_KEY, 'test1');
+
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test3');
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test4');
 
             await act(async () => waitForPromisesToResolve());
 
@@ -361,7 +361,7 @@ describe('useOnyx', () => {
     });
 
     describe('initWithStoredValues', () => {
-        it('should return null and loaded state, and after merge return updated value and loaded state', async () => {
+        it('should return `undefined` and loaded state, and after merge return updated value and loaded state', async () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test1');
 
             const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {initWithStoredValues: false}));

@@ -1,6 +1,6 @@
 {
   "name": "react-native-onyx",
-  "version": "2.0.39",
+  "version": "2.0.50",
   "author": "Expensify, Inc.",
   "homepage": "https://expensify.com",
   "description": "State management for React Native",
@@ -31,7 +31,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "jest",
-    "build": "tsc -p tsconfig.build.json && cp ./lib/*.d.ts ./dist",
+    "build": "tsc -p tsconfig.build.json",
     "build:watch": "nodemon --watch lib --ext js,json,ts,tsx --exec \"npm run build && npm pack\"",
     "prebuild:docs": "npm run build",
     "build:docs": "ts-node buildDocs.ts",
@@ -45,6 +45,7 @@
   },
   "devDependencies": {
     "@actions/core": "^1.10.1",
+    "@jest/globals": "^29.7.0",
     "@lwc/eslint-plugin-lwc": "^1.7.2",
     "@ngneat/falso": "^7.2.0",
     "@react-native-community/eslint-config": "^3.2.0",
@@ -110,8 +111,8 @@
     }
   },
   "engines": {
-    "node": ">=20.10.0",
-    "npm": ">=10.2.3"
+    "node": ">=20.14.0",
+    "npm": ">=10.7.0"
   },
   "sideEffects": false
 }

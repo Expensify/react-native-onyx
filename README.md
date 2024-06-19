@@ -9,7 +9,7 @@ Awesome persistent storage solution wrapped in a Pub/Sub library.
 - Onyx allows other code to subscribe to changes in data, and then publishes change events whenever data is changed
 - Anything needing to read Onyx data needs to:
     1. Know what key the data is stored in (for web, you can find this by looking in the JS console > Application > local storage)
-    2. Subscribe to changes of the data for a particular key or set of keys. React components use `withOnyx()` and non-React libs use `Onyx.connect()`.
+    2. Subscribe to changes of the data for a particular key or set of keys. React function components use the `useOnyx()` hook (recommended), both class and function components can use `withOnyx()` HOC (deprecated, not-recommended) and non-React libs use `Onyx.connect()`.
     3. Get initialized with the current value of that key from persistent storage (Onyx does this by calling `setState()` or triggering the `callback` with the values currently on disk as part of the connection process)
 - Subscribing to Onyx keys is done using a constant defined in `ONYXKEYS`. Each Onyx key represents either a collection of items or a specific entry in storage. For example, since all reports are stored as individual keys like `report_1234`, if code needs to know about all the reports (e.g. display a list of them in the nav menu), then it would subscribe to the key `ONYXKEYS.COLLECTION.REPORT`.
 
@@ -116,7 +116,41 @@ To teardown the subscription call `Onyx.disconnect()` with the `connectionID` re
 Onyx.disconnect(connectionID);
 ```
 
-We can also access values inside React components via the `withOnyx()` [higher order component](https://reactjs.org/docs/higher-order-components.html). When the data changes the component will re-render.
+We can also access values inside React function components via the `useOnyx()` [hook](https://react.dev/reference/react/hooks) (recommended) or class and function components via the `withOnyx()` [higher order component](https://reactjs.org/docs/higher-order-components.html) (deprecated, not-recommended). When the data changes the component will re-render.
+
+```javascript
+import React from 'react';
+import {useOnyx} from 'react-native-onyx';
+
+const App = () => {
+    const [session] = useOnyx('session');
+    
+    return (
+        <View>
+            {session.token ? <Text>Logged in</Text> : <Text>Logged out</Text>}
+        </View>
+    );
+};
+
+export default App;
+```
+
+The `useOnyx()` hook won't delay the rendering of the component using it while the key/entity is being fetched and passed to the component. However, you can simulate this behavior by checking if the `status` of the hook's result metadata is `loading`. When `status` is `loading` it means that the Onyx data is being loaded into cache and thus is not immediately available, while `loaded` means that the data is already loaded and available to be consumed.
+
+```javascript
+const [reports, reportsResult] = useOnyx(ONYXKEYS.COLLECTION.REPORT);
+const [session, sessionResult] = useOnyx(ONYXKEYS.SESSION);
+
+if (reportsResult.status === 'loading' || sessionResult.status === 'loading') {
+    return <Placeholder />; // or `null` if you don't want to render anything.
+}
+
+// rest of the component's code.
+```
+
+> [!warning]
+> ## Deprecated Note
+> Please note that the `withOnyx()` Higher Order Component (HOC) is now considered deprecated. Use `useOnyx()` hook instead.
 
 ```javascript
 import React from 'react';
@@ -135,7 +169,7 @@ export default withOnyx({
 })(App);
 ```
 
-While `Onyx.connect()` gives you more control on how your component reacts as data is fetched from disk, `withOnyx()` will delay the rendering of the wrapped component until all keys/entities have been fetched and passed to the component, this can be convenient for simple cases. This however, can really delay your application if many entities are connected to the same component, you can pass an `initialValue` to each key to allow Onyx to eagerly render your component with this value.
+Differently from `useOnyx()`, `withOnyx()` will delay the rendering of the wrapped component until all keys/entities have been fetched and passed to the component, this can be convenient for simple cases. This however, can really delay your application if many entities are connected to the same component, you can pass an `initialValue` to each key to allow Onyx to eagerly render your component with this value.
 
 ```javascript
 export default withOnyx({
@@ -146,7 +180,9 @@ export default withOnyx({
 })(App);
 ```
 
-Additionally, if your component has many keys/entities when your component will mount but will receive many updates as data is fetched from DB and passed down to it, as every key that gets fetched will trigger a `setState` on the `withOnyx` HOC. This might cause re-renders on the initial mounting, preventing the component from mounting/rendering in reasonable time, making your app feel slow and even delaying animations. You can workaround this by passing an additional object with the `shouldDelayUpdates` property set to true. Onyx will then put all the updates in a queue until you decide when then should be applied, the component will receive a function `markReadyForHydration`. A good place to call this function is on the `onLayout` method, which gets triggered after your component has been rendered.
+Additionally, if your component has many keys/entities when your component will mount but will receive many updates as data is fetched from DB and passed down to it, as every key that gets fetched will trigger a `setState` on the `withOnyx` HOC. This might cause re-renders on the initial mounting, preventing the component from mounting/rendering in reasonable time, making your app feel slow and even delaying animations.
+
+You can workaround this by passing an additional object with the `shouldDelayUpdates` property set to true. Onyx will then put all the updates in a queue until you decide when then should be applied, the component will receive a function `markReadyForHydration`. A good place to call this function is on the `onLayout` method, which gets triggered after your component has been rendered.
 
 ```javascript
 const App = ({session, markReadyForHydration}) => (
@@ -164,27 +200,43 @@ export default withOnyx({
 }, true)(App);
 ```
 
-### Dependent Onyx Keys and withOnyx()
+### Dependent Onyx Keys and useOnyx()
 Some components need to subscribe to multiple Onyx keys at once and sometimes, one key might rely on the data from another key. This is similar to a JOIN in SQL.
 
 Example: To get the policy of a report, the `policy` key depends on the `report` key.
 
 ```javascript
-export default withOnyx({
-    report: {
-        key: ({reportID) => `${ONYXKEYS.COLLECTION.REPORT}${reportID}`,
-    },
-    policy: {
-        key: ({report}) => `${ONYXKEYS.COLLECTION.POLICY}${report.policyID}`,
-    },
-})(App);
+const App = ({reportID}) => {
+    const [report] = useOnyx(`${ONYXKEYS.COLLECTION.REPORT}${reportID}`);
+    const [policy] = useOnyx(`${ONYXKEYS.COLLECTION.POLICY}${report.policyID}`);
+
+    return (
+        <View>
+            {/* Render with policy data */}
+        </View>
+    );
+};
+
+export default App;
 ```
 
-Background info:
-- The `key` value can be a function that returns the key that Onyx subscribes to
-- The first argument to the `key` function is the `props` from the component
+**Detailed explanation of how this is handled and rendered with `useOnyx()`:**
 
-**Detailed explanation of how this is handled and rendered:**
+1. The component mounts with a `reportID={1234}` prop.
+2. The `useOnyx` hook evaluates the mapping and subscribes to the key `reports_1234` using the `reportID` prop.
+3. The `useOnyx` hook fetches the data for the key `reports_1234` from Onyx and sets the state with the initial value (if provided).
+4. Since `report` is not defined yet, `report?.policyID` defaults to `undefined`. The `useOnyx` hook subscribes to the key `policies_undefined`.
+5. The `useOnyx` hook reads the data and updates the state of the component:
+   - `report={{reportID: 1234, policyID: 1, ...rest of the object...}}`
+   - `policy={undefined}` (since there is no policy with ID `undefined`)
+6. The `useOnyx` hook again evaluates the key `policies_1` after fetching the updated `report` object which has `policyID: 1`.
+7. The `useOnyx` hook reads the data and updates the state with:
+   - `policy={{policyID: 1, ...rest of the object...}}`
+8. Now, all mappings have values that are defined (not undefined), and the component is rendered with all necessary data.
+  
+* It is VERY important to NOT use empty string default values like `report.policyID || ''`. This results in the key returned to `useOnyx` as `policies_`, which subscribes to the ENTIRE POLICY COLLECTION and is most assuredly not what you were intending. You can use a default of `0` (as long as you are reasonably sure that there is never a policyID=0). This allows Onyx to return `undefined` as the value of the policy key, which is handled by `useOnyx` appropriately.
+
+**Detailed explanation of how this is handled and rendered with `withOnyx` HOC:**
 1. The component mounts with a `reportID={1234}` prop
 2. `withOnyx` evaluates the mapping
 3. `withOnyx` connects to the key `reports_1234` because of the prop passed to the component
@@ -239,15 +291,23 @@ Onyx.mergeCollection(ONYXKEYS.COLLECTION.REPORT, {
 There are several ways to subscribe to these keys:
 
 ```javascript
-withOnyx({
-    allReports: {key: ONYXKEYS.COLLECTION.REPORT},
-})(MyComponent);
+const MyComponent = () => {
+    const [allReports] = useOnyx(ONYXKEYS.COLLECTION.REPORT);
+
+    return (
+        <View>
+            {/* Render with allReports data */}
+        </View>
+    );
+};
+
+export default MyComponent;
 ```
 
 This will add a prop to the component called `allReports` which is an object of collection member key/values. Changes to the individual member keys will modify the entire object and new props will be passed with each individual key update. The prop doesn't update on the initial rendering of the component until the entire collection has been read out of Onyx.
 
 ```js
-Onyx.connect({key: ONYXKEYS.COLLECTION.REPORT}, callback: (memberValue, memberKey) => {...}});
+Onyx.connect({key: ONYXKEYS.COLLECTION.REPORT}, callback: (memberValue, memberKey) => {...});
 ```
 
 This will fire the callback once per member key depending on how many collection member keys are currently stored. Changes to those keys after the initial callbacks fire will occur when each individual key is updated.
@@ -256,11 +316,11 @@ This will fire the callback once per member key depending on how many collection
 Onyx.connect({
     key: ONYXKEYS.COLLECTION.REPORT,
     waitForCollectionCallback: true,
-    callback: (allReports) => {...}},
+    callback: (allReports) => {...},
 });
 ```
 
-This final option forces `Onyx.connect()` to behave more like `withOnyx()` and only update the callback once with the entire collection initially and later with an updated version of the collection when individual keys update.
+This final option forces `Onyx.connect()` to behave more like `useOnyx()` and only update the callback once with the entire collection initially and later with an updated version of the collection when individual keys update.
 
 ### Performance Considerations When Using Collections
 
@@ -270,12 +330,12 @@ Remember, `mergeCollection()` will notify a subscriber only *once* with the tota
 
 ```js
 // Bad
-_.each(reports, report => Onyx.merge(`${ONYXKEYS.COLLECTION.REPORT}${report.reportID}`, report)); // -> A component using withOnyx() will have it's state updated with each iteration
+_.each(reports, report => Onyx.merge(`${ONYXKEYS.COLLECTION.REPORT}${report.reportID}`, report)); // -> A component using useOnyx() will have it's state updated with each iteration
 
 // Good
 const values = {};
 _.each(reports, report => values[`${ONYXKEYS.COLLECTION.REPORT}${report.reportID}`] = report);
-Onyx.mergeCollection(ONYXKEYS.COLLECTION.REPORT, values); // -> A component using withOnyx() will only have it's state updated once
+Onyx.mergeCollection(ONYXKEYS.COLLECTION.REPORT, values); // -> A component using useOnyx() will only have its state updated once
 ```
 
 ## Clean up
@@ -325,12 +385,20 @@ Onyx.init({
 ```
 
 ```js
-export default withOnyx({
-    reportActions: {
-        key: ({reportID}) => `${ONYXKEYS.COLLECTION.REPORT_ACTIONS}${reportID}_`,
-        canEvict: props => !props.isActiveReport,
-    },
-})(ReportActionsView);
+const ReportActionsView = ({reportID, isActiveReport}) => {
+    const [reportActions] = useOnyx(
+        `${ONYXKEYS.COLLECTION.REPORT_ACTIONS}${reportID}_`,
+        {canEvict: () => !isActiveReport}
+    );
+
+    return (
+        <View>
+            {/* Render with reportActions data */}
+        </View>
+    );
+};
+
+export default ReportActionsView;
 ```
 
 # Benchmarks

@@ -1,20 +1,28 @@
 /* eslint-disable rulesdir/onyx-props-must-have-default */
 import React from 'react';
 import {render} from '@testing-library/react-native';
-import _ from 'underscore';
 
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
+import type {ViewWithTextOnyxProps, ViewWithTextProps} from '../components/ViewWithText';
 import ViewWithText from '../components/ViewWithText';
+import type {ViewWithCollectionsProps} from '../components/ViewWithCollections';
 import ViewWithCollections from '../components/ViewWithCollections';
+import type OnyxCache from '../../lib/OnyxCache';
+import type MockedStorage from '../../lib/storage/__mocks__';
+import type OnyxInstance from '../../lib/Onyx';
+import type withOnyxType from '../../lib/withOnyx';
+import type {InitOptions} from '../../lib/types';
+import generateRange from '../utils/generateRange';
 
 describe('Onyx', () => {
     describe('Cache Service', () => {
         /** @type OnyxCache */
-        let cache;
+        let cache: typeof OnyxCache;
 
         // Always use a "fresh" instance
         beforeEach(() => {
             jest.resetModules();
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
             cache = require('../../lib/OnyxCache').default;
         });
 
@@ -42,9 +50,9 @@ describe('Onyx', () => {
 
             it('Should keep storage keys even when no values are provided', () => {
                 // Given cache with some items
-                cache.set('mockKey');
-                cache.set('mockKey2');
-                cache.set('mockKey3');
+                cache.set('mockKey', undefined);
+                cache.set('mockKey2', undefined);
+                cache.set('mockKey3', undefined);
 
                 // Then the keys should be stored in cache
                 const allKeys = cache.getAllKeys();
@@ -71,7 +79,7 @@ describe('Onyx', () => {
                 // Given empty cache
 
                 // When a value is retrieved
-                const result = cache.getValue('mockKey');
+                const result = cache.get('mockKey');
 
                 // Then it should be undefined
                 expect(result).not.toBeDefined();
@@ -84,8 +92,8 @@ describe('Onyx', () => {
 
                 // When a value is retrieved
                 // Then it should be the correct value
-                expect(cache.getValue('mockKey')).toEqual({items: ['mockValue', 'mockValue2']});
-                expect(cache.getValue('mockKey2')).toEqual('mockValue3');
+                expect(cache.get('mockKey')).toEqual({items: ['mockValue', 'mockValue2']});
+                expect(cache.get('mockKey2')).toEqual('mockValue3');
             });
         });
 
@@ -147,7 +155,7 @@ describe('Onyx', () => {
                 cache.set('mockKey', {value: 'mockValue'});
 
                 // Then data should be cached
-                const data = cache.getValue('mockKey');
+                const data = cache.get('mockKey');
                 expect(data).toEqual({value: 'mockValue'});
             });
 
@@ -170,7 +178,7 @@ describe('Onyx', () => {
                 cache.set('mockKey2', {value: []});
 
                 // Then the value should be overwritten
-                expect(cache.getValue('mockKey2')).toEqual({value: []});
+                expect(cache.get('mockKey2')).toEqual({value: []});
             });
         });
 
@@ -185,8 +193,8 @@ describe('Onyx', () => {
 
                 // Then a value should not be available in cache
                 expect(cache.hasCacheForKey('mockKey')).toBe(false);
-                expect(cache.getValue('mockKey')).not.toBeDefined();
-                expect(cache.getAllKeys('mockKey').has('mockKey')).toBe(false);
+                expect(cache.get('mockKey')).not.toBeDefined();
+                expect(cache.getAllKeys().has('mockKey')).toBe(false);
             });
         });
 
@@ -201,8 +209,8 @@ describe('Onyx', () => {
                 });
 
                 // Then data should be created in cache
-                expect(cache.getValue('mockKey')).toEqual({value: 'mockValue'});
-                expect(cache.getValue('mockKey2')).toEqual({value: 'mockValue2'});
+                expect(cache.get('mockKey')).toEqual({value: 'mockValue'});
+                expect(cache.get('mockKey2')).toEqual({value: 'mockValue2'});
             });
 
             it('Should merge data to existing cache value', () => {
@@ -217,12 +225,12 @@ describe('Onyx', () => {
                 });
 
                 // Then the values should be merged together in cache
-                expect(cache.getValue('mockKey')).toEqual({
+                expect(cache.get('mockKey')).toEqual({
                     value: 'mockValue',
                     mockItems: [],
                 });
 
-                expect(cache.getValue('mockKey2')).toEqual({
+                expect(cache.get('mockKey2')).toEqual({
                     other: 'overwrittenMockValue',
                     items: [1, 2],
                     mock: 'mock',
@@ -239,7 +247,7 @@ describe('Onyx', () => {
                 });
 
                 // Then the values should be merged together in cache
-                expect(cache.getValue('mockKey')).toEqual({
+                expect(cache.get('mockKey')).toEqual({
                     value: 'mockValue',
                     mockItems: [],
                     otherValue: 'overwritten',
@@ -256,7 +264,7 @@ describe('Onyx', () => {
                 });
 
                 // Then the arrays should be replaced as expected
-                expect(cache.getValue('mockKey')).toEqual([{ID: 3}, {added: 'field'}, {}, {ID: 1000}]);
+                expect(cache.get('mockKey')).toEqual([{ID: 3}, {added: 'field'}, {}, {ID: 1000}]);
             });
 
             it('Should merge arrays inside objects correctly', () => {
@@ -269,7 +277,7 @@ describe('Onyx', () => {
                 });
 
                 // Then the first array is completely replaced by the second array
-                expect(cache.getValue('mockKey')).toEqual({ID: [2]});
+                expect(cache.get('mockKey')).toEqual({ID: [2]});
             });
 
             it('Should work with primitive values', () => {
@@ -280,31 +288,31 @@ describe('Onyx', () => {
                 cache.merge({mockKey: false});
 
                 // Then the object should be overwritten with a bool value
-                expect(cache.getValue('mockKey')).toEqual(false);
+                expect(cache.get('mockKey')).toEqual(false);
 
                 // When merge is called with number
                 cache.merge({mockKey: 0});
 
                 // Then the value should be overwritten
-                expect(cache.getValue('mockKey')).toEqual(0);
+                expect(cache.get('mockKey')).toEqual(0);
 
                 // When merge is called with string
                 cache.merge({mockKey: '123'});
 
                 // Then the value should be overwritten
-                expect(cache.getValue('mockKey')).toEqual('123');
+                expect(cache.get('mockKey')).toEqual('123');
 
                 // When merge is called with string again
                 cache.merge({mockKey: '123'});
 
                 // Then strings should not have been concatenated
-                expect(cache.getValue('mockKey')).toEqual('123');
+                expect(cache.get('mockKey')).toEqual('123');
 
                 // When merge is called with an object
                 cache.merge({mockKey: {value: 'myMockObject'}});
 
                 // Then the old primitive value should be overwritten with the object
-                expect(cache.getValue('mockKey')).toEqual({value: 'myMockObject'});
+                expect(cache.get('mockKey')).toEqual({value: 'myMockObject'});
             });
 
             it('Should ignore `undefined` values', () => {
@@ -315,12 +323,12 @@ describe('Onyx', () => {
                 cache.merge({mockKey: {ID: undefined}});
 
                 // Then the key should still be in cache and the value unchanged
-                expect(cache.getValue('mockKey')).toEqual({ID: 5});
+                expect(cache.get('mockKey')).toEqual({ID: 5});
 
                 cache.merge({mockKey: undefined});
 
                 // Then the key should still be in cache and the value unchanged
-                expect(cache.getValue('mockKey')).toEqual({ID: 5});
+                expect(cache.get('mockKey')).toEqual({ID: 5});
             });
 
             it('Should update storageKeys when new keys are created', () => {
@@ -340,22 +348,23 @@ describe('Onyx', () => {
             });
 
             it('Should throw if called with anything that is not an object', () => {
+                // @ts-expect-error -- intentionally testing invalid input
                 expect(() => cache.merge([])).toThrow();
+                // @ts-expect-error -- intentionally testing invalid input
                 expect(() => cache.merge('')).toThrow();
+                // @ts-expect-error -- intentionally testing invalid input
                 expect(() => cache.merge(0)).toThrow();
                 expect(() => cache.merge({})).not.toThrow();
             });
 
-            it('Should merge `null` values', () => {
-                // `null` values can override existing values and should also
-                // be preserved during merges.
+            it('Should remove `null` values when merging', () => {
                 cache.set('mockKey', {ID: 5});
                 cache.set('mockNullKey', null);
 
                 cache.merge({mockKey: null});
 
-                expect(cache.getValue('mockKey')).toEqual(null);
-                expect(cache.getValue('mockNullKey')).toEqual(null);
+                expect(cache.get('mockKey')).toEqual(undefined);
+                expect(cache.get('mockNullKey')).toEqual(undefined);
             });
         });
 
@@ -405,7 +414,7 @@ describe('Onyx', () => {
                 const taskPromise = cache.getTaskPromise('mockTask');
 
                 // Then it should resolve with the same result as the captured task
-                return taskPromise.then((result) => {
+                return taskPromise!.then((result) => {
                     expect(result).toEqual({mockResult: true});
                 });
             });
@@ -413,12 +422,12 @@ describe('Onyx', () => {
     });
 
     describe('Onyx with Cache', () => {
-        let Onyx;
-        let StorageMock;
-        let withOnyx;
+        let Onyx: typeof OnyxInstance;
+        let StorageMock: typeof MockedStorage;
+        let withOnyx: typeof withOnyxType;
 
         /** @type OnyxCache */
-        let cache;
+        let cache: typeof OnyxCache;
 
         const ONYX_KEYS = {
             TEST_KEY: 'test',
@@ -428,11 +437,10 @@ describe('Onyx', () => {
             },
         };
 
-        function initOnyx(overrides) {
+        function initOnyx(overrides?: Partial<InitOptions>) {
             Onyx.init({
                 keys: ONYX_KEYS,
                 safeEvictionKeys: [ONYX_KEYS.COLLECTION.MOCK_COLLECTION],
-                registerStorageEventListener: jest.fn(),
                 maxCachedKeysCount: 10,
                 ...overrides,
             });
@@ -446,16 +454,19 @@ describe('Onyx', () => {
         // This reset top level static variables (in Onyx.js, OnyxCache.js, etc.)
         beforeEach(() => {
             jest.resetModules();
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
             const OnyxModule = require('../../lib');
             Onyx = OnyxModule.default;
             withOnyx = OnyxModule.withOnyx;
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
             StorageMock = require('../../lib/storage').default;
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
             cache = require('../../lib/OnyxCache').default;
         });
 
         it('Expect a single call to getItem when multiple components use the same key', () => {
             // Given a component connected to Onyx
-            const TestComponentWithOnyx = withOnyx({
+            const TestComponentWithOnyx = withOnyx<ViewWithTextProps, ViewWithTextOnyxProps>({
                 text: {
                     key: ONYX_KEYS.TEST_KEY,
                 },
@@ -484,7 +495,7 @@ describe('Onyx', () => {
 
         it('Expect a single call to getAllKeys when multiple components use the same key', () => {
             // Given a component connected to Onyx
-            const TestComponentWithOnyx = withOnyx({
+            const TestComponentWithOnyx = withOnyx<ViewWithTextProps, ViewWithTextOnyxProps>({
                 text: {
                     key: ONYX_KEYS.TEST_KEY,
                 },
@@ -515,9 +526,9 @@ describe('Onyx', () => {
         it('Should keep recently accessed items in cache', () => {
             // Given Storage with 10 different keys
             StorageMock.getItem.mockResolvedValue('"mockValue"');
-            const range = _.range(10);
-            StorageMock.getAllKeys.mockResolvedValue(_.map(range, (number) => `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}${number}`));
-            let connections;
+            const range = generateRange(0, 10);
+            StorageMock.getAllKeys.mockResolvedValue(range.map((number) => `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}${number}`));
+            let connections: Array<{key: string; connectionId: number}> = [];
 
             // Given Onyx is configured with max 5 keys in cache
             return initOnyx({
@@ -525,7 +536,7 @@ describe('Onyx', () => {
             })
                 .then(() => {
                     // Given 10 connections for different keys
-                    connections = _.map(range, (number) => {
+                    connections = range.map((number) => {
                         const key = `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}${number}`;
                         return {
                             key,
@@ -540,13 +551,13 @@ describe('Onyx', () => {
                 })
                 .then(() => {
                     // Then the most recent 5 keys should remain in cache
-                    _.range(5, 10).forEach((number) => {
+                    generateRange(5, 10).forEach((number) => {
                         const key = connections[number].key;
                         expect(cache.hasCacheForKey(key)).toBe(true);
                     });
 
                     // AND the least recent 5 should be dropped
-                    _.range(0, 5).forEach((number) => {
+                    generateRange(0, 5).forEach((number) => {
                         const key = connections[number].key;
                         expect(cache.hasCacheForKey(key)).toBe(false);
                     });
@@ -555,7 +566,7 @@ describe('Onyx', () => {
 
         it('Expect multiple calls to getItem when value cannot be retrieved from cache', () => {
             // Given a component connected to Onyx
-            const TestComponentWithOnyx = withOnyx({
+            const TestComponentWithOnyx = withOnyx<ViewWithTextProps, ViewWithTextOnyxProps>({
                 text: {
                     key: ONYX_KEYS.TEST_KEY,
                 },
@@ -589,13 +600,13 @@ describe('Onyx', () => {
 
         it('Expect multiple calls to getItem when multiple keys are used', () => {
             // Given two component
-            const TestComponentWithOnyx = withOnyx({
+            const TestComponentWithOnyx = withOnyx<ViewWithCollectionsProps, {testObject: unknown}>({
                 testObject: {
                     key: ONYX_KEYS.TEST_KEY,
                 },
             })(ViewWithCollections);
 
-            const OtherTestComponentWithOnyx = withOnyx({
+            const OtherTestComponentWithOnyx = withOnyx<ViewWithTextProps, ViewWithTextOnyxProps>({
                 text: {
                     key: ONYX_KEYS.OTHER_TEST,
                 },
@@ -627,8 +638,8 @@ describe('Onyx', () => {
         it('Should clean cache when connections to eviction keys happen', () => {
             // Given storage with some data
             StorageMock.getItem.mockResolvedValue('"mockValue"');
-            const range = _.range(1, 10);
-            StorageMock.getAllKeys.mockResolvedValue(_.map(range, (n) => `key${n}`));
+            const range = generateRange(1, 10);
+            StorageMock.getAllKeys.mockResolvedValue(range.map((n) => `key${n}`));
 
             // Given Onyx with LRU size of 3
             return initOnyx({maxCachedKeysCount: 3})

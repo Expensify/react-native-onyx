@@ -1,5 +1,6 @@
-import {IsEqual} from 'type-fest';
-import {CollectionKeyBase, ExtractOnyxCollectionValue, KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey, Selector} from './types';
+import type {ForwardedRef} from 'react';
+import type {IsEqual} from 'type-fest';
+import type {CollectionKeyBase, ExtractOnyxCollectionValue, KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey, OnyxValue, Selector} from '../types';
 
 /**
  * Represents the base mapping options between an Onyx key and the component's prop.
@@ -10,10 +11,16 @@ type BaseMapping<TComponentProps, TOnyxProps> = {
     allowStaleData?: boolean;
 };
 
+/**
+ * Represents the base mapping options when an Onyx collection key is supplied.
+ */
 type CollectionBaseMapping<TOnyxKey extends CollectionKeyBase> = {
     initialValue?: OnyxCollection<KeyValueMapping[TOnyxKey]>;
 };
 
+/**
+ * Represents the base mapping options when an Onyx non-collection key is supplied.
+ */
 type EntryBaseMapping<TOnyxKey extends OnyxKey> = {
     initialValue?: OnyxEntry<KeyValueMapping[TOnyxKey]>;
 };
@@ -61,6 +68,7 @@ type BaseMappingKey<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxPr
  * },
  * ```
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 type BaseMappingStringKeyAndSelector<TComponentProps, TOnyxProps, TReturnType, TOnyxKey extends OnyxKey> = {
     key: TOnyxKey;
     selector: Selector<TOnyxKey, TOnyxProps, TReturnType>;
@@ -98,6 +106,14 @@ type Mapping<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TO
     );
 
 /**
+ * Represents a superset of `Mapping` type with internal properties included.
+ */
+type WithOnyxMapping<TComponentProps, TOnyxProps> = Mapping<TComponentProps, TOnyxProps, keyof TOnyxProps, OnyxKey> & {
+    connectionID: number;
+    previousKey?: OnyxKey;
+};
+
+/**
  * Represents the mapping options between an Onyx collection key without suffix and the component's prop with all its possibilities.
  */
 type CollectionMapping<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TOnyxKey extends CollectionKeyBase> = BaseMapping<TComponentProps, TOnyxProps> &
@@ -125,17 +141,30 @@ type OnyxPropCollectionMapping<TComponentProps, TOnyxProps, TOnyxProp extends ke
 }[CollectionKeyBase];
 
 /**
- * @deprecated Use `useOnyx` instead of `withOnyx` whenever possible.
- *
- * This is a higher order component that provides the ability to map a state property directly to
- * something in Onyx (a key/value store). That way, as soon as data in Onyx changes, the state will be set and the view
- * will automatically change to reflect the new data.
+ * Represents an Onyx mapping object that connects Onyx keys to component's props.
  */
-declare function withOnyx<TComponentProps, TOnyxProps>(
-    mapping: {
-        [TOnyxProp in keyof TOnyxProps]: OnyxPropMapping<TComponentProps, TOnyxProps, TOnyxProp> | OnyxPropCollectionMapping<TComponentProps, TOnyxProps, TOnyxProp>;
-    },
-    shouldDelayUpdates?: boolean,
-): (component: React.ComponentType<TComponentProps>) => React.ComponentType<Omit<TComponentProps, keyof TOnyxProps>>;
+type MapOnyxToState<TComponentProps, TOnyxProps> = {
+    [TOnyxProp in keyof TOnyxProps]: OnyxPropMapping<TComponentProps, TOnyxProps, TOnyxProp> | OnyxPropCollectionMapping<TComponentProps, TOnyxProps, TOnyxProp>;
+};
 
-export default withOnyx;
+/**
+ * Represents the `withOnyx` internal component props.
+ */
+type WithOnyxProps<TComponentProps, TOnyxProps> = Omit<TComponentProps, keyof TOnyxProps> & {forwardedRef?: ForwardedRef<unknown>};
+
+/**
+ * Represents the `withOnyx` internal component state.
+ */
+type WithOnyxState<TOnyxProps> = TOnyxProps & {
+    loading: boolean;
+};
+
+/**
+ * Represents the `withOnyx` internal component instance.
+ */
+type WithOnyxInstance = React.Component<unknown, WithOnyxState<KeyValueMapping>> & {
+    setStateProxy: (modifier: Record<string, OnyxCollection<KeyValueMapping[OnyxKey]>> | ((state: Record<string, OnyxCollection<KeyValueMapping[OnyxKey]>>) => OnyxValue<OnyxKey>)) => void;
+    setWithOnyxState: (statePropertyName: OnyxKey, value: OnyxValue<OnyxKey>) => void;
+};
+
+export type {WithOnyxMapping, MapOnyxToState, WithOnyxProps, WithOnyxInstance, WithOnyxState};

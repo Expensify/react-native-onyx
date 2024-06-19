@@ -2,11 +2,16 @@
 import React from 'react';
 import {render} from '@testing-library/react-native';
 import Onyx, {withOnyx} from '../../lib';
+import type {ViewWithTextOnyxProps, ViewWithTextProps} from '../components/ViewWithText';
 import ViewWithText from '../components/ViewWithText';
+import type {ViewWithCollectionsProps} from '../components/ViewWithCollections';
 import ViewWithCollections from '../components/ViewWithCollections';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
+import type {ViewWithObjectProps} from '../components/ViewWithObject';
 import ViewWithObject from '../components/ViewWithObject';
 import StorageMock from '../../lib/storage';
+import type {OnyxValue} from '../../lib/types';
+import type GenericCollection from '../utils/GenericCollection';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
@@ -23,7 +28,6 @@ const ONYX_KEYS = {
 
 Onyx.init({
     keys: ONYX_KEYS,
-    registerStorageEventListener: () => {},
 });
 
 beforeEach(() => Onyx.clear());
@@ -39,7 +43,7 @@ describe('withOnyxTest', () => {
         // synchronously from cache, we expect the component to be rendered immediately.
         return Onyx.set(ONYX_KEYS.TEST_KEY, 'test1')
             .then(() => {
-                const TestComponentWithOnyx = withOnyx({
+                const TestComponentWithOnyx = withOnyx<ViewWithTextProps, ViewWithTextOnyxProps>({
                     text: {
                         key: ONYX_KEYS.TEST_KEY,
                     },
@@ -61,7 +65,7 @@ describe('withOnyxTest', () => {
     });
 
     it('should update withOnyx subscriber multiple times when merge is used', () => {
-        const TestComponentWithOnyx = withOnyx({
+        const TestComponentWithOnyx = withOnyx<ViewWithCollectionsProps, {text: unknown}>({
             text: {
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
             },
@@ -84,11 +88,11 @@ describe('withOnyxTest', () => {
     it('should batch correctly together little khachapuris', () =>
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
             [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {ID: 999},
-        })
+        } as GenericCollection)
             .then(() => Onyx.merge(ONYX_KEYS.SIMPLE_KEY, 'prev_string'))
             .then(() => Onyx.merge(ONYX_KEYS.SIMPLE_KEY_2, 'prev_string2'))
             .then(() => {
-                const TestComponentWithOnyx = withOnyx({
+                const TestComponentWithOnyx = withOnyx<ViewWithObjectProps, Record<'testKey' | 'simpleKey' | 'simpleKey2', unknown>>({
                     testKey: {
                         key: `${ONYX_KEYS.COLLECTION.TEST_KEY}1`,
                     },
@@ -104,7 +108,7 @@ describe('withOnyxTest', () => {
 
                 return waitForPromisesToResolve()
                     .then(() => {
-                        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}});
+                        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}} as GenericCollection);
                         Onyx.merge(ONYX_KEYS.SIMPLE_KEY, 'string');
                         return Onyx.merge(ONYX_KEYS.SIMPLE_KEY_2, 'string2');
                     })
@@ -116,7 +120,7 @@ describe('withOnyxTest', () => {
             }));
 
     it('should update withOnyx subscriber just once when mergeCollection is used', () => {
-        const TestComponentWithOnyx = withOnyx({
+        const TestComponentWithOnyx = withOnyx<ViewWithCollectionsProps, {text: unknown}>({
             text: {
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
             },
@@ -129,7 +133,7 @@ describe('withOnyxTest', () => {
                     test_1: {ID: 123},
                     test_2: {ID: 234},
                     test_3: {ID: 345},
-                }),
+                } as GenericCollection),
             )
             .then(() => {
                 expect(onRender).toHaveBeenCalledTimes(2);
@@ -138,7 +142,7 @@ describe('withOnyxTest', () => {
 
     it('should update withOnyx subscribing to individual key if mergeCollection is used', () => {
         const collectionItemID = 1;
-        const TestComponentWithOnyx = withOnyx({
+        const TestComponentWithOnyx = withOnyx<ViewWithCollectionsProps, {text: unknown}>({
             text: {
                 key: `${ONYX_KEYS.COLLECTION.TEST_KEY}${collectionItemID}`,
             },
@@ -151,7 +155,7 @@ describe('withOnyxTest', () => {
                     test_1: {ID: 123},
                     test_2: {ID: 234},
                     test_3: {ID: 345},
-                }),
+                } as GenericCollection),
             )
             .then(() => {
                 expect(onRender).toHaveBeenCalledTimes(2);
@@ -160,7 +164,7 @@ describe('withOnyxTest', () => {
 
     it('should replace arrays inside objects with withOnyx subscribing to individual key if mergeCollection is used', () => {
         const collectionItemID = 1;
-        const TestComponentWithOnyx = withOnyx({
+        const TestComponentWithOnyx = withOnyx<ViewWithCollectionsProps, {text: unknown}>({
             text: {
                 key: `${ONYX_KEYS.COLLECTION.TEST_KEY}${collectionItemID}`,
             },
@@ -177,12 +181,12 @@ describe('withOnyxTest', () => {
             .then(() =>
                 Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                     test_1: {list: [1, 2]},
-                }),
+                } as GenericCollection),
             )
             .then(() =>
                 Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                     test_1: {list: [7]},
-                }),
+                } as GenericCollection),
             )
             .then(() => {
                 expect(onRender).toHaveBeenCalledTimes(3);
@@ -198,7 +202,7 @@ describe('withOnyxTest', () => {
 
     it('should update withOnyx subscribing to individual key with merged value if mergeCollection is used', () => {
         const collectionItemID = 4;
-        const TestComponentWithOnyx = withOnyx({
+        const TestComponentWithOnyx = withOnyx<ViewWithCollectionsProps, {text: unknown}>({
             text: {
                 key: `${ONYX_KEYS.COLLECTION.TEST_KEY}${collectionItemID}`,
             },
@@ -212,13 +216,13 @@ describe('withOnyxTest', () => {
             />,
         );
         return waitForPromisesToResolve()
-            .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_4: {ID: 456}, test_5: {ID: 567}}))
+            .then(() => Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_4: {ID: 456}, test_5: {ID: 567}} as GenericCollection))
             .then(() =>
                 Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                     test_4: {Name: 'Test4'},
                     test_5: {Name: 'Test5'},
                     test_6: {ID: 678, Name: 'Test6'},
-                }),
+                } as GenericCollection),
             )
             .then(() => {
                 expect(onRender).toHaveBeenCalledTimes(3);
@@ -233,9 +237,9 @@ describe('withOnyxTest', () => {
     });
 
     it('should update if a prop dependent key changes', () => {
-        let rerender;
-        let getByTestId;
-        const TestComponentWithOnyx = withOnyx({
+        let rerender: ReturnType<typeof render>['rerender'];
+        let getByTestId: ReturnType<typeof render>['getByTestId'];
+        const TestComponentWithOnyx = withOnyx<ViewWithTextProps, ViewWithTextOnyxProps>({
             text: {
                 key: (props) => `${ONYX_KEYS.COLLECTION.TEST_KEY}${props.collectionID}`,
             },
@@ -265,7 +269,7 @@ describe('withOnyxTest', () => {
 
     it('should render the WrappedComponent if no keys are required for init', () => {
         const INITIAL_VALUE = 'initial_value';
-        const TestComponentWithOnyx = withOnyx({
+        const TestComponentWithOnyx = withOnyx<ViewWithTextProps, ViewWithTextOnyxProps>({
             text: {
                 key: 'test',
                 initWithStoredValues: false,
@@ -273,7 +277,7 @@ describe('withOnyxTest', () => {
         })(ViewWithText);
         TestComponentWithOnyx.defaultProps = {
             text: INITIAL_VALUE,
-        };
+        } as ViewWithTextProps;
         Onyx.set('test', 'test_text');
         return waitForPromisesToResolve().then(() => {
             const {getByTestId} = render(<TestComponentWithOnyx collectionID="1" />);
@@ -289,42 +293,52 @@ describe('withOnyxTest', () => {
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.STATIC, {
             static_1: {name: 'Static 1', id: 1},
             static_2: {name: 'Static 2', id: 2},
-        });
+        } as GenericCollection);
 
         // And one collection will depend on data being loaded from the static collection
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.DEPENDS_ON_STATIC, {
             dependsOnStatic_1: {name: 'dependsOnStatic 1', id: 3},
             dependsOnStatic_2: {name: 'dependsOnStatic 2', id: 4},
-        });
+        } as GenericCollection);
 
         // And one collection will depend on the data being loaded from the collection that depends on the static collection (multiple nested dependencies)
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.DEPENDS_ON_DEPENDS_ON_STATIC, {
             dependsOnDependsOnStatic_3: {name: 'dependsOnDependsOnStatic 1', id: 5},
             dependsOnDependsOnStatic_4: {name: 'dependsOnDependsOnStatic 2', id: 6},
-        });
+        } as GenericCollection);
 
         // And another collection with one more layer of dependency just to prove it works
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.DEPENDS_ON_DEPENDS_ON_DEPENDS_ON_STATIC, {
             dependsOnDependsOnDependsOnStatic_5: {name: 'dependsOnDependsOnDependsOnStatic 1'},
             dependsOnDependsOnDependsOnStatic_6: {name: 'dependsOnDependsOnDependsOnStatic 2'},
-        });
+        } as GenericCollection);
 
         // When a component is rendered using withOnyx and several nested dependencies on the keys
         return (
             waitForPromisesToResolve()
                 .then(() => {
-                    const TestComponentWithOnyx = withOnyx({
+                    const TestComponentWithOnyx = withOnyx<
+                        ViewWithCollectionsProps,
+                        Record<'staticObject' | 'dependentObject' | 'multiDependentObject' | 'extremeMultiDependentObject', unknown>
+                    >({
                         staticObject: {
                             key: `${ONYX_KEYS.COLLECTION.STATIC}1`,
                         },
                         dependentObject: {
-                            key: ({staticObject}) => `${ONYX_KEYS.COLLECTION.DEPENDS_ON_STATIC}${(staticObject && staticObject.id) || 0}`,
+                            key: ({staticObject}) =>
+                                `${ONYX_KEYS.COLLECTION.DEPENDS_ON_STATIC}${(staticObject && typeof staticObject === 'object' && 'id' in staticObject && staticObject.id) || 0}`,
                         },
                         multiDependentObject: {
-                            key: ({dependentObject}) => `${ONYX_KEYS.COLLECTION.DEPENDS_ON_DEPENDS_ON_STATIC}${(dependentObject && dependentObject.id) || 0}`,
+                            key: ({dependentObject}) =>
+                                `${ONYX_KEYS.COLLECTION.DEPENDS_ON_DEPENDS_ON_STATIC}${
+                                    (dependentObject && typeof dependentObject === 'object' && 'id' in dependentObject && dependentObject.id) || 0
+                                }`,
                         },
                         extremeMultiDependentObject: {
-                            key: ({multiDependentObject}) => `${ONYX_KEYS.COLLECTION.DEPENDS_ON_DEPENDS_ON_DEPENDS_ON_STATIC}${(multiDependentObject && multiDependentObject.id) || 0}`,
+                            key: ({multiDependentObject}) =>
+                                `${ONYX_KEYS.COLLECTION.DEPENDS_ON_DEPENDS_ON_DEPENDS_ON_STATIC}${
+                                    (multiDependentObject && typeof multiDependentObject === 'object' && 'id' in multiDependentObject && multiDependentObject.id) || 0
+                                }`,
                         },
                     })(ViewWithCollections);
                     render(
@@ -373,13 +387,13 @@ describe('withOnyxTest', () => {
             test_1: {ID: 1},
             test_2: {ID: 2},
             test_3: {ID: 3},
-        });
+        } as GenericCollection);
 
         return (
             waitForPromisesToResolve()
                 .then(() => {
                     // When three components subscribe to each of the items in that collection
-                    const TestComponentWithOnyx1 = withOnyx({
+                    const TestComponentWithOnyx1 = withOnyx<ViewWithCollectionsProps, {testObject: unknown}>({
                         testObject: {
                             key: `${ONYX_KEYS.COLLECTION.TEST_KEY}1`,
                         },
@@ -391,7 +405,7 @@ describe('withOnyxTest', () => {
                         />,
                     );
 
-                    const TestComponentWithOnyx2 = withOnyx({
+                    const TestComponentWithOnyx2 = withOnyx<ViewWithCollectionsProps, {testObject: unknown}>({
                         testObject: {
                             key: `${ONYX_KEYS.COLLECTION.TEST_KEY}2`,
                         },
@@ -403,7 +417,7 @@ describe('withOnyxTest', () => {
                         />,
                     );
 
-                    const TestComponentWithOnyx3 = withOnyx({
+                    const TestComponentWithOnyx3 = withOnyx<ViewWithCollectionsProps, {testObject: unknown}>({
                         testObject: {
                             key: `${ONYX_KEYS.COLLECTION.TEST_KEY}3`,
                         },
@@ -420,7 +434,7 @@ describe('withOnyxTest', () => {
                 .then(() =>
                     Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                         test_1: {ID: 1, newProperty: 'yay'},
-                    }),
+                    } as GenericCollection),
                 )
                 .then(() => {
                     // Then the component subscribed to the modified item should have the new version of the item
@@ -467,13 +481,13 @@ describe('withOnyxTest', () => {
         // Given there is a collection with a simple item in it that has a `number` property set to 1
         Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
             test_1: {ID: 1, number: 1},
-        });
+        } as GenericCollection);
 
         return (
             waitForPromisesToResolve()
                 .then(() => {
                     // When a component subscribes to the one item in that collection
-                    const TestComponentWithOnyx = withOnyx({
+                    const TestComponentWithOnyx = withOnyx<ViewWithCollectionsProps, {testObject: unknown}>({
                         testObject: {
                             key: `${ONYX_KEYS.COLLECTION.TEST_KEY}1`,
                         },
@@ -490,7 +504,7 @@ describe('withOnyxTest', () => {
                 .then(() =>
                     Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                         test_1: {number: 2},
-                    }),
+                    } as GenericCollection),
                 )
                 .then(() => {
                     // Then the component subscribed to the modified item should be rendered twice.
@@ -523,7 +537,7 @@ describe('withOnyxTest', () => {
             waitForPromisesToResolve()
                 .then(() => {
                     // When a component subscribes to the simple key
-                    const TestComponentWithOnyx = withOnyx({
+                    const TestComponentWithOnyx = withOnyx<ViewWithCollectionsProps, {simple: unknown}>({
                         simple: {
                             key: ONYX_KEYS.SIMPLE_KEY,
                         },
@@ -556,7 +570,7 @@ describe('withOnyxTest', () => {
         return waitForPromisesToResolve()
             .then(() => {
                 // When a component subscribes to the simple key
-                const TestComponentWithOnyx = withOnyx({
+                const TestComponentWithOnyx = withOnyx<ViewWithCollectionsProps, {simple: unknown}>({
                     simple: {
                         key: ONYX_KEYS.SIMPLE_KEY,
                         initialValue: 'initialValue',
@@ -584,13 +598,13 @@ describe('withOnyxTest', () => {
 
     it('shouldDelayUpdates + initialValue does not feed data into component until marked ready', () => {
         const onRender = jest.fn();
-        const ref = React.createRef();
+        const ref = React.createRef<{markReadyForHydration: () => void}>();
 
         return (
             waitForPromisesToResolve()
                 .then(() => {
                     // When a component subscribes to the simple key
-                    const TestComponentWithOnyx = withOnyx(
+                    const TestComponentWithOnyx = withOnyx<ViewWithCollectionsProps, {simple: unknown}>(
                         {
                             simple: {
                                 key: ONYX_KEYS.SIMPLE_KEY,
@@ -622,7 +636,7 @@ describe('withOnyxTest', () => {
                     expect(onRender).toHaveBeenCalledTimes(1);
 
                     // We can now tell component to update
-                    ref.current.markReadyForHydration();
+                    ref.current?.markReadyForHydration();
                 })
                 .then(() => {
                     // Now that the component has been marked as ready for hydration, it has been updated
@@ -633,13 +647,13 @@ describe('withOnyxTest', () => {
     });
 
     it('should render immediately when a onyx component is mounted a 2nd time', () => {
-        const TestComponentWithOnyx = withOnyx({
+        const TestComponentWithOnyx = withOnyx<ViewWithTextProps, ViewWithTextOnyxProps>({
             text: {
                 key: ONYX_KEYS.TEST_KEY,
             },
         })(ViewWithText);
         const onRender = jest.fn();
-        let renderResult;
+        let renderResult: ReturnType<typeof render>;
 
         // Set the value in storage, but not in cache.
         return StorageMock.setItem(ONYX_KEYS.TEST_KEY, 'test1')
@@ -671,7 +685,7 @@ describe('withOnyxTest', () => {
     });
 
     it('should cache missing keys', () => {
-        const TestComponentWithOnyx = withOnyx({
+        const TestComponentWithOnyx = withOnyx<ViewWithTextProps, ViewWithTextOnyxProps>({
             text: {
                 key: ONYX_KEYS.TEST_KEY,
             },
@@ -702,13 +716,13 @@ describe('withOnyxTest', () => {
     });
 
     it('should cache empty collections', () => {
-        const TestComponentWithOnyx = withOnyx({
+        const TestComponentWithOnyx = withOnyx<ViewWithCollectionsProps, {text: unknown}>({
             text: {
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
             },
         })(ViewWithCollections);
         const onRender = jest.fn();
-        let renderResult;
+        let renderResult: ReturnType<typeof render>;
 
         // Set a random item in storage since Onyx will only think keys are loaded
         // in cache if there are at least one key.
@@ -742,7 +756,7 @@ describe('withOnyxTest', () => {
 
     it('works with selectors', async () => {
         const selector = jest.fn().mockImplementation((value) => (value ? value.hello : undefined));
-        const TestComponentWithOnyx = withOnyx({
+        const TestComponentWithOnyx = withOnyx<ViewWithTextProps, ViewWithTextOnyxProps>({
             // Note: the prop passed to the wrapped component is called "text",
             // which is different than the key selected by the selector "hello"
             text: {
@@ -750,7 +764,7 @@ describe('withOnyxTest', () => {
                 selector,
             },
         })(ViewWithText);
-        let sourceData = {hello: 'world', goodnight: 'moon'};
+        let sourceData: OnyxValue<typeof ONYX_KEYS.TEST_KEY> = {hello: 'world', goodnight: 'moon'};
         await StorageMock.setItem(ONYX_KEYS.TEST_KEY, sourceData);
 
         const onRender = jest.fn();
@@ -796,7 +810,7 @@ describe('withOnyxTest', () => {
         // Correct data has been passed to the selector
         expect(selector).not.toHaveBeenCalledWith('world', expect.anything());
         expect(selector).not.toHaveBeenCalledWith('dougal', expect.anything());
-        expect(selector).toHaveBeenLastCalledWith(sourceData, {loading: false, text: 'world'});
+        expect(selector).toHaveBeenLastCalledWith(undefined, {loading: false, text: 'world'});
 
         // Default text has been rendered
         expect(onRender).toHaveBeenCalledTimes(1);

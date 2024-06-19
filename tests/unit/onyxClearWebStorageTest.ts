@@ -1,6 +1,8 @@
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import StorageMock from '../../lib/storage';
 import Onyx from '../../lib/Onyx';
+import type OnyxCache from '../../lib/OnyxCache';
+import type GenericCollection from '../utils/GenericCollection';
 
 const ONYX_KEYS = {
     DEFAULT_KEY: 'defaultKey',
@@ -14,19 +16,19 @@ const MERGED_VALUE = 'merged';
 const DEFAULT_VALUE = 'default';
 
 describe('Set data while storage is clearing', () => {
-    let connectionID;
-    let onyxValue;
+    let connectionID: number;
+    let onyxValue: unknown;
 
     /** @type OnyxCache */
-    let cache;
+    let cache: typeof OnyxCache;
 
     // Always use a "fresh" cache instance
     beforeEach(() => {
         onyxValue = null;
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         cache = require('../../lib/OnyxCache').default;
         Onyx.init({
             keys: ONYX_KEYS,
-            registerStorageEventListener: () => {},
             initialKeyStates: {
                 [ONYX_KEYS.DEFAULT_KEY]: DEFAULT_VALUE,
             },
@@ -54,7 +56,7 @@ describe('Set data while storage is clearing', () => {
         return waitForPromisesToResolve().then(() => {
             // Then the value in Onyx, the cache, and Storage is the default key state
             expect(onyxValue).toBe(DEFAULT_VALUE);
-            const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
+            const cachedValue = cache.get(ONYX_KEYS.DEFAULT_KEY);
             expect(cachedValue).toBe(DEFAULT_VALUE);
             const storedValue = StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY);
             return expect(storedValue).resolves.toBe(DEFAULT_VALUE);
@@ -71,7 +73,7 @@ describe('Set data while storage is clearing', () => {
         return waitForPromisesToResolve().then(() => {
             // Then the value in Onyx, the cache, and Storage is the default key state
             expect(onyxValue).toBe(DEFAULT_VALUE);
-            const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
+            const cachedValue = cache.get(ONYX_KEYS.DEFAULT_KEY);
             expect(cachedValue).toBe(DEFAULT_VALUE);
             const storedValue = StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY);
             return expect(storedValue).resolves.toBe(DEFAULT_VALUE);
@@ -82,7 +84,7 @@ describe('Set data while storage is clearing', () => {
         expect.assertions(3);
 
         // Given that Onyx has a value, and we have a variable listening to that value
-        let regularKeyOnyxValue;
+        let regularKeyOnyxValue: unknown;
         Onyx.connect({
             key: ONYX_KEYS.REGULAR_KEY,
             initWithStoredValues: false,
@@ -96,7 +98,7 @@ describe('Set data while storage is clearing', () => {
         return waitForPromisesToResolve().then(() => {
             // Then the value of the preserved key is also still set in both the cache and storage
             expect(regularKeyOnyxValue).toBe(SET_VALUE);
-            const regularKeyCachedValue = cache.getValue(ONYX_KEYS.REGULAR_KEY);
+            const regularKeyCachedValue = cache.get(ONYX_KEYS.REGULAR_KEY);
             expect(regularKeyCachedValue).toBe(SET_VALUE);
             const regularKeyStoredValue = StorageMock.getItem(ONYX_KEYS.REGULAR_KEY);
             return expect(regularKeyStoredValue).resolves.toBe(SET_VALUE);
@@ -115,7 +117,7 @@ describe('Set data while storage is clearing', () => {
         return waitForPromisesToResolve().then(() => {
             // Then the value in Onyx, the cache, and Storage is the set value
             expect(onyxValue).toBe(SET_VALUE);
-            const cachedValue = cache.getValue(ONYX_KEYS.DEFAULT_KEY);
+            const cachedValue = cache.get(ONYX_KEYS.DEFAULT_KEY);
             expect(cachedValue).toBe(SET_VALUE);
             const storedValue = StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY);
             return expect(storedValue).resolves.toBe(SET_VALUE);
@@ -140,11 +142,11 @@ describe('Set data while storage is clearing', () => {
                         [`${ONYX_KEYS.COLLECTION.TEST}2`]: 2,
                         [`${ONYX_KEYS.COLLECTION.TEST}3`]: 3,
                         [`${ONYX_KEYS.COLLECTION.TEST}4`]: 4,
-                    }),
+                    } as GenericCollection),
                 )
 
                 // When onyx is cleared
-                .then(Onyx.clear)
+                .then(() => Onyx.clear())
                 .then(() => {
                     Onyx.disconnect(testConnectionID);
                 })
@@ -156,7 +158,7 @@ describe('Set data while storage is clearing', () => {
                     expect(collectionCallback).toHaveBeenCalledTimes(3);
 
                     // And it should be called with the expected parameters each time
-                    expect(collectionCallback).toHaveBeenNthCalledWith(1, null, undefined);
+                    expect(collectionCallback).toHaveBeenNthCalledWith(1, undefined, undefined);
                     expect(collectionCallback).toHaveBeenNthCalledWith(2, {
                         test_1: 1,
                         test_2: 2,
