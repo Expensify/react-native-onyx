@@ -125,8 +125,13 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): nu
             // We search all the keys in storage to see if any are a "match" for the subscriber we are connecting so that we
             // can send data back to the subscriber. Note that multiple keys can match as a subscriber could either be
             // subscribed to a "collection key" or a single key.
-            const matchingKeys = Array.from(keys).filter((key) => OnyxUtils.isKeyMatch(mapping.key, key));
-
+            const matchingKeys: string[] = [];
+            keys.forEach((key) => {
+                if (!OnyxUtils.isKeyMatch(mapping.key, key)) {
+                    return;
+                }
+                matchingKeys.push(key);
+            });
             // If the key being connected to does not exist we initialize the value with null. For subscribers that connected
             // directly via connect() they will simply get a null value sent to them without any information about which key matched
             // since there are none matched. In withOnyx() we wait for all connected keys to return a value before rendering the child
@@ -649,6 +654,11 @@ function updateSnapshots(data: OnyxUpdate[]) {
 
             updatedData = {...updatedData, [key]: lodashPick(value, Object.keys(snapshotData[key]))};
         });
+
+        // Skip the update if there's no data to be merged
+        if (utils.isEmptyObject(updatedData)) {
+            return;
+        }
 
         promises.push(() => merge(snapshotKey, {data: updatedData}));
     });
