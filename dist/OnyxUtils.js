@@ -262,16 +262,13 @@ function tryGetCachedValue(key, mapping) {
         if (allCacheKeys.size === 0) {
             return;
         }
-        const matchingKeys = Array.from(allCacheKeys).filter((k) => k.startsWith(key));
-        const values = matchingKeys.reduce((finalObject, matchedKey) => {
-            const cachedValue = OnyxCache_1.default.get(matchedKey);
-            if (cachedValue) {
-                // This is permissible because we're in the process of constructing the final object in a reduce function.
-                // eslint-disable-next-line no-param-reassign
-                finalObject[matchedKey] = cachedValue;
+        const values = {};
+        allCacheKeys.forEach((cacheKey) => {
+            if (!cacheKey.startsWith(key)) {
+                return;
             }
-            return finalObject;
-        }, {});
+            values[cacheKey] = OnyxCache_1.default.get(cacheKey);
+        });
         val = values;
     }
     if (mapping === null || mapping === void 0 ? void 0 : mapping.selector) {

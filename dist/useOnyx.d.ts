@@ -38,4 +38,4 @@ type UseOnyxResult<TKey extends OnyxKey, TValue> = [CachedValue<TKey, TValue>, R
 declare function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey, options?: BaseUseOnyxOptions & UseOnyxInitialValueOption<TReturnValue> & Required<UseOnyxSelectorOption<TKey, TReturnValue>>): UseOnyxResult<TKey, TReturnValue>;
 declare function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey, options?: BaseUseOnyxOptions & UseOnyxInitialValueOption<NoInfer<TReturnValue>>): UseOnyxResult<TKey, TReturnValue>;
 export default useOnyx;
-export type { UseOnyxResult, ResultMetadata, FetchStatus };
+export type { FetchStatus, ResultMetadata, UseOnyxResult };

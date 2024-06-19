@@ -116,7 +116,13 @@ function connect(connectOptions) {
         // We search all the keys in storage to see if any are a "match" for the subscriber we are connecting so that we
         // can send data back to the subscriber. Note that multiple keys can match as a subscriber could either be
         // subscribed to a "collection key" or a single key.
-        const matchingKeys = Array.from(keys).filter((key) => OnyxUtils_1.default.isKeyMatch(mapping.key, key));
+        const matchingKeys = [];
+        keys.forEach((key) => {
+            if (!OnyxUtils_1.default.isKeyMatch(mapping.key, key)) {
+                return;
+            }
+            matchingKeys.push(key);
+        });
         // If the key being connected to does not exist we initialize the value with null. For subscribers that connected
         // directly via connect() they will simply get a null value sent to them without any information about which key matched
         // since there are none matched. In withOnyx() we wait for all connected keys to return a value before rendering the child
@@ -560,6 +566,10 @@ function updateSnapshots(data) {
             }
             updatedData = Object.assign(Object.assign({}, updatedData), { [key]: (0, pick_1.default)(value, Object.keys(snapshotData[key])) });
         });
+        // Skip the update if there's no data to be merged
+        if (utils_1.default.isEmptyObject(updatedData)) {
+            return;
+        }
         promises.push(() => merge(snapshotKey, { data: updatedData }));
     });
     return Promise.all(promises.map((p) => p()));
