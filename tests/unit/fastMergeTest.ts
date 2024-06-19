@@ -1,6 +1,9 @@
+import type {DeepRecord} from '../../lib/types';
 import utils from '../../lib/utils';
 
-const testObject = {
+type DeepObject = DeepRecord<string, unknown> | unknown[];
+
+const testObject: DeepObject = {
     a: 'a',
     b: {
         c: 'c',
@@ -12,7 +15,7 @@ const testObject = {
     },
 };
 
-const testObjectWithNullishValues = {
+const testObjectWithNullishValues: DeepObject = {
     a: undefined,
     b: {
         c: {
@@ -24,7 +27,7 @@ const testObjectWithNullishValues = {
     },
 };
 
-const testObjectWithNullValuesRemoved = {
+const testObjectWithNullValuesRemoved: DeepObject = {
     b: {
         c: {
             h: 'h',
@@ -82,13 +85,15 @@ describe('fastMerge', () => {
     });
 
     it('should replace an object with an array', () => {
-        const result = utils.fastMerge(testObject, [1, 2, 3]);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const result = utils.fastMerge(testObject, [1, 2, 3] as any);
 
         expect(result).toEqual([1, 2, 3]);
     });
 
     it('should replace an array with an object', () => {
-        const result = utils.fastMerge([1, 2, 3], testObject);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const result = utils.fastMerge([1, 2, 3] as any, testObject);
 
         expect(result).toEqual(testObject);
     });

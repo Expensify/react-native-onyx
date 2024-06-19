@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/prefer-for-of */
 
-import type {OnyxKey} from './types';
+import type {OnyxInput, OnyxKey} from './types';
 
 type EmptyObject = Record<string, never>;
 type EmptyValue = EmptyObject | null | undefined;
@@ -27,23 +27,28 @@ function isMergeableObject(value: unknown): value is Record<string, unknown> {
  * @param shouldRemoveNestedNulls - If true, null object values will be removed.
  * @returns - The merged object.
  */
-function mergeObject<TObject extends Record<string, unknown>>(target: TObject | null, source: TObject, shouldRemoveNestedNulls = true): TObject {
+function mergeObject<TObject extends Record<string, unknown>>(target: TObject | unknown | null | undefined, source: TObject, shouldRemoveNestedNulls = true): TObject {
     const destination: Record<string, unknown> = {};
+
+    const targetObject = isMergeableObject(target) ? target : undefined;
 
     // First we want to copy over all keys from the target into the destination object,
     // in case "target" is a mergable object.
     // If "shouldRemoveNestedNulls" is true, we want to remove null values from the merged object
     // and therefore we need to omit keys where either the source or target value is null.
-    if (isMergeableObject(target)) {
-        const targetKeys = Object.keys(target);
+    if (targetObject) {
+        const targetKeys = Object.keys(targetObject);
         for (let i = 0; i < targetKeys.length; ++i) {
             const key = targetKeys[i];
             const sourceValue = source?.[key];
-            const targetValue = target?.[key];
+            const targetValue = targetObject?.[key];
 
             // If "shouldRemoveNestedNulls" is true, we want to remove null values from the merged object.
             // Therefore, if either target or source value is null, we want to prevent the key from being set.
-            const isSourceOrTargetNull = targetValue === null || sourceValue === null;
+            // targetValue should techincally never be "undefined", because it will always be a value from cache or storage
+            // and we never set "undefined" there. Still, if there targetValue is undefined we don't want to set
+            // the key explicitly to prevent loose undefined values in objects in cache and storage.
+            const isSourceOrTargetNull = targetValue === undefined || targetValue === null || sourceValue === null;
             const shouldOmitTargetKey = shouldRemoveNestedNulls && isSourceOrTargetNull;
 
             if (!shouldOmitTargetKey) {
@@ -57,7 +62,7 @@ function mergeObject<TObject extends Record<string, unknown>>(target: TObject | 
     for (let i = 0; i < sourceKeys.length; ++i) {
         const key = sourceKeys[i];
         const sourceValue = source?.[key];
-        const targetValue = target?.[key];
+        const targetValue = targetObject?.[key];
 
         // If undefined is passed as the source value for a key, we want to generally ignore it.
         // If "shouldRemoveNestedNulls" is set to true and the source value is null,
@@ -92,7 +97,7 @@ function mergeObject<TObject extends Record<string, unknown>>(target: TObject | 
  * On native, when merging an existing value with new changes, SQLite will use JSON_PATCH, which removes top-level nullish values.
  * To be consistent with the behaviour for merge, we'll also want to remove null values for "set" operations.
  */
-function fastMerge<TObject extends Record<string, unknown>>(target: TObject | null, source: TObject | null, shouldRemoveNestedNulls = true): TObject | null {
+function fastMerge<TValue>(target: TValue, source: TValue, shouldRemoveNestedNulls = true): TValue {
     // We have to ignore arrays and nullish values here,
     // otherwise "mergeObject" will throw an error,
     // because it expects an object as "source"
@@ -100,16 +105,17 @@ function fastMerge<TObject extends Record<string, unknown>>(target: TObject | nu
         return source;
     }
 
-    return mergeObject(target, source, shouldRemoveNestedNulls);
+    return mergeObject(target, source as Record<string, unknown>, shouldRemoveNestedNulls) as TValue;
 }
 
 /** Deep removes the nested null values from the given value. */
-function removeNestedNullValues<TObject extends Record<string, unknown>>(value: unknown | unknown[] | TObject): Record<string, unknown> | unknown[] | null {
+function removeNestedNullValues<TValue extends OnyxInput<OnyxKey> | null>(value: TValue): TValue {
     if (typeof value === 'object' && !Array.isArray(value)) {
-        return fastMerge(value as Record<string, unknown> | null, value as Record<string, unknown> | null);
+        const objectValue = value as Record<string, unknown>;
+        return fastMerge(objectValue, objectValue) as TValue;
     }
 
-    return value as Record<string, unknown> | null;
+    return value;
 }
 
 /** Formats the action name by uppercasing and adding the key if provided. */
@@ -138,4 +144,58 @@ function checkCompatibilityWithExistingValue(value: unknown, existingValue: unkn
     };
 }
 
-export default {isEmptyObject, fastMerge, formatActionName, removeNestedNullValues, checkCompatibilityWithExistingValue};
+/**
+ * Filters an object based on a condition and an inclusion flag.
+ *
+ * @param obj - The object to filter.
+ * @param condition - The condition to apply.
+ * @param include - If true, include entries that match the condition; otherwise, exclude them.
+ * @returns The filtered object.
+ */
+function filterObject<TValue>(obj: Record<string, TValue>, condition: string | string[] | ((entry: [string, TValue]) => boolean), include: boolean): Record<string, TValue> {
+    const result: Record<string, TValue> = {};
+    const entries = Object.entries(obj);
+
+    for (let i = 0; i < entries.length; i++) {
+        const [key, value] = entries[i];
+        let shouldInclude: boolean;
+
+        if (Array.isArray(condition)) {
+            shouldInclude = condition.includes(key);
+        } else if (typeof condition === 'string') {
+            shouldInclude = key === condition;
+        } else {
+            shouldInclude = condition(entries[i]);
+        }
+
+        if (include ? shouldInclude : !shouldInclude) {
+            result[key] = value;
+        }
+    }
+
+    return result;
+}
+
+/**
+ * Picks entries from an object based on a condition.
+ *
+ * @param obj - The object to pick entries from.
+ * @param condition - The condition to determine which entries to pick.
+ * @returns The object containing only the picked entries.
+ */
+function pick<TValue>(obj: Record<string, TValue>, condition: string | string[] | ((entry: [string, TValue]) => boolean)): Record<string, TValue> {
+    return filterObject(obj, condition, true);
+}
+
+/**
+ * Omits entries from an object based on a condition.
+ *
+ * @param obj - The object to omit entries from.
+ * @param condition - The condition to determine which entries to omit.
+ * @returns The object containing only the remaining entries after omission.
+ */
+function omit<TValue>(obj: Record<string, TValue>, condition: string | string[] | ((entry: [string, TValue]) => boolean)): Record<string, TValue> {
+    return filterObject(obj, condition, false);
+}
+
+export default {isEmptyObject, fastMerge, formatActionName, removeNestedNullValues, checkCompatibilityWithExistingValue, pick, omit};
