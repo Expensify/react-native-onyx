@@ -155,10 +155,11 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): nu
                     }
 
                     // We did not opt into using waitForCollectionCallback mode so the callback is called for every matching key.
-                    // eslint-disable-next-line @typescript-eslint/prefer-for-of
-                    for (let i = 0; i < matchingKeys.length; i++) {
-                        OnyxUtils.get(matchingKeys[i]).then((val) => OnyxUtils.sendDataToConnection(mapping, val as OnyxValue<TKey>, matchingKeys[i] as TKey, true));
-                    }
+                    Storage.multiGet(matchingKeys).then((values) => {
+                        values.forEach(([key, val]) => {
+                            OnyxUtils.sendDataToConnection(mapping, val as OnyxValue<TKey>, key as TKey, true);
+                        });
+                    });
                     return;
                 }
 
