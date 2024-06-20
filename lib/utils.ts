@@ -17,7 +17,7 @@ function isEmptyObject<T>(obj: T | EmptyValue): obj is EmptyValue {
  */
 function isMergeableObject(value: unknown): value is Record<string, unknown> {
     const isNonNullObject = value != null ? typeof value === 'object' : false;
-    return isNonNullObject && Object.prototype.toString.call(value) !== '[object RegExp]' && Object.prototype.toString.call(value) !== '[object Date]' && !Array.isArray(value);
+    return isNonNullObject && !(value instanceof RegExp) && !(value instanceof Date) && !Array.isArray(value);
 }
 
 /**
@@ -37,9 +37,8 @@ function mergeObject<TObject extends Record<string, unknown>>(target: TObject | 
     // If "shouldRemoveNestedNulls" is true, we want to remove null values from the merged object
     // and therefore we need to omit keys where either the source or target value is null.
     if (targetObject) {
-        const targetKeys = Object.keys(targetObject);
-        for (let i = 0; i < targetKeys.length; ++i) {
-            const key = targetKeys[i];
+        // eslint-disable-next-line no-restricted-syntax, guard-for-in
+        for (const key in targetObject) {
             const sourceValue = source?.[key];
             const targetValue = targetObject?.[key];
 
@@ -58,10 +57,9 @@ function mergeObject<TObject extends Record<string, unknown>>(target: TObject | 
     }
 
     // After copying over all keys from the target object, we want to merge the source object into the destination object.
-    const sourceKeys = Object.keys(source);
-    for (let i = 0; i < sourceKeys.length; ++i) {
-        const key = sourceKeys[i];
-        const sourceValue = source?.[key];
+    // eslint-disable-next-line no-restricted-syntax, guard-for-in
+    for (const key in source) {
+        const sourceValue = source?.[key] as Record<string, unknown>;
         const targetValue = targetObject?.[key];
 
         // If undefined is passed as the source value for a key, we want to generally ignore it.
