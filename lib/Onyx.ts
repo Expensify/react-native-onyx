@@ -438,7 +438,8 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
 
     // Confirm all the collection keys belong to the same parent
     let hasCollectionKeyCheckFailed = false;
-    Object.keys(mergedCollection).forEach((dataKey) => {
+    const mergedCollectionKeys = Object.keys(mergedCollection);
+    mergedCollectionKeys.forEach((dataKey) => {
         if (OnyxUtils.isKeyMatch(collectionKey, dataKey)) {
             return;
         }
@@ -459,7 +460,7 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
     return OnyxUtils.getAllKeys()
         .then((persistedKeys) => {
             // Split to keys that exist in storage and keys that don't
-            const keys = Object.keys(mergedCollection).filter((key) => {
+            const keys = mergedCollectionKeys.filter((key) => {
                 if (mergedCollection[key] === null) {
                     OnyxUtils.remove(key);
                     return false;
@@ -470,8 +471,6 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
             const existingKeys = keys.filter((key) => persistedKeys.has(key));
 
             const cachedCollectionForExistingKeys = OnyxUtils.getCachedCollection(collectionKey, existingKeys);
-
-            const newKeys = keys.filter((key) => !persistedKeys.has(key));
 
             const existingKeyCollection = existingKeys.reduce((obj: OnyxInputKeyValueMapping, key) => {
                 const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(mergedCollection[key], cachedCollectionForExistingKeys[key]);
@@ -484,11 +483,13 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
                 return obj;
             }, {}) as Record<OnyxKey, OnyxInput<TKey>>;
 
-            const newCollection = newKeys.reduce((obj: OnyxInputKeyValueMapping, key) => {
-                // eslint-disable-next-line no-param-reassign
-                obj[key] = mergedCollection[key];
-                return obj;
-            }, {}) as Record<OnyxKey, OnyxInput<TKey>>;
+            const newCollection: Record<OnyxKey, OnyxInput<TKey>> = {};
+            keys.forEach((key) => {
+                if (persistedKeys.has(key)) {
+                    return;
+                }
+                newCollection[key] = mergedCollection[key];
+            });
 
             // When (multi-)merging the values with the existing values in storage,
             // we don't want to remove nested null values from the data that we pass to the storage layer,
