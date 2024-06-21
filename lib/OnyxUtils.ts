@@ -428,13 +428,13 @@ function addToEvictionBlockList(key: OnyxKey, connectionID: number): void {
     evictionBlocklist[key].push(connectionID);
 }
 /**
- * It extracts the pure, non-numeric part of a given key.
+ * It extracts the non-numeric collection identifier of a given key.
  *
  * For example:
- * - `getPureKey("report_123")` would return "report_"
- * - `getPureKey("report")` would return "report"
- * - `getPureKey("report_")` would return "report_"
- * - `getPureKey(null)` would return ""
+ * - `getCollectionKey("report_123")` would return "report_"
+ * - `getCollectionKey("report")` would return "report"
+ * - `getCollectionKey("report_")` would return "report_"
+ * - `getCollectionKey(null)` would return ""
  *
  * @param {OnyxKey} key - The key to process.
  * @return {string} The pure key without any numeric
