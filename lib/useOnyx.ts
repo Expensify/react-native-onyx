@@ -4,7 +4,7 @@ import type {IsEqual} from 'type-fest';
 import Onyx from './Onyx';
 import OnyxCache from './OnyxCache';
 import OnyxUtils from './OnyxUtils';
-import type {CollectionKeyBase, OnyxCollection, OnyxKey, OnyxValue, Selector} from './types';
+import type {CollectionKeyBase, OnyxCollection, OnyxEntry, OnyxKey, OnyxValue, Selector} from './types';
 import useLiveRef from './useLiveRef';
 import usePrevious from './usePrevious';
 
@@ -46,7 +46,7 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = BaseUseOnyxOptions & U
 
 type FetchStatus = 'loading' | 'loaded';
 
-type CachedValue<TKey extends OnyxKey, TValue> = IsEqual<TValue, OnyxValue<TKey>> extends true ? TValue : TKey extends CollectionKeyBase ? NonNullable<OnyxCollection<TValue>> : TValue;
+type CachedValue<TKey extends OnyxKey, TValue> = IsEqual<TValue, OnyxValue<TKey>> extends true ? TValue : TKey extends CollectionKeyBase ? OnyxCollection<TValue> : OnyxEntry<TValue>;
 
 type ResultMetadata = {
     status: FetchStatus;
