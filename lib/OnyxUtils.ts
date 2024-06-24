@@ -29,6 +29,7 @@ import type {
 } from './types';
 import utils from './utils';
 import type {WithOnyxState} from './withOnyx/types';
+import type {KeyValuePairList} from './storage/providers/types';
 
 // Method constants
 const METHOD = {
@@ -243,6 +244,69 @@ function get<TKey extends OnyxKey, TValue extends OnyxValue<TKey>>(key: TKey): P
         .catch((err) => Logger.logInfo(`Unable to get item from persistent storage. Key: ${key} Error: ${err}`));
 
     return cache.captureTask(taskName, promise) as Promise<TValue>;
+}
+
+// multiGet the data first from the cache and then from the storage for the missing keys.
+function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<KeyValuePairList> {
+    // Keys that are not in the cache
+    const missingKeys: OnyxKey[] = [];
+    // Tasks that are pending
+    const pendingTasks: Array<Promise<OnyxValue<TKey>>> = [];
+    // Keys for the tasks that are pending
+    const pendingKeys: OnyxKey[] = [];
+    // Data to be sent back to the invoker
+    const data: KeyValuePairList = [];
+
+    keys.forEach((key) => {
+        const cacheValue = cache.get(key) as OnyxValue<TKey>;
+        if (cacheValue) {
+            data.push([key, cacheValue]);
+            return;
+        }
+
+        const pendingKey = `get:${key}`;
+        if (cache.hasPendingTask(pendingKey)) {
+            pendingTasks.push(cache.getTaskPromise(pendingKey) as Promise<OnyxValue<TKey>>);
+            pendingKeys.push(key);
+        } else {
+            missingKeys.push(key);
+        }
+    });
+
+    return (
+        Promise.all(pendingTasks)
+            // We are going to wait for all the pending tasks to resolve and then add the data to the data object.
+            .then((values) => {
+                values.forEach((value, index) => {
+                    data.push([pendingKeys[index], value]);
+                });
+
+                return Promise.resolve();
+            })
+            // We are going to get the missing keys using multiGet from the storage.
+            .then(() => {
+                if (missingKeys.length === 0) {
+                    return Promise.resolve(undefined);
+                }
+
+                return Storage.multiGet(missingKeys);
+            })
+            // We are going to add the data from the missing keys to the data object and also merge it to the cache.
+            .then((values): Promise<KeyValuePairList> => {
+                if (!values || values.length === 0) {
+                    return Promise.resolve(data);
+                }
+
+                // temp object is used to merge the missing data into the cache
+                const temp: OnyxCollection<KeyValueMapping[TKey]> = {};
+                values.forEach(([key, value]) => {
+                    data.push([key, value]);
+                    temp[key] = value as OnyxValue<TKey>;
+                });
+                cache.merge(temp);
+                return Promise.resolve(data);
+            })
+    );
 }
 
 /** Returns current key names stored in persisted storage */
@@ -1150,6 +1214,7 @@ const OnyxUtils = {
     applyMerge,
     initializeWithDefaultKeyStates,
     getSnapshotKey,
+    multiGet,
 };
 
 export default OnyxUtils;
