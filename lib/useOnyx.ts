@@ -46,7 +46,9 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = BaseUseOnyxOptions & U
 
 type FetchStatus = 'loading' | 'loaded';
 
-type CachedValue<TKey extends OnyxKey, TValue> = IsEqual<TValue, OnyxValue<TKey>> extends true ? TValue : TKey extends CollectionKeyBase ? OnyxCollection<TValue> : OnyxEntry<TValue>;
+type SelectedValue<TKey, TValue> = TKey extends CollectionKeyBase ? OnyxCollection<TValue> : OnyxEntry<TValue>;
+
+type CachedValue<TKey extends OnyxKey, TValue> = IsEqual<TValue, OnyxValue<TKey>> extends true ? TValue : SelectedValue<TKey, TValue>;
 
 type ResultMetadata = {
     status: FetchStatus;
