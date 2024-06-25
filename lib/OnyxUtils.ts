@@ -258,7 +258,7 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
 
     /**
      * We are going to iterate over all the matching keys and check if we have the data in the cache.
-     * If we do then we add it to the data object. If we do not then we check if there is a pending task
+     * If we do then we add it to the data object. If we do not have them, then we check if there is a pending task
      * for the key. If there is such task, then we add the promise to the pendingTasks array and the key to the pendingKeys
      * array. If there is no pending task then we add the key to the missingKeys array.
      *
