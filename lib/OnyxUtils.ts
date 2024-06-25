@@ -262,7 +262,7 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
      * for the key. If there is then we add the promise to the pendingTasks array and the key to the pendingKeys
      * array. If there is no pending task then we add the key to the missingKeys array.
      *
-     * These missingKeys will be later to use to multiGet the data from the storage.
+     * These missingKeys will be later used to multiGet the data from the storage.
      */
     keys.forEach((key) => {
         const cacheValue = cache.get(key) as OnyxValue<TKey>;
