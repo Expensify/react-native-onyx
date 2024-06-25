@@ -298,7 +298,7 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
 
                 return Storage.multiGet(missingKeys);
             })
-            // We are going to add the data from the missing keys to the data object and also merge it to the cache.
+            // Add the data from the missing keys to the data map and also merge it to the cache.
             .then((values) => {
                 if (!values || values.length === 0) {
                     return dataMap;
