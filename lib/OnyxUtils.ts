@@ -290,7 +290,7 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
 
                 return Promise.resolve();
             })
-            // We are going to get the missing keys using multiGet from the storage.
+            // Get the missing keys using multiGet from the storage.
             .then(() => {
                 if (missingKeys.length === 0) {
                     return Promise.resolve(undefined);
