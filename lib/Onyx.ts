@@ -156,7 +156,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): nu
 
                     // We did not opt into using waitForCollectionCallback mode so the callback is called for every matching key.
                     OnyxUtils.multiGet(matchingKeys).then((values) => {
-                        values.forEach(([key, val]) => {
+                        values.forEach((val, key) => {
                             OnyxUtils.sendDataToConnection(mapping, val as OnyxValue<TKey>, key as TKey, true);
                         });
                     });

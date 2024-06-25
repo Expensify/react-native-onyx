@@ -29,7 +29,6 @@ import type {
 } from './types';
 import utils from './utils';
 import type {WithOnyxState} from './withOnyx/types';
-import type {KeyValuePairList} from './storage/providers/types';
 
 // Method constants
 const METHOD = {
@@ -247,7 +246,7 @@ function get<TKey extends OnyxKey, TValue extends OnyxValue<TKey>>(key: TKey): P
 }
 
 // multiGet the data first from the cache and then from the storage for the missing keys.
-function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<KeyValuePairList> {
+function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<OnyxKey, OnyxValue<TKey>>> {
     // Keys that are not in the cache
     const missingKeys: OnyxKey[] = [];
     // Tasks that are pending
@@ -255,12 +254,20 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<KeyV
     // Keys for the tasks that are pending
     const pendingKeys: OnyxKey[] = [];
     // Data to be sent back to the invoker
-    const data: KeyValuePairList = [];
+    const dataMap = new Map<OnyxKey, OnyxValue<TKey>>();
 
+    /**
+     * We are going to iterate over all the matching keys and check if we have the data in the cache.
+     * If we do then we add it to the data object. If we do not then we check if there is a pending task
+     * for the key. If there is then we add the promise to the pendingTasks array and the key to the pendingKeys
+     * array. If there is no pending task then we add the key to the missingKeys array.
+     *
+     * These missingKeys will be later to use to multiGet the data from the storage.
+     */
     keys.forEach((key) => {
         const cacheValue = cache.get(key) as OnyxValue<TKey>;
         if (cacheValue) {
-            data.push([key, cacheValue]);
+            dataMap.set(key, cacheValue);
             return;
         }
 
@@ -278,7 +285,7 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<KeyV
             // We are going to wait for all the pending tasks to resolve and then add the data to the data object.
             .then((values) => {
                 values.forEach((value, index) => {
-                    data.push([pendingKeys[index], value]);
+                    dataMap.set(pendingKeys[index], value);
                 });
 
                 return Promise.resolve();
@@ -292,19 +299,19 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<KeyV
                 return Storage.multiGet(missingKeys);
             })
             // We are going to add the data from the missing keys to the data object and also merge it to the cache.
-            .then((values): Promise<KeyValuePairList> => {
+            .then((values) => {
                 if (!values || values.length === 0) {
-                    return Promise.resolve(data);
+                    return dataMap;
                 }
 
                 // temp object is used to merge the missing data into the cache
                 const temp: OnyxCollection<KeyValueMapping[TKey]> = {};
                 values.forEach(([key, value]) => {
-                    data.push([key, value]);
+                    dataMap.set(key, value as OnyxValue<TKey>);
                     temp[key] = value as OnyxValue<TKey>;
                 });
                 cache.merge(temp);
-                return Promise.resolve(data);
+                return dataMap;
             })
     );
 }
@@ -907,75 +914,10 @@ function addKeyToRecentlyAccessedIfNeeded<TKey extends OnyxKey>(mapping: Mapping
  * Gets the data for a given an array of matching keys, combines them into an object, and sends the result back to the subscriber.
  */
 function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: CollectionKeyBase[], mapping: Mapping<TKey>): void {
-    // Keys that are not in the cache
-    const missingKeys: OnyxKey[] = [];
-    // Tasks that are pending
-    const pendingTasks: Array<Promise<OnyxValue<TKey>>> = [];
-    // Keys for the tasks that are pending
-    const pendingKeys: OnyxKey[] = [];
-
-    // We are going to combine all the data from the matching keys into a single object
-    const data: OnyxCollection<KeyValueMapping[TKey]> = {};
-
-    /**
-     * We are going to iterate over all the matching keys and check if we have the data in the cache.
-     * If we do then we add it to the data object. If we do not then we check if there is a pending task
-     * for the key. If there is then we add the promise to the pendingTasks array and the key to the pendingKeys
-     * array. If there is no pending task then we add the key to the missingKeys array.
-     *
-     * These missingKeys will be later to use to multiGet the data from the storage.
-     */
-    matchingKeys.forEach((key) => {
-        const cacheValue = cache.get(key) as OnyxValue<TKey>;
-        if (cacheValue) {
-            data[key] = cacheValue;
-            return;
-        }
-
-        const pendingKey = `get:${key}`;
-        if (cache.hasPendingTask(pendingKey)) {
-            pendingTasks.push(cache.getTaskPromise(pendingKey) as Promise<OnyxValue<TKey>>);
-            pendingKeys.push(key);
-        } else {
-            missingKeys.push(key);
-        }
+    multiGet(matchingKeys).then((dataMap) => {
+        const data = Object.fromEntries(dataMap.entries()) as OnyxValue<TKey>;
+        sendDataToConnection(mapping, data, undefined, true);
     });
-
-    Promise.all(pendingTasks)
-        // We are going to wait for all the pending tasks to resolve and then add the data to the data object.
-        .then((values) => {
-            values.forEach((value, index) => {
-                data[pendingKeys[index]] = value;
-            });
-
-            return Promise.resolve();
-        })
-        // We are going to get the missing keys using multiGet from the storage.
-        .then(() => {
-            if (missingKeys.length === 0) {
-                return Promise.resolve(undefined);
-            }
-            return Storage.multiGet(missingKeys);
-        })
-        // We are going to add the data from the missing keys to the data object and also merge it to the cache.
-        .then((values) => {
-            if (!values || values.length === 0) {
-                return Promise.resolve();
-            }
-
-            // temp object is used to merge the missing data into the cache
-            const temp: OnyxCollection<KeyValueMapping[TKey]> = {};
-            values.forEach(([key, value]) => {
-                data[key] = value as OnyxValue<TKey>;
-                temp[key] = value as OnyxValue<TKey>;
-            });
-            cache.merge(temp);
-            return Promise.resolve();
-        })
-        // We are going to send the data to the subscriber.
-        .finally(() => {
-            sendDataToConnection(mapping, data as OnyxValue<TKey>, undefined, true);
-        });
 }
 
 /**
