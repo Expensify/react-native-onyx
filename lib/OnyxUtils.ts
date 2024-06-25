@@ -249,10 +249,13 @@ function get<TKey extends OnyxKey, TValue extends OnyxValue<TKey>>(key: TKey): P
 function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<OnyxKey, OnyxValue<TKey>>> {
     // Keys that are not in the cache
     const missingKeys: OnyxKey[] = [];
+
     // Tasks that are pending
     const pendingTasks: Array<Promise<OnyxValue<TKey>>> = [];
+
     // Keys for the tasks that are pending
     const pendingKeys: OnyxKey[] = [];
+
     // Data to be sent back to the invoker
     const dataMap = new Map<OnyxKey, OnyxValue<TKey>>();
 
