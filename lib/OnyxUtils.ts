@@ -282,7 +282,7 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
 
     return (
         Promise.all(pendingTasks)
-            // We are going to wait for all the pending tasks to resolve and then add the data to the data object.
+            // Wait for all the pending tasks to resolve and then add the data to the data map.
             .then((values) => {
                 values.forEach((value, index) => {
                     dataMap.set(pendingKeys[index], value);
