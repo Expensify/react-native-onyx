@@ -292,7 +292,7 @@ function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collect
  * @returns A tuple where the first element is the collection part and the second element is the ID part.
  */
 function splitCollectionMemberKey<TKey extends CollectionKey>(key: TKey): [TKey extends `${infer Prefix}_${string}` ? `${Prefix}_` : never, string] {
-    const underscoreIndex = key.indexOf('_');
+    const underscoreIndex = key.lastIndexOf('_');
 
     if (underscoreIndex === -1) {
         throw new Error(`Invalid ${key} key provided, only collection keys are allowed.`);
@@ -434,16 +434,18 @@ function addToEvictionBlockList(key: OnyxKey, connectionID: number): void {
  * - `getCollectionKey("report_123")` would return "report_"
  * - `getCollectionKey("report")` would return "report"
  * - `getCollectionKey("report_")` would return "report_"
- * - `getCollectionKey(null)` would return ""
  *
  * @param {OnyxKey} key - The key to process.
  * @return {string} The pure key without any numeric
  */
 function getCollectionKey(key: OnyxKey): string {
-    if (!key) {
-        return '';
+    const underscoreIndex = key.lastIndexOf('_');
+
+    if (underscoreIndex === -1) {
+        return key;
     }
-    return key.replace(/_\w+/g, '_');
+
+    return key.substring(0, underscoreIndex + 1);
 }
 
 /**
@@ -1203,6 +1205,7 @@ const OnyxUtils = {
     keyChanged,
     sendDataToConnection,
     addKeyToRecentlyAccessedIfNeeded,
+    getCollectionKey,
     getCollectionDataAndSendAsObject,
     scheduleSubscriberUpdate,
     scheduleNotifyCollectionSubscribers,
