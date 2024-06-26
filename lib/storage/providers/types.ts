@@ -55,6 +55,11 @@ type StorageProvider = {
     getAllKeys: () => Promise<KeyList>;
 
     /**
+     * Get all key-value pairs from the database
+     */
+    getAllEntries: () => Promise<KeyValuePairList>;
+
+    /**
      * Removes given key and its value from storage
      */
     removeItem: (key: OnyxKey) => Promise<QueryResult | void>;
