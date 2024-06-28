@@ -158,10 +158,11 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): nu
                     }
 
                     // We did not opt into using waitForCollectionCallback mode so the callback is called for every matching key.
-                    // eslint-disable-next-line @typescript-eslint/prefer-for-of
-                    for (let i = 0; i < matchingKeys.length; i++) {
-                        OnyxUtils.get(matchingKeys[i]).then((val) => OnyxUtils.sendDataToConnection(mapping, val as OnyxValue<TKey>, matchingKeys[i] as TKey, true));
-                    }
+                    OnyxUtils.multiGet(matchingKeys).then((values) => {
+                        values.forEach((val, key) => {
+                            OnyxUtils.sendDataToConnection(mapping, val as OnyxValue<TKey>, key as TKey, true);
+                        });
+                    });
                     return;
                 }
 
@@ -440,10 +441,31 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
 
     const mergedCollection: OnyxInputKeyValueMapping = collection;
 
+    // Confirm all the collection keys belong to the same parent
+    let hasCollectionKeyCheckFailed = false;
+    const mergedCollectionKeys = Object.keys(mergedCollection);
+    mergedCollectionKeys.forEach((dataKey) => {
+        if (OnyxUtils.isKeyMatch(collectionKey, dataKey)) {
+            return;
+        }
+
+        if (process.env.NODE_ENV === 'development') {
+            throw new Error(`Provided collection doesn't have all its data belonging to the same parent. CollectionKey: ${collectionKey}, DataKey: ${dataKey}`);
+        }
+
+        hasCollectionKeyCheckFailed = true;
+        Logger.logAlert(`Provided collection doesn't have all its data belonging to the same parent. CollectionKey: ${collectionKey}, DataKey: ${dataKey}`);
+    });
+
+    // Gracefully handle bad mergeCollection updates so it doesn't block the merge queue
+    if (hasCollectionKeyCheckFailed) {
+        return Promise.resolve();
+    }
+
     return OnyxUtils.getAllKeys()
         .then((persistedKeys) => {
             // Split to keys that exist in storage and keys that don't
-            const keys = Object.keys(mergedCollection).filter((key) => {
+            const keys = mergedCollectionKeys.filter((key) => {
                 if (mergedCollection[key] === null) {
                     OnyxUtils.remove(key);
                     return false;
@@ -454,8 +476,6 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
             const existingKeys = keys.filter((key) => persistedKeys.has(key));
 
             const cachedCollectionForExistingKeys = OnyxUtils.getCachedCollection(collectionKey, existingKeys);
-
-            const newKeys = keys.filter((key) => !persistedKeys.has(key));
 
             const existingKeyCollection = existingKeys.reduce((obj: OnyxInputKeyValueMapping, key) => {
                 const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(mergedCollection[key], cachedCollectionForExistingKeys[key]);
@@ -468,11 +488,13 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
                 return obj;
             }, {}) as Record<OnyxKey, OnyxInput<TKey>>;
 
-            const newCollection = newKeys.reduce((obj: OnyxInputKeyValueMapping, key) => {
-                // eslint-disable-next-line no-param-reassign
-                obj[key] = mergedCollection[key];
-                return obj;
-            }, {}) as Record<OnyxKey, OnyxInput<TKey>>;
+            const newCollection: Record<OnyxKey, OnyxInput<TKey>> = {};
+            keys.forEach((key) => {
+                if (persistedKeys.has(key)) {
+                    return;
+                }
+                newCollection[key] = mergedCollection[key];
+            });
 
             // When (multi-)merging the values with the existing values in storage,
             // we don't want to remove nested null values from the data that we pass to the storage layer,
