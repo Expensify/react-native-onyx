@@ -1127,17 +1127,18 @@ function initializeWithDefaultKeyStates(): Promise<void> {
 }
 
 /**
- * Verify if the collection is valid for merging into the collection key using mergeCollection()
+ * Validate the collection is not empty and has a correct type before applying mergeCollection()
  */
-function isValidMergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): boolean {
-    if (typeof collection !== 'object' || Array.isArray(collection) || utils.isEmptyObject(collection)) {
-        Logger.logInfo('mergeCollection() called with invalid or empty value. Skipping this update.');
-        return false;
-    }
+function isValidNonEmptyCollectionForMerge<TKey extends CollectionKeyBase, TMap>(collection: OnyxMergeCollectionInput<TKey, TMap>): boolean {
+    return typeof collection === 'object' && !Array.isArray(collection) && !utils.isEmptyObject(collection);
+}
 
-    // Confirm all the collection keys belong to the same parent
+/**
+ * Verify if all the collection keys belong to the same parent
+ */
+function doAllCollectionItemsBelongToSameParent<TKey extends CollectionKeyBase>(collectionKey: TKey, collectionKeys: string[]): boolean {
     let hasCollectionKeyCheckFailed = false;
-    Object.keys(collection).forEach((dataKey) => {
+    collectionKeys.forEach((dataKey) => {
         if (OnyxUtils.isKeyMatch(collectionKey, dataKey)) {
             return;
         }
@@ -1196,7 +1197,8 @@ const OnyxUtils = {
     initializeWithDefaultKeyStates,
     getSnapshotKey,
     multiGet,
-    isValidMergeCollection,
+    isValidNonEmptyCollectionForMerge,
+    doAllCollectionItemsBelongToSameParent,
 };
 
 export default OnyxUtils;

@@ -434,31 +434,16 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
  * @param collection Object collection keyed by individual collection member keys and values
  */
 function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
-    // Gracefully handle bad mergeCollection updates, so it doesn't block the merge queue
-    if (!OnyxUtils.isValidMergeCollection(collectionKey, collection)) {
+    if (!OnyxUtils.isValidNonEmptyCollectionForMerge(collection)) {
+        Logger.logInfo('mergeCollection() called with invalid or empty value. Skipping this update.');
         return Promise.resolve();
     }
 
     const mergedCollection: OnyxInputKeyValueMapping = collection;
 
     // Confirm all the collection keys belong to the same parent
-    let hasCollectionKeyCheckFailed = false;
     const mergedCollectionKeys = Object.keys(mergedCollection);
-    mergedCollectionKeys.forEach((dataKey) => {
-        if (OnyxUtils.isKeyMatch(collectionKey, dataKey)) {
-            return;
-        }
-
-        if (process.env.NODE_ENV === 'development') {
-            throw new Error(`Provided collection doesn't have all its data belonging to the same parent. CollectionKey: ${collectionKey}, DataKey: ${dataKey}`);
-        }
-
-        hasCollectionKeyCheckFailed = true;
-        Logger.logAlert(`Provided collection doesn't have all its data belonging to the same parent. CollectionKey: ${collectionKey}, DataKey: ${dataKey}`);
-    });
-
-    // Gracefully handle bad mergeCollection updates so it doesn't block the merge queue
-    if (hasCollectionKeyCheckFailed) {
+    if (!OnyxUtils.doAllCollectionItemsBelongToSameParent(collectionKey, mergedCollectionKeys)) {
         return Promise.resolve();
     }
 
@@ -741,11 +726,22 @@ function update(data: OnyxUpdate[]): Promise<void> {
             case OnyxUtils.METHOD.MERGE:
                 enqueueMergeOperation(key, value);
                 break;
-            case OnyxUtils.METHOD.MERGE_COLLECTION:
-                if (OnyxUtils.isValidMergeCollection(key, value as Collection<CollectionKey, unknown, unknown>)) {
-                    Object.entries(value).forEach(([entryKey, entryValue]) => enqueueMergeOperation(entryKey, entryValue));
+            case OnyxUtils.METHOD.MERGE_COLLECTION: {
+                const collection = value as Collection<CollectionKey, unknown, unknown>;
+                if (!OnyxUtils.isValidNonEmptyCollectionForMerge(collection)) {
+                    Logger.logInfo('mergeCollection enqueued within update() with invalid or empty value. Skipping this operation.');
+                    break;
                 }
+
+                // Confirm all the collection keys belong to the same parent
+                const collectionKeys = Object.keys(collection);
+                if (OnyxUtils.doAllCollectionItemsBelongToSameParent(key, collectionKeys)) {
+                    const mergedCollection: OnyxInputKeyValueMapping = collection;
+                    collectionKeys.forEach((collectionKey) => enqueueMergeOperation(collectionKey, mergedCollection[collectionKey]));
+                }
+
                 break;
+            }
             case OnyxUtils.METHOD.MULTI_SET:
                 Object.entries(value).forEach(([entryKey, entryValue]) => enqueueSetOperation(entryKey, entryValue));
                 break;
