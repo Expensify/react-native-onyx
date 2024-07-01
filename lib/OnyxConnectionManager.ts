@@ -1,15 +1,17 @@
 import bindAll from 'lodash/bindAll';
 import type {ConnectOptions} from './Onyx';
 import Onyx from './Onyx';
-import type {OnyxKey} from './types';
+import type {DefaultConnectCallback, DefaultConnectOptions, OnyxKey, OnyxValue} from './types';
 
-type ConnectCallback = () => void;
+type ConnectCallback = DefaultConnectCallback<OnyxKey>;
 
 type Connection = {
     id: number;
     onyxKey: OnyxKey;
     isConnectionMade: boolean;
     callbacks: Map<string, ConnectCallback>;
+    cachedCallbackValue?: OnyxValue<OnyxKey>;
+    cachedCallbackKey?: OnyxKey;
 };
 
 class OnyxConnectionManager {
@@ -24,17 +26,16 @@ class OnyxConnectionManager {
         bindAll(this, 'fireCallbacks', 'connectionMapKey', 'connect', 'disconnect', 'disconnectAll');
     }
 
-    private fireCallbacks<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): void {
-        const mapKey = this.connectionMapKey(connectOptions);
+    private connectionMapKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): string {
+        return `key=${connectOptions.key},initWithStoredValues=${connectOptions.initWithStoredValues ?? true},waitForCollectionCallback=${connectOptions.waitForCollectionCallback ?? false}`;
+    }
+
+    private fireCallbacks(mapKey: string): void {
         const connection = this.connectionsMap.get(mapKey);
 
         connection?.callbacks.forEach((callback) => {
-            callback();
+            callback(connection.cachedCallbackValue, connection.cachedCallbackKey as OnyxKey);
         });
-    }
-
-    private connectionMapKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): string {
-        return `key=${connectOptions.key},initWithStoredValues=${connectOptions.initWithStoredValues ?? true},waitForCollectionCallback=${connectOptions.waitForCollectionCallback ?? false}`;
     }
 
     connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): [number, string, string] {
@@ -46,14 +47,16 @@ class OnyxConnectionManager {
 
         if (!connection) {
             connectionID = Onyx.connect({
-                ...connectOptions,
-                callback: () => {
+                ...(connectOptions as DefaultConnectOptions<OnyxKey>),
+                callback: (value, key) => {
                     const createdConnection = this.connectionsMap.get(mapKey);
                     if (createdConnection) {
                         createdConnection.isConnectionMade = true;
-                    }
+                        createdConnection.cachedCallbackValue = value;
+                        createdConnection.cachedCallbackKey = key;
 
-                    this.fireCallbacks(connectOptions);
+                        this.fireCallbacks(mapKey);
+                    }
                 },
             });
 
@@ -67,10 +70,12 @@ class OnyxConnectionManager {
             this.connectionsMap.set(mapKey, connection);
         }
 
-        connection.callbacks.set(callbackID, connectOptions.callback as ConnectCallback);
+        if (connectOptions.callback) {
+            connection.callbacks.set(callbackID, connectOptions.callback as ConnectCallback);
+        }
 
         if (connection.isConnectionMade) {
-            (connectOptions.callback as ConnectCallback)();
+            (connectOptions as DefaultConnectOptions<OnyxKey>).callback?.(connection.cachedCallbackValue, connection.cachedCallbackKey as OnyxKey);
         }
 
         return [connection.id, mapKey, callbackID];

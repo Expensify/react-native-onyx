@@ -5,7 +5,7 @@ import OnyxUtils from './OnyxUtils';
 import type {CollectionKeyBase, OnyxCollection, OnyxKey, OnyxValue, Selector} from './types';
 import useLiveRef from './useLiveRef';
 import usePrevious from './usePrevious';
-import Onyx from './Onyx';
+import connectionManager from './OnyxConnectionManager';
 
 type BaseUseOnyxOptions = {
     /**
@@ -66,7 +66,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     options?: BaseUseOnyxOptions & UseOnyxInitialValueOption<NoInfer<TReturnValue>>,
 ): UseOnyxResult<TKey, TReturnValue>;
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey, options?: UseOnyxOptions<TKey, TReturnValue>): UseOnyxResult<TKey, TReturnValue> {
-    const connectionIDRef = useRef<number | null>(null);
+    const connectionIDRef = useRef<[number, string, string] | null>(null);
     const previousKey = usePrevious(key);
 
     // Used to stabilize the selector reference and avoid unnecessary calls to `getSnapshot()`.
@@ -154,7 +154,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
-            connectionIDRef.current = Onyx.connect<CollectionKeyBase>({
+            connectionIDRef.current = connectionManager.connect<CollectionKeyBase>({
                 key,
                 callback: () => {
                     // We don't need to update the Onyx cache again here, when `callback` is called the cache is already
@@ -171,7 +171,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
                     return;
                 }
 
-                Onyx.disconnect(connectionIDRef.current);
+                connectionManager.disconnect(connectionIDRef.current[1], connectionIDRef.current[2]);
                 isFirstConnectionRef.current = false;
             };
         },
@@ -189,9 +189,9 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
         }
 
         if (options.canEvict) {
-            OnyxUtils.removeFromEvictionBlockList(key, connectionIDRef.current);
+            OnyxUtils.removeFromEvictionBlockList(key, connectionIDRef.current[0]);
         } else {
-            OnyxUtils.addToEvictionBlockList(key, connectionIDRef.current);
+            OnyxUtils.addToEvictionBlockList(key, connectionIDRef.current[0]);
         }
     }, [key, options?.canEvict]);
 
