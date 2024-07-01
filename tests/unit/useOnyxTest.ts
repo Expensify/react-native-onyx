@@ -97,7 +97,7 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
         });
 
-        it('should initially return null while loading non-cached key, and then return value and loaded state', async () => {
+        it('should initially return `undefined` while loading non-cached key, and then return value and loaded state', async () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
 
             const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
@@ -111,7 +111,7 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
         });
 
-        it('should initially return null and then return cached value after multiple merge operations', async () => {
+        it('should initially return undefined and then return cached value after multiple merge operations', async () => {
             Onyx.merge(ONYXKEYS.TEST_KEY, 'test1');
             Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
             Onyx.merge(ONYXKEYS.TEST_KEY, 'test3');
@@ -195,7 +195,27 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
         });
 
-        it('should not change selected data if a property outside the selector was changed', async () => {
+        it('should not change selected data if a property outside that data was changed', async () => {
+            Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name'});
+
+            const {result} = renderHook(() =>
+                useOnyx(ONYXKEYS.TEST_KEY, {
+                    // @ts-expect-error bypass
+                    selector: (entry: OnyxEntry<{id: string; name: string}>) => ({id: entry?.id}),
+                }),
+            );
+
+            await act(async () => waitForPromisesToResolve());
+
+            const oldResult = result.current;
+
+            await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, {name: 'test_name_changed'}));
+
+            // must be the same reference
+            expect(oldResult).toBe(result.current);
+        });
+
+        it('should not change selected collection data if a property outside that data was changed', async () => {
             // @ts-expect-error bypass
             Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, {
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
@@ -206,7 +226,7 @@ describe('useOnyx', () => {
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.COLLECTION.TEST_KEY, {
                     // @ts-expect-error bypass
-                    selector: (entry: OnyxEntry<{id: string; name: string}>) => entry?.id,
+                    selector: (entry: OnyxEntry<{id: string; name: string}>) => ({id: entry?.id}),
                 }),
             );
 
@@ -244,8 +264,6 @@ describe('useOnyx', () => {
         });
 
         it('should return initial value if selected data is undefined', async () => {
-            Onyx.set(ONYXKEYS.TEST_KEY, 'test_id_1');
-
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
                     // @ts-expect-error bypass
@@ -257,6 +275,8 @@ describe('useOnyx', () => {
             expect(result.current[0]).toEqual('initial value');
             expect(result.current[1].status).toEqual('loaded');
 
+            Onyx.set(ONYXKEYS.TEST_KEY, 'test_id_1');
+
             await act(async () => waitForPromisesToResolve());
 
             expect(result.current[0]).toBeUndefined();
@@ -265,7 +285,7 @@ describe('useOnyx', () => {
     });
 
     describe('initialValue', () => {
-        it('should return initial value from non-cached key and then return null', async () => {
+        it('should return initial value from non-cached key and then return undefined', async () => {
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
                     initialValue: 'initial value',
@@ -298,10 +318,30 @@ describe('useOnyx', () => {
             expect(result.current[0]).toEqual('test');
             expect(result.current[1].status).toEqual('loaded');
         });
+
+        it('should return initial value from cached key and then return selected data', async () => {
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
+
+            const {result} = renderHook(() =>
+                useOnyx(ONYXKEYS.TEST_KEY, {
+                    initialValue: 'initial value',
+                    // @ts-expect-error bypass
+                    selector: (entry: OnyxEntry<string>) => `${entry}_changed`,
+                }),
+            );
+
+            expect(result.current[0]).toEqual('initial value');
+            expect(result.current[1].status).toEqual('loaded');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('test_changed');
+            expect(result.current[1].status).toEqual('loaded');
+        });
     });
 
     describe('allowStaleData', () => {
-        it('should return null and loading state while we have pending merges for the key, and then return updated value and loaded state', async () => {
+        it('should return undefined and loading state while we have pending merges for the key, and then return updated value and loaded state', async () => {
             Onyx.set(ONYXKEYS.TEST_KEY, 'test1');
 
             Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
@@ -319,7 +359,7 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
         });
 
-        it('should return initial value and loaded state while we have pending merges for the key, and then return updated value and loaded state', async () => {
+        it('should return undefined and loading state while we have pending merges for the key, and then return selected data and loaded state', async () => {
             Onyx.set(ONYXKEYS.TEST_KEY, 'test1');
 
             Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
@@ -328,12 +368,35 @@ describe('useOnyx', () => {
 
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
+                    // @ts-expect-error bypass
+                    selector: (entry: OnyxEntry<string>) => `${entry}_changed`,
+                }),
+            );
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loading');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('test4_changed');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should return initial value and loaded state while we have pending merges for the key, and then return updated value and loaded state', async () => {
+            const {result} = renderHook(() =>
+                useOnyx(ONYXKEYS.TEST_KEY, {
                     initialValue: 'initial value',
                 }),
             );
 
             expect(result.current[0]).toEqual('initial value');
             expect(result.current[1].status).toEqual('loaded');
+
+            Onyx.set(ONYXKEYS.TEST_KEY, 'test1');
+
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test3');
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test4');
 
             await act(async () => waitForPromisesToResolve());
 
@@ -361,7 +424,7 @@ describe('useOnyx', () => {
     });
 
     describe('initWithStoredValues', () => {
-        it('should return null and loaded state, and after merge return updated value and loaded state', async () => {
+        it('should return `undefined` and loaded state, and after merge return updated value and loaded state', async () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test1');
 
             const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {initWithStoredValues: false}));
