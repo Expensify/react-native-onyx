@@ -483,4 +483,26 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
         });
     });
+
+    describe('multiple usage', () => {
+        it('should 1', async () => {
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
+
+            const {result: result1} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
+            // const {result: result2} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
+
+            expect(result1.current[0]).toBeUndefined();
+            expect(result1.current[1].status).toEqual('loading');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result1.current[0]).toEqual('test');
+            expect(result1.current[1].status).toEqual('loaded');
+
+            const {result: result2} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
+
+            expect(result2.current[0]).toEqual('test');
+            expect(result2.current[1].status).toEqual('loaded');
+        });
+    });
 });

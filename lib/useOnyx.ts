@@ -2,6 +2,7 @@ import {deepEqual, shallowEqual} from 'fast-equals';
 import {useCallback, useEffect, useRef, useSyncExternalStore} from 'react';
 import type {IsEqual} from 'type-fest';
 import OnyxCache from './OnyxCache';
+import type {ConnectionMetadata} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
 import OnyxUtils from './OnyxUtils';
 import type {CollectionKeyBase, OnyxCollection, OnyxEntry, OnyxKey, OnyxValue, Selector} from './types';
@@ -69,7 +70,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     options?: BaseUseOnyxOptions & UseOnyxInitialValueOption<NoInfer<TReturnValue>>,
 ): UseOnyxResult<TKey, TReturnValue>;
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey, options?: UseOnyxOptions<TKey, TReturnValue>): UseOnyxResult<TKey, TReturnValue> {
-    const connectionIDRef = useRef<[number, string, string] | null>(null);
+    const connectionRef = useRef<ConnectionMetadata | null>(null);
     const previousKey = usePrevious(key);
 
     // Used to stabilize the selector reference and avoid unnecessary calls to `getSnapshot()`.
@@ -186,7 +187,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
-            connectionIDRef.current = connectionManager.connect<CollectionKeyBase>({
+            connectionRef.current = connectionManager.connect<CollectionKeyBase>({
                 key,
                 callback: () => {
                     // Signals that the first connection was made, so some logics in `getSnapshot()`
@@ -204,11 +205,11 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
             });
 
             return () => {
-                if (!connectionIDRef.current) {
+                if (!connectionRef.current) {
                     return;
                 }
 
-                connectionManager.disconnect(connectionIDRef.current[1], connectionIDRef.current[2]);
+                connectionManager.disconnect(connectionRef.current.key, connectionRef.current.callbackID);
                 isFirstConnectionRef.current = false;
             };
         },
@@ -217,7 +218,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
 
     // Mimics withOnyx's checkEvictableKeys() behavior.
     useEffect(() => {
-        if (options?.canEvict === undefined || !connectionIDRef.current) {
+        if (options?.canEvict === undefined || !connectionRef.current) {
             return;
         }
 
@@ -226,9 +227,9 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
         }
 
         if (options.canEvict) {
-            OnyxUtils.removeFromEvictionBlockList(key, connectionIDRef.current[0]);
+            OnyxUtils.removeFromEvictionBlockList(key, connectionRef.current.connectionID);
         } else {
-            OnyxUtils.addToEvictionBlockList(key, connectionIDRef.current[0]);
+            OnyxUtils.addToEvictionBlockList(key, connectionRef.current.connectionID);
         }
     }, [key, options?.canEvict]);
 

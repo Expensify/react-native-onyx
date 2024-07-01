@@ -14,6 +14,12 @@ type Connection = {
     cachedCallbackKey?: OnyxKey;
 };
 
+type ConnectionMetadata = {
+    key: string;
+    callbackID: string;
+    connectionID: number;
+};
+
 class OnyxConnectionManager {
     private connectionsMap: Map<string, Connection>;
 
@@ -38,7 +44,7 @@ class OnyxConnectionManager {
         });
     }
 
-    connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): [number, string, string] {
+    connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): ConnectionMetadata {
         const mapKey = this.connectionMapKey(connectOptions);
         let connection = this.connectionsMap.get(mapKey);
         let connectionID: number | undefined;
@@ -78,11 +84,11 @@ class OnyxConnectionManager {
             (connectOptions as DefaultConnectOptions<OnyxKey>).callback?.(connection.cachedCallbackValue, connection.cachedCallbackKey as OnyxKey);
         }
 
-        return [connection.id, mapKey, callbackID];
+        return {key: mapKey, callbackID, connectionID: connection.id};
     }
 
-    disconnect(mapKey: string, callbackID: string): void {
-        const connection = this.connectionsMap.get(mapKey);
+    disconnect(key: string, callbackID: string): void {
+        const connection = this.connectionsMap.get(key);
 
         if (!connection) {
             return;
@@ -92,8 +98,19 @@ class OnyxConnectionManager {
 
         if (connection.callbacks.size === 0) {
             Onyx.disconnect(connection.id);
-            this.connectionsMap.delete(mapKey);
+            this.connectionsMap.delete(key);
         }
+    }
+
+    disconnectKey(key: string): void {
+        const connection = this.connectionsMap.get(key);
+
+        if (!connection) {
+            return;
+        }
+
+        Onyx.disconnect(connection.id);
+        this.connectionsMap.delete(key);
     }
 
     disconnectAll(): void {
@@ -108,3 +125,5 @@ class OnyxConnectionManager {
 const connectionManager = new OnyxConnectionManager();
 
 export default connectionManager;
+
+export type {ConnectionMetadata};
