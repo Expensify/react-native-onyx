@@ -102,6 +102,11 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): nu
     callbackToStateMapping[connectionID] = mapping as Mapping<OnyxKey>;
     callbackToStateMapping[connectionID].connectionID = connectionID;
 
+    // When keyChanged is called, a key is passed and the method looks through all the Subscribers in callbackToStateMapping for the matching key to get the connectionID
+    // to avoid having to loop through all the Subscribers all the time (even when just one connection belongs to one key),
+    // We create a mapping from key to lists of connectionIDs to access the specific list of connectionIDs.
+    OnyxUtils.storeKeyByConnections(mapping.key, callbackToStateMapping[connectionID].connectionID);
+
     if (mapping.initWithStoredValues === false) {
         return connectionID;
     }
@@ -208,6 +213,7 @@ function disconnect(connectionID: number, keyToRemoveFromEvictionBlocklist?: Ony
         OnyxUtils.removeFromEvictionBlockList(keyToRemoveFromEvictionBlocklist, connectionID);
     }
 
+    OnyxUtils.deleteKeyByConnections(lastConnectionID);
     delete callbackToStateMapping[connectionID];
 }
 
