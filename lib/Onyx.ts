@@ -9,6 +9,8 @@ import Storage from './storage';
 import utils from './utils';
 import DevTools from './DevTools';
 import type {
+    Collection,
+    CollectionKey,
     CollectionKeyBase,
     ConnectOptions,
     InitOptions,
@@ -16,6 +18,7 @@ import type {
     Mapping,
     OnyxInputKeyValueMapping,
     OnyxCollection,
+    MixedOperationsQueue,
     OnyxKey,
     OnyxMergeCollectionInput,
     OnyxMergeInput,
@@ -437,30 +440,16 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
  * @param collection Object collection keyed by individual collection member keys and values
  */
 function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
-    if (typeof collection !== 'object' || Array.isArray(collection) || utils.isEmptyObject(collection)) {
+    if (!OnyxUtils.isValidNonEmptyCollectionForMerge(collection)) {
         Logger.logInfo('mergeCollection() called with invalid or empty value. Skipping this update.');
         return Promise.resolve();
     }
+
     const mergedCollection: OnyxInputKeyValueMapping = collection;
 
     // Confirm all the collection keys belong to the same parent
-    let hasCollectionKeyCheckFailed = false;
     const mergedCollectionKeys = Object.keys(mergedCollection);
-    mergedCollectionKeys.forEach((dataKey) => {
-        if (OnyxUtils.isKeyMatch(collectionKey, dataKey)) {
-            return;
-        }
-
-        if (process.env.NODE_ENV === 'development') {
-            throw new Error(`Provided collection doesn't have all its data belonging to the same parent. CollectionKey: ${collectionKey}, DataKey: ${dataKey}`);
-        }
-
-        hasCollectionKeyCheckFailed = true;
-        Logger.logAlert(`Provided collection doesn't have all its data belonging to the same parent. CollectionKey: ${collectionKey}, DataKey: ${dataKey}`);
-    });
-
-    // Gracefully handle bad mergeCollection updates so it doesn't block the merge queue
-    if (hasCollectionKeyCheckFailed) {
+    if (!OnyxUtils.doAllCollectionItemsBelongToSameParent(collectionKey, mergedCollectionKeys)) {
         return Promise.resolve();
     }
 
@@ -712,29 +701,113 @@ function update(data: OnyxUpdate[]): Promise<void> {
         }
     });
 
+    // The queue of operations within a single `update` call in the format of <item key - list of operations updating the item>.
+    // This allows us to batch the operations per item and merge them into one operation in the order they were requested.
+    const updateQueue: Record<OnyxKey, Array<OnyxValue<OnyxKey>>> = {};
+    const enqueueSetOperation = (key: OnyxKey, value: OnyxValue<OnyxKey>) => {
+        // If a `set` operation is enqueued, we should clear the whole queue.
+        // Since the `set` operation replaces the value entirely, there's no need to perform any previous operations.
+        // To do this, we first put `null` in the queue, which removes the existing value, and then merge the new value.
+        updateQueue[key] = [null, value];
+    };
+    const enqueueMergeOperation = (key: OnyxKey, value: OnyxValue<OnyxKey>) => {
+        if (value === null) {
+            // If we merge `null`, the value is removed and all the previous operations are discarded.
+            updateQueue[key] = [null];
+        } else if (!updateQueue[key]) {
+            updateQueue[key] = [value];
+        } else {
+            updateQueue[key].push(value);
+        }
+    };
+
     const promises: Array<() => Promise<void>> = [];
     let clearPromise: Promise<void> = Promise.resolve();
 
     data.forEach(({onyxMethod, key, value}) => {
         switch (onyxMethod) {
             case OnyxUtils.METHOD.SET:
-                promises.push(() => set(key, value));
+                enqueueSetOperation(key, value);
                 break;
             case OnyxUtils.METHOD.MERGE:
-                promises.push(() => merge(key, value));
+                enqueueMergeOperation(key, value);
                 break;
-            case OnyxUtils.METHOD.MERGE_COLLECTION:
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- We validated that the value is a collection
-                promises.push(() => mergeCollection(key, value as any));
+            case OnyxUtils.METHOD.MERGE_COLLECTION: {
+                const collection = value as Collection<CollectionKey, unknown, unknown>;
+                if (!OnyxUtils.isValidNonEmptyCollectionForMerge(collection)) {
+                    Logger.logInfo('mergeCollection enqueued within update() with invalid or empty value. Skipping this operation.');
+                    break;
+                }
+
+                // Confirm all the collection keys belong to the same parent
+                const collectionKeys = Object.keys(collection);
+                if (OnyxUtils.doAllCollectionItemsBelongToSameParent(key, collectionKeys)) {
+                    const mergedCollection: OnyxInputKeyValueMapping = collection;
+                    collectionKeys.forEach((collectionKey) => enqueueMergeOperation(collectionKey, mergedCollection[collectionKey]));
+                }
+
                 break;
+            }
             case OnyxUtils.METHOD.MULTI_SET:
-                promises.push(() => multiSet(value));
+                Object.entries(value).forEach(([entryKey, entryValue]) => enqueueSetOperation(entryKey, entryValue));
                 break;
             case OnyxUtils.METHOD.CLEAR:
                 clearPromise = clear();
                 break;
             default:
                 break;
+        }
+    });
+
+    // Group all the collection-related keys and update each collection in a single `mergeCollection` call.
+    // This is needed to prevent multiple `mergeCollection` calls for the same collection and `merge` calls for the individual items of the said collection.
+    // This way, we ensure there is no race condition in the queued updates of the same key.
+    OnyxUtils.getCollectionKeys().forEach((collectionKey) => {
+        const collectionItemKeys = Object.keys(updateQueue).filter((key) => OnyxUtils.isKeyMatch(collectionKey, key));
+        if (collectionItemKeys.length <= 1) {
+            // If there are no items of this collection in the updateQueue, we should skip it.
+            // If there is only one item, we should update it individually, therefore retain it in the updateQueue.
+            return;
+        }
+
+        const batchedCollectionUpdates = collectionItemKeys.reduce(
+            (queue: MixedOperationsQueue, key: string) => {
+                const operations = updateQueue[key];
+
+                // Remove the collection-related key from the updateQueue so that it won't be processed individually.
+                delete updateQueue[key];
+
+                const updatedValue = OnyxUtils.applyMerge(undefined, operations, false);
+                if (operations[0] === null) {
+                    // eslint-disable-next-line no-param-reassign
+                    queue.set[key] = updatedValue;
+                } else {
+                    // eslint-disable-next-line no-param-reassign
+                    queue.merge[key] = updatedValue;
+                }
+                return queue;
+            },
+            {
+                merge: {},
+                set: {},
+            },
+        );
+
+        if (!utils.isEmptyObject(batchedCollectionUpdates.merge)) {
+            promises.push(() => mergeCollection(collectionKey, batchedCollectionUpdates.merge as Collection<CollectionKey, unknown, unknown>));
+        }
+        if (!utils.isEmptyObject(batchedCollectionUpdates.set)) {
+            promises.push(() => multiSet(batchedCollectionUpdates.set));
+        }
+    });
+
+    Object.entries(updateQueue).forEach(([key, operations]) => {
+        const batchedChanges = OnyxUtils.applyMerge(undefined, operations, false);
+
+        if (operations[0] === null) {
+            promises.push(() => set(key, batchedChanges));
+        } else {
+            promises.push(() => merge(key, batchedChanges));
         }
     });
 
