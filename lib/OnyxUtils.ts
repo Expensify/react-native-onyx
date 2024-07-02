@@ -51,6 +51,9 @@ const callbackToStateMapping: Record<string, Mapping<OnyxKey>> = {};
 // Keeps a copy of the values of the onyx collection keys as a map for faster lookups
 let onyxCollectionKeyMap = new Map<OnyxKey, OnyxValue<OnyxKey>>();
 
+// Holds a mapping of the connected key to the connectionID for faster lookups
+const onyxKeyToConnectionIDs = new Map();
+
 // Holds a list of keys that have been directly subscribed to or recently modified from least to most recent
 let recentlyAccessedKeys: OnyxKey[] = [];
 
@@ -319,6 +322,33 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
     );
 }
 
+/**
+ * Stores a connection ID associated with a given key.
+ *
+ * @param connectionID - a connection ID of the subscriber
+ * @param key - a key that the subscriber is connected to
+ */
+function storeKeyByConnections(key: OnyxKey, connectionID: number) {
+    if (!onyxKeyToConnectionIDs.has(key)) {
+        onyxKeyToConnectionIDs.set(key, []);
+    }
+    onyxKeyToConnectionIDs.get(key).push(connectionID);
+}
+
+/**
+ * Deletes a connection ID associated with its corresponding key.
+ *
+ * @param {number} connectionID - The connection ID to be deleted.
+ */
+function deleteKeyByConnections(connectionID: number) {
+    const subscriber = callbackToStateMapping[connectionID];
+
+    if (subscriber && onyxKeyToConnectionIDs.has(subscriber.key)) {
+        const updatedConnectionIDs = onyxKeyToConnectionIDs.get(subscriber.key).filter((id: number) => id !== connectionID);
+        onyxKeyToConnectionIDs.set(subscriber.key, updatedConnectionIDs);
+    }
+}
+
 /** Returns current key names stored in persisted storage */
 function getAllKeys(): Promise<Set<OnyxKey>> {
     // When we've already read stored keys, resolve right away
@@ -363,7 +393,7 @@ function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collect
  * @returns A tuple where the first element is the collection part and the second element is the ID part.
  */
 function splitCollectionMemberKey<TKey extends CollectionKey>(key: TKey): [TKey extends `${infer Prefix}_${string}` ? `${Prefix}_` : never, string] {
-    const underscoreIndex = key.indexOf('_');
+    const underscoreIndex = key.lastIndexOf('_');
 
     if (underscoreIndex === -1) {
         throw new Error(`Invalid ${key} key provided, only collection keys are allowed.`);
@@ -383,6 +413,27 @@ function isKeyMatch(configKey: OnyxKey, key: OnyxKey): boolean {
 /** Checks to see if this key has been flagged as safe for removal. */
 function isSafeEvictionKey(testKey: OnyxKey): boolean {
     return evictionAllowList.some((key) => isKeyMatch(key, testKey));
+}
+
+/**
+ * It extracts the non-numeric collection identifier of a given key.
+ *
+ * For example:
+ * - `getCollectionKey("report_123")` would return "report_"
+ * - `getCollectionKey("report")` would return "report"
+ * - `getCollectionKey("report_")` would return "report_"
+ *
+ * @param {OnyxKey} key - The key to process.
+ * @return {string} The pure key without any numeric
+ */
+function getCollectionKey(key: OnyxKey): string {
+    const underscoreIndex = key.lastIndexOf('_');
+
+    if (underscoreIndex === -1) {
+        return key;
+    }
+
+    return key.substring(0, underscoreIndex + 1);
 }
 
 /**
@@ -725,10 +776,23 @@ function keyChanged<TKey extends OnyxKey>(
         removeLastAccessedKey(key);
     }
 
-    // We are iterating over all subscribers to see if they are interested in the key that has just changed. If the subscriber's  key is a collection key then we will
+    // We get the subscribers interested in the key that has just changed. If the subscriber's  key is a collection key then we will
     // notify them if the key that changed is a collection member. Or if it is a regular key notify them when there is an exact match. Depending on whether the subscriber
     // was connected via withOnyx we will call setState() directly on the withOnyx instance. If it is a regular connection we will pass the data to the provided callback.
-    const stateMappingKeys = Object.keys(callbackToStateMapping);
+    // Given the amount of times this function is called we need to make sure we are not iterating over all subscribers every time. On the other hand, we don't need to
+    // do the same in keysChanged, because we only call that function when a collection key changes, and it doesn't happen that often.
+    // For performance reason, we look for the given key and later if don't find it we look for the collection key, instead of checking if it is a collection key first.
+    let stateMappingKeys = onyxKeyToConnectionIDs.get(key) ?? [];
+    const collectionKey = getCollectionKey(key);
+    const plainCollectionKey = collectionKey.lastIndexOf('_') !== -1 ? collectionKey : undefined;
+
+    if (plainCollectionKey) {
+        // Getting the collection key from the specific key because only collection keys were stored in the mapping.
+        stateMappingKeys = [...stateMappingKeys, ...(onyxKeyToConnectionIDs.get(plainCollectionKey) ?? [])];
+        if (stateMappingKeys.length === 0) {
+            return;
+        }
+    }
     for (let i = 0; i < stateMappingKeys.length; i++) {
         const subscriber = callbackToStateMapping[stateMappingKeys[i]];
         if (!subscriber || !isKeyMatch(subscriber.key, key) || !canUpdateSubscriber(subscriber)) {
@@ -1146,6 +1210,7 @@ const OnyxUtils = {
     keyChanged,
     sendDataToConnection,
     addKeyToRecentlyAccessedIfNeeded,
+    getCollectionKey,
     getCollectionDataAndSendAsObject,
     scheduleSubscriberUpdate,
     scheduleNotifyCollectionSubscribers,
@@ -1158,6 +1223,8 @@ const OnyxUtils = {
     prepareKeyValuePairsForStorage,
     applyMerge,
     initializeWithDefaultKeyStates,
+    storeKeyByConnections,
+    deleteKeyByConnections,
     getSnapshotKey,
     multiGet,
 };
