@@ -1,6 +1,7 @@
 import bindAll from 'lodash/bindAll';
 import type {ConnectOptions} from './Onyx';
 import Onyx from './Onyx';
+import * as Str from './Str';
 import type {DefaultConnectCallback, DefaultConnectOptions, OnyxKey, OnyxValue} from './types';
 
 type ConnectCallback = DefaultConnectCallback<OnyxKey>;
@@ -29,11 +30,19 @@ class OnyxConnectionManager {
         this.connectionsMap = new Map();
         this.lastCallbackID = 0;
 
-        bindAll(this, 'fireCallbacks', 'connectionMapKey', 'connect', 'disconnect', 'disconnectAll');
+        bindAll(this, 'fireCallbacks', 'connectionMapKey', 'connect', 'disconnect', 'disconnectKey', 'disconnectAll');
     }
 
     private connectionMapKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): string {
-        return `key=${connectOptions.key},initWithStoredValues=${connectOptions.initWithStoredValues ?? true},waitForCollectionCallback=${connectOptions.waitForCollectionCallback ?? false}`;
+        let suffix = '';
+
+        if ('withOnyxInstance' in connectOptions) {
+            suffix += `,withOnyxInstance=${Str.guid()}`;
+        }
+
+        return `key=${connectOptions.key},initWithStoredValues=${connectOptions.initWithStoredValues ?? true},waitForCollectionCallback=${
+            connectOptions.waitForCollectionCallback ?? false
+        }${suffix}`;
     }
 
     private fireCallbacks(mapKey: string): void {
@@ -52,9 +61,10 @@ class OnyxConnectionManager {
         const callbackID = String(this.lastCallbackID++);
 
         if (!connection) {
-            connectionID = Onyx.connect({
-                ...(connectOptions as DefaultConnectOptions<OnyxKey>),
-                callback: (value, key) => {
+            let callback: ConnectCallback | undefined;
+
+            if (!('withOnyxInstance' in connectOptions)) {
+                callback = (value, key) => {
                     const createdConnection = this.connectionsMap.get(mapKey);
                     if (createdConnection) {
                         createdConnection.isConnectionMade = true;
@@ -63,7 +73,12 @@ class OnyxConnectionManager {
 
                         this.fireCallbacks(mapKey);
                     }
-                },
+                };
+            }
+
+            connectionID = Onyx.connect({
+                ...(connectOptions as DefaultConnectOptions<OnyxKey>),
+                callback,
             });
 
             connection = {
@@ -87,7 +102,7 @@ class OnyxConnectionManager {
         return {key: mapKey, callbackID, connectionID: connection.id};
     }
 
-    disconnect(key: string, callbackID: string): void {
+    disconnect({key, callbackID}: ConnectionMetadata, shouldRemoveKeyFromEvictionBlocklist?: boolean): void {
         const connection = this.connectionsMap.get(key);
 
         if (!connection) {
@@ -97,25 +112,25 @@ class OnyxConnectionManager {
         connection.callbacks.delete(callbackID);
 
         if (connection.callbacks.size === 0) {
-            Onyx.disconnect(connection.id);
+            Onyx.disconnect(connection.id, shouldRemoveKeyFromEvictionBlocklist ? connection.onyxKey : undefined);
             this.connectionsMap.delete(key);
         }
     }
 
-    disconnectKey(key: string): void {
+    disconnectKey(key: string, shouldRemoveKeyFromEvictionBlocklist?: boolean): void {
         const connection = this.connectionsMap.get(key);
 
         if (!connection) {
             return;
         }
 
-        Onyx.disconnect(connection.id);
+        Onyx.disconnect(connection.id, shouldRemoveKeyFromEvictionBlocklist ? connection.onyxKey : undefined);
         this.connectionsMap.delete(key);
     }
 
-    disconnectAll(): void {
+    disconnectAll(shouldRemoveKeysFromEvictionBlocklist?: boolean): void {
         Array.from(this.connectionsMap.values()).forEach((connection) => {
-            Onyx.disconnect(connection.id);
+            Onyx.disconnect(connection.id, shouldRemoveKeysFromEvictionBlocklist ? connection.onyxKey : undefined);
         });
 
         this.connectionsMap.clear();

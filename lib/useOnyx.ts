@@ -209,7 +209,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
                     return;
                 }
 
-                connectionManager.disconnect(connectionRef.current.key, connectionRef.current.callbackID);
+                connectionManager.disconnect(connectionRef.current, true);
                 isFirstConnectionRef.current = false;
             };
         },

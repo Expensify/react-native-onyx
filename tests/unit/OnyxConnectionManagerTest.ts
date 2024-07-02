@@ -1,7 +1,10 @@
+// eslint-disable-next-line max-classes-per-file
 import {act} from '@testing-library/react-native';
 import Onyx from '../../lib';
 import connectionManager from '../../lib/OnyxConnectionManager';
 import StorageMock from '../../lib/storage';
+import type {OnyxKey, WithOnyxConnectOptions} from '../../lib/types';
+import type {WithOnyxInstance} from '../../lib/withOnyx/types';
 import type GenericCollection from '../utils/GenericCollection';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
@@ -34,16 +37,16 @@ describe('OnyxConnectionManager', () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
 
             const callback1 = jest.fn();
-            const {key, callbackID} = connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback1});
+            const connection = connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback1});
 
-            expect(connectionsMap.has(key)).toBeTruthy();
+            expect(connectionsMap.has(connection.key)).toBeTruthy();
 
             await act(async () => waitForPromisesToResolve());
 
             expect(callback1).toHaveBeenCalledTimes(1);
             expect(callback1).toHaveBeenCalledWith('test', ONYXKEYS.TEST_KEY);
 
-            connectionManager.disconnect(key, callbackID);
+            connectionManager.disconnect(connection);
 
             expect(connectionsMap.size).toEqual(0);
         });
@@ -52,14 +55,14 @@ describe('OnyxConnectionManager', () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
 
             const callback1 = jest.fn();
-            const {key: key1, callbackID: callbackID1} = connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback1});
+            const connection1 = connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback1});
 
             const callback2 = jest.fn();
-            const {key: key2, callbackID: callbackID2} = connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback2});
+            const connection2 = connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback2});
 
-            expect(key1).toEqual(key2);
+            expect(connection1.key).toEqual(connection2.key);
             expect(connectionsMap.size).toEqual(1);
-            expect(connectionsMap.has(key1)).toBeTruthy();
+            expect(connectionsMap.has(connection1.key)).toBeTruthy();
 
             await act(async () => waitForPromisesToResolve());
 
@@ -68,8 +71,8 @@ describe('OnyxConnectionManager', () => {
             expect(callback2).toHaveBeenCalledTimes(1);
             expect(callback2).toHaveBeenCalledWith('test', ONYXKEYS.TEST_KEY);
 
-            connectionManager.disconnect(key1, callbackID1);
-            connectionManager.disconnect(key1, callbackID2);
+            connectionManager.disconnect(connection1);
+            connectionManager.disconnect(connection2);
 
             expect(connectionsMap.size).toEqual(0);
         });
@@ -87,15 +90,15 @@ describe('OnyxConnectionManager', () => {
             ]);
 
             const callback1 = jest.fn();
-            const {key: key1, callbackID: callbackID1} = connectionManager.connect({key: ONYXKEYS.COLLECTION.TEST_KEY, callback: callback1});
+            const connection1 = connectionManager.connect({key: ONYXKEYS.COLLECTION.TEST_KEY, callback: callback1});
 
             const callback2 = jest.fn();
-            const {key: key2, callbackID: callbackID2} = connectionManager.connect({key: ONYXKEYS.COLLECTION.TEST_KEY, callback: callback2, waitForCollectionCallback: true});
+            const connection2 = connectionManager.connect({key: ONYXKEYS.COLLECTION.TEST_KEY, callback: callback2, waitForCollectionCallback: true});
 
-            expect(key1).not.toEqual(key2);
+            expect(connection1.key).not.toEqual(connection2.key);
             expect(connectionsMap.size).toEqual(2);
-            expect(connectionsMap.has(key1)).toBeTruthy();
-            expect(connectionsMap.has(key2)).toBeTruthy();
+            expect(connectionsMap.has(connection1.key)).toBeTruthy();
+            expect(connectionsMap.has(connection2.key)).toBeTruthy();
 
             await act(async () => waitForPromisesToResolve());
 
@@ -106,8 +109,8 @@ describe('OnyxConnectionManager', () => {
             expect(callback2).toHaveBeenCalledTimes(1);
             expect(callback2).toHaveBeenCalledWith(collection, undefined);
 
-            connectionManager.disconnect(key1, callbackID1);
-            connectionManager.disconnect(key2, callbackID2);
+            connectionManager.disconnect(connection1);
+            connectionManager.disconnect(connection2);
 
             expect(connectionsMap.size).toEqual(0);
         });
@@ -138,6 +141,82 @@ describe('OnyxConnectionManager', () => {
             expect(callback3).toHaveBeenCalledWith('test', ONYXKEYS.TEST_KEY);
             expect(callback4).toHaveBeenCalledTimes(1);
             expect(callback4).toHaveBeenCalledWith('test', ONYXKEYS.TEST_KEY);
+        });
+    });
+
+    describe('withOnyx', () => {
+        it('should connect to a key two times with withOnyx and create two connections instead of one', async () => {
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
+
+            const connection1 = connectionManager.connect({
+                key: ONYXKEYS.TEST_KEY,
+                displayName: 'Component1',
+                statePropertyName: 'prop1',
+                withOnyxInstance: new (class {
+                    // eslint-disable-next-line @typescript-eslint/no-empty-function
+                    setStateProxy() {}
+
+                    // eslint-disable-next-line @typescript-eslint/no-empty-function
+                    setWithOnyxState() {}
+                })() as unknown as WithOnyxInstance,
+            } as WithOnyxConnectOptions<OnyxKey>);
+
+            const connection2 = connectionManager.connect({
+                key: ONYXKEYS.TEST_KEY,
+                displayName: 'Component2',
+                statePropertyName: 'prop2',
+                withOnyxInstance: new (class {
+                    // eslint-disable-next-line @typescript-eslint/no-empty-function
+                    setStateProxy() {}
+
+                    // eslint-disable-next-line @typescript-eslint/no-empty-function
+                    setWithOnyxState() {}
+                })() as unknown as WithOnyxInstance,
+            } as WithOnyxConnectOptions<OnyxKey>);
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(connection1.key).not.toEqual(connection2.key);
+            expect(connectionsMap.size).toEqual(2);
+            expect(connectionsMap.has(connection1.key)).toBeTruthy();
+            expect(connectionsMap.has(connection2.key)).toBeTruthy();
+
+            connectionManager.disconnect(connection1);
+            connectionManager.disconnect(connection2);
+
+            expect(connectionsMap.size).toEqual(0);
+        });
+
+        it('should connect to a key directly, connect again with withOnyx and create another connection instead of reusing the first one', async () => {
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
+
+            const callback1 = jest.fn();
+            const connection1 = connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback1});
+
+            await act(async () => waitForPromisesToResolve());
+
+            const connection2 = connectionManager.connect({
+                key: ONYXKEYS.TEST_KEY,
+                displayName: 'Component2',
+                statePropertyName: 'prop2',
+                withOnyxInstance: new (class {
+                    // eslint-disable-next-line @typescript-eslint/no-empty-function
+                    setStateProxy() {}
+
+                    // eslint-disable-next-line @typescript-eslint/no-empty-function
+                    setWithOnyxState() {}
+                })() as unknown as WithOnyxInstance,
+            } as WithOnyxConnectOptions<OnyxKey>);
+
+            expect(connection1.key).not.toEqual(connection2.key);
+            expect(connectionsMap.size).toEqual(2);
+            expect(connectionsMap.has(connection1.key)).toBeTruthy();
+            expect(connectionsMap.has(connection2.key)).toBeTruthy();
+
+            connectionManager.disconnect(connection1);
+            connectionManager.disconnect(connection2);
+
+            expect(connectionsMap.size).toEqual(0);
         });
     });
 });
