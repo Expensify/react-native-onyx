@@ -1,6 +1,6 @@
 import bindAll from 'lodash/bindAll';
 import type {ConnectOptions} from './Onyx';
-import Onyx from './Onyx';
+import OnyxUtils from './OnyxUtils';
 import * as Str from './Str';
 import type {DefaultConnectCallback, DefaultConnectOptions, OnyxKey, OnyxValue} from './types';
 
@@ -53,6 +53,34 @@ class OnyxConnectionManager {
         });
     }
 
+    /**
+     * Subscribes a react component's state directly to a store key
+     *
+     * @example
+     * const connection = Onyx.connect({
+     *     key: ONYXKEYS.SESSION,
+     *     callback: onSessionChange,
+     * });
+     *
+     * @param mapping the mapping information to connect Onyx to the components state
+     * @param mapping.key ONYXKEY to subscribe to
+     * @param [mapping.statePropertyName] the name of the property in the state to connect the data to
+     * @param [mapping.withOnyxInstance] whose setState() method will be called with any changed data
+     *      This is used by React components to connect to Onyx
+     * @param [mapping.callback] a method that will be called with changed data
+     *      This is used by any non-React code to connect to Onyx
+     * @param [mapping.initWithStoredValues] If set to false, then no data will be prefilled into the
+     *  component
+     * @param [mapping.waitForCollectionCallback] If set to true, it will return the entire collection to the callback as a single object
+     * @param [mapping.selector] THIS PARAM IS ONLY USED WITH withOnyx(). If included, this will be used to subscribe to a subset of an Onyx key's data.
+     *       The sourceData and withOnyx state are passed to the selector and should return the simplified data. Using this setting on `withOnyx` can have very positive
+     *       performance benefits because the component will only re-render when the subset of data changes. Otherwise, any change of data on any property would normally
+     *       cause the component to re-render (and that can be expensive from a performance standpoint).
+     * @param [mapping.initialValue] THIS PARAM IS ONLY USED WITH withOnyx().
+     * If included, this will be passed to the component so that something can be rendered while data is being fetched from the DB.
+     * Note that it will not cause the component to have the loading prop set to true.
+     * @returns a connection metadata object to use when calling `Onyx.disconnect()`
+     */
     connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): ConnectionMetadata {
         const mapKey = this.connectionMapKey(connectOptions);
         let connection = this.connectionsMap.get(mapKey);
@@ -76,7 +104,7 @@ class OnyxConnectionManager {
                 };
             }
 
-            connectionID = Onyx.connect({
+            connectionID = OnyxUtils.connectToKey({
                 ...(connectOptions as DefaultConnectOptions<OnyxKey>),
                 callback,
             });
@@ -102,6 +130,13 @@ class OnyxConnectionManager {
         return {key: mapKey, callbackID, connectionID: connection.id};
     }
 
+    /**
+     * Remove the listener for a react component
+     * @example
+     * Onyx.disconnectFromKey(connection);
+     *
+     * @param connection connection metadata object returned by call to `Onyx.connect()`
+     */
     disconnect({key, callbackID}: ConnectionMetadata, shouldRemoveKeyFromEvictionBlocklist?: boolean): void {
         const connection = this.connectionsMap.get(key);
 
@@ -112,7 +147,7 @@ class OnyxConnectionManager {
         connection.callbacks.delete(callbackID);
 
         if (connection.callbacks.size === 0) {
-            Onyx.disconnect(connection.id, shouldRemoveKeyFromEvictionBlocklist ? connection.onyxKey : undefined);
+            OnyxUtils.disconnectFromKey(connection.id, shouldRemoveKeyFromEvictionBlocklist ? connection.onyxKey : undefined);
             this.connectionsMap.delete(key);
         }
     }
@@ -124,13 +159,13 @@ class OnyxConnectionManager {
             return;
         }
 
-        Onyx.disconnect(connection.id, shouldRemoveKeyFromEvictionBlocklist ? connection.onyxKey : undefined);
+        OnyxUtils.disconnectFromKey(connection.id, shouldRemoveKeyFromEvictionBlocklist ? connection.onyxKey : undefined);
         this.connectionsMap.delete(key);
     }
 
     disconnectAll(shouldRemoveKeysFromEvictionBlocklist?: boolean): void {
         Array.from(this.connectionsMap.values()).forEach((connection) => {
-            Onyx.disconnect(connection.id, shouldRemoveKeysFromEvictionBlocklist ? connection.onyxKey : undefined);
+            OnyxUtils.disconnectFromKey(connection.id, shouldRemoveKeysFromEvictionBlocklist ? connection.onyxKey : undefined);
         });
 
         this.connectionsMap.clear();

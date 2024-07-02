@@ -3,6 +3,7 @@ import StorageMock from '../../lib/storage';
 import Onyx from '../../lib/Onyx';
 import type OnyxCache from '../../lib/OnyxCache';
 import type GenericCollection from '../utils/GenericCollection';
+import type {ConnectionMetadata} from '../../lib/OnyxConnectionManager';
 
 const ONYX_KEYS = {
     DEFAULT_KEY: 'defaultKey',
@@ -16,7 +17,7 @@ const MERGED_VALUE = 'merged';
 const DEFAULT_VALUE = 'default';
 
 describe('Set data while storage is clearing', () => {
-    let connectionID: number;
+    let connection: ConnectionMetadata | undefined;
     let onyxValue: unknown;
 
     /** @type OnyxCache */
@@ -33,7 +34,7 @@ describe('Set data while storage is clearing', () => {
                 [ONYX_KEYS.DEFAULT_KEY]: DEFAULT_VALUE,
             },
         });
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.DEFAULT_KEY,
             initWithStoredValues: false,
             callback: (val) => (onyxValue = val),
@@ -42,7 +43,9 @@ describe('Set data while storage is clearing', () => {
     });
 
     afterEach(() => {
-        Onyx.disconnect(connectionID);
+        if (connection) {
+            Onyx.disconnect(connection);
+        }
         return Onyx.clear();
     });
 
@@ -129,7 +132,7 @@ describe('Set data while storage is clearing', () => {
 
         // Given a mocked callback function and a collection with four items in it
         const collectionCallback = jest.fn();
-        const testConnectionID = Onyx.connect({
+        const testConnection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST,
             waitForCollectionCallback: true,
             callback: collectionCallback,
@@ -148,7 +151,7 @@ describe('Set data while storage is clearing', () => {
                 // When onyx is cleared
                 .then(() => Onyx.clear())
                 .then(() => {
-                    Onyx.disconnect(testConnectionID);
+                    Onyx.disconnect(testConnection);
                 })
                 .then(() => {
                     // Then the collection callback should only have been called three times:
@@ -159,13 +162,17 @@ describe('Set data while storage is clearing', () => {
 
                     // And it should be called with the expected parameters each time
                     expect(collectionCallback).toHaveBeenNthCalledWith(1, undefined, undefined);
-                    expect(collectionCallback).toHaveBeenNthCalledWith(2, {
-                        test_1: 1,
-                        test_2: 2,
-                        test_3: 3,
-                        test_4: 4,
-                    });
-                    expect(collectionCallback).toHaveBeenLastCalledWith({});
+                    expect(collectionCallback).toHaveBeenNthCalledWith(
+                        2,
+                        {
+                            test_1: 1,
+                            test_2: 2,
+                            test_3: 3,
+                            test_4: 4,
+                        },
+                        undefined,
+                    );
+                    expect(collectionCallback).toHaveBeenLastCalledWith({}, undefined);
                 })
         );
     });
