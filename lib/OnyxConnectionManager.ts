@@ -1,4 +1,5 @@
 import bindAll from 'lodash/bindAll';
+import * as Logger from './Logger';
 import type {ConnectOptions} from './Onyx';
 import OnyxUtils from './OnyxUtils';
 import * as Str from './Str';
@@ -139,11 +140,16 @@ class OnyxConnectionManager {
     /**
      * Remove the listener for a react component
      * @example
-     * Onyx.disconnectFromKey(connection);
+     * Onyx.disconnect(connection);
      *
      * @param connection connection metadata object returned by call to `Onyx.connect()`
      */
     disconnect(connectionMetadada: ConnectionMetadata, shouldRemoveKeyFromEvictionBlocklist?: boolean): void {
+        if (!connectionMetadada) {
+            Logger.logAlert(`[ConnectionManager] Attempted to disconnect passing an undefined metadata object.`);
+            return;
+        }
+
         const connection = this.connectionsMap.get(connectionMetadada.key);
 
         if (!connection) {
