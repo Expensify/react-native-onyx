@@ -276,6 +276,7 @@ type DefaultConnectOptions<TKey extends OnyxKey> = BaseConnectOptions & {
     key: TKey;
     callback?: DefaultConnectCallback<TKey>;
     waitForCollectionCallback?: false;
+    reuseConnection?: boolean;
 };
 
 /** Represents the options used in `Onyx.connect()` method with a collection key. */
@@ -283,6 +284,7 @@ type CollectionConnectOptions<TKey extends OnyxKey> = BaseConnectOptions & {
     key: TKey extends CollectionKeyBase ? TKey : never;
     callback?: CollectionConnectCallback<TKey>;
     waitForCollectionCallback: true;
+    reuseConnection?: boolean;
 };
 
 /**

@@ -36,6 +36,10 @@ class OnyxConnectionManager {
     private connectionMapKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): string {
         let suffix = '';
 
+        if (connectOptions.reuseConnection === false) {
+            suffix += `,uniqueID=${Str.guid()}`;
+        }
+
         if ('withOnyxInstance' in connectOptions) {
             suffix += `,withOnyxInstance=${Str.guid()}`;
         }
@@ -124,7 +128,9 @@ class OnyxConnectionManager {
         }
 
         if (connection.isConnectionMade) {
-            (connectOptions as DefaultConnectOptions<OnyxKey>).callback?.(connection.cachedCallbackValue, connection.cachedCallbackKey as OnyxKey);
+            Promise.resolve().then(() => {
+                (connectOptions as DefaultConnectOptions<OnyxKey>).callback?.(connection.cachedCallbackValue, connection.cachedCallbackKey as OnyxKey);
+            });
         }
 
         return {key: mapKey, callbackID, connectionID: connection.id};
@@ -137,18 +143,18 @@ class OnyxConnectionManager {
      *
      * @param connection connection metadata object returned by call to `Onyx.connect()`
      */
-    disconnect({key, callbackID}: ConnectionMetadata, shouldRemoveKeyFromEvictionBlocklist?: boolean): void {
-        const connection = this.connectionsMap.get(key);
+    disconnect(connectionMetadada: ConnectionMetadata, shouldRemoveKeyFromEvictionBlocklist?: boolean): void {
+        const connection = this.connectionsMap.get(connectionMetadada.key);
 
         if (!connection) {
             return;
         }
 
-        connection.callbacks.delete(callbackID);
+        connection.callbacks.delete(connectionMetadada.callbackID);
 
         if (connection.callbacks.size === 0) {
             OnyxUtils.disconnectFromKey(connection.id, shouldRemoveKeyFromEvictionBlocklist ? connection.onyxKey : undefined);
-            this.connectionsMap.delete(key);
+            this.connectionsMap.delete(connectionMetadada.key);
         }
     }
 

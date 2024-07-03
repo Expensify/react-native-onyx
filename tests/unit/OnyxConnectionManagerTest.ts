@@ -135,12 +135,41 @@ describe('OnyxConnectionManager', () => {
             const callback4 = jest.fn();
             connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback4});
 
+            await act(async () => waitForPromisesToResolve());
+
             expect(callback2).toHaveBeenCalledTimes(1);
             expect(callback2).toHaveBeenCalledWith('test', ONYXKEYS.TEST_KEY);
             expect(callback3).toHaveBeenCalledTimes(1);
             expect(callback3).toHaveBeenCalledWith('test', ONYXKEYS.TEST_KEY);
             expect(callback4).toHaveBeenCalledTimes(1);
             expect(callback4).toHaveBeenCalledWith('test', ONYXKEYS.TEST_KEY);
+        });
+
+        it('should have the connection object already defined when triggering the callback of the second connection to the same key', async () => {
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
+
+            const callback1 = jest.fn();
+            connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback1});
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(callback1).toHaveBeenCalledTimes(1);
+            expect(callback1).toHaveBeenCalledWith('test', ONYXKEYS.TEST_KEY);
+
+            const callback2 = jest.fn();
+            const connection2 = connectionManager.connect({
+                key: ONYXKEYS.TEST_KEY,
+                callback: (...params) => {
+                    callback2(...params);
+                    connectionManager.disconnect(connection2);
+                },
+            });
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(callback2).toHaveBeenCalledTimes(1);
+            expect(callback2).toHaveBeenCalledWith('test', ONYXKEYS.TEST_KEY);
+            expect(connectionsMap.size).toEqual(1);
         });
     });
 

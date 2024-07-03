@@ -18,6 +18,7 @@ import type {
     OnyxMergeCollectionInput,
 } from './types';
 import type {FetchStatus, ResultMetadata, UseOnyxResult} from './useOnyx';
+import type {ConnectionMetadata} from './OnyxConnectionManager';
 import useOnyx from './useOnyx';
 import withOnyx from './withOnyx';
 import type {WithOnyxState} from './withOnyx/types';
@@ -46,4 +47,5 @@ export type {
     Selector,
     UseOnyxResult,
     WithOnyxState,
+    ConnectionMetadata,
 };
