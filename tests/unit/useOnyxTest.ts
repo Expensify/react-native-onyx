@@ -485,11 +485,10 @@ describe('useOnyx', () => {
     });
 
     describe('multiple usage', () => {
-        it('should 1', async () => {
+        it('should connect to a key and load the value into cache, and return the value loaded in the next hook call', async () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
 
             const {result: result1} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
-            // const {result: result2} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
 
             expect(result1.current[0]).toBeUndefined();
             expect(result1.current[1].status).toEqual('loading');
@@ -500,6 +499,27 @@ describe('useOnyx', () => {
             expect(result1.current[1].status).toEqual('loaded');
 
             const {result: result2} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
+
+            expect(result2.current[0]).toEqual('test');
+            expect(result2.current[1].status).toEqual('loaded');
+        });
+
+        it('should connect to a key two times while data is loading from the cache, and return the value loaded to both of them', async () => {
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
+
+            const {result: result1} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
+            const {result: result2} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
+
+            expect(result1.current[0]).toBeUndefined();
+            expect(result1.current[1].status).toEqual('loading');
+
+            expect(result2.current[0]).toBeUndefined();
+            expect(result2.current[1].status).toEqual('loading');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result1.current[0]).toEqual('test');
+            expect(result1.current[1].status).toEqual('loaded');
 
             expect(result2.current[0]).toEqual('test');
             expect(result2.current[1].status).toEqual('loaded');
