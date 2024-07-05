@@ -3,6 +3,7 @@ import type {OnyxEntry} from '../../lib';
 import Onyx, {useOnyx} from '../../lib';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import StorageMock from '../../lib/storage';
+import type GenericCollection from '../utils/GenericCollection';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -163,12 +164,11 @@ describe('useOnyx', () => {
         });
 
         it('should return selected data from a collection key', async () => {
-            // @ts-expect-error bypass
             Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, {
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry3`]: {id: 'entry3_id', name: 'entry3_name'},
-            });
+            } as GenericCollection);
 
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.COLLECTION.TEST_KEY, {
@@ -198,30 +198,50 @@ describe('useOnyx', () => {
         it('should not change selected data if a property outside that data was changed', async () => {
             Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name'});
 
-            const {result} = renderHook(() =>
+            // primitive
+            const {result: primitiveResult} = renderHook(() =>
+                useOnyx(ONYXKEYS.TEST_KEY, {
+                    // @ts-expect-error bypass
+                    selector: (entry: OnyxEntry<{id: string; name: string}>) => entry?.id,
+                }),
+            );
+
+            // object
+            const {result: objectResult} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
                     // @ts-expect-error bypass
                     selector: (entry: OnyxEntry<{id: string; name: string}>) => ({id: entry?.id}),
                 }),
             );
 
+            // array
+            const {result: arrayResult} = renderHook(() =>
+                useOnyx(ONYXKEYS.TEST_KEY, {
+                    // @ts-expect-error bypass
+                    selector: (entry: OnyxEntry<{id: string; name: string}>) => [{id: entry?.id}],
+                }),
+            );
+
             await act(async () => waitForPromisesToResolve());
 
-            const oldResult = result.current;
+            const oldPrimitiveResult = primitiveResult.current;
+            const oldObjectResult = objectResult.current;
+            const oldArrayResult = arrayResult.current;
 
             await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, {name: 'test_name_changed'}));
 
             // must be the same reference
-            expect(oldResult).toBe(result.current);
+            expect(oldPrimitiveResult).toBe(primitiveResult.current);
+            expect(oldObjectResult).toBe(objectResult.current);
+            expect(oldArrayResult).toBe(arrayResult.current);
         });
 
         it('should not change selected collection data if a property outside that data was changed', async () => {
-            // @ts-expect-error bypass
             Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, {
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry3`]: {id: 'entry3_id', name: 'entry3_name'},
-            });
+            } as GenericCollection);
 
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.COLLECTION.TEST_KEY, {
