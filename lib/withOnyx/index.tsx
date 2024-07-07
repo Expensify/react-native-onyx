@@ -164,7 +164,7 @@ export default function <TComponentProps, TOnyxProps>(
                     const previousKey = isFirstTimeUpdatingAfterLoading ? mapping.previousKey : Str.result(mapping.key as GenericFunction, {...prevProps, ...prevOnyxDataFromState});
                     const newKey = Str.result(mapping.key as GenericFunction, {...this.props, ...onyxDataFromState});
                     if (previousKey !== newKey) {
-                        connectionManager.disconnect(this.activeConnections[previousKey], true);
+                        connectionManager.disconnect(this.activeConnections[previousKey]);
                         delete this.activeConnections[previousKey];
                         this.connectMappingToOnyx(mapping, propName, newKey);
                     }
@@ -177,7 +177,7 @@ export default function <TComponentProps, TOnyxProps>(
                 // Disconnect everything from Onyx
                 mapOnyxToStateEntries(mapOnyxToState).forEach(([, mapping]) => {
                     const key = Str.result(mapping.key as GenericFunction, {...this.props, ...getOnyxDataFromState(this.state, mapOnyxToState)});
-                    connectionManager.disconnect(this.activeConnections[key], true);
+                    connectionManager.disconnect(this.activeConnections[key]);
                 });
             }
 
@@ -294,9 +294,9 @@ export default function <TComponentProps, TOnyxProps>(
                     }
 
                     if (canEvict) {
-                        OnyxUtils.removeFromEvictionBlockList(key, mapping.connectionID);
+                        connectionManager.removeFromEvictionBlockList(this.activeConnections[key]);
                     } else {
-                        OnyxUtils.addToEvictionBlockList(key, mapping.connectionID);
+                        connectionManager.addToEvictionBlockList(this.activeConnections[key]);
                     }
                 });
             }

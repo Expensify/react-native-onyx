@@ -8,7 +8,7 @@ import type {DefaultConnectCallback, DefaultConnectOptions, OnyxKey, OnyxValue} 
 type ConnectCallback = DefaultConnectCallback<OnyxKey>;
 
 type Connection = {
-    id: number;
+    subscriptionID: number;
     onyxKey: OnyxKey;
     isConnectionMade: boolean;
     callbacks: Map<string, ConnectCallback>;
@@ -17,9 +17,9 @@ type Connection = {
 };
 
 type ConnectionMetadata = {
-    key: string;
+    id: string;
     callbackID: string;
-    connectionID: number;
+    subscriptionID: number;
 };
 
 class OnyxConnectionManager {
@@ -31,7 +31,7 @@ class OnyxConnectionManager {
         this.connectionsMap = new Map();
         this.lastCallbackID = 0;
 
-        bindAll(this, 'fireCallbacks', 'connectionMapKey', 'connect', 'disconnect', 'disconnectKey', 'disconnectAll');
+        bindAll(this, 'fireCallbacks', 'connectionMapKey', 'connect', 'disconnect', 'disconnectKey', 'disconnectAll', 'addToEvictionBlockList', 'removeFromEvictionBlockList');
     }
 
     private connectionMapKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): string {
@@ -57,7 +57,7 @@ class OnyxConnectionManager {
     connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): ConnectionMetadata {
         const mapKey = this.connectionMapKey(connectOptions);
         let connection = this.connectionsMap.get(mapKey);
-        let connectionID: number | undefined;
+        let subscriptionID: number | undefined;
 
         const callbackID = String(this.lastCallbackID++);
 
@@ -77,13 +77,13 @@ class OnyxConnectionManager {
                 };
             }
 
-            connectionID = OnyxUtils.connectToKey({
+            subscriptionID = OnyxUtils.connectToKey({
                 ...(connectOptions as DefaultConnectOptions<OnyxKey>),
                 callback,
             });
 
             connection = {
-                id: connectionID,
+                subscriptionID,
                 onyxKey: connectOptions.key,
                 isConnectionMade: false,
                 callbacks: new Map(),
@@ -102,7 +102,7 @@ class OnyxConnectionManager {
             });
         }
 
-        return {key: mapKey, callbackID, connectionID: connection.id};
+        return {id: mapKey, callbackID, subscriptionID: connection.subscriptionID};
     }
 
     /**
@@ -112,14 +112,13 @@ class OnyxConnectionManager {
      *
      * @param connection connection metadata object returned by call to `Onyx.connect()`
      */
-    disconnect(connectionMetadada: ConnectionMetadata, shouldRemoveKeyFromEvictionBlocklist?: boolean): void {
+    disconnect(connectionMetadada: ConnectionMetadata): void {
         if (!connectionMetadada) {
             Logger.logAlert(`[ConnectionManager] Attempted to disconnect passing an undefined metadata object.`);
             return;
         }
 
-        const connection = this.connectionsMap.get(connectionMetadada.key);
-
+        const connection = this.connectionsMap.get(connectionMetadada.id);
         if (!connection) {
             return;
         }
@@ -127,28 +126,74 @@ class OnyxConnectionManager {
         connection.callbacks.delete(connectionMetadada.callbackID);
 
         if (connection.callbacks.size === 0) {
-            OnyxUtils.disconnectFromKey(connection.id, shouldRemoveKeyFromEvictionBlocklist ? connection.onyxKey : undefined);
-            this.connectionsMap.delete(connectionMetadada.key);
+            OnyxUtils.disconnectFromKey(connection.subscriptionID);
+            this.removeFromEvictionBlockList(connectionMetadada);
+
+            this.connectionsMap.delete(connectionMetadada.id);
         }
     }
 
-    disconnectKey(key: string, shouldRemoveKeyFromEvictionBlocklist?: boolean): void {
+    disconnectKey(key: string): void {
         const connection = this.connectionsMap.get(key);
 
         if (!connection) {
             return;
         }
 
-        OnyxUtils.disconnectFromKey(connection.id, shouldRemoveKeyFromEvictionBlocklist ? connection.onyxKey : undefined);
+        OnyxUtils.disconnectFromKey(connection.subscriptionID);
+        Array.from(connection.callbacks.keys()).forEach((callbackID) => {
+            this.removeFromEvictionBlockList({id: key, callbackID, subscriptionID: connection.subscriptionID});
+        });
+
         this.connectionsMap.delete(key);
     }
 
-    disconnectAll(shouldRemoveKeysFromEvictionBlocklist?: boolean): void {
-        Array.from(this.connectionsMap.values()).forEach((connection) => {
-            OnyxUtils.disconnectFromKey(connection.id, shouldRemoveKeysFromEvictionBlocklist ? connection.onyxKey : undefined);
+    disconnectAll(): void {
+        Array.from(this.connectionsMap.entries()).forEach(([connectionID, connection]) => {
+            OnyxUtils.disconnectFromKey(connection.subscriptionID);
+            Array.from(connection.callbacks.keys()).forEach((callbackID) => {
+                this.removeFromEvictionBlockList({id: connectionID, callbackID, subscriptionID: connection.subscriptionID});
+            });
         });
 
         this.connectionsMap.clear();
+    }
+
+    /** Keys added to this list can never be deleted. */
+    addToEvictionBlockList(connectionMetadada: ConnectionMetadata): void {
+        const connection = this.connectionsMap.get(connectionMetadada.id);
+        if (!connection) {
+            return;
+        }
+
+        this.removeFromEvictionBlockList(connectionMetadada);
+
+        const evictionBlocklist = OnyxUtils.getEvictionBlocklist();
+        if (!evictionBlocklist[connection.onyxKey]) {
+            evictionBlocklist[connection.onyxKey] = [];
+        }
+
+        evictionBlocklist[connection.onyxKey]?.push(`${connectionMetadada.id}_${connectionMetadada.callbackID}`);
+    }
+
+    /**
+     * Removes a key previously added to this list
+     * which will enable it to be deleted again.
+     */
+    removeFromEvictionBlockList(connectionMetadada: ConnectionMetadata): void {
+        const connection = this.connectionsMap.get(connectionMetadada.id);
+        if (!connection) {
+            return;
+        }
+
+        const evictionBlocklist = OnyxUtils.getEvictionBlocklist();
+        evictionBlocklist[connection.onyxKey] =
+            evictionBlocklist[connection.onyxKey]?.filter((evictionKey) => evictionKey !== `${connectionMetadada.id}_${connectionMetadada.callbackID}`) ?? [];
+
+        // Remove the key if there are no more subscribers.
+        if (evictionBlocklist[connection.onyxKey]?.length === 0) {
+            delete evictionBlocklist[connection.onyxKey];
+        }
     }
 }
 

@@ -101,8 +101,8 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
  *
  * @param connection connection metadata object returned by call to `Onyx.connect()`
  */
-function disconnect(connectionMetadada: ConnectionMetadata, shouldRemoveKeyFromEvictionBlocklist?: boolean): void {
-    connectionManager.disconnect(connectionMetadada, shouldRemoveKeyFromEvictionBlocklist);
+function disconnect(connectionMetadada: ConnectionMetadata): void {
+    connectionManager.disconnect(connectionMetadada);
 }
 
 /**

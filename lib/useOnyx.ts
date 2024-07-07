@@ -124,6 +124,23 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
         );
     }, [previousKey, key]);
 
+    // Mimics withOnyx's checkEvictableKeys() behavior.
+    const checkEvictableKey = useCallback(() => {
+        if (options?.canEvict === undefined || !connectionRef.current) {
+            return;
+        }
+
+        if (!OnyxUtils.isSafeEvictionKey(key)) {
+            throw new Error(`canEvict can't be used on key '${key}'. This key must explicitly be flagged as safe for removal by adding it to Onyx.init({safeEvictionKeys: []}).`);
+        }
+
+        if (options.canEvict) {
+            connectionManager.removeFromEvictionBlockList(connectionRef.current);
+        } else {
+            connectionManager.addToEvictionBlockList(connectionRef.current);
+        }
+    }, [key, options?.canEvict]);
+
     const getSnapshot = useCallback(() => {
         // We get the value from cache while the first connection to Onyx is being made,
         // so we can return any cached value right away. After the connection is made, we only
@@ -204,34 +221,23 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
                 waitForCollectionCallback: OnyxUtils.isCollectionKey(key) as true,
             });
 
+            checkEvictableKey();
+
             return () => {
                 if (!connectionRef.current) {
                     return;
                 }
 
-                connectionManager.disconnect(connectionRef.current, true);
+                connectionManager.disconnect(connectionRef.current);
                 isFirstConnectionRef.current = false;
             };
         },
-        [key, options?.initWithStoredValues],
+        [key, options?.initWithStoredValues, checkEvictableKey],
     );
 
-    // Mimics withOnyx's checkEvictableKeys() behavior.
     useEffect(() => {
-        if (options?.canEvict === undefined || !connectionRef.current) {
-            return;
-        }
-
-        if (!OnyxUtils.isSafeEvictionKey(key)) {
-            throw new Error(`canEvict can't be used on key '${key}'. This key must explicitly be flagged as safe for removal by adding it to Onyx.init({safeEvictionKeys: []}).`);
-        }
-
-        if (options.canEvict) {
-            OnyxUtils.removeFromEvictionBlockList(key, connectionRef.current.connectionID);
-        } else {
-            OnyxUtils.addToEvictionBlockList(key, connectionRef.current.connectionID);
-        }
-    }, [key, options?.canEvict]);
+        checkEvictableKey();
+    }, [checkEvictableKey]);
 
     const result = useSyncExternalStore<UseOnyxResult<TKey, TReturnValue>>(subscribe, getSnapshot);
 

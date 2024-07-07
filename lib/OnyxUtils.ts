@@ -60,9 +60,9 @@ let recentlyAccessedKeys: OnyxKey[] = [];
 // whatever appears in this list it will NEVER be a candidate for eviction.
 let evictionAllowList: OnyxKey[] = [];
 
-// Holds a map of keys and connectionID arrays whose keys will never be automatically evicted as
+// Holds a map of keys and connection arrays whose keys will never be automatically evicted as
 // long as we have at least one subscriber that returns false for the canEvict property.
-const evictionBlocklist: Record<OnyxKey, number[]> = {};
+const evictionBlocklist: Record<OnyxKey, string[] | undefined> = {};
 
 // Optional user-provided key value states set when Onyx initializes or clears
 let defaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
@@ -115,6 +115,13 @@ function getDefaultKeyStates(): Record<OnyxKey, OnyxValue<OnyxKey>> {
  */
 function getDeferredInitTask(): DeferredTask {
     return deferredInitTask;
+}
+
+/**
+ * Getter - returns the eviction block list.
+ */
+function getEvictionBlocklist(): Record<OnyxKey, string[] | undefined> {
+    return evictionBlocklist;
 }
 
 /**
@@ -458,30 +465,6 @@ function addLastAccessedKey(key: OnyxKey): void {
 
     removeLastAccessedKey(key);
     recentlyAccessedKeys.push(key);
-}
-
-/**
- * Removes a key previously added to this list
- * which will enable it to be deleted again.
- */
-function removeFromEvictionBlockList(key: OnyxKey, connectionID: number): void {
-    evictionBlocklist[key] = evictionBlocklist[key]?.filter((evictionKey) => evictionKey !== connectionID) ?? [];
-
-    // Remove the key if there are no more subscribers
-    if (evictionBlocklist[key]?.length === 0) {
-        delete evictionBlocklist[key];
-    }
-}
-
-/** Keys added to this list can never be deleted. */
-function addToEvictionBlockList(key: OnyxKey, connectionID: number): void {
-    removeFromEvictionBlockList(key, connectionID);
-
-    if (!evictionBlocklist[key]) {
-        evictionBlocklist[key] = [];
-    }
-
-    evictionBlocklist[key].push(connectionID);
 }
 
 /**
@@ -1261,15 +1244,9 @@ function connectToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>
  *
  * @param connectionID unique id returned by call to `OnyxUtils.connectToKey()`
  */
-function disconnectFromKey(connectionID: number, keyToRemoveFromEvictionBlocklist?: OnyxKey): void {
+function disconnectFromKey(connectionID: number): void {
     if (!callbackToStateMapping[connectionID]) {
         return;
-    }
-
-    // Remove this key from the eviction block list as we are no longer
-    // subscribing to it and it should be safe to delete again
-    if (keyToRemoveFromEvictionBlocklist) {
-        OnyxUtils.removeFromEvictionBlockList(keyToRemoveFromEvictionBlocklist, connectionID);
     }
 
     delete callbackToStateMapping[connectionID];
@@ -1296,8 +1273,6 @@ const OnyxUtils = {
     tryGetCachedValue,
     removeLastAccessedKey,
     addLastAccessedKey,
-    removeFromEvictionBlockList,
-    addToEvictionBlockList,
     addAllSafeEvictionKeysToRecentlyAccessedList,
     getCachedCollection,
     keysChanged,
@@ -1320,6 +1295,7 @@ const OnyxUtils = {
     multiGet,
     connectToKey,
     disconnectFromKey,
+    getEvictionBlocklist,
 };
 
 export default OnyxUtils;

@@ -3,6 +3,7 @@ import type {OnyxEntry} from '../../lib';
 import Onyx, {useOnyx} from '../../lib';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import StorageMock from '../../lib/storage';
+import OnyxUtils from '../../lib/OnyxUtils';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -11,10 +12,13 @@ const ONYXKEYS = {
         TEST_KEY: 'test_',
         TEST_KEY_2: 'test2_',
     },
+    EVICTABLE_TEST_KEY: 'evictable_test',
+    EVICTABLE_TEST_KEY2: 'evictable_test2',
 };
 
 Onyx.init({
     keys: ONYXKEYS,
+    safeEvictionKeys: [ONYXKEYS.EVICTABLE_TEST_KEY, ONYXKEYS.EVICTABLE_TEST_KEY2],
 });
 
 beforeEach(() => Onyx.clear());
@@ -523,6 +527,80 @@ describe('useOnyx', () => {
 
             expect(result2.current[0]).toEqual('test');
             expect(result2.current[1].status).toEqual('loaded');
+        });
+    });
+
+    // This suite test must be the last one to avoid problems when running the other tests here.
+    describe('canEvict', () => {
+        const error = (key: string) => `canEvict can't be used on key '${key}'. This key must explicitly be flagged as safe for removal by adding it to Onyx.init({safeEvictionKeys: []}).`;
+
+        beforeEach(() => {
+            jest.spyOn(console, 'error').mockImplementation(jest.fn);
+        });
+
+        afterEach(() => {
+            (console.error as unknown as jest.SpyInstance<void, Parameters<typeof console.error>>).mockRestore();
+        });
+
+        it('should throw an error when trying to set the "canEvict" property for a non-evictable key', async () => {
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
+
+            try {
+                renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {canEvict: false}));
+
+                await act(async () => waitForPromisesToResolve());
+
+                fail('Expected to throw an error.');
+            } catch (e) {
+                expect((e as Error).message).toBe(error(ONYXKEYS.TEST_KEY));
+            }
+        });
+
+        it('should add the connection to the blocklist when setting "canEvict" to false', async () => {
+            await StorageMock.setItem(ONYXKEYS.EVICTABLE_TEST_KEY, 'test');
+
+            renderHook(() => useOnyx(ONYXKEYS.EVICTABLE_TEST_KEY, {canEvict: false}));
+
+            await act(async () => waitForPromisesToResolve());
+
+            const evictionBlocklist = OnyxUtils.getEvictionBlocklist();
+            expect(evictionBlocklist[ONYXKEYS.EVICTABLE_TEST_KEY]).toHaveLength(1);
+        });
+
+        it('should handle removal/adding the connection to the blocklist properly when changing the evictable key to another', async () => {
+            await StorageMock.setItem(ONYXKEYS.EVICTABLE_TEST_KEY, 'test');
+
+            const {rerender} = renderHook((key: string) => useOnyx(key, {canEvict: false}), {initialProps: ONYXKEYS.EVICTABLE_TEST_KEY as string});
+
+            await act(async () => waitForPromisesToResolve());
+
+            const evictionBlocklist = OnyxUtils.getEvictionBlocklist();
+            expect(evictionBlocklist[ONYXKEYS.EVICTABLE_TEST_KEY]).toHaveLength(1);
+            expect(evictionBlocklist[ONYXKEYS.EVICTABLE_TEST_KEY2]).toBeUndefined();
+
+            await act(async () => {
+                rerender(ONYXKEYS.EVICTABLE_TEST_KEY2);
+            });
+
+            expect(evictionBlocklist[ONYXKEYS.EVICTABLE_TEST_KEY]).toBeUndefined();
+            expect(evictionBlocklist[ONYXKEYS.EVICTABLE_TEST_KEY2]).toHaveLength(1);
+        });
+
+        it('should remove the connection from the blocklist when setting "canEvict" to true', async () => {
+            await StorageMock.setItem(ONYXKEYS.EVICTABLE_TEST_KEY, 'test');
+
+            const {rerender} = renderHook((canEvict: boolean) => useOnyx(ONYXKEYS.EVICTABLE_TEST_KEY, {canEvict}), {initialProps: false as boolean});
+
+            await act(async () => waitForPromisesToResolve());
+
+            const evictionBlocklist = OnyxUtils.getEvictionBlocklist();
+            expect(evictionBlocklist[ONYXKEYS.EVICTABLE_TEST_KEY]).toHaveLength(1);
+
+            await act(async () => {
+                rerender(true);
+            });
+
+            expect(evictionBlocklist[ONYXKEYS.EVICTABLE_TEST_KEY]).toBeUndefined();
         });
     });
 });

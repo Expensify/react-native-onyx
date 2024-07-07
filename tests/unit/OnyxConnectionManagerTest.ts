@@ -7,6 +7,7 @@ import type {OnyxKey, WithOnyxConnectOptions} from '../../lib/types';
 import type {WithOnyxInstance} from '../../lib/withOnyx/types';
 import type GenericCollection from '../utils/GenericCollection';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
+import OnyxUtils from '../../lib/OnyxUtils';
 
 // eslint-disable-next-line dot-notation
 const connectionsMap = connectionManager['connectionsMap'];
@@ -32,14 +33,14 @@ describe('OnyxConnectionManager', () => {
         connectionManager.disconnectAll();
     });
 
-    describe('connect', () => {
+    describe('connect / disconnect', () => {
         it('should connect to a key and fire the callback with its value', async () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
 
             const callback1 = jest.fn();
             const connection = connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback1});
 
-            expect(connectionsMap.has(connection.key)).toBeTruthy();
+            expect(connectionsMap.has(connection.id)).toBeTruthy();
 
             await act(async () => waitForPromisesToResolve());
 
@@ -60,9 +61,9 @@ describe('OnyxConnectionManager', () => {
             const callback2 = jest.fn();
             const connection2 = connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback2});
 
-            expect(connection1.key).toEqual(connection2.key);
+            expect(connection1.id).toEqual(connection2.id);
             expect(connectionsMap.size).toEqual(1);
-            expect(connectionsMap.has(connection1.key)).toBeTruthy();
+            expect(connectionsMap.has(connection1.id)).toBeTruthy();
 
             await act(async () => waitForPromisesToResolve());
 
@@ -95,10 +96,10 @@ describe('OnyxConnectionManager', () => {
             const callback2 = jest.fn();
             const connection2 = connectionManager.connect({key: ONYXKEYS.COLLECTION.TEST_KEY, callback: callback2, waitForCollectionCallback: true});
 
-            expect(connection1.key).not.toEqual(connection2.key);
+            expect(connection1.id).not.toEqual(connection2.id);
             expect(connectionsMap.size).toEqual(2);
-            expect(connectionsMap.has(connection1.key)).toBeTruthy();
-            expect(connectionsMap.has(connection2.key)).toBeTruthy();
+            expect(connectionsMap.has(connection1.id)).toBeTruthy();
+            expect(connectionsMap.has(connection2.id)).toBeTruthy();
 
             await act(async () => waitForPromisesToResolve());
 
@@ -205,10 +206,10 @@ describe('OnyxConnectionManager', () => {
 
             await act(async () => waitForPromisesToResolve());
 
-            expect(connection1.key).not.toEqual(connection2.key);
+            expect(connection1.id).not.toEqual(connection2.id);
             expect(connectionsMap.size).toEqual(2);
-            expect(connectionsMap.has(connection1.key)).toBeTruthy();
-            expect(connectionsMap.has(connection2.key)).toBeTruthy();
+            expect(connectionsMap.has(connection1.id)).toBeTruthy();
+            expect(connectionsMap.has(connection2.id)).toBeTruthy();
 
             connectionManager.disconnect(connection1);
             connectionManager.disconnect(connection2);
@@ -216,7 +217,7 @@ describe('OnyxConnectionManager', () => {
             expect(connectionsMap.size).toEqual(0);
         });
 
-        it('should connect to a key directly, connect again with withOnyx and create another connection instead of reusing the first one', async () => {
+        it('should connect to a key directly, connect again with withOnyx but create another connection instead of reusing the first one', async () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
 
             const callback1 = jest.fn();
@@ -237,15 +238,51 @@ describe('OnyxConnectionManager', () => {
                 })() as unknown as WithOnyxInstance,
             } as WithOnyxConnectOptions<OnyxKey>);
 
-            expect(connection1.key).not.toEqual(connection2.key);
+            expect(connection1.id).not.toEqual(connection2.id);
             expect(connectionsMap.size).toEqual(2);
-            expect(connectionsMap.has(connection1.key)).toBeTruthy();
-            expect(connectionsMap.has(connection2.key)).toBeTruthy();
+            expect(connectionsMap.has(connection1.id)).toBeTruthy();
+            expect(connectionsMap.has(connection2.id)).toBeTruthy();
 
             connectionManager.disconnect(connection1);
             connectionManager.disconnect(connection2);
 
             expect(connectionsMap.size).toEqual(0);
+        });
+    });
+
+    describe('addToEvictionBlockList / removeFromEvictionBlockList', () => {
+        it('should add and remove connections from the eviction block list correctly', async () => {
+            const evictionBlocklist = OnyxUtils.getEvictionBlocklist();
+
+            connectionsMap.set('connectionID1', {subscriptionID: 0, onyxKey: ONYXKEYS.TEST_KEY, callbacks: new Map(), isConnectionMade: true});
+            connectionsMap.get('connectionID1')?.callbacks.set('callbackID1', () => undefined);
+            connectionManager.addToEvictionBlockList({id: 'connectionID1', callbackID: 'callbackID1', subscriptionID: 0});
+            expect(evictionBlocklist[ONYXKEYS.TEST_KEY]).toEqual(['connectionID1_callbackID1']);
+
+            connectionsMap.get('connectionID1')?.callbacks.set('callbackID2', () => undefined);
+            connectionManager.addToEvictionBlockList({id: 'connectionID1', callbackID: 'callbackID2', subscriptionID: 0});
+            expect(evictionBlocklist[ONYXKEYS.TEST_KEY]).toEqual(['connectionID1_callbackID1', 'connectionID1_callbackID2']);
+
+            connectionsMap.set('connectionID2', {subscriptionID: 1, onyxKey: `${ONYXKEYS.COLLECTION.TEST_KEY}entry1`, callbacks: new Map(), isConnectionMade: true});
+            connectionsMap.get('connectionID2')?.callbacks.set('callbackID3', () => undefined);
+            connectionManager.addToEvictionBlockList({id: 'connectionID2', callbackID: 'callbackID3', subscriptionID: 1});
+            expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]).toEqual(['connectionID2_callbackID3']);
+
+            connectionManager.removeFromEvictionBlockList({id: 'connectionID2', callbackID: 'callbackID3', subscriptionID: 1});
+            expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]).toBeUndefined();
+
+            // inexistent callback ID, shouldn't do anything
+            connectionManager.removeFromEvictionBlockList({id: 'connectionID1', callbackID: 'callbackID1000', subscriptionID: 0});
+            expect(evictionBlocklist[ONYXKEYS.TEST_KEY]).toEqual(['connectionID1_callbackID1', 'connectionID1_callbackID2']);
+
+            connectionManager.removeFromEvictionBlockList({id: 'connectionID1', callbackID: 'callbackID2', subscriptionID: 0});
+            expect(evictionBlocklist[ONYXKEYS.TEST_KEY]).toEqual(['connectionID1_callbackID1']);
+
+            connectionManager.removeFromEvictionBlockList({id: 'connectionID1', callbackID: 'callbackID1', subscriptionID: 0});
+            expect(evictionBlocklist[ONYXKEYS.TEST_KEY]).toBeUndefined();
+
+            // inexistent connection ID, shouldn't do anything
+            expect(() => connectionManager.removeFromEvictionBlockList({id: 'connectionID0', callbackID: 'callbackID0', subscriptionID: 0})).not.toThrow();
         });
     });
 });
