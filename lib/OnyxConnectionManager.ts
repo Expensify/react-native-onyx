@@ -37,7 +37,7 @@ class OnyxConnectionManager {
     private connectionMapKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): string {
         let suffix = '';
 
-        if (connectOptions.reuseConnection === false || 'withOnyxInstance' in connectOptions) {
+        if (connectOptions.reuseConnection === false || connectOptions.initWithStoredValues === false || 'withOnyxInstance' in connectOptions) {
             suffix += `,uniqueID=${Str.guid()}`;
         }
 

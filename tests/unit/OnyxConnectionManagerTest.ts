@@ -188,6 +188,43 @@ describe('OnyxConnectionManager', () => {
             expect(connectionsMap.has(connection2.id)).toBeTruthy();
         });
 
+        it('should create a separate connection to the same key when setting initWithStoredValues to false', async () => {
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
+
+            const callback1 = jest.fn();
+            const connection1 = connectionManager.connect({key: ONYXKEYS.TEST_KEY, initWithStoredValues: false, callback: callback1});
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(callback1).not.toHaveBeenCalled();
+            expect(connectionsMap.size).toEqual(1);
+            expect(connectionsMap.has(connection1.id)).toBeTruthy();
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'test2');
+
+            expect(callback1).toHaveBeenCalledTimes(1);
+            expect(callback1).toHaveBeenCalledWith('test2', ONYXKEYS.TEST_KEY);
+
+            const callback2 = jest.fn();
+            const connection2 = connectionManager.connect({key: ONYXKEYS.TEST_KEY, initWithStoredValues: false, callback: callback2});
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(callback2).not.toHaveBeenCalled();
+            expect(connectionsMap.size).toEqual(2);
+            expect(connectionsMap.has(connection2.id)).toBeTruthy();
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'test3');
+
+            expect(callback2).toHaveBeenCalledTimes(1);
+            expect(callback2).toHaveBeenCalledWith('test3', ONYXKEYS.TEST_KEY);
+
+            connectionManager.disconnect(connection1);
+            connectionManager.disconnect(connection2);
+
+            expect(connectionsMap.size).toEqual(0);
+        });
+
         describe('withOnyx', () => {
             it('should connect to a key two times with withOnyx and create two connections instead of one', async () => {
                 await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
