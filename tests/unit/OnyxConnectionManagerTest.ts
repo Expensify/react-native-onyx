@@ -172,6 +172,21 @@ describe('OnyxConnectionManager', () => {
             expect(callback2).toHaveBeenCalledWith('test', ONYXKEYS.TEST_KEY);
             expect(connectionsMap.size).toEqual(1);
         });
+
+        it('should create a separate connection to the same key when setting reuseConnection to false', async () => {
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
+
+            const callback1 = jest.fn();
+            const connection1 = connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback1});
+
+            const callback2 = jest.fn();
+            const connection2 = connectionManager.connect({key: ONYXKEYS.TEST_KEY, reuseConnection: false, callback: callback2});
+
+            expect(connection1.id).not.toEqual(connection2.id);
+            expect(connectionsMap.size).toEqual(2);
+            expect(connectionsMap.has(connection1.id)).toBeTruthy();
+            expect(connectionsMap.has(connection2.id)).toBeTruthy();
+        });
     });
 
     describe('withOnyx', () => {
