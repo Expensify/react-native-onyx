@@ -31,7 +31,7 @@ class OnyxConnectionManager {
         this.connectionsMap = new Map();
         this.lastCallbackID = 0;
 
-        bindAll(this, 'fireCallbacks', 'connectionMapKey', 'connect', 'disconnect', 'disconnectKey', 'disconnectAll', 'addToEvictionBlockList', 'removeFromEvictionBlockList');
+        bindAll(this, 'fireCallbacks', 'connectionMapKey', 'connect', 'disconnect', 'disconnectAll', 'addToEvictionBlockList', 'removeFromEvictionBlockList');
     }
 
     private connectionMapKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): string {
@@ -131,21 +131,6 @@ class OnyxConnectionManager {
 
             this.connectionsMap.delete(connectionMetadada.id);
         }
-    }
-
-    disconnectKey(key: string): void {
-        const connection = this.connectionsMap.get(key);
-
-        if (!connection) {
-            return;
-        }
-
-        OnyxUtils.disconnectFromKey(connection.subscriptionID);
-        Array.from(connection.callbacks.keys()).forEach((callbackID) => {
-            this.removeFromEvictionBlockList({id: key, callbackID, subscriptionID: connection.subscriptionID});
-        });
-
-        this.connectionsMap.delete(key);
     }
 
     disconnectAll(): void {
