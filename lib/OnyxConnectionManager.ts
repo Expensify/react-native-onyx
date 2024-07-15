@@ -134,9 +134,9 @@ class OnyxConnectionManager {
     }
 
     disconnectAll(): void {
-        Array.from(this.connectionsMap.entries()).forEach(([connectionID, connection]) => {
+        this.connectionsMap.forEach((connection, connectionID) => {
             OnyxUtils.disconnectFromKey(connection.subscriptionID);
-            Array.from(connection.callbacks.keys()).forEach((callbackID) => {
+            connection.callbacks.forEach((_, callbackID) => {
                 this.removeFromEvictionBlockList({id: connectionID, callbackID, subscriptionID: connection.subscriptionID});
             });
         });
