@@ -19,7 +19,6 @@ type Connection = {
 type ConnectionMetadata = {
     id: string;
     callbackID: string;
-    subscriptionID: number;
 };
 
 class OnyxConnectionManager {
@@ -102,7 +101,7 @@ class OnyxConnectionManager {
             });
         }
 
-        return {id: mapKey, callbackID, subscriptionID: connection.subscriptionID};
+        return {id: mapKey, callbackID};
     }
 
     /**
@@ -137,7 +136,7 @@ class OnyxConnectionManager {
         this.connectionsMap.forEach((connection, connectionID) => {
             OnyxUtils.disconnectFromKey(connection.subscriptionID);
             connection.callbacks.forEach((_, callbackID) => {
-                this.removeFromEvictionBlockList({id: connectionID, callbackID, subscriptionID: connection.subscriptionID});
+                this.removeFromEvictionBlockList({id: connectionID, callbackID});
             });
         });
 

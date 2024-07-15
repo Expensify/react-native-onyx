@@ -335,33 +335,33 @@ describe('OnyxConnectionManager', () => {
 
             connectionsMap.set('connectionID1', {subscriptionID: 0, onyxKey: ONYXKEYS.TEST_KEY, callbacks: new Map(), isConnectionMade: true});
             connectionsMap.get('connectionID1')?.callbacks.set('callbackID1', () => undefined);
-            connectionManager.addToEvictionBlockList({id: 'connectionID1', callbackID: 'callbackID1', subscriptionID: 0});
+            connectionManager.addToEvictionBlockList({id: 'connectionID1', callbackID: 'callbackID1'});
             expect(evictionBlocklist[ONYXKEYS.TEST_KEY]).toEqual(['connectionID1_callbackID1']);
 
             connectionsMap.get('connectionID1')?.callbacks.set('callbackID2', () => undefined);
-            connectionManager.addToEvictionBlockList({id: 'connectionID1', callbackID: 'callbackID2', subscriptionID: 0});
+            connectionManager.addToEvictionBlockList({id: 'connectionID1', callbackID: 'callbackID2'});
             expect(evictionBlocklist[ONYXKEYS.TEST_KEY]).toEqual(['connectionID1_callbackID1', 'connectionID1_callbackID2']);
 
             connectionsMap.set('connectionID2', {subscriptionID: 1, onyxKey: `${ONYXKEYS.COLLECTION.TEST_KEY}entry1`, callbacks: new Map(), isConnectionMade: true});
             connectionsMap.get('connectionID2')?.callbacks.set('callbackID3', () => undefined);
-            connectionManager.addToEvictionBlockList({id: 'connectionID2', callbackID: 'callbackID3', subscriptionID: 1});
+            connectionManager.addToEvictionBlockList({id: 'connectionID2', callbackID: 'callbackID3'});
             expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]).toEqual(['connectionID2_callbackID3']);
 
-            connectionManager.removeFromEvictionBlockList({id: 'connectionID2', callbackID: 'callbackID3', subscriptionID: 1});
+            connectionManager.removeFromEvictionBlockList({id: 'connectionID2', callbackID: 'callbackID3'});
             expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]).toBeUndefined();
 
             // inexistent callback ID, shouldn't do anything
-            connectionManager.removeFromEvictionBlockList({id: 'connectionID1', callbackID: 'callbackID1000', subscriptionID: 0});
+            connectionManager.removeFromEvictionBlockList({id: 'connectionID1', callbackID: 'callbackID1000'});
             expect(evictionBlocklist[ONYXKEYS.TEST_KEY]).toEqual(['connectionID1_callbackID1', 'connectionID1_callbackID2']);
 
-            connectionManager.removeFromEvictionBlockList({id: 'connectionID1', callbackID: 'callbackID2', subscriptionID: 0});
+            connectionManager.removeFromEvictionBlockList({id: 'connectionID1', callbackID: 'callbackID2'});
             expect(evictionBlocklist[ONYXKEYS.TEST_KEY]).toEqual(['connectionID1_callbackID1']);
 
-            connectionManager.removeFromEvictionBlockList({id: 'connectionID1', callbackID: 'callbackID1', subscriptionID: 0});
+            connectionManager.removeFromEvictionBlockList({id: 'connectionID1', callbackID: 'callbackID1'});
             expect(evictionBlocklist[ONYXKEYS.TEST_KEY]).toBeUndefined();
 
             // inexistent connection ID, shouldn't do anything
-            expect(() => connectionManager.removeFromEvictionBlockList({id: 'connectionID0', callbackID: 'callbackID0', subscriptionID: 0})).not.toThrow();
+            expect(() => connectionManager.removeFromEvictionBlockList({id: 'connectionID0', callbackID: 'callbackID0'})).not.toThrow();
         });
     });
 });
