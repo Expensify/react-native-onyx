@@ -432,6 +432,14 @@ type InitOptions = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type GenericFunction = (...args: any[]) => any;
 
+/**
+ * Represents a combination of Merge and Set operations that should be executed in Onyx
+ */
+type MixedOperationsQueue = {
+    merge: OnyxInputKeyValueMapping;
+    set: OnyxInputKeyValueMapping;
+};
+
 export type {
     BaseConnectOptions,
     Collection,
@@ -468,4 +476,5 @@ export type {
     OnyxValue,
     Selector,
     WithOnyxConnectOptions,
+    MixedOperationsQueue,
 };
