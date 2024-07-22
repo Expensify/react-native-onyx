@@ -100,6 +100,21 @@ describe('Onyx', () => {
             });
     });
 
+    it("shouldn't call a connection twice when setting a value", () => {
+        const mockCallback = jest.fn();
+
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            callback: mockCallback,
+            // True is the default, just setting it here to be explicit
+            initWithStoredValues: true,
+        });
+
+        return Onyx.set(ONYX_KEYS.TEST_KEY, 'test').then(() => {
+            expect(mockCallback).toHaveBeenCalledTimes(1);
+        });
+    });
+
     it('should merge an object with another object', () => {
         let testKeyValue: unknown;
 
