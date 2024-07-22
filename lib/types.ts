@@ -263,6 +263,11 @@ type Collection<TKey extends CollectionKeyBase, TValue, TMap = never> = {
 /** Represents the base options used in `Onyx.connect()` method. */
 type BaseConnectOptions = {
     initWithStoredValues?: boolean;
+    /**
+     * If true, it will call the callback function even if the value might hasn't changed.
+     * @default false
+     */
+    alwaysNotify?: boolean;
 };
 
 /** Represents additional options used inside withOnyx HOC */

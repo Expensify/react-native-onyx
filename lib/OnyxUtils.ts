@@ -971,9 +971,11 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, valu
     // For regular callbacks, we never want to pass null values, but always just undefined if a value is not set in cache or storage.
     const valueToPass = value === null ? undefined : value;
     const lastValue = lastConnectionCallbackData.get(mapping.connectionID);
+    lastConnectionCallbackData.get(mapping.connectionID);
 
     // If the value has not changed we do not need to trigger the callback
-    if (lastConnectionCallbackData.has(mapping.connectionID) && valueToPass === lastValue) {
+    const alwaysNotify = 'alwaysNotify' in mapping && mapping.alwaysNotify;
+    if (!alwaysNotify && lastConnectionCallbackData.has(mapping.connectionID) && valueToPass === lastValue) {
         return;
     }
 

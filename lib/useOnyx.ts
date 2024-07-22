@@ -200,6 +200,9 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
                 },
                 initWithStoredValues: options?.initWithStoredValues,
                 waitForCollectionCallback: OnyxUtils.isCollectionKey(key) as true,
+                // As we potentially calculate the result data with a selector that can return different data
+                // for the same input data, we always want to receive the connect callback.
+                alwaysNotify: true,
             });
 
             return () => {
