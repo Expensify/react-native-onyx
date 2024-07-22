@@ -72,6 +72,9 @@ let defaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
 let batchUpdatesPromise: Promise<void> | null = null;
 let batchUpdatesQueue: Array<() => void> = [];
 
+// Holds a map representing the latest data that was used to invoke a connection callback
+const lastConnectionCallbackData = new Map<number, OnyxValue<OnyxKey>>();
+
 let snapshotKey: OnyxKey | null = null;
 
 function getSnapshotKey(): OnyxKey | null {
@@ -774,8 +777,8 @@ function keyChanged<TKey extends OnyxKey>(
     value: OnyxValue<TKey>,
     previousValue: OnyxValue<TKey>,
     canUpdateSubscriber: (subscriber?: Mapping<OnyxKey>) => boolean = () => true,
-    notifyRegularSubscibers = true,
-    notifyWithOnyxSubscibers = true,
+    notifyConnectSubscribers = true,
+    notifyWithOnyxSubscribers = true,
 ): void {
     // Add or remove this key from the recentlyAccessedKeys lists
     if (value !== null) {
@@ -809,9 +812,13 @@ function keyChanged<TKey extends OnyxKey>(
 
         // Subscriber is a regular call to connect() and provided a callback
         if (typeof subscriber.callback === 'function') {
-            if (!notifyRegularSubscibers) {
+            if (!notifyConnectSubscribers) {
                 continue;
             }
+            if (lastConnectionCallbackData.has(subscriber.connectionID) && lastConnectionCallbackData.get(subscriber.connectionID) === value) {
+                continue;
+            }
+
             if (isCollectionKey(subscriber.key) && subscriber.waitForCollectionCallback) {
                 const cachedCollection = getCachedCollection(subscriber.key);
 
@@ -822,12 +829,14 @@ function keyChanged<TKey extends OnyxKey>(
 
             const subscriberCallback = subscriber.callback as DefaultConnectCallback<TKey>;
             subscriberCallback(value, key);
+
+            lastConnectionCallbackData.set(subscriber.connectionID, value);
             continue;
         }
 
         // Subscriber connected via withOnyx() HOC
         if ('withOnyxInstance' in subscriber && subscriber.withOnyxInstance) {
-            if (!notifyWithOnyxSubscibers) {
+            if (!notifyWithOnyxSubscribers) {
                 continue;
             }
 
@@ -960,6 +969,14 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, valu
     // If we would pass undefined to setWithOnyxInstance instead, withOnyx would not set the value in the state.
     // withOnyx will internally replace null values with undefined and never pass null values to wrapped components.
     // For regular callbacks, we never want to pass null values, but always just undefined if a value is not set in cache or storage.
+    const valueToPass = value === null ? undefined : value;
+    const lastValue = lastConnectionCallbackData.get(mapping.connectionID);
+
+    // If the value has not changed we do not need to trigger the callback
+    if (lastConnectionCallbackData.has(mapping.connectionID) && valueToPass === lastValue) {
+        return;
+    }
+
     (mapping as DefaultConnectOptions<TKey>).callback?.(value === null ? undefined : value, matchedKey as TKey);
 }
 
