@@ -197,6 +197,41 @@ describe('Onyx', () => {
             });
     });
 
+    it('should reset Onyx state to empty after calling clear()', () => {
+        const mockCallback = jest.fn();
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            waitForCollectionCallback: true,
+            callback: mockCallback,
+        });
+
+        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: 'test1',
+        } as GenericCollection)
+            .then(() => {
+                expect(mockCallback).toHaveBeenCalledTimes(2); // TODO: should only be 1, fixed here https://github.com/Expensify/react-native-onyx/pull/570
+                mockCallback.mockReset();
+                return Onyx.clear();
+            })
+            .then(() => {
+                // After clearing we expect the callback to be called with an empty object
+                expect(mockCallback).toHaveBeenCalledTimes(1);
+                expect(mockCallback).toHaveBeenCalledWith({});
+
+                // Make sure that the onyx cache and storage are empty
+
+                mockCallback.mockReset();
+
+                return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                    [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: 'test2',
+                } as GenericCollection);
+            })
+            .then(() => {
+                expect(mockCallback).toHaveBeenCalledTimes(1);
+                expect(mockCallback).toHaveBeenCalledWith({[`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: 'test2'});
+            });
+    });
+
     it('should not notify subscribers after they have disconnected', () => {
         let testKeyValue: unknown;
         connectionID = Onyx.connect({

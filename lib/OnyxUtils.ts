@@ -974,8 +974,7 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, valu
     lastConnectionCallbackData.get(mapping.connectionID);
 
     // If the value has not changed we do not need to trigger the callback
-    const alwaysNotify = 'alwaysNotify' in mapping && mapping.alwaysNotify;
-    if (!alwaysNotify && lastConnectionCallbackData.has(mapping.connectionID) && valueToPass === lastValue) {
+    if (lastConnectionCallbackData.has(mapping.connectionID) && valueToPass === lastValue) {
         return;
     }
 
