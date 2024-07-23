@@ -1387,6 +1387,7 @@ describe('Onyx', () => {
 
                 // Cat hasn't changed from its original value, expect only the initial connect callback
                 expect(catCallback).toHaveBeenCalledTimes(1);
+
                 // Dog was modified, expect the initial connect callback and the mergeCollection callback
                 expect(dogCallback).toHaveBeenCalledTimes(2);
 
