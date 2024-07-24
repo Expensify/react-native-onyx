@@ -87,7 +87,7 @@ function init({
  * @param [mapping.callback] a method that will be called with changed data
  *      This is used by any non-React code to connect to Onyx
  * @param [mapping.initWithStoredValues] If set to false, then no data will be prefilled into the
- *  component
+ *  component. Default is true.
  * @param [mapping.waitForCollectionCallback] If set to true, it will return the entire collection to the callback as a single object
  * @param [mapping.selector] THIS PARAM IS ONLY USED WITH withOnyx(). If included, this will be used to subscribe to a subset of an Onyx key's data.
  *       The sourceData and withOnyx state are passed to the selector and should return the simplified data. Using this setting on `withOnyx` can have very positive

@@ -100,6 +100,21 @@ describe('Onyx', () => {
             });
     });
 
+    it("shouldn't call a connection twice when setting a value", () => {
+        const mockCallback = jest.fn();
+
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            callback: mockCallback,
+            // True is the default, just setting it here to be explicit
+            initWithStoredValues: true,
+        });
+
+        return Onyx.set(ONYX_KEYS.TEST_KEY, 'test').then(() => {
+            expect(mockCallback).toHaveBeenCalledTimes(1);
+        });
+    });
+
     it('should merge an object with another object', () => {
         let testKeyValue: unknown;
 
@@ -153,22 +168,27 @@ describe('Onyx', () => {
         });
 
         let otherTestValue: unknown;
+        const mockCallback = jest.fn((value) => {
+            otherTestValue = value;
+        });
         const otherTestConnectionID = Onyx.connect({
             key: ONYX_KEYS.OTHER_TEST,
-            callback: (value) => {
-                otherTestValue = value;
-            },
+            callback: mockCallback,
         });
 
         return waitForPromisesToResolve()
             .then(() => Onyx.set(ONYX_KEYS.TEST_KEY, 'test'))
             .then(() => {
                 expect(testKeyValue).toBe('test');
+                mockCallback.mockReset();
                 return Onyx.clear().then(waitForPromisesToResolve);
             })
             .then(() => {
                 // Test key should be cleared
                 expect(testKeyValue).toBeUndefined();
+
+                // Expect that the connection to a key with a default value wasn't cleared
+                expect(mockCallback).toHaveBeenCalledTimes(0);
 
                 // Other test key should be returned to its default state
                 expect(otherTestValue).toBe(42);
@@ -1365,7 +1385,10 @@ describe('Onyx', () => {
                 expect(collectionCallback).toHaveBeenCalledTimes(3);
                 expect(collectionCallback).toHaveBeenCalledWith(collectionDiff);
 
-                expect(catCallback).toHaveBeenCalledTimes(2);
+                // Cat hasn't changed from its original value, expect only the initial connect callback
+                expect(catCallback).toHaveBeenCalledTimes(1);
+
+                // Dog was modified, expect the initial connect callback and the mergeCollection callback
                 expect(dogCallback).toHaveBeenCalledTimes(2);
 
                 connectionIDs.map((id) => Onyx.disconnect(id));
