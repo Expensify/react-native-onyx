@@ -978,7 +978,7 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, valu
         return;
     }
 
-    (mapping as DefaultConnectOptions<TKey>).callback?.(value === null ? undefined : value, matchedKey as TKey);
+    (mapping as DefaultConnectOptions<TKey>).callback?.(valueToPass, matchedKey as TKey);
 }
 
 /**
