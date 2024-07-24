@@ -279,9 +279,7 @@ describe('useOnyx', () => {
             // In a react app we expect the selector ref to change during a rerender (see selectorRef/useLiveRef)
             rerender(undefined);
 
-            await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, {id: 'changed_id', name: 'changed_name'}));
-
-            expect(result.current[0]).toEqual('id - changed_id, name - changed_name - selector changed');
+            expect(result.current[0]).toEqual('id - test_id, name - test_name - selector changed');
             expect(result.current[1].status).toEqual('loaded');
         });
 
