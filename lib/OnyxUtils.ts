@@ -72,7 +72,7 @@ let defaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
 let batchUpdatesPromise: Promise<void> | null = null;
 let batchUpdatesQueue: Array<() => void> = [];
 
-// Holds a map representing the latest data that was used to invoke a connection callback
+// Used for comparison with a new update to avoid invoking the Onyx.connect callback with the same data.
 const lastConnectionCallbackData = new Map<number, OnyxValue<OnyxKey>>();
 
 let snapshotKey: OnyxKey | null = null;
