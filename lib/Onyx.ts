@@ -614,7 +614,6 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
             Object.entries(keyValuesToResetIndividually).forEach(([key, value]) => {
                 updatePromises.push(OnyxUtils.scheduleSubscriberUpdate(key, value, cache.get(key, false)));
             });
-            console.log(keyValuesToResetAsCollection);
             Object.entries(keyValuesToResetAsCollection).forEach(([key, value]) => {
                 updatePromises.push(OnyxUtils.scheduleNotifyCollectionSubscribers(key, value));
             });
