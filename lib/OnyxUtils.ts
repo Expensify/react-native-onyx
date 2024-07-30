@@ -351,6 +351,8 @@ function deleteKeyByConnections(connectionID: number) {
         const updatedConnectionIDs = onyxKeyToConnectionIDs.get(subscriber.key).filter((id: number) => id !== connectionID);
         onyxKeyToConnectionIDs.set(subscriber.key, updatedConnectionIDs);
     }
+
+    lastConnectionCallbackData.delete(connectionID);
 }
 
 /** Returns current key names stored in persisted storage */
