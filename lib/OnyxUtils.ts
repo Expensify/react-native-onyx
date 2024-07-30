@@ -24,6 +24,7 @@ import type {
     OnyxEntry,
     OnyxInput,
     OnyxKey,
+    OnyxMergeCollectionInput,
     OnyxValue,
     Selector,
 } from './types';
@@ -47,11 +48,11 @@ type OnyxMethod = ValueOf<typeof METHOD>;
 const mergeQueue: Record<OnyxKey, Array<OnyxValue<OnyxKey>>> = {};
 const mergeQueuePromise: Record<OnyxKey, Promise<void>> = {};
 
-// Holds a mapping of all the react components that want their state subscribed to a store key
+// Holds a mapping of all the React components that want their state subscribed to a store key
 const callbackToStateMapping: Record<string, Mapping<OnyxKey>> = {};
 
 // Keeps a copy of the values of the onyx collection keys as a map for faster lookups
-let onyxCollectionKeyMap = new Map<OnyxKey, OnyxValue<OnyxKey>>();
+let onyxCollectionKeySet = new Set<OnyxKey>();
 
 // Holds a mapping of the connected key to the connectionID for faster lookups
 const onyxKeyToConnectionIDs = new Map();
@@ -137,11 +138,11 @@ function getEvictionBlocklist(): Record<OnyxKey, string[] | undefined> {
 function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Partial<KeyValueMapping>, safeEvictionKeys: OnyxKey[]): void {
     // We need the value of the collection keys later for checking if a
     // key is a collection. We store it in a map for faster lookup.
-    const collectionValues = Object.values(keys.COLLECTION ?? {});
-    onyxCollectionKeyMap = collectionValues.reduce((acc, val) => {
-        acc.set(val, true);
+    const collectionValues = Object.values(keys.COLLECTION ?? {}) as string[];
+    onyxCollectionKeySet = collectionValues.reduce((acc, val) => {
+        acc.add(val);
         return acc;
-    }, new Map());
+    }, new Set<OnyxKey>());
 
     // Set our default key states to use when initializing and clearing Onyx data
     defaultKeyStates = initialKeyStates;
@@ -398,11 +399,18 @@ function getAllKeys(): Promise<Set<OnyxKey>> {
 }
 
 /**
- * Checks to see if the a subscriber's supplied key
+ * Returns set of all registered collection keys
+ */
+function getCollectionKeys(): Set<OnyxKey> {
+    return onyxCollectionKeySet;
+}
+
+/**
+ * Checks to see if the subscriber's supplied key
  * is associated with a collection of keys.
  */
 function isCollectionKey(key: OnyxKey): key is CollectionKeyBase {
-    return onyxCollectionKeyMap.has(key);
+    return onyxCollectionKeySet.has(key);
 }
 
 function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collectionKey: TCollectionKey, key: string): key is `${TCollectionKey}${string}` {
@@ -1181,6 +1189,34 @@ function initializeWithDefaultKeyStates(): Promise<void> {
 }
 
 /**
+ * Validate the collection is not empty and has a correct type before applying mergeCollection()
+ */
+function isValidNonEmptyCollectionForMerge<TKey extends CollectionKeyBase, TMap>(collection: OnyxMergeCollectionInput<TKey, TMap>): boolean {
+    return typeof collection === 'object' && !Array.isArray(collection) && !utils.isEmptyObject(collection);
+}
+
+/**
+ * Verify if all the collection keys belong to the same parent
+ */
+function doAllCollectionItemsBelongToSameParent<TKey extends CollectionKeyBase>(collectionKey: TKey, collectionKeys: string[]): boolean {
+    let hasCollectionKeyCheckFailed = false;
+    collectionKeys.forEach((dataKey) => {
+        if (OnyxUtils.isKeyMatch(collectionKey, dataKey)) {
+            return;
+        }
+
+        if (process.env.NODE_ENV === 'development') {
+            throw new Error(`Provided collection doesn't have all its data belonging to the same parent. CollectionKey: ${collectionKey}, DataKey: ${dataKey}`);
+        }
+
+        hasCollectionKeyCheckFailed = true;
+        Logger.logAlert(`Provided collection doesn't have all its data belonging to the same parent. CollectionKey: ${collectionKey}, DataKey: ${dataKey}`);
+    });
+
+    return !hasCollectionKeyCheckFailed;
+}
+
+/**
  * Subscribes a react component's state directly to a store key
  *
  * @example
@@ -1335,6 +1371,7 @@ const OnyxUtils = {
     batchUpdates,
     get,
     getAllKeys,
+    getCollectionKeys,
     isCollectionKey,
     isCollectionMemberKey,
     splitCollectionMemberKey,
@@ -1366,6 +1403,8 @@ const OnyxUtils = {
     deleteKeyByConnections,
     getSnapshotKey,
     multiGet,
+    isValidNonEmptyCollectionForMerge,
+    doAllCollectionItemsBelongToSameParent,
     connectToKey,
     disconnectFromKey,
     getEvictionBlocklist,
