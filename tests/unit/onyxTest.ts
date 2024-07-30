@@ -51,15 +51,18 @@ describe('Onyx', () => {
                 expect(keys.has(ONYX_KEYS.OTHER_TEST)).toBe(true);
                 return Onyx.set(ONYX_KEYS.OTHER_TEST, null);
             })
+            // Checks if cache value is removed.
             .then(() => {
-                // Checks if cache value is removed.
-                expect(cache.getAllKeys().size).toBe(0);
-
-                // When cache keys length is 0, we fetch the keys from storage.
+                expect(cache.get(ONYX_KEYS.OTHER_TEST)).toBeUndefined();
                 return OnyxUtils.getAllKeys();
             })
             .then((keys) => {
                 expect(keys.has(ONYX_KEYS.OTHER_TEST)).toBe(false);
+            })
+            // Expect to reset to initial key value when calling Onyx.clear()
+            .then(() => Onyx.clear())
+            .then(() => {
+                expect(cache.get(ONYX_KEYS.OTHER_TEST)).toBe(42);
             }));
 
     it('should set a simple key', () => {
@@ -167,31 +170,30 @@ describe('Onyx', () => {
             },
         });
 
-        let otherTestValue: unknown;
-        const mockCallback = jest.fn((value) => {
-            otherTestValue = value;
-        });
+        const mockCallback = jest.fn();
         const otherTestConnectionID = Onyx.connect({
             key: ONYX_KEYS.OTHER_TEST,
             callback: mockCallback,
         });
 
         return waitForPromisesToResolve()
+            .then(() => {
+                expect(mockCallback).toHaveBeenCalledTimes(1);
+                expect(mockCallback).toHaveBeenCalledWith(42, ONYX_KEYS.OTHER_TEST);
+                mockCallback.mockClear();
+            })
             .then(() => Onyx.set(ONYX_KEYS.TEST_KEY, 'test'))
             .then(() => {
                 expect(testKeyValue).toBe('test');
-                mockCallback.mockReset();
-                return Onyx.clear().then(waitForPromisesToResolve);
+                return Onyx.clear();
             })
+            .then(() => waitForPromisesToResolve())
             .then(() => {
                 // Test key should be cleared
                 expect(testKeyValue).toBeUndefined();
 
-                // Expect that the connection to a key with a default value wasn't cleared
+                // Expect that the connection to a key with a default value that wasn't changed is not called on clear
                 expect(mockCallback).toHaveBeenCalledTimes(0);
-
-                // Other test key should be returned to its default state
-                expect(otherTestValue).toBe(42);
 
                 return Onyx.disconnect(otherTestConnectionID);
             });
