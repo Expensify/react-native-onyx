@@ -587,13 +587,12 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                     if (newValue !== oldValue) {
                         cache.set(key, newValue);
 
-                        const potentialCollectionKey = OnyxUtils.getCollectionKey(key);
-                        if (OnyxUtils.isCollectionKey(potentialCollectionKey)) {
-                            const [collectionKey, memberKey] = OnyxUtils.splitCollectionMemberKey(key);
+                        const collectionKey = OnyxUtils.getCollectionKey(key);
+                        if (OnyxUtils.isCollectionKey(collectionKey)) {
                             if (!keyValuesToResetAsCollection[collectionKey]) {
                                 keyValuesToResetAsCollection[collectionKey] = {};
                             }
-                            keyValuesToResetAsCollection[collectionKey]![memberKey] = newValue ?? undefined;
+                            keyValuesToResetAsCollection[collectionKey]![key] = newValue ?? undefined;
                         } else {
                             keyValuesToResetIndividually[key] = newValue ?? undefined;
                         }
