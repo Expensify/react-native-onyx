@@ -586,12 +586,14 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                     const newValue = defaultKeyStates[key] ?? null;
                     if (newValue !== oldValue) {
                         cache.set(key, newValue);
-                        const collectionKey = key.substring(0, key.indexOf('_') + 1);
-                        if (collectionKey) {
+
+                        const potentialCollectionKey = OnyxUtils.getCollectionKey(key);
+                        if (OnyxUtils.isCollectionKey(potentialCollectionKey)) {
+                            const [collectionKey, memberKey] = OnyxUtils.splitCollectionMemberKey(key);
                             if (!keyValuesToResetAsCollection[collectionKey]) {
                                 keyValuesToResetAsCollection[collectionKey] = {};
                             }
-                            keyValuesToResetAsCollection[collectionKey]![key] = newValue ?? undefined;
+                            keyValuesToResetAsCollection[collectionKey]![memberKey] = newValue ?? undefined;
                         } else {
                             keyValuesToResetIndividually[key] = newValue ?? undefined;
                         }
@@ -612,6 +614,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
             Object.entries(keyValuesToResetIndividually).forEach(([key, value]) => {
                 updatePromises.push(OnyxUtils.scheduleSubscriberUpdate(key, value, cache.get(key, false)));
             });
+            console.log(keyValuesToResetAsCollection);
             Object.entries(keyValuesToResetAsCollection).forEach(([key, value]) => {
                 updatePromises.push(OnyxUtils.scheduleNotifyCollectionSubscribers(key, value));
             });
