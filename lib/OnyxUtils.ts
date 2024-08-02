@@ -23,6 +23,7 @@ import type {
     OnyxEntry,
     OnyxInput,
     OnyxKey,
+    OnyxMergeCollectionInput,
     OnyxValue,
     Selector,
     WithOnyxConnectOptions,
@@ -45,11 +46,11 @@ type OnyxMethod = ValueOf<typeof METHOD>;
 const mergeQueue: Record<OnyxKey, Array<OnyxValue<OnyxKey>>> = {};
 const mergeQueuePromise: Record<OnyxKey, Promise<void>> = {};
 
-// Holds a mapping of all the react components that want their state subscribed to a store key
+// Holds a mapping of all the React components that want their state subscribed to a store key
 const callbackToStateMapping: Record<string, Mapping<OnyxKey>> = {};
 
 // Keeps a copy of the values of the onyx collection keys as a map for faster lookups
-let onyxCollectionKeyMap = new Map<OnyxKey, OnyxValue<OnyxKey>>();
+let onyxCollectionKeySet = new Set<OnyxKey>();
 
 // Holds a mapping of the connected key to the connectionID for faster lookups
 const onyxKeyToConnectionIDs = new Map();
@@ -70,6 +71,9 @@ let defaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
 
 let batchUpdatesPromise: Promise<void> | null = null;
 let batchUpdatesQueue: Array<() => void> = [];
+
+// Used for comparison with a new update to avoid invoking the Onyx.connect callback with the same data.
+const lastConnectionCallbackData = new Map<number, OnyxValue<OnyxKey>>();
 
 let snapshotKey: OnyxKey | null = null;
 
@@ -115,11 +119,11 @@ function getDefaultKeyStates(): Record<OnyxKey, OnyxValue<OnyxKey>> {
 function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Partial<KeyValueMapping>, safeEvictionKeys: OnyxKey[]): void {
     // We need the value of the collection keys later for checking if a
     // key is a collection. We store it in a map for faster lookup.
-    const collectionValues = Object.values(keys.COLLECTION ?? {});
-    onyxCollectionKeyMap = collectionValues.reduce((acc, val) => {
-        acc.set(val, true);
+    const collectionValues = Object.values(keys.COLLECTION ?? {}) as string[];
+    onyxCollectionKeySet = collectionValues.reduce((acc, val) => {
+        acc.add(val);
         return acc;
-    }, new Map());
+    }, new Set<OnyxKey>());
 
     // Set our default key states to use when initializing and clearing Onyx data
     defaultKeyStates = initialKeyStates;
@@ -376,11 +380,18 @@ function getAllKeys(): Promise<Set<OnyxKey>> {
 }
 
 /**
- * Checks to see if the a subscriber's supplied key
+ * Returns set of all registered collection keys
+ */
+function getCollectionKeys(): Set<OnyxKey> {
+    return onyxCollectionKeySet;
+}
+
+/**
+ * Checks to see if the subscriber's supplied key
  * is associated with a collection of keys.
  */
 function isCollectionKey(key: OnyxKey): key is CollectionKeyBase {
-    return onyxCollectionKeyMap.has(key);
+    return onyxCollectionKeySet.has(key);
 }
 
 function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collectionKey: TCollectionKey, key: string): key is `${TCollectionKey}${string}` {
@@ -766,8 +777,8 @@ function keyChanged<TKey extends OnyxKey>(
     value: OnyxValue<TKey>,
     previousValue: OnyxValue<TKey>,
     canUpdateSubscriber: (subscriber?: Mapping<OnyxKey>) => boolean = () => true,
-    notifyRegularSubscibers = true,
-    notifyWithOnyxSubscibers = true,
+    notifyConnectSubscribers = true,
+    notifyWithOnyxSubscribers = true,
 ): void {
     // Add or remove this key from the recentlyAccessedKeys lists
     if (value !== null) {
@@ -801,9 +812,13 @@ function keyChanged<TKey extends OnyxKey>(
 
         // Subscriber is a regular call to connect() and provided a callback
         if (typeof subscriber.callback === 'function') {
-            if (!notifyRegularSubscibers) {
+            if (!notifyConnectSubscribers) {
                 continue;
             }
+            if (lastConnectionCallbackData.has(subscriber.connectionID) && lastConnectionCallbackData.get(subscriber.connectionID) === value) {
+                continue;
+            }
+
             if (isCollectionKey(subscriber.key) && subscriber.waitForCollectionCallback) {
                 const cachedCollection = getCachedCollection(subscriber.key);
 
@@ -814,12 +829,14 @@ function keyChanged<TKey extends OnyxKey>(
 
             const subscriberCallback = subscriber.callback as DefaultConnectCallback<TKey>;
             subscriberCallback(value, key);
+
+            lastConnectionCallbackData.set(subscriber.connectionID, value);
             continue;
         }
 
         // Subscriber connected via withOnyx() HOC
         if ('withOnyxInstance' in subscriber && subscriber.withOnyxInstance) {
-            if (!notifyWithOnyxSubscibers) {
+            if (!notifyWithOnyxSubscribers) {
                 continue;
             }
 
@@ -952,7 +969,16 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, valu
     // If we would pass undefined to setWithOnyxInstance instead, withOnyx would not set the value in the state.
     // withOnyx will internally replace null values with undefined and never pass null values to wrapped components.
     // For regular callbacks, we never want to pass null values, but always just undefined if a value is not set in cache or storage.
-    (mapping as DefaultConnectOptions<TKey>).callback?.(value === null ? undefined : value, matchedKey as TKey);
+    const valueToPass = value === null ? undefined : value;
+    const lastValue = lastConnectionCallbackData.get(mapping.connectionID);
+    lastConnectionCallbackData.get(mapping.connectionID);
+
+    // If the value has not changed we do not need to trigger the callback
+    if (lastConnectionCallbackData.has(mapping.connectionID) && valueToPass === lastValue) {
+        return;
+    }
+
+    (mapping as DefaultConnectOptions<TKey>).callback?.(valueToPass, matchedKey as TKey);
 }
 
 /**
@@ -1182,6 +1208,34 @@ function initializeWithDefaultKeyStates(): Promise<void> {
     });
 }
 
+/**
+ * Validate the collection is not empty and has a correct type before applying mergeCollection()
+ */
+function isValidNonEmptyCollectionForMerge<TKey extends CollectionKeyBase, TMap>(collection: OnyxMergeCollectionInput<TKey, TMap>): boolean {
+    return typeof collection === 'object' && !Array.isArray(collection) && !utils.isEmptyObject(collection);
+}
+
+/**
+ * Verify if all the collection keys belong to the same parent
+ */
+function doAllCollectionItemsBelongToSameParent<TKey extends CollectionKeyBase>(collectionKey: TKey, collectionKeys: string[]): boolean {
+    let hasCollectionKeyCheckFailed = false;
+    collectionKeys.forEach((dataKey) => {
+        if (OnyxUtils.isKeyMatch(collectionKey, dataKey)) {
+            return;
+        }
+
+        if (process.env.NODE_ENV === 'development') {
+            throw new Error(`Provided collection doesn't have all its data belonging to the same parent. CollectionKey: ${collectionKey}, DataKey: ${dataKey}`);
+        }
+
+        hasCollectionKeyCheckFailed = true;
+        Logger.logAlert(`Provided collection doesn't have all its data belonging to the same parent. CollectionKey: ${collectionKey}, DataKey: ${dataKey}`);
+    });
+
+    return !hasCollectionKeyCheckFailed;
+}
+
 const OnyxUtils = {
     METHOD,
     getMergeQueue,
@@ -1194,6 +1248,7 @@ const OnyxUtils = {
     batchUpdates,
     get,
     getAllKeys,
+    getCollectionKeys,
     isCollectionKey,
     isCollectionMemberKey,
     splitCollectionMemberKey,
@@ -1227,6 +1282,8 @@ const OnyxUtils = {
     deleteKeyByConnections,
     getSnapshotKey,
     multiGet,
+    isValidNonEmptyCollectionForMerge,
+    doAllCollectionItemsBelongToSameParent,
 };
 
 export default OnyxUtils;
