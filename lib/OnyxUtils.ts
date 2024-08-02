@@ -384,7 +384,7 @@ function isCollectionKey(key: OnyxKey): key is CollectionKeyBase {
 }
 
 function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collectionKey: TCollectionKey, key: string): key is `${TCollectionKey}${string}` {
-    return Str.startsWith(key, collectionKey) && key.length > collectionKey.length;
+    return key.startsWith(collectionKey) && key.length > collectionKey.length;
 }
 
 /**
