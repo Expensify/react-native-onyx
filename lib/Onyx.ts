@@ -29,7 +29,7 @@ import type {
 } from './types';
 import OnyxUtils from './OnyxUtils';
 import logMessages from './logMessages';
-import type {ConnectionMetadata} from './OnyxConnectionManager';
+import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
 
 /** Initialize the store with actions and listening for storage events */
@@ -93,7 +93,7 @@ function init({
  * Note that it will not cause the component to have the loading prop set to true.
  * @returns a connection metadata object to use when calling `Onyx.disconnect()`
  */
-function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): ConnectionMetadata {
+function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Connection {
     return connectionManager.connect(connectOptions);
 }
 
@@ -104,7 +104,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
  *
  * @param connection connection metadata object returned by call to `Onyx.connect()`
  */
-function disconnect(connectionMetadada: ConnectionMetadata): void {
+function disconnect(connectionMetadada: Connection): void {
     connectionManager.disconnect(connectionMetadada);
 }
 

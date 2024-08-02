@@ -5,7 +5,7 @@ import OnyxUtils from '../../lib/OnyxUtils';
 import type OnyxCache from '../../lib/OnyxCache';
 import type {OnyxCollection, OnyxUpdate} from '../../lib/types';
 import type GenericCollection from '../utils/GenericCollection';
-import type {ConnectionMetadata} from '../../lib/OnyxConnectionManager';
+import type {Connection} from '../../lib/OnyxConnectionManager';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
@@ -30,7 +30,7 @@ Onyx.init({
 });
 
 describe('Onyx', () => {
-    let connection: ConnectionMetadata | undefined;
+    let connection: Connection | undefined;
 
     /** @type OnyxCache */
     let cache: typeof OnyxCache;
@@ -1111,7 +1111,7 @@ describe('Onyx', () => {
     });
 
     it('should return a promise that completes when all update() operations are done', () => {
-        const connections: ConnectionMetadata[] = [];
+        const connections: Connection[] = [];
 
         const testCallback = jest.fn();
         const otherTestCallback = jest.fn();
@@ -1335,7 +1335,7 @@ describe('Onyx', () => {
     });
 
     it('should not call a collection item subscriber if the value did not change', () => {
-        const connections: ConnectionMetadata[] = [];
+        const connections: Connection[] = [];
 
         const cat = `${ONYX_KEYS.COLLECTION.ANIMALS}cat`;
         const dog = `${ONYX_KEYS.COLLECTION.ANIMALS}dog`;
@@ -1403,7 +1403,7 @@ describe('Onyx', () => {
 
     describe('update', () => {
         it('should squash all updates of collection-related keys into a single mergeCollection call', () => {
-            const connections: ConnectionMetadata[] = [];
+            const connections: Connection[] = [];
 
             const routineRoute = `${ONYX_KEYS.COLLECTION.ROUTES}routine`;
             const holidayRoute = `${ONYX_KEYS.COLLECTION.ROUTES}holiday`;
@@ -1504,7 +1504,7 @@ describe('Onyx', () => {
         });
 
         it('should return a promise that completes when all update() operations are done', () => {
-            const connections: ConnectionMetadata[] = [];
+            const connections: Connection[] = [];
 
             const bob = `${ONYX_KEYS.COLLECTION.PEOPLE}bob`;
             const lisa = `${ONYX_KEYS.COLLECTION.PEOPLE}lisa`;

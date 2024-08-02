@@ -13,7 +13,7 @@ import type OnyxInstance from '../../lib/Onyx';
 import type withOnyxType from '../../lib/withOnyx';
 import type {InitOptions} from '../../lib/types';
 import generateRange from '../utils/generateRange';
-import type {ConnectionMetadata} from '../../lib/OnyxConnectionManager';
+import type {Connection} from '../../lib/OnyxConnectionManager';
 
 describe('Onyx', () => {
     describe('Cache Service', () => {
@@ -529,7 +529,7 @@ describe('Onyx', () => {
             StorageMock.getItem.mockResolvedValue('"mockValue"');
             const range = generateRange(0, 10);
             StorageMock.getAllKeys.mockResolvedValue(range.map((number) => `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}${number}`));
-            let connections: Array<{key: string; connection: ConnectionMetadata}> = [];
+            let connections: Array<{key: string; connection: Connection}> = [];
 
             // Given Onyx is configured with max 5 keys in cache
             return initOnyx({

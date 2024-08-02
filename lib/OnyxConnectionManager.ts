@@ -7,7 +7,7 @@ import type {DefaultConnectCallback, DefaultConnectOptions, OnyxKey, OnyxValue} 
 
 type ConnectCallback = DefaultConnectCallback<OnyxKey>;
 
-type Connection = {
+type ConnectionMetadata = {
     subscriptionID: number;
     onyxKey: OnyxKey;
     isConnectionMade: boolean;
@@ -16,13 +16,13 @@ type Connection = {
     cachedCallbackKey?: OnyxKey;
 };
 
-type ConnectionMetadata = {
+type Connection = {
     id: string;
     callbackID: string;
 };
 
 class OnyxConnectionManager {
-    private connectionsMap: Map<string, Connection>;
+    private connectionsMap: Map<string, ConnectionMetadata>;
 
     private lastCallbackID: number;
 
@@ -53,7 +53,7 @@ class OnyxConnectionManager {
         });
     }
 
-    connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): ConnectionMetadata {
+    connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Connection {
         const mapKey = this.connectionMapKey(connectOptions);
         let connection = this.connectionsMap.get(mapKey);
         let subscriptionID: number | undefined;
@@ -111,7 +111,7 @@ class OnyxConnectionManager {
      *
      * @param connection connection metadata object returned by call to `Onyx.connect()`
      */
-    disconnect(connectionMetadada: ConnectionMetadata): void {
+    disconnect(connectionMetadada: Connection): void {
         if (!connectionMetadada) {
             Logger.logAlert(`[ConnectionManager] Attempted to disconnect passing an undefined metadata object.`);
             return;
@@ -144,7 +144,7 @@ class OnyxConnectionManager {
     }
 
     /** Keys added to this list can never be deleted. */
-    addToEvictionBlockList(connectionMetadada: ConnectionMetadata): void {
+    addToEvictionBlockList(connectionMetadada: Connection): void {
         const connection = this.connectionsMap.get(connectionMetadada.id);
         if (!connection) {
             return;
@@ -164,7 +164,7 @@ class OnyxConnectionManager {
      * Removes a key previously added to this list
      * which will enable it to be deleted again.
      */
-    removeFromEvictionBlockList(connectionMetadada: ConnectionMetadata): void {
+    removeFromEvictionBlockList(connectionMetadada: Connection): void {
         const connection = this.connectionsMap.get(connectionMetadada.id);
         if (!connection) {
             return;
@@ -185,4 +185,4 @@ const connectionManager = new OnyxConnectionManager();
 
 export default connectionManager;
 
-export type {ConnectionMetadata};
+export type {Connection};

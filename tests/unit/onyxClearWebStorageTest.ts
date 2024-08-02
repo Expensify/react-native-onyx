@@ -3,7 +3,7 @@ import StorageMock from '../../lib/storage';
 import Onyx from '../../lib/Onyx';
 import type OnyxCache from '../../lib/OnyxCache';
 import type GenericCollection from '../utils/GenericCollection';
-import type {ConnectionMetadata} from '../../lib/OnyxConnectionManager';
+import type {Connection} from '../../lib/OnyxConnectionManager';
 
 const ONYX_KEYS = {
     DEFAULT_KEY: 'defaultKey',
@@ -17,7 +17,7 @@ const MERGED_VALUE = 'merged';
 const DEFAULT_VALUE = 'default';
 
 describe('Set data while storage is clearing', () => {
-    let connection: ConnectionMetadata | undefined;
+    let connection: Connection | undefined;
     let onyxValue: unknown;
 
     /** @type OnyxCache */

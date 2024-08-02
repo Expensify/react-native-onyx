@@ -2,7 +2,7 @@ import {deepEqual, shallowEqual} from 'fast-equals';
 import {useCallback, useEffect, useRef, useSyncExternalStore} from 'react';
 import type {IsEqual} from 'type-fest';
 import OnyxCache from './OnyxCache';
-import type {ConnectionMetadata} from './OnyxConnectionManager';
+import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
 import OnyxUtils from './OnyxUtils';
 import type {CollectionKeyBase, OnyxCollection, OnyxEntry, OnyxKey, OnyxValue, Selector} from './types';
@@ -70,7 +70,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     options?: BaseUseOnyxOptions & UseOnyxInitialValueOption<NoInfer<TReturnValue>>,
 ): UseOnyxResult<TKey, TReturnValue>;
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey, options?: UseOnyxOptions<TKey, TReturnValue>): UseOnyxResult<TKey, TReturnValue> {
-    const connectionRef = useRef<ConnectionMetadata | null>(null);
+    const connectionRef = useRef<Connection | null>(null);
     const previousKey = usePrevious(key);
 
     // Used to stabilize the selector reference and avoid unnecessary calls to `getSnapshot()`.

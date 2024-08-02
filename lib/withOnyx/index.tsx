@@ -10,7 +10,7 @@ import type {GenericFunction, Mapping, OnyxKey, WithOnyxConnectOptions} from '..
 import utils from '../utils';
 import type {MapOnyxToState, WithOnyxInstance, WithOnyxMapping, WithOnyxProps, WithOnyxState} from './types';
 import cache from '../OnyxCache';
-import type {ConnectionMetadata} from '../OnyxConnectionManager';
+import type {Connection} from '../OnyxConnectionManager';
 import connectionManager from '../OnyxConnectionManager';
 
 // This is a list of keys that can exist on a `mapping`, but are not directly related to loading data from Onyx. When the keys of a mapping are looped over to check
@@ -68,7 +68,7 @@ export default function <TComponentProps, TOnyxProps>(
 
             shouldDelayUpdates: boolean;
 
-            activeConnections: Record<string, ConnectionMetadata>;
+            activeConnections: Record<string, Connection>;
 
             tempState: WithOnyxState<TOnyxProps> | undefined;
 
