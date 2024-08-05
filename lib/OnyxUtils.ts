@@ -823,7 +823,12 @@ function keyChanged<TKey extends OnyxKey>(
             }
 
             if (isCollectionKey(subscriber.key) && subscriber.waitForCollectionCallback) {
-                const cachedCollection = cachedCollections[subscriber.key] ?? getCachedCollection(subscriber.key);
+                let cachedCollection = cachedCollections[subscriber.key];
+
+                if (!cachedCollection) {
+                    cachedCollection = getCachedCollection(subscriber.key);
+                    cachedCollections[subscriber.key] = cachedCollection;
+                }
 
                 cachedCollection[key] = value;
                 subscriber.callback(cachedCollection);
