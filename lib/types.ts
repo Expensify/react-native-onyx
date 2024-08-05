@@ -310,7 +310,7 @@ type WithOnyxConnectOptions<TKey extends OnyxKey> = ConnectOptions<TKey> & {
 };
 
 type Mapping<TKey extends OnyxKey> = WithOnyxConnectOptions<TKey> & {
-    connectionID: number;
+    subscriptionID: number;
 };
 
 /**

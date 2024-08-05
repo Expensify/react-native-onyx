@@ -66,46 +66,40 @@ function init({
 }
 
 /**
- * Subscribes a react component's state directly to a store key
+ * Connects to an Onyx key given the options passed and listens to its changes.
  *
  * @example
+ * ```ts
  * const connection = Onyx.connect({
  *     key: ONYXKEYS.SESSION,
  *     callback: onSessionChange,
  * });
+ * ```
  *
- * @param mapping the mapping information to connect Onyx to the components state
- * @param mapping.key ONYXKEY to subscribe to
- * @param [mapping.statePropertyName] the name of the property in the state to connect the data to
- * @param [mapping.withOnyxInstance] whose setState() method will be called with any changed data
- *      This is used by React components to connect to Onyx
- * @param [mapping.callback] a method that will be called with changed data
- *      This is used by any non-React code to connect to Onyx
- * @param [mapping.initWithStoredValues] If set to false, then no data will be prefilled into the
- *  component
- * @param [mapping.waitForCollectionCallback] If set to true, it will return the entire collection to the callback as a single object
- * @param [mapping.selector] THIS PARAM IS ONLY USED WITH withOnyx(). If included, this will be used to subscribe to a subset of an Onyx key's data.
- *       The sourceData and withOnyx state are passed to the selector and should return the simplified data. Using this setting on `withOnyx` can have very positive
- *       performance benefits because the component will only re-render when the subset of data changes. Otherwise, any change of data on any property would normally
- *       cause the component to re-render (and that can be expensive from a performance standpoint).
- * @param [mapping.initialValue] THIS PARAM IS ONLY USED WITH withOnyx().
- * If included, this will be passed to the component so that something can be rendered while data is being fetched from the DB.
- * Note that it will not cause the component to have the loading prop set to true.
- * @returns a connection metadata object to use when calling `Onyx.disconnect()`
+ * @param connectOptions The options object that will define the behavior of the connection.
+ * @returns The connection object to use when calling `Onyx.disconnect()`.
  */
 function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Connection {
     return connectionManager.connect(connectOptions);
 }
 
 /**
- * Remove the listener for a react component
- * @example
- * Onyx.disconnect(connection);
+ * Disconnects and removes the listener from the Onyx key.
  *
- * @param connection connection metadata object returned by call to `Onyx.connect()`
+ * @example
+ * ```ts
+ * const connection = Onyx.connect({
+ *     key: ONYXKEYS.SESSION,
+ *     callback: onSessionChange,
+ * });
+ *
+ * Onyx.disconnect(connection);
+ * ```
+ *
+ * @param connection Connection object returned by calling `Onyx.connect()`.
  */
-function disconnect(connectionMetadada: Connection): void {
-    connectionManager.disconnect(connectionMetadada);
+function disconnect(connection: Connection): void {
+    connectionManager.disconnect(connection);
 }
 
 /**

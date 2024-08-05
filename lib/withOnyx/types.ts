@@ -109,7 +109,7 @@ type Mapping<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TO
  * Represents a superset of `Mapping` type with internal properties included.
  */
 type WithOnyxMapping<TComponentProps, TOnyxProps> = Mapping<TComponentProps, TOnyxProps, keyof TOnyxProps, OnyxKey> & {
-    connectionID: number;
+    subscriptionID: number;
     previousKey?: OnyxKey;
 };
 

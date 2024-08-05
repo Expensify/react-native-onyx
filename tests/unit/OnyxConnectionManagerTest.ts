@@ -9,6 +9,8 @@ import type GenericCollection from '../utils/GenericCollection';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import OnyxUtils from '../../lib/OnyxUtils';
 
+// We need access to `connectionsMap` during the tests but the property is private,
+// so this workaround allows us to have access to it.
 // eslint-disable-next-line dot-notation
 const connectionsMap = connectionManager['connectionsMap'];
 

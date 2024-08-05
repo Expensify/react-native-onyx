@@ -54,8 +54,8 @@ const callbackToStateMapping: Record<string, Mapping<OnyxKey>> = {};
 // Keeps a copy of the values of the onyx collection keys as a map for faster lookups
 let onyxCollectionKeySet = new Set<OnyxKey>();
 
-// Holds a mapping of the connected key to the connectionID for faster lookups
-const onyxKeyToConnectionIDs = new Map();
+// Holds a mapping of the connected key to the subscriptionID for faster lookups
+const onyxKeyToSubscriptionIDs = new Map();
 
 // Holds a list of keys that have been directly subscribed to or recently modified from least to most recent
 let recentlyAccessedKeys: OnyxKey[] = [];
@@ -76,8 +76,8 @@ let batchUpdatesQueue: Array<() => void> = [];
 
 let snapshotKey: OnyxKey | null = null;
 
-// Keeps track of the last connectionID that was used so we can keep incrementing it
-let lastConnectionID = 0;
+// Keeps track of the last subscriptionID that was used so we can keep incrementing it
+let lastSubscriptionID = 0;
 
 // Connections can be made before `Onyx.init`. They would wait for this task before resolving
 const deferredInitTask = createDeferredTask();
@@ -346,29 +346,29 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
 }
 
 /**
- * Stores a connection ID associated with a given key.
+ * Stores a subscription ID associated with a given key.
  *
- * @param connectionID - a connection ID of the subscriber
- * @param key - a key that the subscriber is connected to
+ * @param subscriptionID - A subscription ID of the subscriber.
+ * @param key - A key that the subscriber is subscribed to.
  */
-function storeKeyByConnections(key: OnyxKey, connectionID: number) {
-    if (!onyxKeyToConnectionIDs.has(key)) {
-        onyxKeyToConnectionIDs.set(key, []);
+function storeKeyBySubscriptions(key: OnyxKey, subscriptionID: number) {
+    if (!onyxKeyToSubscriptionIDs.has(key)) {
+        onyxKeyToSubscriptionIDs.set(key, []);
     }
-    onyxKeyToConnectionIDs.get(key).push(connectionID);
+    onyxKeyToSubscriptionIDs.get(key).push(subscriptionID);
 }
 
 /**
- * Deletes a connection ID associated with its corresponding key.
+ * Deletes a subscription ID associated with its corresponding key.
  *
- * @param {number} connectionID - The connection ID to be deleted.
+ * @param subscriptionID - The subscription ID to be deleted.
  */
-function deleteKeyByConnections(connectionID: number) {
-    const subscriber = callbackToStateMapping[connectionID];
+function deleteKeyBySubscriptions(subscriptionID: number) {
+    const subscriber = callbackToStateMapping[subscriptionID];
 
-    if (subscriber && onyxKeyToConnectionIDs.has(subscriber.key)) {
-        const updatedConnectionIDs = onyxKeyToConnectionIDs.get(subscriber.key).filter((id: number) => id !== connectionID);
-        onyxKeyToConnectionIDs.set(subscriber.key, updatedConnectionIDs);
+    if (subscriber && onyxKeyToSubscriptionIDs.has(subscriber.key)) {
+        const updatedSubscriptionsIDs = onyxKeyToSubscriptionIDs.get(subscriber.key).filter((id: number) => id !== subscriptionID);
+        onyxKeyToSubscriptionIDs.set(subscriber.key, updatedSubscriptionsIDs);
     }
 }
 
@@ -788,13 +788,13 @@ function keyChanged<TKey extends OnyxKey>(
     // Given the amount of times this function is called we need to make sure we are not iterating over all subscribers every time. On the other hand, we don't need to
     // do the same in keysChanged, because we only call that function when a collection key changes, and it doesn't happen that often.
     // For performance reason, we look for the given key and later if don't find it we look for the collection key, instead of checking if it is a collection key first.
-    let stateMappingKeys = onyxKeyToConnectionIDs.get(key) ?? [];
+    let stateMappingKeys = onyxKeyToSubscriptionIDs.get(key) ?? [];
     const collectionKey = getCollectionKey(key);
     const plainCollectionKey = collectionKey.lastIndexOf('_') !== -1 ? collectionKey : undefined;
 
     if (plainCollectionKey) {
         // Getting the collection key from the specific key because only collection keys were stored in the mapping.
-        stateMappingKeys = [...stateMappingKeys, ...(onyxKeyToConnectionIDs.get(plainCollectionKey) ?? [])];
+        stateMappingKeys = [...stateMappingKeys, ...(onyxKeyToSubscriptionIDs.get(plainCollectionKey) ?? [])];
         if (stateMappingKeys.length === 0) {
             return;
         }
@@ -926,7 +926,7 @@ function keyChanged<TKey extends OnyxKey>(
 function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, value: OnyxValue<TKey> | null, matchedKey: TKey | undefined, isBatched: boolean): void {
     // If the mapping no longer exists then we should not send any data.
     // This means our subscriber disconnected or withOnyx wrapped component unmounted.
-    if (!callbackToStateMapping[mapping.connectionID]) {
+    if (!callbackToStateMapping[mapping.subscriptionID]) {
         return;
     }
 
@@ -1217,13 +1217,7 @@ function doAllCollectionItemsBelongToSameParent<TKey extends CollectionKeyBase>(
 }
 
 /**
- * Subscribes a react component's state directly to a store key
- *
- * @example
- * const connectionID = OnyxUtils.connectToKey({
- *     key: ONYXKEYS.SESSION,
- *     callback: onSessionChange,
- * });
+ * Subscribes to an Onyx key and listens to its changes.
  *
  * @param mapping the mapping information to connect Onyx to the components state
  * @param mapping.key ONYXKEY to subscribe to
@@ -1242,21 +1236,21 @@ function doAllCollectionItemsBelongToSameParent<TKey extends CollectionKeyBase>(
  * @param [mapping.initialValue] THIS PARAM IS ONLY USED WITH withOnyx().
  * If included, this will be passed to the component so that something can be rendered while data is being fetched from the DB.
  * Note that it will not cause the component to have the loading prop set to true.
- * @returns an ID to use when calling `OnyxUtils.disconnectFromKey()`
+ * @returns The subscription ID to use when calling `OnyxUtils.unsubscribeFromKey()`.
  */
-function connectToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): number {
+function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): number {
     const mapping = connectOptions as Mapping<TKey>;
-    const connectionID = lastConnectionID++;
-    callbackToStateMapping[connectionID] = mapping as Mapping<OnyxKey>;
-    callbackToStateMapping[connectionID].connectionID = connectionID;
+    const subscriptionID = lastSubscriptionID++;
+    callbackToStateMapping[subscriptionID] = mapping as Mapping<OnyxKey>;
+    callbackToStateMapping[subscriptionID].subscriptionID = subscriptionID;
 
-    // When keyChanged is called, a key is passed and the method looks through all the Subscribers in callbackToStateMapping for the matching key to get the connectionID
+    // When keyChanged is called, a key is passed and the method looks through all the Subscribers in callbackToStateMapping for the matching key to get the subscriptionID
     // to avoid having to loop through all the Subscribers all the time (even when just one connection belongs to one key),
-    // We create a mapping from key to lists of connectionIDs to access the specific list of connectionIDs.
-    OnyxUtils.storeKeyByConnections(mapping.key, callbackToStateMapping[connectionID].connectionID);
+    // We create a mapping from key to lists of subscriptionIDs to access the specific list of subscriptionIDs.
+    OnyxUtils.storeKeyByConnections(mapping.key, callbackToStateMapping[subscriptionID].subscriptionID);
 
     if (mapping.initWithStoredValues === false) {
-        return connectionID;
+        return subscriptionID;
     }
 
     // Commit connection only after init passes
@@ -1337,25 +1331,23 @@ function connectToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>
             console.error('Warning: Onyx.connect() was found without a callback or withOnyxInstance');
         });
 
-    // The connectionID is returned back to the caller so that it can be used to clean up the connection when it's no longer needed
-    // by calling Onyx.disconnect(connectionID).
-    return connectionID;
+    // The subscriptionID is returned back to the caller so that it can be used to clean up the connection when it's no longer needed
+    // by calling OnyxUtils.disconnect(subscriptionID).
+    return subscriptionID;
 }
 
 /**
- * Remove the listener for a react component
- * @example
- * Onyx.disconnectFromKey(connectionID);
+ * Disconnects and removes the listener from the Onyx key.
  *
- * @param connectionID unique id returned by call to `OnyxUtils.connectToKey()`
+ * @param subscriptionID Subscription ID returned by calling `OnyxUtils.subscribeToKey()`.
  */
-function disconnectFromKey(connectionID: number): void {
-    if (!callbackToStateMapping[connectionID]) {
+function unsubscribeFromKey(subscriptionID: number): void {
+    if (!callbackToStateMapping[subscriptionID]) {
         return;
     }
 
-    OnyxUtils.deleteKeyByConnections(lastConnectionID);
-    delete callbackToStateMapping[connectionID];
+    OnyxUtils.deleteKeyByConnections(lastSubscriptionID);
+    delete callbackToStateMapping[subscriptionID];
 }
 
 const OnyxUtils = {
@@ -1399,14 +1391,14 @@ const OnyxUtils = {
     prepareKeyValuePairsForStorage,
     applyMerge,
     initializeWithDefaultKeyStates,
-    storeKeyByConnections,
-    deleteKeyByConnections,
+    storeKeyByConnections: storeKeyBySubscriptions,
+    deleteKeyByConnections: deleteKeyBySubscriptions,
     getSnapshotKey,
     multiGet,
     isValidNonEmptyCollectionForMerge,
     doAllCollectionItemsBelongToSameParent,
-    connectToKey,
-    disconnectFromKey,
+    subscribeToKey,
+    unsubscribeFromKey,
     getEvictionBlocklist,
 };
 
