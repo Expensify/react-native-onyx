@@ -9,10 +9,22 @@ import type GenericCollection from '../utils/GenericCollection';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import OnyxUtils from '../../lib/OnyxUtils';
 
-// We need access to `connectionsMap` during the tests but the property is private,
-// so this workaround allows us to have access to it.
+// We need access to `connectionsMap` and `generateConnectionID` during the tests but the properties are private,
+// so this workaround allows us to have access to them.
 // eslint-disable-next-line dot-notation
 const connectionsMap = connectionManager['connectionsMap'];
+// eslint-disable-next-line dot-notation
+const generateConnectionID = connectionManager['generateConnectionID'];
+
+function generateEmptyWithOnyxInstance() {
+    return new (class {
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        setStateProxy() {}
+
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        setWithOnyxState() {}
+    })() as unknown as WithOnyxInstance;
+}
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -33,6 +45,37 @@ describe('OnyxConnectionManager', () => {
     // Always use a "fresh" instance
     beforeEach(() => {
         connectionManager.disconnectAll();
+    });
+
+    describe('generateConnectionID', () => {
+        it('should generate a stable connection ID', async () => {
+            const connectionID = generateConnectionID({key: ONYXKEYS.TEST_KEY});
+            expect(connectionID).toEqual(`onyxKey=${ONYXKEYS.TEST_KEY},initWithStoredValues=true,waitForCollectionCallback=false`);
+        });
+
+        it("should generate a stable connection ID regardless of the order which the option's properties were passed", async () => {
+            const connectionID = generateConnectionID({key: ONYXKEYS.TEST_KEY, waitForCollectionCallback: true, initWithStoredValues: true});
+            expect(connectionID).toEqual(`onyxKey=${ONYXKEYS.TEST_KEY},initWithStoredValues=true,waitForCollectionCallback=true`);
+        });
+
+        it('should generate unique connection IDs if certain options are passed', async () => {
+            const connectionID1 = generateConnectionID({key: ONYXKEYS.TEST_KEY, reuseConnection: false});
+            const connectionID2 = generateConnectionID({key: ONYXKEYS.TEST_KEY, reuseConnection: false});
+            expect(connectionID1.startsWith(`onyxKey=${ONYXKEYS.TEST_KEY},initWithStoredValues=true,waitForCollectionCallback=false,uniqueID=`)).toBeTruthy();
+            expect(connectionID2.startsWith(`onyxKey=${ONYXKEYS.TEST_KEY},initWithStoredValues=true,waitForCollectionCallback=false,uniqueID=`)).toBeTruthy();
+            expect(connectionID1).not.toEqual(connectionID2);
+
+            const connectionID3 = generateConnectionID({key: ONYXKEYS.TEST_KEY, initWithStoredValues: false});
+            expect(connectionID3.startsWith(`onyxKey=${ONYXKEYS.TEST_KEY},initWithStoredValues=false,waitForCollectionCallback=false,uniqueID=`)).toBeTruthy();
+
+            const connectionID4 = generateConnectionID({
+                key: ONYXKEYS.TEST_KEY,
+                displayName: 'Component1',
+                statePropertyName: 'prop1',
+                withOnyxInstance: generateEmptyWithOnyxInstance(),
+            } as WithOnyxConnectOptions<OnyxKey>);
+            expect(connectionID4.startsWith(`onyxKey=${ONYXKEYS.TEST_KEY},initWithStoredValues=true,waitForCollectionCallback=false,uniqueID=`)).toBeTruthy();
+        });
     });
 
     describe('connect / disconnect', () => {
@@ -235,26 +278,14 @@ describe('OnyxConnectionManager', () => {
                     key: ONYXKEYS.TEST_KEY,
                     displayName: 'Component1',
                     statePropertyName: 'prop1',
-                    withOnyxInstance: new (class {
-                        // eslint-disable-next-line @typescript-eslint/no-empty-function
-                        setStateProxy() {}
-
-                        // eslint-disable-next-line @typescript-eslint/no-empty-function
-                        setWithOnyxState() {}
-                    })() as unknown as WithOnyxInstance,
+                    withOnyxInstance: generateEmptyWithOnyxInstance(),
                 } as WithOnyxConnectOptions<OnyxKey>);
 
                 const connection2 = connectionManager.connect({
                     key: ONYXKEYS.TEST_KEY,
                     displayName: 'Component2',
                     statePropertyName: 'prop2',
-                    withOnyxInstance: new (class {
-                        // eslint-disable-next-line @typescript-eslint/no-empty-function
-                        setStateProxy() {}
-
-                        // eslint-disable-next-line @typescript-eslint/no-empty-function
-                        setWithOnyxState() {}
-                    })() as unknown as WithOnyxInstance,
+                    withOnyxInstance: generateEmptyWithOnyxInstance(),
                 } as WithOnyxConnectOptions<OnyxKey>);
 
                 await act(async () => waitForPromisesToResolve());
@@ -282,13 +313,7 @@ describe('OnyxConnectionManager', () => {
                     key: ONYXKEYS.TEST_KEY,
                     displayName: 'Component2',
                     statePropertyName: 'prop2',
-                    withOnyxInstance: new (class {
-                        // eslint-disable-next-line @typescript-eslint/no-empty-function
-                        setStateProxy() {}
-
-                        // eslint-disable-next-line @typescript-eslint/no-empty-function
-                        setWithOnyxState() {}
-                    })() as unknown as WithOnyxInstance,
+                    withOnyxInstance: generateEmptyWithOnyxInstance(),
                 } as WithOnyxConnectOptions<OnyxKey>);
 
                 expect(connection1.id).not.toEqual(connection2.id);

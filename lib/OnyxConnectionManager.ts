@@ -76,18 +76,19 @@ class OnyxConnectionManager {
         this.connectionsMap = new Map();
         this.lastCallbackID = 0;
 
-        bindAll(this, 'fireCallbacks', 'generateConnectionID', 'connect', 'disconnect', 'disconnectAll', 'addToEvictionBlockList', 'removeFromEvictionBlockList');
+        bindAll(this, 'generateConnectionID', 'fireCallbacks', 'connect', 'disconnect', 'disconnectAll', 'addToEvictionBlockList', 'removeFromEvictionBlockList');
     }
 
     /**
      * Generates a connection ID based on the `connectOptions` object passed to the function.
-     * The properties used to generate the key are handpicked for performance reasons and
+     *
+     * The properties used to generate the ID are handpicked for performance reasons and
      * according to their purpose and effect they produce in the Onyx connection.
      */
     private generateConnectionID<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): string {
         let suffix = '';
 
-        // We will generate a unique key in any of the following situations:
+        // We will generate a unique ID in any of the following situations:
         // - `connectOptions.reuseConnection` is `false`. That means the subscriber explicitly wants the connection to not be reused.
         // - `connectOptions.initWithStoredValues` is `false`. This flag changes the subscription flow when set to `false`, so the connection can't be reused.
         // - `withOnyxInstance` is defined inside `connectOptions`. That means the subscriber is a `withOnyx` HOC and therefore doesn't support connection reuse.
@@ -101,10 +102,10 @@ class OnyxConnectionManager {
     }
 
     /**
-     * Fires all the subscribers callbacks associated with that connection key.
+     * Fires all the subscribers callbacks associated with that connection ID.
      */
-    private fireCallbacks(mapKey: string): void {
-        const connection = this.connectionsMap.get(mapKey);
+    private fireCallbacks(connectionID: string): void {
+        const connection = this.connectionsMap.get(connectionID);
 
         connection?.callbacks.forEach((callback) => {
             callback(connection.cachedCallbackValue, connection.cachedCallbackKey as OnyxKey);
