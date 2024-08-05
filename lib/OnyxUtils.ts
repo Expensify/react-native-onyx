@@ -394,8 +394,8 @@ function isCollectionKey(key: OnyxKey): key is CollectionKeyBase {
     return onyxCollectionKeySet.has(key);
 }
 
-function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collectionKey: TCollectionKey, key: string): key is `${TCollectionKey}${string}` {
-    return key.startsWith(collectionKey) && key.length > collectionKey.length;
+function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collectionKey: TCollectionKey, key: string, collectionKeyLength: number): key is `${TCollectionKey}${string}` {
+    return Str.startsWith(key, collectionKey) && key.length > collectionKeyLength;
 }
 
 /**
@@ -554,12 +554,14 @@ function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey
     const allKeys = collectionMemberKeys || cache.getAllKeys();
     const collection: OnyxCollection<KeyValueMapping[TKey]> = {};
 
+    const collectionKeyLength = collectionKey.length;
+
     // forEach exists on both Set and Array
     allKeys.forEach((key) => {
         // If we don't have collectionMemberKeys array then we have to check whether a key is a collection member key.
         // Because in that case the keys will be coming from `cache.getAllKeys()` and we need to filter out the keys that
         // are not part of the collection.
-        if (!collectionMemberKeys && !isCollectionMemberKey(collectionKey, key)) {
+        if (!collectionMemberKeys && !isCollectionMemberKey(collectionKey, key, collectionKeyLength)) {
             return;
         }
 
@@ -595,6 +597,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
     // individual collection key member for the collection that is being updated. It is important to note that the collection parameter cane be a PARTIAL collection
     // and does not represent all of the combined keys and values for a collection key. It is just the "new" data that was merged in via mergeCollection().
     const stateMappingKeys = Object.keys(callbackToStateMapping);
+    const collectionKeyLength = collectionKey.length;
     for (let i = 0; i < stateMappingKeys.length; i++) {
         const subscriber = callbackToStateMapping[stateMappingKeys[i]];
         if (!subscriber) {
@@ -614,7 +617,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
         /**
          * e.g. Onyx.connect({key: `${ONYXKEYS.COLLECTION.REPORT}{reportID}`, callback: ...});
          */
-        const isSubscribedToCollectionMemberKey = isCollectionMemberKey(collectionKey, subscriber.key);
+        const isSubscribedToCollectionMemberKey = isCollectionMemberKey(collectionKey, subscriber.key, collectionKeyLength);
 
         // Regular Onyx.connect() subscriber found.
         if (typeof subscriber.callback === 'function') {
