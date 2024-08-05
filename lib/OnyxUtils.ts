@@ -1201,7 +1201,7 @@ function isValidNonEmptyCollectionForMerge<TKey extends CollectionKeyBase, TMap>
 function doAllCollectionItemsBelongToSameParent<TKey extends CollectionKeyBase>(collectionKey: TKey, collectionKeys: string[]): boolean {
     let hasCollectionKeyCheckFailed = false;
     collectionKeys.forEach((dataKey) => {
-        if (OnyxUtils.isKeyMatch(collectionKey, dataKey)) {
+        if (isKeyMatch(collectionKey, dataKey)) {
             return;
         }
 
@@ -1231,7 +1231,7 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
     // When keyChanged is called, a key is passed and the method looks through all the Subscribers in callbackToStateMapping for the matching key to get the subscriptionID
     // to avoid having to loop through all the Subscribers all the time (even when just one connection belongs to one key),
     // We create a mapping from key to lists of subscriptionIDs to access the specific list of subscriptionIDs.
-    OnyxUtils.storeKeyByConnections(mapping.key, callbackToStateMapping[subscriptionID].subscriptionID);
+    storeKeyBySubscriptions(mapping.key, callbackToStateMapping[subscriptionID].subscriptionID);
 
     if (mapping.initWithStoredValues === false) {
         return subscriptionID;
@@ -1239,7 +1239,7 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
 
     // Commit connection only after init passes
     deferredInitTask.promise
-        .then(() => OnyxUtils.addKeyToRecentlyAccessedIfNeeded(mapping))
+        .then(() => addKeyToRecentlyAccessedIfNeeded(mapping))
         .then(() => {
             // Performance improvement
             // If the mapping is connected to an onyx key that is not a collection
@@ -1247,7 +1247,7 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
             if (Boolean(mapping.key) && typeof mapping.key === 'string' && !mapping.key.endsWith('_') && cache.getAllKeys().has(mapping.key)) {
                 return new Set([mapping.key]);
             }
-            return OnyxUtils.getAllKeys();
+            return getAllKeys();
         })
         .then((keys) => {
             // We search all the keys in storage to see if any are a "match" for the subscriber we are connecting so that we
@@ -1255,7 +1255,7 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
             // subscribed to a "collection key" or a single key.
             const matchingKeys: string[] = [];
             keys.forEach((key) => {
-                if (!OnyxUtils.isKeyMatch(mapping.key, key)) {
+                if (!isKeyMatch(mapping.key, key)) {
                     return;
                 }
                 matchingKeys.push(key);
@@ -1265,13 +1265,13 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
             // since there are none matched. In withOnyx() we wait for all connected keys to return a value before rendering the child
             // component. This null value will be filtered out so that the connected component can utilize defaultProps.
             if (matchingKeys.length === 0) {
-                if (mapping.key && !OnyxUtils.isCollectionKey(mapping.key)) {
+                if (mapping.key && !isCollectionKey(mapping.key)) {
                     cache.addNullishStorageKey(mapping.key);
                 }
 
                 // Here we cannot use batching because the nullish value is expected to be set immediately for default props
                 // or they will be undefined.
-                OnyxUtils.sendDataToConnection(mapping, null, undefined, false);
+                sendDataToConnection(mapping, null, undefined, false);
                 return;
             }
 
@@ -1279,36 +1279,36 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
             // into an object and just make a single call. The latter behavior is enabled by providing a waitForCollectionCallback key
             // combined with a subscription to a collection key.
             if (typeof mapping.callback === 'function') {
-                if (OnyxUtils.isCollectionKey(mapping.key)) {
+                if (isCollectionKey(mapping.key)) {
                     if (mapping.waitForCollectionCallback) {
-                        OnyxUtils.getCollectionDataAndSendAsObject(matchingKeys, mapping);
+                        getCollectionDataAndSendAsObject(matchingKeys, mapping);
                         return;
                     }
 
                     // We did not opt into using waitForCollectionCallback mode so the callback is called for every matching key.
-                    OnyxUtils.multiGet(matchingKeys).then((values) => {
+                    multiGet(matchingKeys).then((values) => {
                         values.forEach((val, key) => {
-                            OnyxUtils.sendDataToConnection(mapping, val as OnyxValue<TKey>, key as TKey, true);
+                            sendDataToConnection(mapping, val as OnyxValue<TKey>, key as TKey, true);
                         });
                     });
                     return;
                 }
 
                 // If we are not subscribed to a collection key then there's only a single key to send an update for.
-                OnyxUtils.get(mapping.key).then((val) => OnyxUtils.sendDataToConnection(mapping, val as OnyxValue<TKey>, mapping.key, true));
+                get(mapping.key).then((val) => sendDataToConnection(mapping, val as OnyxValue<TKey>, mapping.key, true));
                 return;
             }
 
             // If we have a withOnyxInstance that means a React component has subscribed via the withOnyx() HOC and we need to
             // group collection key member data into an object.
             if ('withOnyxInstance' in mapping && mapping.withOnyxInstance) {
-                if (OnyxUtils.isCollectionKey(mapping.key)) {
-                    OnyxUtils.getCollectionDataAndSendAsObject(matchingKeys, mapping);
+                if (isCollectionKey(mapping.key)) {
+                    getCollectionDataAndSendAsObject(matchingKeys, mapping);
                     return;
                 }
 
                 // If the subscriber is not using a collection key then we just send a single value back to the subscriber
-                OnyxUtils.get(mapping.key).then((val) => OnyxUtils.sendDataToConnection(mapping, val as OnyxValue<TKey>, mapping.key, true));
+                get(mapping.key).then((val) => sendDataToConnection(mapping, val as OnyxValue<TKey>, mapping.key, true));
                 return;
             }
 
@@ -1330,7 +1330,7 @@ function unsubscribeFromKey(subscriptionID: number): void {
         return;
     }
 
-    OnyxUtils.deleteKeyByConnections(lastSubscriptionID);
+    deleteKeyBySubscriptions(lastSubscriptionID);
     delete callbackToStateMapping[subscriptionID];
 }
 
@@ -1375,8 +1375,6 @@ const OnyxUtils = {
     prepareKeyValuePairsForStorage,
     applyMerge,
     initializeWithDefaultKeyStates,
-    storeKeyByConnections: storeKeyBySubscriptions,
-    deleteKeyByConnections: deleteKeyBySubscriptions,
     getSnapshotKey,
     multiGet,
     isValidNonEmptyCollectionForMerge,
