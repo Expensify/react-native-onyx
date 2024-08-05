@@ -16,12 +16,12 @@ type BaseUseOnyxOptions = {
     canEvict?: boolean;
 
     /**
-     * If set to false, then no data will be prefilled into the component.
+     * If set to `false`, then no data will be prefilled into the component.
      */
     initWithStoredValues?: boolean;
 
     /**
-     * If set to true, data will be retrieved from cache during the first render even if there is a pending merge for the key.
+     * If set to `true`, data will be retrieved from cache during the first render even if there is a pending merge for the key.
      */
     allowStaleData?: boolean;
 };

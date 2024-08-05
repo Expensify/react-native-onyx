@@ -261,8 +261,16 @@ type Collection<TKey extends CollectionKeyBase, TValue, TMap = never> = {
 };
 
 /** Represents the base options used in `Onyx.connect()` method. */
+// NOTE: Any changes to this type like adding or removing options must be accounted in OnyxConnectionManager's `generateConnectionID()` method!
 type BaseConnectOptions = {
+    /** If set to `false`, then the initial data will be only sent to the callback function if it changes. */
     initWithStoredValues?: boolean;
+
+    /**
+     * If set to `false`, the connection won't be reused between other subscribers that are listening to the same Onyx key
+     * with the same connect configurations.
+     */
+    reuseConnection?: boolean;
 };
 
 /** Represents the callback function used in `Onyx.connect()` method with a regular key. */
@@ -272,19 +280,29 @@ type DefaultConnectCallback<TKey extends OnyxKey> = (value: OnyxEntry<KeyValueMa
 type CollectionConnectCallback<TKey extends OnyxKey> = (value: NonUndefined<OnyxCollection<KeyValueMapping[TKey]>>, key: undefined) => void;
 
 /** Represents the options used in `Onyx.connect()` method with a regular key. */
+// NOTE: Any changes to this type like adding or removing options must be accounted in OnyxConnectionManager's `generateConnectionID()` method!
 type DefaultConnectOptions<TKey extends OnyxKey> = BaseConnectOptions & {
+    /** The Onyx key to subscribe to. */
     key: TKey;
+
+    /** A function that will be called when the Onyx data we are subscribed changes. */
     callback?: DefaultConnectCallback<TKey>;
+
+    /** If set to `true`, it will return the entire collection to the callback as a single object. */
     waitForCollectionCallback?: false;
-    reuseConnection?: boolean;
 };
 
 /** Represents the options used in `Onyx.connect()` method with a collection key. */
+// NOTE: Any changes to this type like adding or removing options must be accounted in OnyxConnectionManager's `generateConnectionID()` method!
 type CollectionConnectOptions<TKey extends OnyxKey> = BaseConnectOptions & {
+    /** The Onyx key to subscribe to. */
     key: TKey extends CollectionKeyBase ? TKey : never;
+
+    /** A function that will be called when the Onyx data we are subscribed changes. */
     callback?: CollectionConnectCallback<TKey>;
+
+    /** If set to `true`, it will return the entire collection to the callback as a single object. */
     waitForCollectionCallback: true;
-    reuseConnection?: boolean;
 };
 
 /**
@@ -298,14 +316,30 @@ type CollectionConnectOptions<TKey extends OnyxKey> = BaseConnectOptions & {
  * If `waitForCollectionCallback` is `false` or not specified, the `key` can be any Onyx key and `callback` will be triggered with updates of each collection item
  * and will pass `value` as an `OnyxEntry`.
  */
+// NOTE: Any changes to this type like adding or removing options must be accounted in OnyxConnectionManager's `generateConnectionID()` method!
 type ConnectOptions<TKey extends OnyxKey> = DefaultConnectOptions<TKey> | CollectionConnectOptions<TKey>;
 
-/** Represents additional `Onyx.connect()` options used inside withOnyx HOC. */
+/** Represents additional `Onyx.connect()` options used inside `withOnyx()` HOC. */
+// NOTE: Any changes to this type like adding or removing options must be accounted in OnyxConnectionManager's `generateConnectionID()` method!
 type WithOnyxConnectOptions<TKey extends OnyxKey> = ConnectOptions<TKey> & {
+    /** The `withOnyx` class instance to be internally passed. */
     withOnyxInstance: WithOnyxInstance;
+
+    /** The name of the component's prop that is connected to the Onyx key. */
     statePropertyName: string;
+
+    /** The component's display name. */
     displayName: string;
+
+    /**
+     * This will be used to subscribe to a subset of an Onyx key's data.
+     * Using this setting on `withOnyx` can have very positive performance benefits because the component will only re-render
+     * when the subset of data changes. Otherwise, any change of data on any property would normally
+     * cause the component to re-render (and that can be expensive from a performance standpoint).
+     */
     selector?: Selector<TKey, unknown, unknown>;
+
+    /** Determines if this key in this subscription is safe to be evicted. */
     canEvict?: boolean;
 };
 
