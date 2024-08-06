@@ -54,15 +54,21 @@ describe('Onyx', () => {
                 expect(keys.has(ONYX_KEYS.OTHER_TEST)).toBe(true);
                 return Onyx.set(ONYX_KEYS.OTHER_TEST, null);
             })
+            // Checks if cache value is removed.
             .then(() => {
-                // Checks if cache value is removed.
-                expect(cache.getAllKeys().size).toBe(0);
-
-                // When cache keys length is 0, we fetch the keys from storage.
+                expect(cache.get(ONYX_KEYS.OTHER_TEST)).toBeUndefined();
                 return OnyxUtils.getAllKeys();
             })
             .then((keys) => {
                 expect(keys.has(ONYX_KEYS.OTHER_TEST)).toBe(false);
+            }));
+
+    it('should restore a key with initial state if the key was set to null and Onyx.clear() is called', () =>
+        Onyx.set(ONYX_KEYS.OTHER_TEST, 42)
+            .then(() => Onyx.set(ONYX_KEYS.OTHER_TEST, null))
+            .then(() => Onyx.clear())
+            .then(() => {
+                expect(cache.get(ONYX_KEYS.OTHER_TEST)).toBe(42);
             }));
 
     it('should set a simple key', () => {
@@ -101,6 +107,21 @@ describe('Onyx', () => {
             .then(() => {
                 expect(testKeyValue).toStrictEqual(['test']);
             });
+    });
+
+    it("shouldn't call a connection twice when setting a value", () => {
+        const mockCallback = jest.fn();
+
+        connection = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            callback: mockCallback,
+            // True is the default, just setting it here to be explicit
+            initWithStoredValues: true,
+        });
+
+        return Onyx.set(ONYX_KEYS.TEST_KEY, 'test').then(() => {
+            expect(mockCallback).toHaveBeenCalledTimes(1);
+        });
     });
 
     it('should merge an object with another object', () => {
@@ -155,26 +176,30 @@ describe('Onyx', () => {
             },
         });
 
-        let otherTestValue: unknown;
+        const mockCallback = jest.fn();
         const otherTestConnection = Onyx.connect({
             key: ONYX_KEYS.OTHER_TEST,
-            callback: (value) => {
-                otherTestValue = value;
-            },
+            callback: mockCallback,
         });
 
         return waitForPromisesToResolve()
+            .then(() => {
+                expect(mockCallback).toHaveBeenCalledTimes(1);
+                expect(mockCallback).toHaveBeenCalledWith(42, ONYX_KEYS.OTHER_TEST);
+                mockCallback.mockClear();
+            })
             .then(() => Onyx.set(ONYX_KEYS.TEST_KEY, 'test'))
             .then(() => {
                 expect(testKeyValue).toBe('test');
-                return Onyx.clear().then(waitForPromisesToResolve);
+                return Onyx.clear();
             })
+            .then(() => waitForPromisesToResolve())
             .then(() => {
                 // Test key should be cleared
                 expect(testKeyValue).toBeUndefined();
 
-                // Other test key should be returned to its default state
-                expect(otherTestValue).toBe(42);
+                // Expect that the connection to a key with a default value that wasn't changed is not called on clear
+                expect(mockCallback).toHaveBeenCalledTimes(0);
 
                 return Onyx.disconnect(otherTestConnection);
             });
@@ -1370,7 +1395,10 @@ describe('Onyx', () => {
                 expect(collectionCallback).toHaveBeenCalledTimes(3);
                 expect(collectionCallback).toHaveBeenCalledWith(collectionDiff, undefined);
 
-                expect(catCallback).toHaveBeenCalledTimes(2);
+                // Cat hasn't changed from its original value, expect only the initial connect callback
+                expect(catCallback).toHaveBeenCalledTimes(1);
+
+                // Dog was modified, expect the initial connect callback and the mergeCollection callback
                 expect(dogCallback).toHaveBeenCalledTimes(2);
 
                 connections.map((id) => Onyx.disconnect(id));

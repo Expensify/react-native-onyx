@@ -436,22 +436,27 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
  * @param keysToPreserve is a list of ONYXKEYS that should not be cleared with the rest of the data
  */
 function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
+    const defaultKeyStates = OnyxUtils.getDefaultKeyStates();
+    const initialKeys = Object.keys(defaultKeyStates);
+
     return OnyxUtils.getAllKeys()
-        .then((keys) => {
+        .then((cachedKeys) => {
             cache.clearNullishStorageKeys();
 
             const keysToBeClearedFromStorage: OnyxKey[] = [];
             const keyValuesToResetAsCollection: Record<OnyxKey, OnyxCollection<KeyValueMapping[OnyxKey]>> = {};
             const keyValuesToResetIndividually: KeyValueMapping = {};
 
+            const allKeys = new Set([...cachedKeys, ...initialKeys]);
+
             // The only keys that should not be cleared are:
             // 1. Anything specifically passed in keysToPreserve (because some keys like language preferences, offline
             //      status, or activeClients need to remain in Onyx even when signed out)
             // 2. Any keys with a default state (because they need to remain in Onyx as their default, and setting them
             //      to null would cause unknown behavior)
-            keys.forEach((key) => {
+            //   2.1 However, if a default key was explicitly set to null, we need to reset it to the default value
+            allKeys.forEach((key) => {
                 const isKeyToPreserve = keysToPreserve.includes(key);
-                const defaultKeyStates = OnyxUtils.getDefaultKeyStates();
                 const isDefaultKey = key in defaultKeyStates;
 
                 // If the key is being removed or reset to default:
@@ -493,7 +498,6 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                 updatePromises.push(OnyxUtils.scheduleNotifyCollectionSubscribers(key, value));
             });
 
-            const defaultKeyStates = OnyxUtils.getDefaultKeyStates();
             const defaultKeyValuePairs = Object.entries(
                 Object.keys(defaultKeyStates)
                     .filter((key) => !keysToPreserve.includes(key))
