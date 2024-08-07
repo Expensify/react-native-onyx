@@ -110,7 +110,11 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
             const previousCollectionKey = OnyxUtils.splitCollectionMemberKey(previousKey)[0];
             const collectionKey = OnyxUtils.splitCollectionMemberKey(key)[0];
 
-            if (OnyxUtils.isCollectionMemberKey(previousCollectionKey, previousKey) && OnyxUtils.isCollectionMemberKey(collectionKey, key) && previousCollectionKey === collectionKey) {
+            if (
+                OnyxUtils.isCollectionMemberKey(previousCollectionKey, previousKey, previousCollectionKey.length) &&
+                OnyxUtils.isCollectionMemberKey(collectionKey, key, collectionKey.length) &&
+                previousCollectionKey === collectionKey
+            ) {
                 return;
             }
         } catch (e) {
