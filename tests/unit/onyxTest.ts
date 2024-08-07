@@ -9,6 +9,8 @@ import type GenericCollection from '../utils/GenericCollection';
 const ONYX_KEYS = {
     TEST_KEY: 'test',
     OTHER_TEST: 'otherTest',
+    // Special case: this key is not a collection key, but it has an underscore in its name
+    KEY_WITH_UNDERSCORE: 'nvp_test',
     COLLECTION: {
         TEST_KEY: 'test_',
         TEST_CONNECT_COLLECTION: 'testConnectCollection_',
@@ -25,6 +27,7 @@ Onyx.init({
     keys: ONYX_KEYS,
     initialKeyStates: {
         [ONYX_KEYS.OTHER_TEST]: 42,
+        [ONYX_KEYS.KEY_WITH_UNDERSCORE]: 'default',
     },
 });
 
@@ -199,6 +202,35 @@ describe('Onyx', () => {
                 expect(mockCallback).toHaveBeenCalledTimes(0);
 
                 return Onyx.disconnect(otherTestConnectionID);
+            });
+    });
+
+    it('should notify key subscribers that use a underscore in their name', () => {
+        const mockCallback = jest.fn();
+        connectionID = Onyx.connect({
+            key: ONYX_KEYS.KEY_WITH_UNDERSCORE,
+            callback: mockCallback,
+        });
+
+        return waitForPromisesToResolve()
+            .then(() => mockCallback.mockReset())
+            .then(() => Onyx.set(ONYX_KEYS.KEY_WITH_UNDERSCORE, 'test'))
+            .then(() => {
+                expect(mockCallback).toHaveBeenCalledTimes(1);
+                expect(mockCallback).toHaveBeenLastCalledWith('test', ONYX_KEYS.KEY_WITH_UNDERSCORE);
+                mockCallback.mockReset();
+                return Onyx.clear();
+            })
+            .then(() => {
+                expect(mockCallback).toHaveBeenCalledTimes(1);
+                expect(mockCallback).toHaveBeenCalledWith('default', ONYX_KEYS.KEY_WITH_UNDERSCORE);
+            })
+            .then(() => Onyx.set(ONYX_KEYS.KEY_WITH_UNDERSCORE, 'default'))
+            .then(() => mockCallback.mockReset())
+            .then(() => Onyx.set(ONYX_KEYS.KEY_WITH_UNDERSCORE, 'test'))
+            .then(() => {
+                expect(mockCallback).toHaveBeenCalledTimes(1);
+                expect(mockCallback).toHaveBeenCalledWith('test', ONYX_KEYS.KEY_WITH_UNDERSCORE);
             });
     });
 

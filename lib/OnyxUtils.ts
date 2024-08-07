@@ -405,14 +405,16 @@ function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collect
  * @param key - The collection member key to split.
  * @returns A tuple where the first element is the collection part and the second element is the ID part.
  */
-function splitCollectionMemberKey<TKey extends CollectionKey>(key: TKey): [TKey extends `${infer Prefix}_${string}` ? `${Prefix}_` : never, string] {
+function splitCollectionMemberKey<TKey extends CollectionKey, CollectionKeyType = TKey extends `${infer Prefix}_${string}` ? `${Prefix}_` : never>(key: TKey): [CollectionKeyType, string] {
     const underscoreIndex = key.lastIndexOf('_');
 
     if (underscoreIndex === -1) {
         throw new Error(`Invalid ${key} key provided, only collection keys are allowed.`);
     }
 
-    return [key.substring(0, underscoreIndex + 1) as TKey extends `${infer Prefix}_${string}` ? `${Prefix}_` : never, key.substring(underscoreIndex + 1)];
+    const collectionKey = key.substring(0, underscoreIndex + 1) as CollectionKeyType;
+    const memberKey = key.substring(underscoreIndex + 1);
+    return [collectionKey, memberKey];
 }
 
 /**
