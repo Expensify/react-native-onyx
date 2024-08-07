@@ -185,13 +185,13 @@ class OnyxConnectionManager {
      */
     disconnect(connection: Connection): void {
         if (!connection) {
-            Logger.logAlert(`[ConnectionManager] Attempted to disconnect passing an undefined connection object.`);
+            Logger.logInfo(`[ConnectionManager] Attempted to disconnect passing an undefined connection object.`);
             return;
         }
 
         const connectionMetadata = this.connectionsMap.get(connection.id);
         if (!connectionMetadata) {
-            Logger.logAlert(`[ConnectionManager] Attempted to disconnect but no connection was found.`);
+            Logger.logInfo(`[ConnectionManager] Attempted to disconnect but no connection was found.`);
             return;
         }
 
