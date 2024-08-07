@@ -1,6 +1,6 @@
 {
   "name": "react-native-onyx",
-  "version": "2.0.58",
+  "version": "2.0.61",
   "author": "Expensify, Inc.",
   "homepage": "https://expensify.com",
   "description": "State management for React Native",
@@ -111,7 +111,7 @@
     }
   },
   "engines": {
-    "node": ">=20.14.0",
+    "node": ">=20.15.1",
     "npm": ">=10.7.0"
   },
   "sideEffects": false

@@ -61,8 +61,11 @@ describe('Onyx', () => {
             })
             .then((keys) => {
                 expect(keys.has(ONYX_KEYS.OTHER_TEST)).toBe(false);
-            })
-            // Expect to reset to initial key value when calling Onyx.clear()
+            }));
+
+    it('should restore a key with initial state if the key was set to null and Onyx.clear() is called', () =>
+        Onyx.set(ONYX_KEYS.OTHER_TEST, 42)
+            .then(() => Onyx.set(ONYX_KEYS.OTHER_TEST, null))
             .then(() => Onyx.clear())
             .then(() => {
                 expect(cache.get(ONYX_KEYS.OTHER_TEST)).toBe(42);
