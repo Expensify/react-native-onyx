@@ -806,6 +806,9 @@ function keyChanged<TKey extends OnyxKey>(
             return;
         }
     }
+
+    const cachedCollections: Record<string, ReturnType<typeof getCachedCollection>> = {};
+
     for (let i = 0; i < stateMappingKeys.length; i++) {
         const subscriber = callbackToStateMapping[stateMappingKeys[i]];
         if (!subscriber || !isKeyMatch(subscriber.key, key) || !canUpdateSubscriber(subscriber)) {
@@ -822,7 +825,12 @@ function keyChanged<TKey extends OnyxKey>(
             }
 
             if (isCollectionKey(subscriber.key) && subscriber.waitForCollectionCallback) {
-                const cachedCollection = getCachedCollection(subscriber.key);
+                let cachedCollection = cachedCollections[subscriber.key];
+
+                if (!cachedCollection) {
+                    cachedCollection = getCachedCollection(subscriber.key);
+                    cachedCollections[subscriber.key] = cachedCollection;
+                }
 
                 cachedCollection[key] = value;
                 subscriber.callback(cachedCollection);
