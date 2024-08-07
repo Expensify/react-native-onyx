@@ -13,6 +13,7 @@ import type OnyxInstance from '../../lib/Onyx';
 import type withOnyxType from '../../lib/withOnyx';
 import type {InitOptions} from '../../lib/types';
 import generateRange from '../utils/generateRange';
+import type {Connection} from '../../lib/OnyxConnectionManager';
 
 describe('Onyx', () => {
     describe('Cache Service', () => {
@@ -528,7 +529,7 @@ describe('Onyx', () => {
             StorageMock.getItem.mockResolvedValue('"mockValue"');
             const range = generateRange(0, 10);
             StorageMock.getAllKeys.mockResolvedValue(range.map((number) => `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}${number}`));
-            let connections: Array<{key: string; connectionId: number}> = [];
+            let connections: Array<{key: string; connection: Connection}> = [];
 
             // Given Onyx is configured with max 5 keys in cache
             return initOnyx({
@@ -540,14 +541,14 @@ describe('Onyx', () => {
                         const key = `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}${number}`;
                         return {
                             key,
-                            connectionId: Onyx.connect({key, callback: jest.fn()}),
+                            connection: Onyx.connect({key, callback: jest.fn()}),
                         };
                     });
                 })
                 .then(waitForPromisesToResolve)
                 .then(() => {
                     // When a new connection for a safe eviction key happens
-                    Onyx.connect({key: `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}9`, callback: jest.fn()});
+                    Onyx.connect({key: `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}10`, callback: jest.fn()});
                 })
                 .then(() => {
                     // Then the most recent 5 keys should remain in cache
