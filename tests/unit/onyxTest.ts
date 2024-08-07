@@ -210,7 +210,7 @@ describe('Onyx', () => {
 
     it('should notify key subscribers that use a underscore in their name', () => {
         const mockCallback = jest.fn();
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.KEY_WITH_UNDERSCORE,
             callback: mockCallback,
         });
