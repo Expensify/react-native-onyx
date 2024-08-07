@@ -550,7 +550,7 @@ describe('useOnyx', () => {
         });
     });
 
-    // This suite test must be the last one to avoid problems when running the other tests here.
+    // This test suite must be the last one to avoid problems when running the other tests here.
     describe('canEvict', () => {
         const error = (key: string) => `canEvict can't be used on key '${key}'. This key must explicitly be flagged as safe for removal by adding it to Onyx.init({safeEvictionKeys: []}).`;
 

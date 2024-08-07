@@ -230,8 +230,6 @@ class OnyxConnectionManager {
             return;
         }
 
-        this.removeFromEvictionBlockList(connection);
-
         const evictionBlocklist = OnyxUtils.getEvictionBlocklist();
         if (!evictionBlocklist[connectionMetadata.onyxKey]) {
             evictionBlocklist[connectionMetadata.onyxKey] = [];
