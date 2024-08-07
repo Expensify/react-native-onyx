@@ -127,6 +127,10 @@ const provider: StorageProvider = {
         return Promise.resolve(_.keys(store));
     },
 
+    getAllEntries() {
+        return Promise.resolve(Object.entries(store));
+    },
+
     /**
      * Gets the total bytes of the store.
      * `bytesRemaining` will always be `Number.POSITIVE_INFINITY` since we don't have a hard limit on memory.

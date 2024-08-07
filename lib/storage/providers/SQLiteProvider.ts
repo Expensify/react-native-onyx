@@ -89,6 +89,8 @@ const provider: StorageProvider = {
             const result = rows?._array.map((row) => row.record_key);
             return (result ?? []) as KeyList;
         }),
+    // eslint-disable-next-line no-underscore-dangle
+    getAllEntries: () => db.executeAsync('SELECT record_key, valueJSON FROM keyvaluepairs;', []).then(({rows}) => (rows?._array ?? []).map((row) => [row.item(0), row.item(1)])),
     removeItem: (key) => db.executeAsync('DELETE FROM keyvaluepairs WHERE record_key = ?;', [key]),
     removeItems: (keys) => {
         const placeholders = keys.map(() => '?').join(',');
