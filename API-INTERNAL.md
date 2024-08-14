@@ -17,6 +17,12 @@
 <dt><a href="#getDefaultKeyStates">getDefaultKeyStates()</a></dt>
 <dd><p>Getter - returns the default key states.</p>
 </dd>
+<dt><a href="#getDeferredInitTask">getDeferredInitTask()</a></dt>
+<dd><p>Getter - returns the deffered init task.</p>
+</dd>
+<dt><a href="#getEvictionBlocklist">getEvictionBlocklist()</a></dt>
+<dd><p>Getter - returns the eviction block list.</p>
+</dd>
 <dt><a href="#initStoreValues">initStoreValues(keys, initialKeyStates, safeEvictionKeys)</a></dt>
 <dd><p>Sets the initial values for the Onyx store</p>
 </dd>
@@ -34,11 +40,20 @@ The resulting collection will only contain items that are returned by the select
 <dt><a href="#get">get()</a></dt>
 <dd><p>Get some data from the store</p>
 </dd>
+<dt><a href="#storeKeyBySubscriptions">storeKeyBySubscriptions(subscriptionID, key)</a></dt>
+<dd><p>Stores a subscription ID associated with a given key.</p>
+</dd>
+<dt><a href="#deleteKeyBySubscriptions">deleteKeyBySubscriptions(subscriptionID)</a></dt>
+<dd><p>Deletes a subscription ID associated with its corresponding key.</p>
+</dd>
 <dt><a href="#getAllKeys">getAllKeys()</a></dt>
 <dd><p>Returns current key names stored in persisted storage</p>
 </dd>
+<dt><a href="#getCollectionKeys">getCollectionKeys()</a></dt>
+<dd><p>Returns set of all registered collection keys</p>
+</dd>
 <dt><a href="#isCollectionKey">isCollectionKey()</a></dt>
-<dd><p>Checks to see if the a subscriber&#39;s supplied key
+<dd><p>Checks to see if the subscriber&#39;s supplied key
 is associated with a collection of keys.</p>
 </dd>
 <dt><a href="#splitCollectionMemberKey">splitCollectionMemberKey(key)</a> ⇒</dt>
@@ -51,6 +66,15 @@ or if the provided key is a collection member key (in case our configured key is
 <dt><a href="#isSafeEvictionKey">isSafeEvictionKey()</a></dt>
 <dd><p>Checks to see if this key has been flagged as safe for removal.</p>
 </dd>
+<dt><a href="#getCollectionKey">getCollectionKey(key)</a> ⇒ <code>string</code></dt>
+<dd><p>It extracts the non-numeric collection identifier of a given key.</p>
+<p>For example:</p>
+<ul>
+<li><code>getCollectionKey(&quot;report_123&quot;)</code> would return &quot;report_&quot;</li>
+<li><code>getCollectionKey(&quot;report&quot;)</code> would return &quot;report&quot;</li>
+<li><code>getCollectionKey(&quot;report_&quot;)</code> would return &quot;report_&quot;</li>
+</ul>
+</dd>
 <dt><a href="#tryGetCachedValue">tryGetCachedValue()</a></dt>
 <dd><p>Tries to get a value from the cache. If the value is not present in cache it will return the default value or undefined.
 If the requested key is a collection, it will return an object with all the collection members.</p>
@@ -62,13 +86,6 @@ If the requested key is a collection, it will return an object with all the coll
 <dd><p>Add a key to the list of recently accessed keys. The least
 recently accessed key should be at the head and the most
 recently accessed key at the tail.</p>
-</dd>
-<dt><a href="#removeFromEvictionBlockList">removeFromEvictionBlockList()</a></dt>
-<dd><p>Removes a key previously added to this list
-which will enable it to be deleted again.</p>
-</dd>
-<dt><a href="#addToEvictionBlockList">addToEvictionBlockList()</a></dt>
-<dd><p>Keys added to this list can never be deleted.</p>
 </dd>
 <dt><a href="#addAllSafeEvictionKeysToRecentlyAccessedList">addAllSafeEvictionKeysToRecentlyAccessedList()</a></dt>
 <dd><p>Take all the keys that are safe to evict and add them to
@@ -129,6 +146,18 @@ to an array of key-value pairs in the above format and removes key-value pairs t
 <dt><a href="#initializeWithDefaultKeyStates">initializeWithDefaultKeyStates()</a></dt>
 <dd><p>Merge user provided default key value pairs.</p>
 </dd>
+<dt><a href="#isValidNonEmptyCollectionForMerge">isValidNonEmptyCollectionForMerge()</a></dt>
+<dd><p>Validate the collection is not empty and has a correct type before applying mergeCollection()</p>
+</dd>
+<dt><a href="#doAllCollectionItemsBelongToSameParent">doAllCollectionItemsBelongToSameParent()</a></dt>
+<dd><p>Verify if all the collection keys belong to the same parent</p>
+</dd>
+<dt><a href="#subscribeToKey">subscribeToKey(connectOptions)</a> ⇒</dt>
+<dd><p>Subscribes to an Onyx key and listens to its changes.</p>
+</dd>
+<dt><a href="#unsubscribeFromKey">unsubscribeFromKey(subscriptionID)</a></dt>
+<dd><p>Disconnects and removes the listener from the Onyx key.</p>
+</dd>
 </dl>
 
 <a name="getMergeQueue"></a>
@@ -153,6 +182,18 @@ Getter - returns the callback to state mapping.
 
 ## getDefaultKeyStates()
 Getter - returns the default key states.
+
+**Kind**: global function  
+<a name="getDeferredInitTask"></a>
+
+## getDeferredInitTask()
+Getter - returns the deffered init task.
+
+**Kind**: global function  
+<a name="getEvictionBlocklist"></a>
+
+## getEvictionBlocklist()
+Getter - returns the eviction block list.
 
 **Kind**: global function  
 <a name="initStoreValues"></a>
@@ -191,16 +232,45 @@ The resulting collection will only contain items that are returned by the select
 Get some data from the store
 
 **Kind**: global function  
+<a name="storeKeyBySubscriptions"></a>
+
+## storeKeyBySubscriptions(subscriptionID, key)
+Stores a subscription ID associated with a given key.
+
+**Kind**: global function  
+
+| Param | Description |
+| --- | --- |
+| subscriptionID | A subscription ID of the subscriber. |
+| key | A key that the subscriber is subscribed to. |
+
+<a name="deleteKeyBySubscriptions"></a>
+
+## deleteKeyBySubscriptions(subscriptionID)
+Deletes a subscription ID associated with its corresponding key.
+
+**Kind**: global function  
+
+| Param | Description |
+| --- | --- |
+| subscriptionID | The subscription ID to be deleted. |
+
 <a name="getAllKeys"></a>
 
 ## getAllKeys()
 Returns current key names stored in persisted storage
 
 **Kind**: global function  
+<a name="getCollectionKeys"></a>
+
+## getCollectionKeys()
+Returns set of all registered collection keys
+
+**Kind**: global function  
 <a name="isCollectionKey"></a>
 
 ## isCollectionKey()
-Checks to see if the a subscriber's supplied key
+Checks to see if the subscriber's supplied key
 is associated with a collection of keys.
 
 **Kind**: global function  
@@ -229,6 +299,23 @@ or if the provided key is a collection member key (in case our configured key is
 Checks to see if this key has been flagged as safe for removal.
 
 **Kind**: global function  
+<a name="getCollectionKey"></a>
+
+## getCollectionKey(key) ⇒ <code>string</code>
+It extracts the non-numeric collection identifier of a given key.
+
+For example:
+- `getCollectionKey("report_123")` would return "report_"
+- `getCollectionKey("report")` would return "report"
+- `getCollectionKey("report_")` would return "report_"
+
+**Kind**: global function  
+**Returns**: <code>string</code> - The pure key without any numeric  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| key | <code>OnyxKey</code> | The key to process. |
+
 <a name="tryGetCachedValue"></a>
 
 ## tryGetCachedValue()
@@ -248,19 +335,6 @@ Remove a key from the recently accessed key list.
 Add a key to the list of recently accessed keys. The least
 recently accessed key should be at the head and the most
 recently accessed key at the tail.
-
-**Kind**: global function  
-<a name="removeFromEvictionBlockList"></a>
-
-## removeFromEvictionBlockList()
-Removes a key previously added to this list
-which will enable it to be deleted again.
-
-**Kind**: global function  
-<a name="addToEvictionBlockList"></a>
-
-## addToEvictionBlockList()
-Keys added to this list can never be deleted.
 
 **Kind**: global function  
 <a name="addAllSafeEvictionKeysToRecentlyAccessedList"></a>
@@ -399,3 +473,38 @@ Merges an array of changes with an existing value
 Merge user provided default key value pairs.
 
 **Kind**: global function  
+<a name="isValidNonEmptyCollectionForMerge"></a>
+
+## isValidNonEmptyCollectionForMerge()
+Validate the collection is not empty and has a correct type before applying mergeCollection()
+
+**Kind**: global function  
+<a name="doAllCollectionItemsBelongToSameParent"></a>
+
+## doAllCollectionItemsBelongToSameParent()
+Verify if all the collection keys belong to the same parent
+
+**Kind**: global function  
+<a name="subscribeToKey"></a>
+
+## subscribeToKey(connectOptions) ⇒
+Subscribes to an Onyx key and listens to its changes.
+
+**Kind**: global function  
+**Returns**: The subscription ID to use when calling `OnyxUtils.unsubscribeFromKey()`.  
+
+| Param | Description |
+| --- | --- |
+| connectOptions | The options object that will define the behavior of the connection. |
+
+<a name="unsubscribeFromKey"></a>
+
+## unsubscribeFromKey(subscriptionID)
+Disconnects and removes the listener from the Onyx key.
+
+**Kind**: global function  
+
+| Param | Description |
+| --- | --- |
+| subscriptionID | Subscription ID returned by calling `OnyxUtils.subscribeToKey()`. |
+

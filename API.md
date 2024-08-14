@@ -8,11 +8,11 @@
 <dt><a href="#init">init()</a></dt>
 <dd><p>Initialize the store with actions and listening for storage events</p>
 </dd>
-<dt><a href="#connect">connect(mapping)</a> ⇒</dt>
-<dd><p>Subscribes a react component&#39;s state directly to a store key</p>
+<dt><a href="#connect">connect(connectOptions)</a> ⇒</dt>
+<dd><p>Connects to an Onyx key given the options passed and listens to its changes.</p>
 </dd>
-<dt><a href="#disconnect">disconnect(connectionID)</a></dt>
-<dd><p>Remove the listener for a react component</p>
+<dt><a href="#disconnect">disconnect(connection)</a></dt>
+<dd><p>Disconnects and removes the listener from the Onyx key.</p>
 </dd>
 <dt><a href="#set">set(key, value)</a></dt>
 <dd><p>Write a value to our store with the given key</p>
@@ -60,45 +60,42 @@ Initialize the store with actions and listening for storage events
 **Kind**: global function  
 <a name="connect"></a>
 
-## connect(mapping) ⇒
-Subscribes a react component's state directly to a store key
+## connect(connectOptions) ⇒
+Connects to an Onyx key given the options passed and listens to its changes.
 
 **Kind**: global function  
-**Returns**: an ID to use when calling disconnect  
+**Returns**: The connection object to use when calling `Onyx.disconnect()`.  
 
 | Param | Description |
 | --- | --- |
-| mapping | the mapping information to connect Onyx to the components state |
-| mapping.key | ONYXKEY to subscribe to |
-| [mapping.statePropertyName] | the name of the property in the state to connect the data to |
-| [mapping.withOnyxInstance] | whose setState() method will be called with any changed data      This is used by React components to connect to Onyx |
-| [mapping.callback] | a method that will be called with changed data      This is used by any non-React code to connect to Onyx |
-| [mapping.initWithStoredValues] | If set to false, then no data will be prefilled into the  component |
-| [mapping.waitForCollectionCallback] | If set to true, it will return the entire collection to the callback as a single object |
-| [mapping.selector] | THIS PARAM IS ONLY USED WITH withOnyx(). If included, this will be used to subscribe to a subset of an Onyx key's data.       The sourceData and withOnyx state are passed to the selector and should return the simplified data. Using this setting on `withOnyx` can have very positive       performance benefits because the component will only re-render when the subset of data changes. Otherwise, any change of data on any property would normally       cause the component to re-render (and that can be expensive from a performance standpoint). |
-| [mapping.initialValue] | THIS PARAM IS ONLY USED WITH withOnyx(). If included, this will be passed to the component so that something can be rendered while data is being fetched from the DB. Note that it will not cause the component to have the loading prop set to true. |
+| connectOptions | The options object that will define the behavior of the connection. |
 
 **Example**  
-```js
-const connectionID = Onyx.connect({
+```ts
+const connection = Onyx.connect({
     key: ONYXKEYS.SESSION,
     callback: onSessionChange,
 });
 ```
 <a name="disconnect"></a>
 
-## disconnect(connectionID)
-Remove the listener for a react component
+## disconnect(connection)
+Disconnects and removes the listener from the Onyx key.
 
 **Kind**: global function  
 
 | Param | Description |
 | --- | --- |
-| connectionID | unique id returned by call to Onyx.connect() |
+| connection | Connection object returned by calling `Onyx.connect()`. |
 
 **Example**  
-```js
-Onyx.disconnect(connectionID);
+```ts
+const connection = Onyx.connect({
+    key: ONYXKEYS.SESSION,
+    callback: onSessionChange,
+});
+
+Onyx.disconnect(connection);
 ```
 <a name="set"></a>
 
