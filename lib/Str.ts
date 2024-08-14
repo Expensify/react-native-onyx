@@ -23,16 +23,14 @@ function result<TFunction extends (...a: TArgs) => unknown, TArgs extends unknow
 
 /**
  * A simple GUID generator taken from https://stackoverflow.com/a/32760401/9114791
- *
- * @param [prefix] an optional prefix to put in front of the guid
  */
-function guid(prefix = ''): string {
+function guid(): string {
     function s4() {
         return Math.floor((1 + Math.random()) * 0x10000)
             .toString(16)
             .substring(1);
     }
-    return `${prefix}${s4()}${s4()}-${s4()}-${s4()}-${s4()}-${s4()}${s4()}${s4()}`;
+    return `${s4()}${s4()}-${s4()}-${s4()}-${s4()}-${s4()}${s4()}${s4()}`;
 }
 
 export {guid, result, startsWith};
