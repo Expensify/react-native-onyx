@@ -4,6 +4,7 @@ import type {ConnectOptions} from './Onyx';
 import OnyxUtils from './OnyxUtils';
 import * as Str from './Str';
 import type {DefaultConnectCallback, DefaultConnectOptions, OnyxKey, OnyxValue} from './types';
+import utils from './utils';
 
 type ConnectCallback = DefaultConnectCallback<OnyxKey>;
 
@@ -92,7 +93,7 @@ class OnyxConnectionManager {
         // - `connectOptions.reuseConnection` is `false`. That means the subscriber explicitly wants the connection to not be reused.
         // - `connectOptions.initWithStoredValues` is `false`. This flag changes the subscription flow when set to `false`, so the connection can't be reused.
         // - `withOnyxInstance` is defined inside `connectOptions`. That means the subscriber is a `withOnyx` HOC and therefore doesn't support connection reuse.
-        if (connectOptions.reuseConnection === false || connectOptions.initWithStoredValues === false || 'withOnyxInstance' in connectOptions) {
+        if (connectOptions.reuseConnection === false || connectOptions.initWithStoredValues === false || utils.hasWithOnyxInstance(connectOptions)) {
             suffix += `,uniqueID=${Str.guid()}`;
         }
 
@@ -131,7 +132,7 @@ class OnyxConnectionManager {
 
             // If the subscriber is a `withOnyx` HOC we don't define `callback` as the HOC will use
             // its own logic to handle the data.
-            if (!('withOnyxInstance' in connectOptions)) {
+            if (!utils.hasWithOnyxInstance(connectOptions)) {
                 callback = (value, key) => {
                     const createdConnection = this.connectionsMap.get(connectionID);
                     if (createdConnection) {

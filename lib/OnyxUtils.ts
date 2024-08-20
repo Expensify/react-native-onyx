@@ -666,7 +666,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
         }
 
         // React component subscriber found.
-        if ('withOnyxInstance' in subscriber && subscriber.withOnyxInstance) {
+        if (utils.hasWithOnyxInstance(subscriber)) {
             if (!notifyWithOnyxSubscibers) {
                 continue;
             }
@@ -848,7 +848,7 @@ function keyChanged<TKey extends OnyxKey>(
         }
 
         // Subscriber connected via withOnyx() HOC
-        if ('withOnyxInstance' in subscriber && subscriber.withOnyxInstance) {
+        if (utils.hasWithOnyxInstance(subscriber)) {
             if (!notifyWithOnyxSubscribers) {
                 continue;
             }
@@ -954,7 +954,7 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, valu
         return;
     }
 
-    if ('withOnyxInstance' in mapping && mapping.withOnyxInstance) {
+    if (utils.hasWithOnyxInstance(mapping)) {
         let newData: OnyxValue<OnyxKey> = value;
 
         // If the mapping has a selector, then the component's state must only be updated with the data
@@ -1006,7 +1006,7 @@ function addKeyToRecentlyAccessedIfNeeded<TKey extends OnyxKey>(mapping: Mapping
     // Try to free some cache whenever we connect to a safe eviction key
     cache.removeLeastRecentlyUsedKeys();
 
-    if ('withOnyxInstance' in mapping && mapping.withOnyxInstance && !isCollectionKey(mapping.key)) {
+    if (utils.hasWithOnyxInstance(mapping) && !isCollectionKey(mapping.key)) {
         // All React components subscribing to a key flagged as a safe eviction key must implement the canEvict property.
         if (mapping.canEvict === undefined) {
             throw new Error(`Cannot subscribe to safe eviction key '${mapping.key}' without providing a canEvict value.`);
@@ -1334,7 +1334,7 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
 
             // If we have a withOnyxInstance that means a React component has subscribed via the withOnyx() HOC and we need to
             // group collection key member data into an object.
-            if ('withOnyxInstance' in mapping && mapping.withOnyxInstance) {
+            if (utils.hasWithOnyxInstance(mapping)) {
                 if (isCollectionKey(mapping.key)) {
                     getCollectionDataAndSendAsObject(matchingKeys, mapping);
                     return;
