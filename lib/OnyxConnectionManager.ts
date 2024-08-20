@@ -29,7 +29,7 @@ type ConnectionMetadata = {
     isConnectionMade: boolean;
 
     /**
-     * A map of the subcriber's callbacks associated to this connection.
+     * A map of the subscriber's callbacks associated to this connection.
      */
     callbacks: Map<string, ConnectCallback>;
 
@@ -77,6 +77,7 @@ class OnyxConnectionManager {
         this.connectionsMap = new Map();
         this.lastCallbackID = 0;
 
+        // Binds all public methods to prevent problems with `this`.
         bindAll(this, 'generateConnectionID', 'fireCallbacks', 'connect', 'disconnect', 'disconnectAll', 'addToEvictionBlockList', 'removeFromEvictionBlockList');
     }
 

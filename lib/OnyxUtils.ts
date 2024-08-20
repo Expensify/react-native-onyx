@@ -104,13 +104,6 @@ function getMergeQueuePromise(): Record<OnyxKey, Promise<void>> {
 }
 
 /**
- * Getter - returns the callback to state mapping.
- */
-function getCallbackToStateMapping(): Record<string, Mapping<OnyxKey>> {
-    return callbackToStateMapping;
-}
-
-/**
  * Getter - returns the default key states.
  */
 function getDefaultKeyStates(): Record<OnyxKey, OnyxValue<OnyxKey>> {
@@ -1349,7 +1342,7 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
         });
 
     // The subscriptionID is returned back to the caller so that it can be used to clean up the connection when it's no longer needed
-    // by calling OnyxUtils.disconnect(subscriptionID).
+    // by calling OnyxUtils.unsubscribeFromKey(subscriptionID).
     return subscriptionID;
 }
 
@@ -1371,7 +1364,6 @@ const OnyxUtils = {
     METHOD,
     getMergeQueue,
     getMergeQueuePromise,
-    getCallbackToStateMapping,
     getDefaultKeyStates,
     getDeferredInitTask,
     initStoreValues,
@@ -1394,7 +1386,6 @@ const OnyxUtils = {
     keysChanged,
     keyChanged,
     sendDataToConnection,
-    addKeyToRecentlyAccessedIfNeeded,
     getCollectionKey,
     getCollectionDataAndSendAsObject,
     scheduleSubscriberUpdate,
