@@ -170,9 +170,9 @@ describe('Set data while storage is clearing', () => {
                             test_3: 3,
                             test_4: 4,
                         },
-                        undefined,
+                        ONYX_KEYS.COLLECTION.TEST,
                     );
-                    expect(collectionCallback).toHaveBeenLastCalledWith({}, undefined);
+                    expect(collectionCallback).toHaveBeenLastCalledWith({}, ONYX_KEYS.COLLECTION.TEST);
                 })
         );
     });

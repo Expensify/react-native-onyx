@@ -1017,7 +1017,7 @@ describe('Onyx', () => {
                     expect(mockCallback).toHaveBeenNthCalledWith(1, undefined, undefined);
 
                     // AND the value for the second call should be collectionUpdate since the collection was updated
-                    expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate, undefined);
+                    expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate, ONYX_KEYS.COLLECTION.TEST_POLICY);
                 })
         );
     });
@@ -1072,7 +1072,7 @@ describe('Onyx', () => {
                     expect(mockCallback).toHaveBeenCalledTimes(2);
 
                     // AND the value for the second call should be collectionUpdate
-                    expect(mockCallback).toHaveBeenLastCalledWith(collectionUpdate, undefined);
+                    expect(mockCallback).toHaveBeenLastCalledWith(collectionUpdate, ONYX_KEYS.COLLECTION.TEST_POLICY);
                 })
         );
     });
@@ -1107,7 +1107,7 @@ describe('Onyx', () => {
                     expect(mockCallback).toHaveBeenCalledTimes(2);
 
                     // And the value for the second call should be collectionUpdate
-                    expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate, undefined);
+                    expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate, ONYX_KEYS.COLLECTION.TEST_POLICY);
                 })
 
                 // When merge is called again with the same collection not modified
@@ -1148,7 +1148,7 @@ describe('Onyx', () => {
                     expect(mockCallback).toHaveBeenCalledTimes(1);
 
                     // And the value for the second call should be collectionUpdate
-                    expect(mockCallback).toHaveBeenNthCalledWith(1, collectionUpdate, undefined);
+                    expect(mockCallback).toHaveBeenNthCalledWith(1, collectionUpdate, ONYX_KEYS.COLLECTION.TEST_POLICY);
                 })
 
                 // When merge is called again with the same collection not modified
@@ -1186,7 +1186,7 @@ describe('Onyx', () => {
             ]).then(() => {
                 expect(collectionCallback).toHaveBeenCalledTimes(2);
                 expect(collectionCallback).toHaveBeenNthCalledWith(1, undefined, undefined);
-                expect(collectionCallback).toHaveBeenNthCalledWith(2, {[itemKey]: {a: 'a'}}, undefined);
+                expect(collectionCallback).toHaveBeenNthCalledWith(2, {[itemKey]: {a: 'a'}}, ONYX_KEYS.COLLECTION.TEST_UPDATE);
 
                 expect(testCallback).toHaveBeenCalledTimes(2);
                 expect(testCallback).toHaveBeenNthCalledWith(1, undefined, undefined);
@@ -1425,7 +1425,7 @@ describe('Onyx', () => {
             })
             .then(() => {
                 expect(collectionCallback).toHaveBeenCalledTimes(3);
-                expect(collectionCallback).toHaveBeenCalledWith(collectionDiff, undefined);
+                expect(collectionCallback).toHaveBeenCalledWith(collectionDiff, ONYX_KEYS.COLLECTION.ANIMALS);
 
                 // Cat hasn't changed from its original value, expect only the initial connect callback
                 expect(catCallback).toHaveBeenCalledTimes(1);
@@ -1556,7 +1556,7 @@ describe('Onyx', () => {
                             },
                         },
                     },
-                    undefined,
+                    ONYX_KEYS.COLLECTION.ROUTES,
                 );
 
                 connections.map((id) => Onyx.disconnect(id));
@@ -1626,7 +1626,7 @@ describe('Onyx', () => {
                     {
                         [cat]: {age: 3, sound: 'meow'},
                     },
-                    undefined,
+                    ONYX_KEYS.COLLECTION.ANIMALS,
                 );
                 expect(animalsCollectionCallback).toHaveBeenNthCalledWith(
                     2,
@@ -1634,7 +1634,7 @@ describe('Onyx', () => {
                         [cat]: {age: 3, sound: 'meow'},
                         [dog]: {size: 'M', sound: 'woof'},
                     },
-                    undefined,
+                    ONYX_KEYS.COLLECTION.ANIMALS,
                 );
 
                 expect(catCallback).toHaveBeenNthCalledWith(1, {age: 3, sound: 'meow'}, cat);
@@ -1645,7 +1645,7 @@ describe('Onyx', () => {
                         [bob]: {age: 25, car: 'sedan'},
                         [lisa]: {age: 21, car: 'SUV'},
                     },
-                    undefined,
+                    ONYX_KEYS.COLLECTION.PEOPLE,
                 );
 
                 connections.map((id) => Onyx.disconnect(id));
