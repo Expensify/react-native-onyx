@@ -11,9 +11,6 @@
 <dt><a href="#getMergeQueuePromise">getMergeQueuePromise()</a></dt>
 <dd><p>Getter - returns the merge queue promise.</p>
 </dd>
-<dt><a href="#getCallbackToStateMapping">getCallbackToStateMapping()</a></dt>
-<dd><p>Getter - returns the callback to state mapping.</p>
-</dd>
 <dt><a href="#getDefaultKeyStates">getDefaultKeyStates()</a></dt>
 <dd><p>Getter - returns the default key states.</p>
 </dd>
@@ -170,12 +167,6 @@ Getter - returns the merge queue.
 
 ## getMergeQueuePromise()
 Getter - returns the merge queue promise.
-
-**Kind**: global function  
-<a name="getCallbackToStateMapping"></a>
-
-## getCallbackToStateMapping()
-Getter - returns the callback to state mapping.
 
 **Kind**: global function  
 <a name="getDefaultKeyStates"></a>

@@ -69,6 +69,13 @@ Connects to an Onyx key given the options passed and listens to its changes.
 | Param | Description |
 | --- | --- |
 | connectOptions | The options object that will define the behavior of the connection. |
+| connectOptions.key | The Onyx key to subscribe to. |
+| connectOptions.callback | A function that will be called when the Onyx data we are subscribed changes. |
+| connectOptions.waitForCollectionCallback | If set to `true`, it will return the entire collection to the callback as a single object. |
+| connectOptions.withOnyxInstance | The `withOnyx` class instance to be internally passed. **Only used inside `withOnyx()` HOC.** |
+| connectOptions.statePropertyName | The name of the component's prop that is connected to the Onyx key. **Only used inside `withOnyx()` HOC.** |
+| connectOptions.displayName | The component's display name. **Only used inside `withOnyx()` HOC.** |
+| connectOptions.selector | This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook or `withOnyx()` HOC.**        Using this setting on `useOnyx()` or `withOnyx()` can have very positive performance benefits because the component will only re-render        when the subset of data changes. Otherwise, any change of data on any property would normally        cause the component to re-render (and that can be expensive from a performance standpoint). |
 
 **Example**  
 ```ts
