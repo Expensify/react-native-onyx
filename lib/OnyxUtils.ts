@@ -14,6 +14,7 @@ import Storage from './storage';
 import type {
     CollectionKey,
     CollectionKeyBase,
+    ConnectOptions,
     DeepRecord,
     DefaultConnectCallback,
     DefaultConnectOptions,
@@ -26,10 +27,11 @@ import type {
     OnyxMergeCollectionInput,
     OnyxValue,
     Selector,
-    WithOnyxConnectOptions,
 } from './types';
 import utils from './utils';
 import type {WithOnyxState} from './withOnyx/types';
+import type {DeferredTask} from './createDeferredTask';
+import createDeferredTask from './createDeferredTask';
 
 // Method constants
 const METHOD = {
@@ -52,8 +54,8 @@ const callbackToStateMapping: Record<string, Mapping<OnyxKey>> = {};
 // Keeps a copy of the values of the onyx collection keys as a map for faster lookups
 let onyxCollectionKeySet = new Set<OnyxKey>();
 
-// Holds a mapping of the connected key to the connectionID for faster lookups
-const onyxKeyToConnectionIDs = new Map();
+// Holds a mapping of the connected key to the subscriptionID for faster lookups
+const onyxKeyToSubscriptionIDs = new Map();
 
 // Holds a list of keys that have been directly subscribed to or recently modified from least to most recent
 let recentlyAccessedKeys: OnyxKey[] = [];
@@ -62,9 +64,9 @@ let recentlyAccessedKeys: OnyxKey[] = [];
 // whatever appears in this list it will NEVER be a candidate for eviction.
 let evictionAllowList: OnyxKey[] = [];
 
-// Holds a map of keys and connectionID arrays whose keys will never be automatically evicted as
+// Holds a map of keys and connection arrays whose keys will never be automatically evicted as
 // long as we have at least one subscriber that returns false for the canEvict property.
-const evictionBlocklist: Record<OnyxKey, number[]> = {};
+const evictionBlocklist: Record<OnyxKey, string[] | undefined> = {};
 
 // Optional user-provided key value states set when Onyx initializes or clears
 let defaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
@@ -76,6 +78,12 @@ let batchUpdatesQueue: Array<() => void> = [];
 const lastConnectionCallbackData = new Map<number, OnyxValue<OnyxKey>>();
 
 let snapshotKey: OnyxKey | null = null;
+
+// Keeps track of the last subscriptionID that was used so we can keep incrementing it
+let lastSubscriptionID = 0;
+
+// Connections can be made before `Onyx.init`. They would wait for this task before resolving
+const deferredInitTask = createDeferredTask();
 
 function getSnapshotKey(): OnyxKey | null {
     return snapshotKey;
@@ -96,17 +104,24 @@ function getMergeQueuePromise(): Record<OnyxKey, Promise<void>> {
 }
 
 /**
- * Getter - returns the callback to state mapping.
- */
-function getCallbackToStateMapping(): Record<string, Mapping<OnyxKey>> {
-    return callbackToStateMapping;
-}
-
-/**
  * Getter - returns the default key states.
  */
 function getDefaultKeyStates(): Record<OnyxKey, OnyxValue<OnyxKey>> {
     return defaultKeyStates;
+}
+
+/**
+ * Getter - returns the deffered init task.
+ */
+function getDeferredInitTask(): DeferredTask {
+    return deferredInitTask;
+}
+
+/**
+ * Getter - returns the eviction block list.
+ */
+function getEvictionBlocklist(): Record<OnyxKey, string[] | undefined> {
+    return evictionBlocklist;
 }
 
 /**
@@ -327,32 +342,32 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
 }
 
 /**
- * Stores a connection ID associated with a given key.
+ * Stores a subscription ID associated with a given key.
  *
- * @param connectionID - a connection ID of the subscriber
- * @param key - a key that the subscriber is connected to
+ * @param subscriptionID - A subscription ID of the subscriber.
+ * @param key - A key that the subscriber is subscribed to.
  */
-function storeKeyByConnections(key: OnyxKey, connectionID: number) {
-    if (!onyxKeyToConnectionIDs.has(key)) {
-        onyxKeyToConnectionIDs.set(key, []);
+function storeKeyBySubscriptions(key: OnyxKey, subscriptionID: number) {
+    if (!onyxKeyToSubscriptionIDs.has(key)) {
+        onyxKeyToSubscriptionIDs.set(key, []);
     }
-    onyxKeyToConnectionIDs.get(key).push(connectionID);
+    onyxKeyToSubscriptionIDs.get(key).push(subscriptionID);
 }
 
 /**
- * Deletes a connection ID associated with its corresponding key.
+ * Deletes a subscription ID associated with its corresponding key.
  *
- * @param {number} connectionID - The connection ID to be deleted.
+ * @param subscriptionID - The subscription ID to be deleted.
  */
-function deleteKeyByConnections(connectionID: number) {
-    const subscriber = callbackToStateMapping[connectionID];
+function deleteKeyBySubscriptions(subscriptionID: number) {
+    const subscriber = callbackToStateMapping[subscriptionID];
 
-    if (subscriber && onyxKeyToConnectionIDs.has(subscriber.key)) {
-        const updatedConnectionIDs = onyxKeyToConnectionIDs.get(subscriber.key).filter((id: number) => id !== connectionID);
-        onyxKeyToConnectionIDs.set(subscriber.key, updatedConnectionIDs);
+    if (subscriber && onyxKeyToSubscriptionIDs.has(subscriber.key)) {
+        const updatedSubscriptionsIDs = onyxKeyToSubscriptionIDs.get(subscriber.key).filter((id: number) => id !== subscriptionID);
+        onyxKeyToSubscriptionIDs.set(subscriber.key, updatedSubscriptionsIDs);
     }
 
-    lastConnectionCallbackData.delete(connectionID);
+    lastConnectionCallbackData.delete(subscriptionID);
 }
 
 /** Returns current key names stored in persisted storage */
@@ -455,7 +470,7 @@ function getCollectionKey(key: OnyxKey): string {
  * Tries to get a value from the cache. If the value is not present in cache it will return the default value or undefined.
  * If the requested key is a collection, it will return an object with all the collection members.
  */
-function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Partial<WithOnyxConnectOptions<TKey>>): OnyxValue<OnyxKey> {
+function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Partial<Mapping<TKey>>): OnyxValue<OnyxKey> {
     let val = cache.get(key);
 
     if (isCollectionKey(key)) {
@@ -509,30 +524,6 @@ function addLastAccessedKey(key: OnyxKey): void {
 
     removeLastAccessedKey(key);
     recentlyAccessedKeys.push(key);
-}
-
-/**
- * Removes a key previously added to this list
- * which will enable it to be deleted again.
- */
-function removeFromEvictionBlockList(key: OnyxKey, connectionID: number): void {
-    evictionBlocklist[key] = evictionBlocklist[key]?.filter((evictionKey) => evictionKey !== connectionID) ?? [];
-
-    // Remove the key if there are no more subscribers
-    if (evictionBlocklist[key]?.length === 0) {
-        delete evictionBlocklist[key];
-    }
-}
-
-/** Keys added to this list can never be deleted. */
-function addToEvictionBlockList(key: OnyxKey, connectionID: number): void {
-    removeFromEvictionBlockList(key, connectionID);
-
-    if (!evictionBlocklist[key]) {
-        evictionBlocklist[key] = [];
-    }
-
-    evictionBlocklist[key].push(connectionID);
 }
 
 /**
@@ -633,7 +624,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
             // send the whole cached collection.
             if (isSubscribedToCollectionKey) {
                 if (subscriber.waitForCollectionCallback) {
-                    subscriber.callback(cachedCollection);
+                    subscriber.callback(cachedCollection, subscriber.key);
                     continue;
                 }
 
@@ -668,7 +659,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
         }
 
         // React component subscriber found.
-        if ('withOnyxInstance' in subscriber && subscriber.withOnyxInstance) {
+        if (utils.hasWithOnyxInstance(subscriber)) {
             if (!notifyWithOnyxSubscibers) {
                 continue;
             }
@@ -800,13 +791,13 @@ function keyChanged<TKey extends OnyxKey>(
     // Given the amount of times this function is called we need to make sure we are not iterating over all subscribers every time. On the other hand, we don't need to
     // do the same in keysChanged, because we only call that function when a collection key changes, and it doesn't happen that often.
     // For performance reason, we look for the given key and later if don't find it we look for the collection key, instead of checking if it is a collection key first.
-    let stateMappingKeys = onyxKeyToConnectionIDs.get(key) ?? [];
+    let stateMappingKeys = onyxKeyToSubscriptionIDs.get(key) ?? [];
     const collectionKey = getCollectionKey(key);
     const plainCollectionKey = collectionKey.lastIndexOf('_') !== -1 ? collectionKey : undefined;
 
     if (plainCollectionKey) {
         // Getting the collection key from the specific key because only collection keys were stored in the mapping.
-        stateMappingKeys = [...stateMappingKeys, ...(onyxKeyToConnectionIDs.get(plainCollectionKey) ?? [])];
+        stateMappingKeys = [...stateMappingKeys, ...(onyxKeyToSubscriptionIDs.get(plainCollectionKey) ?? [])];
         if (stateMappingKeys.length === 0) {
             return;
         }
@@ -825,7 +816,7 @@ function keyChanged<TKey extends OnyxKey>(
             if (!notifyConnectSubscribers) {
                 continue;
             }
-            if (lastConnectionCallbackData.has(subscriber.connectionID) && lastConnectionCallbackData.get(subscriber.connectionID) === value) {
+            if (lastConnectionCallbackData.has(subscriber.subscriptionID) && lastConnectionCallbackData.get(subscriber.subscriptionID) === value) {
                 continue;
             }
 
@@ -838,19 +829,19 @@ function keyChanged<TKey extends OnyxKey>(
                 }
 
                 cachedCollection[key] = value;
-                subscriber.callback(cachedCollection);
+                subscriber.callback(cachedCollection, subscriber.key);
                 continue;
             }
 
             const subscriberCallback = subscriber.callback as DefaultConnectCallback<TKey>;
             subscriberCallback(value, key);
 
-            lastConnectionCallbackData.set(subscriber.connectionID, value);
+            lastConnectionCallbackData.set(subscriber.subscriptionID, value);
             continue;
         }
 
         // Subscriber connected via withOnyx() HOC
-        if ('withOnyxInstance' in subscriber && subscriber.withOnyxInstance) {
+        if (utils.hasWithOnyxInstance(subscriber)) {
             if (!notifyWithOnyxSubscribers) {
                 continue;
             }
@@ -952,11 +943,11 @@ function keyChanged<TKey extends OnyxKey>(
 function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, value: OnyxValue<TKey> | null, matchedKey: TKey | undefined, isBatched: boolean): void {
     // If the mapping no longer exists then we should not send any data.
     // This means our subscriber disconnected or withOnyx wrapped component unmounted.
-    if (!callbackToStateMapping[mapping.connectionID]) {
+    if (!callbackToStateMapping[mapping.subscriptionID]) {
         return;
     }
 
-    if ('withOnyxInstance' in mapping && mapping.withOnyxInstance) {
+    if (utils.hasWithOnyxInstance(mapping)) {
         let newData: OnyxValue<OnyxKey> = value;
 
         // If the mapping has a selector, then the component's state must only be updated with the data
@@ -985,11 +976,11 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, valu
     // withOnyx will internally replace null values with undefined and never pass null values to wrapped components.
     // For regular callbacks, we never want to pass null values, but always just undefined if a value is not set in cache or storage.
     const valueToPass = value === null ? undefined : value;
-    const lastValue = lastConnectionCallbackData.get(mapping.connectionID);
-    lastConnectionCallbackData.get(mapping.connectionID);
+    const lastValue = lastConnectionCallbackData.get(mapping.subscriptionID);
+    lastConnectionCallbackData.get(mapping.subscriptionID);
 
     // If the value has not changed we do not need to trigger the callback
-    if (lastConnectionCallbackData.has(mapping.connectionID) && valueToPass === lastValue) {
+    if (lastConnectionCallbackData.has(mapping.subscriptionID) && valueToPass === lastValue) {
         return;
     }
 
@@ -1008,7 +999,7 @@ function addKeyToRecentlyAccessedIfNeeded<TKey extends OnyxKey>(mapping: Mapping
     // Try to free some cache whenever we connect to a safe eviction key
     cache.removeLeastRecentlyUsedKeys();
 
-    if ('withOnyxInstance' in mapping && mapping.withOnyxInstance && !isCollectionKey(mapping.key)) {
+    if (utils.hasWithOnyxInstance(mapping) && !isCollectionKey(mapping.key)) {
         // All React components subscribing to a key flagged as a safe eviction key must implement the canEvict property.
         if (mapping.canEvict === undefined) {
             throw new Error(`Cannot subscribe to safe eviction key '${mapping.key}' without providing a canEvict value.`);
@@ -1236,7 +1227,7 @@ function isValidNonEmptyCollectionForMerge<TKey extends CollectionKeyBase, TMap>
 function doAllCollectionItemsBelongToSameParent<TKey extends CollectionKeyBase>(collectionKey: TKey, collectionKeys: string[]): boolean {
     let hasCollectionKeyCheckFailed = false;
     collectionKeys.forEach((dataKey) => {
-        if (OnyxUtils.isKeyMatch(collectionKey, dataKey)) {
+        if (isKeyMatch(collectionKey, dataKey)) {
             return;
         }
 
@@ -1251,12 +1242,130 @@ function doAllCollectionItemsBelongToSameParent<TKey extends CollectionKeyBase>(
     return !hasCollectionKeyCheckFailed;
 }
 
+/**
+ * Subscribes to an Onyx key and listens to its changes.
+ *
+ * @param connectOptions The options object that will define the behavior of the connection.
+ * @returns The subscription ID to use when calling `OnyxUtils.unsubscribeFromKey()`.
+ */
+function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): number {
+    const mapping = connectOptions as Mapping<TKey>;
+    const subscriptionID = lastSubscriptionID++;
+    callbackToStateMapping[subscriptionID] = mapping as Mapping<OnyxKey>;
+    callbackToStateMapping[subscriptionID].subscriptionID = subscriptionID;
+
+    // When keyChanged is called, a key is passed and the method looks through all the Subscribers in callbackToStateMapping for the matching key to get the subscriptionID
+    // to avoid having to loop through all the Subscribers all the time (even when just one connection belongs to one key),
+    // We create a mapping from key to lists of subscriptionIDs to access the specific list of subscriptionIDs.
+    storeKeyBySubscriptions(mapping.key, callbackToStateMapping[subscriptionID].subscriptionID);
+
+    if (mapping.initWithStoredValues === false) {
+        return subscriptionID;
+    }
+
+    // Commit connection only after init passes
+    deferredInitTask.promise
+        .then(() => addKeyToRecentlyAccessedIfNeeded(mapping))
+        .then(() => {
+            // Performance improvement
+            // If the mapping is connected to an onyx key that is not a collection
+            // we can skip the call to getAllKeys() and return an array with a single item
+            if (Boolean(mapping.key) && typeof mapping.key === 'string' && !mapping.key.endsWith('_') && cache.getAllKeys().has(mapping.key)) {
+                return new Set([mapping.key]);
+            }
+            return getAllKeys();
+        })
+        .then((keys) => {
+            // We search all the keys in storage to see if any are a "match" for the subscriber we are connecting so that we
+            // can send data back to the subscriber. Note that multiple keys can match as a subscriber could either be
+            // subscribed to a "collection key" or a single key.
+            const matchingKeys: string[] = [];
+            keys.forEach((key) => {
+                if (!isKeyMatch(mapping.key, key)) {
+                    return;
+                }
+                matchingKeys.push(key);
+            });
+            // If the key being connected to does not exist we initialize the value with null. For subscribers that connected
+            // directly via connect() they will simply get a null value sent to them without any information about which key matched
+            // since there are none matched. In withOnyx() we wait for all connected keys to return a value before rendering the child
+            // component. This null value will be filtered out so that the connected component can utilize defaultProps.
+            if (matchingKeys.length === 0) {
+                if (mapping.key && !isCollectionKey(mapping.key)) {
+                    cache.addNullishStorageKey(mapping.key);
+                }
+
+                // Here we cannot use batching because the nullish value is expected to be set immediately for default props
+                // or they will be undefined.
+                sendDataToConnection(mapping, null, undefined, false);
+                return;
+            }
+
+            // When using a callback subscriber we will either trigger the provided callback for each key we find or combine all values
+            // into an object and just make a single call. The latter behavior is enabled by providing a waitForCollectionCallback key
+            // combined with a subscription to a collection key.
+            if (typeof mapping.callback === 'function') {
+                if (isCollectionKey(mapping.key)) {
+                    if (mapping.waitForCollectionCallback) {
+                        getCollectionDataAndSendAsObject(matchingKeys, mapping);
+                        return;
+                    }
+
+                    // We did not opt into using waitForCollectionCallback mode so the callback is called for every matching key.
+                    multiGet(matchingKeys).then((values) => {
+                        values.forEach((val, key) => {
+                            sendDataToConnection(mapping, val as OnyxValue<TKey>, key as TKey, true);
+                        });
+                    });
+                    return;
+                }
+
+                // If we are not subscribed to a collection key then there's only a single key to send an update for.
+                get(mapping.key).then((val) => sendDataToConnection(mapping, val as OnyxValue<TKey>, mapping.key, true));
+                return;
+            }
+
+            // If we have a withOnyxInstance that means a React component has subscribed via the withOnyx() HOC and we need to
+            // group collection key member data into an object.
+            if (utils.hasWithOnyxInstance(mapping)) {
+                if (isCollectionKey(mapping.key)) {
+                    getCollectionDataAndSendAsObject(matchingKeys, mapping);
+                    return;
+                }
+
+                // If the subscriber is not using a collection key then we just send a single value back to the subscriber
+                get(mapping.key).then((val) => sendDataToConnection(mapping, val as OnyxValue<TKey>, mapping.key, true));
+                return;
+            }
+
+            console.error('Warning: Onyx.connect() was found without a callback or withOnyxInstance');
+        });
+
+    // The subscriptionID is returned back to the caller so that it can be used to clean up the connection when it's no longer needed
+    // by calling OnyxUtils.unsubscribeFromKey(subscriptionID).
+    return subscriptionID;
+}
+
+/**
+ * Disconnects and removes the listener from the Onyx key.
+ *
+ * @param subscriptionID Subscription ID returned by calling `OnyxUtils.subscribeToKey()`.
+ */
+function unsubscribeFromKey(subscriptionID: number): void {
+    if (!callbackToStateMapping[subscriptionID]) {
+        return;
+    }
+
+    deleteKeyBySubscriptions(lastSubscriptionID);
+    delete callbackToStateMapping[subscriptionID];
+}
+
 const OnyxUtils = {
     METHOD,
     getMergeQueue,
     getMergeQueuePromise,
-    getCallbackToStateMapping,
     getDefaultKeyStates,
+    getDeferredInitTask,
     initStoreValues,
     sendActionToDevTools,
     maybeFlushBatchUpdates,
@@ -1272,14 +1381,11 @@ const OnyxUtils = {
     tryGetCachedValue,
     removeLastAccessedKey,
     addLastAccessedKey,
-    removeFromEvictionBlockList,
-    addToEvictionBlockList,
     addAllSafeEvictionKeysToRecentlyAccessedList,
     getCachedCollection,
     keysChanged,
     keyChanged,
     sendDataToConnection,
-    addKeyToRecentlyAccessedIfNeeded,
     getCollectionKey,
     getCollectionDataAndSendAsObject,
     scheduleSubscriberUpdate,
@@ -1293,12 +1399,13 @@ const OnyxUtils = {
     prepareKeyValuePairsForStorage,
     applyMerge,
     initializeWithDefaultKeyStates,
-    storeKeyByConnections,
-    deleteKeyByConnections,
     getSnapshotKey,
     multiGet,
     isValidNonEmptyCollectionForMerge,
     doAllCollectionItemsBelongToSameParent,
+    subscribeToKey,
+    unsubscribeFromKey,
+    getEvictionBlocklist,
 };
 
 export default OnyxUtils;

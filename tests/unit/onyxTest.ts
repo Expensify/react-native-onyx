@@ -5,6 +5,7 @@ import OnyxUtils from '../../lib/OnyxUtils';
 import type OnyxCache from '../../lib/OnyxCache';
 import type {OnyxCollection, OnyxUpdate} from '../../lib/types';
 import type GenericCollection from '../utils/GenericCollection';
+import type {Connection} from '../../lib/OnyxConnectionManager';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
@@ -32,7 +33,7 @@ Onyx.init({
 });
 
 describe('Onyx', () => {
-    let connectionID: number;
+    let connection: Connection | undefined;
 
     /** @type OnyxCache */
     let cache: typeof OnyxCache;
@@ -43,7 +44,9 @@ describe('Onyx', () => {
     });
 
     afterEach(() => {
-        Onyx.disconnect(connectionID);
+        if (connection) {
+            Onyx.disconnect(connection);
+        }
         return Onyx.clear();
     });
 
@@ -74,7 +77,7 @@ describe('Onyx', () => {
     it('should set a simple key', () => {
         let testKeyValue: unknown;
 
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
             callback: (value) => {
@@ -91,7 +94,7 @@ describe('Onyx', () => {
     it('should not set the key if the value is incompatible (array vs object)', () => {
         let testKeyValue: unknown;
 
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
             callback: (value) => {
@@ -112,7 +115,7 @@ describe('Onyx', () => {
     it("shouldn't call a connection twice when setting a value", () => {
         const mockCallback = jest.fn();
 
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             callback: mockCallback,
             // True is the default, just setting it here to be explicit
@@ -127,7 +130,7 @@ describe('Onyx', () => {
     it('should merge an object with another object', () => {
         let testKeyValue: unknown;
 
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
             callback: (value) => {
@@ -148,7 +151,7 @@ describe('Onyx', () => {
     it('should not merge if the value is incompatible (array vs object)', () => {
         let testKeyValue: unknown;
 
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
             callback: (value) => {
@@ -168,7 +171,7 @@ describe('Onyx', () => {
 
     it('should notify subscribers when data has been cleared', () => {
         let testKeyValue: unknown;
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
             callback: (value) => {
@@ -177,7 +180,7 @@ describe('Onyx', () => {
         });
 
         const mockCallback = jest.fn();
-        const otherTestConnectionID = Onyx.connect({
+        const otherTestConnection = Onyx.connect({
             key: ONYX_KEYS.OTHER_TEST,
             callback: mockCallback,
         });
@@ -201,13 +204,13 @@ describe('Onyx', () => {
                 // Expect that the connection to a key with a default value that wasn't changed is not called on clear
                 expect(mockCallback).toHaveBeenCalledTimes(0);
 
-                return Onyx.disconnect(otherTestConnectionID);
+                return Onyx.disconnect(otherTestConnection);
             });
     });
 
     it('should notify key subscribers that use a underscore in their name', () => {
         const mockCallback = jest.fn();
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.KEY_WITH_UNDERSCORE,
             callback: mockCallback,
         });
@@ -236,7 +239,7 @@ describe('Onyx', () => {
 
     it('should not notify subscribers after they have disconnected', () => {
         let testKeyValue: unknown;
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
             callback: (value) => {
@@ -247,7 +250,9 @@ describe('Onyx', () => {
         return Onyx.set(ONYX_KEYS.TEST_KEY, 'test')
             .then(() => {
                 expect(testKeyValue).toBe('test');
-                Onyx.disconnect(connectionID);
+                if (connection) {
+                    Onyx.disconnect(connection);
+                }
                 return Onyx.set(ONYX_KEYS.TEST_KEY, 'test updated');
             })
             .then(() => {
@@ -258,7 +263,7 @@ describe('Onyx', () => {
 
     it('should merge arrays by replacing previous value with new value', () => {
         let testKeyValue: unknown;
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
             callback: (value) => {
@@ -279,7 +284,7 @@ describe('Onyx', () => {
 
     it('should merge 2 objects when it has no initial stored value for test key', () => {
         let testKeyValue: unknown;
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
             callback: (value) => {
@@ -295,7 +300,7 @@ describe('Onyx', () => {
 
     it('should merge 2 arrays when it has no initial stored value for test key', () => {
         let testKeyValue: unknown;
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
             callback: (value) => {
@@ -312,7 +317,7 @@ describe('Onyx', () => {
     it('should remove keys that are set to null when merging', () => {
         let testKeyValue: unknown;
 
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
             callback: (value) => {
@@ -373,7 +378,7 @@ describe('Onyx', () => {
     it('should ignore top-level and remove nested `undefined` values in Onyx.set', () => {
         let testKeyValue: unknown;
 
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
             callback: (value) => {
@@ -421,7 +426,7 @@ describe('Onyx', () => {
 
     it('should ignore top-level and remove nested `undefined` values in Onyx.multiSet', () => {
         let testKeyValue: unknown;
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
             callback: (value) => {
@@ -430,7 +435,7 @@ describe('Onyx', () => {
         });
 
         let otherTestKeyValue: unknown;
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.OTHER_TEST,
             initWithStoredValues: false,
             callback: (value) => {
@@ -480,7 +485,7 @@ describe('Onyx', () => {
     it('should ignore top-level and remove nested `undefined` values in Onyx.merge', () => {
         let testKeyValue: unknown;
 
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
             callback: (value) => {
@@ -527,7 +532,7 @@ describe('Onyx', () => {
         const holidayRoute = `${ONYX_KEYS.COLLECTION.TEST_KEY}holiday`;
         const workRoute = `${ONYX_KEYS.COLLECTION.TEST_KEY}work`;
 
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
             initWithStoredValues: false,
             callback: (value) => (result = value),
@@ -562,7 +567,7 @@ describe('Onyx', () => {
 
     it('should overwrite an array key nested inside an object', () => {
         let testKeyValue: unknown;
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
             callback: (value) => {
@@ -578,7 +583,7 @@ describe('Onyx', () => {
 
     it('should overwrite an array key nested inside an object when using merge on a collection', () => {
         let testKeyValue: unknown;
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
             initWithStoredValues: false,
             callback: (value) => {
@@ -595,7 +600,7 @@ describe('Onyx', () => {
     it('should properly set and merge when using mergeCollection', () => {
         const valuesReceived: Record<string, unknown> = {};
         const mockCallback = jest.fn((data) => (valuesReceived[data.ID] = data.value));
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
             initWithStoredValues: false,
             callback: mockCallback,
@@ -659,7 +664,7 @@ describe('Onyx', () => {
 
     it('should skip the update when a key not belonging to collection key is present in mergeCollection', () => {
         const valuesReceived: Record<string, unknown> = {};
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
             initWithStoredValues: false,
             callback: (data, key) => (valuesReceived[key] = data),
@@ -672,7 +677,7 @@ describe('Onyx', () => {
 
     it('should return full object to callback when calling mergeCollection()', () => {
         const valuesReceived: Record<string, unknown> = {};
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
             initWithStoredValues: false,
             callback: (data, key) => (valuesReceived[key] = data),
@@ -716,7 +721,7 @@ describe('Onyx', () => {
 
     it('should use update data object to set/merge keys', () => {
         let testKeyValue: unknown;
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
             callback: (value) => {
@@ -725,7 +730,7 @@ describe('Onyx', () => {
         });
 
         let otherTestKeyValue: unknown;
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.OTHER_TEST,
             initWithStoredValues: false,
             callback: (value) => {
@@ -768,7 +773,7 @@ describe('Onyx', () => {
     it('should use update data object to merge a collection of keys', () => {
         const valuesReceived: Record<string, unknown> = {};
         const mockCallback = jest.fn((data) => (valuesReceived[data.ID] = data.value));
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
             initWithStoredValues: false,
             callback: mockCallback,
@@ -880,7 +885,7 @@ describe('Onyx', () => {
 
     it('should properly set all keys provided in a multiSet called via update', () => {
         const valuesReceived: Record<string, unknown> = {};
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
             initWithStoredValues: false,
             callback: (data, key) => (valuesReceived[key] = data),
@@ -973,7 +978,7 @@ describe('Onyx', () => {
         return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION, initialCollectionData as GenericCollection)
             .then(() => {
                 // When we connect to that collection with waitForCollectionCallback = true
-                connectionID = Onyx.connect({
+                connection = Onyx.connect({
                     key: ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION,
                     waitForCollectionCallback: true,
                     callback: mockCallback,
@@ -995,7 +1000,7 @@ describe('Onyx', () => {
         };
 
         // Given an Onyx.connect call with waitForCollectionCallback=true
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_POLICY,
             waitForCollectionCallback: true,
             callback: mockCallback,
@@ -1012,7 +1017,7 @@ describe('Onyx', () => {
                     expect(mockCallback).toHaveBeenNthCalledWith(1, undefined, undefined);
 
                     // AND the value for the second call should be collectionUpdate since the collection was updated
-                    expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate);
+                    expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate, ONYX_KEYS.COLLECTION.TEST_POLICY);
                 })
         );
     });
@@ -1025,7 +1030,7 @@ describe('Onyx', () => {
         };
 
         // Given an Onyx.connect call with waitForCollectionCallback=false
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: `${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`,
             callback: mockCallback,
         });
@@ -1053,7 +1058,7 @@ describe('Onyx', () => {
         };
 
         // Given an Onyx.connect call with waitForCollectionCallback=true
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_POLICY,
             waitForCollectionCallback: true,
             callback: mockCallback,
@@ -1067,7 +1072,7 @@ describe('Onyx', () => {
                     expect(mockCallback).toHaveBeenCalledTimes(2);
 
                     // AND the value for the second call should be collectionUpdate
-                    expect(mockCallback).toHaveBeenLastCalledWith(collectionUpdate);
+                    expect(mockCallback).toHaveBeenLastCalledWith(collectionUpdate, ONYX_KEYS.COLLECTION.TEST_POLICY);
                 })
         );
     });
@@ -1088,7 +1093,7 @@ describe('Onyx', () => {
         };
 
         // Given an Onyx.connect call with waitForCollectionCallback=true
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_POLICY,
             waitForCollectionCallback: true,
             callback: mockCallback,
@@ -1102,7 +1107,7 @@ describe('Onyx', () => {
                     expect(mockCallback).toHaveBeenCalledTimes(2);
 
                     // And the value for the second call should be collectionUpdate
-                    expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate);
+                    expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate, ONYX_KEYS.COLLECTION.TEST_POLICY);
                 })
 
                 // When merge is called again with the same collection not modified
@@ -1128,7 +1133,7 @@ describe('Onyx', () => {
         };
 
         // Given an Onyx.connect call with waitForCollectionCallback=true
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_POLICY,
             waitForCollectionCallback: true,
             callback: mockCallback,
@@ -1143,7 +1148,7 @@ describe('Onyx', () => {
                     expect(mockCallback).toHaveBeenCalledTimes(1);
 
                     // And the value for the second call should be collectionUpdate
-                    expect(mockCallback).toHaveBeenNthCalledWith(1, collectionUpdate);
+                    expect(mockCallback).toHaveBeenNthCalledWith(1, collectionUpdate, ONYX_KEYS.COLLECTION.TEST_POLICY);
                 })
 
                 // When merge is called again with the same collection not modified
@@ -1163,16 +1168,16 @@ describe('Onyx', () => {
     });
 
     it('should return a promise that completes when all update() operations are done', () => {
-        const connectionIDs: number[] = [];
+        const connections: Connection[] = [];
 
         const testCallback = jest.fn();
         const otherTestCallback = jest.fn();
         const collectionCallback = jest.fn();
         const itemKey = `${ONYX_KEYS.COLLECTION.TEST_UPDATE}1`;
 
-        connectionIDs.push(Onyx.connect({key: ONYX_KEYS.TEST_KEY, callback: testCallback}));
-        connectionIDs.push(Onyx.connect({key: ONYX_KEYS.OTHER_TEST, callback: otherTestCallback}));
-        connectionIDs.push(Onyx.connect({key: ONYX_KEYS.COLLECTION.TEST_UPDATE, callback: collectionCallback, waitForCollectionCallback: true}));
+        connections.push(Onyx.connect({key: ONYX_KEYS.TEST_KEY, callback: testCallback}));
+        connections.push(Onyx.connect({key: ONYX_KEYS.OTHER_TEST, callback: otherTestCallback}));
+        connections.push(Onyx.connect({key: ONYX_KEYS.COLLECTION.TEST_UPDATE, callback: collectionCallback, waitForCollectionCallback: true}));
         return waitForPromisesToResolve().then(() =>
             Onyx.update([
                 {onyxMethod: Onyx.METHOD.SET, key: ONYX_KEYS.TEST_KEY, value: 'taco'},
@@ -1181,7 +1186,7 @@ describe('Onyx', () => {
             ]).then(() => {
                 expect(collectionCallback).toHaveBeenCalledTimes(2);
                 expect(collectionCallback).toHaveBeenNthCalledWith(1, undefined, undefined);
-                expect(collectionCallback).toHaveBeenNthCalledWith(2, {[itemKey]: {a: 'a'}});
+                expect(collectionCallback).toHaveBeenNthCalledWith(2, {[itemKey]: {a: 'a'}}, ONYX_KEYS.COLLECTION.TEST_UPDATE);
 
                 expect(testCallback).toHaveBeenCalledTimes(2);
                 expect(testCallback).toHaveBeenNthCalledWith(1, undefined, undefined);
@@ -1191,7 +1196,7 @@ describe('Onyx', () => {
                 // We set an initial value of 42 for ONYX_KEYS.OTHER_TEST in Onyx.init()
                 expect(otherTestCallback).toHaveBeenNthCalledWith(1, 42, ONYX_KEYS.OTHER_TEST);
                 expect(otherTestCallback).toHaveBeenNthCalledWith(2, 'pizza', ONYX_KEYS.OTHER_TEST);
-                connectionIDs.forEach((id) => Onyx.disconnect(id));
+                connections.forEach((id) => Onyx.disconnect(id));
             }),
         );
     });
@@ -1199,7 +1204,7 @@ describe('Onyx', () => {
     it('should merge an object with a batch of objects and undefined', () => {
         let testKeyValue: unknown;
 
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
             callback: (value) => {
@@ -1230,7 +1235,7 @@ describe('Onyx', () => {
     it('should merge an object with null and overwrite the value', () => {
         let testKeyValue: unknown;
 
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
             callback: (value) => {
@@ -1257,7 +1262,7 @@ describe('Onyx', () => {
     it('should merge a key with null and allow subsequent updates', () => {
         let testKeyValue: unknown;
 
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
             callback: (value) => {
@@ -1283,7 +1288,7 @@ describe('Onyx', () => {
     it("should not set null values in Onyx.merge, when the key doesn't exist yet", () => {
         let testKeyValue: unknown;
 
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
             callback: (value) => {
@@ -1309,7 +1314,7 @@ describe('Onyx', () => {
     it('should apply updates in order with Onyx.update', () => {
         let testKeyValue: unknown;
 
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
             initWithStoredValues: false,
             callback: (value) => {
@@ -1345,7 +1350,7 @@ describe('Onyx', () => {
         const routineRoute = `${ONYX_KEYS.COLLECTION.TEST_KEY}routine`;
         const holidayRoute = `${ONYX_KEYS.COLLECTION.TEST_KEY}holiday`;
 
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
             initWithStoredValues: false,
             callback: (value) => (result = value),
@@ -1387,7 +1392,7 @@ describe('Onyx', () => {
     });
 
     it('should not call a collection item subscriber if the value did not change', () => {
-        const connectionIDs: number[] = [];
+        const connections: Connection[] = [];
 
         const cat = `${ONYX_KEYS.COLLECTION.ANIMALS}cat`;
         const dog = `${ONYX_KEYS.COLLECTION.ANIMALS}dog`;
@@ -1396,15 +1401,15 @@ describe('Onyx', () => {
         const catCallback = jest.fn();
         const dogCallback = jest.fn();
 
-        connectionIDs.push(
+        connections.push(
             Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.ANIMALS,
                 callback: collectionCallback,
                 waitForCollectionCallback: true,
             }),
         );
-        connectionIDs.push(Onyx.connect({key: cat, callback: catCallback}));
-        connectionIDs.push(Onyx.connect({key: dog, callback: dogCallback}));
+        connections.push(Onyx.connect({key: cat, callback: catCallback}));
+        connections.push(Onyx.connect({key: dog, callback: dogCallback}));
 
         const initialValue = {name: 'Fluffy'};
 
@@ -1420,7 +1425,7 @@ describe('Onyx', () => {
             })
             .then(() => {
                 expect(collectionCallback).toHaveBeenCalledTimes(3);
-                expect(collectionCallback).toHaveBeenCalledWith(collectionDiff);
+                expect(collectionCallback).toHaveBeenCalledWith(collectionDiff, ONYX_KEYS.COLLECTION.ANIMALS);
 
                 // Cat hasn't changed from its original value, expect only the initial connect callback
                 expect(catCallback).toHaveBeenCalledTimes(1);
@@ -1428,7 +1433,7 @@ describe('Onyx', () => {
                 // Dog was modified, expect the initial connect callback and the mergeCollection callback
                 expect(dogCallback).toHaveBeenCalledTimes(2);
 
-                connectionIDs.map((id) => Onyx.disconnect(id));
+                connections.map((id) => Onyx.disconnect(id));
             });
     });
 
@@ -1458,13 +1463,13 @@ describe('Onyx', () => {
 
     describe('update', () => {
         it('should squash all updates of collection-related keys into a single mergeCollection call', () => {
-            const connectionIDs: number[] = [];
+            const connections: Connection[] = [];
 
             const routineRoute = `${ONYX_KEYS.COLLECTION.ROUTES}routine`;
             const holidayRoute = `${ONYX_KEYS.COLLECTION.ROUTES}holiday`;
 
             const routesCollectionCallback = jest.fn();
-            connectionIDs.push(
+            connections.push(
                 Onyx.connect({
                     key: ONYX_KEYS.COLLECTION.ROUTES,
                     callback: routesCollectionCallback,
@@ -1530,32 +1535,36 @@ describe('Onyx', () => {
                     },
                 },
             ]).then(() => {
-                expect(routesCollectionCallback).toHaveBeenNthCalledWith(1, {
-                    [holidayRoute]: {
-                        waypoints: {
-                            0: 'Bed',
-                            1: 'Home',
-                            2: 'Beach',
-                            3: 'Restaurant',
-                            4: 'Home',
+                expect(routesCollectionCallback).toHaveBeenNthCalledWith(
+                    1,
+                    {
+                        [holidayRoute]: {
+                            waypoints: {
+                                0: 'Bed',
+                                1: 'Home',
+                                2: 'Beach',
+                                3: 'Restaurant',
+                                4: 'Home',
+                            },
+                        },
+                        [routineRoute]: {
+                            waypoints: {
+                                0: 'Bed',
+                                1: 'Home',
+                                2: 'Work',
+                                3: 'Gym',
+                            },
                         },
                     },
-                    [routineRoute]: {
-                        waypoints: {
-                            0: 'Bed',
-                            1: 'Home',
-                            2: 'Work',
-                            3: 'Gym',
-                        },
-                    },
-                });
+                    ONYX_KEYS.COLLECTION.ROUTES,
+                );
 
-                connectionIDs.map((id) => Onyx.disconnect(id));
+                connections.map((id) => Onyx.disconnect(id));
             });
         });
 
         it('should return a promise that completes when all update() operations are done', () => {
-            const connectionIDs: number[] = [];
+            const connections: Connection[] = [];
 
             const bob = `${ONYX_KEYS.COLLECTION.PEOPLE}bob`;
             const lisa = `${ONYX_KEYS.COLLECTION.PEOPLE}lisa`;
@@ -1569,23 +1578,23 @@ describe('Onyx', () => {
             const animalsCollectionCallback = jest.fn();
             const catCallback = jest.fn();
 
-            connectionIDs.push(Onyx.connect({key: ONYX_KEYS.TEST_KEY, callback: testCallback}));
-            connectionIDs.push(Onyx.connect({key: ONYX_KEYS.OTHER_TEST, callback: otherTestCallback}));
-            connectionIDs.push(
+            connections.push(Onyx.connect({key: ONYX_KEYS.TEST_KEY, callback: testCallback}));
+            connections.push(Onyx.connect({key: ONYX_KEYS.OTHER_TEST, callback: otherTestCallback}));
+            connections.push(
                 Onyx.connect({
                     key: ONYX_KEYS.COLLECTION.ANIMALS,
                     callback: animalsCollectionCallback,
                     waitForCollectionCallback: true,
                 }),
             );
-            connectionIDs.push(
+            connections.push(
                 Onyx.connect({
                     key: ONYX_KEYS.COLLECTION.PEOPLE,
                     callback: peopleCollectionCallback,
                     waitForCollectionCallback: true,
                 }),
             );
-            connectionIDs.push(Onyx.connect({key: cat, callback: catCallback}));
+            connections.push(Onyx.connect({key: cat, callback: catCallback}));
 
             return Onyx.update([
                 {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.TEST_KEY, value: 'none'},
@@ -1612,29 +1621,41 @@ describe('Onyx', () => {
 
                 expect(otherTestCallback).toHaveBeenNthCalledWith(1, {food: 'pizza', drink: 'water'}, ONYX_KEYS.OTHER_TEST);
 
-                expect(animalsCollectionCallback).toHaveBeenNthCalledWith(1, {
-                    [cat]: {age: 3, sound: 'meow'},
-                });
-                expect(animalsCollectionCallback).toHaveBeenNthCalledWith(2, {
-                    [cat]: {age: 3, sound: 'meow'},
-                    [dog]: {size: 'M', sound: 'woof'},
-                });
+                expect(animalsCollectionCallback).toHaveBeenNthCalledWith(
+                    1,
+                    {
+                        [cat]: {age: 3, sound: 'meow'},
+                    },
+                    ONYX_KEYS.COLLECTION.ANIMALS,
+                );
+                expect(animalsCollectionCallback).toHaveBeenNthCalledWith(
+                    2,
+                    {
+                        [cat]: {age: 3, sound: 'meow'},
+                        [dog]: {size: 'M', sound: 'woof'},
+                    },
+                    ONYX_KEYS.COLLECTION.ANIMALS,
+                );
 
                 expect(catCallback).toHaveBeenNthCalledWith(1, {age: 3, sound: 'meow'}, cat);
 
-                expect(peopleCollectionCallback).toHaveBeenNthCalledWith(1, {
-                    [bob]: {age: 25, car: 'sedan'},
-                    [lisa]: {age: 21, car: 'SUV'},
-                });
+                expect(peopleCollectionCallback).toHaveBeenNthCalledWith(
+                    1,
+                    {
+                        [bob]: {age: 25, car: 'sedan'},
+                        [lisa]: {age: 21, car: 'SUV'},
+                    },
+                    ONYX_KEYS.COLLECTION.PEOPLE,
+                );
 
-                connectionIDs.map((id) => Onyx.disconnect(id));
+                connections.map((id) => Onyx.disconnect(id));
             });
         });
 
         it('should apply updates in the correct order with Onyx.update', () => {
             let testKeyValue: unknown;
 
-            connectionID = Onyx.connect({
+            connection = Onyx.connect({
                 key: ONYX_KEYS.TEST_KEY,
                 initWithStoredValues: false,
                 callback: (value) => {
@@ -1668,7 +1689,7 @@ describe('Onyx', () => {
             it('should remove a deeply nested null when merging an existing key', () => {
                 let result: unknown;
 
-                connectionID = Onyx.connect({
+                connection = Onyx.connect({
                     key: ONYX_KEYS.TEST_KEY,
                     initWithStoredValues: false,
                     callback: (value) => (result = value),

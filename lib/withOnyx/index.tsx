@@ -4,13 +4,14 @@
  * will automatically change to reflect the new data.
  */
 import React from 'react';
-import Onyx from '../Onyx';
 import OnyxUtils from '../OnyxUtils';
 import * as Str from '../Str';
-import type {GenericFunction, OnyxKey, WithOnyxConnectOptions} from '../types';
+import type {GenericFunction, Mapping, OnyxKey, WithOnyxConnectOptions} from '../types';
 import utils from '../utils';
 import type {MapOnyxToState, WithOnyxInstance, WithOnyxMapping, WithOnyxProps, WithOnyxState} from './types';
 import cache from '../OnyxCache';
+import type {Connection} from '../OnyxConnectionManager';
+import connectionManager from '../OnyxConnectionManager';
 
 // This is a list of keys that can exist on a `mapping`, but are not directly related to loading data from Onyx. When the keys of a mapping are looped over to check
 // if a key has changed, it's a good idea to skip looking at these properties since they would have unexpected results.
@@ -67,7 +68,7 @@ export default function <TComponentProps, TOnyxProps>(
 
             shouldDelayUpdates: boolean;
 
-            activeConnectionIDs: Record<string, number>;
+            activeConnections: Record<string, Connection>;
 
             tempState: WithOnyxState<TOnyxProps> | undefined;
 
@@ -78,13 +79,13 @@ export default function <TComponentProps, TOnyxProps>(
                 this.setWithOnyxState = this.setWithOnyxState.bind(this);
                 this.flushPendingSetStates = this.flushPendingSetStates.bind(this);
 
-                // This stores all the Onyx connection IDs to be used when the component unmounts so everything can be
-                // disconnected. It is a key value store with the format {[mapping.key]: connectionID}.
-                this.activeConnectionIDs = {};
+                // This stores all the Onyx connections to be used when the component unmounts so everything can be
+                // disconnected. It is a key value store with the format {[mapping.key]: connection metadata object}.
+                this.activeConnections = {};
 
                 const cachedState = mapOnyxToStateEntries(mapOnyxToState).reduce<WithOnyxState<TOnyxProps>>((resultObj, [propName, mapping]) => {
                     const key = Str.result(mapping.key as GenericFunction, props);
-                    let value = OnyxUtils.tryGetCachedValue(key, mapping as Partial<WithOnyxConnectOptions<OnyxKey>>);
+                    let value = OnyxUtils.tryGetCachedValue(key, mapping as Mapping<OnyxKey>);
                     const hasCacheForKey = cache.hasCacheForKey(key);
 
                     if (!hasCacheForKey && !value && mapping.initialValue) {
@@ -163,8 +164,8 @@ export default function <TComponentProps, TOnyxProps>(
                     const previousKey = isFirstTimeUpdatingAfterLoading ? mapping.previousKey : Str.result(mapping.key as GenericFunction, {...prevProps, ...prevOnyxDataFromState});
                     const newKey = Str.result(mapping.key as GenericFunction, {...this.props, ...onyxDataFromState});
                     if (previousKey !== newKey) {
-                        Onyx.disconnect(this.activeConnectionIDs[previousKey], previousKey);
-                        delete this.activeConnectionIDs[previousKey];
+                        connectionManager.disconnect(this.activeConnections[previousKey]);
+                        delete this.activeConnections[previousKey];
                         this.connectMappingToOnyx(mapping, propName, newKey);
                     }
                 });
@@ -176,7 +177,7 @@ export default function <TComponentProps, TOnyxProps>(
                 // Disconnect everything from Onyx
                 mapOnyxToStateEntries(mapOnyxToState).forEach(([, mapping]) => {
                     const key = Str.result(mapping.key as GenericFunction, {...this.props, ...getOnyxDataFromState(this.state, mapOnyxToState)});
-                    Onyx.disconnect(this.activeConnectionIDs[key], key);
+                    connectionManager.disconnect(this.activeConnections[key]);
                 });
             }
 
@@ -293,9 +294,9 @@ export default function <TComponentProps, TOnyxProps>(
                     }
 
                     if (canEvict) {
-                        OnyxUtils.removeFromEvictionBlockList(key, mapping.connectionID);
+                        connectionManager.removeFromEvictionBlockList(this.activeConnections[key]);
                     } else {
-                        OnyxUtils.addToEvictionBlockList(key, mapping.connectionID);
+                        connectionManager.addToEvictionBlockList(this.activeConnections[key]);
                     }
                 });
             }
@@ -319,13 +320,13 @@ export default function <TComponentProps, TOnyxProps>(
                 onyxMapping.previousKey = key;
 
                 // eslint-disable-next-line rulesdir/prefer-onyx-connect-in-libs
-                this.activeConnectionIDs[key] = Onyx.connect({
+                this.activeConnections[key] = connectionManager.connect({
                     ...mapping,
                     key,
                     statePropertyName: statePropertyName as string,
                     withOnyxInstance: this as unknown as WithOnyxInstance,
                     displayName,
-                });
+                } as WithOnyxConnectOptions<OnyxKey>);
             }
 
             flushPendingSetStates() {

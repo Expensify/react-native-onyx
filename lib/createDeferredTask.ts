@@ -17,3 +17,5 @@ export default function createDeferredTask(): DeferredTask {
 
     return deferred;
 }
+
+export type {DeferredTask};

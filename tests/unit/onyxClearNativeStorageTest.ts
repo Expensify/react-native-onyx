@@ -2,6 +2,7 @@ import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import StorageMock from '../../lib/storage';
 import Onyx from '../../lib/Onyx';
 import type OnyxCache from '../../lib/OnyxCache';
+import type {Connection} from '../../lib/OnyxConnectionManager';
 
 const ONYX_KEYS = {
     DEFAULT_KEY: 'defaultKey',
@@ -14,7 +15,7 @@ const MERGED_VALUE = 1;
 const DEFAULT_VALUE = 0;
 
 describe('Set data while storage is clearing', () => {
-    let connectionID: number;
+    let connection: Connection | undefined;
     let onyxValue: unknown;
 
     /** @type OnyxCache */
@@ -31,7 +32,7 @@ describe('Set data while storage is clearing', () => {
                 [ONYX_KEYS.DEFAULT_KEY]: DEFAULT_VALUE,
             },
         });
-        connectionID = Onyx.connect({
+        connection = Onyx.connect({
             key: ONYX_KEYS.DEFAULT_KEY,
             initWithStoredValues: false,
             callback: (val) => (onyxValue = val),
@@ -40,7 +41,9 @@ describe('Set data while storage is clearing', () => {
     });
 
     afterEach(() => {
-        Onyx.disconnect(connectionID);
+        if (connection) {
+            Onyx.disconnect(connection);
+        }
         return Onyx.clear();
     });
 
