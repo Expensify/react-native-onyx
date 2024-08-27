@@ -227,8 +227,14 @@ class OnyxConnectionManager {
      * Adds the connection to the eviction block list. Connections added to this list can never be evicted.
      * */
     addToEvictionBlockList(connection: Connection): void {
-        const connectionMetadata = this.connectionsMap.get(connection?.id);
+        if (!connection) {
+            Logger.logInfo(`[ConnectionManager] Attempted to add connection to eviction block list passing an undefined connection object.`);
+            return;
+        }
+
+        const connectionMetadata = this.connectionsMap.get(connection.id);
         if (!connectionMetadata) {
+            Logger.logInfo(`[ConnectionManager] Attempted to add connection to eviction block list but no connection was found.`);
             return;
         }
 
@@ -245,8 +251,14 @@ class OnyxConnectionManager {
      * which will enable it to be evicted again.
      */
     removeFromEvictionBlockList(connection: Connection): void {
-        const connectionMetadata = this.connectionsMap.get(connection?.id);
+        if (!connection) {
+            Logger.logInfo(`[ConnectionManager] Attempted to remove connection from eviction block list passing an undefined connection object.`);
+            return;
+        }
+
+        const connectionMetadata = this.connectionsMap.get(connection.id);
         if (!connectionMetadata) {
+            Logger.logInfo(`[ConnectionManager] Attempted to remove connection from eviction block list but no connection was found.`);
             return;
         }
 
