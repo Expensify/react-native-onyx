@@ -1,13 +1,14 @@
 // eslint-disable-next-line max-classes-per-file
 import {act} from '@testing-library/react-native';
 import Onyx from '../../lib';
+import type {Connection} from '../../lib/OnyxConnectionManager';
 import connectionManager from '../../lib/OnyxConnectionManager';
+import OnyxUtils from '../../lib/OnyxUtils';
 import StorageMock from '../../lib/storage';
 import type {OnyxKey, WithOnyxConnectOptions} from '../../lib/types';
 import type {WithOnyxInstance} from '../../lib/withOnyx/types';
 import type GenericCollection from '../utils/GenericCollection';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
-import OnyxUtils from '../../lib/OnyxUtils';
 
 // We need access to `connectionsMap` and `generateConnectionID` during the tests but the properties are private,
 // so this workaround allows us to have access to them.
@@ -270,6 +271,18 @@ describe('OnyxConnectionManager', () => {
             expect(connectionsMap.size).toEqual(0);
         });
 
+        it('should not throw any errors when passing an undefined connection or trying to access an inexistent one inside disconnect()', () => {
+            expect(connectionsMap.size).toEqual(0);
+
+            expect(() => {
+                connectionManager.disconnect(undefined as unknown as Connection);
+            }).not.toThrow();
+
+            expect(() => {
+                connectionManager.disconnect({id: 'connectionID1', callbackID: 'callbackID1'});
+            }).not.toThrow();
+        });
+
         describe('withOnyx', () => {
             it('should connect to a key two times with withOnyx and create two connections instead of one', async () => {
                 await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
@@ -389,6 +402,30 @@ describe('OnyxConnectionManager', () => {
 
             // inexistent connection ID, shouldn't do anything
             expect(() => connectionManager.removeFromEvictionBlockList({id: 'connectionID0', callbackID: 'callbackID0'})).not.toThrow();
+        });
+
+        it('should not throw any errors when passing an undefined connection or trying to access an inexistent one inside addToEvictionBlockList()', () => {
+            expect(connectionsMap.size).toEqual(0);
+
+            expect(() => {
+                connectionManager.addToEvictionBlockList(undefined as unknown as Connection);
+            }).not.toThrow();
+
+            expect(() => {
+                connectionManager.addToEvictionBlockList({id: 'connectionID1', callbackID: 'callbackID1'});
+            }).not.toThrow();
+        });
+
+        it('should not throw any errors when passing an undefined connection or trying to access an inexistent one inside removeFromEvictionBlockList()', () => {
+            expect(connectionsMap.size).toEqual(0);
+
+            expect(() => {
+                connectionManager.removeFromEvictionBlockList(undefined as unknown as Connection);
+            }).not.toThrow();
+
+            expect(() => {
+                connectionManager.removeFromEvictionBlockList({id: 'connectionID1', callbackID: 'callbackID1'});
+            }).not.toThrow();
         });
     });
 });
