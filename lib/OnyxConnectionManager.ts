@@ -227,7 +227,7 @@ class OnyxConnectionManager {
      * Adds the connection to the eviction block list. Connections added to this list can never be evicted.
      * */
     addToEvictionBlockList(connection: Connection): void {
-        const connectionMetadata = this.connectionsMap.get(connection.id);
+        const connectionMetadata = this.connectionsMap.get(connection?.id);
         if (!connectionMetadata) {
             return;
         }
@@ -245,7 +245,7 @@ class OnyxConnectionManager {
      * which will enable it to be evicted again.
      */
     removeFromEvictionBlockList(connection: Connection): void {
-        const connectionMetadata = this.connectionsMap.get(connection.id);
+        const connectionMetadata = this.connectionsMap.get(connection?.id);
         if (!connectionMetadata) {
             return;
         }
