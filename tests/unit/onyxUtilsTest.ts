@@ -53,6 +53,7 @@ describe('OnyxUtils', () => {
             test_level_1: 'test_level_',
             test_level_2: 'test_level_',
             test_level_last_3: 'test_level_last_',
+            test___FAKE__: 'test_',
             'test_-1_something': 'test_',
             'test_level_-1_something': 'test_level_',
         };
