@@ -38,14 +38,14 @@ describe('OnyxUtils', () => {
 
     it('splitCollectionMemberKey should throw error if key does not contain underscore', () => {
         expect(() => {
-            OnyxUtils.splitCollectionMemberKey('test');
+            OnyxUtils.splitCollectionMemberKey(ONYXKEYS.TEST_KEY);
         }).toThrowError("Invalid 'test' key provided, only collection keys are allowed.");
         expect(() => {
             OnyxUtils.splitCollectionMemberKey('');
         }).toThrowError("Invalid '' key provided, only collection keys are allowed.");
     });
 
-    it('getCollectionKey should return correct values', () => {
+    describe('getCollectionKey should return correct values', () => {
         const dataResult: Record<string, string> = {
             test: 'test',
             test_: 'test_',
@@ -53,9 +53,11 @@ describe('OnyxUtils', () => {
             test_level_1: 'test_level_',
             test_level_2: 'test_level_',
             test_level_last_3: 'test_level_last_',
+            'test_-1_something': 'test_',
+            'test_level_-1_something': 'test_level_',
         };
 
-        Object.keys(dataResult).forEach((key) => {
+        it.each(Object.keys(dataResult))('%s', (key) => {
             const collectionKey = OnyxUtils.getCollectionKey(key);
             expect(collectionKey).toEqual(dataResult[key]);
         });

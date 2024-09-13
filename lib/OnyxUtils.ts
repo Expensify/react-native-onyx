@@ -421,24 +421,13 @@ function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collect
  * @returns A tuple where the first element is the collection part and the second element is the ID part.
  */
 function splitCollectionMemberKey<TKey extends CollectionKey, CollectionKeyType = TKey extends `${infer Prefix}_${string}` ? `${Prefix}_` : never>(key: TKey): [CollectionKeyType, string] {
-    // Start by finding the position of the last underscore in the string
-    let lastUnderscoreIndex = key.lastIndexOf('_');
+    const collectionKey = getCollectionKey(key);
 
-    // Iterate backwards to find the longest key that ends with '_'
-    while (lastUnderscoreIndex > 0) {
-        const possibleKey = key.slice(0, lastUnderscoreIndex + 1);
-
-        // Check if the substring is a key in the Set
-        if (isCollectionKey(possibleKey)) {
-            // Return the matching key and the rest of the string
-            return [possibleKey as CollectionKeyType, key.slice(lastUnderscoreIndex + 1)];
-        }
-
-        // Move to the next underscore to check smaller possible keys
-        lastUnderscoreIndex = key.lastIndexOf('_', lastUnderscoreIndex - 1);
+    if (key === collectionKey && !isCollectionKey(key)) {
+        throw new Error(`Invalid '${key}' key provided, only collection keys are allowed.`);
     }
 
-    throw new Error(`Invalid '${key}' key provided, only collection keys are allowed.`);
+    return [collectionKey as CollectionKeyType, key.slice(collectionKey.length)];
 }
 
 /**
@@ -461,18 +450,31 @@ function isSafeEvictionKey(testKey: OnyxKey): boolean {
  * - `getCollectionKey("report_123")` would return "report_"
  * - `getCollectionKey("report")` would return "report"
  * - `getCollectionKey("report_")` would return "report_"
+ * - `getCollectionKey("report_-1_something")` would return "report_"
+ * - `getCollectionKey("sharedNVP_user_-1_something")` would return "sharedNVP_user_"
  *
  * @param {OnyxKey} key - The key to process.
  * @return {string} The pure key without any numeric
  */
 function getCollectionKey(key: OnyxKey): string {
-    const underscoreIndex = key.lastIndexOf('_');
+    // Start by finding the position of the last underscore in the string
+    let lastUnderscoreIndex = key.lastIndexOf('_');
 
-    if (underscoreIndex === -1) {
-        return key;
+    // Iterate backwards to find the longest key that ends with '_'
+    while (lastUnderscoreIndex > 0) {
+        const possibleKey = key.slice(0, lastUnderscoreIndex + 1);
+
+        // Check if the substring is a key in the Set
+        if (isCollectionKey(possibleKey)) {
+            // Return the matching key and the rest of the string
+            return possibleKey;
+        }
+
+        // Move to the next underscore to check smaller possible keys
+        lastUnderscoreIndex = key.lastIndexOf('_', lastUnderscoreIndex - 1);
     }
 
-    return key.substring(0, underscoreIndex + 1);
+    return key;
 }
 
 /**
