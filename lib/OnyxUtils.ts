@@ -421,15 +421,39 @@ function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collect
  * @returns A tuple where the first element is the collection part and the second element is the ID part.
  */
 function splitCollectionMemberKey<TKey extends CollectionKey, CollectionKeyType = TKey extends `${infer Prefix}_${string}` ? `${Prefix}_` : never>(key: TKey): [CollectionKeyType, string] {
-    const underscoreIndex = key.lastIndexOf('_');
+    // let collectionKey: string;
+    // let memberKey: string;
 
-    if (underscoreIndex === -1) {
-        throw new Error(`Invalid ${key} key provided, only collection keys are allowed.`);
+    // const firstUnderscoreIndex = key.indexOf('_');
+    // collectionKey = key.substring(0, firstUnderscoreIndex + 1);
+    // if (isCollectionKey(collectionKey)) {
+    //     memberKey = key.substring(firstUnderscoreIndex + 1);
+    //     return [collectionKey as CollectionKeyType, memberKey];
+    // }
+
+    // const lastUnderscoreIndex = key.lastIndexOf('_');
+    // collectionKey = key.substring(0, lastUnderscoreIndex + 1);
+    // if (isCollectionKey(collectionKey)) {
+    //     memberKey = key.substring(lastUnderscoreIndex + 1);
+    //     return [collectionKey as CollectionKeyType, memberKey];
+    // }
+
+    // throw new Error(`Invalid '${key}' key provided, only collection keys are allowed.`);
+
+    ////////
+
+    const collectionKeys = OnyxUtils.getCollectionKeys();
+
+    for (const collectionKey of collectionKeys) {
+        console.log(collectionKey);
+        // Check if the string starts with the current key
+        if (key.startsWith(collectionKey)) {
+            // Return the key and the rest of the string after the key
+            return [collectionKey as CollectionKeyType, key.slice(collectionKey.length)];
+        }
     }
 
-    const collectionKey = key.substring(0, underscoreIndex + 1) as CollectionKeyType;
-    const memberKey = key.substring(underscoreIndex + 1);
-    return [collectionKey, memberKey];
+    throw new Error(`Invalid '${key}' key provided, only collection keys are allowed.`);
 }
 
 /**

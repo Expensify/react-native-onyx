@@ -1,4 +1,20 @@
+import Onyx from '../../lib';
 import OnyxUtils from '../../lib/OnyxUtils';
+
+const ONYXKEYS = {
+    TEST_KEY: 'test',
+    COLLECTION: {
+        TEST_KEY: 'test_',
+        TEST_LEVEL_KEY: 'test_level_',
+        TEST_LEVEL_LAST_KEY: 'test_level_',
+    },
+};
+
+Onyx.init({
+    keys: ONYXKEYS,
+});
+
+beforeEach(() => Onyx.clear());
 
 describe('OnyxUtils', () => {
     it('splitCollectionMemberKey should return correct values', () => {
@@ -8,6 +24,9 @@ describe('OnyxUtils', () => {
             test_level_1: ['test_level_', '1'],
             test_level_2: ['test_level_', '2'],
             test_level_last_3: ['test_level_last_', '3'],
+            test___FAKE__: ['test_', '__FAKE__'],
+            'test_-1_something': ['test_', '-1_something'],
+            'test_level_-1_something': ['test_level_', '-1_something'],
         };
 
         Object.keys(dataResult).forEach((key) => {
@@ -20,10 +39,10 @@ describe('OnyxUtils', () => {
     it('splitCollectionMemberKey should throw error if key does not contain underscore', () => {
         expect(() => {
             OnyxUtils.splitCollectionMemberKey('test');
-        }).toThrowError('Invalid test key provided, only collection keys are allowed.');
+        }).toThrowError("Invalid 'test' key provided, only collection keys are allowed.");
         expect(() => {
             OnyxUtils.splitCollectionMemberKey('');
-        }).toThrowError('Invalid  key provided, only collection keys are allowed.');
+        }).toThrowError("Invalid '' key provided, only collection keys are allowed.");
     });
 
     it('getCollectionKey should return correct values', () => {
