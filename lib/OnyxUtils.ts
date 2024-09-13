@@ -421,36 +421,21 @@ function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collect
  * @returns A tuple where the first element is the collection part and the second element is the ID part.
  */
 function splitCollectionMemberKey<TKey extends CollectionKey, CollectionKeyType = TKey extends `${infer Prefix}_${string}` ? `${Prefix}_` : never>(key: TKey): [CollectionKeyType, string] {
-    // let collectionKey: string;
-    // let memberKey: string;
+    // Start by finding the position of the last underscore in the string
+    let lastUnderscoreIndex = key.lastIndexOf('_');
 
-    // const firstUnderscoreIndex = key.indexOf('_');
-    // collectionKey = key.substring(0, firstUnderscoreIndex + 1);
-    // if (isCollectionKey(collectionKey)) {
-    //     memberKey = key.substring(firstUnderscoreIndex + 1);
-    //     return [collectionKey as CollectionKeyType, memberKey];
-    // }
+    // Iterate backwards to find the longest key that ends with '_'
+    while (lastUnderscoreIndex > 0) {
+        const possibleKey = key.slice(0, lastUnderscoreIndex + 1);
 
-    // const lastUnderscoreIndex = key.lastIndexOf('_');
-    // collectionKey = key.substring(0, lastUnderscoreIndex + 1);
-    // if (isCollectionKey(collectionKey)) {
-    //     memberKey = key.substring(lastUnderscoreIndex + 1);
-    //     return [collectionKey as CollectionKeyType, memberKey];
-    // }
-
-    // throw new Error(`Invalid '${key}' key provided, only collection keys are allowed.`);
-
-    ////////
-
-    const collectionKeys = OnyxUtils.getCollectionKeys();
-
-    for (const collectionKey of collectionKeys) {
-        console.log(collectionKey);
-        // Check if the string starts with the current key
-        if (key.startsWith(collectionKey)) {
-            // Return the key and the rest of the string after the key
-            return [collectionKey as CollectionKeyType, key.slice(collectionKey.length)];
+        // Check if the substring is a key in the Set
+        if (isCollectionKey(possibleKey)) {
+            // Return the matching key and the rest of the string
+            return [possibleKey as CollectionKeyType, key.slice(lastUnderscoreIndex + 1)];
         }
+
+        // Move to the next underscore to check smaller possible keys
+        lastUnderscoreIndex = key.lastIndexOf('_', lastUnderscoreIndex - 1);
     }
 
     throw new Error(`Invalid '${key}' key provided, only collection keys are allowed.`);

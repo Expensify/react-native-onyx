@@ -6,7 +6,7 @@ const ONYXKEYS = {
     COLLECTION: {
         TEST_KEY: 'test_',
         TEST_LEVEL_KEY: 'test_level_',
-        TEST_LEVEL_LAST_KEY: 'test_level_',
+        TEST_LEVEL_LAST_KEY: 'test_level_last_',
     },
 };
 
