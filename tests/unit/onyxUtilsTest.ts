@@ -17,7 +17,7 @@ Onyx.init({
 beforeEach(() => Onyx.clear());
 
 describe('OnyxUtils', () => {
-    it('splitCollectionMemberKey should return correct values', () => {
+    describe('splitCollectionMemberKey should return correct values', () => {
         const dataResult: Record<string, [string, string]> = {
             test_: ['test_', ''],
             test_level_: ['test_level_', ''],
@@ -29,7 +29,7 @@ describe('OnyxUtils', () => {
             'test_level_-1_something': ['test_level_', '-1_something'],
         };
 
-        Object.keys(dataResult).forEach((key) => {
+        test.each(Object.keys(dataResult))('%s', (key) => {
             const [collectionKey, id] = OnyxUtils.splitCollectionMemberKey(key);
             expect(collectionKey).toEqual(dataResult[key][0]);
             expect(id).toEqual(dataResult[key][1]);
