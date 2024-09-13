@@ -12,14 +12,13 @@ const ONYXKEYS = {
     COLLECTION: {
         TEST_KEY: 'test_',
         TEST_KEY_2: 'test2_',
+        EVICTABLE_TEST_KEY: 'evictable_test_',
     },
-    EVICTABLE_TEST_KEY: 'evictable_test',
-    EVICTABLE_TEST_KEY2: 'evictable_test2',
 };
 
 Onyx.init({
     keys: ONYXKEYS,
-    safeEvictionKeys: [ONYXKEYS.EVICTABLE_TEST_KEY, ONYXKEYS.EVICTABLE_TEST_KEY2],
+    safeEvictionKeys: [ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY],
 });
 
 beforeEach(() => Onyx.clear());
@@ -577,50 +576,57 @@ describe('useOnyx', () => {
         });
 
         it('should add the connection to the blocklist when setting "canEvict" to false', async () => {
-            await StorageMock.setItem(ONYXKEYS.EVICTABLE_TEST_KEY, 'test');
+            Onyx.mergeCollection(ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY, {
+                [`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
+            } as GenericCollection);
 
-            renderHook(() => useOnyx(ONYXKEYS.EVICTABLE_TEST_KEY, {canEvict: false}));
+            renderHook(() => useOnyx(`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`, {canEvict: false}));
 
             await act(async () => waitForPromisesToResolve());
 
             const evictionBlocklist = OnyxUtils.getEvictionBlocklist();
-            expect(evictionBlocklist[ONYXKEYS.EVICTABLE_TEST_KEY]).toHaveLength(1);
+            expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]).toHaveLength(1);
         });
 
         it('should handle removal/adding the connection to the blocklist properly when changing the evictable key to another', async () => {
-            await StorageMock.setItem(ONYXKEYS.EVICTABLE_TEST_KEY, 'test');
+            Onyx.mergeCollection(ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY, {
+                [`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
+                [`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
+            } as GenericCollection);
 
-            const {rerender} = renderHook((key: string) => useOnyx(key, {canEvict: false}), {initialProps: ONYXKEYS.EVICTABLE_TEST_KEY as string});
+            const {rerender} = renderHook((key: string) => useOnyx(key, {canEvict: false}), {initialProps: `${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1` as string});
 
             await act(async () => waitForPromisesToResolve());
 
             const evictionBlocklist = OnyxUtils.getEvictionBlocklist();
-            expect(evictionBlocklist[ONYXKEYS.EVICTABLE_TEST_KEY]).toHaveLength(1);
-            expect(evictionBlocklist[ONYXKEYS.EVICTABLE_TEST_KEY2]).toBeUndefined();
+            expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]).toHaveLength(1);
+            expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry2`]).toBeUndefined();
 
             await act(async () => {
-                rerender(ONYXKEYS.EVICTABLE_TEST_KEY2);
+                rerender(`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry2`);
             });
 
-            expect(evictionBlocklist[ONYXKEYS.EVICTABLE_TEST_KEY]).toBeUndefined();
-            expect(evictionBlocklist[ONYXKEYS.EVICTABLE_TEST_KEY2]).toHaveLength(1);
+            expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]).toBeUndefined();
+            expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry2`]).toHaveLength(1);
         });
 
         it('should remove the connection from the blocklist when setting "canEvict" to true', async () => {
-            await StorageMock.setItem(ONYXKEYS.EVICTABLE_TEST_KEY, 'test');
+            Onyx.mergeCollection(ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY, {
+                [`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
+            } as GenericCollection);
 
-            const {rerender} = renderHook((canEvict: boolean) => useOnyx(ONYXKEYS.EVICTABLE_TEST_KEY, {canEvict}), {initialProps: false as boolean});
+            const {rerender} = renderHook((canEvict: boolean) => useOnyx(`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`, {canEvict}), {initialProps: false as boolean});
 
             await act(async () => waitForPromisesToResolve());
 
             const evictionBlocklist = OnyxUtils.getEvictionBlocklist();
-            expect(evictionBlocklist[ONYXKEYS.EVICTABLE_TEST_KEY]).toHaveLength(1);
+            expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]).toHaveLength(1);
 
             await act(async () => {
                 rerender(true);
             });
 
-            expect(evictionBlocklist[ONYXKEYS.EVICTABLE_TEST_KEY]).toBeUndefined();
+            expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]).toBeUndefined();
         });
     });
 });

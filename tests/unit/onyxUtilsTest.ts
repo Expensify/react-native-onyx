@@ -29,7 +29,7 @@ describe('OnyxUtils', () => {
             'test_level_-1_something': ['test_level_', '-1_something'],
         };
 
-        test.each(Object.keys(dataResult))('%s', (key) => {
+        it.each(Object.keys(dataResult))('%s', (key) => {
             const [collectionKey, id] = OnyxUtils.splitCollectionMemberKey(key);
             expect(collectionKey).toEqual(dataResult[key][0]);
             expect(id).toEqual(dataResult[key][1]);
