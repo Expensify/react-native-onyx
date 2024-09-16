@@ -421,15 +421,8 @@ function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collect
  * @returns A tuple where the first element is the collection part and the second element is the ID part.
  */
 function splitCollectionMemberKey<TKey extends CollectionKey, CollectionKeyType = TKey extends `${infer Prefix}_${string}` ? `${Prefix}_` : never>(key: TKey): [CollectionKeyType, string] {
-    const underscoreIndex = key.lastIndexOf('_');
-
-    if (underscoreIndex === -1) {
-        throw new Error(`Invalid ${key} key provided, only collection keys are allowed.`);
-    }
-
-    const collectionKey = key.substring(0, underscoreIndex + 1) as CollectionKeyType;
-    const memberKey = key.substring(underscoreIndex + 1);
-    return [collectionKey, memberKey];
+    const collectionKey = getCollectionKey(key);
+    return [collectionKey as CollectionKeyType, key.slice(collectionKey.length)];
 }
 
 /**
@@ -450,20 +443,32 @@ function isSafeEvictionKey(testKey: OnyxKey): boolean {
  *
  * For example:
  * - `getCollectionKey("report_123")` would return "report_"
- * - `getCollectionKey("report")` would return "report"
  * - `getCollectionKey("report_")` would return "report_"
+ * - `getCollectionKey("report_-1_something")` would return "report_"
+ * - `getCollectionKey("sharedNVP_user_-1_something")` would return "sharedNVP_user_"
  *
  * @param {OnyxKey} key - The key to process.
- * @return {string} The pure key without any numeric
+ * @return {string} The plain collection key.
  */
 function getCollectionKey(key: OnyxKey): string {
-    const underscoreIndex = key.lastIndexOf('_');
+    // Start by finding the position of the last underscore in the string
+    let lastUnderscoreIndex = key.lastIndexOf('_');
 
-    if (underscoreIndex === -1) {
-        return key;
+    // Iterate backwards to find the longest key that ends with '_'
+    while (lastUnderscoreIndex > 0) {
+        const possibleKey = key.slice(0, lastUnderscoreIndex + 1);
+
+        // Check if the substring is a key in the Set
+        if (isCollectionKey(possibleKey)) {
+            // Return the matching key and the rest of the string
+            return possibleKey;
+        }
+
+        // Move to the next underscore to check smaller possible keys
+        lastUnderscoreIndex = key.lastIndexOf('_', lastUnderscoreIndex - 1);
     }
 
-    return key.substring(0, underscoreIndex + 1);
+    throw new Error(`Invalid '${key}' key provided, only collection keys are allowed.`);
 }
 
 /**
@@ -792,12 +797,17 @@ function keyChanged<TKey extends OnyxKey>(
     // do the same in keysChanged, because we only call that function when a collection key changes, and it doesn't happen that often.
     // For performance reason, we look for the given key and later if don't find it we look for the collection key, instead of checking if it is a collection key first.
     let stateMappingKeys = onyxKeyToSubscriptionIDs.get(key) ?? [];
-    const collectionKey = getCollectionKey(key);
-    const plainCollectionKey = collectionKey.lastIndexOf('_') !== -1 ? collectionKey : undefined;
+    let collectionKey: string | undefined;
+    try {
+        collectionKey = getCollectionKey(key);
+    } catch (e) {
+        // If getCollectionKey() throws an error it means the key is not a collection key.
+        collectionKey = undefined;
+    }
 
-    if (plainCollectionKey) {
+    if (collectionKey) {
         // Getting the collection key from the specific key because only collection keys were stored in the mapping.
-        stateMappingKeys = [...stateMappingKeys, ...(onyxKeyToSubscriptionIDs.get(plainCollectionKey) ?? [])];
+        stateMappingKeys = [...stateMappingKeys, ...(onyxKeyToSubscriptionIDs.get(collectionKey) ?? [])];
         if (stateMappingKeys.length === 0) {
             return;
         }
