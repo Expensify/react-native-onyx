@@ -479,8 +479,15 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                     if (newValue !== oldValue) {
                         cache.set(key, newValue);
 
-                        const collectionKey = OnyxUtils.getCollectionKey(key);
-                        if (OnyxUtils.isCollectionKey(collectionKey)) {
+                        let collectionKey: string | undefined;
+                        try {
+                            collectionKey = OnyxUtils.getCollectionKey(key);
+                        } catch (e) {
+                            // If getCollectionKey() throws an error it means the key is not a collection key.
+                            collectionKey = undefined;
+                        }
+
+                        if (collectionKey) {
                             if (!keyValuesToResetAsCollection[collectionKey]) {
                                 keyValuesToResetAsCollection[collectionKey] = {};
                             }

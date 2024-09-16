@@ -68,8 +68,9 @@ or if the provided key is a collection member key (in case our configured key is
 <p>For example:</p>
 <ul>
 <li><code>getCollectionKey(&quot;report_123&quot;)</code> would return &quot;report_&quot;</li>
-<li><code>getCollectionKey(&quot;report&quot;)</code> would return &quot;report&quot;</li>
 <li><code>getCollectionKey(&quot;report_&quot;)</code> would return &quot;report_&quot;</li>
+<li><code>getCollectionKey(&quot;report_-1_something&quot;)</code> would return &quot;report_&quot;</li>
+<li><code>getCollectionKey(&quot;sharedNVP_user_-1_something&quot;)</code> would return &quot;sharedNVP_user_&quot;</li>
 </ul>
 </dd>
 <dt><a href="#tryGetCachedValue">tryGetCachedValue()</a></dt>
@@ -297,11 +298,12 @@ It extracts the non-numeric collection identifier of a given key.
 
 For example:
 - `getCollectionKey("report_123")` would return "report_"
-- `getCollectionKey("report")` would return "report"
 - `getCollectionKey("report_")` would return "report_"
+- `getCollectionKey("report_-1_something")` would return "report_"
+- `getCollectionKey("sharedNVP_user_-1_something")` would return "sharedNVP_user_"
 
 **Kind**: global function  
-**Returns**: <code>string</code> - The pure key without any numeric  
+**Returns**: <code>string</code> - The plain collection key.  
 
 | Param | Type | Description |
 | --- | --- | --- |
