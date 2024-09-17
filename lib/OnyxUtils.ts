@@ -418,7 +418,8 @@ function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collect
 /**
  * Splits a collection member key into the collection key part and the ID part.
  * @param key - The collection member key to split.
- * @returns A tuple where the first element is the collection part and the second element is the ID part.
+ * @returns A tuple where the first element is the collection part and the second element is the ID part,
+ * or throws an Error if the key is not a collection one.
  */
 function splitCollectionMemberKey<TKey extends CollectionKey, CollectionKeyType = TKey extends `${infer Prefix}_${string}` ? `${Prefix}_` : never>(key: TKey): [CollectionKeyType, string] {
     const collectionKey = getCollectionKey(key);
@@ -439,7 +440,7 @@ function isSafeEvictionKey(testKey: OnyxKey): boolean {
 }
 
 /**
- * It extracts the non-numeric collection identifier of a given key.
+ * Extracts the collection identifier of a given collection member key.
  *
  * For example:
  * - `getCollectionKey("report_123")` would return "report_"
@@ -447,10 +448,10 @@ function isSafeEvictionKey(testKey: OnyxKey): boolean {
  * - `getCollectionKey("report_-1_something")` would return "report_"
  * - `getCollectionKey("sharedNVP_user_-1_something")` would return "sharedNVP_user_"
  *
- * @param {OnyxKey} key - The key to process.
- * @return {string} The plain collection key.
+ * @param key - The collection key to process.
+ * @returns The plain collection key or throws an Error if the key is not a collection one.
  */
-function getCollectionKey(key: OnyxKey): string {
+function getCollectionKey(key: CollectionKey): string {
     // Start by finding the position of the last underscore in the string
     let lastUnderscoreIndex = key.lastIndexOf('_');
 
@@ -1280,7 +1281,7 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
             // Performance improvement
             // If the mapping is connected to an onyx key that is not a collection
             // we can skip the call to getAllKeys() and return an array with a single item
-            if (Boolean(mapping.key) && typeof mapping.key === 'string' && !mapping.key.endsWith('_') && cache.getAllKeys().has(mapping.key)) {
+            if (Boolean(mapping.key) && typeof mapping.key === 'string' && !isCollectionKey(mapping.key) && cache.getAllKeys().has(mapping.key)) {
                 return new Set([mapping.key]);
             }
             return getAllKeys();

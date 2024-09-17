@@ -63,8 +63,8 @@ or if the provided key is a collection member key (in case our configured key is
 <dt><a href="#isSafeEvictionKey">isSafeEvictionKey()</a></dt>
 <dd><p>Checks to see if this key has been flagged as safe for removal.</p>
 </dd>
-<dt><a href="#getCollectionKey">getCollectionKey(key)</a> ⇒ <code>string</code></dt>
-<dd><p>It extracts the non-numeric collection identifier of a given key.</p>
+<dt><a href="#getCollectionKey">getCollectionKey(key)</a> ⇒</dt>
+<dd><p>Extracts the collection identifier of a given collection member key.</p>
 <p>For example:</p>
 <ul>
 <li><code>getCollectionKey(&quot;report_123&quot;)</code> would return &quot;report_&quot;</li>
@@ -272,7 +272,8 @@ is associated with a collection of keys.
 Splits a collection member key into the collection key part and the ID part.
 
 **Kind**: global function  
-**Returns**: A tuple where the first element is the collection part and the second element is the ID part.  
+**Returns**: A tuple where the first element is the collection part and the second element is the ID part,
+or throws an Error if the key is not a collection one.  
 
 | Param | Description |
 | --- | --- |
@@ -293,8 +294,8 @@ Checks to see if this key has been flagged as safe for removal.
 **Kind**: global function  
 <a name="getCollectionKey"></a>
 
-## getCollectionKey(key) ⇒ <code>string</code>
-It extracts the non-numeric collection identifier of a given key.
+## getCollectionKey(key) ⇒
+Extracts the collection identifier of a given collection member key.
 
 For example:
 - `getCollectionKey("report_123")` would return "report_"
@@ -303,11 +304,11 @@ For example:
 - `getCollectionKey("sharedNVP_user_-1_something")` would return "sharedNVP_user_"
 
 **Kind**: global function  
-**Returns**: <code>string</code> - The plain collection key.  
+**Returns**: The plain collection key or throws an Error if the key is not a collection one.  
 
-| Param | Type | Description |
-| --- | --- | --- |
-| key | <code>OnyxKey</code> | The key to process. |
+| Param | Description |
+| --- | --- |
+| key | The collection key to process. |
 
 <a name="tryGetCachedValue"></a>
 
