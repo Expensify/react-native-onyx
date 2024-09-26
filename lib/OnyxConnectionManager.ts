@@ -89,13 +89,12 @@ class OnyxConnectionManager {
      */
     private generateConnectionID<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): string {
         const {key, initWithStoredValues, reuseConnection, waitForCollectionCallback} = connectOptions;
-
         let suffix = '';
 
         // We will generate a unique ID in any of the following situations:
         // - `reuseConnection` is `false`. That means the subscriber explicitly wants the connection to not be reused.
         // - `initWithStoredValues` is `false`. This flag changes the subscription flow when set to `false`, so the connection can't be reused.
-        // - `key` is a collection key` AND `waitForCollectionCallback` is `undefined/false`. This combination needs a new connection at every subscribe
+        // - `key` is a collection key AND `waitForCollectionCallback` is `undefined/false`. This combination needs a new connection at every subscription
         //   in order to send all the collection entries, so the connection can't be reused.
         // - `withOnyxInstance` is defined inside `connectOptions`. That means the subscriber is a `withOnyx` HOC and therefore doesn't support connection reuse.
         if (
@@ -107,7 +106,7 @@ class OnyxConnectionManager {
             suffix += `,uniqueID=${Str.guid()}`;
         }
 
-        return `onyxKey=${connectOptions.key},initWithStoredValues=${initWithStoredValues ?? true},waitForCollectionCallback=${waitForCollectionCallback ?? false}${suffix}`;
+        return `onyxKey=${key},initWithStoredValues=${initWithStoredValues ?? true},waitForCollectionCallback=${waitForCollectionCallback ?? false}${suffix}`;
     }
 
     /**
