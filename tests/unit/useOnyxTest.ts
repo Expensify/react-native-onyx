@@ -1,5 +1,5 @@
 import {act, renderHook} from '@testing-library/react-native';
-import type {OnyxEntry} from '../../lib';
+import type {OnyxCollection, OnyxEntry} from '../../lib';
 import Onyx, {useOnyx} from '../../lib';
 import OnyxUtils from '../../lib/OnyxUtils';
 import StorageMock from '../../lib/storage';
@@ -176,7 +176,11 @@ describe('useOnyx', () => {
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.COLLECTION.TEST_KEY, {
                     // @ts-expect-error bypass
-                    selector: (entry: OnyxEntry<{id: string; name: string}>) => entry?.id,
+                    selector: (entries: OnyxCollection<{id: string; name: string}>) =>
+                        Object.entries(entries ?? {}).reduce<NonNullable<OnyxCollection<string>>>((acc, [key, value]) => {
+                            acc[key] = value?.id;
+                            return acc;
+                        }, {}),
                 }),
             );
 
