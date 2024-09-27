@@ -5,7 +5,7 @@ import OnyxCache from './OnyxCache';
 import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
 import OnyxUtils from './OnyxUtils';
-import type {CollectionKeyBase, OnyxCollection, OnyxEntry, OnyxKey, OnyxValue, Selector} from './types';
+import type {CollectionKeyBase, KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey, OnyxValue} from './types';
 import useLiveRef from './useLiveRef';
 import usePrevious from './usePrevious';
 
@@ -40,7 +40,7 @@ type UseOnyxSelectorOption<TKey extends OnyxKey, TReturnValue> = {
      * when the subset of data changes. Otherwise, any change of data on any property would normally
      * cause the component to re-render (and that can be expensive from a performance standpoint).
      */
-    selector?: Selector<TKey, unknown, TReturnValue>;
+    selector?: UseOnyxSelector<KeyValueMapping[TKey], TReturnValue>;
 };
 
 type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = BaseUseOnyxOptions & UseOnyxInitialValueOption<TReturnValue> & UseOnyxSelectorOption<TKey, TReturnValue>;
@@ -57,8 +57,35 @@ type ResultMetadata = {
 
 type UseOnyxResult<TKey extends OnyxKey, TValue> = [CachedValue<TKey, TValue>, ResultMetadata];
 
-function getCachedValue<TKey extends OnyxKey, TValue>(key: TKey, selector?: Selector<TKey, unknown, unknown>): CachedValue<TKey, TValue> | undefined {
-    return (OnyxUtils.tryGetCachedValue(key, {selector}) ?? undefined) as CachedValue<TKey, TValue> | undefined;
+type UseOnyxSelector<OnyxData, SelectorValue> = (data: OnyxData) => SelectorValue;
+
+function getCollectionCachedValue<TKey extends OnyxKey>(key: TKey) {
+    const allCacheKeys = OnyxCache.getAllKeys();
+
+    // It is possible we haven't loaded all keys yet so we do not know if the
+    // collection actually exists.
+    if (allCacheKeys.size === 0) {
+        return;
+    }
+
+    const values: OnyxCollection<KeyValueMapping[TKey]> = {};
+    allCacheKeys.forEach((cacheKey) => {
+        if (!cacheKey.startsWith(key)) {
+            return;
+        }
+
+        values[cacheKey] = OnyxCache.get(cacheKey);
+    });
+
+    return values;
+}
+
+function getCachedValue<TKey extends OnyxKey, TValue>(key: TKey, selector?: UseOnyxSelector<KeyValueMapping[TKey], TValue>) {
+    const value = OnyxUtils.isCollectionKey(key) ? getCollectionCachedValue(key) : OnyxCache.get(key);
+
+    const selectedValue = selector ? selector(value) : value;
+
+    return selectedValue as CachedValue<TKey, TValue> | undefined;
 }
 
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
