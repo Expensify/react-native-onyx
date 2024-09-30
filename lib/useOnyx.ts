@@ -5,7 +5,7 @@ import OnyxCache from './OnyxCache';
 import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
 import OnyxUtils from './OnyxUtils';
-import type {CollectionKeyBase, KeyValueMapping, OnyxCollection, OnyxEntry, OnyxKey, OnyxValue} from './types';
+import type {CollectionKeyBase, OnyxCollection, OnyxEntry, OnyxKey, OnyxValue} from './types';
 import useLiveRef from './useLiveRef';
 import usePrevious from './usePrevious';
 
@@ -61,7 +61,7 @@ type UseOnyxSelector<TKey extends OnyxKey, SelectorValue> = (data?: OnyxValue<TK
 
 function getCachedValue<TKey extends OnyxKey>(key: TKey): OnyxValue<TKey> | undefined {
     if (!OnyxUtils.isCollectionKey(key)) {
-        return OnyxCache.get(key) as OnyxValue<TKey>;
+        return OnyxCache.get(key);
     }
 
     const allCacheKeys = OnyxCache.getAllKeys();
@@ -72,9 +72,9 @@ function getCachedValue<TKey extends OnyxKey>(key: TKey): OnyxValue<TKey> | unde
         return;
     }
 
-    const values: OnyxCollection<KeyValueMapping[TKey]> = {};
+    const values: Record<string, unknown> = {};
     allCacheKeys.forEach((cacheKey) => {
-        if (!cacheKey.startsWith(key)) {
+        if (cacheKey.startsWith(key)) {
             return;
         }
 
