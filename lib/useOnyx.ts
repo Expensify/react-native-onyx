@@ -61,7 +61,7 @@ type UseOnyxSelector<TKey extends OnyxKey, SelectorValue> = (data?: OnyxValue<TK
 
 function getCachedValue<TKey extends OnyxKey>(key: TKey): OnyxValue<TKey> | undefined {
     if (!OnyxUtils.isCollectionKey(key)) {
-        return OnyxCache.get(key);
+        return OnyxCache.get(key) as OnyxValue<TKey> | undefined;
     }
 
     const allCacheKeys = OnyxCache.getAllKeys();
@@ -190,7 +190,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
             // If `newValueRef.current` is `null` or any other value it means that the cache does have a value for that key.
             // This difference between `undefined` and other values is crucial and it's used to address the following
             // conditions and use cases.
-            newValueRef.current = getSelectedValue<TKey, TReturnValue>(key, selectorRef.current);
+            newValueRef.current = getSelectedValue(key, selectorRef.current) as CachedValue<TKey, TReturnValue>;
 
             // We set this flag to `false` again since we don't want to get the newest cached value every time `getSnapshot()` is executed,
             // and only when `Onyx.connect()` callback is fired.
