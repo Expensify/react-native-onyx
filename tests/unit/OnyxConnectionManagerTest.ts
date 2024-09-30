@@ -271,6 +271,43 @@ describe('OnyxConnectionManager', () => {
             expect(connectionsMap.size).toEqual(0);
         });
 
+        it("should create a separate connection to the same key when it's a collection one and waitForCollectionCallback is undefined/false", async () => {
+            const collection = {
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry3`]: {id: 'entry3_id', name: 'entry3_name'},
+            };
+
+            Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, collection as GenericCollection);
+
+            await act(async () => waitForPromisesToResolve());
+
+            const callback1 = jest.fn();
+            const connection1 = connectionManager.connect({key: ONYXKEYS.COLLECTION.TEST_KEY, waitForCollectionCallback: undefined, callback: callback1});
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(callback1).toHaveBeenCalledTimes(3);
+            expect(callback1).toHaveBeenNthCalledWith(1, collection[`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`], `${ONYXKEYS.COLLECTION.TEST_KEY}entry1`);
+            expect(callback1).toHaveBeenNthCalledWith(2, collection[`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`], `${ONYXKEYS.COLLECTION.TEST_KEY}entry2`);
+            expect(callback1).toHaveBeenNthCalledWith(3, collection[`${ONYXKEYS.COLLECTION.TEST_KEY}entry3`], `${ONYXKEYS.COLLECTION.TEST_KEY}entry3`);
+
+            const callback2 = jest.fn();
+            const connection2 = connectionManager.connect({key: ONYXKEYS.COLLECTION.TEST_KEY, waitForCollectionCallback: false, callback: callback2});
+
+            expect(connection1.id).not.toEqual(connection2.id);
+            expect(connectionsMap.size).toEqual(2);
+            expect(connectionsMap.has(connection1.id)).toBeTruthy();
+            expect(connectionsMap.has(connection2.id)).toBeTruthy();
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(callback2).toHaveBeenCalledTimes(3);
+            expect(callback2).toHaveBeenNthCalledWith(1, collection[`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`], `${ONYXKEYS.COLLECTION.TEST_KEY}entry1`);
+            expect(callback2).toHaveBeenNthCalledWith(2, collection[`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`], `${ONYXKEYS.COLLECTION.TEST_KEY}entry2`);
+            expect(callback2).toHaveBeenNthCalledWith(3, collection[`${ONYXKEYS.COLLECTION.TEST_KEY}entry3`], `${ONYXKEYS.COLLECTION.TEST_KEY}entry3`);
+        });
+
         it('should not throw any errors when passing an undefined connection or trying to access an inexistent one inside disconnect()', () => {
             expect(connectionsMap.size).toEqual(0);
 

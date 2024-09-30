@@ -88,19 +88,25 @@ class OnyxConnectionManager {
      * according to their purpose and effect they produce in the Onyx connection.
      */
     private generateConnectionID<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): string {
+        const {key, initWithStoredValues, reuseConnection, waitForCollectionCallback} = connectOptions;
         let suffix = '';
 
         // We will generate a unique ID in any of the following situations:
-        // - `connectOptions.reuseConnection` is `false`. That means the subscriber explicitly wants the connection to not be reused.
-        // - `connectOptions.initWithStoredValues` is `false`. This flag changes the subscription flow when set to `false`, so the connection can't be reused.
+        // - `reuseConnection` is `false`. That means the subscriber explicitly wants the connection to not be reused.
+        // - `initWithStoredValues` is `false`. This flag changes the subscription flow when set to `false`, so the connection can't be reused.
+        // - `key` is a collection key AND `waitForCollectionCallback` is `undefined/false`. This combination needs a new connection at every subscription
+        //   in order to send all the collection entries, so the connection can't be reused.
         // - `withOnyxInstance` is defined inside `connectOptions`. That means the subscriber is a `withOnyx` HOC and therefore doesn't support connection reuse.
-        if (connectOptions.reuseConnection === false || connectOptions.initWithStoredValues === false || utils.hasWithOnyxInstance(connectOptions)) {
+        if (
+            reuseConnection === false ||
+            initWithStoredValues === false ||
+            (!utils.hasWithOnyxInstance(connectOptions) && OnyxUtils.isCollectionKey(key) && (waitForCollectionCallback === undefined || waitForCollectionCallback === false)) ||
+            utils.hasWithOnyxInstance(connectOptions)
+        ) {
             suffix += `,uniqueID=${Str.guid()}`;
         }
 
-        return `onyxKey=${connectOptions.key},initWithStoredValues=${connectOptions.initWithStoredValues ?? true},waitForCollectionCallback=${
-            connectOptions.waitForCollectionCallback ?? false
-        }${suffix}`;
+        return `onyxKey=${key},initWithStoredValues=${initWithStoredValues ?? true},waitForCollectionCallback=${waitForCollectionCallback ?? false}${suffix}`;
     }
 
     /**
