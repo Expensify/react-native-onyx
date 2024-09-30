@@ -109,7 +109,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
 
     // Stores the previous cached value as it's necessary to compare with the new value in `getSnapshot()`.
     // We initialize it to `null` to simulate that we don't have any value from cache yet.
-    const previousValueRef = useRef<TReturnValue | OnyxValue<TKey> | undefined | null>(null);
+    const previousValueRef = useRef<CachedValue<TKey, TReturnValue> | undefined | null>(null);
 
     // Stores the newest cached value in order to compare with the previous one and optimize `getSnapshot()` execution.
     const newValueRef = useRef<CachedValue<TKey, TReturnValue> | undefined | null>(null);
