@@ -74,7 +74,7 @@ function getCachedValue<TKey extends OnyxKey>(key: TKey): OnyxValue<TKey> | unde
 
     const values: Record<string, unknown> = {};
     allCacheKeys.forEach((cacheKey) => {
-        if (cacheKey.startsWith(key)) {
+        if (!cacheKey.startsWith(key)) {
             return;
         }
 
