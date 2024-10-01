@@ -59,6 +59,10 @@ type UseOnyxResult<TKey extends OnyxKey, TValue> = [CachedValue<TKey, TValue>, R
 
 type UseOnyxSelector<TKey extends OnyxKey, SelectorValue> = (data?: OnyxValue<TKey>) => SelectorValue;
 
+/**
+ * Gets the cached value from the Onyx cache. If the key is a collection key, it will return all the values in the collection.
+ * It is a fork of `tryGetCachedValue` from `OnyxUtils` caused by different selector logic in `useOnyx`. It should be unified in the future, when `withOnyx` is removed.
+ */
 function getCachedValue<TKey extends OnyxKey>(key: TKey): OnyxValue<TKey> | undefined {
     if (!OnyxUtils.isCollectionKey(key)) {
         return OnyxCache.get(key) as OnyxValue<TKey> | undefined;
@@ -84,6 +88,9 @@ function getCachedValue<TKey extends OnyxKey>(key: TKey): OnyxValue<TKey> | unde
     return values as OnyxValue<TKey>;
 }
 
+/**
+ * Gets the value from cache and maps it with selector.
+ */
 function getSelectedValue<TKey extends OnyxKey, TValue = OnyxValue<TKey> | undefined>(key: TKey, selector?: UseOnyxSelector<TKey, TValue>) {
     const value = getCachedValue(key);
 
