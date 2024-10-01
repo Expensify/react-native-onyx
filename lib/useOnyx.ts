@@ -111,7 +111,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
     // Stores the previously result returned by the hook, containing the data from cache and the fetch status.
     // We initialize it to `undefined` and `loading` fetch status to simulate the initial result when the hook is loading from the cache.
     // However, if `initWithStoredValues` is `false` we set the fetch status to `loaded` since we want to signal that data is ready.
-    const resultRef = useRef<UseOnyxResult<TReturnValue | undefined>>([
+    const resultRef = useRef<UseOnyxResult<TReturnValue | undefined | null>>([
         undefined,
         {
             status: options?.initWithStoredValues === false ? 'loaded' : 'loading',
