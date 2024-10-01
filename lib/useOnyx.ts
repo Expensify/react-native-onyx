@@ -94,6 +94,14 @@ function getSelectedValue<TKey extends OnyxKey, TValue>(key: TKey, selector?: Us
     return selectedValue;
 }
 
+function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
+    key: TKey,
+    options?: BaseUseOnyxOptions & UseOnyxInitialValueOption<TReturnValue> & Required<UseOnyxSelectorOption<TKey, TReturnValue>>,
+): UseOnyxResult<TReturnValue>;
+function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
+    key: TKey,
+    options?: BaseUseOnyxOptions & UseOnyxInitialValueOption<NoInfer<TReturnValue>>,
+): UseOnyxResult<TReturnValue>;
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey, options?: UseOnyxOptions<TKey, TReturnValue>) {
     const connectionRef = useRef<Connection | null>(null);
     const previousKey = usePrevious(key);
