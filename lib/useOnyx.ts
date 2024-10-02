@@ -119,7 +119,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
 
     // Stores the previously result returned by the hook, containing the data from cache and the fetch status.
     // We initialize it to `undefined` and `loading` fetch status to simulate the initial result when the hook is loading from the cache.
-    // However, if `initWithStoredValues` is `true` we set the fetch status to `loaded` since we want to signal that data is ready.
+    // However, if `initWithStoredValues` is `false` we set the fetch status to `loaded` since we want to signal that data is ready.
     const resultRef = useRef<UseOnyxResult<TReturnValue>>([
         undefined,
         {
@@ -180,6 +180,11 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
     }, [key, options?.canEvict]);
 
     const getSnapshot = useCallback(() => {
+        // We return the initial result right away during the first connection if `initWithStoredValues` is set to `false`.
+        if (isFirstConnectionRef.current && options?.initWithStoredValues === false) {
+            return resultRef.current;
+        }
+
         // We get the value from cache while the first connection to Onyx is being made,
         // so we can return any cached value right away. After the connection is made, we only
         // update `newValueRef` when `Onyx.connect()` callback is fired.
@@ -237,7 +242,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
         }
 
         return resultRef.current;
-    }, [key, selectorRef, options?.allowStaleData, options?.initialValue]);
+    }, [options?.initWithStoredValues, options?.allowStaleData, options?.initialValue, key, selectorRef]);
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
