@@ -4,7 +4,7 @@ import OnyxCache from './OnyxCache';
 import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
 import OnyxUtils from './OnyxUtils';
-import type {CollectionKeyBase, OnyxKey, OnyxValue} from './types';
+import type {CollectionKeyBase, KeyValueMapping, OnyxCollection, OnyxKey, OnyxValue} from './types';
 import useLiveRef from './useLiveRef';
 import usePrevious from './usePrevious';
 
@@ -40,6 +40,7 @@ type UseOnyxSelectorOption<TKey extends OnyxKey, TReturnValue> = {
      * Using this setting on `useOnyx` can have very positive performance benefits because the component will only re-render
      * when the subset of data changes. Otherwise, any change of data on any property would normally
      * cause the component to re-render (and that can be expensive from a performance standpoint).
+     * @see `useOnyx` cannot return `null` and so selector will replace `null` with `undefined` to maintain compatibility.
      */
     selector?: UseOnyxSelector<TKey, TReturnValue>;
 };
@@ -52,15 +53,15 @@ type ResultMetadata = {
     status: FetchStatus;
 };
 
-type UseOnyxResult<TValue> = [TValue, ResultMetadata];
+type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata];
 
 /**
  * Gets the cached value from the Onyx cache. If the key is a collection key, it will return all the values in the collection.
  * It is a fork of `tryGetCachedValue` from `OnyxUtils` caused by different selector logic in `useOnyx`. It should be unified in the future, when `withOnyx` is removed.
  */
-function getCachedValue<TKey extends OnyxKey>(key: TKey): OnyxValue<TKey> | undefined {
+function tryGetCachedValue<TKey extends OnyxKey>(key: TKey): OnyxValue<OnyxKey> {
     if (!OnyxUtils.isCollectionKey(key)) {
-        return OnyxCache.get(key) as OnyxValue<TKey> | undefined;
+        return OnyxCache.get(key);
     }
 
     const allCacheKeys = OnyxCache.getAllKeys();
@@ -71,7 +72,7 @@ function getCachedValue<TKey extends OnyxKey>(key: TKey): OnyxValue<TKey> | unde
         return;
     }
 
-    const values: Record<string, unknown> = {};
+    const values: OnyxCollection<KeyValueMapping[TKey]> = {};
     allCacheKeys.forEach((cacheKey) => {
         if (!cacheKey.startsWith(key)) {
             return;
@@ -80,18 +81,18 @@ function getCachedValue<TKey extends OnyxKey>(key: TKey): OnyxValue<TKey> | unde
         values[cacheKey] = OnyxCache.get(cacheKey);
     });
 
-    return values as OnyxValue<TKey>;
+    return values;
 }
 
 /**
- * Gets the value from cache and maps it with selector.
+ * Gets the value from cache and maps it with selector. It changes `null` to `undefined` for `useOnyx` compatibility.
  */
-function getSelectedValue<TKey extends OnyxKey, TValue>(key: TKey, selector?: UseOnyxSelector<TKey, TValue>) {
-    const value = getCachedValue(key);
+function getCachedValue<TKey extends OnyxKey, TValue>(key: TKey, selector?: UseOnyxSelector<TKey, TValue>) {
+    const value = tryGetCachedValue(key) as OnyxValue<TKey>;
 
-    const selectedValue = (selector ? selector(value) : value) as TValue;
+    const selectedValue = selector ? selector(value) : (value as TValue);
 
-    return selectedValue;
+    return selectedValue ?? undefined;
 }
 
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
@@ -102,7 +103,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     key: TKey,
     options?: BaseUseOnyxOptions & UseOnyxInitialValueOption<NoInfer<TReturnValue>>,
 ): UseOnyxResult<TReturnValue>;
-function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey, options?: UseOnyxOptions<TKey, TReturnValue>) {
+function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey, options?: UseOnyxOptions<TKey, TReturnValue>): UseOnyxResult<TReturnValue> {
     const connectionRef = useRef<Connection | null>(null);
     const previousKey = usePrevious(key);
 
@@ -118,8 +119,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
 
     // Stores the previously result returned by the hook, containing the data from cache and the fetch status.
     // We initialize it to `undefined` and `loading` fetch status to simulate the initial result when the hook is loading from the cache.
-    // However, if `initWithStoredValues` is `false` we set the fetch status to `loaded` since we want to signal that data is ready.
-    const resultRef = useRef<UseOnyxResult<TReturnValue | undefined | null>>([
+    // However, if `initWithStoredValues` is `true` we set the fetch status to `loaded` since we want to signal that data is ready.
+    const resultRef = useRef<UseOnyxResult<TReturnValue>>([
         undefined,
         {
             status: options?.initWithStoredValues === false ? 'loaded' : 'loading',
@@ -179,11 +180,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
     }, [key, options?.canEvict]);
 
     const getSnapshot = useCallback(() => {
-        // We return the initial result right away during the first connection if `initWithStoredValues` is set to `false`.
-        if (isFirstConnectionRef.current && options?.initWithStoredValues === false) {
-            return resultRef.current;
-        }
-
         // We get the value from cache while the first connection to Onyx is being made,
         // so we can return any cached value right away. After the connection is made, we only
         // update `newValueRef` when `Onyx.connect()` callback is fired.
@@ -192,7 +188,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
             // If `newValueRef.current` is `null` or any other value it means that the cache does have a value for that key.
             // This difference between `undefined` and other values is crucial and it's used to address the following
             // conditions and use cases.
-            newValueRef.current = getSelectedValue(key, selectorRef.current);
+            newValueRef.current = getCachedValue(key, selectorRef.current);
 
             // We set this flag to `false` again since we don't want to get the newest cached value every time `getSnapshot()` is executed,
             // and only when `Onyx.connect()` callback is fired.
@@ -215,7 +211,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
         // If data is not present in cache and `initialValue` is set during the first connection,
         // we set the new value to `initialValue` and fetch status to `loaded` since we already have some data to return to the consumer.
         if (isFirstConnectionRef.current && !hasCacheForKey && options?.initialValue !== undefined) {
-            newValueRef.current = options?.initialValue ?? undefined;
+            newValueRef.current = (options?.initialValue ?? undefined) as TReturnValue;
             newFetchStatus = 'loaded';
         }
 
@@ -237,11 +233,11 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
             previousValueRef.current = newValueRef.current;
 
             // If the new value is `null` we default it to `undefined` to ensure the consumer gets a consistent result from the hook.
-            resultRef.current = [previousValueRef.current, {status: newFetchStatus ?? 'loaded'}];
+            resultRef.current = [previousValueRef.current ?? undefined, {status: newFetchStatus ?? 'loaded'}];
         }
 
         return resultRef.current;
-    }, [key, selectorRef, options?.initWithStoredValues, options?.allowStaleData, options?.initialValue]);
+    }, [key, selectorRef, options?.allowStaleData, options?.initialValue]);
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
@@ -280,7 +276,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
         checkEvictableKey();
     }, [checkEvictableKey]);
 
-    const result = useSyncExternalStore(subscribe, getSnapshot);
+    const result = useSyncExternalStore<UseOnyxResult<TReturnValue>>(subscribe, getSnapshot);
 
     return result;
 }
