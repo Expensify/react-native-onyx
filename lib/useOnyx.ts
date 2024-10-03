@@ -80,9 +80,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
     // We initialize it to `null` to simulate that we don't have any value from cache yet.
     const previousValueRef = useRef<CachedValue<TKey, TReturnValue> | undefined | null>(null);
 
-    // Stores the newest cached value in order to compare with the previous one and optimize `getSnapshot()` execution.
-    const newValueRef = useRef<CachedValue<TKey, TReturnValue> | undefined | null>(null);
-
     // Stores the previously result returned by the hook, containing the data from cache and the fetch status.
     // We initialize it to `undefined` and `loading` fetch status to simulate the initial result when the hook is loading from the cache.
     // However, if `initWithStoredValues` is `false` we set the fetch status to `loaded` since we want to signal that data is ready.
@@ -151,6 +148,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
             return resultRef.current;
         }
 
+        let newValue: CachedValue<TKey, TReturnValue> | undefined;
+
         // We get the value from cache while the first connection to Onyx is being made,
         // so we can return any cached value right away. After the connection is made, we only
         // update `newValueRef` when `Onyx.connect()` callback is fired.
@@ -159,7 +158,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
             // If `newValueRef.current` is `null` or any other value it means that the cache does have a value for that key.
             // This difference between `undefined` and other values is crucial and it's used to address the following
             // conditions and use cases.
-            newValueRef.current = getCachedValue<TKey, TReturnValue>(key);
+            newValue = getCachedValue<TKey, TReturnValue>(key);
 
             // We set this flag to `false` again since we don't want to get the newest cached value every time `getSnapshot()` is executed,
             // and only when `Onyx.connect()` callback is fired.
@@ -175,28 +174,28 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
         // and fetch status to `loading` to simulate that it is still being loaded until we have the most updated data.
         // If `allowStaleData` is `true` this logic will be ignored and cached value will be used, even if it's stale data.
         if (isFirstConnectionRef.current && OnyxUtils.hasPendingMergeForKey(key) && !options?.allowStaleData) {
-            newValueRef.current = undefined;
+            newValue = undefined;
             newFetchStatus = 'loading';
         }
 
         // If data is not present in cache and `initialValue` is set during the first connection,
         // we set the new value to `initialValue` and fetch status to `loaded` since we already have some data to return to the consumer.
         if (isFirstConnectionRef.current && !hasCacheForKey && options?.initialValue !== undefined) {
-            newValueRef.current = (options?.initialValue ?? undefined) as CachedValue<TKey, TReturnValue>;
+            newValue = (options?.initialValue ?? undefined) as CachedValue<TKey, TReturnValue>;
             newFetchStatus = 'loaded';
         }
 
         // We do a deep equality check if `selector` is defined, since each `OnyxUtils.tryGetCachedValue()` call will
         // generate a plain new primitive/object/array that was created using the `selector` function.
         // For the other cases we will only deal with object reference checks, so just a shallow equality check is enough.
-        const areValuesEqual = shallowEqual(previousValueRef.current ?? undefined, newValueRef.current);
+        const areValuesEqual = shallowEqual(previousValueRef.current ?? undefined, newValue);
 
         // If the previously cached value is different from the new value, we update both cached value
         // and the result to be returned by the hook.
         // If the cache was set for the first time, we also update the cached value and the result.
         const isCacheSetFirstTime = previousValueRef.current === null && hasCacheForKey;
         if (isCacheSetFirstTime || !areValuesEqual) {
-            previousValueRef.current = newValueRef.current;
+            previousValueRef.current = newValue;
 
             // If the new value is `null` we default it to `undefined` to ensure the consumer gets a consistent result from the hook.
             resultRef.current = [
