@@ -197,11 +197,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
         if (isCacheSetFirstTime || !areValuesEqual) {
             previousValueRef.current = newValue;
 
-            // If the new value is `null` we default it to `undefined` to ensure the consumer gets a consistent result from the hook.
-            resultRef.current = [
-                (selectorRef.current ? selectorRef.current(previousValueRef.current) : previousValueRef.current) as CachedValue<TKey, TReturnValue>,
-                {status: newFetchStatus ?? 'loaded'},
-            ];
+            resultRef.current = [(selectorRef.current ? selectorRef.current(newValue) : newValue) as CachedValue<TKey, TReturnValue>, {status: newFetchStatus ?? 'loaded'}];
         }
 
         return resultRef.current;
