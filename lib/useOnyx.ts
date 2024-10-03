@@ -188,7 +188,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
         // We do a deep equality check if `selector` is defined, since each `OnyxUtils.tryGetCachedValue()` call will
         // generate a plain new primitive/object/array that was created using the `selector` function.
         // For the other cases we will only deal with object reference checks, so just a shallow equality check is enough.
-        const areValuesEqual = shallowEqual(previousValueRef.current ?? undefined, newValue);
+        const areValuesEqual = shallowEqual(previousValueRef.current ?? undefined, newValue ?? previousValueRef.current);
 
         // If the previously cached value is different from the new value, we update both cached value
         // and the result to be returned by the hook.
