@@ -220,7 +220,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
             newFetchStatus = 'loaded';
         }
 
-        // We do a deep equality check if `selector` is defined, since each `OnyxUtils.tryGetCachedValue()` call will
+        // We do a deep equality check if `selector` is defined, since each `tryGetCachedValue()` call will
         // generate a plain new primitive/object/array that was created using the `selector` function.
         // For the other cases we will only deal with object reference checks, so just a shallow equality check is enough.
         let areValuesEqual: boolean;
