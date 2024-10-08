@@ -23,6 +23,12 @@ type BaseUseOnyxOptions = {
      * If set to `true`, data will be retrieved from cache during the first render even if there is a pending merge for the key.
      */
     allowStaleData?: boolean;
+
+    /**
+     * If set to `false`, the connection won't be reused between other subscribers that are listening to the same Onyx key
+     * with the same connect configurations.
+     */
+    reuseConnection?: boolean;
 };
 
 type UseOnyxInitialValueOption<TInitialValue> = {
@@ -261,6 +267,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
                 },
                 initWithStoredValues: options?.initWithStoredValues,
                 waitForCollectionCallback: OnyxUtils.isCollectionKey(key) as true,
+                reuseConnection: options?.reuseConnection,
             });
 
             checkEvictableKey();
@@ -274,7 +281,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
                 isFirstConnectionRef.current = false;
             };
         },
-        [key, options?.initWithStoredValues, checkEvictableKey],
+        [key, options?.initWithStoredValues, options?.reuseConnection, checkEvictableKey],
     );
 
     useEffect(() => {
