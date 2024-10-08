@@ -73,12 +73,18 @@ class OnyxConnectionManager {
      */
     private lastCallbackID: number;
 
+    /**
+     * Stores the last generated session ID for the connection manager.
+     */
+    private sessionID: string;
+
     constructor() {
         this.connectionsMap = new Map();
         this.lastCallbackID = 0;
+        this.sessionID = Str.guid();
 
         // Binds all public methods to prevent problems with `this`.
-        bindAll(this, 'generateConnectionID', 'fireCallbacks', 'connect', 'disconnect', 'disconnectAll', 'addToEvictionBlockList', 'removeFromEvictionBlockList');
+        bindAll(this, 'generateConnectionID', 'fireCallbacks', 'connect', 'disconnect', 'disconnectAll', 'refreshSessionID', 'addToEvictionBlockList', 'removeFromEvictionBlockList');
     }
 
     /**
@@ -89,7 +95,10 @@ class OnyxConnectionManager {
      */
     private generateConnectionID<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): string {
         const {key, initWithStoredValues, reuseConnection, waitForCollectionCallback} = connectOptions;
-        let suffix = '';
+
+        // The current session ID is appended to the connection ID so we can have different connections
+        // after an Onyx.clear() operation.
+        let suffix = `,sessionID=${this.sessionID}`;
 
         // We will generate a unique ID in any of the following situations:
         // - `reuseConnection` is `false`. That means the subscriber explicitly wants the connection to not be reused.
@@ -227,6 +236,15 @@ class OnyxConnectionManager {
         });
 
         this.connectionsMap.clear();
+    }
+
+    /**
+     * Refreshes the connection manager's session ID. Used in Onyx.clear() in order to
+     * create new connections after Onyx is cleared, instead of reusing existing connections
+     * that can produce unexpected behavior in Onyx subscribers.
+     */
+    refreshSessionID(): void {
+        this.sessionID = Str.guid();
     }
 
     /**
