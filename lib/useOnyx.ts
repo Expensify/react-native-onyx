@@ -238,8 +238,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
 
         // If the previously cached value is different from the new value, we update both cached value
         // and the result to be returned by the hook.
-        // If the cache was set for the first time, we also update the cached value and the result.
-        const isCacheSetFirstTime = previousValueRef.current === null && hasCacheForKey;
+        // If the cache was set for the first time or we have a pending Onyx.clear() task, we also update the cached value and the result.
+        const isCacheSetFirstTime = previousValueRef.current === null && (hasCacheForKey || OnyxCache.hasPendingTask('clear'));
         if (isCacheSetFirstTime || !areValuesEqual) {
             previousValueRef.current = newValueRef.current;
 

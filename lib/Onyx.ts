@@ -449,7 +449,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
     const defaultKeyStates = OnyxUtils.getDefaultKeyStates();
     const initialKeys = Object.keys(defaultKeyStates);
 
-    return OnyxUtils.getAllKeys()
+    const promise = OnyxUtils.getAllKeys()
         .then((cachedKeys) => {
             cache.clearNullishStorageKeys();
 
@@ -537,6 +537,8 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                 });
         })
         .then(() => undefined);
+
+    return cache.captureTask('clear', promise) as Promise<void>;
 }
 
 function updateSnapshots(data: OnyxUpdate[]) {

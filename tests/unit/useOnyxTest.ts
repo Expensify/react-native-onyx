@@ -150,15 +150,21 @@ describe('useOnyx', () => {
 
             Onyx.clear();
 
-            const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
+            const {result: result1} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
+            const {result: result2} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
 
-            expect(result.current[0]).toBeUndefined();
-            expect(result.current[1].status).toEqual('loading');
+            expect(result1.current[0]).toBeUndefined();
+            expect(result1.current[1].status).toEqual('loaded');
+            expect(result2.current[0]).toBeUndefined();
+            expect(result2.current[1].status).toEqual('loaded');
 
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
             await act(async () => waitForPromisesToResolve());
 
-            expect(result.current[0]).toBeUndefined();
-            expect(result.current[1].status).toEqual('loaded');
+            expect(result1.current[0]).toEqual('test2');
+            expect(result1.current[1].status).toEqual('loaded');
+            expect(result2.current[0]).toEqual('test2');
+            expect(result2.current[1].status).toEqual('loaded');
         });
 
         it('should return updated state when connecting to the same key after an Onyx.clear() call', async () => {
@@ -174,7 +180,6 @@ describe('useOnyx', () => {
             await act(async () => Onyx.clear());
 
             const {result: result2} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
-
             const {result: result3} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
 
             await act(async () => waitForPromisesToResolve());
