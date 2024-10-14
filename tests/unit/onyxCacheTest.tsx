@@ -14,6 +14,9 @@ import type withOnyxType from '../../lib/withOnyx';
 import type {InitOptions} from '../../lib/types';
 import generateRange from '../utils/generateRange';
 import type {Connection} from '../../lib/OnyxConnectionManager';
+import type {CacheTask} from '../../lib/OnyxCache';
+
+const MOCK_TASK = 'mockTask' as CacheTask;
 
 describe('Onyx', () => {
     describe('Cache Service', () => {
@@ -374,22 +377,22 @@ describe('Onyx', () => {
                 // Given empty cache with no started tasks
                 // When a task has not been started
                 // Then it should return false
-                expect(cache.hasPendingTask('mockTask')).toBe(false);
+                expect(cache.hasPendingTask(MOCK_TASK)).toBe(false);
             });
 
             it('Should return true when a task is running', () => {
                 // Given empty cache with no started tasks
                 // When a unique task is started
                 const promise = Promise.resolve();
-                cache.captureTask('mockTask', promise);
+                cache.captureTask(MOCK_TASK, promise);
 
                 // Then `hasPendingTask` should return true
-                expect(cache.hasPendingTask('mockTask')).toBe(true);
+                expect(cache.hasPendingTask(MOCK_TASK)).toBe(true);
 
                 // When the promise is completed
                 return waitForPromisesToResolve().then(() => {
                     // Then `hasPendingTask` should return false
-                    expect(cache.hasPendingTask('mockTask')).toBe(false);
+                    expect(cache.hasPendingTask(MOCK_TASK)).toBe(false);
                 });
             });
         });
@@ -399,7 +402,7 @@ describe('Onyx', () => {
                 // Given empty cache with no started tasks
 
                 // When a task is retrieved
-                const task = cache.getTaskPromise('mockTask');
+                const task = cache.getTaskPromise(MOCK_TASK);
 
                 // Then it should be undefined
                 expect(task).not.toBeDefined();
@@ -409,10 +412,10 @@ describe('Onyx', () => {
                 // Given empty cache with no started tasks
                 // When a unique task is started
                 const promise = Promise.resolve({mockResult: true});
-                cache.captureTask('mockTask', promise);
+                cache.captureTask(MOCK_TASK, promise);
 
                 // When a task is retrieved
-                const taskPromise = cache.getTaskPromise('mockTask');
+                const taskPromise = cache.getTaskPromise(MOCK_TASK);
 
                 // Then it should resolve with the same result as the captured task
                 return taskPromise!.then((result) => {

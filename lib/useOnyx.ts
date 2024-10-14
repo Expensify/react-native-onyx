@@ -1,6 +1,6 @@
 import {deepEqual, shallowEqual} from 'fast-equals';
 import {useCallback, useEffect, useRef, useSyncExternalStore} from 'react';
-import OnyxCache from './OnyxCache';
+import OnyxCache, {TASK} from './OnyxCache';
 import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
 import OnyxUtils from './OnyxUtils';
@@ -239,7 +239,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
         // If the previously cached value is different from the new value, we update both cached value
         // and the result to be returned by the hook.
         // If the cache was set for the first time or we have a pending Onyx.clear() task, we also update the cached value and the result.
-        const isCacheSetFirstTime = previousValueRef.current === null && (hasCacheForKey || OnyxCache.hasPendingTask('clear'));
+        const isCacheSetFirstTime = previousValueRef.current === null && (hasCacheForKey || OnyxCache.hasPendingTask(TASK.CLEAR));
         if (isCacheSetFirstTime || !areValuesEqual) {
             previousValueRef.current = newValueRef.current;
 

@@ -2,7 +2,7 @@
 import _ from 'underscore';
 import lodashPick from 'lodash/pick';
 import * as Logger from './Logger';
-import cache from './OnyxCache';
+import cache, {TASK} from './OnyxCache';
 import * as PerformanceUtils from './PerformanceUtils';
 import Storage from './storage';
 import utils from './utils';
@@ -538,7 +538,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
         })
         .then(() => undefined);
 
-    return cache.captureTask('clear', promise) as Promise<void>;
+    return cache.captureTask(TASK.CLEAR, promise) as Promise<void>;
 }
 
 function updateSnapshots(data: OnyxUpdate[]) {
