@@ -1,6 +1,6 @@
 import {deepEqual, shallowEqual} from 'fast-equals';
 import {useCallback, useEffect, useRef, useSyncExternalStore} from 'react';
-import OnyxCache from './OnyxCache';
+import OnyxCache, {TASK} from './OnyxCache';
 import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
 import OnyxUtils from './OnyxUtils';
@@ -23,6 +23,12 @@ type BaseUseOnyxOptions = {
      * If set to `true`, data will be retrieved from cache during the first render even if there is a pending merge for the key.
      */
     allowStaleData?: boolean;
+
+    /**
+     * If set to `false`, the connection won't be reused between other subscribers that are listening to the same Onyx key
+     * with the same connect configurations.
+     */
+    reuseConnection?: boolean;
 };
 
 type UseOnyxInitialValueOption<TInitialValue> = {
@@ -232,8 +238,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
 
         // If the previously cached value is different from the new value, we update both cached value
         // and the result to be returned by the hook.
-        // If the cache was set for the first time, we also update the cached value and the result.
-        const isCacheSetFirstTime = previousValueRef.current === null && hasCacheForKey;
+        // If the cache was set for the first time or we have a pending Onyx.clear() task, we also update the cached value and the result.
+        const isCacheSetFirstTime = previousValueRef.current === null && (hasCacheForKey || OnyxCache.hasPendingTask(TASK.CLEAR));
         if (isCacheSetFirstTime || !areValuesEqual) {
             previousValueRef.current = newValueRef.current;
 
@@ -261,6 +267,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
                 },
                 initWithStoredValues: options?.initWithStoredValues,
                 waitForCollectionCallback: OnyxUtils.isCollectionKey(key) as true,
+                reuseConnection: options?.reuseConnection,
             });
 
             checkEvictableKey();
@@ -274,7 +281,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
                 isFirstConnectionRef.current = false;
             };
         },
-        [key, options?.initWithStoredValues, checkEvictableKey],
+        [key, options?.initWithStoredValues, options?.reuseConnection, checkEvictableKey],
     );
 
     useEffect(() => {

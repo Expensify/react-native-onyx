@@ -6,7 +6,7 @@ import type {ValueOf} from 'type-fest';
 import DevTools from './DevTools';
 import * as Logger from './Logger';
 import type Onyx from './Onyx';
-import cache from './OnyxCache';
+import cache, {TASK} from './OnyxCache';
 import * as PerformanceUtils from './PerformanceUtils';
 import * as Str from './Str';
 import unstable_batchedUpdates from './batch';
@@ -244,7 +244,7 @@ function get<TKey extends OnyxKey, TValue extends OnyxValue<TKey>>(key: TKey): P
         return Promise.resolve(cache.get(key) as TValue);
     }
 
-    const taskName = `get:${key}`;
+    const taskName = `${TASK.GET}:${key}` as const;
 
     // When a value retrieving task for this key is still running hook to it
     if (cache.hasPendingTask(taskName)) {
@@ -296,7 +296,7 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
             return;
         }
 
-        const pendingKey = `get:${key}`;
+        const pendingKey = `${TASK.GET}:${key}` as const;
         if (cache.hasPendingTask(pendingKey)) {
             pendingTasks.push(cache.getTaskPromise(pendingKey) as Promise<OnyxValue<TKey>>);
             pendingKeys.push(key);
@@ -378,11 +378,9 @@ function getAllKeys(): Promise<Set<OnyxKey>> {
         return Promise.resolve(cachedKeys);
     }
 
-    const taskName = 'getAllKeys';
-
     // When a value retrieving task for all keys is still running hook to it
-    if (cache.hasPendingTask(taskName)) {
-        return cache.getTaskPromise(taskName) as Promise<Set<OnyxKey>>;
+    if (cache.hasPendingTask(TASK.GET_ALL_KEYS)) {
+        return cache.getTaskPromise(TASK.GET_ALL_KEYS) as Promise<Set<OnyxKey>>;
     }
 
     // Otherwise retrieve the keys from storage and capture a promise to aid concurrent usages
@@ -393,7 +391,7 @@ function getAllKeys(): Promise<Set<OnyxKey>> {
         return cache.getAllKeys();
     });
 
-    return cache.captureTask(taskName, promise) as Promise<Set<OnyxKey>>;
+    return cache.captureTask(TASK.GET_ALL_KEYS, promise) as Promise<Set<OnyxKey>>;
 }
 
 /**
