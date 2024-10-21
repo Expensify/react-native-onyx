@@ -12,9 +12,6 @@ dist/
 # IDEs
 .idea
 
-# Decrypted private key we do not want to commit
-.github/OSBotify-private-key.asc
-
 # Published package
 *.tgz
 
