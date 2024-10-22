@@ -1,7 +1,17 @@
 import {deepEqual} from 'fast-equals';
 import bindAll from 'lodash/bindAll';
+import type {ValueOf} from 'type-fest';
 import utils from './utils';
 import type {OnyxKey, OnyxValue} from './types';
+
+// Task constants
+const TASK = {
+    GET: 'get',
+    GET_ALL_KEYS: 'getAllKeys',
+    CLEAR: 'clear',
+} as const;
+
+type CacheTask = ValueOf<typeof TASK> | `${ValueOf<typeof TASK>}:${string}`;
 
 /**
  * In memory cache providing data by reference
@@ -172,7 +182,7 @@ class OnyxCache {
      * Check whether the given task is already running
      * @param taskName - unique name given for the task
      */
-    hasPendingTask(taskName: string): boolean {
+    hasPendingTask(taskName: CacheTask): boolean {
         return this.pendingPromises.get(taskName) !== undefined;
     }
 
@@ -182,7 +192,7 @@ class OnyxCache {
      * provided from this function
      * @param taskName - unique name given for the task
      */
-    getTaskPromise(taskName: string): Promise<OnyxValue<OnyxKey> | OnyxKey[]> | undefined {
+    getTaskPromise(taskName: CacheTask): Promise<OnyxValue<OnyxKey> | OnyxKey[]> | undefined {
         return this.pendingPromises.get(taskName);
     }
 
@@ -191,7 +201,7 @@ class OnyxCache {
      * hook up to the promise if it's still pending
      * @param taskName - unique name for the task
      */
-    captureTask(taskName: string, promise: Promise<OnyxValue<OnyxKey>>): Promise<OnyxValue<OnyxKey>> {
+    captureTask(taskName: CacheTask, promise: Promise<OnyxValue<OnyxKey>>): Promise<OnyxValue<OnyxKey>> {
         const returnPromise = promise.finally(() => {
             this.pendingPromises.delete(taskName);
         });
@@ -242,3 +252,5 @@ class OnyxCache {
 const instance = new OnyxCache();
 
 export default instance;
+export {TASK};
+export type {CacheTask};
