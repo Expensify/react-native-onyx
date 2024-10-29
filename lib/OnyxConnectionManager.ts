@@ -74,7 +74,17 @@ class OnyxConnectionManager {
     private lastCallbackID: number;
 
     /**
-     * Stores the last generated session ID for the connection manager.
+     * Stores the last generated session ID for the connection manager. The current session ID
+     * is appended to the connection IDs and it's used to create new different connections for the same key
+     * when `refreshSessionID()` is called.
+     *
+     * When calling `Onyx.clear()` after a logout operation some connections might remain active as they
+     * aren't tied to the React's lifecycle e.g. `Onyx.connect()` usage, causing infinite loading state issues to new `useOnyx()` subscribers
+     * that are connecting to the same key as we didn't populate the cache again because we are still reusing such connections.
+     *
+     * To elimitate this problem, the session ID must be refreshed during the `Onyx.clear()` call (by using `refreshSessionID()`)
+     * in order to create fresh connections when new subscribers connect to the same keys again, allowing them
+     * to use the cache system correctly and avoid the mentioned issues in `useOnyx()`.
      */
     private sessionID: string;
 
@@ -97,7 +107,7 @@ class OnyxConnectionManager {
         const {key, initWithStoredValues, reuseConnection, waitForCollectionCallback} = connectOptions;
 
         // The current session ID is appended to the connection ID so we can have different connections
-        // after an Onyx.clear() operation.
+        // after an `Onyx.clear()` operation.
         let suffix = `,sessionID=${this.sessionID}`;
 
         // We will generate a unique ID in any of the following situations:
@@ -239,9 +249,7 @@ class OnyxConnectionManager {
     }
 
     /**
-     * Refreshes the connection manager's session ID. Used in Onyx.clear() in order to
-     * create new connections after Onyx is cleared, instead of reusing existing connections
-     * that can produce unexpected behavior in Onyx subscribers.
+     * Refreshes the connection manager's session ID.
      */
     refreshSessionID(): void {
         this.sessionID = Str.guid();

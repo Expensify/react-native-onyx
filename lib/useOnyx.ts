@@ -236,11 +236,14 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
             areValuesEqual = shallowEqual(previousValueRef.current ?? undefined, newValueRef.current);
         }
 
-        // If the previously cached value is different from the new value, we update both cached value
-        // and the result to be returned by the hook.
-        // If the cache was set for the first time or we have a pending Onyx.clear() task, we also update the cached value and the result.
-        const isCacheSetFirstTime = previousValueRef.current === null && (hasCacheForKey || OnyxCache.hasPendingTask(TASK.CLEAR));
-        if (isCacheSetFirstTime || !areValuesEqual) {
+        // We updated the cached value and the result in the following conditions:
+        // We will update the cached value and the result in any of the following situations:
+        // - The previously cached value is different from the new value.
+        // - The previously cached value is `null` (not set from cache yet) and we have cache for this key
+        //   OR we have a pending `Onyx.clear()` task (if `Onyx.clear()` is running cache might not be available anymore
+        //   so we update the cached value/result right away in order to prevent infinite loading state issues).
+        const shouldUpdateResult = !areValuesEqual || (previousValueRef.current === null && (hasCacheForKey || OnyxCache.hasPendingTask(TASK.CLEAR)));
+        if (shouldUpdateResult) {
             previousValueRef.current = newValueRef.current;
 
             // If the new value is `null` we default it to `undefined` to ensure the consumer gets a consistent result from the hook.
