@@ -2,7 +2,7 @@
 import _ from 'underscore';
 import lodashPick from 'lodash/pick';
 import * as Logger from './Logger';
-import cache from './OnyxCache';
+import cache, {TASK} from './OnyxCache';
 import * as PerformanceUtils from './PerformanceUtils';
 import Storage from './storage';
 import utils from './utils';
@@ -449,7 +449,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
     const defaultKeyStates = OnyxUtils.getDefaultKeyStates();
     const initialKeys = Object.keys(defaultKeyStates);
 
-    return OnyxUtils.getAllKeys()
+    const promise = OnyxUtils.getAllKeys()
         .then((cachedKeys) => {
             cache.clearNullishStorageKeys();
 
@@ -529,6 +529,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
             // Remove only the items that we want cleared from storage, and reset others to default
             keysToBeClearedFromStorage.forEach((key) => cache.drop(key));
             return Storage.removeItems(keysToBeClearedFromStorage)
+                .then(() => connectionManager.refreshSessionID())
                 .then(() => Storage.multiSet(defaultKeyValuePairs))
                 .then(() => {
                     DevTools.clearState(keysToPreserve);
@@ -536,6 +537,8 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                 });
         })
         .then(() => undefined);
+
+    return cache.captureTask(TASK.CLEAR, promise) as Promise<void>;
 }
 
 function updateSnapshots(data: OnyxUpdate[]) {
