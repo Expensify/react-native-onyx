@@ -556,7 +556,7 @@ function updateSnapshots(data: OnyxUpdate[]) {
             return;
         }
 
-        let updatedData = {};
+        let updatedData: Record<string, unknown> = {};
 
         data.forEach(({key, value}) => {
             // snapshots are normal keys so we want to skip update if they are written to Onyx
@@ -573,7 +573,10 @@ function updateSnapshots(data: OnyxUpdate[]) {
                 return;
             }
 
-            updatedData = {...updatedData, [key]: lodashPick(value, Object.keys(snapshotData[key]))};
+            const oldValue = updatedData[key] || {};
+            const newValue = lodashPick(value, Object.keys(snapshotData[key]));
+
+            updatedData = {...updatedData, [key]: Object.assign(oldValue, newValue)};
         });
 
         // Skip the update if there's no data to be merged
