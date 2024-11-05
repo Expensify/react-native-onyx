@@ -725,6 +725,56 @@ function update(data: OnyxUpdate[]): Promise<void> {
         .then(() => undefined);
 }
 
+/**
+ * Sets a collection by replacing all existing collection members with new values.
+ * Any existing collection members not included in the new data will be removed.
+ *
+ * @example
+ * Onyx.setCollection(ONYXKEYS.COLLECTION.REPORT, {
+ *     [`${ONYXKEYS.COLLECTION.REPORT}1`]: report1,
+ *     [`${ONYXKEYS.COLLECTION.REPORT}2`]: report2,
+ * });
+ *
+ * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
+ * @param collection Object collection keyed by individual collection member keys and values
+ */
+function setCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
+    if (!OnyxUtils.isValidNonEmptyCollectionForMerge(collection)) {
+        Logger.logInfo('setCollection() called with invalid or empty value. Skipping this update.');
+        return Promise.resolve();
+    }
+
+    const newCollectionKeys = Object.keys(collection);
+    if (!OnyxUtils.doAllCollectionItemsBelongToSameParent(collectionKey, newCollectionKeys)) {
+        return Promise.resolve();
+    }
+
+    return OnyxUtils.getAllKeys().then((persistedKeys) => {
+        // Find existing collection members
+        const existingCollectionKeys = Array.from(persistedKeys).filter((key) => key.startsWith(collectionKey));
+
+        // Create removal object with null values for keys to be removed
+        const removalCollection = existingCollectionKeys
+            .filter((key) => !newCollectionKeys.includes(key))
+            .reduce(
+                (obj, key) => ({
+                    ...obj,
+                    [key]: null,
+                }),
+                {},
+            );
+
+        // Combine removals with new collection data
+        const finalCollection = {
+            ...removalCollection,
+            ...collection,
+        };
+
+        // Use multiSet to handle all updates atomically
+        return multiSet(finalCollection);
+    });
+}
+
 const Onyx = {
     METHOD: OnyxUtils.METHOD,
     connect,
@@ -733,6 +783,7 @@ const Onyx = {
     multiSet,
     merge,
     mergeCollection,
+    setCollection,
     update,
     clear,
     init,

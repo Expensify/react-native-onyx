@@ -1725,5 +1725,86 @@ describe('Onyx', () => {
                     });
             });
         });
+
+        describe('setCollection', () => {
+            it('should replace all existing collection members with new values and remove old ones', async () => {
+                let result: OnyxCollection<unknown>;
+                const routeA = `${ONYX_KEYS.COLLECTION.ROUTES}A`;
+                const routeB = `${ONYX_KEYS.COLLECTION.ROUTES}B`;
+                const routeC = `${ONYX_KEYS.COLLECTION.ROUTES}C`;
+
+                connection = Onyx.connect({
+                    key: ONYX_KEYS.COLLECTION.ROUTES,
+                    initWithStoredValues: false,
+                    callback: (value) => (result = value),
+                    waitForCollectionCallback: true,
+                });
+
+                // Set initial collection state
+                await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                    [routeA]: {name: 'Route A'},
+                    [routeB]: {name: 'Route B'},
+                    [routeC]: {name: 'Route C'},
+                } as GenericCollection);
+
+                // Replace with new collection data
+                await Onyx.setCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                    [routeA]: {name: 'New Route A'},
+                    [routeB]: {name: 'New Route B'},
+                } as GenericCollection);
+
+                expect(result).toEqual({
+                    [routeA]: {name: 'New Route A'},
+                    [routeB]: {name: 'New Route B'},
+                });
+            });
+
+            it('should not update if collection is empty', async () => {
+                let result: OnyxCollection<unknown>;
+                const routeA = `${ONYX_KEYS.COLLECTION.ROUTES}A`;
+
+                connection = Onyx.connect({
+                    key: ONYX_KEYS.COLLECTION.ROUTES,
+                    initWithStoredValues: false,
+                    callback: (value) => (result = value),
+                    waitForCollectionCallback: true,
+                });
+
+                await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                    [routeA]: {name: 'Route A'},
+                } as GenericCollection);
+
+                await Onyx.setCollection(ONYX_KEYS.COLLECTION.ROUTES, {} as GenericCollection);
+
+                expect(result).toEqual({
+                    [routeA]: {name: 'Route A'},
+                });
+            });
+
+            it('should reject collection items with invalid keys', async () => {
+                let result: OnyxCollection<unknown>;
+                const routeA = `${ONYX_KEYS.COLLECTION.ROUTES}A`;
+                const invalidRoute = 'invalid_route';
+
+                connection = Onyx.connect({
+                    key: ONYX_KEYS.COLLECTION.ROUTES,
+                    initWithStoredValues: false,
+                    callback: (value) => (result = value),
+                    waitForCollectionCallback: true,
+                });
+
+                await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                    [routeA]: {name: 'Route A'},
+                } as GenericCollection);
+
+                await Onyx.setCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                    [invalidRoute]: {name: 'Invalid Route'},
+                } as GenericCollection);
+
+                expect(result).toEqual({
+                    [routeA]: {name: 'Route A'},
+                });
+            });
+        });
     });
 });

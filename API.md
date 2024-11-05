@@ -50,6 +50,10 @@ value will be saved to storage after the default value.</p>
 <dt><a href="#update">update(data)</a> ⇒</dt>
 <dd><p>Insert API responses and lifecycle data into Onyx</p>
 </dd>
+<dt><a href="#setCollection">setCollection(collectionKey, collection)</a></dt>
+<dd><p>Sets a collection by replacing all existing collection members with new values.
+Any existing collection members not included in the new data will be removed.</p>
+</dd>
 </dl>
 
 <a name="init"></a>
@@ -209,3 +213,23 @@ Insert API responses and lifecycle data into Onyx
 | --- | --- |
 | data | An array of objects with update expressions |
 
+<a name="setCollection"></a>
+
+## setCollection(collectionKey, collection)
+Sets a collection by replacing all existing collection members with new values.
+Any existing collection members not included in the new data will be removed.
+
+**Kind**: global function  
+
+| Param | Description |
+| --- | --- |
+| collectionKey | e.g. `ONYXKEYS.COLLECTION.REPORT` |
+| collection | Object collection keyed by individual collection member keys and values |
+
+**Example**  
+```js
+Onyx.setCollection(ONYXKEYS.COLLECTION.REPORT, {
+    [`${ONYXKEYS.COLLECTION.REPORT}1`]: report1,
+    [`${ONYXKEYS.COLLECTION.REPORT}2`]: report2,
+});
+```
