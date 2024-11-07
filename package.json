@@ -41,6 +41,10 @@
   "dependencies": {
     "ascii-table": "0.0.9",
     "fast-equals": "^4.0.3",
+    "lodash.bindall": "^4.4.0",
+    "lodash.clone": "^4.5.0",
+    "lodash.pick": "^4.4.0",
+    "lodash.transform": "^4.6.0",
     "underscore": "^1.13.6"
   },
   "devDependencies": {
