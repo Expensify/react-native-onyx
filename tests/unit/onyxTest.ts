@@ -1731,6 +1731,7 @@ describe('Onyx', () => {
                 let result: OnyxCollection<unknown>;
                 const routeA = `${ONYX_KEYS.COLLECTION.ROUTES}A`;
                 const routeB = `${ONYX_KEYS.COLLECTION.ROUTES}B`;
+                const routeB1 = `${ONYX_KEYS.COLLECTION.ROUTES}B1`;
                 const routeC = `${ONYX_KEYS.COLLECTION.ROUTES}C`;
 
                 connection = Onyx.connect({
@@ -1743,7 +1744,7 @@ describe('Onyx', () => {
                 // Set initial collection state
                 await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
                     [routeA]: {name: 'Route A'},
-                    [routeB]: {name: 'Route B'},
+                    [routeB1]: {name: 'Route B1'},
                     [routeC]: {name: 'Route C'},
                 } as GenericCollection);
 
@@ -1751,15 +1752,17 @@ describe('Onyx', () => {
                 await Onyx.setCollection(ONYX_KEYS.COLLECTION.ROUTES, {
                     [routeA]: {name: 'New Route A'},
                     [routeB]: {name: 'New Route B'},
+                    [routeC]: {name: 'New Route C'},
                 } as GenericCollection);
 
                 expect(result).toEqual({
                     [routeA]: {name: 'New Route A'},
                     [routeB]: {name: 'New Route B'},
+                    [routeC]: {name: 'New Route C'},
                 });
             });
 
-            it('should not update if collection is empty', async () => {
+            it('should replace the collection with empty values', async () => {
                 let result: OnyxCollection<unknown>;
                 const routeA = `${ONYX_KEYS.COLLECTION.ROUTES}A`;
 
@@ -1776,9 +1779,7 @@ describe('Onyx', () => {
 
                 await Onyx.setCollection(ONYX_KEYS.COLLECTION.ROUTES, {} as GenericCollection);
 
-                expect(result).toEqual({
-                    [routeA]: {name: 'Route A'},
-                });
+                expect(result).toEqual({});
             });
 
             it('should reject collection items with invalid keys', async () => {

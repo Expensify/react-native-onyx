@@ -725,6 +725,8 @@ function update(data: OnyxUpdate[]): Promise<void> {
         .then(() => undefined);
 }
 
+type BaseCollection<TMap> = Record<string, TMap | null>;
+
 /**
  * Sets a collection by replacing all existing collection members with new values.
  * Any existing collection members not included in the new data will be removed.
@@ -738,40 +740,29 @@ function update(data: OnyxUpdate[]): Promise<void> {
  * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
  * @param collection Object collection keyed by individual collection member keys and values
  */
-function setCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
-    if (!OnyxUtils.isValidNonEmptyCollectionForMerge(collection)) {
-        Logger.logInfo('setCollection() called with invalid or empty value. Skipping this update.');
-        return Promise.resolve();
-    }
-
+function setCollection<TKey extends CollectionKeyBase, TMap extends string>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TMap>): Promise<void> {
     const newCollectionKeys = Object.keys(collection);
+
     if (!OnyxUtils.doAllCollectionItemsBelongToSameParent(collectionKey, newCollectionKeys)) {
+        Logger.logAlert(`setCollection called with keys that do not belong to the same parent ${collectionKey}. Skipping this update.`);
         return Promise.resolve();
     }
 
     return OnyxUtils.getAllKeys().then((persistedKeys) => {
-        // Find existing collection members
-        const existingCollectionKeys = Array.from(persistedKeys).filter((key) => key.startsWith(collectionKey));
+        const mutableCollection: BaseCollection<TMap> = {...collection};
 
-        // Create removal object with null values for keys to be removed
-        const removalCollection = existingCollectionKeys
-            .filter((key) => !newCollectionKeys.includes(key))
-            .reduce(
-                (obj, key) => ({
-                    ...obj,
-                    [key]: null,
-                }),
-                {},
-            );
+        persistedKeys.forEach((key) => {
+            if (!key.startsWith(collectionKey)) {
+                return;
+            }
+            if (newCollectionKeys.includes(key)) {
+                return;
+            }
 
-        // Combine removals with new collection data
-        const finalCollection = {
-            ...removalCollection,
-            ...collection,
-        };
+            mutableCollection[key] = null;
+        });
 
-        // Use multiSet to handle all updates atomically
-        return multiSet(finalCollection);
+        return multiSet(mutableCollection);
     });
 }
 
