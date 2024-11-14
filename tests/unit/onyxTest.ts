@@ -1099,8 +1099,10 @@ describe('Onyx', () => {
                     expect(mockCallback).toHaveBeenCalledTimes(3);
 
                     // We should not call the callback with {testPolicy_1: undefined}
-                    // I need to check like this because checking for {} passes the test even if the object passed
-                    // is really {testPolicy_1: undefined}
+                    expect(mockCallback).toHaveBeenLastCalledWith({}, ONYX_KEYS.COLLECTION.TEST_POLICY);
+
+                    // The call above should fail, but for some reason it is not, seems like jest is treating
+                    // {testPolicy_1: undefined} the same as {} so adding this check that shows the failure
                     expect(Object.keys(mockCallback.mock.calls[mockCallback.mock.calls.length - 1][0])).toBe([]);
                 })
         );
