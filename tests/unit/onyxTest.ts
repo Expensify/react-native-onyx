@@ -1077,6 +1077,26 @@ describe('Onyx', () => {
         );
     });
 
+    it('should not call the callback with undefined to a collection subscriber using waitForCollectionCallback when deleting one of the collection keys', () => {
+        const mockCallback = jest.fn();
+
+        // Given an Onyx.connect call with waitForCollectionCallback=true
+        connection = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_POLICY,
+            waitForCollectionCallback: true,
+            callback: mockCallback,
+        });
+        return (
+            waitForPromisesToResolve()
+                // When mergeCollection is called with an updated collection
+                .then(() => Onyx.set(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, null))
+                .then(() => {
+                    // AND the value for the second call should be collectionUpdate
+                    expect(mockCallback).toHaveBeenCalledWith({});
+                })
+        );
+    });
+
     it('should return a promise when set() called with the same value and there is no change', () => {
         const promiseOne = Onyx.set('test', 'pizza');
         expect(promiseOne).toBeInstanceOf(Promise);
