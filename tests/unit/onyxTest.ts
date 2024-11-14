@@ -1086,13 +1086,22 @@ describe('Onyx', () => {
             waitForCollectionCallback: true,
             callback: mockCallback,
         });
+        Onyx.set(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, {someData: 1});
         return (
             waitForPromisesToResolve()
                 // When mergeCollection is called with an updated collection
                 .then(() => Onyx.set(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, null))
                 .then(() => {
-                    // AND the value for the second call should be collectionUpdate
-                    expect(mockCallback).toHaveBeenCalledWith({});
+                    // TODO: not sure why 3 times, I see it gets called with:
+                    // - { testPolicy_1: { someData: 1 } } testPolicy_ (expected)
+                    // - { testPolicy_1: { someData: 1 } } undefined (not expected)
+                    // - { testPolicy_1: undefined } testPolicy_ (this is showing what I think is a problem)
+                    expect(mockCallback).toHaveBeenCalledTimes(3);
+
+                    // We should not call the callback with {testPolicy_1: undefined}
+                    // I need to check like this because checking for {} passes the test even if the object passed
+                    // is really {testPolicy_1: undefined}
+                    expect(Object.keys(mockCallback.mock.calls[mockCallback.mock.calls.length - 1][0])).toBe([]);
                 })
         );
     });
