@@ -1,5 +1,6 @@
 import {deepEqual, shallowEqual} from 'fast-equals';
 import {useCallback, useEffect, useRef, useSyncExternalStore} from 'react';
+import lodashClone from 'lodash/clone';
 import OnyxCache, {TASK} from './OnyxCache';
 import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
@@ -104,12 +105,14 @@ function getCachedValue<TKey extends OnyxKey, TValue>(key: TKey, selector?: UseO
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     key: TKey,
     options?: BaseUseOnyxOptions & UseOnyxInitialValueOption<TReturnValue> & Required<UseOnyxSelectorOption<TKey, TReturnValue>>,
+    dependencies?: unknown[],
 ): UseOnyxResult<TReturnValue>;
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     key: TKey,
     options?: BaseUseOnyxOptions & UseOnyxInitialValueOption<NoInfer<TReturnValue>>,
+    dependencies?: unknown[],
 ): UseOnyxResult<TReturnValue>;
-function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey, options?: UseOnyxOptions<TKey, TReturnValue>): UseOnyxResult<TReturnValue> {
+function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey, options?: UseOnyxOptions<TKey, TReturnValue>, dependencies?: unknown[]): UseOnyxResult<TReturnValue> {
     const connectionRef = useRef<Connection | null>(null);
     const previousKey = usePrevious(key);
 
@@ -139,6 +142,9 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
 
     // Indicates if we should get the newest cached value from Onyx during `getSnapshot()` execution.
     const shouldGetCachedValueRef = useRef(true);
+
+    // Holds the collection of previous dependencies passed to the hook
+    const prevDependencies = useRef(lodashClone(dependencies));
 
     useEffect(() => {
         // These conditions will ensure we can only handle dynamic collection member keys from the same collection.
@@ -194,7 +200,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
         // We get the value from cache while the first connection to Onyx is being made,
         // so we can return any cached value right away. After the connection is made, we only
         // update `newValueRef` when `Onyx.connect()` callback is fired.
-        if (isFirstConnectionRef.current || shouldGetCachedValueRef.current) {
+        if (isFirstConnectionRef.current || shouldGetCachedValueRef.current || !deepEqual(prevDependencies.current, dependencies)) {
             // If `newValueRef.current` is `undefined` it means that the cache doesn't have a value for that key yet.
             // If `newValueRef.current` is `null` or any other value it means that the cache does have a value for that key.
             // This difference between `undefined` and other values is crucial and it's used to address the following
@@ -204,6 +210,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
             // We set this flag to `false` again since we don't want to get the newest cached value every time `getSnapshot()` is executed,
             // and only when `Onyx.connect()` callback is fired.
             shouldGetCachedValueRef.current = false;
+
+            prevDependencies.current = lodashClone(dependencies);
         }
 
         const hasCacheForKey = OnyxCache.hasCacheForKey(key);
@@ -251,7 +259,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
         }
 
         return resultRef.current;
-    }, [options?.initWithStoredValues, options?.allowStaleData, options?.initialValue, key, selectorRef]);
+    }, [options?.initWithStoredValues, options?.allowStaleData, options?.initialValue, dependencies, key, selectorRef]);
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {

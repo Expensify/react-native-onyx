@@ -2,6 +2,7 @@ import {act, renderHook} from '@testing-library/react-native';
 import type {OnyxCollection, OnyxEntry} from '../../lib';
 import Onyx, {useOnyx} from '../../lib';
 import OnyxUtils from '../../lib/OnyxUtils';
+import OnyxCache from '../../lib/OnyxCache';
 import StorageMock from '../../lib/storage';
 import type GenericCollection from '../utils/GenericCollection';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
@@ -688,6 +689,63 @@ describe('useOnyx', () => {
             });
 
             expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]).toBeUndefined();
+        });
+    });
+
+    describe('dependencies', () => {
+        it('should return new result if a selector dependency changes but cache remains the same', async () => {
+            type Collection = Record<string, {id: string}>;
+            const getEntriesByID = (collection: Collection | undefined, ids: string[]) => Object.fromEntries(Object.entries(collection ?? {}).filter(([, value]) => ids.includes(value.id)));
+            const initialIDs = ['1', '2'];
+            const initialResult = {
+                '1': {
+                    id: '1',
+                },
+                '2': {
+                    id: '2',
+                },
+            };
+            const finalIDs = ['1', '4'];
+            const finalResult = {
+                '1': {
+                    id: '1',
+                },
+                '4': {
+                    id: '4',
+                },
+            };
+            const onyxData = {
+                ...initialResult,
+                ...finalResult,
+            };
+
+            Onyx.set(ONYXKEYS.TEST_KEY, onyxData);
+
+            const {result, rerender} = renderHook(
+                (ids: string[]) =>
+                    useOnyx(
+                        ONYXKEYS.TEST_KEY,
+                        {
+                            selector: (collection) => getEntriesByID(collection as Collection | undefined, ids),
+                        },
+                        [ids],
+                    ),
+                {
+                    initialProps: initialIDs,
+                },
+            );
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toMatchObject(initialResult);
+            expect(OnyxCache.get(ONYXKEYS.TEST_KEY)).toMatchObject(onyxData);
+
+            await act(async () => {
+                rerender(finalIDs);
+            });
+
+            expect(result.current[0]).toMatchObject(finalResult);
+            expect(OnyxCache.get(ONYXKEYS.TEST_KEY)).toMatchObject(onyxData);
         });
     });
 });
