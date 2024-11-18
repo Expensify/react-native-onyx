@@ -728,6 +728,47 @@ function update(data: OnyxUpdate[]): Promise<void> {
         .then(() => undefined);
 }
 
+type BaseCollection<TMap> = Record<string, TMap | null>;
+
+/**
+ * Sets a collection by replacing all existing collection members with new values.
+ * Any existing collection members not included in the new data will be removed.
+ *
+ * @example
+ * Onyx.setCollection(ONYXKEYS.COLLECTION.REPORT, {
+ *     [`${ONYXKEYS.COLLECTION.REPORT}1`]: report1,
+ *     [`${ONYXKEYS.COLLECTION.REPORT}2`]: report2,
+ * });
+ *
+ * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
+ * @param collection Object collection keyed by individual collection member keys and values
+ */
+function setCollection<TKey extends CollectionKeyBase, TMap extends string>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TMap>): Promise<void> {
+    const newCollectionKeys = Object.keys(collection);
+
+    if (!OnyxUtils.doAllCollectionItemsBelongToSameParent(collectionKey, newCollectionKeys)) {
+        Logger.logAlert(`setCollection called with keys that do not belong to the same parent ${collectionKey}. Skipping this update.`);
+        return Promise.resolve();
+    }
+
+    return OnyxUtils.getAllKeys().then((persistedKeys) => {
+        const mutableCollection: BaseCollection<TMap> = {...collection};
+
+        persistedKeys.forEach((key) => {
+            if (!key.startsWith(collectionKey)) {
+                return;
+            }
+            if (newCollectionKeys.includes(key)) {
+                return;
+            }
+
+            mutableCollection[key] = null;
+        });
+
+        return multiSet(mutableCollection);
+    });
+}
+
 const Onyx = {
     METHOD: OnyxUtils.METHOD,
     connect,
@@ -736,6 +777,7 @@ const Onyx = {
     multiSet,
     merge,
     mergeCollection,
+    setCollection,
     update,
     clear,
     init,
