@@ -40,6 +40,7 @@ function init({
     maxCachedKeysCount = 1000,
     shouldSyncMultipleInstances = Boolean(global.localStorage),
     debugSetState = false,
+    enablePerformanceMetrics = false,
 }: InitOptions): void {
     Storage.init();
 
@@ -63,6 +64,24 @@ function init({
 
     // Initialize all of our keys with data provided then give green light to any pending connections
     Promise.all([OnyxUtils.addAllSafeEvictionKeysToRecentlyAccessedList(), OnyxUtils.initializeWithDefaultKeyStates()]).then(OnyxUtils.getDeferredInitTask().resolve);
+}
+
+function applyDecorators() {
+    // We're requiring the script dynamically here so that it's only evaluated when decorators are used
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const decorate = require('./metrics');
+
+    // Re-assign with decorated functions
+    /* eslint-disable no-func-assign */
+    connect = decorate(connect, 'Onyx:connect');
+    set = decorate(set, 'Onyx:set');
+    multiSet = decorate(multiSet, 'Onyx:multiSet');
+    clear = decorate(clear, 'Onyx:clear');
+    merge = decorate(merge, 'Onyx:merge');
+    mergeCollection = decorate(mergeCollection, 'Onyx:mergeCollection');
+    update = decorate(update, 'Onyx:update');
+    clear = decorate(clear, 'Onyx:clear');
+    /* eslint-enable */
 }
 
 /**

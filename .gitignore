@@ -21,3 +21,5 @@ yalc.lock
 
 # Perf tests
 .reassure
+
+example/
