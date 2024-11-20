@@ -1423,6 +1423,7 @@ GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
     if (!enablePerformanceMetrics) {
         return;
     }
+    // We are reassigning the functions directly so that internal function calls are also decorated
 
     // @ts-expect-error Reassign
     initStoreValues = decorateWithMetrics(initStoreValues, 'OnyxUtils.initStoreValues');

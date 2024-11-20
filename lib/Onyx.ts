@@ -751,21 +751,22 @@ const Onyx = {
 };
 
 function applyDecorators() {
+    // We are reassigning the functions directly so that internal function calls are also decorated
     /* eslint-disable rulesdir/prefer-actions-set-data */
     // @ts-expect-error Reassign
-    connect = decorateWithMetrics(connect, 'Onyx:connect');
+    connect = decorateWithMetrics(connect, 'Onyx.connect');
     // @ts-expect-error Reassign
-    set = decorateWithMetrics(set, 'Onyx:set');
+    set = decorateWithMetrics(set, 'Onyx.set');
     // @ts-expect-error Reassign
-    multiSet = decorateWithMetrics(multiSet, 'Onyx:multiSet');
+    multiSet = decorateWithMetrics(multiSet, 'Onyx.multiSet');
     // @ts-expect-error Reassign
-    merge = decorateWithMetrics(merge, 'Onyx:merge');
+    merge = decorateWithMetrics(merge, 'Onyx.merge');
     // @ts-expect-error Reassign
-    mergeCollection = decorateWithMetrics(mergeCollection, 'Onyx:mergeCollection');
+    mergeCollection = decorateWithMetrics(mergeCollection, 'Onyx.mergeCollection');
     // @ts-expect-error Reassign
-    update = decorateWithMetrics(update, 'Onyx:update');
+    update = decorateWithMetrics(update, 'Onyx.update');
     // @ts-expect-error Reassign
-    clear = decorateWithMetrics(clear, 'Onyx:clear');
+    clear = decorateWithMetrics(clear, 'Onyx.clear');
     /* eslint-enable rulesdir/prefer-actions-set-data */
 }
 
