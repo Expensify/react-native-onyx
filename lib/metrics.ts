@@ -1,4 +1,3 @@
-import type * as performance from 'react-native-performance';
 import PerformanceProxy from './dependencies/PerformanceProxy';
 
 const decoratedAliases = new Set();
@@ -6,7 +5,7 @@ const decoratedAliases = new Set();
 /**
  * Capture a measurement between the start mark and now
  */
-function measureMarkToNow(startMark: performance.PerformanceMark, detail: Record<string, unknown>) {
+function measureMarkToNow(startMark: PerformanceMark, detail: Record<string, unknown>) {
     PerformanceProxy.measure(`${startMark.name} [${startMark.detail.args.toString()}]`, {
         start: startMark.startTime,
         end: PerformanceProxy.now(),

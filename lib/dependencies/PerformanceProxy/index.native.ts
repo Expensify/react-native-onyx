@@ -1,5 +1,5 @@
 import type performance from 'react-native-performance';
-import {createModuleProxy, OptionalDependencyNotInstalledError} from './ModuleProxy';
+import {createModuleProxy, OptionalDependencyNotInstalledError} from '../ModuleProxy';
 
 const PerformanceProxy = createModuleProxy<typeof performance>(() => {
     try {
