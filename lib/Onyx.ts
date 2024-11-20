@@ -31,6 +31,8 @@ import OnyxUtils from './OnyxUtils';
 import logMessages from './logMessages';
 import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
+import * as GlobalSettings from './GlobalSettings';
+import decorateWithMetrics from './metrics';
 
 /** Initialize the store with actions and listening for storage events */
 function init({
@@ -42,6 +44,11 @@ function init({
     debugSetState = false,
     enablePerformanceMetrics = false,
 }: InitOptions): void {
+    if (enablePerformanceMetrics) {
+        GlobalSettings.setPerformanceMetricsEnabled(true);
+        applyDecorators();
+    }
+
     Storage.init();
 
     if (shouldSyncMultipleInstances) {
@@ -64,24 +71,6 @@ function init({
 
     // Initialize all of our keys with data provided then give green light to any pending connections
     Promise.all([OnyxUtils.addAllSafeEvictionKeysToRecentlyAccessedList(), OnyxUtils.initializeWithDefaultKeyStates()]).then(OnyxUtils.getDeferredInitTask().resolve);
-}
-
-function applyDecorators() {
-    // We're requiring the script dynamically here so that it's only evaluated when decorators are used
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const decorate = require('./metrics');
-
-    // Re-assign with decorated functions
-    /* eslint-disable no-func-assign */
-    connect = decorate(connect, 'Onyx:connect');
-    set = decorate(set, 'Onyx:set');
-    multiSet = decorate(multiSet, 'Onyx:multiSet');
-    clear = decorate(clear, 'Onyx:clear');
-    merge = decorate(merge, 'Onyx:merge');
-    mergeCollection = decorate(mergeCollection, 'Onyx:mergeCollection');
-    update = decorate(update, 'Onyx:update');
-    clear = decorate(clear, 'Onyx:clear');
-    /* eslint-enable */
 }
 
 /**
@@ -759,7 +748,26 @@ const Onyx = {
     clear,
     init,
     registerLogger: Logger.registerLogger,
-} as const;
+};
+
+function applyDecorators() {
+    /* eslint-disable rulesdir/prefer-actions-set-data */
+    // @ts-expect-error Reassign
+    connect = decorateWithMetrics(connect, 'Onyx:connect');
+    // @ts-expect-error Reassign
+    set = decorateWithMetrics(set, 'Onyx:set');
+    // @ts-expect-error Reassign
+    multiSet = decorateWithMetrics(multiSet, 'Onyx:multiSet');
+    // @ts-expect-error Reassign
+    merge = decorateWithMetrics(merge, 'Onyx:merge');
+    // @ts-expect-error Reassign
+    mergeCollection = decorateWithMetrics(mergeCollection, 'Onyx:mergeCollection');
+    // @ts-expect-error Reassign
+    update = decorateWithMetrics(update, 'Onyx:update');
+    // @ts-expect-error Reassign
+    clear = decorateWithMetrics(clear, 'Onyx:clear');
+    /* eslint-enable rulesdir/prefer-actions-set-data */
+}
 
 export default Onyx;
 export type {OnyxUpdate, Mapping, ConnectOptions};
