@@ -2,6 +2,7 @@ import type {Merge} from 'type-fest';
 import type {BuiltIns} from 'type-fest/source/internal';
 import type OnyxUtils from './OnyxUtils';
 import type {WithOnyxInstance, WithOnyxState} from './withOnyx/types';
+import type {OnyxMethod} from './OnyxUtils';
 
 /**
  * Utility type that excludes `null` from the type `TValue`.
@@ -396,7 +397,6 @@ type OnyxMergeInput<TKey extends OnyxKey> = OnyxInput<TKey>;
 type OnyxMergeCollectionInput<TKey extends OnyxKey, TMap = object> = Collection<TKey, NonNullable<OnyxInput<TKey>>, TMap>;
 
 type OnyxMethodMap = typeof OnyxUtils.METHOD;
-type OnyxMethod = OnyxMethodMap[keyof OnyxMethodMap];
 
 // Maps onyx methods to their corresponding value types
 type OnyxMethodValueMap = {

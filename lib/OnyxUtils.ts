@@ -1418,4 +1418,6 @@ const OnyxUtils = {
     getEvictionBlocklist,
 };
 
+export type {OnyxMethod};
+
 export default OnyxUtils;
