@@ -420,6 +420,10 @@ type OnyxMethodValueMap = {
         key: CollectionKeyBase;
         value: OnyxMergeCollectionInput<CollectionKeyBase>;
     };
+    [OnyxUtils.METHOD.SET_COLLECTION]: {
+        key: CollectionKeyBase;
+        value: OnyxMergeCollectionInput<CollectionKeyBase>;
+    };
 };
 
 /**
