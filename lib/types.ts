@@ -395,41 +395,43 @@ type OnyxMergeInput<TKey extends OnyxKey> = OnyxInput<TKey>;
  */
 type OnyxMergeCollectionInput<TKey extends OnyxKey, TMap = object> = Collection<TKey, NonNullable<OnyxInput<TKey>>, TMap>;
 
+type OnyxMethodMap = typeof OnyxUtils.METHOD;
+type OnyxMethod = OnyxMethodMap[keyof OnyxMethodMap];
+
+// Maps onyx methods to their corresponding value types
+type OnyxMethodValueMap = {
+    [OnyxUtils.METHOD.SET]: {
+        key: OnyxKey;
+        value: OnyxSetInput<OnyxKey>;
+    };
+    [OnyxUtils.METHOD.MULTI_SET]: {
+        key: OnyxKey;
+        value: OnyxMultiSetInput;
+    };
+    [OnyxUtils.METHOD.MERGE]: {
+        key: OnyxKey;
+        value: OnyxMergeInput<OnyxKey>;
+    };
+    [OnyxUtils.METHOD.CLEAR]: {
+        key: OnyxKey;
+        value?: undefined;
+    };
+    [OnyxUtils.METHOD.MERGE_COLLECTION]: {
+        key: CollectionKeyBase;
+        value: OnyxMergeCollectionInput<CollectionKeyBase>;
+    };
+};
+
 /**
- * Represents different kinds of updates that can be passed to `Onyx.update()` method. It is a discriminated union of
- * different update methods (`SET`, `MERGE`, `MERGE_COLLECTION`), each with their own key and value structure.
+ * OnyxUpdate type includes all onyx methods used in OnyxMethodValueMap.
+ * If a new method is added to OnyxUtils.METHOD constant, it must be added to OnyxMethodValueMap type.
+ * Otherwise it will show static type errors.
  */
-type OnyxUpdate =
-    | {
-          [TKey in OnyxKey]:
-              | {
-                    onyxMethod: typeof OnyxUtils.METHOD.SET;
-                    key: TKey;
-                    value: OnyxSetInput<TKey>;
-                }
-              | {
-                    onyxMethod: typeof OnyxUtils.METHOD.MULTI_SET;
-                    key: TKey;
-                    value: OnyxMultiSetInput;
-                }
-              | {
-                    onyxMethod: typeof OnyxUtils.METHOD.MERGE;
-                    key: TKey;
-                    value: OnyxMergeInput<TKey>;
-                }
-              | {
-                    onyxMethod: typeof OnyxUtils.METHOD.CLEAR;
-                    key: TKey;
-                    value?: undefined;
-                };
-      }[OnyxKey]
-    | {
-          [TKey in CollectionKeyBase]: {
-              onyxMethod: typeof OnyxUtils.METHOD.MERGE_COLLECTION;
-              key: TKey;
-              value: OnyxMergeCollectionInput<TKey>;
-          };
-      }[CollectionKeyBase];
+type OnyxUpdate = {
+    [Method in OnyxMethod]: {
+        onyxMethod: Method;
+    } & OnyxMethodValueMap[Method];
+}[OnyxMethod];
 
 /**
  * Represents the options used in `Onyx.init()` method.
@@ -507,6 +509,8 @@ export type {
     OnyxMultiSetInput,
     OnyxMergeInput,
     OnyxMergeCollectionInput,
+    OnyxMethod,
+    OnyxMethodMap,
     OnyxUpdate,
     OnyxValue,
     Selector,

@@ -26,6 +26,7 @@ import type {
     OnyxUpdate,
     OnyxValue,
     OnyxInput,
+    OnyxMethodMap,
 } from './types';
 import OnyxUtils from './OnyxUtils';
 import logMessages from './logMessages';
@@ -636,38 +637,32 @@ function update(data: OnyxUpdate[]): Promise<void> {
     let clearPromise: Promise<void> = Promise.resolve();
 
     data.forEach(({onyxMethod, key, value}) => {
-        switch (onyxMethod) {
-            case OnyxUtils.METHOD.SET:
-                enqueueSetOperation(key, value);
-                break;
-            case OnyxUtils.METHOD.MERGE:
-                enqueueMergeOperation(key, value);
-                break;
-            case OnyxUtils.METHOD.MERGE_COLLECTION: {
-                const collection = value as Collection<CollectionKey, unknown, unknown>;
+        const handlers: Record<OnyxMethodMap[keyof OnyxMethodMap], (k: typeof key, v: typeof value) => void> = {
+            [OnyxUtils.METHOD.SET]: enqueueSetOperation,
+            [OnyxUtils.METHOD.MERGE]: enqueueMergeOperation,
+            [OnyxUtils.METHOD.MERGE_COLLECTION]: (k, v) => {
+                const collection = v as Collection<CollectionKey, unknown, unknown>;
                 if (!OnyxUtils.isValidNonEmptyCollectionForMerge(collection)) {
                     Logger.logInfo('mergeCollection enqueued within update() with invalid or empty value. Skipping this operation.');
-                    break;
+                    return;
                 }
 
                 // Confirm all the collection keys belong to the same parent
                 const collectionKeys = Object.keys(collection);
-                if (OnyxUtils.doAllCollectionItemsBelongToSameParent(key, collectionKeys)) {
+                if (OnyxUtils.doAllCollectionItemsBelongToSameParent(k, collectionKeys)) {
                     const mergedCollection: OnyxInputKeyValueMapping = collection;
                     collectionKeys.forEach((collectionKey) => enqueueMergeOperation(collectionKey, mergedCollection[collectionKey]));
                 }
-
-                break;
-            }
-            case OnyxUtils.METHOD.MULTI_SET:
-                Object.entries(value).forEach(([entryKey, entryValue]) => enqueueSetOperation(entryKey, entryValue));
-                break;
-            case OnyxUtils.METHOD.CLEAR:
+            },
+            [OnyxUtils.METHOD.MULTI_SET]: (k, v) => {
+                Object.entries(v as Partial<OnyxInputKeyValueMapping>).forEach(([entryKey, entryValue]) => enqueueSetOperation(entryKey, entryValue));
+            },
+            [OnyxUtils.METHOD.CLEAR]: () => {
                 clearPromise = clear();
-                break;
-            default:
-                break;
-        }
+            },
+        };
+
+        handlers[onyxMethod](key, value);
     });
 
     // Group all the collection-related keys and update each collection in a single `mergeCollection` call.
