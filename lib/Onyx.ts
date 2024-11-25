@@ -27,7 +27,6 @@ import type {
     OnyxValue,
     OnyxInput,
     OnyxMethodMap,
-    OnyxMethod,
 } from './types';
 import OnyxUtils from './OnyxUtils';
 import logMessages from './logMessages';
@@ -634,22 +633,6 @@ function update(data: OnyxUpdate[]): Promise<void> {
         }
     };
 
-    const handleCollectionOperation = (operation: typeof enqueueSetOperation | typeof enqueueMergeOperation, onyxMethod: OnyxMethod) => {
-        return (key: OnyxKey, value: OnyxInput<OnyxKey>) => {
-            const collection = value as Collection<CollectionKey, unknown, unknown>;
-            if (!OnyxUtils.isValidNonEmptyCollectionForMerge(collection)) {
-                Logger.logInfo(`${onyxMethod} enqueued within update() with invalid or empty value. Skipping this operation.`);
-                return;
-            }
-
-            const collectionKeys = Object.keys(collection);
-            if (OnyxUtils.doAllCollectionItemsBelongToSameParent(key, collectionKeys)) {
-                const mergedCollection: OnyxInputKeyValueMapping = collection;
-                collectionKeys.forEach((collectionKey) => operation(collectionKey, mergedCollection[collectionKey]));
-            }
-        };
-    };
-
     const promises: Array<() => Promise<void>> = [];
     let clearPromise: Promise<void> = Promise.resolve();
 
@@ -657,8 +640,21 @@ function update(data: OnyxUpdate[]): Promise<void> {
         const handlers: Record<OnyxMethodMap[keyof OnyxMethodMap], (k: typeof key, v: typeof value) => void> = {
             [OnyxUtils.METHOD.SET]: enqueueSetOperation,
             [OnyxUtils.METHOD.MERGE]: enqueueMergeOperation,
-            [OnyxUtils.METHOD.MERGE_COLLECTION]: handleCollectionOperation(enqueueMergeOperation, onyxMethod),
-            [OnyxUtils.METHOD.SET_COLLECTION]: handleCollectionOperation(enqueueSetOperation, onyxMethod),
+            [OnyxUtils.METHOD.MERGE_COLLECTION]: () => {
+                const collection = value as Collection<CollectionKey, unknown, unknown>;
+                if (!OnyxUtils.isValidNonEmptyCollectionForMerge(collection)) {
+                    Logger.logInfo('mergeCollection enqueued within update() with invalid or empty value. Skipping this operation.');
+                    return;
+                }
+
+                // Confirm all the collection keys belong to the same parent
+                const collectionKeys = Object.keys(collection);
+                if (OnyxUtils.doAllCollectionItemsBelongToSameParent(key, collectionKeys)) {
+                    const mergedCollection: OnyxInputKeyValueMapping = collection;
+                    collectionKeys.forEach((collectionKey) => enqueueMergeOperation(collectionKey, mergedCollection[collectionKey]));
+                }
+            },
+            [OnyxUtils.METHOD.SET_COLLECTION]: (k, v) => promises.push(() => setCollection(k, v as Collection<CollectionKey, unknown, unknown>)),
             [OnyxUtils.METHOD.MULTI_SET]: (k, v) => Object.entries(v as Partial<OnyxInputKeyValueMapping>).forEach(([entryKey, entryValue]) => enqueueSetOperation(entryKey, entryValue)),
             [OnyxUtils.METHOD.CLEAR]: () => {
                 clearPromise = clear();
@@ -706,12 +702,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
             promises.push(() => mergeCollection(collectionKey, batchedCollectionUpdates.merge as Collection<CollectionKey, unknown, unknown>));
         }
         if (!utils.isEmptyObject(batchedCollectionUpdates.set)) {
-            // Check if this is from a SET_COLLECTION operation
-            if (data.some((onyxUpdate) => onyxUpdate.onyxMethod === OnyxUtils.METHOD.SET_COLLECTION && onyxUpdate.key === collectionKey)) {
-                promises.push(() => setCollection(collectionKey, batchedCollectionUpdates.set as Collection<CollectionKey, unknown, unknown>));
-            } else {
-                promises.push(() => multiSet(batchedCollectionUpdates.set));
-            }
+            promises.push(() => multiSet(batchedCollectionUpdates.set));
         }
     });
 
