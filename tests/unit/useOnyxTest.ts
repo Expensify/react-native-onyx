@@ -366,6 +366,89 @@ describe('useOnyx', () => {
             expect(result.current[0]).toBeUndefined();
             expect(result.current[1].status).toEqual('loaded');
         });
+
+        it('should return dynamic selected data from a collection key even if cache is the same', async () => {
+            const getEntriesByIDs = (ids: string[], data: Record<string, {id: string; name: string}>) =>
+                Object.fromEntries(Object.entries(data).filter(([, value]) => ids.includes(value.id)));
+
+            const generateSelector = (ids: string[]) => (entry: OnyxEntry<Record<string, {id: string; name: string}>>) => getEntriesByIDs(ids, entry ?? {});
+
+            const data = {
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry3`]: {id: 'entry3_id', name: 'entry3_name'},
+            };
+
+            Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, data as GenericCollection);
+
+            const {result, rerender} = renderHook(
+                ({selector}) =>
+                    useOnyx(ONYXKEYS.COLLECTION.TEST_KEY, {
+                        // @ts-expect-error bypass
+                        selector,
+                    }),
+                {
+                    initialProps: {
+                        selector: generateSelector(['entry1_id', 'entry2_id']),
+                    },
+                },
+            );
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toMatchObject(getEntriesByIDs(['entry1_id', 'entry2_id'], data));
+
+            rerender({
+                selector: generateSelector(['entry3_id']),
+            });
+
+            expect(result.current[0]).toMatchObject(getEntriesByIDs(['entry3_id'], data));
+        });
+
+        it('should return dynamic selected data from a non-collection key even if cache is the same', async () => {
+            const getEntriesByIDs = (ids: string[], data: OnyxEntry<Record<string, {id: string; name: string}>>) =>
+                Object.fromEntries(Object.entries(data ?? {}).filter(([, value]) => ids.includes(value.id)));
+
+            const data = {
+                '0': {
+                    id: '0',
+                    name: 'test_name_0',
+                },
+                '1': {
+                    id: '1',
+                    name: 'test_name_1',
+                },
+                '2': {
+                    id: '2',
+                    name: 'test_name_2',
+                },
+            };
+
+            Onyx.set(ONYXKEYS.TEST_KEY, data);
+
+            await act(async () => waitForPromisesToResolve());
+
+            const {result, rerender} = renderHook(
+                ({ids}) => {
+                    debugger;
+                    return useOnyx(ONYXKEYS.TEST_KEY, {
+                        // @ts-expect-error bypass
+                        selector: (entry: OnyxEntry<Record<string, {id: string; name: string}>>) => getEntriesByIDs(ids, entry),
+                    });
+                },
+                {
+                    initialProps: {
+                        ids: ['0', '1'],
+                    },
+                },
+            );
+
+            expect(result.current[0]).toMatchObject(getEntriesByIDs(['0', '1'], data));
+
+            rerender({ids: ['2']});
+
+            expect(result.current[0]).toMatchObject(getEntriesByIDs(['2'], data));
+        });
     });
 
     describe('initialValue', () => {
