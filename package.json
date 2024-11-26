@@ -82,10 +82,10 @@
     "prop-types": "^15.7.2",
     "react": "18.2.0",
     "react-dom": "^18.2.0",
-    "react-native": "0.71.2",
+    "react-native": "0.74.0",
     "react-native-device-info": "^10.3.0",
+    "react-native-nitro-sqlite": "^9.0.1",
     "react-native-performance": "^2.0.0",
-    "react-native-quick-sqlite": "^8.0.6",
     "react-test-renderer": "18.1.0",
     "reassure": "^0.11.0",
     "ts-node": "^10.9.2",
@@ -95,10 +95,11 @@
   "peerDependencies": {
     "idb-keyval": "^6.2.1",
     "react": ">=18.1.0",
+    "react-native": ">=0.74.0",
     "react-dom": ">=18.1.0",
     "react-native-device-info": "^10.3.0",
-    "react-native-performance": "^5.1.0",
-    "react-native-quick-sqlite": "^8.0.0-beta.2"
+    "react-native-nitro-sqlite": "^9.0.1",
+    "react-native-performance": "^5.1.0"
   },
   "peerDependenciesMeta": {
     "idb-keyval": {
@@ -107,7 +108,7 @@
     "react-native-performance": {
       "optional": true
     },
-    "react-native-quick-sqlite": {
+    "react-native-nitro-sqlite": {
       "optional": true
     },
     "react-native-device-info": {
