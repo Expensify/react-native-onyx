@@ -9,15 +9,26 @@ import type StorageProvider from './types';
 import utils from '../../utils';
 import type {KeyList, KeyValuePairList} from './types';
 
+/**
+ * The type of the key-value pair stored in the SQLite database
+ * @property record_key - the key of the record
+ * @property valueJSON - the value of the record in JSON string format
+ */
 type OnyxSQLiteKeyValuePair = {
     record_key: string;
     valueJSON: string;
 };
 
+/**
+ * The result of the `PRAGMA page_size`, which gets the page size of the SQLite database
+ */
 type PageSizeResult = {
     page_size: number;
 };
 
+/**
+ * The result of the `PRAGMA page_count`, which gets the page count of the SQLite database
+ */
 type PageCountResult = {
     page_count: number;
 };

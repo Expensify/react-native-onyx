@@ -22,6 +22,7 @@ import type {Connection} from './OnyxConnectionManager';
 import useOnyx from './useOnyx';
 import withOnyx from './withOnyx';
 import type {WithOnyxState} from './withOnyx/types';
+import type {OnyxSQLiteKeyValuePair} from './storage/providers/SQLiteProvider';
 
 export default Onyx;
 export {useOnyx, withOnyx};
@@ -48,4 +49,5 @@ export type {
     UseOnyxResult,
     WithOnyxState,
     Connection,
+    OnyxSQLiteKeyValuePair,
 };
