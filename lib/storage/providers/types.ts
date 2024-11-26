@@ -1,4 +1,4 @@
-import type {BatchQueryResult, QueryResult} from 'react-native-quick-sqlite';
+import type {BatchQueryResult, QueryResult} from 'react-native-nitro-sqlite';
 import type {OnyxKey, OnyxValue} from '../../types';
 
 type KeyValuePair = [OnyxKey, OnyxValue<OnyxKey>];

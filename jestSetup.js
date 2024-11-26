@@ -4,7 +4,7 @@ jest.mock('./lib/storage/platforms/index', () => require('./lib/storage/__mocks_
 jest.mock('./lib/storage/providers/IDBKeyValProvider', () => require('./lib/storage/__mocks__'));
 
 jest.mock('react-native-device-info', () => ({getFreeDiskStorage: () => {}}));
-jest.mock('react-native-quick-sqlite', () => ({
+jest.mock('react-native-nitro-sqlite', () => ({
     open: () => ({execute: () => {}}),
 }));
 

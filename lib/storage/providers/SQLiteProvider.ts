@@ -2,15 +2,28 @@
  * The SQLiteStorage provider stores everything in a key/value store by
  * converting the value to a JSON string
  */
-import type {BatchQueryResult, QuickSQLiteConnection} from 'react-native-quick-sqlite';
-import {open} from 'react-native-quick-sqlite';
+import type {BatchQueryResult, NitroSQLiteConnection} from 'react-native-nitro-sqlite';
+import {open} from 'react-native-nitro-sqlite';
 import {getFreeDiskStorage} from 'react-native-device-info';
 import type StorageProvider from './types';
 import utils from '../../utils';
 import type {KeyList, KeyValuePairList} from './types';
 
+type OnyxSQLiteKeyValuePair = {
+    record_key: string;
+    valueJSON: string;
+};
+
+type PageSizeResult = {
+    page_size: number;
+};
+
+type PageCountResult = {
+    page_count: number;
+};
+
 const DB_NAME = 'OnyxDB';
-let db: QuickSQLiteConnection;
+let db: NitroSQLiteConnection;
 
 const provider: StorageProvider = {
     /**
@@ -32,18 +45,23 @@ const provider: StorageProvider = {
         db.execute('PRAGMA journal_mode=WAL;');
     },
     getItem(key) {
-        return db.executeAsync('SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key = ?;', [key]).then(({rows}) => {
+        return db.executeAsync<OnyxSQLiteKeyValuePair>('SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key = ?;', [key]).then(({rows}) => {
             if (!rows || rows?.length === 0) {
                 return null;
             }
             const result = rows?.item(0);
+
+            if (result == null) {
+                return undefined;
+            }
+
             return JSON.parse(result.valueJSON);
         });
     },
     multiGet(keys) {
         const placeholders = keys.map(() => '?').join(',');
         const command = `SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
-        return db.executeAsync(command, keys).then(({rows}) => {
+        return db.executeAsync<OnyxSQLiteKeyValuePair>(command, keys).then(({rows}) => {
             // eslint-disable-next-line no-underscore-dangle
             const result = rows?._array.map((row) => [row.record_key, JSON.parse(row.valueJSON)]);
             return (result ?? []) as KeyValuePairList;
@@ -53,11 +71,12 @@ const provider: StorageProvider = {
         return db.executeAsync('REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);', [key, JSON.stringify(value)]);
     },
     multiSet(pairs) {
-        const stringifiedPairs = pairs.map((pair) => [pair[0], JSON.stringify(pair[1] === undefined ? null : pair[1])]);
-        if (utils.isEmptyObject(stringifiedPairs)) {
+        const query = 'REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, json(?));';
+        const params = pairs.map((pair) => [pair[0], JSON.stringify(pair[1] === undefined ? null : pair[1])]);
+        if (utils.isEmptyObject(params)) {
             return Promise.resolve();
         }
-        return db.executeBatchAsync([['REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, json(?));', stringifiedPairs]]);
+        return db.executeBatchAsync([{query, params}]);
     },
     multiMerge(pairs) {
         // Note: We use `ON CONFLICT DO UPDATE` here instead of `INSERT OR REPLACE INTO`
@@ -69,12 +88,12 @@ const provider: StorageProvider = {
         `;
 
         const nonNullishPairs = pairs.filter((pair) => pair[1] !== undefined);
-        const queryArguments = nonNullishPairs.map((pair) => {
+        const params = nonNullishPairs.map((pair) => {
             const value = JSON.stringify(pair[1]);
             return [pair[0], value];
         });
 
-        return db.executeBatchAsync([[query, queryArguments]]);
+        return db.executeBatchAsync([{query, params}]);
     },
     mergeItem(key, deltaChanges, preMergedValue, shouldSetValue) {
         if (shouldSetValue) {
@@ -97,15 +116,18 @@ const provider: StorageProvider = {
     },
     clear: () => db.executeAsync('DELETE FROM keyvaluepairs;', []),
     getDatabaseSize() {
-        return Promise.all([db.executeAsync('PRAGMA page_size;'), db.executeAsync('PRAGMA page_count;'), getFreeDiskStorage()]).then(([pageSizeResult, pageCountResult, bytesRemaining]) => {
-            const pageSize: number = pageSizeResult.rows?.item(0).page_size;
-            const pageCount: number = pageCountResult.rows?.item(0).page_count;
-            return {
-                bytesUsed: pageSize * pageCount,
-                bytesRemaining,
-            };
-        });
+        return Promise.all([db.executeAsync<PageSizeResult>('PRAGMA page_size;'), db.executeAsync<PageCountResult>('PRAGMA page_count;'), getFreeDiskStorage()]).then(
+            ([pageSizeResult, pageCountResult, bytesRemaining]) => {
+                const pageSize = pageSizeResult.rows?.item(0)?.page_size ?? 0;
+                const pageCount = pageCountResult.rows?.item(0)?.page_count ?? 0;
+                return {
+                    bytesUsed: pageSize * pageCount,
+                    bytesRemaining,
+                };
+            },
+        );
     },
 };
 
 export default provider;
+export type {OnyxSQLiteKeyValuePair};
