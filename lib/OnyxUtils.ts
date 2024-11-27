@@ -40,6 +40,7 @@ const METHOD = {
     SET: 'set',
     MERGE: 'merge',
     MERGE_COLLECTION: 'mergecollection',
+    SET_COLLECTION: 'setcollection',
     MULTI_SET: 'multiset',
     CLEAR: 'clear',
 } as const;
@@ -1465,4 +1466,5 @@ GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
     subscribeToKey = decorateWithMetrics(subscribeToKey, 'OnyxUtils.subscribeToKey');
 });
 
+export type {OnyxMethod};
 export default OnyxUtils;

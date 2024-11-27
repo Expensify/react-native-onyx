@@ -26,6 +26,7 @@ import type {
     OnyxUpdate,
     OnyxValue,
     OnyxInput,
+    OnyxMethodMap,
 } from './types';
 import OnyxUtils from './OnyxUtils';
 import logMessages from './logMessages';
@@ -607,7 +608,7 @@ function updateSnapshots(data: OnyxUpdate[]) {
 function update(data: OnyxUpdate[]): Promise<void> {
     // First, validate the Onyx object is in the format we expect
     data.forEach(({onyxMethod, key, value}) => {
-        if (![OnyxUtils.METHOD.CLEAR, OnyxUtils.METHOD.SET, OnyxUtils.METHOD.MERGE, OnyxUtils.METHOD.MERGE_COLLECTION, OnyxUtils.METHOD.MULTI_SET].includes(onyxMethod)) {
+        if (!Object.values(OnyxUtils.METHOD).includes(onyxMethod)) {
             throw new Error(`Invalid onyxMethod ${onyxMethod} in Onyx update.`);
         }
         if (onyxMethod === OnyxUtils.METHOD.MULTI_SET) {
@@ -644,18 +645,14 @@ function update(data: OnyxUpdate[]): Promise<void> {
     let clearPromise: Promise<void> = Promise.resolve();
 
     data.forEach(({onyxMethod, key, value}) => {
-        switch (onyxMethod) {
-            case OnyxUtils.METHOD.SET:
-                enqueueSetOperation(key, value);
-                break;
-            case OnyxUtils.METHOD.MERGE:
-                enqueueMergeOperation(key, value);
-                break;
-            case OnyxUtils.METHOD.MERGE_COLLECTION: {
+        const handlers: Record<OnyxMethodMap[keyof OnyxMethodMap], (k: typeof key, v: typeof value) => void> = {
+            [OnyxUtils.METHOD.SET]: enqueueSetOperation,
+            [OnyxUtils.METHOD.MERGE]: enqueueMergeOperation,
+            [OnyxUtils.METHOD.MERGE_COLLECTION]: () => {
                 const collection = value as Collection<CollectionKey, unknown, unknown>;
                 if (!OnyxUtils.isValidNonEmptyCollectionForMerge(collection)) {
                     Logger.logInfo('mergeCollection enqueued within update() with invalid or empty value. Skipping this operation.');
-                    break;
+                    return;
                 }
 
                 // Confirm all the collection keys belong to the same parent
@@ -664,18 +661,15 @@ function update(data: OnyxUpdate[]): Promise<void> {
                     const mergedCollection: OnyxInputKeyValueMapping = collection;
                     collectionKeys.forEach((collectionKey) => enqueueMergeOperation(collectionKey, mergedCollection[collectionKey]));
                 }
-
-                break;
-            }
-            case OnyxUtils.METHOD.MULTI_SET:
-                Object.entries(value).forEach(([entryKey, entryValue]) => enqueueSetOperation(entryKey, entryValue));
-                break;
-            case OnyxUtils.METHOD.CLEAR:
+            },
+            [OnyxUtils.METHOD.SET_COLLECTION]: (k, v) => promises.push(() => setCollection(k, v as Collection<CollectionKey, unknown, unknown>)),
+            [OnyxUtils.METHOD.MULTI_SET]: (k, v) => Object.entries(v as Partial<OnyxInputKeyValueMapping>).forEach(([entryKey, entryValue]) => enqueueSetOperation(entryKey, entryValue)),
+            [OnyxUtils.METHOD.CLEAR]: () => {
                 clearPromise = clear();
-                break;
-            default:
-                break;
-        }
+            },
+        };
+
+        handlers[onyxMethod](key, value);
     });
 
     // Group all the collection-related keys and update each collection in a single `mergeCollection` call.
@@ -736,6 +730,47 @@ function update(data: OnyxUpdate[]): Promise<void> {
         .then(() => undefined);
 }
 
+type BaseCollection<TMap> = Record<string, TMap | null>;
+
+/**
+ * Sets a collection by replacing all existing collection members with new values.
+ * Any existing collection members not included in the new data will be removed.
+ *
+ * @example
+ * Onyx.setCollection(ONYXKEYS.COLLECTION.REPORT, {
+ *     [`${ONYXKEYS.COLLECTION.REPORT}1`]: report1,
+ *     [`${ONYXKEYS.COLLECTION.REPORT}2`]: report2,
+ * });
+ *
+ * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
+ * @param collection Object collection keyed by individual collection member keys and values
+ */
+function setCollection<TKey extends CollectionKeyBase, TMap extends string>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TMap>): Promise<void> {
+    const newCollectionKeys = Object.keys(collection);
+
+    if (!OnyxUtils.doAllCollectionItemsBelongToSameParent(collectionKey, newCollectionKeys)) {
+        Logger.logAlert(`setCollection called with keys that do not belong to the same parent ${collectionKey}. Skipping this update.`);
+        return Promise.resolve();
+    }
+
+    return OnyxUtils.getAllKeys().then((persistedKeys) => {
+        const mutableCollection: BaseCollection<TMap> = {...collection};
+
+        persistedKeys.forEach((key) => {
+            if (!key.startsWith(collectionKey)) {
+                return;
+            }
+            if (newCollectionKeys.includes(key)) {
+                return;
+            }
+
+            mutableCollection[key] = null;
+        });
+
+        return multiSet(mutableCollection);
+    });
+}
+
 const Onyx = {
     METHOD: OnyxUtils.METHOD,
     connect,
@@ -744,6 +779,7 @@ const Onyx = {
     multiSet,
     merge,
     mergeCollection,
+    setCollection,
     update,
     clear,
     init,
