@@ -2,13 +2,11 @@
  * Stores settings from Onyx.init globally so they can be made accessible by other parts of the library.
  */
 
-type GlobalSettings = {
-    enablePerformanceMetrics: boolean;
-};
-
-const globalSettings: GlobalSettings = {
+const globalSettings = {
     enablePerformanceMetrics: false,
 };
+
+type GlobalSettings = typeof globalSettings;
 
 const listeners = new Set<(settings: GlobalSettings) => unknown>();
 function addGlobalSettingsChangeListener(listener: (settings: GlobalSettings) => unknown) {
