@@ -32,6 +32,8 @@ import OnyxUtils from './OnyxUtils';
 import logMessages from './logMessages';
 import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
+import * as GlobalSettings from './GlobalSettings';
+import decorateWithMetrics from './metrics';
 
 /** Initialize the store with actions and listening for storage events */
 function init({
@@ -41,7 +43,13 @@ function init({
     maxCachedKeysCount = 1000,
     shouldSyncMultipleInstances = Boolean(global.localStorage),
     debugSetState = false,
+    enablePerformanceMetrics = false,
 }: InitOptions): void {
+    if (enablePerformanceMetrics) {
+        GlobalSettings.setPerformanceMetricsEnabled(true);
+        applyDecorators();
+    }
+
     Storage.init();
 
     if (shouldSyncMultipleInstances) {
@@ -776,7 +784,27 @@ const Onyx = {
     clear,
     init,
     registerLogger: Logger.registerLogger,
-} as const;
+};
+
+function applyDecorators() {
+    // We are reassigning the functions directly so that internal function calls are also decorated
+    /* eslint-disable rulesdir/prefer-actions-set-data */
+    // @ts-expect-error Reassign
+    connect = decorateWithMetrics(connect, 'Onyx.connect');
+    // @ts-expect-error Reassign
+    set = decorateWithMetrics(set, 'Onyx.set');
+    // @ts-expect-error Reassign
+    multiSet = decorateWithMetrics(multiSet, 'Onyx.multiSet');
+    // @ts-expect-error Reassign
+    merge = decorateWithMetrics(merge, 'Onyx.merge');
+    // @ts-expect-error Reassign
+    mergeCollection = decorateWithMetrics(mergeCollection, 'Onyx.mergeCollection');
+    // @ts-expect-error Reassign
+    update = decorateWithMetrics(update, 'Onyx.update');
+    // @ts-expect-error Reassign
+    clear = decorateWithMetrics(clear, 'Onyx.clear');
+    /* eslint-enable rulesdir/prefer-actions-set-data */
+}
 
 export default Onyx;
 export type {OnyxUpdate, Mapping, ConnectOptions};
