@@ -144,8 +144,10 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     // in `getSnapshot()` to be satisfied several times.
     const isFirstConnectionRef = useRef(true);
 
+    // Indicates if the hook is connecting to a Onyx key.
     const isConnectingRef = useRef(false);
 
+    // Stores the `onStoreChange` function, which can be used to trigger a `getSnapshot` update when desired.
     const onStoreChangeFnRef = useRef<(() => void) | null>(null);
 
     // Indicates if we should get the newest cached value from Onyx during `getSnapshot()` execution.
@@ -179,12 +181,17 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         );
     }, [previousKey, key]);
 
-    // eslint-disable-next-line rulesdir/prefer-early-return
     useEffect(() => {
-        if (connectionRef.current !== null && !isConnectingRef.current && onStoreChangeFnRef.current) {
-            shouldGetCachedValueRef.current = true;
-            onStoreChangeFnRef.current();
+        // This effect will only run if the `dependencies` array changes. If it changes it will force the hook
+        // to trigger a `getSnapshot` update by calling the stored `onStoreChange` function reference, thus
+        // re-running the hook and returning the latest value to the consumer.
+        if (connectionRef.current === null || isConnectingRef.current || !onStoreChangeFnRef.current) {
+            return;
         }
+
+        shouldGetCachedValueRef.current = true;
+        onStoreChangeFnRef.current();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [...dependencies]);
 
     // Mimics withOnyx's checkEvictableKeys() behavior.

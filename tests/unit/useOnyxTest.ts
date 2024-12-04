@@ -611,7 +611,7 @@ describe('useOnyx', () => {
     });
 
     describe('dependencies', () => {
-        it('should 1', async () => {
+        it('should return the updated selected value when a external value passed to the dependencies list changes', async () => {
             Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, {
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
