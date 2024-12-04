@@ -26,11 +26,14 @@ import type {
     OnyxUpdate,
     OnyxValue,
     OnyxInput,
+    OnyxMethodMap,
 } from './types';
 import OnyxUtils from './OnyxUtils';
 import logMessages from './logMessages';
 import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
+import * as GlobalSettings from './GlobalSettings';
+import decorateWithMetrics from './metrics';
 
 /** Initialize the store with actions and listening for storage events */
 function init({
@@ -40,7 +43,13 @@ function init({
     maxCachedKeysCount = 1000,
     shouldSyncMultipleInstances = Boolean(global.localStorage),
     debugSetState = false,
+    enablePerformanceMetrics = false,
 }: InitOptions): void {
+    if (enablePerformanceMetrics) {
+        GlobalSettings.setPerformanceMetricsEnabled(true);
+        applyDecorators();
+    }
+
     Storage.init();
 
     if (shouldSyncMultipleInstances) {
@@ -599,7 +608,7 @@ function updateSnapshots(data: OnyxUpdate[]) {
 function update(data: OnyxUpdate[]): Promise<void> {
     // First, validate the Onyx object is in the format we expect
     data.forEach(({onyxMethod, key, value}) => {
-        if (![OnyxUtils.METHOD.CLEAR, OnyxUtils.METHOD.SET, OnyxUtils.METHOD.MERGE, OnyxUtils.METHOD.MERGE_COLLECTION, OnyxUtils.METHOD.MULTI_SET].includes(onyxMethod)) {
+        if (!Object.values(OnyxUtils.METHOD).includes(onyxMethod)) {
             throw new Error(`Invalid onyxMethod ${onyxMethod} in Onyx update.`);
         }
         if (onyxMethod === OnyxUtils.METHOD.MULTI_SET) {
@@ -636,18 +645,14 @@ function update(data: OnyxUpdate[]): Promise<void> {
     let clearPromise: Promise<void> = Promise.resolve();
 
     data.forEach(({onyxMethod, key, value}) => {
-        switch (onyxMethod) {
-            case OnyxUtils.METHOD.SET:
-                enqueueSetOperation(key, value);
-                break;
-            case OnyxUtils.METHOD.MERGE:
-                enqueueMergeOperation(key, value);
-                break;
-            case OnyxUtils.METHOD.MERGE_COLLECTION: {
+        const handlers: Record<OnyxMethodMap[keyof OnyxMethodMap], (k: typeof key, v: typeof value) => void> = {
+            [OnyxUtils.METHOD.SET]: enqueueSetOperation,
+            [OnyxUtils.METHOD.MERGE]: enqueueMergeOperation,
+            [OnyxUtils.METHOD.MERGE_COLLECTION]: () => {
                 const collection = value as Collection<CollectionKey, unknown, unknown>;
                 if (!OnyxUtils.isValidNonEmptyCollectionForMerge(collection)) {
                     Logger.logInfo('mergeCollection enqueued within update() with invalid or empty value. Skipping this operation.');
-                    break;
+                    return;
                 }
 
                 // Confirm all the collection keys belong to the same parent
@@ -656,18 +661,15 @@ function update(data: OnyxUpdate[]): Promise<void> {
                     const mergedCollection: OnyxInputKeyValueMapping = collection;
                     collectionKeys.forEach((collectionKey) => enqueueMergeOperation(collectionKey, mergedCollection[collectionKey]));
                 }
-
-                break;
-            }
-            case OnyxUtils.METHOD.MULTI_SET:
-                Object.entries(value).forEach(([entryKey, entryValue]) => enqueueSetOperation(entryKey, entryValue));
-                break;
-            case OnyxUtils.METHOD.CLEAR:
+            },
+            [OnyxUtils.METHOD.SET_COLLECTION]: (k, v) => promises.push(() => setCollection(k, v as Collection<CollectionKey, unknown, unknown>)),
+            [OnyxUtils.METHOD.MULTI_SET]: (k, v) => Object.entries(v as Partial<OnyxInputKeyValueMapping>).forEach(([entryKey, entryValue]) => enqueueSetOperation(entryKey, entryValue)),
+            [OnyxUtils.METHOD.CLEAR]: () => {
                 clearPromise = clear();
-                break;
-            default:
-                break;
-        }
+            },
+        };
+
+        handlers[onyxMethod](key, value);
     });
 
     // Group all the collection-related keys and update each collection in a single `mergeCollection` call.
@@ -782,7 +784,27 @@ const Onyx = {
     clear,
     init,
     registerLogger: Logger.registerLogger,
-} as const;
+};
+
+function applyDecorators() {
+    // We are reassigning the functions directly so that internal function calls are also decorated
+    /* eslint-disable rulesdir/prefer-actions-set-data */
+    // @ts-expect-error Reassign
+    connect = decorateWithMetrics(connect, 'Onyx.connect');
+    // @ts-expect-error Reassign
+    set = decorateWithMetrics(set, 'Onyx.set');
+    // @ts-expect-error Reassign
+    multiSet = decorateWithMetrics(multiSet, 'Onyx.multiSet');
+    // @ts-expect-error Reassign
+    merge = decorateWithMetrics(merge, 'Onyx.merge');
+    // @ts-expect-error Reassign
+    mergeCollection = decorateWithMetrics(mergeCollection, 'Onyx.mergeCollection');
+    // @ts-expect-error Reassign
+    update = decorateWithMetrics(update, 'Onyx.update');
+    // @ts-expect-error Reassign
+    clear = decorateWithMetrics(clear, 'Onyx.clear');
+    /* eslint-enable rulesdir/prefer-actions-set-data */
+}
 
 export default Onyx;
 export type {OnyxUpdate, Mapping, ConnectOptions};
