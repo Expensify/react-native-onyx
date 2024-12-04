@@ -468,6 +468,8 @@ type InitOptions = {
 
     /** Enables debugging setState() calls to connected components */
     debugSetState?: boolean;
+
+    skippableCollectionMemberIDs?: string[];
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

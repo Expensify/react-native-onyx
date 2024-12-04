@@ -86,6 +86,8 @@ let lastSubscriptionID = 0;
 // Connections can be made before `Onyx.init`. They would wait for this task before resolving
 const deferredInitTask = createDeferredTask();
 
+let skippableCollectionMemberIDs: string[] = [];
+
 function getSnapshotKey(): OnyxKey | null {
     return snapshotKey;
 }
@@ -123,6 +125,20 @@ function getDeferredInitTask(): DeferredTask {
  */
 function getEvictionBlocklist(): Record<OnyxKey, string[] | undefined> {
     return evictionBlocklist;
+}
+
+/**
+ * Getter - TODO
+ */
+function getSkippableCollectionMemberIDs(): string[] {
+    return skippableCollectionMemberIDs;
+}
+
+/**
+ * Setter - TODO
+ */
+function setSkippableCollectionMemberIDs(ids: string[]): void {
+    skippableCollectionMemberIDs = ids;
 }
 
 /**
@@ -417,11 +433,23 @@ function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collect
 /**
  * Splits a collection member key into the collection key part and the ID part.
  * @param key - The collection member key to split.
+ * @param collectionKey - The collection key of the `key` param that can be passed in advance to optimize the function.
  * @returns A tuple where the first element is the collection part and the second element is the ID part,
  * or throws an Error if the key is not a collection one.
  */
-function splitCollectionMemberKey<TKey extends CollectionKey, CollectionKeyType = TKey extends `${infer Prefix}_${string}` ? `${Prefix}_` : never>(key: TKey): [CollectionKeyType, string] {
-    const collectionKey = getCollectionKey(key);
+function splitCollectionMemberKey<TKey extends CollectionKey, CollectionKeyType = TKey extends `${infer Prefix}_${string}` ? `${Prefix}_` : never>(
+    key: TKey,
+    collectionKey?: string,
+): [CollectionKeyType, string] {
+    if (collectionKey && !isCollectionMemberKey(collectionKey, key, collectionKey.length)) {
+        throw new Error(`Invalid '${collectionKey}' collection key provided, it isn't compatible with '${key}' key.`);
+    }
+
+    if (!collectionKey) {
+        // eslint-disable-next-line no-param-reassign
+        collectionKey = getCollectionKey(key);
+    }
+
     return [collectionKey as CollectionKeyType, key.slice(collectionKey.length)];
 }
 
@@ -1416,6 +1444,8 @@ const OnyxUtils = {
     subscribeToKey,
     unsubscribeFromKey,
     getEvictionBlocklist,
+    getSkippableCollectionMemberIDs,
+    setSkippableCollectionMemberIDs,
 };
 
 export type {OnyxMethod};
