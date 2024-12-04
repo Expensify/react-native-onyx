@@ -45,7 +45,7 @@ function init({
 }: InitOptions): void {
     Storage.init();
 
-    OnyxUtils.setSkippableCollectionMemberIDs(skippableCollectionMemberIDs);
+    OnyxUtils.setSkippableCollectionMemberIDs(new Set(skippableCollectionMemberIDs));
 
     if (shouldSyncMultipleInstances) {
         Storage.keepInstancesSync?.((key, value) => {
@@ -123,13 +123,16 @@ function disconnect(connection: Connection): void {
  * @param value value to store
  */
 function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>): Promise<void> {
-    try {
-        const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key);
-        if (OnyxUtils.getSkippableCollectionMemberIDs().includes(collectionMemberID)) {
-            return Promise.resolve();
+    const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
+    if (skippableCollectionMemberIDs.size) {
+        try {
+            const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key);
+            if (skippableCollectionMemberIDs.has(collectionMemberID)) {
+                return Promise.resolve();
+            }
+        } catch (e) {
+            // Key is not a collection one or something went wrong during split, so we proceed with the function's logic.
         }
-    } catch (e) {
-        // Key is not a collection one or something went wrong during split, so we proceed with the function's logic.
     }
 
     // When we use Onyx.set to set a key we want to clear the current delta changes from Onyx.merge that were queued
@@ -203,21 +206,23 @@ function multiSet(data: OnyxMultiSetInput): Promise<void> {
     let newData = data;
 
     const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
-    newData = Object.keys(newData).reduce((result: OnyxMultiSetInput, key) => {
-        try {
-            const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key);
-            if (!skippableCollectionMemberIDs.includes(collectionMemberID)) {
+    if (skippableCollectionMemberIDs.size) {
+        newData = Object.keys(newData).reduce((result: OnyxMultiSetInput, key) => {
+            try {
+                const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key);
+                if (!skippableCollectionMemberIDs.has(collectionMemberID)) {
+                    // eslint-disable-next-line no-param-reassign
+                    result[key] = newData[key];
+                }
+            } catch {
+                // Key is not a collection one or something went wrong during split, so we assign the data to result anyway.
                 // eslint-disable-next-line no-param-reassign
                 result[key] = newData[key];
             }
-        } catch {
-            // Key is not a collection one or something went wrong during split, so we assign the data to result anyway.
-            // eslint-disable-next-line no-param-reassign
-            result[key] = newData[key];
-        }
 
-        return result;
-    }, {});
+            return result;
+        }, {});
+    }
 
     const keyValuePairsToSet = OnyxUtils.prepareKeyValuePairsForStorage(newData, true);
 
@@ -255,13 +260,16 @@ function multiSet(data: OnyxMultiSetInput): Promise<void> {
  * Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Workspace'}
  */
 function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): Promise<void> {
-    try {
-        const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key);
-        if (OnyxUtils.getSkippableCollectionMemberIDs().includes(collectionMemberID)) {
-            return Promise.resolve();
+    const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
+    if (skippableCollectionMemberIDs.size) {
+        try {
+            const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key);
+            if (skippableCollectionMemberIDs.has(collectionMemberID)) {
+                return Promise.resolve();
+            }
+        } catch (e) {
+            // Key is not a collection one or something went wrong during split, so we proceed with the function's logic.
         }
-    } catch (e) {
-        // Key is not a collection one or something went wrong during split, so we proceed with the function's logic.
     }
 
     const mergeQueue = OnyxUtils.getMergeQueue();
@@ -387,21 +395,23 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
     }
 
     const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
-    resultCollection = Object.keys(resultCollection).reduce((result: OnyxInputKeyValueMapping, key) => {
-        try {
-            const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key, collectionKey);
-            if (!skippableCollectionMemberIDs.includes(collectionMemberID)) {
+    if (skippableCollectionMemberIDs.size) {
+        resultCollection = Object.keys(resultCollection).reduce((result: OnyxInputKeyValueMapping, key) => {
+            try {
+                const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key, collectionKey);
+                if (!skippableCollectionMemberIDs.has(collectionMemberID)) {
+                    // eslint-disable-next-line no-param-reassign
+                    result[key] = resultCollection[key];
+                }
+            } catch {
+                // Something went wrong during split, so we assign the data to result anyway.
                 // eslint-disable-next-line no-param-reassign
                 result[key] = resultCollection[key];
             }
-        } catch {
-            // Something went wrong during split, so we assign the data to result anyway.
-            // eslint-disable-next-line no-param-reassign
-            result[key] = resultCollection[key];
-        }
 
-        return result;
-    }, {});
+            return result;
+        }, {});
+    }
 
     return OnyxUtils.getAllKeys()
         .then((persistedKeys) => {
@@ -803,21 +813,23 @@ function setCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey
     }
 
     const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
-    resultCollection = Object.keys(resultCollection).reduce((result: OnyxInputKeyValueMapping, key) => {
-        try {
-            const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key, collectionKey);
-            if (!skippableCollectionMemberIDs.includes(collectionMemberID)) {
+    if (skippableCollectionMemberIDs.size) {
+        resultCollection = Object.keys(resultCollection).reduce((result: OnyxInputKeyValueMapping, key) => {
+            try {
+                const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key, collectionKey);
+                if (!skippableCollectionMemberIDs.has(collectionMemberID)) {
+                    // eslint-disable-next-line no-param-reassign
+                    result[key] = resultCollection[key];
+                }
+            } catch {
+                // Something went wrong during split, so we assign the data to result anyway.
                 // eslint-disable-next-line no-param-reassign
                 result[key] = resultCollection[key];
             }
-        } catch {
-            // Something went wrong during split, so we assign the data to result anyway.
-            // eslint-disable-next-line no-param-reassign
-            result[key] = resultCollection[key];
-        }
 
-        return result;
-    }, {});
+            return result;
+        }, {});
+    }
 
     return OnyxUtils.getAllKeys().then((persistedKeys) => {
         const mutableCollection: OnyxInputKeyValueMapping = {...resultCollection};

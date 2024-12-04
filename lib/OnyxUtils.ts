@@ -86,7 +86,7 @@ let lastSubscriptionID = 0;
 // Connections can be made before `Onyx.init`. They would wait for this task before resolving
 const deferredInitTask = createDeferredTask();
 
-let skippableCollectionMemberIDs: string[] = [];
+let skippableCollectionMemberIDs = new Set<string>();
 
 function getSnapshotKey(): OnyxKey | null {
     return snapshotKey;
@@ -130,14 +130,14 @@ function getEvictionBlocklist(): Record<OnyxKey, string[] | undefined> {
 /**
  * Getter - TODO
  */
-function getSkippableCollectionMemberIDs(): string[] {
+function getSkippableCollectionMemberIDs(): Set<string> {
     return skippableCollectionMemberIDs;
 }
 
 /**
  * Setter - TODO
  */
-function setSkippableCollectionMemberIDs(ids: string[]): void {
+function setSkippableCollectionMemberIDs(ids: Set<string>): void {
     skippableCollectionMemberIDs = ids;
 }
 
