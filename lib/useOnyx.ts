@@ -147,7 +147,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     // Indicates if the hook is connecting to a Onyx key.
     const isConnectingRef = useRef(false);
 
-    // Stores the `onStoreChange` function, which can be used to trigger a `getSnapshot` update when desired.
+    // Stores the `onStoreChange()` function, which can be used to trigger a `getSnapshot()` update when desired.
     const onStoreChangeFnRef = useRef<(() => void) | null>(null);
 
     // Indicates if we should get the newest cached value from Onyx during `getSnapshot()` execution.
@@ -183,7 +183,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
     useEffect(() => {
         // This effect will only run if the `dependencies` array changes. If it changes it will force the hook
-        // to trigger a `getSnapshot` update by calling the stored `onStoreChange` function reference, thus
+        // to trigger a `getSnapshot()` update by calling the stored `onStoreChange()` function reference, thus
         // re-running the hook and returning the latest value to the consumer.
         if (connectionRef.current === null || isConnectingRef.current || !onStoreChangeFnRef.current) {
             return;
@@ -288,6 +288,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                 key,
                 callback: () => {
                     isConnectingRef.current = false;
+                    onStoreChangeFnRef.current = onStoreChange;
 
                     // Signals that the first connection was made, so some logics in `getSnapshot()`
                     // won't be executed anymore.
@@ -312,9 +313,9 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                 }
 
                 connectionManager.disconnect(connectionRef.current);
-                onStoreChangeFnRef.current = null;
-                isConnectingRef.current = false;
                 isFirstConnectionRef.current = false;
+                isConnectingRef.current = false;
+                onStoreChangeFnRef.current = null;
             };
         },
         [key, options?.initWithStoredValues, options?.reuseConnection, checkEvictableKey],
