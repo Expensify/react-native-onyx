@@ -469,6 +469,12 @@ type InitOptions = {
     /** Enables debugging setState() calls to connected components */
     debugSetState?: boolean;
 
+    /**
+     * If enabled it will use the performance API to measure the time taken by Onyx operations.
+     * @default false
+     */
+    enablePerformanceMetrics?: boolean;
+
     skippableCollectionMemberIDs?: string[];
 };
 

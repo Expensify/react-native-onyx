@@ -610,6 +610,55 @@ describe('useOnyx', () => {
         });
     });
 
+    describe('dependencies', () => {
+        it('should return the updated selected value when a external value passed to the dependencies list changes', async () => {
+            Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, {
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry3`]: {id: 'entry3_id', name: 'entry3_name'},
+            } as GenericCollection);
+
+            let externalValue = 'ex1';
+
+            const {result, rerender} = renderHook(() =>
+                useOnyx(
+                    ONYXKEYS.COLLECTION.TEST_KEY,
+                    {
+                        // @ts-expect-error bypass
+                        selector: (entries: OnyxCollection<{id: string; name: string}>) =>
+                            Object.entries(entries ?? {}).reduce<NonNullable<OnyxCollection<string>>>((acc, [key, value]) => {
+                                acc[key] = `${value?.id}_${externalValue}`;
+                                return acc;
+                            }, {}),
+                    },
+                    [externalValue],
+                ),
+            );
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual({
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: 'entry1_id_ex1',
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: 'entry2_id_ex1',
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry3`]: 'entry3_id_ex1',
+            });
+            expect(result.current[1].status).toEqual('loaded');
+
+            externalValue = 'ex2';
+
+            await act(async () => {
+                rerender(undefined);
+            });
+
+            expect(result.current[0]).toEqual({
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: 'entry1_id_ex2',
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: 'entry2_id_ex2',
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry3`]: 'entry3_id_ex2',
+            });
+            expect(result.current[1].status).toEqual('loaded');
+        });
+    });
+
     // This test suite must be the last one to avoid problems when running the other tests here.
     describe('canEvict', () => {
         const error = (key: string) => `canEvict can't be used on key '${key}'. This key must explicitly be flagged as safe for removal by adding it to Onyx.init({safeEvictionKeys: []}).`;
