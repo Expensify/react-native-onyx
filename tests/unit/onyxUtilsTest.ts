@@ -45,6 +45,18 @@ describe('OnyxUtils', () => {
                 OnyxUtils.splitCollectionMemberKey('');
             }).toThrowError("Invalid '' key provided, only collection keys are allowed.");
         });
+
+        it('should allow passing the collection key beforehand for performance gains', () => {
+            const [collectionKey, id] = OnyxUtils.splitCollectionMemberKey(`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, ONYXKEYS.COLLECTION.TEST_KEY);
+            expect(collectionKey).toEqual(ONYXKEYS.COLLECTION.TEST_KEY);
+            expect(id).toEqual('id1');
+        });
+
+        it("should throw error if the passed collection key isn't compatible with the key", () => {
+            expect(() => {
+                OnyxUtils.splitCollectionMemberKey(`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, ONYXKEYS.COLLECTION.TEST_LEVEL_KEY);
+            }).toThrowError("Invalid 'test_level_' collection key provided, it isn't compatible with 'test_id1' key.");
+        });
     });
 
     describe('getCollectionKey', () => {
