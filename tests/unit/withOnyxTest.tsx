@@ -28,6 +28,7 @@ const ONYX_KEYS = {
 
 Onyx.init({
     keys: ONYX_KEYS,
+    skippableCollectionMemberIDs: ['skippable-id'],
 });
 
 beforeEach(() => Onyx.clear());
@@ -816,5 +817,30 @@ describe('withOnyxTest', () => {
         expect(onRender).toHaveBeenCalledTimes(1);
         textComponent = renderResult.getByText('null');
         expect(textComponent).not.toBeNull();
+    });
+
+    describe('skippable collection member ids', () => {
+        it('should 1', async () => {
+            // TODO: Finish
+            const TestComponentWithOnyx = withOnyx<ViewWithCollectionsProps, {text: unknown}>({
+                text: {
+                    key: ONYX_KEYS.COLLECTION.TEST_KEY,
+                },
+            })(ViewWithCollections);
+            const onRender = jest.fn();
+            const renderResult = render(<TestComponentWithOnyx onRender={onRender} />);
+
+            Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {ID: 1},
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {ID: 2},
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`]: {ID: 3},
+            } as GenericCollection);
+
+            return waitForPromisesToResolve().then(() => {
+                expect(renderResult.getByText('1')).not.toBeNull();
+                expect(renderResult.getByText('2')).not.toBeNull();
+                expect(renderResult.getByText('3')).toBeNull();
+            });
+        });
     });
 });

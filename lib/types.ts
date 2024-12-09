@@ -474,6 +474,8 @@ type InitOptions = {
      * @default false
      */
     enablePerformanceMetrics?: boolean;
+
+    skippableCollectionMemberIDs?: string[];
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
