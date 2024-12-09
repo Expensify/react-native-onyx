@@ -144,7 +144,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     // in `getSnapshot()` to be satisfied several times.
     const isFirstConnectionRef = useRef(true);
 
-    // Indicates if the hook is connecting to a Onyx key.
+    // Indicates if the hook is connecting to an Onyx key.
     const isConnectingRef = useRef(false);
 
     // Stores the `onStoreChange()` function, which can be used to trigger a `getSnapshot()` update when desired.
