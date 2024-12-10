@@ -1,5 +1,6 @@
 import {deepEqual, shallowEqual} from 'fast-equals';
 import {useCallback, useEffect, useRef, useSyncExternalStore} from 'react';
+import type {DependencyList} from 'react';
 import OnyxCache, {TASK} from './OnyxCache';
 import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
@@ -104,12 +105,18 @@ function getCachedValue<TKey extends OnyxKey, TValue>(key: TKey, selector?: UseO
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     key: TKey,
     options?: BaseUseOnyxOptions & UseOnyxInitialValueOption<TReturnValue> & Required<UseOnyxSelectorOption<TKey, TReturnValue>>,
+    dependencies?: DependencyList,
 ): UseOnyxResult<TReturnValue>;
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     key: TKey,
     options?: BaseUseOnyxOptions & UseOnyxInitialValueOption<NoInfer<TReturnValue>>,
+    dependencies?: DependencyList,
 ): UseOnyxResult<TReturnValue>;
-function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey, options?: UseOnyxOptions<TKey, TReturnValue>): UseOnyxResult<TReturnValue> {
+function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
+    key: TKey,
+    options?: UseOnyxOptions<TKey, TReturnValue>,
+    dependencies: DependencyList = [],
+): UseOnyxResult<TReturnValue> {
     const connectionRef = useRef<Connection | null>(null);
     const previousKey = usePrevious(key);
 
@@ -136,6 +143,12 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
     // Indicates if it's the first Onyx connection of this hook or not, as we don't want certain use cases
     // in `getSnapshot()` to be satisfied several times.
     const isFirstConnectionRef = useRef(true);
+
+    // Indicates if the hook is connecting to an Onyx key.
+    const isConnectingRef = useRef(false);
+
+    // Stores the `onStoreChange()` function, which can be used to trigger a `getSnapshot()` update when desired.
+    const onStoreChangeFnRef = useRef<(() => void) | null>(null);
 
     // Indicates if we should get the newest cached value from Onyx during `getSnapshot()` execution.
     const shouldGetCachedValueRef = useRef(true);
@@ -167,6 +180,19 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
             `'${previousKey}' key can't be changed to '${key}'. useOnyx() only supports dynamic keys if they are both collection member keys from the same collection e.g. from 'collection_id1' to 'collection_id2'.`,
         );
     }, [previousKey, key]);
+
+    useEffect(() => {
+        // This effect will only run if the `dependencies` array changes. If it changes it will force the hook
+        // to trigger a `getSnapshot()` update by calling the stored `onStoreChange()` function reference, thus
+        // re-running the hook and returning the latest value to the consumer.
+        if (connectionRef.current === null || isConnectingRef.current || !onStoreChangeFnRef.current) {
+            return;
+        }
+
+        shouldGetCachedValueRef.current = true;
+        onStoreChangeFnRef.current();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [...dependencies]);
 
     // Mimics withOnyx's checkEvictableKeys() behavior.
     const checkEvictableKey = useCallback(() => {
@@ -255,9 +281,15 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
+            isConnectingRef.current = true;
+            onStoreChangeFnRef.current = onStoreChange;
+
             connectionRef.current = connectionManager.connect<CollectionKeyBase>({
                 key,
                 callback: () => {
+                    isConnectingRef.current = false;
+                    onStoreChangeFnRef.current = onStoreChange;
+
                     // Signals that the first connection was made, so some logics in `getSnapshot()`
                     // won't be executed anymore.
                     isFirstConnectionRef.current = false;
@@ -282,6 +314,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
 
                 connectionManager.disconnect(connectionRef.current);
                 isFirstConnectionRef.current = false;
+                isConnectingRef.current = false;
+                onStoreChangeFnRef.current = null;
             };
         },
         [key, options?.initWithStoredValues, options?.reuseConnection, checkEvictableKey],

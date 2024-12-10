@@ -4,6 +4,8 @@ import PlatformStorage from './platforms';
 import InstanceSync from './InstanceSync';
 import MemoryOnlyProvider from './providers/MemoryOnlyProvider';
 import type StorageProvider from './providers/types';
+import * as GlobalSettings from '../GlobalSettings';
+import decorateWithMetrics from '../metrics';
 
 let provider = PlatformStorage;
 let shouldKeepInstancesSync = false;
@@ -55,7 +57,7 @@ function tryOrDegradePerformance<T>(fn: () => Promise<T> | T, waitForInitializat
     });
 }
 
-const Storage: Storage = {
+const storage: Storage = {
     /**
      * Returns the storage provider currently in use
      */
@@ -202,4 +204,22 @@ const Storage: Storage = {
     },
 };
 
-export default Storage;
+GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
+    if (!enablePerformanceMetrics) {
+        return;
+    }
+
+    // Apply decorators
+    storage.getItem = decorateWithMetrics(storage.getItem, 'Storage.getItem');
+    storage.multiGet = decorateWithMetrics(storage.multiGet, 'Storage.multiGet');
+    storage.setItem = decorateWithMetrics(storage.setItem, 'Storage.setItem');
+    storage.multiSet = decorateWithMetrics(storage.multiSet, 'Storage.multiSet');
+    storage.mergeItem = decorateWithMetrics(storage.mergeItem, 'Storage.mergeItem');
+    storage.multiMerge = decorateWithMetrics(storage.multiMerge, 'Storage.multiMerge');
+    storage.removeItem = decorateWithMetrics(storage.removeItem, 'Storage.removeItem');
+    storage.removeItems = decorateWithMetrics(storage.removeItems, 'Storage.removeItems');
+    storage.clear = decorateWithMetrics(storage.clear, 'Storage.clear');
+    storage.getAllKeys = decorateWithMetrics(storage.getAllKeys, 'Storage.getAllKeys');
+});
+
+export default storage;
