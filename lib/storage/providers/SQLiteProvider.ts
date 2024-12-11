@@ -63,7 +63,7 @@ const provider: StorageProvider = {
             const result = rows?.item(0);
 
             if (result == null) {
-                return undefined;
+                return null;
             }
 
             return JSON.parse(result.valueJSON);
