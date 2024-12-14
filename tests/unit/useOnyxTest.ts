@@ -661,7 +661,7 @@ describe('useOnyx', () => {
     });
 
     describe('skippable collection member ids', () => {
-        it('should 1', async () => {
+        it('should always return undefined entry when subscribing to a collection with skippable member ids', async () => {
             Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, {
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
@@ -679,27 +679,36 @@ describe('useOnyx', () => {
             });
             expect(result.current[1].status).toEqual('loaded');
 
-            await act(async () => Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`, 'something'));
+            await act(async () =>
+                Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, {
+                    [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name_changed'},
+                    [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name_changed'},
+                    [`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`]: {id: 'skippable-id_id', name: 'skippable-id_name_changed'},
+                } as GenericCollection),
+            );
 
             expect(result.current[0]).toEqual({
-                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
-                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name_changed'},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name_changed'},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`]: undefined,
             });
             expect(result.current[1].status).toEqual('loaded');
         });
 
-        it('should 2', async () => {
+        it('should always return undefined when subscribing to a skippable collection member id', async () => {
             // @ts-expect-error bypass
-            await StorageMock.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`, 'something');
+            await StorageMock.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`, 'skippable-id_value');
 
-            const {result} = renderHook(() => useOnyx(ONYXKEYS.COLLECTION.TEST_KEY));
+            const {result} = renderHook(() => useOnyx(`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`));
 
             await act(async () => waitForPromisesToResolve());
 
-            expect(result.current[0]).toEqual({
-                [`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`]: undefined,
-            });
+            expect(result.current[0]).toEqual(undefined);
+            expect(result.current[1].status).toEqual('loaded');
+
+            await act(async () => Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`, 'skippable-id_value_changed'));
+
+            expect(result.current[0]).toEqual(undefined);
             expect(result.current[1].status).toEqual('loaded');
         });
     });

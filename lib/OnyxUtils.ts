@@ -258,17 +258,6 @@ function reduceCollectionWithSelector<TKey extends CollectionKeyBase, TMap, TRet
 
 /** Get some data from the store */
 function get<TKey extends OnyxKey, TValue extends OnyxValue<TKey>>(key: TKey): Promise<TValue> {
-    if (skippableCollectionMemberIDs.size) {
-        try {
-            const [, collectionMemberID] = splitCollectionMemberKey(key);
-            if (skippableCollectionMemberIDs.has(collectionMemberID)) {
-                return Promise.resolve(undefined as TValue);
-            }
-        } catch (e) {
-            // Key is not a collection one or something went wrong during split, so we proceed with the function's logic.
-        }
-    }
-
     // When we already have the value in cache - resolve right away
     if (cache.hasCacheForKey(key)) {
         return Promise.resolve(cache.get(key) as TValue);
@@ -284,6 +273,18 @@ function get<TKey extends OnyxKey, TValue extends OnyxValue<TKey>>(key: TKey): P
     // Otherwise retrieve the value from storage and capture a promise to aid concurrent usages
     const promise = Storage.getItem(key)
         .then((val) => {
+            if (skippableCollectionMemberIDs.size) {
+                try {
+                    const [, collectionMemberID] = splitCollectionMemberKey(key);
+                    if (skippableCollectionMemberIDs.has(collectionMemberID)) {
+                        // eslint-disable-next-line no-param-reassign
+                        val = undefined as OnyxValue<TKey>;
+                    }
+                } catch (e) {
+                    // Key is not a collection one or something went wrong during split, so we proceed with the function's logic.
+                }
+            }
+
             if (val === undefined) {
                 cache.addNullishStorageKey(key);
                 return undefined;
@@ -320,17 +321,6 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
      * These missingKeys will be later used to multiGet the data from the storage.
      */
     keys.forEach((key) => {
-        if (skippableCollectionMemberIDs.size) {
-            try {
-                const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key);
-                if (skippableCollectionMemberIDs.has(collectionMemberID)) {
-                    return;
-                }
-            } catch (e) {
-                // Key is not a collection one or something went wrong during split, so we proceed with the function's logic.
-            }
-        }
-
         const cacheValue = cache.get(key) as OnyxValue<TKey>;
         if (cacheValue) {
             dataMap.set(key, cacheValue);
@@ -373,6 +363,17 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
                 // temp object is used to merge the missing data into the cache
                 const temp: OnyxCollection<KeyValueMapping[TKey]> = {};
                 values.forEach(([key, value]) => {
+                    if (skippableCollectionMemberIDs.size) {
+                        try {
+                            const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key);
+                            if (skippableCollectionMemberIDs.has(collectionMemberID)) {
+                                return;
+                            }
+                        } catch (e) {
+                            // Key is not a collection one or something went wrong during split, so we proceed with the function's logic.
+                        }
+                    }
+
                     dataMap.set(key, value as OnyxValue<TKey>);
                     temp[key] = value as OnyxValue<TKey>;
                 });

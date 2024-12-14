@@ -131,6 +131,12 @@ function disconnect(connection: Connection): void {
  * @param value value to store
  */
 function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>): Promise<void> {
+    // When we use Onyx.set to set a key we want to clear the current delta changes from Onyx.merge that were queued
+    // before the value was set. If Onyx.merge is currently reading the old value from storage, it will then not apply the changes.
+    if (OnyxUtils.hasPendingMergeForKey(key)) {
+        delete OnyxUtils.getMergeQueue()[key];
+    }
+
     const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
     if (skippableCollectionMemberIDs.size) {
         try {
@@ -141,12 +147,6 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>): Promis
         } catch (e) {
             // Key is not a collection one or something went wrong during split, so we proceed with the function's logic.
         }
-    }
-
-    // When we use Onyx.set to set a key we want to clear the current delta changes from Onyx.merge that were queued
-    // before the value was set. If Onyx.merge is currently reading the old value from storage, it will then not apply the changes.
-    if (OnyxUtils.hasPendingMergeForKey(key)) {
-        delete OnyxUtils.getMergeQueue()[key];
     }
 
     // Onyx.set will ignore `undefined` values as inputs, therefore we can return early.
@@ -218,10 +218,8 @@ function multiSet(data: OnyxMultiSetInput): Promise<void> {
         newData = Object.keys(newData).reduce((result: OnyxMultiSetInput, key) => {
             try {
                 const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key);
-                if (!skippableCollectionMemberIDs.has(collectionMemberID)) {
-                    // eslint-disable-next-line no-param-reassign
-                    result[key] = newData[key];
-                }
+                // eslint-disable-next-line no-param-reassign
+                result[key] = !skippableCollectionMemberIDs.has(collectionMemberID) ? newData[key] : null;
             } catch {
                 // Key is not a collection one or something went wrong during split, so we assign the data to result anyway.
                 // eslint-disable-next-line no-param-reassign
@@ -273,7 +271,8 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
         try {
             const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key);
             if (skippableCollectionMemberIDs.has(collectionMemberID)) {
-                return Promise.resolve();
+                // eslint-disable-next-line no-param-reassign
+                changes = undefined;
             }
         } catch (e) {
             // Key is not a collection one or something went wrong during split, so we proceed with the function's logic.
@@ -407,10 +406,8 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
         resultCollection = Object.keys(resultCollection).reduce((result: OnyxInputKeyValueMapping, key) => {
             try {
                 const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key, collectionKey);
-                if (!skippableCollectionMemberIDs.has(collectionMemberID)) {
-                    // eslint-disable-next-line no-param-reassign
-                    result[key] = resultCollection[key];
-                }
+                // eslint-disable-next-line no-param-reassign
+                result[key] = !skippableCollectionMemberIDs.has(collectionMemberID) ? resultCollection[key] : null;
             } catch {
                 // Something went wrong during split, so we assign the data to result anyway.
                 // eslint-disable-next-line no-param-reassign
@@ -825,10 +822,8 @@ function setCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey
         resultCollection = Object.keys(resultCollection).reduce((result: OnyxInputKeyValueMapping, key) => {
             try {
                 const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key, collectionKey);
-                if (!skippableCollectionMemberIDs.has(collectionMemberID)) {
-                    // eslint-disable-next-line no-param-reassign
-                    result[key] = resultCollection[key];
-                }
+                // eslint-disable-next-line no-param-reassign
+                result[key] = !skippableCollectionMemberIDs.has(collectionMemberID) ? resultCollection[key] : null;
             } catch {
                 // Something went wrong during split, so we assign the data to result anyway.
                 // eslint-disable-next-line no-param-reassign
