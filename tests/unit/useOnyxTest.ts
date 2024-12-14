@@ -703,12 +703,12 @@ describe('useOnyx', () => {
 
             await act(async () => waitForPromisesToResolve());
 
-            expect(result.current[0]).toEqual(undefined);
+            expect(result.current[0]).toBeUndefined();
             expect(result.current[1].status).toEqual('loaded');
 
             await act(async () => Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`, 'skippable-id_value_changed'));
 
-            expect(result.current[0]).toEqual(undefined);
+            expect(result.current[0]).toBeUndefined();
             expect(result.current[1].status).toEqual('loaded');
         });
     });
