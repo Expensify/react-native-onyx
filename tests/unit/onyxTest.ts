@@ -30,6 +30,7 @@ Onyx.init({
         [ONYX_KEYS.OTHER_TEST]: 42,
         [ONYX_KEYS.KEY_WITH_UNDERSCORE]: 'default',
     },
+    skippableCollectionMemberIDs: ['skippable-id'],
 });
 
 describe('Onyx', () => {
@@ -1904,6 +1905,118 @@ describe('Onyx', () => {
 
                     expect(testKeyValue).toBe('merged value');
                 });
+        });
+    });
+
+    describe('skippable collection member ids', () => {
+        it('should skip the collection member id value when using Onyx.set()', async () => {
+            let testKeyValue: unknown;
+            connection = Onyx.connect({
+                key: ONYX_KEYS.COLLECTION.TEST_KEY,
+                initWithStoredValues: false,
+                waitForCollectionCallback: true,
+                callback: (value) => {
+                    testKeyValue = value;
+                },
+            });
+
+            await Onyx.set(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`, {id: 'entry1_id', name: 'entry2_name'});
+            await Onyx.set(`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`, {id: 'skippable-id_id', name: 'skippable-id_name'});
+
+            expect(testKeyValue).toEqual({
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry2_name'},
+            });
+        });
+
+        it('should skip the collection member id value when using Onyx.merge()', async () => {
+            let testKeyValue: unknown;
+            connection = Onyx.connect({
+                key: ONYX_KEYS.COLLECTION.TEST_KEY,
+                initWithStoredValues: false,
+                waitForCollectionCallback: true,
+                callback: (value) => {
+                    testKeyValue = value;
+                },
+            });
+
+            await Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`, {id: 'entry1_id', name: 'entry2_name'});
+            await Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`, {id: 'skippable-id_id', name: 'skippable-id_name'});
+
+            expect(testKeyValue).toEqual({
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry2_name'},
+            });
+        });
+
+        it('should skip the collection member id value when using Onyx.mergeCollection()', async () => {
+            let testKeyValue: unknown;
+            connection = Onyx.connect({
+                key: ONYX_KEYS.COLLECTION.TEST_KEY,
+                initWithStoredValues: false,
+                waitForCollectionCallback: true,
+                callback: (value) => {
+                    testKeyValue = value;
+                },
+            });
+
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`]: {id: 'skippable-id_id', name: 'skippable-id_name'},
+            } as GenericCollection);
+
+            expect(testKeyValue).toEqual({
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`]: undefined,
+            });
+        });
+
+        it('should skip the collection member id value when using Onyx.setCollection()', async () => {
+            let testKeyValue: unknown;
+            connection = Onyx.connect({
+                key: ONYX_KEYS.COLLECTION.TEST_KEY,
+                initWithStoredValues: false,
+                waitForCollectionCallback: true,
+                callback: (value) => {
+                    testKeyValue = value;
+                },
+            });
+
+            await Onyx.setCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`]: {id: 'skippable-id_id', name: 'skippable-id_name'},
+            } as GenericCollection);
+
+            expect(testKeyValue).toEqual({
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`]: undefined,
+            });
+        });
+
+        it('should skip the collection member id value when using Onyx.multiSet()', async () => {
+            let testKeyValue: unknown;
+            connection = Onyx.connect({
+                key: ONYX_KEYS.COLLECTION.TEST_KEY,
+                initWithStoredValues: false,
+                waitForCollectionCallback: true,
+                callback: (value) => {
+                    testKeyValue = value;
+                },
+            });
+
+            await Onyx.multiSet({
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`]: {id: 'skippable-id_id', name: 'skippable-id_name'},
+            } as GenericCollection);
+
+            expect(testKeyValue).toEqual({
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`]: undefined,
+            });
         });
     });
 });

@@ -26,7 +26,7 @@ function ViewWithCollections(
         <View>
             {Object.values(collections).map((collection, i) => (
                 // eslint-disable-next-line react/no-array-index-key
-                <Text key={i}>{collection.ID}</Text>
+                <Text key={i}>{collection?.ID}</Text>
             ))}
         </View>
     );
