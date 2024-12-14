@@ -1,7 +1,5 @@
 import PerformanceProxy from './dependencies/PerformanceProxy';
 
-const decoratedAliases = new Set();
-
 /**
  * Capture a measurement between the start mark and now
  */
@@ -21,11 +19,6 @@ function isPromiseLike(value: unknown): value is Promise<unknown> {
  * Wraps a function with metrics capturing logic
  */
 function decorateWithMetrics<Args extends unknown[], ReturnType>(func: (...args: Args) => ReturnType, alias = func.name) {
-    if (decoratedAliases.has(alias)) {
-        throw new Error(`"${alias}" is already decorated`);
-    }
-
-    decoratedAliases.add(alias);
     function decorated(...args: Args) {
         const mark = PerformanceProxy.mark(alias, {detail: {args, alias}});
 

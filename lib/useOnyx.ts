@@ -1,13 +1,15 @@
 import {deepEqual, shallowEqual} from 'fast-equals';
-import {useCallback, useEffect, useRef, useSyncExternalStore} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useSyncExternalStore} from 'react';
 import type {DependencyList} from 'react';
 import OnyxCache, {TASK} from './OnyxCache';
 import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
 import OnyxUtils from './OnyxUtils';
+import * as GlobalSettings from './GlobalSettings';
 import type {CollectionKeyBase, KeyValueMapping, OnyxCollection, OnyxKey, OnyxValue} from './types';
 import useLiveRef from './useLiveRef';
 import usePrevious from './usePrevious';
+import decorateWithMetrics from './metrics';
 
 type BaseUseOnyxOptions = {
     /**
@@ -144,7 +146,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     // in `getSnapshot()` to be satisfied several times.
     const isFirstConnectionRef = useRef(true);
 
-    // Indicates if the hook is connecting to a Onyx key.
+    // Indicates if the hook is connecting to an Onyx key.
     const isConnectingRef = useRef(false);
 
     // Stores the `onStoreChange()` function, which can be used to trigger a `getSnapshot()` update when desired.
@@ -321,11 +323,19 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         [key, options?.initWithStoredValues, options?.reuseConnection, checkEvictableKey],
     );
 
+    const getSnapshotDecorated = useMemo(() => {
+        if (!GlobalSettings.isPerformanceMetricsEnabled()) {
+            return getSnapshot;
+        }
+
+        return decorateWithMetrics(getSnapshot, 'useOnyx.getSnapshot');
+    }, [getSnapshot]);
+
     useEffect(() => {
         checkEvictableKey();
     }, [checkEvictableKey]);
 
-    const result = useSyncExternalStore<UseOnyxResult<TReturnValue>>(subscribe, getSnapshot);
+    const result = useSyncExternalStore<UseOnyxResult<TReturnValue>>(subscribe, getSnapshotDecorated);
 
     return result;
 }

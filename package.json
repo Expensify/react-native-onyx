@@ -1,6 +1,6 @@
 {
   "name": "react-native-onyx",
-  "version": "2.0.84",
+  "version": "2.0.86",
   "author": "Expensify, Inc.",
   "homepage": "https://expensify.com",
   "description": "State management for React Native",
@@ -25,7 +25,8 @@
     "README.md",
     "LICENSE.md"
   ],
-  "main": "lib/index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
