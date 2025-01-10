@@ -772,13 +772,13 @@ function setCollection<TKey extends CollectionKeyBase, TMap extends string>(coll
 
         keyValuePairs.forEach(([key, value]) => cache.set(key, value));
 
-        // Single notification for collection subscribers
-        OnyxUtils.keysChanged(collectionKey, mutableCollection, previousCollection);
+        const updatePromise = OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
 
         return Storage.multiSet(keyValuePairs)
             .catch((error) => OnyxUtils.evictStorageAndRetry(error, setCollection, collectionKey, collection))
             .then(() => {
                 OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET_COLLECTION, undefined, mutableCollection);
+                return updatePromise;
             });
     });
 }
