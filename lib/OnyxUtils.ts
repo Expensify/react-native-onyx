@@ -1088,7 +1088,7 @@ function reportStorageQuota(): Promise<void> {
  * evicting some data from Onyx and then retrying to do
  * whatever it is we attempted to do.
  */
-function evictStorageAndRetry<TMethod extends typeof Onyx.set | typeof Onyx.multiSet | typeof Onyx.mergeCollection>(
+function evictStorageAndRetry<TMethod extends typeof Onyx.set | typeof Onyx.multiSet | typeof Onyx.mergeCollection | typeof Onyx.setCollection>(
     error: Error,
     onyxMethod: TMethod,
     ...args: Parameters<TMethod>
