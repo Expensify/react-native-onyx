@@ -848,7 +848,19 @@ function setCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey
             mutableCollection[key] = null;
         });
 
-        return multiSet(mutableCollection);
+        const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(mutableCollection, true);
+        const previousCollection = OnyxUtils.getCachedCollection(collectionKey);
+
+        keyValuePairs.forEach(([key, value]) => cache.set(key, value));
+
+        const updatePromise = OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
+
+        return Storage.multiSet(keyValuePairs)
+            .catch((error) => OnyxUtils.evictStorageAndRetry(error, setCollection, collectionKey, collection))
+            .then(() => {
+                OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET_COLLECTION, undefined, mutableCollection);
+                return updatePromise;
+            });
     });
 }
 
