@@ -675,7 +675,6 @@ describe('useOnyx', () => {
             expect(result.current[0]).toEqual({
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
-                [`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`]: undefined,
             });
             expect(result.current[1].status).toEqual('loaded');
 
@@ -690,7 +689,6 @@ describe('useOnyx', () => {
             expect(result.current[0]).toEqual({
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name_changed'},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name_changed'},
-                [`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`]: undefined,
             });
             expect(result.current[1].status).toEqual('loaded');
         });

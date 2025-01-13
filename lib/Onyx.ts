@@ -819,7 +819,7 @@ function setCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey
 
     const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
     if (skippableCollectionMemberIDs.size) {
-        resultCollection = Object.keys(resultCollection).reduce((result: OnyxInputKeyValueMapping, key) => {
+        resultCollection = newCollectionKeys.reduce((result: OnyxInputKeyValueMapping, key) => {
             try {
                 const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key, collectionKey);
                 // eslint-disable-next-line no-param-reassign

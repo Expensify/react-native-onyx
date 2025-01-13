@@ -1967,7 +1967,6 @@ describe('Onyx', () => {
             expect(testKeyValue).toEqual({
                 [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
                 [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
-                [`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`]: undefined,
             });
         });
 
@@ -1991,7 +1990,6 @@ describe('Onyx', () => {
             expect(testKeyValue).toEqual({
                 [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
                 [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
-                [`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`]: undefined,
             });
         });
 
@@ -2015,7 +2013,6 @@ describe('Onyx', () => {
             expect(testKeyValue).toEqual({
                 [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
                 [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
-                [`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`]: undefined,
             });
         });
     });
