@@ -582,6 +582,11 @@ function updateSnapshots(data: OnyxUpdate[]) {
                 return;
             }
 
+            if (Array.isArray(value)) {
+                updatedData[key] = value;
+                return;
+            }
+
             const oldValue = updatedData[key] || {};
             const newValue = lodashPick(value, Object.keys(snapshotData[key]));
 
