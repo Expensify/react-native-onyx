@@ -165,13 +165,13 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
  * @param mergedValue - (optional) value that was written in the storage after a merge method was executed.
  */
 function sendActionToDevTools(
-    method: typeof METHOD.MERGE_COLLECTION | typeof METHOD.MULTI_SET,
+    method: typeof METHOD.MERGE_COLLECTION | typeof METHOD.MULTI_SET | typeof METHOD.SET_COLLECTION,
     key: undefined,
     value: OnyxCollection<KeyValueMapping[OnyxKey]>,
     mergedValue?: undefined,
 ): void;
 function sendActionToDevTools(
-    method: Exclude<OnyxMethod, typeof METHOD.MERGE_COLLECTION | typeof METHOD.MULTI_SET>,
+    method: Exclude<OnyxMethod, typeof METHOD.MERGE_COLLECTION | typeof METHOD.MULTI_SET | typeof METHOD.SET_COLLECTION>,
     key: OnyxKey,
     value: OnyxEntry<KeyValueMapping[OnyxKey]>,
     mergedValue?: OnyxEntry<KeyValueMapping[OnyxKey]>,
@@ -1088,7 +1088,7 @@ function reportStorageQuota(): Promise<void> {
  * evicting some data from Onyx and then retrying to do
  * whatever it is we attempted to do.
  */
-function evictStorageAndRetry<TMethod extends typeof Onyx.set | typeof Onyx.multiSet | typeof Onyx.mergeCollection>(
+function evictStorageAndRetry<TMethod extends typeof Onyx.set | typeof Onyx.multiSet | typeof Onyx.mergeCollection | typeof Onyx.setCollection>(
     error: Error,
     onyxMethod: TMethod,
     ...args: Parameters<TMethod>
