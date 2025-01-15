@@ -582,8 +582,8 @@ function updateSnapshots(data: OnyxUpdate[]) {
                 return;
             }
 
-            if (Array.isArray(value)) {
-                updatedData[key] = value;
+            if (Array.isArray(value) || Array.isArray(snapshotData[key])) {
+                updatedData[key] = value || [];
                 return;
             }
 
