@@ -89,6 +89,44 @@ describe('useOnyx', () => {
                 fail("Expected to don't throw any errors.");
             }
         });
+
+        it('should not throw an error when changing from a non-collection key to another one if allowDynamicKey is true', async () => {
+            const {rerender} = renderHook((key: string) => useOnyx(key, {allowDynamicKey: true}), {initialProps: ONYXKEYS.TEST_KEY});
+
+            try {
+                await act(async () => {
+                    rerender(ONYXKEYS.TEST_KEY_2);
+                });
+            } catch (e) {
+                fail("Expected to don't throw any errors.");
+            }
+        });
+
+        it('should throw an error when changing from a non-collection key to another one if allowDynamicKey is false', async () => {
+            const {rerender} = renderHook((key: string) => useOnyx(key, {allowDynamicKey: false}), {initialProps: ONYXKEYS.TEST_KEY});
+
+            try {
+                await act(async () => {
+                    rerender(ONYXKEYS.TEST_KEY_2);
+                });
+
+                fail('Expected to throw an error.');
+            } catch (e) {
+                expect((e as Error).message).toBe(error(ONYXKEYS.TEST_KEY, ONYXKEYS.TEST_KEY_2));
+            }
+        });
+
+        it('should not throw an error when changing from a collection member key to another one if allowDynamicKey is true', async () => {
+            const {rerender} = renderHook((key: string) => useOnyx(key, {allowDynamicKey: true}), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}` as string});
+
+            try {
+                await act(async () => {
+                    rerender(`${ONYXKEYS.COLLECTION.TEST_KEY_2}`);
+                });
+            } catch (e) {
+                fail("Expected to don't throw any errors.");
+            }
+        });
     });
 
     describe('misc', () => {
