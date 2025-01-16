@@ -278,11 +278,12 @@ function get<TKey extends OnyxKey, TValue extends OnyxValue<TKey>>(key: TKey): P
                 try {
                     const [, collectionMemberID] = splitCollectionMemberKey(key);
                     if (skippableCollectionMemberIDs.has(collectionMemberID)) {
+                        // The key is a skippable one, so we set the value to undefined.
                         // eslint-disable-next-line no-param-reassign
                         val = undefined as OnyxValue<TKey>;
                     }
                 } catch (e) {
-                    // Key is not a collection one or something went wrong during split, so we proceed with the function's logic.
+                    // The key is not a collection one or something went wrong during split, so we proceed with the function's logic.
                 }
             }
 
@@ -368,10 +369,11 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
                         try {
                             const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key);
                             if (skippableCollectionMemberIDs.has(collectionMemberID)) {
+                                // The key is a skippable one, so we skip this iteration.
                                 return;
                             }
                         } catch (e) {
-                            // Key is not a collection one or something went wrong during split, so we proceed with the function's logic.
+                            // The key is not a collection one or something went wrong during split, so we proceed with the function's logic.
                         }
                     }
 
