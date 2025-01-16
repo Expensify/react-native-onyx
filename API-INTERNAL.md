@@ -21,10 +21,10 @@
 <dd><p>Getter - returns the eviction block list.</p>
 </dd>
 <dt><a href="#getSkippableCollectionMemberIDs">getSkippableCollectionMemberIDs()</a></dt>
-<dd><p>Getter - TODO</p>
+<dd><p>Getter - returns the skippable collection member IDs.</p>
 </dd>
 <dt><a href="#setSkippableCollectionMemberIDs">setSkippableCollectionMemberIDs()</a></dt>
-<dd><p>Setter - TODO</p>
+<dd><p>Setter - sets the skippable collection member IDs.</p>
 </dd>
 <dt><a href="#initStoreValues">initStoreValues(keys, initialKeyStates, safeEvictionKeys)</a></dt>
 <dd><p>Sets the initial values for the Onyx store</p>
@@ -197,13 +197,13 @@ Getter - returns the eviction block list.
 <a name="getSkippableCollectionMemberIDs"></a>
 
 ## getSkippableCollectionMemberIDs()
-Getter - TODO
+Getter - returns the skippable collection member IDs.
 
 **Kind**: global function  
 <a name="setSkippableCollectionMemberIDs"></a>
 
 ## setSkippableCollectionMemberIDs()
-Setter - TODO
+Setter - sets the skippable collection member IDs.
 
 **Kind**: global function  
 <a name="initStoreValues"></a>
