@@ -32,6 +32,11 @@ type BaseUseOnyxOptions = {
      * with the same connect configurations.
      */
     reuseConnection?: boolean;
+
+    /**
+     * If set to `true`, the key can be changed dynamically during the component lifecycle.
+     */
+    allowDynamicKey?: boolean;
 };
 
 type UseOnyxInitialValueOption<TInitialValue> = {
@@ -157,7 +162,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
     useEffect(() => {
         // These conditions will ensure we can only handle dynamic collection member keys from the same collection.
-        if (previousKey === key) {
+        if (options?.allowDynamicKey || previousKey === key) {
             return;
         }
 
@@ -181,7 +186,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         throw new Error(
             `'${previousKey}' key can't be changed to '${key}'. useOnyx() only supports dynamic keys if they are both collection member keys from the same collection e.g. from 'collection_id1' to 'collection_id2'.`,
         );
-    }, [previousKey, key]);
+    }, [previousKey, key, options?.allowDynamicKey]);
 
     useEffect(() => {
         // This effect will only run if the `dependencies` array changes. If it changes it will force the hook
@@ -342,4 +347,4 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
 export default useOnyx;
 
-export type {FetchStatus, ResultMetadata, UseOnyxResult};
+export type {FetchStatus, ResultMetadata, UseOnyxResult, BaseUseOnyxOptions, UseOnyxSelector, UseOnyxSelectorOption, UseOnyxInitialValueOption, UseOnyxOptions};
