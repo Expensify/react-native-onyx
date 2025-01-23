@@ -1,6 +1,6 @@
 /* eslint-disable rulesdir/onyx-props-must-have-default */
 import React from 'react';
-import {render} from '@testing-library/react-native';
+import {act, render} from '@testing-library/react-native';
 import Onyx, {withOnyx} from '../../lib';
 import type {ViewWithTextOnyxProps, ViewWithTextProps} from '../components/ViewWithText';
 import ViewWithText from '../components/ViewWithText';
@@ -28,6 +28,7 @@ const ONYX_KEYS = {
 
 Onyx.init({
     keys: ONYX_KEYS,
+    skippableCollectionMemberIDs: ['skippable-id'],
 });
 
 beforeEach(() => Onyx.clear());
@@ -816,5 +817,62 @@ describe('withOnyxTest', () => {
         expect(onRender).toHaveBeenCalledTimes(1);
         textComponent = renderResult.getByText('null');
         expect(textComponent).not.toBeNull();
+    });
+
+    describe('skippable collection member ids', () => {
+        it('should always return undefined entry when subscribing to a collection with skippable member ids', async () => {
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {ID: 'entry1_id'},
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {ID: 'entry2_id'},
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`]: {ID: 'skippable-id_id'},
+            } as GenericCollection);
+
+            const TestComponentWithOnyx = withOnyx<ViewWithCollectionsProps, {collections: unknown}>({
+                collections: {
+                    key: ONYX_KEYS.COLLECTION.TEST_KEY,
+                },
+            })(ViewWithCollections);
+            const renderResult = render(<TestComponentWithOnyx />);
+
+            await waitForPromisesToResolve();
+
+            expect(renderResult.queryByText('entry1_id')).not.toBeNull();
+            expect(renderResult.queryByText('entry2_id')).not.toBeNull();
+            expect(renderResult.queryByText('entry3_id')).toBeNull();
+
+            await act(async () =>
+                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                    [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {ID: 'entry1_id_changed'},
+                    [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {ID: 'entry2_id_changed'},
+                    [`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`]: {ID: 'skippable-id_id_changed'},
+                } as GenericCollection),
+            );
+
+            expect(renderResult.queryByText('entry1_id_changed')).not.toBeNull();
+            expect(renderResult.queryByText('entry2_id_changed')).not.toBeNull();
+            expect(renderResult.queryByText('skippable-id_id_changed')).toBeNull();
+        });
+
+        it('should always return undefined when subscribing to a skippable collection member id', async () => {
+            const TestComponentWithOnyx = withOnyx<ViewWithTextProps, ViewWithTextOnyxProps>({
+                text: {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`,
+                },
+            })(ViewWithText);
+
+            // @ts-expect-error bypass
+            await StorageMock.setItem(`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`, 'skippable-id_value');
+
+            const renderResult = render(<TestComponentWithOnyx />);
+
+            await waitForPromisesToResolve();
+            await waitForPromisesToResolve();
+
+            expect(renderResult.queryByText('skippable-id_value')).toBeNull();
+
+            await act(async () => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`, 'skippable-id_value_changed'));
+
+            expect(renderResult.queryByText('skippable-id_value_changed')).toBeNull();
+        });
     });
 });

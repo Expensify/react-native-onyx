@@ -20,6 +20,12 @@
 <dt><a href="#getEvictionBlocklist">getEvictionBlocklist()</a></dt>
 <dd><p>Getter - returns the eviction block list.</p>
 </dd>
+<dt><a href="#getSkippableCollectionMemberIDs">getSkippableCollectionMemberIDs()</a></dt>
+<dd><p>Getter - returns the skippable collection member IDs.</p>
+</dd>
+<dt><a href="#setSkippableCollectionMemberIDs">setSkippableCollectionMemberIDs()</a></dt>
+<dd><p>Setter - sets the skippable collection member IDs.</p>
+</dd>
 <dt><a href="#initStoreValues">initStoreValues(keys, initialKeyStates, safeEvictionKeys)</a></dt>
 <dd><p>Sets the initial values for the Onyx store</p>
 </dd>
@@ -53,7 +59,7 @@ The resulting collection will only contain items that are returned by the select
 <dd><p>Checks to see if the subscriber&#39;s supplied key
 is associated with a collection of keys.</p>
 </dd>
-<dt><a href="#splitCollectionMemberKey">splitCollectionMemberKey(key)</a> ⇒</dt>
+<dt><a href="#splitCollectionMemberKey">splitCollectionMemberKey(key, collectionKey)</a> ⇒</dt>
 <dd><p>Splits a collection member key into the collection key part and the ID part.</p>
 </dd>
 <dt><a href="#isKeyMatch">isKeyMatch()</a></dt>
@@ -188,6 +194,18 @@ Getter - returns the deffered init task.
 Getter - returns the eviction block list.
 
 **Kind**: global function  
+<a name="getSkippableCollectionMemberIDs"></a>
+
+## getSkippableCollectionMemberIDs()
+Getter - returns the skippable collection member IDs.
+
+**Kind**: global function  
+<a name="setSkippableCollectionMemberIDs"></a>
+
+## setSkippableCollectionMemberIDs()
+Setter - sets the skippable collection member IDs.
+
+**Kind**: global function  
 <a name="initStoreValues"></a>
 
 ## initStoreValues(keys, initialKeyStates, safeEvictionKeys)
@@ -268,7 +286,7 @@ is associated with a collection of keys.
 **Kind**: global function  
 <a name="splitCollectionMemberKey"></a>
 
-## splitCollectionMemberKey(key) ⇒
+## splitCollectionMemberKey(key, collectionKey) ⇒
 Splits a collection member key into the collection key part and the ID part.
 
 **Kind**: global function  
@@ -278,6 +296,7 @@ or throws an Error if the key is not a collection one.
 | Param | Description |
 | --- | --- |
 | key | The collection member key to split. |
+| collectionKey | The collection key of the `key` param that can be passed in advance to optimize the function. |
 
 <a name="isKeyMatch"></a>
 
