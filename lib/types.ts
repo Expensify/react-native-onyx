@@ -493,6 +493,12 @@ type MixedOperationsQueue = {
     set: OnyxInputKeyValueMapping;
 };
 
+type ComputedKey<TValue = any> = {
+    cacheKey: string;
+    compute: (...args: any[]) => TValue;
+    dependencies: OnyxKey[];
+};
+
 export type {
     BaseConnectOptions,
     Collection,
@@ -532,4 +538,5 @@ export type {
     Selector,
     WithOnyxConnectOptions,
     MixedOperationsQueue,
+    ComputedKey,
 };

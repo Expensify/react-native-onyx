@@ -3,8 +3,9 @@ import * as Logger from './Logger';
 import type {ConnectOptions} from './Onyx';
 import OnyxUtils from './OnyxUtils';
 import * as Str from './Str';
-import type {DefaultConnectCallback, DefaultConnectOptions, OnyxKey, OnyxValue} from './types';
+import type {DefaultConnectCallback, DefaultConnectOptions, OnyxKey, OnyxValue, ComputedKey} from './types';
 import utils from './utils';
+import cache from './OnyxCache';
 
 type ConnectCallback = DefaultConnectCallback<OnyxKey>;
 
@@ -88,13 +89,115 @@ class OnyxConnectionManager {
      */
     private sessionID: string;
 
+    // Computed key specific storage
+    private computedValues = new Map<string, any>();
+
+    private dependencyMap = new Map<OnyxKey, Set<string>>();
+
+    private computedKeyMap = new Map<string, ComputedKey>();
+
     constructor() {
         this.connectionsMap = new Map();
         this.lastCallbackID = 0;
         this.sessionID = Str.guid();
 
-        // Binds all public methods to prevent problems with `this`.
-        bindAll(this, 'generateConnectionID', 'fireCallbacks', 'connect', 'disconnect', 'disconnectAll', 'refreshSessionID', 'addToEvictionBlockList', 'removeFromEvictionBlockList');
+        bindAll(this, [
+            'generateConnectionID',
+            'fireCallbacks',
+            'connect',
+            'disconnect',
+            'disconnectAll',
+            'refreshSessionID',
+            'addToEvictionBlockList',
+            'removeFromEvictionBlockList',
+            'setupComputedKey',
+        ]);
+    }
+
+    private addDependency(dependency: OnyxKey, computedCacheKey: string) {
+        if (!this.dependencyMap.has(dependency)) {
+            this.dependencyMap.set(dependency, new Set());
+        }
+        this.dependencyMap.get(dependency)!.add(computedCacheKey);
+    }
+
+    private setupComputedKey(key: ComputedKey) {
+        const cacheKey = OnyxUtils.getComputedCacheKey(key);
+
+        this.computedKeyMap.set(cacheKey, key);
+
+        // Setup dependency tracking
+        key.dependencies.forEach((dependency) => {
+            this.addDependency(dependency, cacheKey);
+
+            // Connect to each dependency with collection handling
+            this.connect({
+                key: dependency,
+                callback: () => {
+                    const dependencyValues = key.dependencies.map((dep) => {
+                        if (OnyxUtils.isCollectionKey(dep)) {
+                            const allKeys = cache.getAllKeys();
+                            const collectionData = {};
+                            for (const k of allKeys) {
+                                if (k.startsWith(dep)) {
+                                    // @ts-expect-error - collectionData is a map
+                                    collectionData[k] = cache.get(k);
+                                }
+                            }
+                            return collectionData;
+                        }
+                        return cache.get(dep);
+                    });
+
+                    if (!dependencyValues.some((val) => val === undefined)) {
+                        const newValue = key.compute(...dependencyValues);
+                        this.computedValues.set(cacheKey, newValue);
+                        cache.set(cacheKey, newValue);
+
+                        // Force update all connections for this computed key
+                        for (const [connectionId, metadata] of this.connectionsMap.entries()) {
+                            if (metadata.onyxKey === cacheKey) {
+                                metadata.cachedCallbackValue = newValue;
+                                metadata.cachedCallbackKey = cacheKey;
+                                this.fireCallbacks(connectionId);
+                            }
+                        }
+                    }
+                },
+                waitForCollectionCallback: true,
+            });
+        });
+
+        // Initial computation
+        const dependencyValues = key.dependencies.map((dep) => {
+            if (OnyxUtils.isCollectionKey(dep)) {
+                const allKeys = cache.getAllKeys();
+                const collectionData = {};
+                for (const k of allKeys) {
+                    if (k.startsWith(dep)) {
+                        // @ts-expect-error - collectionData is a map
+                        collectionData[k] = cache.get(k);
+                    }
+                }
+                return collectionData;
+            }
+            return cache.get(dep);
+        });
+
+        if (!dependencyValues.some((val) => val === undefined)) {
+            const initialValue = key.compute(...dependencyValues);
+            this.computedValues.set(cacheKey, initialValue);
+            cache.set(cacheKey, initialValue);
+
+            // Force update all connections for this computed key
+            for (const [connectionId, metadata] of this.connectionsMap.entries()) {
+                if (metadata.onyxKey === cacheKey) {
+                    metadata.cachedCallbackValue = initialValue;
+                    metadata.cachedCallbackKey = cacheKey;
+                    this.fireCallbacks(connectionId);
+                }
+            }
+        }
     }
 
     /**
@@ -146,6 +249,31 @@ class OnyxConnectionManager {
      * @returns The connection object to use when calling `disconnect()`.
      */
     connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Connection {
+        // Handle computed keys before generating connection ID
+        if (OnyxUtils.isComputedKey(connectOptions.key)) {
+            // @ts-expect-error - computedKey is a string
+            const computedKey = connectOptions.key as ComputedKey;
+            this.setupComputedKey(computedKey);
+
+            // Get the cached value immediately if available
+            const cacheKey = OnyxUtils.getComputedCacheKey(computedKey);
+            const cachedValue = this.computedValues.get(cacheKey);
+
+            connectOptions = {
+                ...connectOptions,
+                // @ts-expect-error - computedKey is a string
+                key: cacheKey,
+            };
+
+            // If we have a cached value, trigger the callback immediately
+            if (cachedValue !== undefined && connectOptions.callback) {
+                Promise.resolve().then(() => {
+                    // @ts-ignore
+                    connectOptions.callback(cachedValue, cacheKey);
+                });
+            }
+        }
+
         const connectionID = this.generateConnectionID(connectOptions);
         let connectionMetadata = this.connectionsMap.get(connectionID);
         let subscriptionID: number | undefined;
