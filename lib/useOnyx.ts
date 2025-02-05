@@ -102,7 +102,16 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey): OnyxValue<OnyxKey> 
  * Gets the value from cache and maps it with selector. It changes `null` to `undefined` for `useOnyx` compatibility.
  */
 function getCachedValue<TKey extends OnyxKey, TValue>(key: TKey, selector?: UseOnyxSelector<TKey, TValue>) {
-    const value = tryGetCachedValue(key) as OnyxValue<TKey>;
+    let value: OnyxValue<TKey>;
+
+    // Handle computed keys
+    if (OnyxUtils.isComputedKey(key)) {
+        // @ts-ignore
+        const cacheKey = OnyxUtils.getComputedCacheKey(key);
+        value = tryGetCachedValue(cacheKey) as OnyxValue<TKey>;
+    } else {
+        value = tryGetCachedValue(key) as OnyxValue<TKey>;
+    }
 
     const selectedValue = selector ? selector(value) : (value as TValue);
 
@@ -291,8 +300,12 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             isConnectingRef.current = true;
             onStoreChangeFnRef.current = onStoreChange;
 
+            // Handle computed keys by using their cache key for the connection
+            // @ts-ignore
+            const connectionKey = OnyxUtils.isComputedKey(key) ? OnyxUtils.getComputedCacheKey(key) : key;
+
             connectionRef.current = connectionManager.connect<CollectionKeyBase>({
-                key,
+                key: connectionKey,
                 callback: () => {
                     isConnectingRef.current = false;
                     onStoreChangeFnRef.current = onStoreChange;
@@ -308,7 +321,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                     onStoreChange();
                 },
                 initWithStoredValues: options?.initWithStoredValues,
-                waitForCollectionCallback: OnyxUtils.isCollectionKey(key) as true,
+                waitForCollectionCallback: OnyxUtils.isCollectionKey(connectionKey) as true,
                 reuseConnection: options?.reuseConnection,
             });
 
