@@ -660,7 +660,7 @@ function updateSnapshots(data: OnyxUpdate[]) {
             const oldValue = updatedData[key] || {};
             const newValue = lodashPick(value, Object.keys(snapshotData[key]));
 
-            updatedData = {...updatedData, [key]: Object.assign(oldValue, newValue)};
+            updatedData = {...updatedData, [key]:  value === null ? value: Object.assign(oldValue, newValue)};
         });
 
         // Skip the update if there's no data to be merged
