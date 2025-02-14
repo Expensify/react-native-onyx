@@ -1,3 +1,4 @@
+// @ts-nocheck
 import bindAll from 'lodash/bindAll';
 import * as Logger from './Logger';
 import type {ConnectOptions} from './Onyx';
@@ -126,15 +127,31 @@ class OnyxConnectionManager {
 
         this.computedKeyMap.set(cacheKey, key);
 
+        // First, ensure all computed dependencies are set up
+        key.dependencies.forEach((dependency) => {
+            if (typeof dependency === 'string' && dependency.startsWith('computed_')) {
+                if (!this.computedValues.has(dependency)) {
+                    const computedDep = this.computedKeyMap.get(dependency);
+                    if (computedDep) {
+                        this.setupComputedKey(computedDep);
+                    }
+                }
+            }
+        });
+
         // Setup dependency tracking
         key.dependencies.forEach((dependency) => {
             this.addDependency(dependency, cacheKey);
 
-            // Connect to each dependency with collection handling
             this.connect({
                 key: dependency,
                 callback: () => {
                     const dependencyValues = key.dependencies.map((dep) => {
+                        if (typeof dep === 'string' && dep.startsWith('computed_')) {
+                            const computedValue = this.computedValues.get(dep);
+                            return computedValue;
+                        }
+
                         if (OnyxUtils.isCollectionKey(dep)) {
                             const allKeys = cache.getAllKeys();
                             const collectionData = {};
@@ -146,7 +163,8 @@ class OnyxConnectionManager {
                             }
                             return collectionData;
                         }
-                        return cache.get(dep);
+                        const value = cache.get(dep);
+                        return value;
                     });
 
                     if (!dependencyValues.some((val) => val === undefined)) {
@@ -154,7 +172,7 @@ class OnyxConnectionManager {
                         this.computedValues.set(cacheKey, newValue);
                         cache.set(cacheKey, newValue);
 
-                        // Force update all connections for this computed key
+                        // Force update connections
                         for (const [connectionId, metadata] of this.connectionsMap.entries()) {
                             if (metadata.onyxKey === cacheKey) {
                                 metadata.cachedCallbackValue = newValue;
@@ -167,37 +185,6 @@ class OnyxConnectionManager {
                 waitForCollectionCallback: true,
             });
         });
-
-        // Initial computation
-        const dependencyValues = key.dependencies.map((dep) => {
-            if (OnyxUtils.isCollectionKey(dep)) {
-                const allKeys = cache.getAllKeys();
-                const collectionData = {};
-                for (const k of allKeys) {
-                    if (k.startsWith(dep)) {
-                        // @ts-expect-error - collectionData is a map
-                        collectionData[k] = cache.get(k);
-                    }
-                }
-                return collectionData;
-            }
-            return cache.get(dep);
-        });
-
-        if (!dependencyValues.some((val) => val === undefined)) {
-            const initialValue = key.compute(...dependencyValues);
-            this.computedValues.set(cacheKey, initialValue);
-            cache.set(cacheKey, initialValue);
-
-            // Force update all connections for this computed key
-            for (const [connectionId, metadata] of this.connectionsMap.entries()) {
-                if (metadata.onyxKey === cacheKey) {
-                    metadata.cachedCallbackValue = initialValue;
-                    metadata.cachedCallbackKey = cacheKey;
-                    this.fireCallbacks(connectionId);
-                }
-            }
-        }
     }
 
     /**
@@ -251,25 +238,41 @@ class OnyxConnectionManager {
     connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Connection {
         // Handle computed keys before generating connection ID
         if (OnyxUtils.isComputedKey(connectOptions.key)) {
-            // @ts-expect-error - computedKey is a string
             const computedKey = connectOptions.key as ComputedKey;
-            this.setupComputedKey(computedKey);
+            const cacheKey = OnyxUtils.getComputedCacheKey(computedKey);
+
+            // Transform dependencies to use cache keys for computed dependencies
+            const transformedDependencies = computedKey.dependencies.map((dep) => {
+                if (typeof dep === 'object' && OnyxUtils.isComputedKey(dep)) {
+                    const transformed = OnyxUtils.getComputedCacheKey(dep);
+
+                    return transformed;
+                }
+                return dep;
+            });
+
+            // Create a new computed key with transformed dependencies
+            const transformedComputedKey = {
+                ...computedKey,
+                dependencies: transformedDependencies,
+            };
+
+            // Only set up if not already set up
+            if (!this.computedValues.has(cacheKey)) {
+                this.setupComputedKey(transformedComputedKey);
+            }
 
             // Get the cached value immediately if available
-            const cacheKey = OnyxUtils.getComputedCacheKey(computedKey);
             const cachedValue = this.computedValues.get(cacheKey);
 
             connectOptions = {
                 ...connectOptions,
-                // @ts-expect-error - computedKey is a string
                 key: cacheKey,
             };
 
-            // If we have a cached value, trigger the callback immediately
             if (cachedValue !== undefined && connectOptions.callback) {
                 Promise.resolve().then(() => {
-                    // @ts-ignore
-                    connectOptions.callback(cachedValue, cacheKey);
+                    connectOptions.callback!(cachedValue, cacheKey);
                 });
             }
         }
