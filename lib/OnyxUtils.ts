@@ -14,6 +14,7 @@ import Storage from './storage';
 import type {
     CollectionKey,
     CollectionKeyBase,
+    ComputedKey,
     ConnectOptions,
     DeepRecord,
     DefaultConnectCallback,
@@ -1426,6 +1427,14 @@ function unsubscribeFromKey(subscriptionID: number): void {
     delete callbackToStateMapping[subscriptionID];
 }
 
+function getComputedCacheKey(key: ComputedKey): string {
+    return `computed_${key.cacheKey}`;
+}
+
+function isComputedKey(key: OnyxKey): boolean {
+    return typeof key === 'object' && 'cacheKey' in key && 'compute' in key;
+}
+
 const OnyxUtils = {
     METHOD,
     getMergeQueue,
@@ -1474,6 +1483,8 @@ const OnyxUtils = {
     getEvictionBlocklist,
     getSkippableCollectionMemberIDs,
     setSkippableCollectionMemberIDs,
+    getComputedCacheKey,
+    isComputedKey,
 };
 
 GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
