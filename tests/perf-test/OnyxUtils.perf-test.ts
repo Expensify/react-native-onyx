@@ -200,4 +200,8 @@ describe('OnyxUtils', () => {
     test('reduceCollectionWithSelector', async () => {
         await measureFunction(() => undefined);
     });
+
+    test('updateSnapshots', async () => {
+        await measureFunction(() => undefined);
+    });
 });
