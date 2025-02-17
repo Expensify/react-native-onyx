@@ -1474,6 +1474,10 @@ const OnyxUtils = {
     getEvictionBlocklist,
     getSkippableCollectionMemberIDs,
     setSkippableCollectionMemberIDs,
+    storeKeyBySubscriptions,
+    deleteKeyBySubscriptions,
+    addKeyToRecentlyAccessedIfNeeded,
+    reduceCollectionWithSelector,
 };
 
 GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
