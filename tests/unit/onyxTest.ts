@@ -1686,6 +1686,51 @@ describe('Onyx', () => {
                 });
         });
 
+        it('should 1', async () => {
+            let result: unknown;
+            connection = Onyx.connect({
+                key: ONYX_KEYS.COLLECTION.TEST_UPDATE,
+                waitForCollectionCallback: true,
+                callback: (value) => {
+                    result = value;
+                },
+            });
+
+            await Onyx.set(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`, {
+                sub_entry1: {
+                    id: 'sub_entry1',
+                    someKey: 'someValue',
+                },
+            });
+
+            const queuedUpdates: OnyxUpdate[] = [
+                {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                    onyxMethod: 'merge',
+                    value: {
+                        sub_entry1: null,
+                    },
+                },
+                {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                    onyxMethod: 'merge',
+                    value: {
+                        sub_entry1: {
+                            pendingAction: null,
+                        },
+                    },
+                },
+            ];
+
+            await Onyx.update(queuedUpdates);
+
+            expect(result).toEqual({
+                [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {
+                    sub_entry1: {},
+                },
+            });
+        });
+
         describe('merge', () => {
             it('should remove a deeply nested null when merging an existing key', () => {
                 let result: unknown;
