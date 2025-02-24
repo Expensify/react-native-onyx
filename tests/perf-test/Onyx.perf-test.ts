@@ -151,7 +151,7 @@ describe('Onyx', () => {
             await measureFunction(() =>
                 Onyx.init({
                     keys: ONYXKEYS,
-                    initialKeyStates: getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY),
+                    initialKeyStates: mockedReportActionsMap,
                     maxCachedKeysCount: 20000,
                     safeEvictionKeys: [ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY],
                     skippableCollectionMemberIDs: ['skippable-id'],
