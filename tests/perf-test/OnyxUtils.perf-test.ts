@@ -157,6 +157,10 @@ describe('OnyxUtils', () => {
         await measureFunction(() => undefined);
     });
 
+    test('tupleGet', async () => {
+        await measureFunction(() => undefined);
+    });
+
     test('isValidNonEmptyCollectionForMerge', async () => {
         await measureFunction(() => undefined);
     });
