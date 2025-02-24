@@ -389,6 +389,16 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
 }
 
 /**
+ * This helper exists to map an array of Onyx keys such as `['report_', 'conciergeReportID']`
+ * to the values for those keys (correctly typed) such as `[OnyxCollection<Report>, OnyxEntry<string>]`
+ *
+ * Note: just using .map, you'd end up with `Array<OnyxCollection<Report>|OnyxEntry<string>>`, which is not what we want. This preserves the order of the keys provided.
+ */
+function tupleGet<Keys extends readonly OnyxKey[]>(keys: Keys): Promise<{[Index in keyof Keys]: OnyxValue<Keys[Index]>}> {
+    return Promise.all(keys.map((key) => OnyxUtils.get(key))) as Promise<{[Index in keyof Keys]: OnyxValue<Keys[Index]>}>;
+}
+
+/**
  * Stores a subscription ID associated with a given key.
  *
  * @param subscriptionID - A subscription ID of the subscriber.
@@ -1465,6 +1475,11 @@ function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge) {
                 return;
             }
 
+            if (value === null) {
+                updatedData[key] = value;
+                return;
+            }
+
             const oldValue = updatedData[key] || {};
             const newValue = lodashPick(value, Object.keys(snapshotData[key]));
 
@@ -1523,6 +1538,7 @@ const OnyxUtils = {
     initializeWithDefaultKeyStates,
     getSnapshotKey,
     multiGet,
+    tupleGet,
     isValidNonEmptyCollectionForMerge,
     doAllCollectionItemsBelongToSameParent,
     subscribeToKey,
@@ -1579,6 +1595,8 @@ GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
     initializeWithDefaultKeyStates = decorateWithMetrics(initializeWithDefaultKeyStates, 'OnyxUtils.initializeWithDefaultKeyStates');
     // @ts-expect-error Complex type signature
     multiGet = decorateWithMetrics(multiGet, 'OnyxUtils.multiGet');
+    // @ts-expect-error Reassign
+    tupleGet = decorateWithMetrics(tupleGet, 'OnyxUtils.tupleGet');
     // @ts-expect-error Reassign
     subscribeToKey = decorateWithMetrics(subscribeToKey, 'OnyxUtils.subscribeToKey');
 });
