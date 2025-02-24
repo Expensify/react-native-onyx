@@ -37,6 +37,7 @@ describe('Onyx', () => {
     beforeAll(async () => {
         Onyx.init({
             keys: ONYXKEYS,
+            maxCachedKeysCount: 20000,
             safeEvictionKeys: [ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY],
             skippableCollectionMemberIDs: ['skippable-id'],
         });
@@ -44,14 +45,6 @@ describe('Onyx', () => {
 
     afterEach(async () => {
         await Onyx.clear();
-    });
-
-    test('connect', async () => {
-        await measureFunction(() => undefined);
-    });
-
-    test('disconnect', async () => {
-        await measureFunction(() => undefined);
     });
 
     describe('set', () => {
@@ -139,11 +132,13 @@ describe('Onyx', () => {
 
     describe('clear', () => {
         beforeEach(async () => {
-            await Onyx.multiSet(getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY));
-            await Onyx.multiSet(getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_2));
-            await Onyx.multiSet(getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_3));
-            await Onyx.multiSet(getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_4));
-            await Onyx.multiSet(getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_5));
+            await Onyx.multiSet({
+                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY),
+                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_2),
+                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_3),
+                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_4),
+                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_5),
+            });
         });
 
         test('one call with 50k records to clean', async () => {
@@ -151,7 +146,17 @@ describe('Onyx', () => {
         });
     });
 
-    test('init', async () => {
-        await measureFunction(() => undefined);
+    describe('init', () => {
+        test('one call with 10k records to init', async () => {
+            await measureFunction(() =>
+                Onyx.init({
+                    keys: ONYXKEYS,
+                    initialKeyStates: getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY),
+                    maxCachedKeysCount: 20000,
+                    safeEvictionKeys: [ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY],
+                    skippableCollectionMemberIDs: ['skippable-id'],
+                }),
+            );
+        });
     });
 });
