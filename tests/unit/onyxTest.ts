@@ -1686,7 +1686,7 @@ describe('Onyx', () => {
                 });
         });
 
-        it('should 1', async () => {
+        it('should prioritize null merges in nested properties when batching updates', async () => {
             let result: unknown;
             connection = Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.TEST_UPDATE,
