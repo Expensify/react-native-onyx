@@ -1686,6 +1686,139 @@ describe('Onyx', () => {
                 });
         });
 
+        it('should prioritize null merges in nested properties when batching updates', async () => {
+            let result: unknown;
+            connection = Onyx.connect({
+                key: ONYX_KEYS.COLLECTION.TEST_UPDATE,
+                waitForCollectionCallback: true,
+                callback: (value) => {
+                    result = value;
+                },
+            });
+
+            await Onyx.multiSet({
+                [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {
+                    sub_entry1: {
+                        id: 'sub_entry1',
+                        someKey: 'someValue',
+                    },
+                },
+                [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`]: {
+                    sub_entry2: {
+                        id: 'sub_entry2',
+                        someKey: 'someValue',
+                        someNestedObject: {
+                            someNestedKey: 'someNestedValue',
+                            anotherNestedObject: {
+                                anotherNestedKey: 'anotherNestedValue',
+                            },
+                        },
+                    },
+                },
+            });
+
+            const queuedUpdates: OnyxUpdate[] = [
+                {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                    onyxMethod: 'merge',
+                    value: {
+                        sub_entry1: null,
+                    },
+                },
+                {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                    onyxMethod: 'merge',
+                    value: {
+                        sub_entry1: {
+                            pendingAction: null,
+                        },
+                    },
+                },
+
+                {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`,
+                    onyxMethod: 'merge',
+                    value: {
+                        sub_entry2: {
+                            someKey: 'someValueChanged',
+                        },
+                    },
+                },
+                {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`,
+                    onyxMethod: 'merge',
+                    value: {
+                        sub_entry2: {
+                            someNestedObject: {
+                                anotherNestedObject: {
+                                    anotherNestedKey: 'anotherNestedValueChanged',
+                                },
+                                anotherNestedObject2: {
+                                    anotherNestedKey2: 'anotherNestedValue2',
+                                },
+                            },
+                        },
+                    },
+                },
+                {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`,
+                    onyxMethod: 'merge',
+                    value: {
+                        sub_entry2: {
+                            someNestedObject: {
+                                anotherNestedObject: {
+                                    anotherNestedKey: null,
+                                },
+                            },
+                        },
+                    },
+                },
+                {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`,
+                    onyxMethod: 'merge',
+                    value: {
+                        sub_entry2: {
+                            someNestedObject: {
+                                anotherNestedObject: {
+                                    anotherNestedKey: 'anotherNestedValueChanged2',
+                                },
+                                anotherNestedObject2: null,
+                            },
+                        },
+                    },
+                },
+                {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`,
+                    onyxMethod: 'merge',
+                    value: {
+                        sub_entry2: {
+                            someNestedObject: {
+                                anotherNestedObject2: {
+                                    anotherNestedKey2: 'anotherNestedValue2',
+                                },
+                            },
+                        },
+                    },
+                },
+            ];
+
+            await Onyx.update(queuedUpdates);
+
+            expect(result).toEqual({
+                [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {},
+                [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`]: {
+                    sub_entry2: {
+                        id: 'sub_entry2',
+                        someKey: 'someValueChanged',
+                        someNestedObject: {
+                            someNestedKey: 'someNestedValue',
+                            anotherNestedObject: {},
+                        },
+                    },
+                },
+            });
+        });
+
         describe('merge', () => {
             it('should remove a deeply nested null when merging an existing key', () => {
                 let result: unknown;
