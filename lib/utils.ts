@@ -84,6 +84,8 @@ function mergeObject<TObject extends Record<string, unknown>>(
                 // to ensure that nested null values are removed from the merged object.
                 const targetValueWithFallback = (targetValue ?? {}) as TObject;
                 destination[key] = fastMerge(targetValueWithFallback, sourceValue, shouldRemoveNestedNulls, isBatchingMergeChanges, true, targetValue === null);
+            } else if (isBatchingMergeChanges && destination[key] === null) {
+                destination[key] = null;
             } else {
                 destination[key] = sourceValue;
             }
