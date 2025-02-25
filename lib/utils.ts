@@ -79,11 +79,15 @@ function mergeObject<TObject extends Record<string, unknown>>(
             // remove nested null values from the merged object.
             // If source value is any other value we need to set the source value it directly.
             if (isMergeableObject(sourceValue)) {
-                // If the target value is null or undefined, we need to fallback to an empty object,
-                // so that we can still use "fastMerge" to merge the source value,
-                // to ensure that nested null values are removed from the merged object.
-                const targetValueWithFallback = (targetValue ?? {}) as TObject;
-                destination[key] = fastMerge(targetValueWithFallback, sourceValue, shouldRemoveNestedNulls, isBatchingMergeChanges, true, targetValue === null);
+                if (isBatchingMergeChanges && targetValue === null) {
+                    destination[key] = null;
+                } else {
+                    // If the target value is null or undefined, we need to fallback to an empty object,
+                    // so that we can still use "fastMerge" to merge the source value,
+                    // to ensure that nested null values are removed from the merged object.
+                    const targetValueWithFallback = (targetValue ?? {}) as TObject;
+                    destination[key] = fastMerge(targetValueWithFallback, sourceValue, shouldRemoveNestedNulls, isBatchingMergeChanges);
+                }
             } else if (isBatchingMergeChanges && destination[key] === null) {
                 destination[key] = null;
             } else {
@@ -102,18 +106,7 @@ function mergeObject<TObject extends Record<string, unknown>>(
  * On native, when merging an existing value with new changes, SQLite will use JSON_PATCH, which removes top-level nullish values.
  * To be consistent with the behaviour for merge, we'll also want to remove null values for "set" operations.
  */
-function fastMerge<TValue>(
-    target: TValue,
-    source: TValue,
-    shouldRemoveNestedNulls = true,
-    isBatchingMergeChanges = false,
-    isMergingNestedProperties = false,
-    isTargetOriginallyNull = false,
-): TValue {
-    if (isBatchingMergeChanges && isMergingNestedProperties && isTargetOriginallyNull) {
-        return null as TValue;
-    }
-
+function fastMerge<TValue>(target: TValue, source: TValue, shouldRemoveNestedNulls = true, isBatchingMergeChanges = false): TValue {
     // We have to ignore arrays and nullish values here,
     // otherwise "mergeObject" will throw an error,
     // because it expects an object as "source"
