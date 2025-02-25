@@ -1725,9 +1725,7 @@ describe('Onyx', () => {
             await Onyx.update(queuedUpdates);
 
             expect(result).toEqual({
-                [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {
-                    sub_entry1: {},
-                },
+                [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {},
             });
         });
 

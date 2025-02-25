@@ -320,7 +320,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
             if (!validChanges.length) {
                 return Promise.resolve();
             }
-            const batchedDeltaChanges = OnyxUtils.applyMerge(undefined, validChanges, false);
+            const batchedDeltaChanges = OnyxUtils.applyMerge(undefined, validChanges, false, true);
 
             // Case (1): When there is no existing value in storage, we want to set the value instead of merge it.
             // Case (2): The presence of a top-level `null` in the merge queue instructs us to drop the whole existing value.
@@ -350,7 +350,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
             // The "preMergedValue" will be directly "set" in storage instead of being merged
             // Therefore we merge the batched changes with the existing value to get the final merged value that will be stored.
             // We can remove null values from the "preMergedValue", because "null" implicates that the user wants to remove a value from storage.
-            const preMergedValue = OnyxUtils.applyMerge(shouldSetValue ? undefined : existingValue, [batchedDeltaChanges], true);
+            const preMergedValue = OnyxUtils.applyMerge(shouldSetValue ? undefined : existingValue, [batchedDeltaChanges], true, false);
 
             // In cache, we don't want to remove the key if it's null to improve performance and speed up the next merge.
             const hasChanged = cache.hasValueChanged(key, preMergedValue);
@@ -765,7 +765,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
                 // Remove the collection-related key from the updateQueue so that it won't be processed individually.
                 delete updateQueue[key];
 
-                const updatedValue = OnyxUtils.applyMerge(undefined, operations, false);
+                const updatedValue = OnyxUtils.applyMerge(undefined, operations, false, true);
                 if (operations[0] === null) {
                     // eslint-disable-next-line no-param-reassign
                     queue.set[key] = updatedValue;
@@ -790,7 +790,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
     });
 
     Object.entries(updateQueue).forEach(([key, operations]) => {
-        const batchedChanges = OnyxUtils.applyMerge(undefined, operations, false);
+        const batchedChanges = OnyxUtils.applyMerge(undefined, operations, false, true);
 
         if (operations[0] === null) {
             promises.push(() => set(key, batchedChanges));
