@@ -1696,10 +1696,24 @@ describe('Onyx', () => {
                 },
             });
 
-            await Onyx.set(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`, {
-                sub_entry1: {
-                    id: 'sub_entry1',
-                    someKey: 'someValue',
+            await Onyx.multiSet({
+                [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {
+                    sub_entry1: {
+                        id: 'sub_entry1',
+                        someKey: 'someValue',
+                    },
+                },
+                [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`]: {
+                    sub_entry2: {
+                        id: 'sub_entry2',
+                        someKey: 'someValue',
+                        someNestedObject: {
+                            someNestedKey: 'someNestedValue',
+                            anotherNestedObject: {
+                                anotherNestedKey: 'anotherNestedValue',
+                            },
+                        },
+                    },
                 },
             });
 
@@ -1720,12 +1734,88 @@ describe('Onyx', () => {
                         },
                     },
                 },
+
+                {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`,
+                    onyxMethod: 'merge',
+                    value: {
+                        sub_entry2: {
+                            someKey: 'someValueChanged',
+                        },
+                    },
+                },
+                {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`,
+                    onyxMethod: 'merge',
+                    value: {
+                        sub_entry2: {
+                            someNestedObject: {
+                                anotherNestedObject: {
+                                    anotherNestedKey: 'anotherNestedValueChanged',
+                                },
+                                anotherNestedObject2: {
+                                    anotherNestedKey2: 'anotherNestedValue2',
+                                },
+                            },
+                        },
+                    },
+                },
+                {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`,
+                    onyxMethod: 'merge',
+                    value: {
+                        sub_entry2: {
+                            someNestedObject: {
+                                anotherNestedObject: {
+                                    anotherNestedKey: null,
+                                },
+                            },
+                        },
+                    },
+                },
+                {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`,
+                    onyxMethod: 'merge',
+                    value: {
+                        sub_entry2: {
+                            someNestedObject: {
+                                anotherNestedObject: {
+                                    anotherNestedKey: 'anotherNestedValueChanged2',
+                                },
+                                anotherNestedObject2: null,
+                            },
+                        },
+                    },
+                },
+                {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`,
+                    onyxMethod: 'merge',
+                    value: {
+                        sub_entry2: {
+                            someNestedObject: {
+                                anotherNestedObject2: {
+                                    anotherNestedKey2: 'anotherNestedValue2',
+                                },
+                            },
+                        },
+                    },
+                },
             ];
 
             await Onyx.update(queuedUpdates);
 
             expect(result).toEqual({
                 [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {},
+                [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`]: {
+                    sub_entry2: {
+                        id: 'sub_entry2',
+                        someKey: 'someValueChanged',
+                        someNestedObject: {
+                            someNestedKey: 'someNestedValue',
+                            anotherNestedObject: {},
+                        },
+                    },
+                },
             });
         });
 
