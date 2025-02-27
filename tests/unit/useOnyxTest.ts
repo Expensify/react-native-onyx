@@ -19,6 +19,7 @@ const ONYXKEYS = {
 Onyx.init({
     keys: ONYXKEYS,
     safeEvictionKeys: [ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY],
+    skippableCollectionMemberIDs: ['skippable-id'],
 });
 
 beforeEach(() => Onyx.clear());
@@ -84,6 +85,44 @@ describe('useOnyx', () => {
             try {
                 await act(async () => {
                     rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}2`);
+                });
+            } catch (e) {
+                fail("Expected to don't throw any errors.");
+            }
+        });
+
+        it('should not throw an error when changing from a non-collection key to another one if allowDynamicKey is true', async () => {
+            const {rerender} = renderHook((key: string) => useOnyx(key, {allowDynamicKey: true}), {initialProps: ONYXKEYS.TEST_KEY});
+
+            try {
+                await act(async () => {
+                    rerender(ONYXKEYS.TEST_KEY_2);
+                });
+            } catch (e) {
+                fail("Expected to don't throw any errors.");
+            }
+        });
+
+        it('should throw an error when changing from a non-collection key to another one if allowDynamicKey is false', async () => {
+            const {rerender} = renderHook((key: string) => useOnyx(key, {allowDynamicKey: false}), {initialProps: ONYXKEYS.TEST_KEY});
+
+            try {
+                await act(async () => {
+                    rerender(ONYXKEYS.TEST_KEY_2);
+                });
+
+                fail('Expected to throw an error.');
+            } catch (e) {
+                expect((e as Error).message).toBe(error(ONYXKEYS.TEST_KEY, ONYXKEYS.TEST_KEY_2));
+            }
+        });
+
+        it('should not throw an error when changing from a collection member key to another one if allowDynamicKey is true', async () => {
+            const {rerender} = renderHook((key: string) => useOnyx(key, {allowDynamicKey: true}), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}` as string});
+
+            try {
+                await act(async () => {
+                    rerender(`${ONYXKEYS.COLLECTION.TEST_KEY_2}`);
                 });
             } catch (e) {
                 fail("Expected to don't throw any errors.");
@@ -655,6 +694,57 @@ describe('useOnyx', () => {
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: 'entry2_id_ex2',
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry3`]: 'entry3_id_ex2',
             });
+            expect(result.current[1].status).toEqual('loaded');
+        });
+    });
+
+    describe('skippable collection member ids', () => {
+        it('should always return undefined entry when subscribing to a collection with skippable member ids', async () => {
+            Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, {
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`]: {id: 'skippable-id_id', name: 'skippable-id_name'},
+            } as GenericCollection);
+
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.COLLECTION.TEST_KEY));
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual({
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
+            });
+            expect(result.current[1].status).toEqual('loaded');
+
+            await act(async () =>
+                Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, {
+                    [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name_changed'},
+                    [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name_changed'},
+                    [`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`]: {id: 'skippable-id_id', name: 'skippable-id_name_changed'},
+                } as GenericCollection),
+            );
+
+            expect(result.current[0]).toEqual({
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name_changed'},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name_changed'},
+            });
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should always return undefined when subscribing to a skippable collection member id', async () => {
+            // @ts-expect-error bypass
+            await StorageMock.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`, 'skippable-id_value');
+
+            const {result} = renderHook(() => useOnyx(`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`));
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+
+            await act(async () => Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`, 'skippable-id_value_changed'));
+
+            expect(result.current[0]).toBeUndefined();
             expect(result.current[1].status).toEqual('loaded');
         });
     });

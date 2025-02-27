@@ -88,6 +88,9 @@ let lastSubscriptionID = 0;
 // Connections can be made before `Onyx.init`. They would wait for this task before resolving
 const deferredInitTask = createDeferredTask();
 
+// Holds a set of collection member IDs which updates will be ignored when using Onyx methods.
+let skippableCollectionMemberIDs = new Set<string>();
+
 function getSnapshotKey(): OnyxKey | null {
     return snapshotKey;
 }
@@ -128,6 +131,20 @@ function getEvictionBlocklist(): Record<OnyxKey, string[] | undefined> {
 }
 
 /**
+ * Getter - returns the skippable collection member IDs.
+ */
+function getSkippableCollectionMemberIDs(): Set<string> {
+    return skippableCollectionMemberIDs;
+}
+
+/**
+ * Setter - sets the skippable collection member IDs.
+ */
+function setSkippableCollectionMemberIDs(ids: Set<string>): void {
+    skippableCollectionMemberIDs = ids;
+}
+
+/**
  * Sets the initial values for the Onyx store
  *
  * @param keys - `ONYXKEYS` constants object from Onyx.init()
@@ -165,13 +182,13 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
  * @param mergedValue - (optional) value that was written in the storage after a merge method was executed.
  */
 function sendActionToDevTools(
-    method: typeof METHOD.MERGE_COLLECTION | typeof METHOD.MULTI_SET,
+    method: typeof METHOD.MERGE_COLLECTION | typeof METHOD.MULTI_SET | typeof METHOD.SET_COLLECTION,
     key: undefined,
     value: OnyxCollection<KeyValueMapping[OnyxKey]>,
     mergedValue?: undefined,
 ): void;
 function sendActionToDevTools(
-    method: Exclude<OnyxMethod, typeof METHOD.MERGE_COLLECTION | typeof METHOD.MULTI_SET>,
+    method: Exclude<OnyxMethod, typeof METHOD.MERGE_COLLECTION | typeof METHOD.MULTI_SET | typeof METHOD.SET_COLLECTION>,
     key: OnyxKey,
     value: OnyxEntry<KeyValueMapping[OnyxKey]>,
     mergedValue?: OnyxEntry<KeyValueMapping[OnyxKey]>,
@@ -257,6 +274,19 @@ function get<TKey extends OnyxKey, TValue extends OnyxValue<TKey>>(key: TKey): P
     // Otherwise retrieve the value from storage and capture a promise to aid concurrent usages
     const promise = Storage.getItem(key)
         .then((val) => {
+            if (skippableCollectionMemberIDs.size) {
+                try {
+                    const [, collectionMemberID] = splitCollectionMemberKey(key);
+                    if (skippableCollectionMemberIDs.has(collectionMemberID)) {
+                        // The key is a skippable one, so we set the value to undefined.
+                        // eslint-disable-next-line no-param-reassign
+                        val = undefined as OnyxValue<TKey>;
+                    }
+                } catch (e) {
+                    // The key is not a collection one or something went wrong during split, so we proceed with the function's logic.
+                }
+            }
+
             if (val === undefined) {
                 cache.addNullishStorageKey(key);
                 return undefined;
@@ -335,6 +365,18 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
                 // temp object is used to merge the missing data into the cache
                 const temp: OnyxCollection<KeyValueMapping[TKey]> = {};
                 values.forEach(([key, value]) => {
+                    if (skippableCollectionMemberIDs.size) {
+                        try {
+                            const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key);
+                            if (skippableCollectionMemberIDs.has(collectionMemberID)) {
+                                // The key is a skippable one, so we skip this iteration.
+                                return;
+                            }
+                        } catch (e) {
+                            // The key is not a collection one or something went wrong during split, so we proceed with the function's logic.
+                        }
+                    }
+
                     dataMap.set(key, value as OnyxValue<TKey>);
                     temp[key] = value as OnyxValue<TKey>;
                 });
@@ -342,6 +384,16 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
                 return dataMap;
             })
     );
+}
+
+/**
+ * This helper exists to map an array of Onyx keys such as `['report_', 'conciergeReportID']`
+ * to the values for those keys (correctly typed) such as `[OnyxCollection<Report>, OnyxEntry<string>]`
+ *
+ * Note: just using .map, you'd end up with `Array<OnyxCollection<Report>|OnyxEntry<string>>`, which is not what we want. This preserves the order of the keys provided.
+ */
+function tupleGet<Keys extends readonly OnyxKey[]>(keys: Keys): Promise<{[Index in keyof Keys]: OnyxValue<Keys[Index]>}> {
+    return Promise.all(keys.map((key) => OnyxUtils.get(key))) as Promise<{[Index in keyof Keys]: OnyxValue<Keys[Index]>}>;
 }
 
 /**
@@ -419,11 +471,23 @@ function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collect
 /**
  * Splits a collection member key into the collection key part and the ID part.
  * @param key - The collection member key to split.
+ * @param collectionKey - The collection key of the `key` param that can be passed in advance to optimize the function.
  * @returns A tuple where the first element is the collection part and the second element is the ID part,
  * or throws an Error if the key is not a collection one.
  */
-function splitCollectionMemberKey<TKey extends CollectionKey, CollectionKeyType = TKey extends `${infer Prefix}_${string}` ? `${Prefix}_` : never>(key: TKey): [CollectionKeyType, string] {
-    const collectionKey = getCollectionKey(key);
+function splitCollectionMemberKey<TKey extends CollectionKey, CollectionKeyType = TKey extends `${infer Prefix}_${string}` ? `${Prefix}_` : never>(
+    key: TKey,
+    collectionKey?: string,
+): [CollectionKeyType, string] {
+    if (collectionKey && !isCollectionMemberKey(collectionKey, key, collectionKey.length)) {
+        throw new Error(`Invalid '${collectionKey}' collection key provided, it isn't compatible with '${key}' key.`);
+    }
+
+    if (!collectionKey) {
+        // eslint-disable-next-line no-param-reassign
+        collectionKey = getCollectionKey(key);
+    }
+
     return [collectionKey as CollectionKeyType, key.slice(collectionKey.length)];
 }
 
@@ -1088,7 +1152,7 @@ function reportStorageQuota(): Promise<void> {
  * evicting some data from Onyx and then retrying to do
  * whatever it is we attempted to do.
  */
-function evictStorageAndRetry<TMethod extends typeof Onyx.set | typeof Onyx.multiSet | typeof Onyx.mergeCollection>(
+function evictStorageAndRetry<TMethod extends typeof Onyx.set | typeof Onyx.multiSet | typeof Onyx.mergeCollection | typeof Onyx.setCollection>(
     error: Error,
     onyxMethod: TMethod,
     ...args: Parameters<TMethod>
@@ -1413,11 +1477,14 @@ const OnyxUtils = {
     initializeWithDefaultKeyStates,
     getSnapshotKey,
     multiGet,
+    tupleGet,
     isValidNonEmptyCollectionForMerge,
     doAllCollectionItemsBelongToSameParent,
     subscribeToKey,
     unsubscribeFromKey,
     getEvictionBlocklist,
+    getSkippableCollectionMemberIDs,
+    setSkippableCollectionMemberIDs,
 };
 
 GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
@@ -1462,6 +1529,8 @@ GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
     initializeWithDefaultKeyStates = decorateWithMetrics(initializeWithDefaultKeyStates, 'OnyxUtils.initializeWithDefaultKeyStates');
     // @ts-expect-error Complex type signature
     multiGet = decorateWithMetrics(multiGet, 'OnyxUtils.multiGet');
+    // @ts-expect-error Reassign
+    tupleGet = decorateWithMetrics(tupleGet, 'OnyxUtils.tupleGet');
     // @ts-expect-error Reassign
     subscribeToKey = decorateWithMetrics(subscribeToKey, 'OnyxUtils.subscribeToKey');
 });

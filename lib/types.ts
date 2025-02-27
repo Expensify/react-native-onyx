@@ -474,6 +474,12 @@ type InitOptions = {
      * @default false
      */
     enablePerformanceMetrics?: boolean;
+
+    /**
+     * Array of collection member IDs which updates will be ignored when using Onyx methods.
+     * Additionally, any subscribers from these keys to won't receive any data from Onyx.
+     */
+    skippableCollectionMemberIDs?: string[];
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
