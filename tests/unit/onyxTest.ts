@@ -1686,6 +1686,50 @@ describe('Onyx', () => {
                 });
         });
 
+        it('should replace the old value after a null merge in the top-level object when batching updates', async () => {
+            let result: unknown;
+            connection = Onyx.connect({
+                key: ONYX_KEYS.COLLECTION.TEST_UPDATE,
+                waitForCollectionCallback: true,
+                callback: (value) => {
+                    result = value;
+                },
+            });
+
+            await Onyx.multiSet({
+                [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {
+                    id: 'entry1',
+                    someKey: 'someValue',
+                },
+            });
+
+            const queuedUpdates: OnyxUpdate[] = [
+                {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                    onyxMethod: 'merge',
+                    // Removing the entire object in this update.
+                    // Any subsequent changes to this key should completely replace the old value.
+                    value: null,
+                },
+                {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                    onyxMethod: 'merge',
+                    // This change should completely replace `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1` old value.
+                    value: {
+                        someKey: 'someValueChanged',
+                    },
+                },
+            ];
+
+            await Onyx.update(queuedUpdates);
+
+            expect(result).toEqual({
+                [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {
+                    someKey: 'someValueChanged',
+                },
+            });
+        });
+
         it('should prioritize null merges in nested properties when batching updates', async () => {
             let result: unknown;
             connection = Onyx.connect({
@@ -1831,6 +1875,41 @@ describe('Onyx', () => {
         });
 
         describe('merge', () => {
+            it('should replace the old value after a null merge in the top-level object when batching merges', async () => {
+                let result: unknown;
+                connection = Onyx.connect({
+                    key: ONYX_KEYS.COLLECTION.TEST_UPDATE,
+                    waitForCollectionCallback: true,
+                    callback: (value) => {
+                        result = value;
+                    },
+                });
+
+                await Onyx.multiSet({
+                    [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {
+                        id: 'entry1',
+                        someKey: 'someValue',
+                    },
+                });
+
+                // Removing the entire object in this merge.
+                // Any subsequent changes to this key should completely replace the old value.
+                Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`, null);
+
+                // This change should completely replace `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1` old value.
+                Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`, {
+                    someKey: 'someValueChanged',
+                });
+
+                await waitForPromisesToResolve();
+
+                expect(result).toEqual({
+                    [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {
+                        someKey: 'someValueChanged',
+                    },
+                });
+            });
+
             it('should prioritize null merges in nested properties when batching merges', async () => {
                 let result: unknown;
                 connection = Onyx.connect({
