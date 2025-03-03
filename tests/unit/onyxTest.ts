@@ -1730,6 +1730,157 @@ describe('Onyx', () => {
             });
         });
 
+        it('should replace the old value after a null merge in a nested property when batching updates', async () => {
+            let result: unknown;
+            connection = Onyx.connect({
+                key: ONYX_KEYS.COLLECTION.TEST_UPDATE,
+                waitForCollectionCallback: true,
+                callback: (value) => {
+                    result = value;
+                },
+            });
+
+            await Onyx.multiSet({
+                [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {
+                    sub_entry1: {
+                        id: 'sub_entry1',
+                        someKey: 'someValue',
+                    },
+                },
+                [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`]: {
+                    sub_entry2: {
+                        id: 'sub_entry2',
+                        someKey: 'someValue',
+                        someNestedObject: {
+                            someNestedKey: 'someNestedValue',
+                            anotherNestedObject: {
+                                anotherNestedKey: 'anotherNestedValue',
+                            },
+                        },
+                    },
+                },
+            });
+
+            const queuedUpdates: OnyxUpdate[] = [
+                // entry1
+                {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                    onyxMethod: 'merge',
+                    value: {
+                        // Removing "sub_entry1" property in this update.
+                        // Any subsequent changes to this property should completely replace the old value.
+                        sub_entry1: null,
+                    },
+                },
+                {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                    onyxMethod: 'merge',
+                    value: {
+                        // This change should completely replace "sub_entry1" old value.
+                        sub_entry1: {
+                            newKey: 'newValue',
+                        },
+                    },
+                },
+
+                // entry2
+                {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`,
+                    onyxMethod: 'merge',
+                    value: {
+                        sub_entry2: {
+                            someKey: 'someValueChanged',
+                        },
+                    },
+                },
+                {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`,
+                    onyxMethod: 'merge',
+                    value: {
+                        sub_entry2: {
+                            someNestedObject: {
+                                anotherNestedObject: {
+                                    anotherNestedKey: 'anotherNestedValueChanged',
+                                },
+                                anotherNestedObject2: {
+                                    anotherNestedKey2: 'anotherNestedValue2',
+                                },
+                            },
+                        },
+                    },
+                },
+                {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`,
+                    onyxMethod: 'merge',
+                    value: {
+                        sub_entry2: {
+                            someNestedObject: {
+                                anotherNestedObject: {
+                                    // Removing "anotherNestedKey" property in this update.
+                                    anotherNestedKey: null,
+                                },
+                            },
+                        },
+                    },
+                },
+                {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`,
+                    onyxMethod: 'merge',
+                    value: {
+                        sub_entry2: {
+                            someNestedObject: {
+                                anotherNestedObject: {
+                                    newNestedKey: 'newNestedValue',
+                                },
+                                // Removing "anotherNestedObject2" property in this update.
+                                // Any subsequent changes to this property should completely replace the old value.
+                                anotherNestedObject2: null,
+                            },
+                        },
+                    },
+                },
+                {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`,
+                    onyxMethod: 'merge',
+                    value: {
+                        sub_entry2: {
+                            someNestedObject: {
+                                // This change should completely replace "anotherNestedObject2" old value.
+                                anotherNestedObject2: {
+                                    newNestedKey2: 'newNestedValue2',
+                                },
+                            },
+                        },
+                    },
+                },
+            ];
+
+            await Onyx.update(queuedUpdates);
+
+            expect(result).toEqual({
+                [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {
+                    sub_entry1: {
+                        newKey: 'newValue',
+                    },
+                },
+                [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`]: {
+                    sub_entry2: {
+                        id: 'sub_entry2',
+                        someKey: 'someValueChanged',
+                        someNestedObject: {
+                            someNestedKey: 'someNestedValue',
+                            anotherNestedObject: {
+                                newNestedKey: 'newNestedValue',
+                            },
+                            anotherNestedObject2: {
+                                newNestedKey2: 'newNestedValue2',
+                            },
+                        },
+                    },
+                },
+            });
+        });
+
         describe('merge', () => {
             it('should replace the old value after a null merge in the top-level object when batching merges', async () => {
                 let result: unknown;
@@ -1762,6 +1913,127 @@ describe('Onyx', () => {
                 expect(result).toEqual({
                     [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {
                         someKey: 'someValueChanged',
+                    },
+                });
+            });
+
+            it('should replace the old value after a null merge in a nested property when batching merges', async () => {
+                let result: unknown;
+                connection = Onyx.connect({
+                    key: ONYX_KEYS.COLLECTION.TEST_UPDATE,
+                    waitForCollectionCallback: true,
+                    callback: (value) => {
+                        result = value;
+                    },
+                });
+
+                await Onyx.multiSet({
+                    [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {
+                        sub_entry1: {
+                            id: 'sub_entry1',
+                            someKey: 'someValue',
+                        },
+                    },
+                    [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`]: {
+                        sub_entry2: {
+                            id: 'sub_entry2',
+                            someKey: 'someValue',
+                            someNestedObject: {
+                                someNestedKey: 'someNestedValue',
+                                anotherNestedObject: {
+                                    anotherNestedKey: 'anotherNestedValue',
+                                },
+                            },
+                        },
+                    },
+                });
+
+                // entry1
+                Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`, {
+                    // Removing "sub_entry1" property in this merge.
+                    // Any subsequent changes to this property should completely replace the old value.
+                    sub_entry1: null,
+                });
+                Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`, {
+                    // This change should completely replace "sub_entry1" old value.
+                    sub_entry1: {
+                        newKey: 'newValue',
+                    },
+                });
+
+                // entry2
+                Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`, {
+                    sub_entry2: {
+                        someKey: 'someValueChanged',
+                    },
+                });
+                Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`, {
+                    sub_entry2: {
+                        someNestedObject: {
+                            anotherNestedObject: {
+                                anotherNestedKey: 'anotherNestedValueChanged',
+                            },
+                            anotherNestedObject2: {
+                                anotherNestedKey2: 'anotherNestedValue2',
+                            },
+                        },
+                    },
+                });
+                Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`, {
+                    sub_entry2: {
+                        someNestedObject: {
+                            anotherNestedObject: {
+                                // Removing "anotherNestedKey" property in this merge.
+                                anotherNestedKey: null,
+                            },
+                        },
+                    },
+                });
+                Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`, {
+                    sub_entry2: {
+                        someNestedObject: {
+                            anotherNestedObject: {
+                                newNestedKey: 'newNestedValue',
+                            },
+                            // Removing "anotherNestedObject2" property in this update.
+                            // Any subsequent changes to this property should completely replace the old value.
+                            anotherNestedObject2: null,
+                        },
+                    },
+                });
+                Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`, {
+                    sub_entry2: {
+                        someNestedObject: {
+                            // This change should completely replace "anotherNestedObject2" old value.
+                            anotherNestedObject2: {
+                                newNestedKey2: 'newNestedValue2',
+                            },
+                        },
+                    },
+                });
+
+                await waitForPromisesToResolve();
+
+                expect(result).toEqual({
+                    [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {
+                        sub_entry1: {
+                            newKey: 'newValue',
+                        },
+                    },
+                    [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`]: {
+                        sub_entry2: {
+                            id: 'sub_entry2',
+                            someKey: 'someValueChanged',
+                            someNestedObject: {
+                                someNestedKey: 'someNestedValue',
+                                anotherNestedObject: {
+                                    newNestedKey: 'newNestedValue',
+                                },
+                                anotherNestedObject2: {
+                                    newNestedKey2: 'newNestedValue2',
+                                },
+                            },
+                        },
                     },
                 });
             });
