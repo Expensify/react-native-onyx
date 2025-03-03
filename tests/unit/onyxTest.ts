@@ -1730,7 +1730,7 @@ describe('Onyx', () => {
             });
         });
 
-        it('should prioritize null merges in nested properties when batching updates', async () => {
+        it('should ignore subsequent changes after a null merge in a nested property when batching updates', async () => {
             let result: unknown;
             connection = Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.TEST_UPDATE,
@@ -1778,7 +1778,7 @@ describe('Onyx', () => {
                     value: {
                         // This change should be ignored because we previously changed "sub_entry1" to null.
                         sub_entry1: {
-                            pendingAction: null,
+                            newKey: 'newValue',
                         },
                     },
                 },
@@ -1910,7 +1910,7 @@ describe('Onyx', () => {
                 });
             });
 
-            it('should prioritize null merges in nested properties when batching merges', async () => {
+            it('should ignore subsequent changes after a null merge in a nested property when batching merges', async () => {
                 let result: unknown;
                 connection = Onyx.connect({
                     key: ONYX_KEYS.COLLECTION.TEST_UPDATE,
