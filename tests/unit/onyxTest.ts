@@ -1756,6 +1756,9 @@ describe('Onyx', () => {
                             anotherNestedObject: {
                                 anotherNestedKey: 'anotherNestedValue',
                             },
+                            anotherNestedObject2: {
+                                anotherNestedKey2: 'anotherNestedValue2',
+                            },
                         },
                     },
                 },
@@ -1802,8 +1805,8 @@ describe('Onyx', () => {
                                 anotherNestedObject: {
                                     anotherNestedKey: 'anotherNestedValueChanged',
                                 },
-                                anotherNestedObject2: {
-                                    anotherNestedKey2: 'anotherNestedValue2',
+                                anotherNestedObject3: {
+                                    anotherNestedKey3: 'anotherNestedValue3',
                                 },
                             },
                         },
@@ -1817,20 +1820,8 @@ describe('Onyx', () => {
                             someNestedObject: {
                                 anotherNestedObject: {
                                     // Removing "anotherNestedKey" property in this update.
+                                    // This property's old value is a primitive value, so it won't cause issues with merging.
                                     anotherNestedKey: null,
-                                },
-                            },
-                        },
-                    },
-                },
-                {
-                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`,
-                    onyxMethod: 'merge',
-                    value: {
-                        sub_entry2: {
-                            someNestedObject: {
-                                anotherNestedObject: {
-                                    newNestedKey: 'newNestedValue',
                                 },
                                 // Removing "anotherNestedObject2" property in this update.
                                 // Any subsequent changes to this property should completely replace the old value.
@@ -1845,9 +1836,29 @@ describe('Onyx', () => {
                     value: {
                         sub_entry2: {
                             someNestedObject: {
+                                anotherNestedObject: {
+                                    newNestedKey: 'newNestedValue',
+                                },
+                                // Removing "anotherNestedObject3" property in this update.
+                                // This property was only introduced in a previous update, so we don't need to care
+                                // about an old value because there isn't one.
+                                anotherNestedObject3: null,
+                            },
+                        },
+                    },
+                },
+                {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`,
+                    onyxMethod: 'merge',
+                    value: {
+                        sub_entry2: {
+                            someNestedObject: {
                                 // This change should completely replace "anotherNestedObject2" old value.
                                 anotherNestedObject2: {
                                     newNestedKey2: 'newNestedValue2',
+                                },
+                                anotherNestedObject3: {
+                                    newNestedKey3: 'newNestedValue3',
                                 },
                             },
                         },
@@ -1874,6 +1885,9 @@ describe('Onyx', () => {
                             },
                             anotherNestedObject2: {
                                 newNestedKey2: 'newNestedValue2',
+                            },
+                            anotherNestedObject3: {
+                                newNestedKey3: 'newNestedValue3',
                             },
                         },
                     },
@@ -1943,6 +1957,9 @@ describe('Onyx', () => {
                                 anotherNestedObject: {
                                     anotherNestedKey: 'anotherNestedValue',
                                 },
+                                anotherNestedObject2: {
+                                    anotherNestedKey2: 'anotherNestedValue2',
+                                },
                             },
                         },
                     },
@@ -1973,8 +1990,8 @@ describe('Onyx', () => {
                             anotherNestedObject: {
                                 anotherNestedKey: 'anotherNestedValueChanged',
                             },
-                            anotherNestedObject2: {
-                                anotherNestedKey2: 'anotherNestedValue2',
+                            anotherNestedObject3: {
+                                anotherNestedKey3: 'anotherNestedValue3',
                             },
                         },
                     },
@@ -1984,8 +2001,12 @@ describe('Onyx', () => {
                         someNestedObject: {
                             anotherNestedObject: {
                                 // Removing "anotherNestedKey" property in this merge.
+                                // This property's old value is a primitive value, so it won't cause issues with merging.
                                 anotherNestedKey: null,
                             },
+                            // Removing "anotherNestedObject2" property in this merge.
+                            // Any subsequent changes to this property should completely replace the old value.
+                            anotherNestedObject2: null,
                         },
                     },
                 });
@@ -1995,9 +2016,10 @@ describe('Onyx', () => {
                             anotherNestedObject: {
                                 newNestedKey: 'newNestedValue',
                             },
-                            // Removing "anotherNestedObject2" property in this update.
-                            // Any subsequent changes to this property should completely replace the old value.
-                            anotherNestedObject2: null,
+                            // Removing "anotherNestedObject3" property in this merge.
+                            // This property was only introduced in a previous merge, so we don't need to care
+                            // about an old value because there isn't one.
+                            anotherNestedObject3: null,
                         },
                     },
                 });
@@ -2007,6 +2029,9 @@ describe('Onyx', () => {
                             // This change should completely replace "anotherNestedObject2" old value.
                             anotherNestedObject2: {
                                 newNestedKey2: 'newNestedValue2',
+                            },
+                            anotherNestedObject3: {
+                                newNestedKey3: 'newNestedValue3',
                             },
                         },
                     },
@@ -2031,6 +2056,9 @@ describe('Onyx', () => {
                                 },
                                 anotherNestedObject2: {
                                     newNestedKey2: 'newNestedValue2',
+                                },
+                                anotherNestedObject3: {
+                                    newNestedKey3: 'newNestedValue3',
                                 },
                             },
                         },
