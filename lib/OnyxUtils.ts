@@ -88,7 +88,7 @@ let snapshotKey: OnyxKey | null = null;
 let lastSubscriptionID = 0;
 
 // Connections can be made before `Onyx.init`. They would wait for this task before resolving
-const deferredInitTask = createDeferredTask();
+let deferredInitTask = createDeferredTask();
 
 // Holds a set of collection member IDs which updates will be ignored when using Onyx methods.
 let skippableCollectionMemberIDs = new Set<string>();
@@ -123,6 +123,13 @@ function getDefaultKeyStates(): Record<OnyxKey, OnyxValue<OnyxKey>> {
  */
 function getDeferredInitTask(): DeferredTask {
     return deferredInitTask;
+}
+
+/**
+ * Setter - resets the deferred init task.
+ */
+function resetDeferredInitTask(): void {
+    deferredInitTask = createDeferredTask();
 }
 
 /**
@@ -1503,6 +1510,7 @@ const OnyxUtils = {
     getMergeQueuePromise,
     getDefaultKeyStates,
     getDeferredInitTask,
+    resetDeferredInitTask,
     initStoreValues,
     sendActionToDevTools,
     maybeFlushBatchUpdates,

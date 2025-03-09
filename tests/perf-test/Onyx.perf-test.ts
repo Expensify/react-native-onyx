@@ -1,9 +1,10 @@
-import {measureFunction} from 'reassure';
+import {measureAsyncFunction} from 'reassure';
 import type {OnyxUpdate} from '../../lib';
 import Onyx from '../../lib';
 import {createCollection} from '../utils/collections/createCollection';
 import createRandomReportAction from '../utils/collections/reportActions';
 import type GenericCollection from '../utils/GenericCollection';
+import OnyxUtils from '../../lib/OnyxUtils';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -37,7 +38,7 @@ describe('Onyx', () => {
     beforeAll(async () => {
         Onyx.init({
             keys: ONYXKEYS,
-            maxCachedKeysCount: 20000,
+            maxCachedKeysCount: 100000,
             safeEvictionKeys: [ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY],
             skippableCollectionMemberIDs: ['skippable-id'],
         });
@@ -49,7 +50,7 @@ describe('Onyx', () => {
 
     describe('set', () => {
         test('10k calls with heavy objects', async () => {
-            await measureFunction(() =>
+            await measureAsyncFunction(() =>
                 Promise.all(
                     Object.values(mockedReportActionsMap).map((reportAction) => {
                         return Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}${reportAction.reportActionID}`, reportAction);
@@ -61,7 +62,7 @@ describe('Onyx', () => {
 
     describe('multiSet', () => {
         test('one call with 10k heavy objects', async () => {
-            await measureFunction(() => Onyx.multiSet(mockedReportActionsMap));
+            await measureAsyncFunction(() => Onyx.multiSet(mockedReportActionsMap));
         });
     });
 
@@ -72,7 +73,7 @@ describe('Onyx', () => {
 
         test('10k calls with heavy objects', async () => {
             const changedReportActions = Object.fromEntries(Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const));
-            await measureFunction(() =>
+            await measureAsyncFunction(() =>
                 Promise.all(
                     Object.values(changedReportActions).map((changedReportAction) => {
                         return Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}${changedReportAction.reportActionID}`, changedReportAction);
@@ -91,7 +92,7 @@ describe('Onyx', () => {
             const changedReportActions = Object.fromEntries(
                 Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const),
             ) as GenericCollection;
-            await measureFunction(() => Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, changedReportActions));
+            await measureAsyncFunction(() => Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, changedReportActions));
         });
     });
 
@@ -104,7 +105,7 @@ describe('Onyx', () => {
             const changedReportActions = Object.fromEntries(
                 Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const),
             ) as GenericCollection;
-            await measureFunction(() => Onyx.setCollection(ONYXKEYS.COLLECTION.TEST_KEY, changedReportActions));
+            await measureAsyncFunction(() => Onyx.setCollection(ONYXKEYS.COLLECTION.TEST_KEY, changedReportActions));
         });
     });
 
@@ -126,7 +127,7 @@ describe('Onyx', () => {
 
             const updates = alternateLists(sets, merges) as OnyxUpdate[];
 
-            await measureFunction(() => Onyx.update(updates));
+            await measureAsyncFunction(() => Onyx.update(updates));
         });
     });
 
@@ -142,21 +143,23 @@ describe('Onyx', () => {
         });
 
         test('one call with 50k records to clean', async () => {
-            await measureFunction(() => Onyx.clear());
+            await measureAsyncFunction(() => Onyx.clear());
         });
     });
 
     describe('init', () => {
         test('one call with 10k records to init', async () => {
-            await measureFunction(() =>
+            await measureAsyncFunction(() => {
                 Onyx.init({
                     keys: ONYXKEYS,
                     initialKeyStates: mockedReportActionsMap,
-                    maxCachedKeysCount: 20000,
+                    maxCachedKeysCount: 100000,
                     safeEvictionKeys: [ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY],
                     skippableCollectionMemberIDs: ['skippable-id'],
-                }),
-            );
+                });
+
+                return OnyxUtils.getDeferredInitTask().promise;
+            });
         });
     });
 });

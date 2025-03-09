@@ -45,6 +45,8 @@ function init({
     enablePerformanceMetrics = false,
     skippableCollectionMemberIDs = [],
 }: InitOptions): void {
+    OnyxUtils.resetDeferredInitTask();
+
     if (enablePerformanceMetrics) {
         GlobalSettings.setPerformanceMetricsEnabled(true);
         applyDecorators();
