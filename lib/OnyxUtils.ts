@@ -695,7 +695,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
             // send the whole cached collection.
             if (isSubscribedToCollectionKey) {
                 if (subscriber.waitForCollectionCallback) {
-                    subscriber.callback(cachedCollection, subscriber.key);
+                    subscriber.callback(cachedCollection, subscriber.key, partialCollection);
                     continue;
                 }
 
@@ -709,7 +709,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
                         continue;
                     }
 
-                    subscriber.callback(cachedCollection[dataKey], dataKey);
+                    subscriber.callback(cachedCollection[dataKey], dataKey, partialCollection);
                 }
                 continue;
             }
@@ -722,7 +722,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
                 }
 
                 const subscriberCallback = subscriber.callback as DefaultConnectCallback<TKey>;
-                subscriberCallback(cachedCollection[subscriber.key], subscriber.key as TKey);
+                subscriberCallback(cachedCollection[subscriber.key], subscriber.key as TKey, partialCollection);
                 continue;
             }
 
@@ -905,12 +905,12 @@ function keyChanged<TKey extends OnyxKey>(
                 }
 
                 cachedCollection[key] = value;
-                subscriber.callback(cachedCollection, subscriber.key);
+                subscriber.callback(cachedCollection, subscriber.key, value);
                 continue;
             }
 
             const subscriberCallback = subscriber.callback as DefaultConnectCallback<TKey>;
-            subscriberCallback(value, key);
+            subscriberCallback(value, key, value);
 
             lastConnectionCallbackData.set(subscriber.subscriptionID, value);
             continue;

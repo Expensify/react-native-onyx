@@ -42,6 +42,11 @@ type ConnectionMetadata = {
      * The last callback key returned by `OnyxUtils.subscribeToKey()`'s callback.
      */
     cachedCallbackKey?: OnyxKey;
+
+    /**
+     * The value that triggered the last update
+     */
+    sourceValue?: OnyxValue<OnyxKey>;
 };
 
 /**
@@ -135,7 +140,7 @@ class OnyxConnectionManager {
         const connection = this.connectionsMap.get(connectionID);
 
         connection?.callbacks.forEach((callback) => {
-            callback(connection.cachedCallbackValue, connection.cachedCallbackKey as OnyxKey);
+            callback(connection.cachedCallbackValue, connection.cachedCallbackKey as OnyxKey, connection.sourceValue);
         });
     }
 
@@ -159,7 +164,7 @@ class OnyxConnectionManager {
             // If the subscriber is a `withOnyx` HOC we don't define `callback` as the HOC will use
             // its own logic to handle the data.
             if (!utils.hasWithOnyxInstance(connectOptions)) {
-                callback = (value, key) => {
+                callback = (value, key, sourceValue) => {
                     const createdConnection = this.connectionsMap.get(connectionID);
                     if (createdConnection) {
                         // We signal that the first connection was made and now any new subscribers
@@ -167,7 +172,7 @@ class OnyxConnectionManager {
                         createdConnection.isConnectionMade = true;
                         createdConnection.cachedCallbackValue = value;
                         createdConnection.cachedCallbackKey = key;
-
+                        createdConnection.sourceValue = sourceValue;
                         this.fireCallbacks(connectionID);
                     }
                 };
