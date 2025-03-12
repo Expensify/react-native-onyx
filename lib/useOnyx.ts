@@ -137,6 +137,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     // Stores the newest cached value in order to compare with the previous one and optimize `getSnapshot()` execution.
     const newValueRef = useRef<TReturnValue | undefined | null>(null);
 
+    const cachedValueRef = useRef<TReturnValue | undefined | null>(null);
+
     // Stores the previously result returned by the hook, containing the data from cache and the fetch status.
     // We initialize it to `undefined` and `loading` fetch status to simulate the initial result when the hook is loading from the cache.
     // However, if `initWithStoredValues` is `false` we set the fetch status to `loaded` since we want to signal that data is ready.
@@ -232,11 +234,16 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             // If `newValueRef.current` is `null` or any other value it means that the cache does have a value for that key.
             // This difference between `undefined` and other values is crucial and it's used to address the following
             // conditions and use cases.
+
+            cachedValueRef.current = getCachedValue(key);
+
             newValueRef.current = getCachedValue(key, selectorRef.current);
 
             // We set this flag to `false` again since we don't want to get the newest cached value every time `getSnapshot()` is executed,
             // and only when `Onyx.connect()` callback is fired.
             shouldGetCachedValueRef.current = false;
+        } else if (selectorRef.current) {
+            resultRef.current[0] = selectorRef.current(cachedValueRef.current as OnyxValue<TKey>) ?? undefined;
         }
 
         const hasCacheForKey = OnyxCache.hasCacheForKey(key);
