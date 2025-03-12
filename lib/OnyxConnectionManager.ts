@@ -197,6 +197,7 @@ class OnyxConnectionManager {
                 onyxKey: connectOptions.key,
                 isConnectionMade: false,
                 callbacks: new Map(),
+                waitForCollectionCallback: connectOptions.waitForCollectionCallback,
             };
 
             this.connectionsMap.set(connectionID, connectionMetadata);
