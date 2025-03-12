@@ -905,7 +905,7 @@ function keyChanged<TKey extends OnyxKey>(
                 }
 
                 cachedCollection[key] = value;
-                subscriber.callback(cachedCollection, subscriber.key, value);
+                subscriber.callback(cachedCollection, subscriber.key, {[key]: value});
                 continue;
             }
 
