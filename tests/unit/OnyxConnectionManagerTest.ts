@@ -164,7 +164,7 @@ describe('OnyxConnectionManager', () => {
             expect(callback1).toHaveBeenNthCalledWith(2, obj2, `${ONYXKEYS.COLLECTION.TEST_KEY}entry2`);
 
             expect(callback2).toHaveBeenCalledTimes(1);
-            expect(callback2).toHaveBeenCalledWith(collection, undefined);
+            expect(callback2).toHaveBeenCalledWith(collection, undefined, undefined);
 
             connectionManager.disconnect(connection1);
             connectionManager.disconnect(connection2);
