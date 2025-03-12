@@ -3,10 +3,10 @@ import * as Logger from './Logger';
 import type {ConnectOptions} from './Onyx';
 import OnyxUtils from './OnyxUtils';
 import * as Str from './Str';
-import type {DefaultConnectCallback, DefaultConnectOptions, OnyxKey, OnyxValue} from './types';
+import type {CollectionConnectCallback, DefaultConnectCallback, DefaultConnectOptions, OnyxKey, OnyxValue} from './types';
 import utils from './utils';
 
-type ConnectCallback = DefaultConnectCallback<OnyxKey>;
+type ConnectCallback = DefaultConnectCallback<OnyxKey> | CollectionConnectCallback<OnyxKey>;
 
 /**
  * Represents the connection's metadata that contains the necessary properties
@@ -47,6 +47,11 @@ type ConnectionMetadata = {
      * The value that triggered the last update
      */
     sourceValue?: OnyxValue<OnyxKey>;
+
+    /**
+     * Whether the subscriber is waiting for the collection callback to be fired.
+     */
+    waitForCollectionCallback?: boolean;
 };
 
 /**
@@ -140,7 +145,11 @@ class OnyxConnectionManager {
         const connection = this.connectionsMap.get(connectionID);
 
         connection?.callbacks.forEach((callback) => {
-            callback(connection.cachedCallbackValue, connection.cachedCallbackKey as OnyxKey, connection.sourceValue);
+            if (connection.waitForCollectionCallback) {
+                (callback as CollectionConnectCallback<OnyxKey>)(connection.cachedCallbackValue as Record<string, unknown>, connection.cachedCallbackKey as OnyxKey, connection.sourceValue);
+            } else {
+                (callback as DefaultConnectCallback<OnyxKey>)(connection.cachedCallbackValue, connection.cachedCallbackKey as OnyxKey);
+            }
         });
     }
 
@@ -179,8 +188,8 @@ class OnyxConnectionManager {
             }
 
             subscriptionID = OnyxUtils.subscribeToKey({
-                ...(connectOptions as DefaultConnectOptions<OnyxKey>),
-                callback,
+                ...connectOptions,
+                callback: callback as DefaultConnectCallback<TKey>,
             });
 
             connectionMetadata = {

@@ -275,7 +275,7 @@ type BaseConnectOptions = {
 };
 
 /** Represents the callback function used in `Onyx.connect()` method with a regular key. */
-type DefaultConnectCallback<TKey extends OnyxKey> = (value: OnyxEntry<KeyValueMapping[TKey]>, key: TKey, sourceValue?: OnyxEntry<KeyValueMapping[TKey]>) => void;
+type DefaultConnectCallback<TKey extends OnyxKey> = (value: OnyxEntry<KeyValueMapping[TKey]>, key: TKey) => void;
 
 /** Represents the callback function used in `Onyx.connect()` method with a collection key. */
 type CollectionConnectCallback<TKey extends OnyxKey> = (value: NonUndefined<OnyxCollection<KeyValueMapping[TKey]>>, key: TKey, sourceValue?: OnyxEntry<KeyValueMapping[TKey]>) => void;
