@@ -709,7 +709,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
                         continue;
                     }
 
-                    subscriber.callback(cachedCollection[dataKey], dataKey, partialCollection);
+                    subscriber.callback(cachedCollection[dataKey], dataKey);
                 }
                 continue;
             }
@@ -722,7 +722,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
                 }
 
                 const subscriberCallback = subscriber.callback as DefaultConnectCallback<TKey>;
-                subscriberCallback(cachedCollection[subscriber.key], subscriber.key as TKey, partialCollection);
+                subscriberCallback(cachedCollection[subscriber.key], subscriber.key as TKey);
                 continue;
             }
 
@@ -910,7 +910,7 @@ function keyChanged<TKey extends OnyxKey>(
             }
 
             const subscriberCallback = subscriber.callback as DefaultConnectCallback<TKey>;
-            subscriberCallback(value, key, value);
+            subscriberCallback(value, key);
 
             lastConnectionCallbackData.set(subscriber.subscriptionID, value);
             continue;
