@@ -1074,7 +1074,9 @@ describe('Onyx', () => {
 
                     // AND the value for the second call should be collectionUpdate
                     expect(mockCallback).toHaveBeenNthCalledWith(1, undefined, undefined, undefined);
-                    expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate, ONYX_KEYS.COLLECTION.TEST_POLICY, collectionUpdate.testPolicy_1);
+                    expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate, ONYX_KEYS.COLLECTION.TEST_POLICY, {
+                        [`${ONYX_KEYS.COLLECTION.TEST_POLICY}1`]: collectionUpdate.testPolicy_1,
+                    });
                 })
         );
     });
@@ -1109,7 +1111,7 @@ describe('Onyx', () => {
                     expect(mockCallback).toHaveBeenCalledTimes(2);
 
                     // And the value for the second call should be collectionUpdate
-                    expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate, ONYX_KEYS.COLLECTION.TEST_POLICY, collectionUpdate.testPolicy_1);
+                    expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate, ONYX_KEYS.COLLECTION.TEST_POLICY, {testPolicy_1: collectionUpdate.testPolicy_1});
                 })
 
                 // When merge is called again with the same collection not modified
@@ -1150,7 +1152,7 @@ describe('Onyx', () => {
                     expect(mockCallback).toHaveBeenCalledTimes(1);
 
                     // And the value for the second call should be collectionUpdate
-                    expect(mockCallback).toHaveBeenNthCalledWith(1, collectionUpdate, ONYX_KEYS.COLLECTION.TEST_POLICY, collectionUpdate.testPolicy_1);
+                    expect(mockCallback).toHaveBeenNthCalledWith(1, collectionUpdate, ONYX_KEYS.COLLECTION.TEST_POLICY, {testPolicy_1: collectionUpdate.testPolicy_1});
                 })
 
                 // When merge is called again with the same collection not modified
@@ -1188,7 +1190,7 @@ describe('Onyx', () => {
             ]).then(() => {
                 expect(collectionCallback).toHaveBeenCalledTimes(2);
                 expect(collectionCallback).toHaveBeenNthCalledWith(1, undefined, undefined, undefined);
-                expect(collectionCallback).toHaveBeenNthCalledWith(2, {[itemKey]: {a: 'a'}}, ONYX_KEYS.COLLECTION.TEST_UPDATE, {a: 'a'});
+                expect(collectionCallback).toHaveBeenNthCalledWith(2, {[itemKey]: {a: 'a'}}, ONYX_KEYS.COLLECTION.TEST_UPDATE, {[itemKey]: {a: 'a'}});
 
                 expect(testCallback).toHaveBeenCalledTimes(2);
                 expect(testCallback).toHaveBeenNthCalledWith(1, undefined, undefined);
@@ -1427,7 +1429,7 @@ describe('Onyx', () => {
             })
             .then(() => {
                 expect(collectionCallback).toHaveBeenCalledTimes(3);
-                expect(collectionCallback).toHaveBeenNthCalledWith(1, {[cat]: initialValue}, ONYX_KEYS.COLLECTION.ANIMALS, initialValue);
+                expect(collectionCallback).toHaveBeenNthCalledWith(1, {[cat]: initialValue}, ONYX_KEYS.COLLECTION.ANIMALS, {[cat]: initialValue});
                 expect(collectionCallback).toHaveBeenNthCalledWith(2, {[cat]: initialValue}, undefined, undefined);
                 expect(collectionCallback).toHaveBeenNthCalledWith(3, collectionDiff, ONYX_KEYS.COLLECTION.ANIMALS, {[cat]: initialValue, [dog]: {name: 'Rex'}});
 
@@ -1635,7 +1637,7 @@ describe('Onyx', () => {
                         [cat]: {age: 3, sound: 'meow'},
                     },
                     ONYX_KEYS.COLLECTION.ANIMALS,
-                    {age: 3, sound: 'meow'},
+                    {[cat]: {age: 3, sound: 'meow'}},
                 );
                 expect(animalsCollectionCallback).toHaveBeenNthCalledWith(
                     2,
