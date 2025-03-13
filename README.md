@@ -316,11 +316,11 @@ This will fire the callback once per member key depending on how many collection
 Onyx.connect({
     key: ONYXKEYS.COLLECTION.REPORT,
     waitForCollectionCallback: true,
-    callback: (allReports) => {...},
+    callback: (allReports, collectionKey, sourceValue) => {...},
 });
 ```
 
-This final option forces `Onyx.connect()` to behave more like `useOnyx()` and only update the callback once with the entire collection initially and later with an updated version of the collection when individual keys update.
+This final option forces `Onyx.connect()` to behave more like `useOnyx()` and only update the callback once with the entire collection initially and later with an updated version of the collection when individual keys update. The `sourceValue` parameter contains only the specific keys and values that triggered the current update, which can be useful for optimizing your code to only process what changed. This parameter is not available when `waitForCollectionCallback` is false or the key is not a collection key.
 
 ### Performance Considerations When Using Collections
 

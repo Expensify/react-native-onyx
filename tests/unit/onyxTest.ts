@@ -1753,6 +1753,7 @@ describe('Onyx', () => {
                     callback: (value) => (result = value),
                     waitForCollectionCallback: true,
                 });
+
                 // Set initial collection state
                 await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
                     [routeA]: {name: 'Route A'},
