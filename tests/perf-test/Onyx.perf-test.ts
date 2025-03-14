@@ -34,6 +34,10 @@ const getMockedReportActions = (collection = ONYXKEYS.COLLECTION.TEST_KEY, lengt
 
 const mockedReportActionsMap = getMockedReportActions();
 
+const clearOnyxAfterEachMeasure = async () => {
+    await Onyx.clear();
+};
+
 describe('Onyx', () => {
     beforeAll(async () => {
         Onyx.init({
@@ -50,70 +54,73 @@ describe('Onyx', () => {
 
     describe('set', () => {
         test('10k calls with heavy objects', async () => {
-            await measureAsyncFunction(() =>
-                Promise.all(
-                    Object.values(mockedReportActionsMap).map((reportAction) => {
-                        return Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}${reportAction.reportActionID}`, reportAction);
-                    }),
-                ),
+            await measureAsyncFunction(
+                () =>
+                    Promise.all(
+                        Object.values(mockedReportActionsMap).map((reportAction) => {
+                            return Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}${reportAction.reportActionID}`, reportAction);
+                        }),
+                    ),
+                {afterEach: clearOnyxAfterEachMeasure},
             );
         });
     });
 
     describe('multiSet', () => {
         test('one call with 10k heavy objects', async () => {
-            await measureAsyncFunction(() => Onyx.multiSet(mockedReportActionsMap));
+            await measureAsyncFunction(() => Onyx.multiSet(mockedReportActionsMap), {afterEach: clearOnyxAfterEachMeasure});
         });
     });
 
     describe('merge', () => {
-        beforeEach(async () => {
-            await Onyx.multiSet(mockedReportActionsMap);
-        });
-
         test('10k calls with heavy objects', async () => {
             const changedReportActions = Object.fromEntries(Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const));
-            await measureAsyncFunction(() =>
-                Promise.all(
-                    Object.values(changedReportActions).map((changedReportAction) => {
-                        return Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}${changedReportAction.reportActionID}`, changedReportAction);
-                    }),
-                ),
+            await measureAsyncFunction(
+                () =>
+                    Promise.all(
+                        Object.values(changedReportActions).map((changedReportAction) => {
+                            return Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}${changedReportAction.reportActionID}`, changedReportAction);
+                        }),
+                    ),
+                {
+                    beforeEach: async () => {
+                        await Onyx.multiSet(mockedReportActionsMap);
+                    },
+                    afterEach: clearOnyxAfterEachMeasure,
+                },
             );
         });
     });
 
     describe('mergeCollection', () => {
-        beforeEach(async () => {
-            await Onyx.multiSet(mockedReportActionsMap);
-        });
-
         test('one call with 10k heavy objects', async () => {
             const changedReportActions = Object.fromEntries(
                 Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const),
             ) as GenericCollection;
-            await measureAsyncFunction(() => Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, changedReportActions));
+            await measureAsyncFunction(() => Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, changedReportActions), {
+                beforeEach: async () => {
+                    await Onyx.multiSet(mockedReportActionsMap);
+                },
+                afterEach: clearOnyxAfterEachMeasure,
+            });
         });
     });
 
     describe('setCollection', () => {
-        beforeEach(async () => {
-            await Onyx.multiSet(mockedReportActionsMap);
-        });
-
         test('one call with 10k heavy objects', async () => {
             const changedReportActions = Object.fromEntries(
                 Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const),
             ) as GenericCollection;
-            await measureAsyncFunction(() => Onyx.setCollection(ONYXKEYS.COLLECTION.TEST_KEY, changedReportActions));
+            await measureAsyncFunction(() => Onyx.setCollection(ONYXKEYS.COLLECTION.TEST_KEY, changedReportActions), {
+                beforeEach: async () => {
+                    await Onyx.multiSet(mockedReportActionsMap);
+                },
+                afterEach: clearOnyxAfterEachMeasure,
+            });
         });
     });
 
     describe('update', () => {
-        beforeEach(async () => {
-            await Onyx.multiSet(mockedReportActionsMap);
-        });
-
         test('one call with 5k sets and 5k merges updates', async () => {
             const changedReportActions = Object.fromEntries(Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const));
 
@@ -127,39 +134,41 @@ describe('Onyx', () => {
 
             const updates = alternateLists(sets, merges) as OnyxUpdate[];
 
-            await measureAsyncFunction(() => Onyx.update(updates));
+            await measureAsyncFunction(() => Onyx.update(updates), {
+                beforeEach: async () => {
+                    await Onyx.multiSet(mockedReportActionsMap);
+                },
+                afterEach: clearOnyxAfterEachMeasure,
+            });
         });
     });
 
     describe('clear', () => {
-        beforeEach(async () => {
-            await Onyx.multiSet({
-                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY),
-                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_2),
-                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_3),
-                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_4),
-                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_5),
+        test('one call with 10k records to clean', async () => {
+            await measureAsyncFunction(() => Onyx.clear(), {
+                beforeEach: async () => {
+                    await Onyx.multiSet(mockedReportActionsMap);
+                },
             });
-        });
-
-        test('one call with 50k records to clean', async () => {
-            await measureAsyncFunction(() => Onyx.clear());
         });
     });
 
     describe('init', () => {
         test('one call with 10k records to init', async () => {
-            await measureAsyncFunction(() => {
-                Onyx.init({
-                    keys: ONYXKEYS,
-                    initialKeyStates: mockedReportActionsMap,
-                    maxCachedKeysCount: 100000,
-                    safeEvictionKeys: [ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY],
-                    skippableCollectionMemberIDs: ['skippable-id'],
-                });
+            await measureAsyncFunction(
+                () => {
+                    Onyx.init({
+                        keys: ONYXKEYS,
+                        initialKeyStates: mockedReportActionsMap,
+                        maxCachedKeysCount: 100000,
+                        safeEvictionKeys: [ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY],
+                        skippableCollectionMemberIDs: ['skippable-id'],
+                    });
 
-                return OnyxUtils.getDeferredInitTask().promise;
-            });
+                    return OnyxUtils.getDeferredInitTask().promise;
+                },
+                {afterEach: clearOnyxAfterEachMeasure},
+            );
         });
     });
 });
