@@ -5,6 +5,7 @@ import {createCollection} from '../utils/collections/createCollection';
 import createRandomReportAction from '../utils/collections/reportActions';
 import type GenericCollection from '../utils/GenericCollection';
 import OnyxUtils from '../../lib/OnyxUtils';
+import createDeferredTask from '../../lib/createDeferredTask';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -167,7 +168,12 @@ describe('Onyx', () => {
 
                     return OnyxUtils.getDeferredInitTask().promise;
                 },
-                {afterEach: clearOnyxAfterEachMeasure},
+                {
+                    beforeEach: async () => {
+                        Object.assign(OnyxUtils.getDeferredInitTask(), createDeferredTask());
+                    },
+                    afterEach: clearOnyxAfterEachMeasure,
+                },
             );
         });
     });

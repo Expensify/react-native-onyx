@@ -1,26 +1,57 @@
 import {measureAsyncFunction, measureFunction} from 'reassure';
 import {createCollection} from '../utils/collections/createCollection';
 import createRandomReportAction from '../utils/collections/reportActions';
+import type {OnyxKey, Selector} from '../../lib';
 import Onyx from '../../lib';
 import StorageMock from '../../lib/storage';
 import OnyxUtils from '../../lib/OnyxUtils';
+import type GenericCollection from '../utils/GenericCollection';
+import type {Mapping, OnyxUpdate} from '../../lib/Onyx';
+import type {WithOnyxInstance} from '../../lib/withOnyx/types';
+import createDeferredTask from '../../lib/createDeferredTask';
+import type {OnyxInputKeyValueMapping} from '../../lib/types';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
     TEST_KEY_2: 'test2',
     COLLECTION: {
         TEST_KEY: 'test_',
+        TEST_NESTED_KEY: 'test_nested_',
+        TEST_NESTED_NESTED_KEY: 'test_nested_nested_',
         TEST_KEY_2: 'test2_',
         TEST_KEY_3: 'test3_',
         TEST_KEY_4: 'test4_',
         TEST_KEY_5: 'test5_',
         EVICTABLE_TEST_KEY: 'evictable_test_',
+        SNAPSHOT: 'snapshot_',
     },
 };
 
 const safeEvictionKeys = [ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY];
 
-const getMockedReportActions = (collection = ONYXKEYS.COLLECTION.TEST_KEY, length = 10000) =>
+const initialKeyStates = {};
+
+const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
+
+const generateEmptyWithOnyxInstance = () => {
+    return new (class {
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        setStateProxy() {}
+
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        setWithOnyxState() {}
+    })() as unknown as WithOnyxInstance;
+};
+
+// @ts-expect-error bypass
+const generateTestSelector = (): Selector<string, unknown, unknown> => (value: Record<string, unknown>) => {
+    return {
+        reportActionID: value.reportActionID,
+        originalMessage: value.originalMessage,
+    };
+};
+
+const getMockedReportActions = (collection = collectionKey, length = 10000) =>
     createCollection<Record<string, unknown>>(
         (item) => `${collection}${item.reportActionID}`,
         (index) => createRandomReportAction(index),
@@ -29,10 +60,9 @@ const getMockedReportActions = (collection = ONYXKEYS.COLLECTION.TEST_KEY, lengt
 
 const mockedReportActionsMap = getMockedReportActions();
 
-async function clearOnyxAfterRun(fn: () => Promise<unknown>): Promise<void> {
-    await fn();
-    return Onyx.clear();
-}
+const clearOnyxAfterEachMeasure = async () => {
+    await Onyx.clear();
+};
 
 describe('OnyxUtils', () => {
     beforeAll(async () => {
@@ -40,6 +70,7 @@ describe('OnyxUtils', () => {
             keys: ONYXKEYS,
             maxCachedKeysCount: 100000,
             safeEvictionKeys,
+            initialKeyStates,
             skippableCollectionMemberIDs: ['skippable-id'],
         });
     });
@@ -72,17 +103,7 @@ describe('OnyxUtils', () => {
         });
     });
 
-    describe('resetDeferredInitTask', () => {
-        test('one call', async () => {
-            await measureFunction(() => OnyxUtils.resetDeferredInitTask());
-        });
-    });
-
     describe('initStoreValues', () => {
-        afterEach(() => {
-            OnyxUtils.initStoreValues(ONYXKEYS, {}, safeEvictionKeys);
-        });
-
         test('one call with 50k heavy objects', async () => {
             const data = {
                 ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY),
@@ -92,7 +113,11 @@ describe('OnyxUtils', () => {
                 ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_5),
             };
 
-            await measureFunction(() => OnyxUtils.initStoreValues(ONYXKEYS, data, safeEvictionKeys));
+            await measureFunction(() => OnyxUtils.initStoreValues(ONYXKEYS, data, safeEvictionKeys), {
+                afterEach: () => {
+                    OnyxUtils.initStoreValues(ONYXKEYS, initialKeyStates, safeEvictionKeys);
+                },
+            });
         });
     });
 
@@ -102,46 +127,32 @@ describe('OnyxUtils', () => {
         });
     });
 
-    test('maybeFlushBatchUpdates', async () => {
-        await measureFunction(() => undefined);
-    });
-
-    describe('batchUpdates', () => {
-        // beforeEach(async () => {
-        //     await Onyx.multiSet(mockedReportActionsMap);
-        // });
-        // test('one call with 5k sets and 5k merges updates', async () => {
-        //     const changedReportActions = Object.fromEntries(Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const));
-        //     const sets = Object.entries(changedReportActions)
-        //         .filter(([, v]) => Number(v.reportActionID) % 2 === 0)
-        //         .map(([k, v]): OnyxUpdate => ({key: k, onyxMethod: Onyx.METHOD.SET, value: v}));
-        //     const merges = Object.entries(changedReportActions)
-        //         .filter(([, v]) => Number(v.reportActionID) % 2 !== 0)
-        //         .map(([k, v]): OnyxUpdate => ({key: k, onyxMethod: Onyx.METHOD.MERGE, value: v}));
-        //     const updates = alternateLists(sets, merges) as OnyxUpdate[];
-        //     await measureFunction(() => Onyx.update(updates));
-        // });
+    describe('batchUpdates / maybeFlushBatchUpdates', () => {
+        test('one call with 1k updates', async () => {
+            const updates: Array<() => void> = Array.from({length: 1000}, () => jest.fn);
+            await measureAsyncFunction(() => Promise.all(updates.map((update) => OnyxUtils.batchUpdates(update))));
+        });
     });
 
     describe('get', () => {
         test('10k calls with heavy objects', async () => {
-            await StorageMock.multiSet(Object.entries(mockedReportActionsMap).map(([k, v]) => [k, v]));
-            await measureAsyncFunction(() => clearOnyxAfterRun(() => Promise.all(Object.keys(mockedReportActionsMap).map((key) => OnyxUtils.get(key)))));
+            await measureAsyncFunction(() => Promise.all(Object.keys(mockedReportActionsMap).map((key) => OnyxUtils.get(key))), {
+                beforeEach: async () => {
+                    await StorageMock.multiSet(Object.entries(mockedReportActionsMap).map(([k, v]) => [k, v]));
+                },
+                afterEach: clearOnyxAfterEachMeasure,
+            });
         });
     });
 
     describe('getAllKeys', () => {
         test('one call with 50k heavy objects', async () => {
-            const data = {
-                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY),
-                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_2),
-                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_3),
-                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_4),
-                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_5),
-            };
-
-            await StorageMock.multiSet(Object.entries(data).map(([k, v]) => [k, v]));
-            await measureAsyncFunction(() => clearOnyxAfterRun(OnyxUtils.getAllKeys));
+            await measureAsyncFunction(() => OnyxUtils.getAllKeys(), {
+                beforeEach: async () => {
+                    await StorageMock.multiSet(Object.entries(mockedReportActionsMap).map(([k, v]) => [k, v]));
+                },
+                afterEach: clearOnyxAfterEachMeasure,
+            });
         });
     });
 
@@ -158,7 +169,6 @@ describe('OnyxUtils', () => {
     });
 
     describe('isCollectionMemberKey', () => {
-        const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
         const collectionKeyLength = ONYXKEYS.COLLECTION.TEST_KEY.length;
 
         test('one call with correct key', async () => {
@@ -171,8 +181,6 @@ describe('OnyxUtils', () => {
     });
 
     describe('splitCollectionMemberKey', () => {
-        const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
-
         test('one call without passing the collection key', async () => {
             await measureFunction(() => OnyxUtils.splitCollectionMemberKey(`${collectionKey}entry1`));
         });
@@ -183,8 +191,6 @@ describe('OnyxUtils', () => {
     });
 
     describe('isKeyMatch', () => {
-        const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
-
         test('one call passing normal key', async () => {
             await measureFunction(() => OnyxUtils.isKeyMatch(ONYXKEYS.TEST_KEY, ONYXKEYS.TEST_KEY_2));
         });
@@ -195,237 +201,733 @@ describe('OnyxUtils', () => {
     });
 
     describe('isSafeEvictionKey', () => {
-        test('one call', async () => {
+        test('one call checking one key', async () => {
             await measureFunction(() => OnyxUtils.isSafeEvictionKey(`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`));
         });
     });
 
     describe('tryGetCachedValue', () => {
-        const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
         const key = `${collectionKey}0`;
         const reportAction = mockedReportActionsMap[`${collectionKey}0`];
         const collections = {
             ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_2),
-            ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_3),
             ...getMockedReportActions(collectionKey),
-            ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_4),
-            ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_5),
         };
 
         test('one call passing normal key without selector', async () => {
-            await Onyx.set(key, reportAction);
-            await measureFunction(() => OnyxUtils.tryGetCachedValue(key));
+            await measureFunction(() => OnyxUtils.tryGetCachedValue(key), {
+                beforeEach: async () => {
+                    await Onyx.set(key, reportAction);
+                },
+                afterEach: clearOnyxAfterEachMeasure,
+            });
         });
 
         test('one call passing normal key with selector', async () => {
-            await Onyx.set(key, reportAction);
-            await measureFunction(() =>
-                OnyxUtils.tryGetCachedValue(key, {
-                    // @ts-expect-error bypass
-                    selector: (value: Record<string, unknown>) => {
-                        return {
-                            reportActionID: value.reportActionID,
-                            originalMessage: value.originalMessage,
-                        };
+            await measureFunction(
+                () =>
+                    OnyxUtils.tryGetCachedValue(key, {
+                        selector: generateTestSelector(),
+                    }),
+                {
+                    beforeEach: async () => {
+                        await Onyx.set(key, reportAction);
                     },
-                }),
+                    afterEach: clearOnyxAfterEachMeasure,
+                },
             );
         });
 
         test('one call passing collection key without selector', async () => {
-            await Onyx.multiSet(collections);
-            await measureFunction(() => OnyxUtils.tryGetCachedValue(collectionKey));
+            await measureFunction(() => OnyxUtils.tryGetCachedValue(collectionKey), {
+                beforeEach: async () => {
+                    await Onyx.multiSet(collections);
+                },
+                afterEach: clearOnyxAfterEachMeasure,
+            });
         });
 
         test('one call passing collection key with selector', async () => {
-            await Onyx.multiSet(collections);
-            await measureFunction(() =>
-                OnyxUtils.tryGetCachedValue(collectionKey, {
-                    // @ts-expect-error bypass
-                    selector: (value: Record<string, unknown>) => {
-                        return {
-                            reportActionID: value.reportActionID,
-                            originalMessage: value.originalMessage,
-                        };
+            await measureFunction(
+                () =>
+                    OnyxUtils.tryGetCachedValue(collectionKey, {
+                        selector: generateTestSelector(),
+                    }),
+                {
+                    beforeEach: async () => {
+                        await Onyx.multiSet(collections);
                     },
-                }),
+                    afterEach: clearOnyxAfterEachMeasure,
+                },
             );
         });
     });
 
     describe('removeLastAccessedKey', () => {
-        afterEach(() => {
-            Object.keys(mockedReportActionsMap).forEach((key) => OnyxUtils.removeLastAccessedKey(key));
-        });
-
-        test('one call', async () => {
-            Object.keys(mockedReportActionsMap).forEach((key) => OnyxUtils.addLastAccessedKey(key));
-            await measureFunction(() => OnyxUtils.removeLastAccessedKey(`${ONYXKEYS.COLLECTION.TEST_KEY}5000`));
+        test('one call removing one key', async () => {
+            await measureFunction(() => OnyxUtils.removeLastAccessedKey(`${ONYXKEYS.COLLECTION.TEST_KEY}5000`), {
+                beforeEach: async () => {
+                    Object.keys(mockedReportActionsMap).forEach((key) => OnyxUtils.addLastAccessedKey(key));
+                },
+                afterEach: async () => {
+                    Object.keys(mockedReportActionsMap).forEach((key) => OnyxUtils.removeLastAccessedKey(key));
+                },
+            });
         });
     });
 
     describe('addLastAccessedKey', () => {
-        afterEach(() => {
-            Object.keys(mockedReportActionsMap).forEach((key) => OnyxUtils.removeLastAccessedKey(key));
-        });
-
-        test('one call', async () => {
-            Object.keys(mockedReportActionsMap).forEach((key) => OnyxUtils.addLastAccessedKey(key));
-            await measureFunction(() => OnyxUtils.addLastAccessedKey(`${ONYXKEYS.COLLECTION.TEST_KEY}5000`));
+        test('one call adding one key', async () => {
+            await measureFunction(() => OnyxUtils.addLastAccessedKey(`${ONYXKEYS.COLLECTION.TEST_KEY}5000`), {
+                beforeEach: async () => {
+                    Object.keys(mockedReportActionsMap).forEach((key) => OnyxUtils.addLastAccessedKey(key));
+                },
+                afterEach: async () => {
+                    Object.keys(mockedReportActionsMap).forEach((key) => OnyxUtils.removeLastAccessedKey(key));
+                },
+            });
         });
     });
 
     describe('addAllSafeEvictionKeysToRecentlyAccessedList', () => {
         const data = {
-            ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY),
-            ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_2),
-            ...getMockedReportActions(ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY),
-            ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_4),
-            ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_5),
+            ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY, 1000),
+            ...getMockedReportActions(ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY, 1000),
         };
 
-        test('one call', async () => {
-            await Onyx.multiSet(data);
-            await measureAsyncFunction(() => clearOnyxAfterRun(OnyxUtils.addAllSafeEvictionKeysToRecentlyAccessedList));
+        test('one call adding 1k keys', async () => {
+            await measureAsyncFunction(() => OnyxUtils.addAllSafeEvictionKeysToRecentlyAccessedList(), {
+                beforeEach: async () => {
+                    await Onyx.multiSet(data);
+                },
+                afterEach: clearOnyxAfterEachMeasure,
+            });
         });
     });
 
     describe('getCachedCollection', () => {
-        test('one call', async () => {
+        test('one call retrieving a collection with 5k heavy objects', async () => {
             const data = {
-                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_2),
-                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_3),
-                ...mockedReportActionsMap,
-                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_4),
-                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_5),
+                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY, 5000),
+                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_2, 5000),
             };
 
-            await Onyx.multiSet(data);
-            await measureFunction(() => OnyxUtils.getCachedCollection(ONYXKEYS.COLLECTION.TEST_KEY));
+            await measureFunction(() => OnyxUtils.getCachedCollection(ONYXKEYS.COLLECTION.TEST_KEY), {
+                beforeEach: async () => {
+                    await Onyx.multiSet(data);
+                },
+                afterEach: clearOnyxAfterEachMeasure,
+            });
         });
     });
 
-    test('keysChanged', async () => {
-        await measureFunction(() => undefined);
+    describe('keysChanged', () => {
+        test('one call with 10k heavy objects to update 10k subscribers', async () => {
+            const subscriptionMap = new Map<string, number>();
+
+            const changedReportActions = Object.fromEntries(
+                Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const),
+            ) as GenericCollection;
+
+            await measureFunction(() => OnyxUtils.keysChanged(collectionKey, changedReportActions, mockedReportActionsMap), {
+                beforeEach: async () => {
+                    await Onyx.multiSet(mockedReportActionsMap);
+                    Object.keys(mockedReportActionsMap).forEach((key) => {
+                        const id = OnyxUtils.subscribeToKey({key, callback: jest.fn(), initWithStoredValues: false});
+                        subscriptionMap.set(key, id);
+                    });
+                },
+                afterEach: async () => {
+                    await clearOnyxAfterEachMeasure();
+                    Object.keys(mockedReportActionsMap).forEach((key) => {
+                        const id = subscriptionMap.get(key);
+                        if (id) {
+                            OnyxUtils.unsubscribeFromKey(id);
+                        }
+                    });
+                    subscriptionMap.clear();
+                },
+            });
+        });
     });
 
-    test('keyChanged', async () => {
-        await measureFunction(() => undefined);
+    describe('keyChanged', () => {
+        test('one call with one heavy object to update 10k subscribers', async () => {
+            const subscriptionIDs = new Set<number>();
+
+            const key = `${collectionKey}0`;
+            const previousReportAction = mockedReportActionsMap[`${collectionKey}0`];
+            const changedReportAction = createRandomReportAction(Number(previousReportAction.reportActionID));
+
+            await measureFunction(() => OnyxUtils.keyChanged(key, changedReportAction, previousReportAction), {
+                beforeEach: async () => {
+                    await Onyx.set(key, previousReportAction);
+                    for (let i = 0; i < 10000; i++) {
+                        const id = OnyxUtils.subscribeToKey({key, callback: jest.fn(), initWithStoredValues: false});
+                        subscriptionIDs.add(id);
+                    }
+                },
+                afterEach: async () => {
+                    await clearOnyxAfterEachMeasure();
+                    subscriptionIDs.forEach((id) => {
+                        OnyxUtils.unsubscribeFromKey(id);
+                    });
+                    subscriptionIDs.clear();
+                },
+            });
+        });
     });
 
-    test('sendDataToConnection', async () => {
-        await measureFunction(() => undefined);
+    describe('sendDataToConnection', () => {
+        test('one call with 10k heavy objects passing to a regular subscriber', async () => {
+            let subscriptionID = -1;
+
+            await measureFunction(
+                () =>
+                    OnyxUtils.sendDataToConnection(
+                        // @ts-expect-error we just need to pass these properties
+                        {
+                            key: collectionKey,
+                            subscriptionID,
+                            callback: jest.fn(),
+                        } as Mapping<OnyxKey>,
+                        mockedReportActionsMap,
+                        undefined,
+                        false,
+                    ),
+                {
+                    beforeEach: async () => {
+                        await Onyx.multiSet(mockedReportActionsMap);
+                        subscriptionID = OnyxUtils.subscribeToKey({key: collectionKey, callback: jest.fn(), initWithStoredValues: false});
+                    },
+                    afterEach: async () => {
+                        await clearOnyxAfterEachMeasure();
+                        if (subscriptionID) {
+                            OnyxUtils.unsubscribeFromKey(subscriptionID);
+                        }
+                    },
+                },
+            );
+        });
+
+        test('one call with 10k heavy objects passing to a withOnyx subscriber with selector', async () => {
+            let subscriptionID = -1;
+
+            await measureFunction(
+                () =>
+                    OnyxUtils.sendDataToConnection(
+                        // @ts-expect-error we just need to pass these properties
+                        {
+                            key: collectionKey,
+                            subscriptionID,
+                            callback: jest.fn(),
+                            withOnyxInstance: generateEmptyWithOnyxInstance(),
+                            selector: generateTestSelector(),
+                        } as Mapping<OnyxKey>,
+                        mockedReportActionsMap,
+                        undefined,
+                        false,
+                    ),
+                {
+                    beforeEach: async () => {
+                        await Onyx.multiSet(mockedReportActionsMap);
+                        subscriptionID = OnyxUtils.subscribeToKey({key: collectionKey, callback: jest.fn(), initWithStoredValues: false});
+                    },
+                    afterEach: async () => {
+                        await clearOnyxAfterEachMeasure();
+                        if (subscriptionID) {
+                            OnyxUtils.unsubscribeFromKey(subscriptionID);
+                        }
+                    },
+                },
+            );
+        });
     });
 
-    test('getCollectionKey', async () => {
-        await measureFunction(() => undefined);
+    describe('getCollectionKey', () => {
+        test('one call', async () => {
+            await measureFunction(() => OnyxUtils.getCollectionKey(`${ONYXKEYS.COLLECTION.TEST_NESTED_NESTED_KEY}entry1`));
+        });
     });
 
-    test('getCollectionDataAndSendAsObject', async () => {
-        await measureFunction(() => undefined);
+    describe('getCollectionDataAndSendAsObject', () => {
+        test('one call with 10k heavy objects', async () => {
+            let subscriptionID = -1;
+
+            await measureAsyncFunction(
+                async () => {
+                    const callback = createDeferredTask();
+
+                    subscriptionID = OnyxUtils.subscribeToKey({
+                        key: collectionKey,
+                        callback: jest.fn(),
+                        initWithStoredValues: false,
+                    });
+
+                    OnyxUtils.getCollectionDataAndSendAsObject(
+                        Object.keys(mockedReportActionsMap),
+                        // @ts-expect-error we just need to pass these properties
+                        {
+                            key: collectionKey,
+                            subscriptionID,
+                            callback: () => {
+                                callback.resolve?.();
+                            },
+                        } as Mapping<OnyxKey>,
+                    );
+
+                    return callback.promise;
+                },
+                {
+                    beforeEach: async () => {
+                        await Onyx.multiSet(mockedReportActionsMap);
+                    },
+                    afterEach: async () => {
+                        await clearOnyxAfterEachMeasure();
+                        if (subscriptionID) {
+                            OnyxUtils.unsubscribeFromKey(subscriptionID);
+                        }
+                    },
+                },
+            );
+        });
     });
 
-    test('scheduleSubscriberUpdate', async () => {
-        await measureFunction(() => undefined);
+    describe('scheduleSubscriberUpdate', () => {
+        test('10k calls scheduling updates', async () => {
+            const subscriptionMap = new Map<string, number>();
+
+            const changedReportActions = Object.fromEntries(
+                Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const),
+            ) as GenericCollection;
+
+            await measureAsyncFunction(
+                () => Promise.all(Object.entries(changedReportActions).map(([key, value]) => OnyxUtils.scheduleSubscriberUpdate(key, value, mockedReportActionsMap[key]))),
+                {
+                    beforeEach: async () => {
+                        await Onyx.multiSet(mockedReportActionsMap);
+                        Object.keys(mockedReportActionsMap).forEach((key) => {
+                            const id = OnyxUtils.subscribeToKey({key, callback: jest.fn(), initWithStoredValues: false});
+                            subscriptionMap.set(key, id);
+                        });
+                    },
+                    afterEach: async () => {
+                        await clearOnyxAfterEachMeasure();
+                        Object.keys(mockedReportActionsMap).forEach((key) => {
+                            const id = subscriptionMap.get(key);
+                            if (id) {
+                                OnyxUtils.unsubscribeFromKey(id);
+                            }
+                        });
+                        subscriptionMap.clear();
+                    },
+                },
+            );
+        });
     });
 
-    test('scheduleNotifyCollectionSubscribers', async () => {
-        await measureFunction(() => undefined);
+    describe('scheduleNotifyCollectionSubscribers', () => {
+        test('one call with 10k heavy objects to update 10k subscribers', async () => {
+            const subscriptionMap = new Map<string, number>();
+
+            const changedReportActions = Object.fromEntries(
+                Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const),
+            ) as GenericCollection;
+
+            await measureAsyncFunction(() => OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, changedReportActions, mockedReportActionsMap), {
+                beforeEach: async () => {
+                    await Onyx.multiSet(mockedReportActionsMap);
+                    Object.keys(mockedReportActionsMap).forEach((key) => {
+                        const id = OnyxUtils.subscribeToKey({key, callback: jest.fn(), initWithStoredValues: false});
+                        subscriptionMap.set(key, id);
+                    });
+                },
+                afterEach: async () => {
+                    await clearOnyxAfterEachMeasure();
+                    Object.keys(mockedReportActionsMap).forEach((key) => {
+                        const id = subscriptionMap.get(key);
+                        if (id) {
+                            OnyxUtils.unsubscribeFromKey(id);
+                        }
+                    });
+                    subscriptionMap.clear();
+                },
+            });
+        });
     });
 
-    test('remove', async () => {
-        await measureFunction(() => undefined);
+    describe('remove', () => {
+        test('10k calls', async () => {
+            await measureAsyncFunction(() => Promise.all(Object.keys(mockedReportActionsMap).map((key) => OnyxUtils.remove(key))), {
+                beforeEach: async () => {
+                    await Onyx.multiSet(mockedReportActionsMap);
+                },
+                afterEach: async () => {
+                    await clearOnyxAfterEachMeasure();
+                },
+            });
+        });
     });
 
-    test('reportStorageQuota', async () => {
-        await measureFunction(() => undefined);
+    describe('reportStorageQuota', () => {
+        test('one call', async () => {
+            await measureAsyncFunction(() => OnyxUtils.reportStorageQuota());
+        });
     });
 
-    test('evictStorageAndRetry', async () => {
-        await measureFunction(() => undefined);
+    describe('evictStorageAndRetry', () => {
+        test('one call', async () => {
+            const error = new Error();
+            const onyxMethod = jest.fn() as typeof Onyx.set;
+
+            await measureAsyncFunction(() => OnyxUtils.evictStorageAndRetry(error, onyxMethod, '', null), {
+                beforeEach: async () => {
+                    Object.keys(mockedReportActionsMap).forEach((key) => OnyxUtils.addLastAccessedKey(key));
+                    OnyxUtils.addLastAccessedKey(`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}1`);
+                },
+                afterEach: async () => {
+                    Object.keys(mockedReportActionsMap).forEach((key) => OnyxUtils.removeLastAccessedKey(key));
+                    OnyxUtils.removeLastAccessedKey(`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}1`);
+                },
+            });
+        });
     });
 
-    test('broadcastUpdate', async () => {
-        await measureFunction(() => undefined);
+    describe('broadcastUpdate', () => {
+        test('one call', async () => {
+            const key = `${collectionKey}0`;
+            const reportAction = mockedReportActionsMap[`${collectionKey}0`];
+            const changedReportAction = createRandomReportAction(Number(reportAction.reportActionID));
+
+            await measureAsyncFunction(() => OnyxUtils.broadcastUpdate(key, changedReportAction, true), {
+                beforeEach: async () => {
+                    await Onyx.set(key, reportAction);
+                },
+                afterEach: clearOnyxAfterEachMeasure,
+            });
+        });
     });
 
-    test('hasPendingMergeForKey', async () => {
-        await measureFunction(() => undefined);
+    describe('hasPendingMergeForKey', () => {
+        test('one call to look through 10k pending merges', async () => {
+            await measureFunction(() => OnyxUtils.hasPendingMergeForKey(`${collectionKey}5000`), {
+                beforeEach: async () => {
+                    Object.keys(mockedReportActionsMap).forEach((key) => {
+                        OnyxUtils.getMergeQueue()[key] = [{}];
+                    });
+                },
+                afterEach: async () => {
+                    Object.keys(mockedReportActionsMap).forEach((key) => {
+                        delete OnyxUtils.getMergeQueue()[key];
+                    });
+                },
+            });
+        });
     });
 
-    test('removeNullValues', async () => {
-        await measureFunction(() => undefined);
+    describe('removeNullValues', () => {
+        test('one call with one heavy object', async () => {
+            const key = `${collectionKey}0`;
+            const reportAction = mockedReportActionsMap[`${collectionKey}0`];
+
+            await measureFunction(() => OnyxUtils.removeNullValues(key, reportAction, true));
+        });
     });
 
-    test('prepareKeyValuePairsForStorage', async () => {
-        await measureFunction(() => undefined);
+    describe('prepareKeyValuePairsForStorage', () => {
+        test('one call with 10k heavy objects', async () => {
+            await measureFunction(() => OnyxUtils.prepareKeyValuePairsForStorage(mockedReportActionsMap, false));
+        });
     });
 
-    test('applyMerge', async () => {
-        await measureFunction(() => undefined);
+    describe('applyMerge', () => {
+        test('one call merging 5 changes', async () => {
+            const reportAction = mockedReportActionsMap[`${collectionKey}0`];
+            const changedReportAction1 = createRandomReportAction(Number(reportAction.reportActionID));
+            const changedReportAction2 = createRandomReportAction(Number(reportAction.reportActionID));
+            const changedReportAction3 = createRandomReportAction(Number(reportAction.reportActionID));
+            const changedReportAction4 = createRandomReportAction(Number(reportAction.reportActionID));
+            const changedReportAction5 = createRandomReportAction(Number(reportAction.reportActionID));
+
+            await measureFunction(() =>
+                OnyxUtils.applyMerge(reportAction, [changedReportAction1, changedReportAction2, changedReportAction3, changedReportAction4, changedReportAction5], false),
+            );
+        });
     });
 
-    test('initializeWithDefaultKeyStates', async () => {
-        await measureFunction(() => undefined);
+    describe('initializeWithDefaultKeyStates', () => {
+        test('one call initializing 10k heavy objects', async () => {
+            const changedReportActions = Object.fromEntries(
+                Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const),
+            ) as GenericCollection;
+
+            await measureAsyncFunction(() => OnyxUtils.initializeWithDefaultKeyStates(), {
+                beforeEach: async () => {
+                    await StorageMock.multiSet(Object.entries(changedReportActions).map(([k, v]) => [k, v]));
+                    OnyxUtils.initStoreValues(ONYXKEYS, mockedReportActionsMap, safeEvictionKeys);
+                },
+                afterEach: async () => {
+                    await clearOnyxAfterEachMeasure();
+                    OnyxUtils.initStoreValues(ONYXKEYS, initialKeyStates, safeEvictionKeys);
+                },
+            });
+        });
     });
 
-    test('getSnapshotKey', async () => {
-        await measureFunction(() => undefined);
+    describe('getSnapshotKey', () => {
+        test('one call', async () => {
+            await measureFunction(() => OnyxUtils.getSnapshotKey());
+        });
     });
 
-    test('multiGet', async () => {
-        await measureFunction(() => undefined);
+    describe('multiGet', () => {
+        test('one call getting 10k heavy objects from storage', async () => {
+            await measureAsyncFunction(() => OnyxUtils.multiGet(Object.keys(mockedReportActionsMap)), {
+                beforeEach: async () => {
+                    await StorageMock.multiSet(Object.entries(mockedReportActionsMap).map(([k, v]) => [k, v]));
+                },
+                afterEach: clearOnyxAfterEachMeasure,
+            });
+        });
+
+        test('one call getting 10k heavy objects from cache', async () => {
+            await measureAsyncFunction(() => OnyxUtils.multiGet(Object.keys(mockedReportActionsMap)), {
+                beforeEach: async () => {
+                    await Onyx.multiSet(mockedReportActionsMap);
+                },
+                afterEach: clearOnyxAfterEachMeasure,
+            });
+        });
     });
 
-    test('tupleGet', async () => {
-        await measureFunction(() => undefined);
+    describe('tupleGet', () => {
+        test('one call getting 10k heavy objects', async () => {
+            await measureFunction(() => OnyxUtils.tupleGet(Object.keys(mockedReportActionsMap)), {
+                beforeEach: async () => {
+                    await Onyx.multiSet(mockedReportActionsMap);
+                },
+                afterEach: clearOnyxAfterEachMeasure,
+            });
+        });
     });
 
-    test('isValidNonEmptyCollectionForMerge', async () => {
-        await measureFunction(() => undefined);
+    describe('isValidNonEmptyCollectionForMerge', () => {
+        test('one call', async () => {
+            await measureFunction(() => OnyxUtils.isValidNonEmptyCollectionForMerge(mockedReportActionsMap as GenericCollection));
+        });
     });
 
-    test('doAllCollectionItemsBelongToSameParent', async () => {
-        await measureFunction(() => undefined);
+    describe('doAllCollectionItemsBelongToSameParent', () => {
+        test('one call checking 10k heavy objects', async () => {
+            await measureFunction(() => OnyxUtils.doAllCollectionItemsBelongToSameParent(collectionKey, Object.keys(mockedReportActionsMap)));
+        });
     });
 
-    test('subscribeToKey', async () => {
-        await measureFunction(() => undefined);
+    describe('subscribeToKey', () => {
+        test('one call subscribing to a single key', async () => {
+            let subscriptionID = -1;
+
+            await measureAsyncFunction(
+                async () => {
+                    const callback = createDeferredTask();
+                    subscriptionID = OnyxUtils.subscribeToKey({
+                        key: `${collectionKey}0`,
+                        callback: () => {
+                            callback.resolve?.();
+                        },
+                    });
+                    return callback.promise;
+                },
+                {
+                    beforeEach: async () => {
+                        await StorageMock.multiSet(Object.entries(mockedReportActionsMap).map(([k, v]) => [k, v]));
+                    },
+                    afterEach: async () => {
+                        await clearOnyxAfterEachMeasure();
+                        OnyxUtils.unsubscribeFromKey(subscriptionID);
+                    },
+                },
+            );
+        });
+
+        test('one call subscribing to a whole collection of 10k heavy objects', async () => {
+            let subscriptionID = -1;
+
+            await measureAsyncFunction(
+                async () => {
+                    const callback = createDeferredTask();
+                    subscriptionID = OnyxUtils.subscribeToKey({
+                        key: collectionKey,
+                        callback: () => {
+                            callback.resolve?.();
+                        },
+                        waitForCollectionCallback: true,
+                    });
+                    return callback.promise;
+                },
+                {
+                    beforeEach: async () => {
+                        // await Onyx.set(key, reportAction);
+                        await StorageMock.multiSet(Object.entries(mockedReportActionsMap).map(([k, v]) => [k, v]));
+                    },
+                    afterEach: async () => {
+                        await clearOnyxAfterEachMeasure();
+                        OnyxUtils.unsubscribeFromKey(subscriptionID);
+                    },
+                },
+            );
+        });
     });
 
-    test('unsubscribeFromKey', async () => {
-        await measureFunction(() => undefined);
+    describe('unsubscribeFromKey', () => {
+        test('one call', async () => {
+            const key = `${collectionKey}0`;
+            let subscriptionID = -1;
+
+            await measureFunction(() => OnyxUtils.unsubscribeFromKey(subscriptionID), {
+                beforeEach: async () => {
+                    subscriptionID = OnyxUtils.subscribeToKey({
+                        key,
+                        initWithStoredValues: false,
+                    });
+                },
+                afterEach: clearOnyxAfterEachMeasure,
+            });
+        });
     });
 
-    test('getEvictionBlocklist', async () => {
-        await measureFunction(() => undefined);
+    describe('getEvictionBlocklist', () => {
+        test('one call', async () => {
+            await measureFunction(() => OnyxUtils.getEvictionBlocklist());
+        });
     });
 
-    test('getSkippableCollectionMemberIDs', async () => {
-        await measureFunction(() => undefined);
+    describe('getSkippableCollectionMemberIDs', () => {
+        test('one call', async () => {
+            const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
+            await measureFunction(() => OnyxUtils.getSkippableCollectionMemberIDs(), {
+                beforeEach: async () => {
+                    OnyxUtils.setSkippableCollectionMemberIDs(new Set([ONYXKEYS.COLLECTION.TEST_KEY, ONYXKEYS.COLLECTION.TEST_KEY_2]));
+                },
+                afterEach: async () => {
+                    OnyxUtils.setSkippableCollectionMemberIDs(skippableCollectionMemberIDs);
+                },
+            });
+        });
     });
 
-    test('setSkippableCollectionMemberIDs', async () => {
-        await measureFunction(() => undefined);
+    describe('setSkippableCollectionMemberIDs', () => {
+        test('one call', async () => {
+            const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
+            await measureFunction(() => OnyxUtils.setSkippableCollectionMemberIDs(new Set([ONYXKEYS.COLLECTION.TEST_KEY, ONYXKEYS.COLLECTION.TEST_KEY_2])), {
+                afterEach: async () => {
+                    OnyxUtils.setSkippableCollectionMemberIDs(skippableCollectionMemberIDs);
+                },
+            });
+        });
     });
 
-    test('storeKeyBySubscriptions', async () => {
-        await measureFunction(() => undefined);
+    describe('storeKeyBySubscriptions', () => {
+        test('one call', async () => {
+            const key = `${collectionKey}0`;
+            let subscriptionID = -1;
+
+            await measureFunction(() => OnyxUtils.storeKeyBySubscriptions(key, subscriptionID), {
+                beforeEach: async () => {
+                    subscriptionID = OnyxUtils.subscribeToKey({
+                        key,
+                        initWithStoredValues: false,
+                    });
+                },
+                afterEach: async () => {
+                    await clearOnyxAfterEachMeasure();
+                    OnyxUtils.deleteKeyBySubscriptions(subscriptionID);
+                    OnyxUtils.unsubscribeFromKey(subscriptionID);
+                },
+            });
+        });
     });
 
-    test('deleteKeyBySubscriptions', async () => {
-        await measureFunction(() => undefined);
+    describe('deleteKeyBySubscriptions', () => {
+        test('one call', async () => {
+            const key = `${collectionKey}0`;
+            let subscriptionID = -1;
+
+            await measureFunction(() => OnyxUtils.deleteKeyBySubscriptions(subscriptionID), {
+                beforeEach: async () => {
+                    subscriptionID = OnyxUtils.subscribeToKey({
+                        key,
+                        initWithStoredValues: false,
+                    });
+                    OnyxUtils.storeKeyBySubscriptions(key, subscriptionID);
+                },
+                afterEach: async () => {
+                    await clearOnyxAfterEachMeasure();
+                    OnyxUtils.unsubscribeFromKey(subscriptionID);
+                },
+            });
+        });
     });
 
-    test('addKeyToRecentlyAccessedIfNeeded', async () => {
-        await measureFunction(() => undefined);
+    describe('addKeyToRecentlyAccessedIfNeeded', () => {
+        test('one call', async () => {
+            const key = `${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}0`;
+
+            await measureFunction(
+                () =>
+                    // @ts-expect-error we just need to pass these properties
+                    OnyxUtils.addKeyToRecentlyAccessedIfNeeded({
+                        key,
+                        canEvict: true,
+                        withOnyxInstance: generateEmptyWithOnyxInstance(),
+                    }),
+                {
+                    afterEach: async () => {
+                        await clearOnyxAfterEachMeasure();
+                        OnyxUtils.removeLastAccessedKey(key);
+                    },
+                },
+            );
+        });
     });
 
-    test('reduceCollectionWithSelector', async () => {
-        await measureFunction(() => undefined);
+    describe('reduceCollectionWithSelector', () => {
+        test('one call with 10k heavy objects', async () => {
+            const selector = generateTestSelector();
+            await measureFunction(() => OnyxUtils.reduceCollectionWithSelector(mockedReportActionsMap, selector, undefined));
+        });
     });
 
-    test('updateSnapshots', async () => {
-        await measureFunction(() => undefined);
+    describe('updateSnapshots', () => {
+        test('one call with 100 updates', async () => {
+            const updates: OnyxUpdate[] = [];
+            for (let i = 0; i < 100; i++) {
+                updates.push({
+                    onyxMethod: OnyxUtils.METHOD.MERGE,
+                    key: `${collectionKey}${i}`,
+                    value: createRandomReportAction(i),
+                });
+            }
+
+            await measureAsyncFunction(() => OnyxUtils.updateSnapshots(updates, Onyx.merge), {
+                beforeEach: async () => {
+                    const searchData: Partial<OnyxInputKeyValueMapping> = {};
+                    const data: Partial<OnyxInputKeyValueMapping> = {
+                        ...mockedReportActionsMap,
+                        [`${ONYXKEYS.COLLECTION.SNAPSHOT}hash0`]: {
+                            data: searchData,
+                            search: {},
+                        },
+                    };
+
+                    for (let i = 0; i < 100; i++) {
+                        searchData[`${collectionKey}${i}`] = mockedReportActionsMap[`${collectionKey}${i}`];
+                    }
+
+                    await Onyx.multiSet(data);
+                },
+                afterEach: clearOnyxAfterEachMeasure,
+            });
+        });
     });
 });

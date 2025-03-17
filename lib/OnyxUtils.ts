@@ -88,7 +88,7 @@ let snapshotKey: OnyxKey | null = null;
 let lastSubscriptionID = 0;
 
 // Connections can be made before `Onyx.init`. They would wait for this task before resolving
-let deferredInitTask = createDeferredTask();
+const deferredInitTask = createDeferredTask();
 
 // Holds a set of collection member IDs which updates will be ignored when using Onyx methods.
 let skippableCollectionMemberIDs = new Set<string>();
@@ -123,13 +123,6 @@ function getDefaultKeyStates(): Record<OnyxKey, OnyxValue<OnyxKey>> {
  */
 function getDeferredInitTask(): DeferredTask {
     return deferredInitTask;
-}
-
-/**
- * Setter - resets the deferred init task.
- */
-function resetDeferredInitTask(): void {
-    deferredInitTask = createDeferredTask();
 }
 
 /**
@@ -659,8 +652,8 @@ function keysChanged<TKey extends CollectionKeyBase>(
     collectionKey: TKey,
     partialCollection: OnyxCollection<KeyValueMapping[TKey]>,
     partialPreviousCollection: OnyxCollection<KeyValueMapping[TKey]> | undefined,
-    notifyRegularSubscibers = true,
-    notifyWithOnyxSubscibers = true,
+    notifyConnectSubscribers = true,
+    notifyWithOnyxSubscribers = true,
 ): void {
     // We prepare the "cached collection" which is the entire collection + the new partial data that
     // was merged in via mergeCollection().
@@ -696,7 +689,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
 
         // Regular Onyx.connect() subscriber found.
         if (typeof subscriber.callback === 'function') {
-            if (!notifyRegularSubscibers) {
+            if (!notifyConnectSubscribers) {
                 continue;
             }
 
@@ -740,7 +733,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
 
         // React component subscriber found.
         if (utils.hasWithOnyxInstance(subscriber)) {
-            if (!notifyWithOnyxSubscibers) {
+            if (!notifyWithOnyxSubscribers) {
                 continue;
             }
 
@@ -1445,9 +1438,9 @@ function unsubscribeFromKey(subscriptionID: number): void {
     delete callbackToStateMapping[subscriptionID];
 }
 
-function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge) {
+function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge): Promise<void[] | void> {
     const snapshotCollectionKey = OnyxUtils.getSnapshotKey();
-    if (!snapshotCollectionKey) return;
+    if (!snapshotCollectionKey) return Promise.resolve();
 
     const promises: Array<() => Promise<void>> = [];
 
@@ -1510,7 +1503,6 @@ const OnyxUtils = {
     getMergeQueuePromise,
     getDefaultKeyStates,
     getDeferredInitTask,
-    resetDeferredInitTask,
     initStoreValues,
     sendActionToDevTools,
     maybeFlushBatchUpdates,
