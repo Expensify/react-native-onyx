@@ -10,6 +10,7 @@ import type {CollectionKeyBase, KeyValueMapping, OnyxCollection, OnyxKey, OnyxVa
 import useLiveRef from './useLiveRef';
 import usePrevious from './usePrevious';
 import decorateWithMetrics from './metrics';
+import * as Logger from './Logger';
 
 type BaseUseOnyxOptions = {
     /**
@@ -37,6 +38,11 @@ type BaseUseOnyxOptions = {
      * If set to `true`, the key can be changed dynamically during the component lifecycle.
      */
     allowDynamicKey?: boolean;
+
+    /**
+     * If set to `false`, the hook will log an alert when Onyx doesn't return data for that key.
+     */
+    canBeMissing?: boolean;
 };
 
 type UseOnyxInitialValueOption<TInitialValue> = {
@@ -280,11 +286,17 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             previousValueRef.current = newValueRef.current;
 
             // If the new value is `null` we default it to `undefined` to ensure the consumer gets a consistent result from the hook.
-            resultRef.current = [previousValueRef.current ?? undefined, {status: newFetchStatus ?? 'loaded'}];
+            const newValue = previousValueRef.current ?? undefined;
+            const newStatus = newFetchStatus ?? 'loaded';
+            resultRef.current = [previousValueRef.current ?? undefined, {status: newStatus}];
+
+            if (options?.canBeMissing === false && newStatus === 'loaded' && newValue === undefined) {
+                Logger.logAlert(`useOnyx returned no data for key '${key}' while canBeMissing was set to false.`);
+            }
         }
 
         return resultRef.current;
-    }, [options?.initWithStoredValues, options?.allowStaleData, options?.initialValue, key, selectorRef]);
+    }, [options?.initWithStoredValues, options?.allowStaleData, options?.initialValue, options?.canBeMissing, key, selectorRef]);
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
