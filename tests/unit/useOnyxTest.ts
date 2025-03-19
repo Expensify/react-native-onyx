@@ -799,11 +799,13 @@ describe('useOnyx', () => {
 
             expect(result1.current[0]).toBeUndefined();
             expect(result1.current[1].status).toEqual('loading');
+            expect(logAlertFn).not.toBeCalledWith(alert(ONYXKEYS.TEST_KEY));
 
             await act(async () => waitForPromisesToResolve());
 
             expect(result1.current[0]).toBeUndefined();
             expect(result1.current[1].status).toEqual('loaded');
+            expect(logAlertFn).toHaveBeenCalledTimes(1);
             expect(logAlertFn).toHaveBeenNthCalledWith(1, alert(ONYXKEYS.TEST_KEY));
 
             await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'test'));
@@ -813,6 +815,7 @@ describe('useOnyx', () => {
             await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, null));
 
             expect(result1.current[0]).toBeUndefined();
+            expect(logAlertFn).toHaveBeenCalledTimes(2);
             expect(logAlertFn).toHaveBeenNthCalledWith(2, alert(ONYXKEYS.TEST_KEY));
         });
 
@@ -827,11 +830,13 @@ describe('useOnyx', () => {
 
             expect(result1.current[0]).toBeUndefined();
             expect(result1.current[1].status).toEqual('loading');
+            expect(logAlertFn).not.toBeCalledWith(alert(ONYXKEYS.TEST_KEY));
 
             await act(async () => waitForPromisesToResolve());
 
             expect(result1.current[0]).toBeUndefined();
             expect(result1.current[1].status).toEqual('loaded');
+            expect(logAlertFn).toHaveBeenCalledTimes(1);
             expect(logAlertFn).toHaveBeenNthCalledWith(1, alert(ONYXKEYS.TEST_KEY));
 
             await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'test'));
@@ -841,6 +846,7 @@ describe('useOnyx', () => {
             await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, null));
 
             expect(result1.current[0]).toBeUndefined();
+            expect(logAlertFn).toHaveBeenCalledTimes(2);
             expect(logAlertFn).toHaveBeenNthCalledWith(2, alert(ONYXKEYS.TEST_KEY));
         });
 
