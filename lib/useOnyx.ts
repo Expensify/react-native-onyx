@@ -104,17 +104,6 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey): OnyxValue<OnyxKey> 
     return values;
 }
 
-/**
- * Gets the value from cache and maps it with selector. It changes `null` to `undefined` for `useOnyx` compatibility.
- */
-function getCachedValue<TKey extends OnyxKey, TValue>(key: TKey, selector?: UseOnyxSelector<TKey, TValue>) {
-    const value = tryGetCachedValue(key) as OnyxValue<TKey>;
-
-    const selectedValue = selector ? selector(value) : (value as TValue);
-
-    return selectedValue ?? undefined;
-}
-
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     key: TKey,
     options?: BaseUseOnyxOptions & UseOnyxInitialValueOption<TReturnValue> & Required<UseOnyxSelectorOption<TKey, TReturnValue>>,
@@ -225,6 +214,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     }, [key, options?.canEvict]);
 
     const getSnapshot = useCallback(() => {
+        let isOnyxValueDefined = true;
+
         // We return the initial result right away during the first connection if `initWithStoredValues` is set to `false`.
         if (isFirstConnectionRef.current && options?.initWithStoredValues === false) {
             return resultRef.current;
@@ -234,11 +225,14 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // so we can return any cached value right away. After the connection is made, we only
         // update `newValueRef` when `Onyx.connect()` callback is fired.
         if (isFirstConnectionRef.current || shouldGetCachedValueRef.current) {
-            // If `newValueRef.current` is `undefined` it means that the cache doesn't have a value for that key yet.
-            // If `newValueRef.current` is `null` or any other value it means that the cache does have a value for that key.
-            // This difference between `undefined` and other values is crucial and it's used to address the following
-            // conditions and use cases.
-            newValueRef.current = getCachedValue(key, selectorRef.current);
+            // Gets the value from cache and maps it with selector. It changes `null` to `undefined` for `useOnyx` compatibility.
+            const value = tryGetCachedValue(key) as OnyxValue<TKey>;
+            const selectedValue = selectorRef.current ? selectorRef.current(value) : value;
+            newValueRef.current = (selectedValue ?? undefined) as TReturnValue | undefined;
+
+            // This flag is `false` when the original Onyx value (without selector) is not defined yet.
+            // It will be used later to check if we need to log an alert that the value is missing.
+            isOnyxValueDefined = value !== null && value !== undefined;
 
             // We set this flag to `false` again since we don't want to get the newest cached value every time `getSnapshot()` is executed,
             // and only when `Onyx.connect()` callback is fired.
@@ -261,7 +255,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // If data is not present in cache and `initialValue` is set during the first connection,
         // we set the new value to `initialValue` and fetch status to `loaded` since we already have some data to return to the consumer.
         if (isFirstConnectionRef.current && !hasCacheForKey && options?.initialValue !== undefined) {
-            newValueRef.current = (options?.initialValue ?? undefined) as TReturnValue;
+            newValueRef.current = options.initialValue;
             newFetchStatus = 'loaded';
         }
 
@@ -275,7 +269,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             areValuesEqual = shallowEqual(previousValueRef.current ?? undefined, newValueRef.current);
         }
 
-        // We updated the cached value and the result in the following conditions:
+        // We update the cached value and the result in the following conditions:
         // We will update the cached value and the result in any of the following situations:
         // - The previously cached value is different from the new value.
         // - The previously cached value is `null` (not set from cache yet) and we have cache for this key
@@ -286,11 +280,12 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             previousValueRef.current = newValueRef.current;
 
             // If the new value is `null` we default it to `undefined` to ensure the consumer gets a consistent result from the hook.
-            const newValue = previousValueRef.current ?? undefined;
             const newStatus = newFetchStatus ?? 'loaded';
             resultRef.current = [previousValueRef.current ?? undefined, {status: newStatus}];
 
-            if (options?.canBeMissing === false && newStatus === 'loaded' && newValue === undefined) {
+            // If `canBeMissing` is set to `false` and the Onyx value of that key is not defined,
+            // we log an alert so it can be acknowledged by the consumer.
+            if (options?.canBeMissing === false && newStatus === 'loaded' && !isOnyxValueDefined) {
                 Logger.logAlert(`useOnyx returned no data for key '${key}' while canBeMissing was set to false.`);
             }
         }

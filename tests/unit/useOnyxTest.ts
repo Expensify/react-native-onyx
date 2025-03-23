@@ -850,7 +850,7 @@ describe('useOnyx', () => {
             expect(logAlertFn).toHaveBeenNthCalledWith(2, alert(ONYXKEYS.TEST_KEY));
         });
 
-        it('should not log an alert if Onyx doesn\'t return data but there is a selector that always return something and "canBeMissing" property is false', async () => {
+        it('should log an alert if Onyx doesn\'t return data but there is a selector that always return something and "canBeMissing" property is false', async () => {
             const {result: result1} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
                     // @ts-expect-error bypass
@@ -864,7 +864,8 @@ describe('useOnyx', () => {
 
             expect(result1.current[0]).toBe('undefined_changed');
             expect(result1.current[1].status).toEqual('loaded');
-            expect(logAlertFn).not.toBeCalledWith(alert(ONYXKEYS.TEST_KEY));
+            expect(logAlertFn).toHaveBeenCalledTimes(1);
+            expect(logAlertFn).toHaveBeenNthCalledWith(1, alert(ONYXKEYS.TEST_KEY));
 
             await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'test'));
 
@@ -873,7 +874,8 @@ describe('useOnyx', () => {
             await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, null));
 
             expect(result1.current[0]).toBe('undefined_changed');
-            expect(logAlertFn).not.toBeCalledWith(alert(ONYXKEYS.TEST_KEY));
+            expect(logAlertFn).toHaveBeenCalledTimes(2);
+            expect(logAlertFn).toHaveBeenNthCalledWith(2, alert(ONYXKEYS.TEST_KEY));
         });
     });
 
