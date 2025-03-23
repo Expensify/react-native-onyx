@@ -286,7 +286,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             // If `canBeMissing` is set to `false` and the Onyx value of that key is not defined,
             // we log an alert so it can be acknowledged by the consumer.
             if (options?.canBeMissing === false && newStatus === 'loaded' && !isOnyxValueDefined) {
-                Logger.logAlert(`useOnyx returned no data for key '${key}' while canBeMissing was set to false.`);
+                Logger.logAlert(`useOnyx returned no data for key '${key}' while canBeMissing was set to false.`, {showAlert: true});
             }
         }
 

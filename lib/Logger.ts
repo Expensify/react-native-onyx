@@ -1,6 +1,7 @@
 type LogData = {
     message: string;
     level: 'alert' | 'info' | 'hmmm';
+    extraData?: Record<string, unknown>;
 };
 type LoggerCallback = (data: LogData) => void;
 
@@ -17,22 +18,22 @@ function registerLogger(callback: LoggerCallback) {
 /**
  * Send an alert message to the logger
  */
-function logAlert(message: string) {
-    logger({message: `[Onyx] ${message}`, level: 'alert'});
+function logAlert(message: string, extraData?: Record<string, unknown>) {
+    logger({message: `[Onyx] ${message}`, level: 'alert', extraData});
 }
 
 /**
  * Send an info message to the logger
  */
-function logInfo(message: string) {
-    logger({message: `[Onyx] ${message}`, level: 'info'});
+function logInfo(message: string, extraData?: Record<string, unknown>) {
+    logger({message: `[Onyx] ${message}`, level: 'info', extraData});
 }
 
 /**
  * Send an hmmm message to the logger
  */
-function logHmmm(message: string) {
-    logger({message: `[Onyx] ${message}`, level: 'hmmm'});
+function logHmmm(message: string, extraData?: Record<string, unknown>) {
+    logger({message: `[Onyx] ${message}`, level: 'hmmm', extraData});
 }
 
 export {registerLogger, logInfo, logAlert, logHmmm};
