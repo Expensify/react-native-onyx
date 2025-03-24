@@ -60,21 +60,17 @@ const provider: StorageProvider = {
         return db.executeBatchAsync([['REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, json(?));', stringifiedPairs]]);
     },
     multiMerge(pairs) {
-        // Note: We use `ON CONFLICT DO UPDATE` here instead of `INSERT OR REPLACE INTO`
-        // so the new JSON value is merged into the old one if there's an existing value
-        const query = `INSERT INTO keyvaluepairs (record_key, valueJSON)
-             VALUES (:key, JSON(:value))
-             ON CONFLICT DO UPDATE
-             SET valueJSON = JSON_PATCH(valueJSON, JSON(:value));
-        `;
-
         const nonNullishPairs = pairs.filter((pair) => pair[1] !== undefined);
-        const queryArguments = nonNullishPairs.map((pair) => {
-            const value = JSON.stringify(pair[1]);
-            return [pair[0], value];
-        });
+        const nonNullishPairsKeys = pairs.map((pair) => pair[0]);
 
-        return db.executeBatchAsync([[query, queryArguments]]);
+        return this.multiGet(nonNullishPairsKeys).then((storagePairs) => {
+            const newPairs: KeyValuePairList = [];
+            for (let i = 0; i < storagePairs.length; i++) {
+                const newPair = storagePairs[i];
+                newPairs[i] = [newPair[0], utils.fastMerge(newPair[1] as Record<string, unknown>, nonNullishPairs[i][1] as Record<string, unknown>, true, false, true)];
+            }
+            return this.multiSet(newPairs);
+        });
     },
     mergeItem(key, preMergedValue) {
         return this.setItem(key, preMergedValue) as Promise<BatchQueryResult>;

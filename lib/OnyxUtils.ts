@@ -1288,7 +1288,7 @@ function initializeWithDefaultKeyStates(): Promise<void> {
     return Storage.multiGet(Object.keys(defaultKeyStates)).then((pairs) => {
         const existingDataAsObject = Object.fromEntries(pairs);
 
-        const merged = utils.fastMerge(existingDataAsObject, defaultKeyStates);
+        const merged = utils.fastMerge(existingDataAsObject, defaultKeyStates, true, false, false);
         cache.merge(merged ?? {});
 
         Object.entries(merged ?? {}).forEach(([key, value]) => keyChanged(key, value, existingDataAsObject));

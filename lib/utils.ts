@@ -32,9 +32,9 @@ function isMergeableObject(value: unknown): value is Record<string, unknown> {
 function mergeObject<TObject extends Record<string, unknown>>(
     target: TObject | unknown | null | undefined,
     source: TObject,
-    shouldRemoveNestedNulls = true,
-    isBatchingMergeChanges = false,
-    shouldReplaceMarkedObjects = false,
+    shouldRemoveNestedNulls: boolean,
+    isBatchingMergeChanges: boolean,
+    shouldReplaceMarkedObjects: boolean,
 ): TObject {
     const destination: Record<string, unknown> = {};
 
@@ -92,8 +92,8 @@ function mergeObject<TObject extends Record<string, unknown>>(
                 }
 
                 if (shouldReplaceMarkedObjects && sourceValue[ONYX_INTERNALS__REPLACE_OBJECT_MARK] === true) {
-                    delete sourceValue[ONYX_INTERNALS__REPLACE_OBJECT_MARK];
-                    destination[key] = sourceValue;
+                    destination[key] = {...sourceValue};
+                    delete (destination[key] as Record<string, unknown>).ONYX_INTERNALS__REPLACE_OBJECT_MARK;
                 } else {
                     destination[key] = fastMerge(targetValueWithFallback, sourceValue, shouldRemoveNestedNulls, isBatchingMergeChanges, shouldReplaceMarkedObjects);
                 }
@@ -113,7 +113,7 @@ function mergeObject<TObject extends Record<string, unknown>>(
  * On native, when merging an existing value with new changes, SQLite will use JSON_PATCH, which removes top-level nullish values.
  * To be consistent with the behaviour for merge, we'll also want to remove null values for "set" operations.
  */
-function fastMerge<TValue>(target: TValue, source: TValue, shouldRemoveNestedNulls = true, isBatchingMergeChanges = false, shouldReplaceMarkedObjects = false): TValue {
+function fastMerge<TValue>(target: TValue, source: TValue, shouldRemoveNestedNulls: boolean, isBatchingMergeChanges: boolean, shouldReplaceMarkedObjects: boolean): TValue {
     // We have to ignore arrays and nullish values here,
     // otherwise "mergeObject" will throw an error,
     // because it expects an object as "source"
@@ -128,7 +128,7 @@ function fastMerge<TValue>(target: TValue, source: TValue, shouldRemoveNestedNul
 function removeNestedNullValues<TValue extends OnyxInput<OnyxKey> | null>(value: TValue): TValue {
     if (typeof value === 'object' && !Array.isArray(value)) {
         const objectValue = value as Record<string, unknown>;
-        return fastMerge(objectValue, objectValue) as TValue;
+        return fastMerge(objectValue, objectValue, true, false, true) as TValue;
     }
 
     return value;

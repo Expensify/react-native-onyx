@@ -38,7 +38,7 @@ const testObjectWithNullValuesRemoved: DeepObject = {
 
 describe('fastMerge', () => {
     it('should merge an object with another object and remove nested null values', () => {
-        const result = utils.fastMerge(testObject, testObjectWithNullishValues);
+        const result = utils.fastMerge(testObject, testObjectWithNullishValues, true, false, false);
 
         expect(result).toEqual({
             a: 'a',
@@ -55,7 +55,7 @@ describe('fastMerge', () => {
     });
 
     it('should merge an object with another object and not remove nested null values', () => {
-        const result = utils.fastMerge(testObject, testObjectWithNullishValues, false);
+        const result = utils.fastMerge(testObject, testObjectWithNullishValues, false, false, false);
 
         expect(result).toEqual({
             a: 'a',
@@ -73,7 +73,7 @@ describe('fastMerge', () => {
     });
 
     it('should merge an object with an empty object and remove deeply nested null values', () => {
-        const result = utils.fastMerge({}, testObjectWithNullishValues);
+        const result = utils.fastMerge({}, testObjectWithNullishValues, true, false, false);
 
         expect(result).toEqual(testObjectWithNullValuesRemoved);
     });
@@ -86,14 +86,14 @@ describe('fastMerge', () => {
 
     it('should replace an object with an array', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = utils.fastMerge(testObject, [1, 2, 3] as any);
+        const result = utils.fastMerge(testObject, [1, 2, 3] as any, true, false, false);
 
         expect(result).toEqual([1, 2, 3]);
     });
 
     it('should replace an array with an object', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = utils.fastMerge([1, 2, 3] as any, testObject);
+        const result = utils.fastMerge([1, 2, 3] as any, testObject, true, false, false);
 
         expect(result).toEqual(testObject);
     });
