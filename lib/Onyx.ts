@@ -365,7 +365,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
                 return updatePromise;
             }
 
-            return Storage.mergeItem(key, batchedDeltaChanges as OnyxValue<TKey>, preMergedValue as OnyxValue<TKey>, shouldSetValue).then(() => {
+            return Storage.mergeItem(key, preMergedValue as OnyxValue<TKey>).then(() => {
                 OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, changes, preMergedValue);
                 return updatePromise;
             });

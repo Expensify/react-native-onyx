@@ -55,7 +55,7 @@ const provider: StorageProvider = {
                 return Promise.all(upsertMany);
             });
         }),
-    mergeItem(key, _deltaChanges, preMergedValue) {
+    mergeItem(key, preMergedValue) {
         // Since Onyx also merged the existing value with the changes, we can just set the value directly
         return provider.setItem(key, preMergedValue);
     },
