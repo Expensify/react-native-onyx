@@ -752,7 +752,6 @@ describe('useOnyx', () => {
 
     describe('canBeMissing', () => {
         let logAlertFn = jest.fn();
-        const alertMessage = 'useOnyx returned no data for key with canBeMissing set to false.';
 
         beforeEach(() => {
             logAlertFn = jest.fn();
