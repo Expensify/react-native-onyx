@@ -390,7 +390,7 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
  * This helper exists to map an array of Onyx keys such as `['report_', 'conciergeReportID']`
  * to the values for those keys (correctly typed) such as `[OnyxCollection<Report>, OnyxEntry<string>]`
  *
- * Note: just using .map, you'd end up with `Array<OnyxCollection<Report>|OnyxEntry<string>>`, which is not what we want. This preserves the order of the keys provided.
+ * Note: just using `.map`, you'd end up with `Array<OnyxCollection<Report>|OnyxEntry<string>>`, which is not what we want. This preserves the order of the keys provided.
  */
 function tupleGet<Keys extends readonly OnyxKey[]>(keys: Keys): Promise<{[Index in keyof Keys]: OnyxValue<Keys[Index]>}> {
     return Promise.all(keys.map((key) => OnyxUtils.get(key))) as Promise<{[Index in keyof Keys]: OnyxValue<Keys[Index]>}>;
