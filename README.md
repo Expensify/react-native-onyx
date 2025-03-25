@@ -258,7 +258,7 @@ It's also beneficial to use a [selector](https://github.com/Expensify/react-nati
 
 ### useOnyx()'s `canBeMissing` option
 
-You can pass the `canBeMissing` configuration flag to `useOnyx` if you want the hook to log an alert when data is missing from Onyx store. Regarding usage in `Expensify/App` repo, if the component calling this is the one loading the data by calling an action, then you should set this to `true`. If the component calling this does not load the data then you should set it to `false`, which means that if the data is not there, it will log an alert, as it means we are using data that no one loaded and that's most probably a bug.
+You must pass the `canBeMissing` configuration flag to `useOnyx` if you want the hook to log an alert when data is missing from Onyx store. Regarding usage in `Expensify/App` repo, if the component calling this is the one loading the data by calling an action, then you should set this to `true`. If the component calling this does not load the data then you should set it to `false`, which means that if the data is not there, it will log an alert, as it means we are using data that no one loaded and that's most probably a bug.
 
 ```javascript
 const Component = ({reportID}) => {
