@@ -40,7 +40,10 @@ type BaseUseOnyxOptions = {
     allowDynamicKey?: boolean;
 
     /**
-     * If set to `false`, the hook will log an alert when Onyx doesn't return data for that key.
+     * If the component calling this is the one loading the data by calling an action, then you should set this to `true`.
+     *
+     * If the component calling this does not load the data then you should set it to `false`, which means that if the data
+     * is not there, it will log an alert, as it means we are using data that no one loaded and that's most probably a bug.
      */
     canBeMissing?: boolean;
 };
