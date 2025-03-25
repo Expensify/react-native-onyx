@@ -5,6 +5,7 @@ import OnyxUtils from '../../lib/OnyxUtils';
 import StorageMock from '../../lib/storage';
 import type GenericCollection from '../utils/GenericCollection';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
+import * as Logger from '../../lib/Logger';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -746,6 +747,135 @@ describe('useOnyx', () => {
 
             expect(result.current[0]).toBeUndefined();
             expect(result.current[1].status).toEqual('loaded');
+        });
+    });
+
+    describe('canBeMissing', () => {
+        let logAlertFn = jest.fn();
+        const alertMessage = 'useOnyx returned no data for key with canBeMissing set to false.';
+
+        beforeEach(() => {
+            logAlertFn = jest.fn();
+            jest.spyOn(Logger, 'logAlert').mockImplementation(logAlertFn);
+        });
+
+        afterEach(() => {
+            (Logger.logAlert as unknown as jest.SpyInstance<void, Parameters<typeof Logger.logAlert>>).mockRestore();
+        });
+
+        it('should not log an alert if Onyx doesn\'t return data in loaded state and "canBeMissing" property is not provided', async () => {
+            const {result: result1} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
+
+            expect(result1.current[0]).toBeUndefined();
+            expect(result1.current[1].status).toEqual('loading');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result1.current[0]).toBeUndefined();
+            expect(result1.current[1].status).toEqual('loaded');
+            expect(logAlertFn).not.toBeCalledWith(alertMessage);
+
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'test'));
+
+            expect(result1.current[0]).toBe('test');
+
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, null));
+
+            expect(result1.current[0]).toBeUndefined();
+            expect(logAlertFn).not.toBeCalledWith(alertMessage);
+        });
+
+        it('should not log an alert if Onyx doesn\'t return data, "canBeMissing" property is false but "initWithStoredValues" is also false', async () => {
+            const {result: result1} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {canBeMissing: false, initWithStoredValues: false}));
+
+            expect(result1.current[0]).toBeUndefined();
+            expect(result1.current[1].status).toEqual('loaded');
+
+            expect(logAlertFn).not.toBeCalledWith(alertMessage);
+        });
+
+        it('should log an alert if Onyx doesn\'t return data in loaded state and "canBeMissing" property is false', async () => {
+            const {result: result1} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {canBeMissing: false}));
+
+            expect(result1.current[0]).toBeUndefined();
+            expect(result1.current[1].status).toEqual('loading');
+            expect(logAlertFn).not.toBeCalledWith(alertMessage);
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result1.current[0]).toBeUndefined();
+            expect(result1.current[1].status).toEqual('loaded');
+            expect(logAlertFn).toHaveBeenCalledTimes(1);
+            expect(logAlertFn).toHaveBeenNthCalledWith(1, alertMessage, {key: ONYXKEYS.TEST_KEY, showAlert: true});
+
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'test'));
+
+            expect(result1.current[0]).toBe('test');
+
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, null));
+
+            expect(result1.current[0]).toBeUndefined();
+            expect(logAlertFn).toHaveBeenCalledTimes(2);
+            expect(logAlertFn).toHaveBeenNthCalledWith(2, alertMessage, {key: ONYXKEYS.TEST_KEY, showAlert: true});
+        });
+
+        it('should log an alert if Onyx doesn\'t return selected data in loaded state and "canBeMissing" property is false', async () => {
+            const {result: result1} = renderHook(() =>
+                useOnyx(ONYXKEYS.TEST_KEY, {
+                    // @ts-expect-error bypass
+                    selector: (entry: OnyxEntry<string>) => (entry ? `${entry}_changed` : undefined),
+                    canBeMissing: false,
+                }),
+            );
+
+            expect(result1.current[0]).toBeUndefined();
+            expect(result1.current[1].status).toEqual('loading');
+            expect(logAlertFn).not.toBeCalledWith(alertMessage);
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result1.current[0]).toBeUndefined();
+            expect(result1.current[1].status).toEqual('loaded');
+            expect(logAlertFn).toHaveBeenCalledTimes(1);
+            expect(logAlertFn).toHaveBeenNthCalledWith(1, alertMessage, {key: ONYXKEYS.TEST_KEY, showAlert: true});
+
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'test'));
+
+            expect(result1.current[0]).toBe('test_changed');
+
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, null));
+
+            expect(result1.current[0]).toBeUndefined();
+            expect(logAlertFn).toHaveBeenCalledTimes(2);
+            expect(logAlertFn).toHaveBeenNthCalledWith(2, alertMessage, {key: ONYXKEYS.TEST_KEY, showAlert: true});
+        });
+
+        it('should log an alert if Onyx doesn\'t return data but there is a selector that always return something and "canBeMissing" property is false', async () => {
+            const {result: result1} = renderHook(() =>
+                useOnyx(ONYXKEYS.TEST_KEY, {
+                    // @ts-expect-error bypass
+                    // This selector will always return a value, even if the Onyx data is missing.
+                    selector: (entry: OnyxEntry<string>) => `${entry}_changed`,
+                    canBeMissing: false,
+                }),
+            );
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result1.current[0]).toBe('undefined_changed');
+            expect(result1.current[1].status).toEqual('loaded');
+            expect(logAlertFn).toHaveBeenCalledTimes(1);
+            expect(logAlertFn).toHaveBeenNthCalledWith(1, alertMessage, {key: ONYXKEYS.TEST_KEY, showAlert: true});
+
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'test'));
+
+            expect(result1.current[0]).toBe('test_changed');
+
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, null));
+
+            expect(result1.current[0]).toBe('undefined_changed');
+            expect(logAlertFn).toHaveBeenCalledTimes(2);
+            expect(logAlertFn).toHaveBeenNthCalledWith(2, alertMessage, {key: ONYXKEYS.TEST_KEY, showAlert: true});
         });
     });
 
