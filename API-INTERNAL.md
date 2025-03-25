@@ -43,6 +43,11 @@ The resulting collection will only contain items that are returned by the select
 <dt><a href="#get">get()</a></dt>
 <dd><p>Get some data from the store</p>
 </dd>
+<dt><a href="#tupleGet">tupleGet()</a></dt>
+<dd><p>This helper exists to map an array of Onyx keys such as <code>[&#39;report_&#39;, &#39;conciergeReportID&#39;]</code>
+to the values for those keys (correctly typed) such as <code>[OnyxCollection&lt;Report&gt;, OnyxEntry&lt;string&gt;]</code></p>
+<p>Note: just using .map, you&#39;d end up with <code>Array&lt;OnyxCollection&lt;Report&gt;|OnyxEntry&lt;string&gt;&gt;</code>, which is not what we want. This preserves the order of the keys provided.</p>
+</dd>
 <dt><a href="#storeKeyBySubscriptions">storeKeyBySubscriptions(subscriptionID, key)</a></dt>
 <dd><p>Stores a subscription ID associated with a given key.</p>
 </dd>
@@ -240,6 +245,15 @@ The resulting collection will only contain items that are returned by the select
 
 ## get()
 Get some data from the store
+
+**Kind**: global function  
+<a name="tupleGet"></a>
+
+## tupleGet()
+This helper exists to map an array of Onyx keys such as `['report_', 'conciergeReportID']`
+to the values for those keys (correctly typed) such as `[OnyxCollection<Report>, OnyxEntry<string>]`
+
+Note: just using .map, you'd end up with `Array<OnyxCollection<Report>|OnyxEntry<string>>`, which is not what we want. This preserves the order of the keys provided.
 
 **Kind**: global function  
 <a name="storeKeyBySubscriptions"></a>
