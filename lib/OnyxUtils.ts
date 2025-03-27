@@ -695,7 +695,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
             // send the whole cached collection.
             if (isSubscribedToCollectionKey) {
                 if (subscriber.waitForCollectionCallback) {
-                    subscriber.callback(cachedCollection, subscriber.key);
+                    subscriber.callback(cachedCollection, subscriber.key, partialCollection);
                     continue;
                 }
 
@@ -905,7 +905,7 @@ function keyChanged<TKey extends OnyxKey>(
                 }
 
                 cachedCollection[key] = value;
-                subscriber.callback(cachedCollection, subscriber.key);
+                subscriber.callback(cachedCollection, subscriber.key, {[key]: value});
                 continue;
             }
 
