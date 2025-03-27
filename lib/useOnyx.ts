@@ -350,7 +350,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         checkEvictableKey();
     }, [checkEvictableKey]);
 
-    const result = useSyncExternalStore<UseOnyxResult<TReturnValue>>(subscribe, getSnapshotDecorated);
+    const result = useSyncExternalStore<UseOnyxResult<TReturnValue>>(subscribe, getSnapshotDecorated, getSnapshotDecorated);
 
     return result;
 }
