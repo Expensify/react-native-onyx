@@ -164,7 +164,7 @@ class OnyxCache {
             throw new Error('data passed to cache.merge() must be an Object of onyx key/value pairs');
         }
 
-        this.storageMap = {...utils.fastMerge(this.storageMap, data)};
+        this.storageMap = {...utils.fastMerge(this.storageMap, data, true, false, true)};
 
         Object.entries(data).forEach(([key, value]) => {
             this.addKey(key);
