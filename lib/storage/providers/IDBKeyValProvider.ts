@@ -56,7 +56,7 @@ const provider: StorageProvider = {
             });
         }),
     mergeItem(key, preMergedValue) {
-        // Since Onyx also merged the existing value with the changes, we can just set the value directly
+        // Since Onyx already merged the existing value with the changes, we can just set the value directly.
         return provider.setItem(key, preMergedValue);
     },
     multiSet: (pairs) => {

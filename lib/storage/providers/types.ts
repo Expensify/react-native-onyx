@@ -42,7 +42,7 @@ type StorageProvider = {
     multiMerge: (pairs: KeyValuePairList) => Promise<BatchQueryResult | IDBValidKey[] | void>;
 
     /**
-     * Merges an existing value with a new one by leveraging JSON_PATCH
+     * Merges an existing value with a new one
      * @param preMergedValue - the pre-merged data from `Onyx.applyMerge`
      */
     mergeItem: <TKey extends OnyxKey>(key: TKey, preMergedValue: OnyxValue<TKey>) => Promise<BatchQueryResult | void>;

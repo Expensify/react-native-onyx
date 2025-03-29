@@ -27,6 +27,10 @@ function isMergeableObject(value: unknown): value is Record<string, unknown> {
  * @param target - The target object.
  * @param source - The source object.
  * @param shouldRemoveNestedNulls - If true, null object values will be removed.
+ * @param isBatchingMergeChanges - If true, it means that we are batching merge changes before applying
+ * them to the Onyx value, so we must use a special logic to handle these changes.
+ * @param shouldReplaceMarkedObjects - If true, any nested objects that contains the internal "ONYX_INTERNALS__REPLACE_OBJECT_MARK"
+ * flag will be completely replaced instead of merged.
  * @returns - The merged object.
  */
 function mergeObject<TObject extends Record<string, unknown>>(
@@ -87,14 +91,25 @@ function mergeObject<TObject extends Record<string, unknown>>(
                 // to ensure that nested null values are removed from the merged object.
                 const targetValueWithFallback = (targetValue ?? {}) as TObject;
 
+                // If we are batching merge changes and the previous merge change (targetValue) is null,
+                // it means we want to fully replace this object when merging the batched changes with the Onyx value.
+                // To achieve this, we first mark these nested objects with an internal flag. With the desired objects
+                // marked, when calling this method again with "shouldReplaceMarkedObjects" set to true we can proceed
+                // to effectively replace them in the next condition.
                 if (isBatchingMergeChanges && targetValue === null) {
                     (targetValueWithFallback as Record<string, unknown>)[ONYX_INTERNALS__REPLACE_OBJECT_MARK] = true;
                 }
 
+                // Then, when merging the batched changes with the Onyx value, if a nested object of the batched changes
+                // has the internal flag set, we replace the entire destination object with the source one and remove
+                // the flag.
                 if (shouldReplaceMarkedObjects && sourceValue[ONYX_INTERNALS__REPLACE_OBJECT_MARK] === true) {
+                    // We do a spread here in order to have a new object reference and allow us to delete the internal flag
+                    // of the merged object only.
                     destination[key] = {...sourceValue};
                     delete (destination[key] as Record<string, unknown>).ONYX_INTERNALS__REPLACE_OBJECT_MARK;
                 } else {
+                    // For the normal situations we'll just call `fastMerge()` again to merge the nested object.
                     destination[key] = fastMerge(targetValueWithFallback, sourceValue, shouldRemoveNestedNulls, isBatchingMergeChanges, shouldReplaceMarkedObjects);
                 }
             } else {
@@ -110,8 +125,6 @@ function mergeObject<TObject extends Record<string, unknown>>(
  * Merges two objects and removes null values if "shouldRemoveNestedNulls" is set to true
  *
  * We generally want to remove null values from objects written to disk and cache, because it decreases the amount of data stored in memory and on disk.
- * On native, when merging an existing value with new changes, SQLite will use JSON_PATCH, which removes top-level nullish values.
- * To be consistent with the behaviour for merge, we'll also want to remove null values for "set" operations.
  */
 function fastMerge<TValue>(target: TValue, source: TValue, shouldRemoveNestedNulls: boolean, isBatchingMergeChanges: boolean, shouldReplaceMarkedObjects: boolean): TValue {
     // We have to ignore arrays and nullish values here,
