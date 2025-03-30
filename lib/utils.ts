@@ -234,4 +234,14 @@ function hasWithOnyxInstance<TKey extends OnyxKey>(mapping: ConnectOptions<TKey>
     return 'withOnyxInstance' in mapping && mapping.withOnyxInstance;
 }
 
-export default {isEmptyObject, fastMerge, formatActionName, removeNestedNullValues, checkCompatibilityWithExistingValue, pick, omit, hasWithOnyxInstance};
+export default {
+    isEmptyObject,
+    fastMerge,
+    formatActionName,
+    removeNestedNullValues,
+    checkCompatibilityWithExistingValue,
+    pick,
+    omit,
+    hasWithOnyxInstance,
+    ONYX_INTERNALS__REPLACE_OBJECT_MARK,
+};
