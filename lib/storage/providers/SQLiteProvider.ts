@@ -8,6 +8,7 @@ import {getFreeDiskStorage} from 'react-native-device-info';
 import type StorageProvider from './types';
 import utils from '../../utils';
 import type {KeyList, KeyValuePairList} from './types';
+import type {OnyxKey, OnyxValue} from '../../types';
 
 const DB_NAME = 'OnyxDB';
 let db: QuickSQLiteConnection;
@@ -60,15 +61,45 @@ const provider: StorageProvider = {
         return db.executeBatchAsync([['REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, json(?));', stringifiedPairs]]);
     },
     multiMerge(pairs) {
-        const nonNullishPairs = pairs.filter((pair) => pair[1] !== undefined);
-        const nonNullishPairsKeys = pairs.map((pair) => pair[0]);
+        const nonNullishPairs: KeyValuePairList = [];
+        const nonNullishPairsKeys: OnyxKey[] = [];
+
+        // eslint-disable-next-line @typescript-eslint/prefer-for-of
+        for (let i = 0; i < pairs.length; i++) {
+            const pair = pairs[i];
+            if (pair[1] !== undefined) {
+                nonNullishPairs.push(pair);
+                nonNullishPairsKeys.push(pair[0]);
+            }
+        }
+
+        if (nonNullishPairs.length === 0) {
+            return Promise.resolve();
+        }
 
         return this.multiGet(nonNullishPairsKeys).then((storagePairs) => {
-            const newPairs: KeyValuePairList = [];
+            // multiGet() is not guaranteed to return the data in the same order we asked with "nonNullishPairsKeys",
+            // so we use a map to associate keys to their existing values correctly.
+            const existingMap = new Map<OnyxKey, OnyxValue<OnyxKey>>();
+            // eslint-disable-next-line @typescript-eslint/prefer-for-of
             for (let i = 0; i < storagePairs.length; i++) {
-                const newPair = storagePairs[i];
-                newPairs[i] = [newPair[0], utils.fastMerge(newPair[1] as Record<string, unknown>, nonNullishPairs[i][1] as Record<string, unknown>, true, false, true)];
+                existingMap.set(storagePairs[i][0], storagePairs[i][1]);
             }
+
+            const newPairs: KeyValuePairList = [];
+
+            // eslint-disable-next-line @typescript-eslint/prefer-for-of
+            for (let i = 0; i < nonNullishPairs.length; i++) {
+                const key = nonNullishPairs[i][0];
+                const newValue = nonNullishPairs[i][1];
+
+                const existingValue = existingMap.get(key) ?? {};
+
+                const mergedValue = utils.fastMerge(existingValue, newValue, true, false, true);
+
+                newPairs.push([key, mergedValue]);
+            }
+
             return this.multiSet(newPairs);
         });
     },
