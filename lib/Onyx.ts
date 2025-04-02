@@ -552,7 +552,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
 
 function updateSnapshots(data: OnyxUpdate[]) {
     const snapshotCollectionKey = OnyxUtils.getSnapshotKey();
-    if (!snapshotCollectionKey) return;
+    if (!snapshotCollectionKey) return [];
 
     const promises: Array<() => Promise<void>> = [];
 
@@ -601,7 +601,7 @@ function updateSnapshots(data: OnyxUpdate[]) {
         promises.push(() => merge(snapshotKey, {data: updatedData}));
     });
 
-    return Promise.all(promises.map((p) => p()));
+    return promises;
 }
 
 /**
@@ -729,10 +729,9 @@ function update(data: OnyxUpdate[]): Promise<void> {
         }
     });
 
-    return clearPromise
-        .then(() => updateSnapshots(data))
-        .then(() => Promise.all(promises.map((p) => p())))
-        .then(() => undefined);
+    const snapshotPromises = updateSnapshots(data);
+
+    return clearPromise.then(() => Promise.all([...snapshotPromises, ...promises].map((p) => p()))).then(() => undefined);
 }
 
 type BaseCollection<TMap> = Record<string, TMap | null>;
