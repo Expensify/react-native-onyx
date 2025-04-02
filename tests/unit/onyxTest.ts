@@ -1454,6 +1454,15 @@ describe('Onyx', () => {
             callback,
         });
 
+        function delay(ms: number) {
+            return new Promise((resolve) => {
+                setTimeout(resolve, ms);
+            });
+        }
+
+        // Delay for the first callback to be called
+        await delay(100);
+
         await Onyx.update([{key: cat, value: finalValue, onyxMethod: Onyx.METHOD.MERGE}]);
 
         expect(callback).toBeCalledTimes(2);
