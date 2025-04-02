@@ -730,8 +730,8 @@ function update(data: OnyxUpdate[]): Promise<void> {
     });
 
     return clearPromise
-        .then(() => Promise.all(promises.map((p) => p())))
         .then(() => updateSnapshots(data))
+        .then(() => Promise.all(promises.map((p) => p())))
         .then(() => undefined);
 }
 
