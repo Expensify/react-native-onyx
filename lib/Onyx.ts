@@ -731,7 +731,10 @@ function update(data: OnyxUpdate[]): Promise<void> {
 
     const snapshotPromises = updateSnapshots(data);
 
-    return clearPromise.then(() => Promise.all([...snapshotPromises, ...promises].map((p) => p()))).then(() => undefined);
+    // We need to run the snapshot updates before the other updates so the snapshot data can be updated before the loading state in the snapshot
+    const finalPromises = snapshotPromises.concat(promises);
+
+    return clearPromise.then(() => Promise.all(finalPromises.map((p) => p()))).then(() => undefined);
 }
 
 type BaseCollection<TMap> = Record<string, TMap | null>;
