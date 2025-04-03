@@ -1460,6 +1460,8 @@ describe('Onyx', () => {
             callback,
         });
 
+        await waitForPromisesToResolve();
+
         await Onyx.update([{key: cat, value: finalValue, onyxMethod: Onyx.METHOD.MERGE}]);
 
         expect(callback).toBeCalledTimes(2);
