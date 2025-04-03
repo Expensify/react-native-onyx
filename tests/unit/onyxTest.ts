@@ -1454,10 +1454,7 @@ describe('Onyx', () => {
             callback,
         });
 
-        // The snapshot is updated belong to other updates, so we need to set a delay to ensure the connection is done before the snapshot is updated
-        await new Promise((resolve) => {
-            setTimeout(resolve, 100);
-        });
+        await waitForPromisesToResolve();
 
         await Onyx.update([{key: cat, value: finalValue, onyxMethod: Onyx.METHOD.MERGE}]);
 
