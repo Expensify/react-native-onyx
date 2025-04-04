@@ -37,7 +37,8 @@
     "prebuild:docs": "npm run build",
     "build:docs": "ts-node buildDocs.ts",
     "lint-tests": "eslint tests/**",
-    "prettier": "prettier --write ."
+    "prettier": "prettier --write .",
+    "gh-actions-build": "./.github/scripts/buildActions.sh"
   },
   "dependencies": {
     "ascii-table": "0.0.9",
@@ -67,6 +68,7 @@
     "@types/underscore": "^1.11.15",
     "@typescript-eslint/eslint-plugin": "^6.19.0",
     "@typescript-eslint/parser": "^6.19.0",
+    "@vercel/ncc": "0.38.1",
     "date-fns": "^4.1.0",
     "eslint": "^8.56.0",
     "eslint-config-expensify": "^2.0.44",
