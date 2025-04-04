@@ -909,7 +909,7 @@ describe('OnyxUtils', () => {
                 });
             }
 
-            await measureAsyncFunction(() => OnyxUtils.updateSnapshots(updates, Onyx.merge), {
+            await measureAsyncFunction(() => Promise.all(OnyxUtils.updateSnapshots(updates, Onyx.merge).map((p) => p())), {
                 beforeEach: async () => {
                     const searchData: Partial<OnyxInputKeyValueMapping> = {};
                     const data: Partial<OnyxInputKeyValueMapping> = {

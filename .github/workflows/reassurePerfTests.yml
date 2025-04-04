@@ -11,12 +11,14 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout
-              uses: actions/checkout@v4
+              # v4
+              uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
               with:
                   fetch-depth: 0
 
             - name: Setup Node
-              uses: actions/setup-node@v4
+              # v4
+              uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e
               with:
                   node-version-file: '.nvmrc'
 

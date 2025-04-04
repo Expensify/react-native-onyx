@@ -392,7 +392,7 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
  * This helper exists to map an array of Onyx keys such as `['report_', 'conciergeReportID']`
  * to the values for those keys (correctly typed) such as `[OnyxCollection<Report>, OnyxEntry<string>]`
  *
- * Note: just using .map, you'd end up with `Array<OnyxCollection<Report>|OnyxEntry<string>>`, which is not what we want. This preserves the order of the keys provided.
+ * Note: just using `.map`, you'd end up with `Array<OnyxCollection<Report>|OnyxEntry<string>>`, which is not what we want. This preserves the order of the keys provided.
  */
 function tupleGet<Keys extends readonly OnyxKey[]>(keys: Keys): Promise<{[Index in keyof Keys]: OnyxValue<Keys[Index]>}> {
     return Promise.all(keys.map((key) => OnyxUtils.get(key))) as Promise<{[Index in keyof Keys]: OnyxValue<Keys[Index]>}>;
@@ -697,7 +697,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
             // send the whole cached collection.
             if (isSubscribedToCollectionKey) {
                 if (subscriber.waitForCollectionCallback) {
-                    subscriber.callback(cachedCollection, subscriber.key);
+                    subscriber.callback(cachedCollection, subscriber.key, partialCollection);
                     continue;
                 }
 
@@ -907,7 +907,7 @@ function keyChanged<TKey extends OnyxKey>(
                 }
 
                 cachedCollection[key] = value;
-                subscriber.callback(cachedCollection, subscriber.key);
+                subscriber.callback(cachedCollection, subscriber.key, {[key]: value});
                 continue;
             }
 
@@ -1438,9 +1438,9 @@ function unsubscribeFromKey(subscriptionID: number): void {
     delete callbackToStateMapping[subscriptionID];
 }
 
-function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge): Promise<void[] | void> {
+function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge): Array<() => Promise<void>> {
     const snapshotCollectionKey = OnyxUtils.getSnapshotKey();
-    if (!snapshotCollectionKey) return Promise.resolve();
+    if (!snapshotCollectionKey) return [];
 
     const promises: Array<() => Promise<void>> = [];
 
@@ -1494,7 +1494,7 @@ function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge): Promis
         promises.push(() => mergeFn(snapshotEntryKey, {data: updatedData}));
     });
 
-    return Promise.all(promises.map((p) => p()));
+    return promises;
 }
 
 const OnyxUtils = {
