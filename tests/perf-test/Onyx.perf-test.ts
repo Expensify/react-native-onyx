@@ -1,11 +1,11 @@
 import {measureAsyncFunction} from 'reassure';
 import type {OnyxUpdate} from '../../lib';
 import Onyx from '../../lib';
-import {createCollection} from '../utils/collections/createCollection';
-import createRandomReportAction from '../utils/collections/reportActions';
+import createRandomReportAction, {getRandomReportActions} from '../utils/collections/reportActions';
 import type GenericCollection from '../utils/GenericCollection';
 import OnyxUtils from '../../lib/OnyxUtils';
 import createDeferredTask from '../../lib/createDeferredTask';
+import alternateLists from '../utils/alternateLists';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -20,20 +20,8 @@ const ONYXKEYS = {
     },
 };
 
-const alternateLists = (list1: unknown[], list2: unknown[]) => {
-    return list1.length > list2.length
-        ? list1.flatMap((item, i) => [item, list2[i]]).filter((x) => x !== undefined)
-        : list2.flatMap((item, i) => [list1[i], item]).filter((x) => x !== undefined);
-};
-
-const getMockedReportActions = (collection = ONYXKEYS.COLLECTION.TEST_KEY, length = 10000) =>
-    createCollection<Record<string, unknown>>(
-        (item) => `${collection}${item.reportActionID}`,
-        (index) => createRandomReportAction(index),
-        length,
-    );
-
-const mockedReportActionsMap = getMockedReportActions();
+const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
+const mockedReportActionsMap = getRandomReportActions(collectionKey);
 
 const clearOnyxAfterEachMeasure = async () => {
     await Onyx.clear();
@@ -59,7 +47,7 @@ describe('Onyx', () => {
                 () =>
                     Promise.all(
                         Object.values(mockedReportActionsMap).map((reportAction) => {
-                            return Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}${reportAction.reportActionID}`, reportAction);
+                            return Onyx.set(`${collectionKey}${reportAction.reportActionID}`, reportAction);
                         }),
                     ),
                 {afterEach: clearOnyxAfterEachMeasure},
@@ -80,7 +68,7 @@ describe('Onyx', () => {
                 () =>
                     Promise.all(
                         Object.values(changedReportActions).map((changedReportAction) => {
-                            return Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}${changedReportAction.reportActionID}`, changedReportAction);
+                            return Onyx.merge(`${collectionKey}${changedReportAction.reportActionID}`, changedReportAction);
                         }),
                     ),
                 {
@@ -98,7 +86,7 @@ describe('Onyx', () => {
             const changedReportActions = Object.fromEntries(
                 Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const),
             ) as GenericCollection;
-            await measureAsyncFunction(() => Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, changedReportActions), {
+            await measureAsyncFunction(() => Onyx.mergeCollection(collectionKey, changedReportActions), {
                 beforeEach: async () => {
                     await Onyx.multiSet(mockedReportActionsMap);
                 },
@@ -112,7 +100,7 @@ describe('Onyx', () => {
             const changedReportActions = Object.fromEntries(
                 Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const),
             ) as GenericCollection;
-            await measureAsyncFunction(() => Onyx.setCollection(ONYXKEYS.COLLECTION.TEST_KEY, changedReportActions), {
+            await measureAsyncFunction(() => Onyx.setCollection(collectionKey, changedReportActions), {
                 beforeEach: async () => {
                     await Onyx.multiSet(mockedReportActionsMap);
                 },

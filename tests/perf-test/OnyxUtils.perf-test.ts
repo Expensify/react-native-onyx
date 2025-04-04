@@ -1,15 +1,14 @@
 import {measureAsyncFunction, measureFunction} from 'reassure';
-import {createCollection} from '../utils/collections/createCollection';
-import createRandomReportAction from '../utils/collections/reportActions';
+import createRandomReportAction, {getRandomReportActions} from '../utils/collections/reportActions';
 import type {OnyxKey, Selector} from '../../lib';
 import Onyx from '../../lib';
 import StorageMock from '../../lib/storage';
 import OnyxUtils from '../../lib/OnyxUtils';
 import type GenericCollection from '../utils/GenericCollection';
 import type {Mapping, OnyxUpdate} from '../../lib/Onyx';
-import type {WithOnyxInstance} from '../../lib/withOnyx/types';
 import createDeferredTask from '../../lib/createDeferredTask';
 import type {OnyxInputKeyValueMapping} from '../../lib/types';
+import generateEmptyWithOnyxInstance from '../utils/generateEmptyWithOnyxInstance';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -31,18 +30,6 @@ const safeEvictionKeys = [ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY];
 
 const initialKeyStates = {};
 
-const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
-
-const generateEmptyWithOnyxInstance = () => {
-    return new (class {
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
-        setStateProxy() {}
-
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
-        setWithOnyxState() {}
-    })() as unknown as WithOnyxInstance;
-};
-
 // @ts-expect-error bypass
 const generateTestSelector = (): Selector<string, unknown, unknown> => (value: Record<string, unknown>) => {
     return {
@@ -51,14 +38,8 @@ const generateTestSelector = (): Selector<string, unknown, unknown> => (value: R
     };
 };
 
-const getMockedReportActions = (collection = collectionKey, length = 10000) =>
-    createCollection<Record<string, unknown>>(
-        (item) => `${collection}${item.reportActionID}`,
-        (index) => createRandomReportAction(index),
-        length,
-    );
-
-const mockedReportActionsMap = getMockedReportActions();
+const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
+const mockedReportActionsMap = getRandomReportActions(collectionKey);
 const mockedReportActionsKeys = Object.keys(mockedReportActionsMap);
 
 const clearOnyxAfterEachMeasure = async () => {
@@ -107,11 +88,11 @@ describe('OnyxUtils', () => {
     describe('initStoreValues', () => {
         test('one call with 50k heavy objects', async () => {
             const data = {
-                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY),
-                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_2),
-                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_3),
-                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_4),
-                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_5),
+                ...getRandomReportActions(collectionKey),
+                ...getRandomReportActions(ONYXKEYS.COLLECTION.TEST_KEY_2),
+                ...getRandomReportActions(ONYXKEYS.COLLECTION.TEST_KEY_3),
+                ...getRandomReportActions(ONYXKEYS.COLLECTION.TEST_KEY_4),
+                ...getRandomReportActions(ONYXKEYS.COLLECTION.TEST_KEY_5),
             };
 
             await measureFunction(() => OnyxUtils.initStoreValues(ONYXKEYS, data, safeEvictionKeys), {
@@ -165,12 +146,12 @@ describe('OnyxUtils', () => {
 
     describe('isCollectionKey', () => {
         test('one call', async () => {
-            await measureFunction(() => OnyxUtils.isCollectionKey(ONYXKEYS.COLLECTION.TEST_KEY));
+            await measureFunction(() => OnyxUtils.isCollectionKey(collectionKey));
         });
     });
 
     describe('isCollectionMemberKey', () => {
-        const collectionKeyLength = ONYXKEYS.COLLECTION.TEST_KEY.length;
+        const collectionKeyLength = collectionKey.length;
 
         test('one call with correct key', async () => {
             await measureFunction(() => OnyxUtils.isCollectionMemberKey(collectionKey, `${collectionKey}entry1`, collectionKeyLength));
@@ -211,8 +192,8 @@ describe('OnyxUtils', () => {
         const key = `${collectionKey}0`;
         const reportAction = mockedReportActionsMap[`${collectionKey}0`];
         const collections = {
-            ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_2),
-            ...getMockedReportActions(collectionKey),
+            ...getRandomReportActions(ONYXKEYS.COLLECTION.TEST_KEY_2),
+            ...getRandomReportActions(collectionKey),
         };
 
         test('one call passing normal key without selector', async () => {
@@ -266,7 +247,7 @@ describe('OnyxUtils', () => {
 
     describe('removeLastAccessedKey', () => {
         test('one call removing one key', async () => {
-            await measureFunction(() => OnyxUtils.removeLastAccessedKey(`${ONYXKEYS.COLLECTION.TEST_KEY}5000`), {
+            await measureFunction(() => OnyxUtils.removeLastAccessedKey(`${collectionKey}5000`), {
                 beforeEach: async () => {
                     mockedReportActionsKeys.forEach((key) => OnyxUtils.addLastAccessedKey(key));
                 },
@@ -279,7 +260,7 @@ describe('OnyxUtils', () => {
 
     describe('addLastAccessedKey', () => {
         test('one call adding one key', async () => {
-            await measureFunction(() => OnyxUtils.addLastAccessedKey(`${ONYXKEYS.COLLECTION.TEST_KEY}5000`), {
+            await measureFunction(() => OnyxUtils.addLastAccessedKey(`${collectionKey}5000`), {
                 beforeEach: async () => {
                     mockedReportActionsKeys.forEach((key) => OnyxUtils.addLastAccessedKey(key));
                 },
@@ -292,8 +273,8 @@ describe('OnyxUtils', () => {
 
     describe('addAllSafeEvictionKeysToRecentlyAccessedList', () => {
         const data = {
-            ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY, 1000),
-            ...getMockedReportActions(ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY, 1000),
+            ...getRandomReportActions(collectionKey, 1000),
+            ...getRandomReportActions(ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY, 1000),
         };
 
         test('one call adding 1k keys', async () => {
@@ -309,11 +290,11 @@ describe('OnyxUtils', () => {
     describe('getCachedCollection', () => {
         test('one call retrieving a collection with 5k heavy objects', async () => {
             const data = {
-                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY, 5000),
-                ...getMockedReportActions(ONYXKEYS.COLLECTION.TEST_KEY_2, 5000),
+                ...getRandomReportActions(collectionKey, 5000),
+                ...getRandomReportActions(ONYXKEYS.COLLECTION.TEST_KEY_2, 5000),
             };
 
-            await measureFunction(() => OnyxUtils.getCachedCollection(ONYXKEYS.COLLECTION.TEST_KEY), {
+            await measureFunction(() => OnyxUtils.getCachedCollection(collectionKey), {
                 beforeEach: async () => {
                     await Onyx.multiSet(data);
                 },
@@ -807,7 +788,7 @@ describe('OnyxUtils', () => {
             const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
             await measureFunction(() => OnyxUtils.getSkippableCollectionMemberIDs(), {
                 beforeEach: async () => {
-                    OnyxUtils.setSkippableCollectionMemberIDs(new Set([ONYXKEYS.COLLECTION.TEST_KEY, ONYXKEYS.COLLECTION.TEST_KEY_2]));
+                    OnyxUtils.setSkippableCollectionMemberIDs(new Set([collectionKey, ONYXKEYS.COLLECTION.TEST_KEY_2]));
                 },
                 afterEach: async () => {
                     OnyxUtils.setSkippableCollectionMemberIDs(skippableCollectionMemberIDs);
@@ -819,7 +800,7 @@ describe('OnyxUtils', () => {
     describe('setSkippableCollectionMemberIDs', () => {
         test('one call', async () => {
             const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
-            await measureFunction(() => OnyxUtils.setSkippableCollectionMemberIDs(new Set([ONYXKEYS.COLLECTION.TEST_KEY, ONYXKEYS.COLLECTION.TEST_KEY_2])), {
+            await measureFunction(() => OnyxUtils.setSkippableCollectionMemberIDs(new Set([collectionKey, ONYXKEYS.COLLECTION.TEST_KEY_2])), {
                 afterEach: async () => {
                     OnyxUtils.setSkippableCollectionMemberIDs(skippableCollectionMemberIDs);
                 },

@@ -1,5 +1,6 @@
 import {randAggregation, randBoolean, randWord} from '@ngneat/falso';
 import {format} from 'date-fns';
+import {createCollection} from './createCollection';
 
 const getRandomDate = (): string => {
     const randomTimestamp = Math.random() * new Date().getTime();
@@ -9,6 +10,13 @@ const getRandomDate = (): string => {
 
     return formattedDate;
 };
+
+const getRandomReportActions = (collection: string, length = 10000) =>
+    createCollection<Record<string, unknown>>(
+        (item) => `${collection}${item.reportActionID}`,
+        (index) => createRandomReportAction(index),
+        length,
+    );
 
 export default function createRandomReportAction(index: number): Record<string, unknown> {
     return {
@@ -50,4 +58,4 @@ export default function createRandomReportAction(index: number): Record<string, 
     };
 }
 
-export {getRandomDate};
+export {getRandomDate, getRandomReportActions};

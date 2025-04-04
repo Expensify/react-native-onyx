@@ -3,8 +3,7 @@ import Onyx from '../../lib';
 import type {Connection} from '../../lib/OnyxConnectionManager';
 import connectionManager from '../../lib/OnyxConnectionManager';
 import createDeferredTask from '../../lib/createDeferredTask';
-import {createCollection} from '../utils/collections/createCollection';
-import createRandomReportAction from '../utils/collections/reportActions';
+import {getRandomReportActions} from '../utils/collections/reportActions';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -23,15 +22,7 @@ const ONYXKEYS = {
 };
 
 const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
-
-const getMockedReportActions = (collection = collectionKey, length = 10000) =>
-    createCollection<Record<string, unknown>>(
-        (item) => `${collection}${item.reportActionID}`,
-        (index) => createRandomReportAction(index),
-        length,
-    );
-
-const mockedReportActionsMap = getMockedReportActions();
+const mockedReportActionsMap = getRandomReportActions(collectionKey);
 const mockedReportActionsKeys = Object.keys(mockedReportActionsMap);
 
 // We need access to some internal properties of `connectionManager` during the tests but they are private,
@@ -62,9 +53,7 @@ describe('OnyxConnectionManager', () => {
     describe('generateConnectionID', () => {
         test('one call', async () => {
             await measureFunction(() => generateConnectionID({key: mockedReportActionsKeys[0]}), {
-                afterEach: async () => {
-                    resetConectionManagerAfterEachMeasure();
-                },
+                afterEach: resetConectionManagerAfterEachMeasure,
             });
         });
     });
@@ -151,9 +140,7 @@ describe('OnyxConnectionManager', () => {
     describe('refreshSessionID', () => {
         test('one call', async () => {
             await measureFunction(() => connectionManager.refreshSessionID(), {
-                afterEach: async () => {
-                    resetConectionManagerAfterEachMeasure();
-                },
+                afterEach: resetConectionManagerAfterEachMeasure,
             });
         });
     });

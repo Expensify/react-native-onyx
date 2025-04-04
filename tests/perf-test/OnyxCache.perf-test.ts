@@ -1,7 +1,6 @@
 import {measureAsyncFunction, measureFunction} from 'reassure';
 import type OnyxCache from '../../lib/OnyxCache';
-import {createCollection} from '../utils/collections/createCollection';
-import createRandomReportAction from '../utils/collections/reportActions';
+import createRandomReportAction, {getRandomReportActions} from '../utils/collections/reportActions';
 import type GenericCollection from '../utils/GenericCollection';
 import {TASK} from '../../lib/OnyxCache';
 
@@ -22,15 +21,7 @@ const ONYXKEYS = {
 };
 
 const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
-
-const getMockedReportActions = (collection = collectionKey, length = 10000) =>
-    createCollection<Record<string, unknown>>(
-        (item) => `${collection}${item.reportActionID}`,
-        (index) => createRandomReportAction(index),
-        length,
-    );
-
-const mockedReportActionsMap = getMockedReportActions();
+const mockedReportActionsMap = getRandomReportActions(collectionKey);
 const mockedReportActionsKeys = Object.keys(mockedReportActionsMap);
 
 let cache: typeof OnyxCache;
@@ -57,9 +48,7 @@ describe('OnyxCache', () => {
     describe('setAllKeys', () => {
         test('one call setting 10k keys', async () => {
             await measureFunction(() => cache.setAllKeys(mockedReportActionsKeys), {
-                beforeEach: async () => {
-                    resetCacheBeforeEachMeasure();
-                },
+                beforeEach: resetCacheBeforeEachMeasure,
             });
         });
     });
@@ -67,9 +56,7 @@ describe('OnyxCache', () => {
     describe('addKey', () => {
         test('one call adding one key', async () => {
             await measureFunction(() => cache.addKey(mockedReportActionsKeys[0]), {
-                beforeEach: async () => {
-                    resetCacheBeforeEachMeasure();
-                },
+                beforeEach: resetCacheBeforeEachMeasure,
             });
         });
     });
@@ -77,9 +64,7 @@ describe('OnyxCache', () => {
     describe('addNullishStorageKey', () => {
         test('one call adding one key', async () => {
             await measureFunction(() => cache.addNullishStorageKey(mockedReportActionsKeys[0]), {
-                beforeEach: async () => {
-                    resetCacheBeforeEachMeasure();
-                },
+                beforeEach: resetCacheBeforeEachMeasure,
             });
         });
     });
@@ -132,9 +117,7 @@ describe('OnyxCache', () => {
         test('one call setting one key', async () => {
             const value = mockedReportActionsMap[mockedReportActionsKeys[0]];
             await measureFunction(() => cache.set(mockedReportActionsKeys[0], value), {
-                beforeEach: async () => {
-                    resetCacheBeforeEachMeasure();
-                },
+                beforeEach: resetCacheBeforeEachMeasure,
             });
         });
     });
@@ -190,9 +173,7 @@ describe('OnyxCache', () => {
     describe('captureTask', () => {
         test('one call capturing one task', async () => {
             await measureAsyncFunction(() => cache.captureTask(`${TASK.GET}:${mockedReportActionsKeys[0]}`, Promise.resolve()), {
-                beforeEach: async () => {
-                    resetCacheBeforeEachMeasure();
-                },
+                beforeEach: resetCacheBeforeEachMeasure,
             });
         });
     });
@@ -200,9 +181,7 @@ describe('OnyxCache', () => {
     describe('addToAccessedKeys', () => {
         test('one call adding one key', async () => {
             await measureFunction(() => cache.addToAccessedKeys(mockedReportActionsKeys[0]), {
-                beforeEach: async () => {
-                    resetCacheBeforeEachMeasure();
-                },
+                beforeEach: resetCacheBeforeEachMeasure,
             });
         });
     });
@@ -222,9 +201,7 @@ describe('OnyxCache', () => {
     describe('setRecentKeysLimit', () => {
         test('one call', async () => {
             await measureFunction(() => cache.setRecentKeysLimit(10000), {
-                beforeEach: async () => {
-                    resetCacheBeforeEachMeasure();
-                },
+                beforeEach: resetCacheBeforeEachMeasure,
             });
         });
     });
