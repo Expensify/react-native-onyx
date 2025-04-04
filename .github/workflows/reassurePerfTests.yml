@@ -42,6 +42,6 @@ jobs:
                   npx reassure --branch
             - name: Validate output.json
               id: validateReassureOutput
-              uses: ./.github/actions/validateReassureOutput
+              uses: ./.github/actions/javascript/validateReassureOutput
               with:
                   DURATION_DEVIATION_PERCENTAGE: 20
