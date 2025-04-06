@@ -307,7 +307,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
         }
 
         try {
-            // We first only merge the changes, so we can use our custom merging strategy by signalling OnyxUtils.applyMerge()
+            // We first only merge the changes, so we can use our custom merging strategy by signaling OnyxUtils.applyMerge()
             // that we are batching merge changes.
             // We don't want to remove null values from the "batchedDeltaChanges" at the moment, this process will be done when merging
             // the batched changes to the existing value.

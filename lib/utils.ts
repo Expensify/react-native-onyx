@@ -95,7 +95,7 @@ function mergeObject<TObject extends Record<string, unknown>>(
                 // it means we want to fully replace this object when merging the batched changes with the Onyx value.
                 // To achieve this, we first mark these nested objects with an internal flag. With the desired objects
                 // marked, when calling this method again with "shouldReplaceMarkedObjects" set to true we can proceed
-                // to effectively replace them in the next condition.
+                // effectively replace them in the next condition.
                 if (isBatchingMergeChanges && targetValue === null) {
                     (targetValueWithFallback as Record<string, unknown>)[ONYX_INTERNALS__REPLACE_OBJECT_MARK] = true;
                 }
@@ -103,7 +103,7 @@ function mergeObject<TObject extends Record<string, unknown>>(
                 // Then, when merging the batched changes with the Onyx value, if a nested object of the batched changes
                 // has the internal flag set, we replace the entire destination object with the source one and remove
                 // the flag.
-                if (shouldReplaceMarkedObjects && sourceValue[ONYX_INTERNALS__REPLACE_OBJECT_MARK] === true) {
+                if (shouldReplaceMarkedObjects && sourceValue[ONYX_INTERNALS__REPLACE_OBJECT_MARK]) {
                     // We do a spread here in order to have a new object reference and allow us to delete the internal flag
                     // of the merged object only.
                     destination[key] = {...sourceValue};
