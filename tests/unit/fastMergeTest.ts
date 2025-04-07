@@ -36,6 +36,22 @@ const testObjectWithNullValuesRemoved: DeepObject = {
     },
 };
 
+const testMergeChanges: DeepObject[] = [
+    {
+        b: {
+            d: {
+                h: 'h',
+            },
+        },
+    },
+    {
+        b: {
+            d: null,
+            h: 'h',
+        },
+    },
+];
+
 describe('fastMerge', () => {
     it('should merge an object with another object and remove nested null values', () => {
         const result = utils.fastMerge(testObject, testObjectWithNullishValues, true, false, false);
@@ -96,5 +112,49 @@ describe('fastMerge', () => {
         const result = utils.fastMerge([1, 2, 3] as any, testObject, true, false, false);
 
         expect(result).toEqual(testObject);
+    });
+
+    it('should add the "ONYX_INTERNALS__REPLACE_OBJECT_MARK" flag to the target object when its source is set to null and "isBatchingMergeChanges" is true', () => {
+        const result = utils.fastMerge(testMergeChanges[1], testMergeChanges[0], true, true, false);
+
+        expect(result).toEqual({
+            b: {
+                d: {
+                    h: 'h',
+                    [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                },
+                h: 'h',
+            },
+        });
+    });
+
+    it('should completely replace the target object with its source when the source has the "ONYX_INTERNALS__REPLACE_OBJECT_MARK" flag and "shouldReplaceMarkedObjects" is true', () => {
+        const result = utils.fastMerge(
+            testObject,
+            {
+                b: {
+                    d: {
+                        h: 'h',
+                        [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                    },
+                    h: 'h',
+                },
+            },
+            true,
+            false,
+            true,
+        );
+
+        expect(result).toEqual({
+            a: 'a',
+            b: {
+                c: 'c',
+                d: {
+                    h: 'h',
+                },
+                h: 'h',
+                g: 'g',
+            },
+        });
     });
 });
