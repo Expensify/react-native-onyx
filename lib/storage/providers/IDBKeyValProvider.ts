@@ -49,14 +49,14 @@ const provider: StorageProvider = {
 
                 const upsertMany = pairsWithoutNull.map(([key, value], index) => {
                     const prev = values[index];
-                    const newValue = utils.fastMerge(prev as Record<string, unknown>, value as Record<string, unknown>);
+                    const newValue = utils.fastMerge(prev as Record<string, unknown>, value as Record<string, unknown>, true, false, true);
                     return promisifyRequest(store.put(newValue, key));
                 });
                 return Promise.all(upsertMany);
             });
         }),
-    mergeItem(key, _deltaChanges, preMergedValue) {
-        // Since Onyx also merged the existing value with the changes, we can just set the value directly
+    mergeItem(key, preMergedValue) {
+        // Since Onyx already merged the existing value with the changes, we can just set the value directly.
         return provider.setItem(key, preMergedValue);
     },
     multiSet: (pairs) => {
