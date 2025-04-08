@@ -74,6 +74,7 @@ type FetchStatus = 'loading' | 'loaded';
 
 type ResultMetadata = {
     status: FetchStatus;
+    sourceValue?: OnyxValue<OnyxKey>;
 };
 
 type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata];
@@ -157,6 +158,9 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
     // Indicates if we should get the newest cached value from Onyx during `getSnapshot()` execution.
     const shouldGetCachedValueRef = useRef(true);
+
+    // Inside useOnyx.ts, we need to track the sourceValue separately
+    const sourceValueRef = useRef<OnyxValue<OnyxKey> | undefined>(undefined);
 
     useEffect(() => {
         // These conditions will ensure we can only handle dynamic collection member keys from the same collection.
@@ -284,7 +288,13 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
             // If the new value is `null` we default it to `undefined` to ensure the consumer gets a consistent result from the hook.
             const newStatus = newFetchStatus ?? 'loaded';
-            resultRef.current = [previousValueRef.current ?? undefined, {status: newStatus}];
+            resultRef.current = [
+                previousValueRef.current ?? undefined,
+                {
+                    status: newStatus,
+                    sourceValue: sourceValueRef.current,
+                },
+            ];
 
             // If `canBeMissing` is set to `false` and the Onyx value of that key is not defined,
             // we log an alert so it can be acknowledged by the consumer. Additionally, we won't log alerts
@@ -304,7 +314,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
             connectionRef.current = connectionManager.connect<CollectionKeyBase>({
                 key,
-                callback: () => {
+                callback: (value, callbackKey, sourceValue) => {
                     isConnectingRef.current = false;
                     onStoreChangeFnRef.current = onStoreChange;
 
@@ -314,6 +324,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
                     // Signals that we want to get the newest cached value again in `getSnapshot()`.
                     shouldGetCachedValueRef.current = true;
+
+                    sourceValueRef.current = sourceValue;
 
                     // Finally, we signal that the store changed, making `getSnapshot()` be called again.
                     onStoreChange();
