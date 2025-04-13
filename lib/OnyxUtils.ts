@@ -1255,13 +1255,7 @@ function prepareKeyValuePairsForStorage(data: Record<OnyxKey, OnyxInput<OnyxKey>
  *
  * @param changes Array of changes that should be applied to the existing value
  */
-function applyMerge<TValue extends OnyxInput<OnyxKey> | undefined, TChange extends OnyxInput<OnyxKey> | undefined>(
-    existingValue: TValue,
-    changes: TChange[],
-    shouldRemoveNestedNulls: boolean,
-    isBatchingMergeChanges: boolean,
-    shouldReplaceMarkedObjects: boolean,
-): TChange {
+function applyMerge<TValue extends OnyxInput<OnyxKey> | undefined, TChange extends OnyxInput<OnyxKey> | undefined>(existingValue: TValue, changes: TChange[]): TChange {
     const lastChange = changes?.at(-1);
 
     if (Array.isArray(lastChange)) {
@@ -1270,10 +1264,24 @@ function applyMerge<TValue extends OnyxInput<OnyxKey> | undefined, TChange exten
 
     if (changes.some((change) => change && typeof change === 'object')) {
         // Object values are then merged one after the other
-        return changes.reduce(
-            (modifiedData, change) => utils.fastMerge(modifiedData, change, shouldRemoveNestedNulls, isBatchingMergeChanges, shouldReplaceMarkedObjects),
-            (existingValue || {}) as TChange,
-        );
+        return changes.reduce((modifiedData, change) => utils.fastMerge(modifiedData, change, true, false, true), (existingValue || {}) as TChange);
+    }
+
+    // If we have anything else we can't merge it so we'll
+    // simply return the last value that was queued
+    return lastChange as TChange;
+}
+
+function batchMergeChanges<TChange extends OnyxInput<OnyxKey> | undefined>(changes: TChange[]): TChange {
+    const lastChange = changes?.at(-1);
+
+    if (Array.isArray(lastChange)) {
+        return lastChange;
+    }
+
+    if (changes.some((change) => change && typeof change === 'object')) {
+        // Object values are then merged one after the other
+        return changes.reduce((modifiedData, change) => utils.fastMerge(modifiedData, change, false, true, false), {} as TChange);
     }
 
     // If we have anything else we can't merge it so we'll
@@ -1490,6 +1498,7 @@ const OnyxUtils = {
     getEvictionBlocklist,
     getSkippableCollectionMemberIDs,
     setSkippableCollectionMemberIDs,
+    batchMergeChanges,
 };
 
 GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {

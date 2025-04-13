@@ -307,10 +307,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
         }
 
         try {
-            // We first only merge the changes, so we can use our custom merging strategy by signaling OnyxUtils.applyMerge()
-            // that we are batching merge changes.
-            // We don't want to remove null values from the "batchedDeltaChanges" at the moment, this process will be done when merging
-            // the batched changes to the existing value.
+            // We first only merge the changes, so we use OnyxUtils.batchMergeChanges() to combine all the changes into just one.
             const validChanges = mergeQueue[key].filter((change) => {
                 const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(change, existingValue);
                 if (!isCompatible) {
@@ -322,7 +319,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
             if (!validChanges.length) {
                 return Promise.resolve();
             }
-            const batchedDeltaChanges = OnyxUtils.applyMerge(undefined, validChanges, false, true, false);
+            const batchedDeltaChanges = OnyxUtils.batchMergeChanges(validChanges);
 
             // Case (1): When there is no existing value in storage, we want to set the value instead of merge it.
             // Case (2): The presence of a top-level `null` in the merge queue instructs us to drop the whole existing value.
@@ -353,7 +350,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
             // We can remove null values from the "preMergedValue", because "null" implicates that the user wants to remove a value from storage.
             // Additionally, we will signal OnyxUtils.applyMerge() to replace any nested properties previously marked in "batchedDeltaChanges"
             // by our custom merging strategy.
-            const preMergedValue = OnyxUtils.applyMerge(shouldSetValue ? undefined : existingValue, [batchedDeltaChanges], true, false, true);
+            const preMergedValue = OnyxUtils.applyMerge(shouldSetValue ? undefined : existingValue, [batchedDeltaChanges]);
 
             // In cache, we don't want to remove the key if it's null to improve performance and speed up the next merge.
             const hasChanged = cache.hasValueChanged(key, preMergedValue);
@@ -773,7 +770,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
                 // Remove the collection-related key from the updateQueue so that it won't be processed individually.
                 delete updateQueue[key];
 
-                const batchedChanges = OnyxUtils.applyMerge(undefined, operations, false, true, false);
+                const batchedChanges = OnyxUtils.batchMergeChanges(operations);
                 if (operations[0] === null) {
                     // eslint-disable-next-line no-param-reassign
                     queue.set[key] = batchedChanges;
@@ -798,7 +795,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
     });
 
     Object.entries(updateQueue).forEach(([key, operations]) => {
-        const batchedChanges = OnyxUtils.applyMerge(undefined, operations, false, true, false);
+        const batchedChanges = OnyxUtils.batchMergeChanges(operations);
 
         if (operations[0] === null) {
             promises.push(() => set(key, batchedChanges));
