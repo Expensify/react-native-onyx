@@ -20,27 +20,21 @@ jobs:
 
       # v4
       - name: Setup Node
-        uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e
-        with:
-          node-version-file: '.nvmrc'
+        uses: ./.github/actions/composite/setupNode
 
-      - name: Run Reassure baseline tests
-        shell: bash
-        run: |
-          BASELINE_BRANCH=${BASELINE_BRANCH:="main"}
-          git fetch origin "$BASELINE_BRANCH" --no-tags --depth=1
-          git switch "$BASELINE_BRANCH"
-          npm install --force || (rm -rf node_modules && npm install --force) 
-          NODE_OPTIONS=--experimental-vm-modules npx reassure --baseline
+      - name: Run reassure baseline tests
+        run: npx reassure --baseline
 
-      - name: Run Reassure delta tests
-        shell: bash
+      - name: Checkout PR head ref
         run: |
-          git switch --force --detach -
-          git merge --no-commit --allow-unrelated-histories "$BASELINE_BRANCH" -X ours
-          git checkout --ours .
-          npm install --force || (rm -rf node_modules && npm install --force)
-          NODE_OPTIONS=--experimental-vm-modules npx reassure --branch
+          git fetch origin ${{ github.event.pull_request.head.ref }} --no-tags --depth=1
+          git switch --force --detach ${{ github.event.pull_request.head.ref }}
+          
+      - name: Reinstall node_modules
+        run: npm install --force
+
+      - name: Run reassure delta tests
+        run: npx reassure --branch
 
       - name: Validate output.json
         id: validateReassureOutput
