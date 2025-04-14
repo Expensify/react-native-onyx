@@ -3,11 +3,13 @@
  * converting the value to a JSON string
  */
 import type {BatchQueryResult, NitroSQLiteConnection} from 'react-native-nitro-sqlite';
-import {open} from 'react-native-nitro-sqlite';
+import {enableSimpleNullHandling, open} from 'react-native-nitro-sqlite';
 import {getFreeDiskStorage} from 'react-native-device-info';
 import type StorageProvider from './types';
 import utils from '../../utils';
 import type {KeyList, KeyValuePairList} from './types';
+
+enableSimpleNullHandling();
 
 /**
  * The type of the key-value pair stored in the SQLite database
@@ -98,8 +100,8 @@ const provider: StorageProvider = {
              SET valueJSON = JSON_PATCH(valueJSON, JSON(:value));
         `;
 
-        const nonNullishPairs = pairs.filter((pair) => pair[1] !== undefined);
-        const params = nonNullishPairs.map((pair) => {
+        const nonUndefinedPairs = pairs.filter((pair) => pair[1] !== undefined);
+        const params = nonUndefinedPairs.map((pair) => {
             const value = JSON.stringify(pair[1]);
             return [pair[0], value];
         });
