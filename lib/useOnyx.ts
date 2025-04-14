@@ -72,12 +72,12 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = BaseUseOnyxOptions & U
 
 type FetchStatus = 'loading' | 'loaded';
 
-type ResultMetadata = {
+type ResultMetadata<TValue> = {
     status: FetchStatus;
-    sourceValue?: OnyxValue<OnyxKey>;
+    sourceValue?: NonNullable<TValue> | undefined;
 };
 
-type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata];
+type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata<TValue>];
 
 /**
  * Gets the cached value from the Onyx cache. If the key is a collection key, it will return all the values in the collection.
@@ -160,7 +160,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     const shouldGetCachedValueRef = useRef(true);
 
     // Inside useOnyx.ts, we need to track the sourceValue separately
-    const sourceValueRef = useRef<OnyxValue<OnyxKey> | undefined>(undefined);
+    const sourceValueRef = useRef<NonNullable<TReturnValue> | undefined>(undefined);
 
     useEffect(() => {
         // These conditions will ensure we can only handle dynamic collection member keys from the same collection.
@@ -325,7 +325,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                     // Signals that we want to get the newest cached value again in `getSnapshot()`.
                     shouldGetCachedValueRef.current = true;
 
-                    sourceValueRef.current = sourceValue;
+                    // sourceValue is unknown type, so we need to cast it to the correct type.
+                    sourceValueRef.current = sourceValue as NonNullable<TReturnValue>;
 
                     // Finally, we signal that the store changed, making `getSnapshot()` be called again.
                     onStoreChange();
