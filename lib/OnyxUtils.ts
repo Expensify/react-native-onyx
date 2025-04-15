@@ -171,6 +171,56 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
     if (typeof keys.COLLECTION === 'object' && typeof keys.COLLECTION.SNAPSHOT === 'string') {
         snapshotKey = keys.COLLECTION.SNAPSHOT;
     }
+
+    // Mark any existing keys in storage that are NOT in safeEvictionKeys as non-evictable
+    cache.getAllKeys().forEach((key) => {
+        // If key is in safeEvictionKeys or starts with a safe key prefix, it's safe to evict, so return early
+        if (isSafeEvictionKey(key)) {
+            return;
+        }
+
+        // Otherwise, mark the key as non-evictable to protect it
+        cache.markKeyAsNonEvictable(key);
+    });
+}
+
+/**
+ * Check if a key is in the safe eviction list (allowed to be evicted)
+ * This avoids duplicate logic between here and OnyxCache
+ */
+function isSafeEvictionKey(testKey: OnyxKey): boolean {
+    // Check if the key exactly matches any safe eviction key
+    if (evictionAllowList.includes(testKey)) {
+        return true;
+    }
+
+    // Check if the key starts with any safe eviction key prefix
+    return evictionAllowList.some((safeKey) => testKey.startsWith(safeKey));
+}
+
+/**
+ * Any time a key is accessed or added, we should check if it needs to be protected
+ * from eviction (if it's not in the safe eviction list)
+ */
+function addLastAccessedKey(key: OnyxKey): void {
+    // First, always add the key to the accessed keys for LRU tracking
+    cache.addToAccessedKeys(key);
+
+    // Check if this key is safe for eviction or not
+    const isSafeForEviction = isSafeEvictionKey(key);
+
+    // If it's a collection key or not safe for eviction, mark it as non-evictable
+    if (isCollectionKey(key) || !isSafeForEviction) {
+        cache.markKeyAsNonEvictable(key);
+        return;
+    }
+
+    // For safe eviction keys, mark them as evictable
+    cache.markKeyAsEvictable(key);
+
+    // Update the recently accessed keys list
+    removeLastAccessedKey(key);
+    recentlyAccessedKeys.push(key);
 }
 
 /**
@@ -499,11 +549,6 @@ function isKeyMatch(configKey: OnyxKey, key: OnyxKey): boolean {
     return isCollectionKey(configKey) ? Str.startsWith(key, configKey) : configKey === key;
 }
 
-/** Checks to see if this key has been flagged as safe for removal. */
-function isSafeEvictionKey(testKey: OnyxKey): boolean {
-    return evictionAllowList.some((key) => isKeyMatch(key, testKey));
-}
-
 /**
  * Extracts the collection identifier of a given collection member key.
  *
@@ -580,21 +625,6 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Partial<Ma
  */
 function removeLastAccessedKey(key: OnyxKey): void {
     recentlyAccessedKeys = recentlyAccessedKeys.filter((recentlyAccessedKey) => recentlyAccessedKey !== key);
-}
-
-/**
- * Add a key to the list of recently accessed keys. The least
- * recently accessed key should be at the head and the most
- * recently accessed key at the tail.
- */
-function addLastAccessedKey(key: OnyxKey): void {
-    // Only specific keys belong in this list since we cannot remove an entire collection.
-    if (isCollectionKey(key) || !isSafeEvictionKey(key)) {
-        return;
-    }
-
-    removeLastAccessedKey(key);
-    recentlyAccessedKeys.push(key);
 }
 
 /**
@@ -1069,6 +1099,8 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, valu
  */
 function addKeyToRecentlyAccessedIfNeeded<TKey extends OnyxKey>(mapping: Mapping<TKey>): void {
     if (!isSafeEvictionKey(mapping.key)) {
+        // Mark this key as non-evictable since it's not in the safe eviction list
+        cache.markKeyAsNonEvictable(mapping.key);
         return;
     }
 
@@ -1081,6 +1113,15 @@ function addKeyToRecentlyAccessedIfNeeded<TKey extends OnyxKey>(mapping: Mapping
             throw new Error(`Cannot subscribe to safe eviction key '${mapping.key}' without providing a canEvict value.`);
         }
 
+        // If a component specifies it can't evict this key, we mark it as non-evictable
+        if (mapping.canEvict === false) {
+            cache.markKeyAsNonEvictable(mapping.key);
+        } else {
+            cache.markKeyAsEvictable(mapping.key);
+            addLastAccessedKey(mapping.key);
+        }
+    } else {
+        cache.markKeyAsEvictable(mapping.key);
         addLastAccessedKey(mapping.key);
     }
 }
