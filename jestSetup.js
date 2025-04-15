@@ -3,9 +3,10 @@ jest.mock('./lib/storage/platforms/index.native', () => require('./lib/storage/_
 jest.mock('./lib/storage/platforms/index', () => require('./lib/storage/__mocks__'));
 jest.mock('./lib/storage/providers/IDBKeyValProvider', () => require('./lib/storage/__mocks__'));
 
-jest.mock('react-native-device-info', () => ({getFreeDiskStorage: () => {}}));
+jest.mock('react-native-device-info', () => ({ getFreeDiskStorage: () => { } }));
 jest.mock('react-native-nitro-sqlite', () => ({
-    open: () => ({execute: () => {}}),
+    open: () => ({ execute: () => { } }),
+    enableSimpleNullHandling: () => undefined,
 }));
 
 jest.useRealTimers();
