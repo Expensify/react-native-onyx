@@ -684,7 +684,6 @@ describe('Onyx', () => {
                 NOT_SAFE_FOR_EVICTION: 'critical_',
             };
 
-            // Create specific test key instances
             const criticalKey1 = `${testKeys.NOT_SAFE_FOR_EVICTION}1`;
             const criticalKey2 = `${testKeys.NOT_SAFE_FOR_EVICTION}2`;
             const criticalKey3 = `${testKeys.NOT_SAFE_FOR_EVICTION}3`;
