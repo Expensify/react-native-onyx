@@ -678,7 +678,6 @@ describe('Onyx', () => {
         });
 
         it('Should NOT evict keys that are not in safeEvictionKeys list when cache limit is reached', () => {
-            // Given Onyx keys configuration
             const testKeys = {
                 ...ONYX_KEYS,
                 SAFE_FOR_EVICTION: 'evictable_',
@@ -693,7 +692,6 @@ describe('Onyx', () => {
             const evictableKey2 = `${testKeys.SAFE_FOR_EVICTION}2`;
             const evictableKey3 = `${testKeys.SAFE_FOR_EVICTION}3`;
 
-            // Given storage with some data
             StorageMock.getItem.mockResolvedValue('"mockValue"');
             const allKeys = [
                 // Keys that should be evictable
@@ -707,7 +705,6 @@ describe('Onyx', () => {
             ];
             StorageMock.getAllKeys.mockResolvedValue(allKeys);
 
-            // Given Onyx with a very small cache limit to force eviction
             return initOnyx({
                 keys: testKeys,
                 maxCachedKeysCount: 3, // Only allow 3 keys in cache
@@ -733,16 +730,7 @@ describe('Onyx', () => {
                 })
                 .then(waitForPromisesToResolve)
                 .then(() => {
-                    // Get which keys were kept in cache
                     const nonEvictableKeysInCache = [cache.hasCacheForKey(criticalKey1), cache.hasCacheForKey(criticalKey2), cache.hasCacheForKey(criticalKey3)];
-
-                    const evictableKeysInCache = [cache.hasCacheForKey(evictableKey1), cache.hasCacheForKey(evictableKey2), cache.hasCacheForKey(evictableKey3)];
-
-                    // Print results for debugging
-                    // eslint-disable-next-line no-console
-                    console.log('Non-evictable keys in cache:', nonEvictableKeysInCache);
-                    // eslint-disable-next-line no-console
-                    console.log('Evictable keys in cache:', evictableKeysInCache);
 
                     // Bug demonstration: This test should FAIL because critical keys are incorrectly evicted
                     // The current implementation evicts based on LRU order, not respecting safeEvictionKeys
