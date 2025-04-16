@@ -1,5 +1,68 @@
 import Onyx from '../../lib';
 import OnyxUtils from '../../lib/OnyxUtils';
+import type {DeepRecord} from '../../lib/types';
+import utils from '../../lib/utils';
+
+const testObject: DeepRecord<string, unknown> = {
+    a: 'a',
+    b: {
+        c: 'c',
+        d: {
+            e: 'e',
+            f: 'f',
+        },
+        g: 'g',
+    },
+};
+
+const testMergeChanges: Array<DeepRecord<string, unknown>> = [
+    {
+        b: {
+            d: {
+                h: 'h',
+            },
+        },
+    },
+    {
+        b: {
+            // Removing "d" object.
+            d: null,
+            h: 'h',
+        },
+    },
+    {
+        b: {
+            // Adding back "d" property with a object.
+            // The "ONYX_INTERNALS__REPLACE_OBJECT_MARK" marker property should be added here when batching merge changes.
+            d: {
+                i: 'i',
+            },
+        },
+    },
+    {
+        b: {
+            // Removing "d" object again.
+            d: null,
+            // Removing "g" object.
+            g: null,
+        },
+    },
+    {
+        b: {
+            // Adding back "d" property with a object.
+            // The "ONYX_INTERNALS__REPLACE_OBJECT_MARK" marker property should be added here when batching merge changes.
+            d: {
+                i: 'i',
+                j: 'j',
+            },
+            // Adding back "g" property with a object.
+            // The "ONYX_INTERNALS__REPLACE_OBJECT_MARK" marker property should be added here when batching merge changes.
+            g: {
+                k: 'k',
+            },
+        },
+    },
+];
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -85,6 +148,75 @@ describe('OnyxUtils', () => {
             expect(() => {
                 OnyxUtils.getCollectionKey('');
             }).toThrowError("Invalid '' key provided, only collection keys are allowed.");
+        });
+    });
+
+    describe('applyMerge', () => {
+        it("should return the last change if it's an array", () => {
+            const result = OnyxUtils.applyMerge(testObject, [...testMergeChanges, [0, 1, 2]]);
+
+            expect(result).toEqual([0, 1, 2]);
+        });
+
+        it("should return the last change if the changes aren't objects", () => {
+            const result = OnyxUtils.applyMerge(testObject, ['a', 0, 'b', 1]);
+
+            expect(result).toEqual(1);
+        });
+
+        it('should merge data correctly when applying batched changes', () => {
+            const batchedChanges: DeepRecord<string, unknown> = {
+                b: {
+                    d: {
+                        i: 'i',
+                        j: 'j',
+                        [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                    },
+                    h: 'h',
+                    g: {
+                        [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                        k: 'k',
+                    },
+                },
+            };
+
+            const result = OnyxUtils.applyMerge(testObject, [batchedChanges]);
+
+            expect(result).toEqual({
+                a: 'a',
+                b: {
+                    c: 'c',
+                    d: {
+                        i: 'i',
+                        j: 'j',
+                    },
+                    h: 'h',
+                    g: {
+                        k: 'k',
+                    },
+                },
+            });
+        });
+    });
+
+    describe('batchMergeChanges', () => {
+        it('should apply the replacement markers if the we have properties with objects being removed and added back during the changes', () => {
+            const result = OnyxUtils.batchMergeChanges(testMergeChanges);
+
+            expect(result).toEqual({
+                b: {
+                    d: {
+                        i: 'i',
+                        j: 'j',
+                        [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                    },
+                    h: 'h',
+                    g: {
+                        [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                        k: 'k',
+                    },
+                },
+            });
         });
     });
 });

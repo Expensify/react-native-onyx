@@ -307,8 +307,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
         }
 
         try {
-            // We first only merge the changes, so we can provide these to the native implementation (SQLite uses only delta changes in "JSON_PATCH" to merge)
-            // We don't want to remove null values from the "batchedDeltaChanges", because SQLite uses them to remove keys from storage natively.
+            // We first only merge the changes, so we use OnyxUtils.batchMergeChanges() to combine all the changes into just one.
             const validChanges = mergeQueue[key].filter((change) => {
                 const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(change, existingValue);
                 if (!isCompatible) {
@@ -320,23 +319,23 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
             if (!validChanges.length) {
                 return Promise.resolve();
             }
-            const batchedDeltaChanges = OnyxUtils.applyMerge(undefined, validChanges, false);
+            const batchedDeltaChanges = OnyxUtils.batchMergeChanges(validChanges);
 
             // Case (1): When there is no existing value in storage, we want to set the value instead of merge it.
             // Case (2): The presence of a top-level `null` in the merge queue instructs us to drop the whole existing value.
-            // In this case, we can't simply merge the batched changes with the existing value, because then the null in the merge queue would have no effect
+            // In this case, we can't simply merge the batched changes with the existing value, because then the null in the merge queue would have no effect.
             const shouldSetValue = !existingValue || mergeQueue[key].includes(null);
 
-            // Clean up the write queue, so we don't apply these changes again
+            // Clean up the write queue, so we don't apply these changes again.
             delete mergeQueue[key];
             delete mergeQueuePromise[key];
 
             const logMergeCall = (hasChanged = true) => {
-                // Logging properties only since values could be sensitive things we don't want to log
+                // Logging properties only since values could be sensitive things we don't want to log.
                 Logger.logInfo(`merge called for key: ${key}${_.isObject(batchedDeltaChanges) ? ` properties: ${_.keys(batchedDeltaChanges).join(',')}` : ''} hasChanged: ${hasChanged}`);
             };
 
-            // If the batched changes equal null, we want to remove the key from storage, to reduce storage size
+            // If the batched changes equal null, we want to remove the key from storage, to reduce storage size.
             const {wasRemoved} = OnyxUtils.removeNullValues(key, batchedDeltaChanges);
 
             // Calling "OnyxUtils.removeNullValues" removes the key from storage and cache and updates the subscriber.
@@ -346,27 +345,28 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
                 return Promise.resolve();
             }
 
-            // For providers that can't handle delta changes, we need to merge the batched changes with the existing value beforehand.
-            // The "preMergedValue" will be directly "set" in storage instead of being merged
-            // Therefore we merge the batched changes with the existing value to get the final merged value that will be stored.
-            // We can remove null values from the "preMergedValue", because "null" implicates that the user wants to remove a value from storage.
-            const preMergedValue = OnyxUtils.applyMerge(shouldSetValue ? undefined : existingValue, [batchedDeltaChanges], true);
+            // If "shouldSetValue" is true, it means that we want to completely replace the existing value with the batched changes,
+            // so we pass `undefined` to OnyxUtils.applyMerge() first parameter to make it use "batchedDeltaChanges" to
+            // create a new object for us.
+            // If "shouldSetValue" is false, it means that we want to merge the batched changes into the existing value,
+            // so we pass "existingValue" to the first parameter.
+            const resultValue = OnyxUtils.applyMerge(shouldSetValue ? undefined : existingValue, [batchedDeltaChanges]);
 
             // In cache, we don't want to remove the key if it's null to improve performance and speed up the next merge.
-            const hasChanged = cache.hasValueChanged(key, preMergedValue);
+            const hasChanged = cache.hasValueChanged(key, resultValue);
 
             logMergeCall(hasChanged);
 
             // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
-            const updatePromise = OnyxUtils.broadcastUpdate(key, preMergedValue as OnyxValue<TKey>, hasChanged);
+            const updatePromise = OnyxUtils.broadcastUpdate(key, resultValue as OnyxValue<TKey>, hasChanged);
 
             // If the value has not changed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
             if (!hasChanged) {
                 return updatePromise;
             }
 
-            return Storage.mergeItem(key, batchedDeltaChanges as OnyxValue<TKey>, preMergedValue as OnyxValue<TKey>, shouldSetValue).then(() => {
-                OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, changes, preMergedValue);
+            return Storage.mergeItem(key, resultValue as OnyxValue<TKey>).then(() => {
+                OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, changes, resultValue);
                 return updatePromise;
             });
         } catch (error) {
@@ -770,13 +770,13 @@ function update(data: OnyxUpdate[]): Promise<void> {
                 // Remove the collection-related key from the updateQueue so that it won't be processed individually.
                 delete updateQueue[key];
 
-                const updatedValue = OnyxUtils.applyMerge(undefined, operations, false);
+                const batchedChanges = OnyxUtils.batchMergeChanges(operations);
                 if (operations[0] === null) {
                     // eslint-disable-next-line no-param-reassign
-                    queue.set[key] = updatedValue;
+                    queue.set[key] = batchedChanges;
                 } else {
                     // eslint-disable-next-line no-param-reassign
-                    queue.merge[key] = updatedValue;
+                    queue.merge[key] = batchedChanges;
                 }
                 return queue;
             },
@@ -795,7 +795,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
     });
 
     Object.entries(updateQueue).forEach(([key, operations]) => {
-        const batchedChanges = OnyxUtils.applyMerge(undefined, operations, false);
+        const batchedChanges = OnyxUtils.batchMergeChanges(operations);
 
         if (operations[0] === null) {
             promises.push(() => set(key, batchedChanges));

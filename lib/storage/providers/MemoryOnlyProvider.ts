@@ -74,8 +74,8 @@ const provider: StorageProvider = {
     /**
      * Merging an existing value with a new one
      */
-    mergeItem(key, _deltaChanges, preMergedValue) {
-        // Since Onyx already merged the existing value with the changes, we can just set the value directly
+    mergeItem(key, preMergedValue) {
+        // Since Onyx already merged the existing value with the changes, we can just set the value directly.
         return this.setItem(key, preMergedValue);
     },
 
@@ -86,7 +86,7 @@ const provider: StorageProvider = {
     multiMerge(pairs) {
         _.forEach(pairs, ([key, value]) => {
             const existingValue = store[key] as Record<string, unknown>;
-            const newValue = utils.fastMerge(existingValue, value as Record<string, unknown>) as OnyxValue<OnyxKey>;
+            const newValue = utils.fastMerge(existingValue, value as Record<string, unknown>, true, false, true) as OnyxValue<OnyxKey>;
 
             set(key, newValue);
         });

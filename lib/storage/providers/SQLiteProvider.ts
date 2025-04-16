@@ -8,6 +8,7 @@ import {getFreeDiskStorage} from 'react-native-device-info';
 import type StorageProvider from './types';
 import utils from '../../utils';
 import type {KeyList, KeyValuePairList} from './types';
+import type {OnyxKey, OnyxValue} from '../../types';
 
 const DB_NAME = 'OnyxDB';
 let db: QuickSQLiteConnection;
@@ -60,28 +61,51 @@ const provider: StorageProvider = {
         return db.executeBatchAsync([['REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, json(?));', stringifiedPairs]]);
     },
     multiMerge(pairs) {
-        // Note: We use `ON CONFLICT DO UPDATE` here instead of `INSERT OR REPLACE INTO`
-        // so the new JSON value is merged into the old one if there's an existing value
-        const query = `INSERT INTO keyvaluepairs (record_key, valueJSON)
-             VALUES (:key, JSON(:value))
-             ON CONFLICT DO UPDATE
-             SET valueJSON = JSON_PATCH(valueJSON, JSON(:value));
-        `;
+        const nonNullishPairs: KeyValuePairList = [];
+        const nonNullishPairsKeys: OnyxKey[] = [];
 
-        const nonNullishPairs = pairs.filter((pair) => pair[1] !== undefined);
-        const queryArguments = nonNullishPairs.map((pair) => {
-            const value = JSON.stringify(pair[1]);
-            return [pair[0], value];
-        });
-
-        return db.executeBatchAsync([[query, queryArguments]]);
-    },
-    mergeItem(key, deltaChanges, preMergedValue, shouldSetValue) {
-        if (shouldSetValue) {
-            return this.setItem(key, preMergedValue) as Promise<BatchQueryResult>;
+        // eslint-disable-next-line @typescript-eslint/prefer-for-of
+        for (let i = 0; i < pairs.length; i++) {
+            const pair = pairs[i];
+            if (pair[1] !== undefined) {
+                nonNullishPairs.push(pair);
+                nonNullishPairsKeys.push(pair[0]);
+            }
         }
 
-        return this.multiMerge([[key, deltaChanges]]) as Promise<BatchQueryResult>;
+        if (nonNullishPairs.length === 0) {
+            return Promise.resolve();
+        }
+
+        return this.multiGet(nonNullishPairsKeys).then((storagePairs) => {
+            // multiGet() is not guaranteed to return the data in the same order we asked with "nonNullishPairsKeys",
+            // so we use a map to associate keys to their existing values correctly.
+            const existingMap = new Map<OnyxKey, OnyxValue<OnyxKey>>();
+            // eslint-disable-next-line @typescript-eslint/prefer-for-of
+            for (let i = 0; i < storagePairs.length; i++) {
+                existingMap.set(storagePairs[i][0], storagePairs[i][1]);
+            }
+
+            const newPairs: KeyValuePairList = [];
+
+            // eslint-disable-next-line @typescript-eslint/prefer-for-of
+            for (let i = 0; i < nonNullishPairs.length; i++) {
+                const key = nonNullishPairs[i][0];
+                const newValue = nonNullishPairs[i][1];
+
+                const existingValue = existingMap.get(key) ?? {};
+
+                const mergedValue = utils.fastMerge(existingValue, newValue, true, false, true);
+
+                newPairs.push([key, mergedValue]);
+            }
+
+            return this.multiSet(newPairs);
+        });
+    },
+    mergeItem(key, preMergedValue) {
+        // Since Onyx already merged the existing value with the changes, we can just set the value directly.
+        return this.setItem(key, preMergedValue) as Promise<BatchQueryResult>;
     },
     getAllKeys: () =>
         db.executeAsync('SELECT record_key FROM keyvaluepairs;').then(({rows}) => {
