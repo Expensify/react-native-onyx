@@ -36,8 +36,35 @@ class OnyxCache {
      */
     private pendingPromises: Map<string, Promise<OnyxValue<OnyxKey> | OnyxKey[]>>;
 
-    /** Maximum size of the keys store din cache */
+    /** Maximum size of the keys stored in cache (legacy property for backward compatibility) */
     private maxRecentKeysSize = 0;
+
+    /** Memory usage limit in bytes (default: 50MB) */
+    private memoryUsageLimit = 10 * 1024 * 1024;
+
+    /** Current estimated memory usage in bytes */
+    private currentMemoryUsage = 0;
+
+    /** Memory threshold percentage that triggers cleanup (default: 85%) */
+    private memoryThreshold = 0.85;
+
+    /** Minimum key size to track for memory estimation (bytes) */
+    private minKeySize = 100;
+
+    /** Map of key timestamps */
+    // private keyTimestamps = new Map<OnyxKey, number>();
+
+    /** Set of keys that should not be evicted */
+    private nonEvictableKeys = new Set<OnyxKey>();
+
+    /** Count of expired keys cleaned since last reset */
+    private expiredKeysCleanedCount = 0;
+
+    /** Timestamp of last key expiration cleanup */
+    private lastExpirationCleanupTime = 0;
+
+    /** Expiration time in milliseconds */
+    private readonly EXPIRATION_TIME_MS = 10 * 60 * 60 * 1000;
 
     constructor() {
         this.storageKeys = new Set();
@@ -65,6 +92,9 @@ class OnyxCache {
             'removeLeastRecentlyUsedKeys',
             'setRecentKeysLimit',
             'setAllKeys',
+            'markKeyAsNonEvictable',
+            'markKeyAsEvictable',
+            'isKeyEvictable',
         );
     }
 
@@ -131,6 +161,7 @@ class OnyxCache {
      * Adds the key to the storage keys list as well
      */
     set(key: OnyxKey, value: OnyxValue<OnyxKey>): OnyxValue<OnyxKey> {
+        // this.cleanExpiredKeys(); //
         this.addKey(key);
         this.addToAccessedKeys(key);
 
@@ -139,8 +170,20 @@ class OnyxCache {
         this.nullishStorageKeys.delete(key);
 
         if (value === null || value === undefined) {
+            // Track memory usage reduction
+            if (this.storageMap[key] !== undefined) {
+                this.reduceMemoryUsage(key, this.storageMap[key]);
+            }
             delete this.storageMap[key];
             return undefined;
+        }
+
+        // Track memory usage
+        this.trackMemoryUsage(key, value);
+
+        // Check if we need to free up memory
+        if (this.shouldReduceMemoryUsage()) {
+            this.freeMemory();
         }
 
         this.storageMap[key] = value;
@@ -215,37 +258,223 @@ class OnyxCache {
     addToAccessedKeys(key: OnyxKey): void {
         this.recentKeys.delete(key);
         this.recentKeys.add(key);
+        // this.keyTimestamps.set(key, Date.now());
+    }
+
+    /**
+     * Tracks memory usage for a key-value pair
+     */
+    trackMemoryUsage(key: OnyxKey, value: OnyxValue<OnyxKey>): void {
+        // If this key already exists, first reduce its current memory usage
+        if (this.storageMap[key] !== undefined) {
+            this.reduceMemoryUsage(key, this.storageMap[key]);
+        }
+
+        // Calculate approximate size of the value
+        let valueSize = 0;
+
+        try {
+            // Using JSON.stringify for a rough estimate
+            const valueStr = JSON.stringify(value);
+            valueSize = valueStr.length * 2; // UTF-16 encoding uses 2 bytes per character
+        } catch (e) {
+            // Fallback to minimum size if stringification fails
+            valueSize = this.minKeySize;
+        }
+
+        // Update memory usage
+        this.currentMemoryUsage += valueSize;
+    }
+
+    /**
+     * Reduces tracked memory usage when a key is removed or updated
+     */
+    reduceMemoryUsage(key: OnyxKey, value: OnyxValue<OnyxKey>): void {
+        let valueSize = 0;
+
+        try {
+            // Using JSON.stringify for a rough estimate
+            const valueStr = JSON.stringify(value);
+            valueSize = valueStr.length * 2; // UTF-16 encoding uses 2 bytes per character
+        } catch (e) {
+            // Fallback to minimum size if stringification fails
+            valueSize = this.minKeySize;
+        }
+
+        this.currentMemoryUsage = Math.max(0, this.currentMemoryUsage - valueSize);
+    }
+
+    /**
+     * Checks if memory usage has exceeded the threshold
+     */
+    shouldReduceMemoryUsage(): boolean {
+        return this.currentMemoryUsage > this.memoryUsageLimit * this.memoryThreshold;
+    }
+
+    /**
+     * Frees memory by removing least recently used keys that are safe to evict
+     */
+    freeMemory(): void {
+        const targetMemoryUsage = this.memoryUsageLimit * 0.7; // Target 70% usage after cleanup
+        const keysToRemove: OnyxKey[] = [];
+
+        // If we're under the limit, no need to free memory
+        if (this.currentMemoryUsage <= targetMemoryUsage) {
+            return;
+        }
+
+        // Build list of keys to remove (least recently used first)
+        const orderedKeys = Array.from(this.recentKeys);
+
+        // Use array iteration instead of for...of loop
+        orderedKeys.some((key) => {
+            if (this.currentMemoryUsage <= targetMemoryUsage) {
+                return true; // Stop iteration once we're under the target
+            }
+
+            if (this.isKeyEvictable(key)) {
+                keysToRemove.push(key);
+                this.reduceMemoryUsage(key, this.storageMap[key]);
+            }
+            return false;
+        });
+
+        // Remove the keys from cache
+        keysToRemove.forEach((key) => {
+            delete this.storageMap[key];
+            this.recentKeys.delete(key);
+        });
+    }
+
+    // cleanExpiredKeys(): void {
+    //     const now = Date.now();
+    //     const expiredKeys: OnyxKey[] = [];
+
+    //     this.keyTimestamps.forEach((timestamp, key) => {
+    //         // Skip keys that are not safe for eviction
+    //         // if (!OnyxUtils.isSafeEvictionKey(key)) return;
+    //         if (now - timestamp < this.EXPIRATION_TIME_MS) {
+    //             return;
+    //         }
+
+    //         expiredKeys.push(key);
+    //     });
+
+    //     // Remove expired keys
+    //     expiredKeys.forEach((key) => {
+    //         this.storageMap[key] = undefined;
+    //         this.recentKeys.delete(key);
+    //         this.keyTimestamps.delete(key);
+    //     });
+
+    //     if (expiredKeys.length > 0) {
+    //         this.expiredKeysCleanedCount += expiredKeys.length;
+    //         this.lastExpirationCleanupTime = now;
+    //         Logger.logInfo(`Cleaned ${expiredKeys.length} expired keys from cache`);
+    //     }
+    // }
+
+    /**
+     * Marks a key as non-evictable, meaning it won't be automatically evicted
+     * when the cache size limit is reached
+     */
+    markKeyAsNonEvictable(key: OnyxKey): void {
+        this.nonEvictableKeys.add(key);
+    }
+
+    /**
+     * Marks a key as evictable, allowing it to be automatically evicted
+     * when the cache size limit is reached
+     */
+    markKeyAsEvictable(key: OnyxKey): void {
+        this.nonEvictableKeys.delete(key);
+    }
+
+    /**
+     * Checks if a key can be evicted
+     */
+    isKeyEvictable(key: OnyxKey): boolean {
+        return !this.nonEvictableKeys.has(key);
     }
 
     /** Remove keys that don't fall into the range of recently used keys */
     removeLeastRecentlyUsedKeys(): void {
-        let numKeysToRemove = this.recentKeys.size - this.maxRecentKeysSize;
-        if (numKeysToRemove <= 0) {
-            return;
-        }
-        const iterator = this.recentKeys.values();
-        const temp = [];
-        while (numKeysToRemove > 0) {
-            const value = iterator.next().value;
-            temp.push(value);
-            numKeysToRemove--;
-        }
-
-        // eslint-disable-next-line @typescript-eslint/prefer-for-of
-        for (let i = 0; i < temp.length; ++i) {
-            delete this.storageMap[temp[i]];
-            this.recentKeys.delete(temp[i]);
-        }
+        // For backward compatibility with code that may still call this method
+        this.freeMemory();
     }
 
     /** Set the recent keys list size */
     setRecentKeysLimit(limit: number): void {
+        // For backward compatibility with code that may still call this method
         this.maxRecentKeysSize = limit;
+
+        // Adjust memory limit based on the key limit (rough heuristic)
+        // This ensures systems that call setRecentKeysLimit still have some control over cache size
+        this.memoryUsageLimit = Math.max(this.memoryUsageLimit, limit * this.minKeySize * 10);
+    }
+
+    /**
+     * Sets the memory usage limit in megabytes
+     */
+    setMemoryLimit(limitInMB: number): void {
+        this.memoryUsageLimit = limitInMB * 1024 * 1024;
+
+        // If we're already over the new limit, trigger cleanup
+        if (this.shouldReduceMemoryUsage()) {
+            this.freeMemory();
+        }
+    }
+
+    /**
+     * Gets the current memory usage in megabytes
+     */
+    getMemoryUsage(): number {
+        return this.currentMemoryUsage / (1024 * 1024);
+    }
+
+    /**
+     * Gets the memory usage limit in megabytes
+     */
+    getMemoryLimit(): number {
+        return this.memoryUsageLimit / (1024 * 1024);
     }
 
     /** Check if the value has changed */
     hasValueChanged(key: OnyxKey, value: OnyxValue<OnyxKey>): boolean {
         return !deepEqual(this.storageMap[key], value);
+    }
+
+    getRecentlyUsedKeys(count = 20): OnyxKey[] {
+        const keys = Array.from(this.recentKeys).slice(-count);
+        return keys.reverse(); // Most recent first
+    }
+
+    /**
+     * Gets the number of expired keys cleaned since last reset
+     */
+    getExpiredKeysCleanedCount(): number {
+        return this.expiredKeysCleanedCount;
+    }
+
+    /**
+     * Gets the timestamp of the last key expiration cleanup
+     */
+    getLastExpirationCleanupTime(): number {
+        return this.lastExpirationCleanupTime;
+    }
+
+    /**
+     * Gets the expiration time in milliseconds
+     */
+    getExpirationTimeMs(): number {
+        return this.EXPIRATION_TIME_MS;
+    }
+
+    /**
+     * Resets the expired keys cleaned count
+     */
+    resetExpiredKeysCleanedCount(): void {
+        this.expiredKeysCleanedCount = 0;
     }
 }
 
