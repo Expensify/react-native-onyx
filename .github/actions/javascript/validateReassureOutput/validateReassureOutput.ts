@@ -4,7 +4,7 @@
  */
 
 import * as core from '@actions/core';
-import type {CompareResult, PerformanceEntry} from '@callstack/reassure-compare/src/types';
+import type {CompareResult, MeasureEntry} from '@callstack/reassure-compare';
 import fs from 'fs';
 
 async function run() {
@@ -21,8 +21,8 @@ async function run() {
 
         for (let i = 0; i < regressionOutput.significant.length; i++) {
             const measurement = regressionOutput.significant[i];
-            const baseline: PerformanceEntry = measurement.baseline;
-            const current: PerformanceEntry = measurement.current;
+            const baseline: MeasureEntry = measurement.baseline;
+            const current: MeasureEntry = measurement.current;
 
             console.log(`Processing measurement ${i + 1}: ${measurement.name}`);
 
