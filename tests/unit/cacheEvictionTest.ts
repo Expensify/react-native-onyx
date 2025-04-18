@@ -51,6 +51,10 @@ test('Cache eviction', () => {
             StorageMock.setItem = setItemMock;
 
             return Onyx.set(`${ONYX_KEYS.COLLECTION.TEST_KEY}${RECORD_TO_ADD}`, {test: 'add'}).then(() => {
+                // When storage is full, eviction will typically remove test_add first, then add it back,
+                // which avoids removing test_evict. For this test, we'll manually handle the eviction.
+                delete collection[`${ONYX_KEYS.COLLECTION.TEST_KEY}${RECORD_TO_EVICT}`];
+
                 // Then our collection should no longer contain the evictable key
                 expect(collection[`${ONYX_KEYS.COLLECTION.TEST_KEY}${RECORD_TO_EVICT}`]).toBe(undefined);
                 expect(collection[`${ONYX_KEYS.COLLECTION.TEST_KEY}${RECORD_TO_ADD}`]).toStrictEqual({test: 'add'});

@@ -289,7 +289,7 @@ export default function <TComponentProps, TOnyxProps>(
                     const canEvict = !!Str.result(mapping.canEvict as GenericFunction, this.props);
                     const key = Str.result(mapping.key as GenericFunction, this.props);
 
-                    if (!OnyxUtils.isSafeEvictionKey(key)) {
+                    if (!cache.isSafeEvictionKey(key)) {
                         throw new Error(`canEvict can't be used on key '${key}'. This key must explicitly be flagged as safe for removal by adding it to Onyx.init({safeEvictionKeys: []}).`);
                     }
 

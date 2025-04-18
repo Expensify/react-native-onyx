@@ -5,6 +5,7 @@ import OnyxUtils from './OnyxUtils';
 import * as Str from './Str';
 import type {CollectionConnectCallback, DefaultConnectCallback, DefaultConnectOptions, OnyxKey, OnyxValue} from './types';
 import utils from './utils';
+import cache from './OnyxCache';
 
 type ConnectCallback = DefaultConnectCallback<OnyxKey> | CollectionConnectCallback<OnyxKey>;
 
@@ -285,7 +286,7 @@ class OnyxConnectionManager {
             return;
         }
 
-        const evictionBlocklist = OnyxUtils.getEvictionBlocklist();
+        const evictionBlocklist = cache.getEvictionBlocklist();
         if (!evictionBlocklist[connectionMetadata.onyxKey]) {
             evictionBlocklist[connectionMetadata.onyxKey] = [];
         }
@@ -309,7 +310,7 @@ class OnyxConnectionManager {
             return;
         }
 
-        const evictionBlocklist = OnyxUtils.getEvictionBlocklist();
+        const evictionBlocklist = cache.getEvictionBlocklist();
         evictionBlocklist[connectionMetadata.onyxKey] =
             evictionBlocklist[connectionMetadata.onyxKey]?.filter((evictionKey) => evictionKey !== `${connection.id}_${connection.callbackID}`) ?? [];
 

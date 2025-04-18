@@ -60,17 +60,6 @@ let onyxCollectionKeySet = new Set<OnyxKey>();
 // Holds a mapping of the connected key to the subscriptionID for faster lookups
 const onyxKeyToSubscriptionIDs = new Map();
 
-// Holds a list of keys that have been directly subscribed to or recently modified from least to most recent
-let recentlyAccessedKeys: OnyxKey[] = [];
-
-// Holds a list of keys that are safe to remove when we reach max storage. If a key does not match with
-// whatever appears in this list it will NEVER be a candidate for eviction.
-let evictionAllowList: OnyxKey[] = [];
-
-// Holds a map of keys and connection arrays whose keys will never be automatically evicted as
-// long as we have at least one subscriber that returns false for the canEvict property.
-const evictionBlocklist: Record<OnyxKey, string[] | undefined> = {};
-
 // Optional user-provided key value states set when Onyx initializes or clears
 let defaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
 
@@ -127,7 +116,7 @@ function getDeferredInitTask(): DeferredTask {
  * Getter - returns the eviction block list.
  */
 function getEvictionBlocklist(): Record<OnyxKey, string[] | undefined> {
-    return evictionBlocklist;
+    return cache.getEvictionBlocklist();
 }
 
 /**
@@ -166,7 +155,7 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
     DevTools.initState(initialKeyStates);
 
     // Let Onyx know about which keys are safe to evict
-    evictionAllowList = safeEvictionKeys;
+    cache.setEvictionAllowList(safeEvictionKeys);
 
     if (typeof keys.COLLECTION === 'object' && typeof keys.COLLECTION.SNAPSHOT === 'string') {
         snapshotKey = keys.COLLECTION.SNAPSHOT;
@@ -499,11 +488,6 @@ function isKeyMatch(configKey: OnyxKey, key: OnyxKey): boolean {
     return isCollectionKey(configKey) ? Str.startsWith(key, configKey) : configKey === key;
 }
 
-/** Checks to see if this key has been flagged as safe for removal. */
-function isSafeEvictionKey(testKey: OnyxKey): boolean {
-    return evictionAllowList.some((key) => isKeyMatch(key, testKey));
-}
-
 /**
  * Extracts the collection identifier of a given collection member key.
  *
@@ -573,47 +557,6 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Partial<Ma
     }
 
     return val;
-}
-
-/**
- * Remove a key from the recently accessed key list.
- */
-function removeLastAccessedKey(key: OnyxKey): void {
-    recentlyAccessedKeys = recentlyAccessedKeys.filter((recentlyAccessedKey) => recentlyAccessedKey !== key);
-}
-
-/**
- * Add a key to the list of recently accessed keys. The least
- * recently accessed key should be at the head and the most
- * recently accessed key at the tail.
- */
-function addLastAccessedKey(key: OnyxKey): void {
-    // Only specific keys belong in this list since we cannot remove an entire collection.
-    if (isCollectionKey(key) || !isSafeEvictionKey(key)) {
-        return;
-    }
-
-    removeLastAccessedKey(key);
-    recentlyAccessedKeys.push(key);
-}
-
-/**
- * Take all the keys that are safe to evict and add them to
- * the recently accessed list when initializing the app. This
- * enables keys that have not recently been accessed to be
- * removed.
- */
-function addAllSafeEvictionKeysToRecentlyAccessedList(): Promise<void> {
-    return getAllKeys().then((keys) => {
-        evictionAllowList.forEach((safeEvictionKey) => {
-            keys.forEach((key) => {
-                if (!isKeyMatch(safeEvictionKey, key)) {
-                    return;
-                }
-                addLastAccessedKey(key);
-            });
-        });
-    });
 }
 
 function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collectionMemberKeys?: string[]): NonNullable<OnyxCollection<KeyValueMapping[TKey]>> {
@@ -851,9 +794,9 @@ function keyChanged<TKey extends OnyxKey>(
 ): void {
     // Add or remove this key from the recentlyAccessedKeys lists
     if (value !== null) {
-        addLastAccessedKey(key);
+        cache.addLastAccessedKey(key, isCollectionKey(key));
     } else {
-        removeLastAccessedKey(key);
+        cache.removeLastAccessedKey(key);
     }
 
     // We get the subscribers interested in the key that has just changed. If the subscriber's  key is a collection key then we will
@@ -1068,7 +1011,7 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, valu
  * run out of storage the least recently accessed key can be removed.
  */
 function addKeyToRecentlyAccessedIfNeeded<TKey extends OnyxKey>(mapping: Mapping<TKey>): void {
-    if (!isSafeEvictionKey(mapping.key)) {
+    if (!cache.isSafeEvictionKey(mapping.key)) {
         return;
     }
 
@@ -1081,7 +1024,7 @@ function addKeyToRecentlyAccessedIfNeeded<TKey extends OnyxKey>(mapping: Mapping
             throw new Error(`Cannot subscribe to safe eviction key '${mapping.key}' without providing a canEvict value.`);
         }
 
-        addLastAccessedKey(mapping.key);
+        cache.addLastAccessedKey(mapping.key, isCollectionKey(mapping.key));
     }
 }
 
@@ -1165,7 +1108,7 @@ function evictStorageAndRetry<TMethod extends typeof Onyx.set | typeof Onyx.mult
     }
 
     // Find the first key that we can remove that has no subscribers in our blocklist
-    const keyForRemoval = recentlyAccessedKeys.find((key) => !evictionBlocklist[key]);
+    const keyForRemoval = cache.getKeyForEviction();
     if (!keyForRemoval) {
         // If we have no acceptable keys to remove then we are possibly trying to save mission critical data. If this is the case,
         // then we should stop retrying as there is not much the user can do to fix this. Instead of getting them stuck in an infinite loop we
@@ -1453,11 +1396,7 @@ const OnyxUtils = {
     isCollectionMemberKey,
     splitCollectionMemberKey,
     isKeyMatch,
-    isSafeEvictionKey,
     tryGetCachedValue,
-    removeLastAccessedKey,
-    addLastAccessedKey,
-    addAllSafeEvictionKeysToRecentlyAccessedList,
     getCachedCollection,
     keysChanged,
     keyChanged,
@@ -1506,7 +1445,7 @@ GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
     // @ts-expect-error Reassign
     getCollectionKeys = decorateWithMetrics(getCollectionKeys, 'OnyxUtils.getCollectionKeys');
     // @ts-expect-error Reassign
-    addAllSafeEvictionKeysToRecentlyAccessedList = decorateWithMetrics(addAllSafeEvictionKeysToRecentlyAccessedList, 'OnyxUtils.addAllSafeEvictionKeysToRecentlyAccessedList');
+    addAllSafeEvictionKeysToRecentlyAccessedList = decorateWithMetrics(cache.addAllSafeEvictionKeysToRecentlyAccessedList, 'OnyxCache.addAllSafeEvictionKeysToRecentlyAccessedList');
     // @ts-expect-error Reassign
     keysChanged = decorateWithMetrics(keysChanged, 'OnyxUtils.keysChanged');
     // @ts-expect-error Reassign

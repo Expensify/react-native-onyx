@@ -74,7 +74,7 @@ function init({
     OnyxUtils.initStoreValues(keys, initialKeyStates, safeEvictionKeys);
 
     // Initialize all of our keys with data provided then give green light to any pending connections
-    Promise.all([OnyxUtils.addAllSafeEvictionKeysToRecentlyAccessedList(), OnyxUtils.initializeWithDefaultKeyStates()]).then(OnyxUtils.getDeferredInitTask().resolve);
+    Promise.all([cache.addAllSafeEvictionKeysToRecentlyAccessedList(OnyxUtils.isCollectionKey), OnyxUtils.initializeWithDefaultKeyStates()]).then(OnyxUtils.getDeferredInitTask().resolve);
 }
 
 /**

@@ -677,7 +677,7 @@ describe('Onyx', () => {
                 });
         });
 
-        it('Should NOT evict keys that are not in safeEvictionKeys list when cache limit is reached', () => {
+        it('Should prioritize eviction of safeEvictionKeys over non-safe keys when cache limit is reached', () => {
             const testKeys = {
                 ...ONYX_KEYS,
                 SAFE_FOR_EVICTION: 'evictable_',
@@ -690,6 +690,8 @@ describe('Onyx', () => {
             const evictableKey1 = `${testKeys.SAFE_FOR_EVICTION}1`;
             const evictableKey2 = `${testKeys.SAFE_FOR_EVICTION}2`;
             const evictableKey3 = `${testKeys.SAFE_FOR_EVICTION}3`;
+            // Additional key to trigger eviction
+            const triggerKey = `${testKeys.SAFE_FOR_EVICTION}trigger`;
 
             StorageMock.getItem.mockResolvedValue('"mockValue"');
             const allKeys = [
@@ -697,6 +699,7 @@ describe('Onyx', () => {
                 evictableKey1,
                 evictableKey2,
                 evictableKey3,
+                triggerKey,
                 // Keys that should NOT be evictable
                 criticalKey1,
                 criticalKey2,
@@ -724,16 +727,79 @@ describe('Onyx', () => {
                 })
                 .then(waitForPromisesToResolve)
                 .then(() => {
-                    // Force an eviction by directly calling removeLeastRecentlyUsedKeys
-                    cache.removeLeastRecentlyUsedKeys();
+                    // Trigger an eviction by connecting to a safe eviction key
+                    Onyx.connect({key: triggerKey, callback: jest.fn()});
                 })
                 .then(waitForPromisesToResolve)
                 .then(() => {
+                    // Check that all evictable keys were removed first
+                    const evictableKeysInCache = [cache.hasCacheForKey(evictableKey1), cache.hasCacheForKey(evictableKey2), cache.hasCacheForKey(evictableKey3)];
+
+                    // Check that non-evictable keys remain in cache
                     const nonEvictableKeysInCache = [cache.hasCacheForKey(criticalKey1), cache.hasCacheForKey(criticalKey2), cache.hasCacheForKey(criticalKey3)];
 
-                    // Bug demonstration: This test should FAIL because critical keys are incorrectly evicted
-                    // The current implementation evicts based on LRU order, not respecting safeEvictionKeys
+                    // Safe keys (evictable) should be removed first
+                    expect(evictableKeysInCache.every((inCache) => !inCache)).toBe(true);
+
+                    // Non-safe keys (critical) should remain when we have enough safe keys to evict
                     expect(nonEvictableKeysInCache.every((inCache) => inCache)).toBe(true);
+                });
+        });
+
+        it('Should fall back to LRU order for all keys once all safeEvictionKeys are evicted', () => {
+            const testKeys = {
+                ...ONYX_KEYS,
+                SAFE_FOR_EVICTION: 'evictable_',
+                NOT_SAFE_FOR_EVICTION: 'critical_',
+            };
+
+            const criticalKey1 = `${testKeys.NOT_SAFE_FOR_EVICTION}1`; // Oldest key (first connected)
+            const criticalKey2 = `${testKeys.NOT_SAFE_FOR_EVICTION}2`; // Second oldest
+            const criticalKey3 = `${testKeys.NOT_SAFE_FOR_EVICTION}3`; // Most recent
+            const evictableKey1 = `${testKeys.SAFE_FOR_EVICTION}1`; // Safe key to evict first
+            // Additional trigger key for natural eviction
+            const triggerKey = `${testKeys.SAFE_FOR_EVICTION}trigger`;
+
+            StorageMock.getItem.mockResolvedValue('"mockValue"');
+            const allKeys = [
+                // Only one key that's safe to evict
+                evictableKey1,
+                triggerKey,
+                // Keys that should be evicted by LRU after safe keys are gone
+                criticalKey1,
+                criticalKey2,
+                criticalKey3,
+            ];
+            StorageMock.getAllKeys.mockResolvedValue(allKeys);
+
+            return initOnyx({
+                keys: testKeys,
+                maxCachedKeysCount: 2, // Only allow 2 keys in cache
+                safeEvictionKeys: [testKeys.SAFE_FOR_EVICTION],
+            })
+                .then(() => {
+                    // Connect to keys in LRU order (oldest first)
+                    Onyx.connect({key: criticalKey1, callback: jest.fn()}); // Oldest - should be evicted after safe key
+                    Onyx.connect({key: criticalKey2, callback: jest.fn()}); // Middle age - should remain
+                    Onyx.connect({key: criticalKey3, callback: jest.fn()}); // Newest - should remain
+                    Onyx.connect({key: evictableKey1, callback: jest.fn()}); // Safe key - should be evicted first
+                })
+                .then(waitForPromisesToResolve)
+                .then(() => {
+                    // Trigger eviction by connecting to another safe eviction key
+                    Onyx.connect({key: triggerKey, callback: jest.fn()});
+                })
+                .then(waitForPromisesToResolve)
+                .then(() => {
+                    // Safe key should be evicted first
+                    expect(cache.hasCacheForKey(evictableKey1)).toBe(false);
+
+                    // Oldest non-safe key should be evicted next (LRU order)
+                    expect(cache.hasCacheForKey(criticalKey1)).toBe(false);
+
+                    // More recent non-safe keys should remain in cache
+                    expect(cache.hasCacheForKey(criticalKey2)).toBe(true);
+                    expect(cache.hasCacheForKey(criticalKey3)).toBe(true);
                 });
         });
     });
