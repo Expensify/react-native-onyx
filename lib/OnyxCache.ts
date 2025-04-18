@@ -3,6 +3,7 @@ import bindAll from 'lodash/bindAll';
 import type {ValueOf} from 'type-fest';
 import utils from './utils';
 import type {OnyxKey, OnyxValue} from './types';
+import Storage from './storage';
 
 // Task constants
 const TASK = {
@@ -356,12 +357,13 @@ class OnyxCache {
      * removed.
      */
     addAllSafeEvictionKeysToRecentlyAccessedList(isCollectionKeyFn: (key: OnyxKey) => boolean): Promise<void> {
-        return Promise.resolve().then(() => {
+        return Storage.getAllKeys().then((keys: string[]) => {
             this.evictionAllowList.forEach((safeEvictionKey) => {
-                this.storageKeys.forEach((key) => {
+                keys.forEach((key: string) => {
                     if (!this.isKeyMatch(safeEvictionKey, key)) {
                         return;
                     }
+
                     this.addLastAccessedKey(key, isCollectionKeyFn(key));
                 });
             });
