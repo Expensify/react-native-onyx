@@ -1,7 +1,7 @@
 import {act, renderHook} from '@testing-library/react-native';
 import type {OnyxCollection, OnyxEntry} from '../../lib';
 import Onyx, {useOnyx} from '../../lib';
-import OnyxUtils from '../../lib/OnyxUtils';
+import OnyxCache from '../../lib/OnyxCache';
 import StorageMock from '../../lib/storage';
 import type GenericCollection from '../utils/GenericCollection';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
@@ -939,7 +939,7 @@ describe('useOnyx', () => {
 
             await act(async () => waitForPromisesToResolve());
 
-            const evictionBlocklist = OnyxUtils.getEvictionBlocklist();
+            const evictionBlocklist = OnyxCache.getEvictionBlocklist();
             expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]).toHaveLength(1);
         });
 
@@ -953,7 +953,7 @@ describe('useOnyx', () => {
 
             await act(async () => waitForPromisesToResolve());
 
-            const evictionBlocklist = OnyxUtils.getEvictionBlocklist();
+            const evictionBlocklist = OnyxCache.getEvictionBlocklist();
             expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]).toHaveLength(1);
             expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry2`]).toBeUndefined();
 
@@ -974,7 +974,7 @@ describe('useOnyx', () => {
 
             await act(async () => waitForPromisesToResolve());
 
-            const evictionBlocklist = OnyxUtils.getEvictionBlocklist();
+            const evictionBlocklist = OnyxCache.getEvictionBlocklist();
             expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]).toHaveLength(1);
 
             await act(async () => {
