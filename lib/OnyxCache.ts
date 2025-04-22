@@ -244,16 +244,12 @@ class OnyxCache {
         }
 
         const iterator = this.recentKeys.values();
-        const safeKeysToRemove = [];
-        const nonSafeKeysToRemove = [];
+        const safeKeysToRemove: OnyxKey[] = [];
+        const nonSafeKeysToRemove: OnyxKey[] = [];
 
         // First pass: categorize all keys by safe/non-safe eviction
-        while (true) {
-            const iterResult = iterator.next();
-            if (iterResult.done) {
-                break;
-            }
-
+        let iterResult = iterator.next();
+        while (!iterResult.done) {
             const key = iterResult.value;
             if (key !== undefined) {
                 if (this.isSafeEvictionKey(key)) {
@@ -262,10 +258,11 @@ class OnyxCache {
                     nonSafeKeysToRemove.push(key);
                 }
             }
+            iterResult = iterator.next();
         }
 
         // Determine keys to remove, prioritizing safe keys first
-        let keysToRemove = [];
+        let keysToRemove: OnyxKey[] = [];
         if (safeKeysToRemove.length >= numKeysToRemove) {
             // We have enough safe keys to evict
             keysToRemove = safeKeysToRemove.slice(0, numKeysToRemove);
@@ -276,7 +273,7 @@ class OnyxCache {
 
         // Remove the identified keys from cache
         // eslint-disable-next-line @typescript-eslint/prefer-for-of
-        for (let i = 0; i < keysToRemove.length; ++i) {
+        for (let i = 0; i < keysToRemove.length; i++) {
             const key = keysToRemove[i];
             delete this.storageMap[key];
             this.recentKeys.delete(key);
