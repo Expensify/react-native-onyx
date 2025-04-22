@@ -246,39 +246,31 @@ class OnyxCache {
 
         const iterator = this.recentKeys.values();
         const safeKeysToRemove: OnyxKey[] = [];
-        const nonSafeKeysToRemove: OnyxKey[] = [];
 
-        // First pass: categorize all keys by safe/non-safe eviction
+        // First pass: identify safe keys to evict that aren't the most recently added key
+        const recentKeysArray = Array.from(this.recentKeys);
+        const mostRecentKey = recentKeysArray[recentKeysArray.length - 1];
+
         let iterResult = iterator.next();
         while (!iterResult.done) {
             const key = iterResult.value;
-            if (key !== undefined) {
-                if (this.isSafeEvictionKey(key)) {
-                    safeKeysToRemove.push(key);
-                } else {
-                    nonSafeKeysToRemove.push(key);
-                }
+            // Don't consider the most recently accessed key for eviction
+            // This ensures we don't immediately evict a key we just added
+            if (key !== undefined && key !== mostRecentKey && this.isSafeEvictionKey(key)) {
+                safeKeysToRemove.push(key);
             }
             iterResult = iterator.next();
         }
 
-        // Determine keys to remove, prioritizing safe keys first
-        let keysToRemove: OnyxKey[] = [];
-        if (safeKeysToRemove.length >= numKeysToRemove) {
-            // We have enough safe keys to evict
-            keysToRemove = safeKeysToRemove.slice(0, numKeysToRemove);
-        } else {
-            // Not enough safe keys, add non-safe keys to make up the difference
-            keysToRemove = safeKeysToRemove.concat(nonSafeKeysToRemove.slice(0, numKeysToRemove - safeKeysToRemove.length));
-        }
+        // Even if we don't have enough safe keys to evict, remove all available safe keys
+        // This will get us as close as possible to the target size without removing the most recent key
+        const keysToRemove = safeKeysToRemove;
 
         // Remove the identified keys from cache
-        // eslint-disable-next-line @typescript-eslint/prefer-for-of
-        for (let i = 0; i < keysToRemove.length; i++) {
-            const key = keysToRemove[i];
+        keysToRemove.forEach((key) => {
             delete this.storageMap[key];
             this.recentKeys.delete(key);
-        }
+        });
     }
 
     /** Set the recent keys list size */

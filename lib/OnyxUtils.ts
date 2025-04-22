@@ -1015,6 +1015,9 @@ function addKeyToRecentlyAccessedIfNeeded<TKey extends OnyxKey>(mapping: Mapping
         return;
     }
 
+    // Add the key to recentKeys first (this makes it the most recent key)
+    cache.addToAccessedKeys(mapping.key);
+
     // Try to free some cache whenever we connect to a safe eviction key
     cache.removeLeastRecentlyUsedKeys();
 
