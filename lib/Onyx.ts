@@ -622,7 +622,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
 
 function updateSnapshots(data: OnyxUpdate[]) {
     const snapshotCollectionKey = OnyxUtils.getSnapshotKey();
-    if (!snapshotCollectionKey) return;
+    if (!snapshotCollectionKey) return [];
 
     const promises: Array<() => Promise<void>> = [];
 
@@ -676,7 +676,7 @@ function updateSnapshots(data: OnyxUpdate[]) {
         promises.push(() => merge(snapshotKey, {data: updatedData}));
     });
 
-    return Promise.all(promises.map((p) => p()));
+    return promises;
 }
 
 /**
@@ -804,10 +804,12 @@ function update(data: OnyxUpdate[]): Promise<void> {
         }
     });
 
-    return clearPromise
-        .then(() => Promise.all(promises.map((p) => p())))
-        .then(() => updateSnapshots(data))
-        .then(() => undefined);
+    const snapshotPromises = updateSnapshots(data);
+
+    // We need to run the snapshot updates before the other updates so the snapshot data can be updated before the loading state in the snapshot
+    const finalPromises = snapshotPromises.concat(promises);
+
+    return clearPromise.then(() => Promise.all(finalPromises.map((p) => p()))).then(() => undefined);
 }
 
 /**
