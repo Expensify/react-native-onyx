@@ -4,6 +4,7 @@ import type {ValueOf} from 'type-fest';
 import utils from './utils';
 import type {OnyxKey, OnyxValue} from './types';
 import Storage from './storage';
+import * as Str from './Str';
 
 // Task constants
 const TASK = {
@@ -319,10 +320,8 @@ class OnyxCache {
      * @param key - Key to test against the pattern
      */
     private isKeyMatch(configKey: OnyxKey, key: OnyxKey): boolean {
-        // Use a consistent way to determine if a key is a collection key by checking
-        // if it ends with an underscore (_)
         const isCollectionKey = configKey.endsWith('_');
-        return isCollectionKey ? key.startsWith(configKey) : configKey === key;
+        return isCollectionKey ? Str.startsWith(key, configKey) : configKey === key;
     }
 
     /**

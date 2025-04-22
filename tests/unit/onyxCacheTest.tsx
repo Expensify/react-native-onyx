@@ -444,7 +444,7 @@ describe('Onyx', () => {
         function initOnyx(overrides?: Partial<InitOptions>) {
             Onyx.init({
                 keys: ONYX_KEYS,
-                safeEvictionKeys: [ONYX_KEYS.COLLECTION.MOCK_COLLECTION],
+                evictableKeys: [ONYX_KEYS.COLLECTION.MOCK_COLLECTION],
                 maxCachedKeysCount: 10,
                 ...overrides,
             });
@@ -677,7 +677,7 @@ describe('Onyx', () => {
                 });
         });
 
-        it('Should prioritize eviction of safeEvictionKeys over non-safe keys when cache limit is reached', () => {
+        it('Should prioritize eviction of evictableKeys over non-evictable keys when cache limit is reached', () => {
             const testKeys = {
                 ...ONYX_KEYS,
                 SAFE_FOR_EVICTION: 'evictable_',
@@ -710,7 +710,7 @@ describe('Onyx', () => {
             return initOnyx({
                 keys: testKeys,
                 maxCachedKeysCount: 3, // Only allow 3 keys in cache
-                safeEvictionKeys: [testKeys.SAFE_FOR_EVICTION],
+                evictableKeys: [testKeys.SAFE_FOR_EVICTION],
             })
                 .then(() => {
                     // Connect to non-evictable keys first (oldest in LRU queue)
@@ -746,7 +746,7 @@ describe('Onyx', () => {
                 });
         });
 
-        it('Should fall back to LRU order for all keys once all safeEvictionKeys are evicted', () => {
+        it('Should fall back to LRU order for all keys once all evictableKeys are evicted', () => {
             const testKeys = {
                 ...ONYX_KEYS,
                 SAFE_FOR_EVICTION: 'evictable_',
@@ -775,7 +775,7 @@ describe('Onyx', () => {
             return initOnyx({
                 keys: testKeys,
                 maxCachedKeysCount: 2, // Only allow 2 keys in cache
-                safeEvictionKeys: [testKeys.SAFE_FOR_EVICTION],
+                evictableKeys: [testKeys.SAFE_FOR_EVICTION],
             })
                 .then(() => {
                     // Connect to keys in LRU order (oldest first)

@@ -39,7 +39,7 @@ import decorateWithMetrics from './metrics';
 function init({
     keys = {},
     initialKeyStates = {},
-    safeEvictionKeys = [],
+    evictableKeys = [],
     maxCachedKeysCount = 1000,
     shouldSyncMultipleInstances = Boolean(global.localStorage),
     debugSetState = false,
@@ -71,7 +71,7 @@ function init({
         cache.setRecentKeysLimit(maxCachedKeysCount);
     }
 
-    OnyxUtils.initStoreValues(keys, initialKeyStates, safeEvictionKeys);
+    OnyxUtils.initStoreValues(keys, initialKeyStates, evictableKeys);
 
     // Initialize all of our keys with data provided then give green light to any pending connections
     Promise.all([cache.addAllSafeEvictionKeysToRecentlyAccessedList(OnyxUtils.isCollectionKey), OnyxUtils.initializeWithDefaultKeyStates()]).then(OnyxUtils.getDeferredInitTask().resolve);

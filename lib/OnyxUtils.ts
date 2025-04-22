@@ -138,9 +138,9 @@ function setSkippableCollectionMemberIDs(ids: Set<string>): void {
  *
  * @param keys - `ONYXKEYS` constants object from Onyx.init()
  * @param initialKeyStates - initial data to set when `init()` and `clear()` are called
- * @param safeEvictionKeys - This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal.
+ * @param evictableKeys - This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal.
  */
-function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Partial<KeyValueMapping>, safeEvictionKeys: OnyxKey[]): void {
+function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Partial<KeyValueMapping>, evictableKeys: OnyxKey[]): void {
     // We need the value of the collection keys later for checking if a
     // key is a collection. We store it in a map for faster lookup.
     const collectionValues = Object.values(keys.COLLECTION ?? {}) as string[];
@@ -155,7 +155,7 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
     DevTools.initState(initialKeyStates);
 
     // Let Onyx know about which keys are safe to evict
-    cache.setEvictionAllowList(safeEvictionKeys);
+    cache.setEvictionAllowList(evictableKeys);
 
     if (typeof keys.COLLECTION === 'object' && typeof keys.COLLECTION.SNAPSHOT === 'string') {
         snapshotKey = keys.COLLECTION.SNAPSHOT;

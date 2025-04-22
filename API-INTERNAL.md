@@ -26,7 +26,7 @@
 <dt><a href="#setSkippableCollectionMemberIDs">setSkippableCollectionMemberIDs()</a></dt>
 <dd><p>Setter - sets the skippable collection member IDs.</p>
 </dd>
-<dt><a href="#initStoreValues">initStoreValues(keys, initialKeyStates, safeEvictionKeys)</a></dt>
+<dt><a href="#initStoreValues">initStoreValues(keys, initialKeyStates, evictableKeys)</a></dt>
 <dd><p>Sets the initial values for the Onyx store</p>
 </dd>
 <dt><a href="#maybeFlushBatchUpdates">maybeFlushBatchUpdates()</a></dt>
@@ -213,7 +213,7 @@ Setter - sets the skippable collection member IDs.
 **Kind**: global function  
 <a name="initStoreValues"></a>
 
-## initStoreValues(keys, initialKeyStates, safeEvictionKeys)
+## initStoreValues(keys, initialKeyStates, evictableKeys)
 Sets the initial values for the Onyx store
 
 **Kind**: global function  
@@ -222,7 +222,7 @@ Sets the initial values for the Onyx store
 | --- | --- |
 | keys | `ONYXKEYS` constants object from Onyx.init() |
 | initialKeyStates | initial data to set when `init()` and `clear()` are called |
-| safeEvictionKeys | This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal. |
+| evictableKeys | This is an array of keys (individual or collection patterns) that are eligible for automatic removal when storage limits are reached. |
 
 <a name="maybeFlushBatchUpdates"></a>
 
