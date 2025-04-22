@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/prefer-for-of */
 /* eslint-disable no-continue */
 import {deepEqual} from 'fast-equals';
 import lodashClone from 'lodash/clone';
@@ -664,8 +663,9 @@ function keysChanged<TKey extends CollectionKeyBase>(
     // and does not represent all of the combined keys and values for a collection key. It is just the "new" data that was merged in via mergeCollection().
     const stateMappingKeys = Object.keys(callbackToStateMapping);
     const collectionKeyLength = collectionKey.length;
-    for (let i = 0; i < stateMappingKeys.length; i++) {
-        const subscriber = callbackToStateMapping[stateMappingKeys[i]];
+
+    for (const stateMappingKey of stateMappingKeys) {
+        const subscriber = callbackToStateMapping[stateMappingKey];
         if (!subscriber) {
             continue;
         }
@@ -702,9 +702,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
                 // If they are not using waitForCollectionCallback then we notify the subscriber with
                 // the new merged data but only for any keys in the partial collection.
                 const dataKeys = Object.keys(partialCollection ?? {});
-                for (let j = 0; j < dataKeys.length; j++) {
-                    const dataKey = dataKeys[j];
-
+                for (const dataKey of dataKeys) {
                     if (deepEqual(cachedCollection[dataKey], previousCollection[dataKey])) {
                         continue;
                     }
@@ -761,8 +759,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
                     const prevCollection = prevState?.[subscriber.statePropertyName] ?? {};
                     const finalCollection = lodashClone(prevCollection);
                     const dataKeys = Object.keys(partialCollection ?? {});
-                    for (let j = 0; j < dataKeys.length; j++) {
-                        const dataKey = dataKeys[j];
+                    for (const dataKey of dataKeys) {
                         finalCollection[dataKey] = cachedCollection[dataKey];
                     }
 
@@ -881,8 +878,8 @@ function keyChanged<TKey extends OnyxKey>(
 
     const cachedCollections: Record<string, ReturnType<typeof getCachedCollection>> = {};
 
-    for (let i = 0; i < stateMappingKeys.length; i++) {
-        const subscriber = callbackToStateMapping[stateMappingKeys[i]];
+    for (const stateMappingKey of stateMappingKeys) {
+        const subscriber = callbackToStateMapping[stateMappingKey];
         if (!subscriber || !isKeyMatch(subscriber.key, key) || !canUpdateSubscriber(subscriber)) {
             continue;
         }
@@ -1346,7 +1343,7 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
             // Performance improvement
             // If the mapping is connected to an onyx key that is not a collection
             // we can skip the call to getAllKeys() and return an array with a single item
-            if (Boolean(mapping.key) && typeof mapping.key === 'string' && !isCollectionKey(mapping.key) && cache.getAllKeys().has(mapping.key)) {
+            if (!!mapping.key && typeof mapping.key === 'string' && !isCollectionKey(mapping.key) && cache.getAllKeys().has(mapping.key)) {
                 return new Set([mapping.key]);
             }
             return getAllKeys();
