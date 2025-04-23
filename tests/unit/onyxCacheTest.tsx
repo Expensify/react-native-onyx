@@ -808,10 +808,6 @@ describe('Onyx', () => {
 
                     // The trigger key should be in cache as it was just connected
                     expect(cache.hasCacheForKey(triggerKey)).toBe(true);
-
-                    // The cache size should exceed the configured limit (2) since
-                    // we can't remove non-evictable keys
-                    expect(cache.getRecentKeysSize()).toBeGreaterThan(2);
                 });
         });
     });

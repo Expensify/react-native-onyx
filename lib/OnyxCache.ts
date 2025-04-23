@@ -84,7 +84,6 @@ class OnyxCache {
             'addLastAccessedKey',
             'addAllSafeEvictionKeysToRecentlyAccessedList',
             'getKeyForEviction',
-            'getRecentKeysSize',
         );
     }
 
@@ -247,7 +246,6 @@ class OnyxCache {
         const iterator = this.recentKeys.values();
         const safeKeysToRemove: OnyxKey[] = [];
 
-        // First pass: identify safe keys to evict that aren't the most recently added key
         const recentKeysArray = Array.from(this.recentKeys);
         const mostRecentKey = recentKeysArray[recentKeysArray.length - 1];
 
@@ -262,12 +260,7 @@ class OnyxCache {
             iterResult = iterator.next();
         }
 
-        // Even if we don't have enough safe keys to evict, remove all available safe keys
-        // This will get us as close as possible to the target size without removing the most recent key
-        const keysToRemove = safeKeysToRemove;
-
-        // Remove the identified keys from cache
-        keysToRemove.forEach((key) => {
+        safeKeysToRemove.forEach((key) => {
             delete this.storageMap[key];
             this.recentKeys.delete(key);
         });
@@ -363,11 +356,6 @@ class OnyxCache {
      */
     getKeyForEviction(): OnyxKey | undefined {
         return this.recentlyAccessedKeys.find((key) => !this.evictionBlocklist[key]);
-    }
-
-    /** Get the size of the recentKeys set */
-    getRecentKeysSize(): number {
-        return this.recentKeys.size;
     }
 }
 
