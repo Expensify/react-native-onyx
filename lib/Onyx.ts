@@ -41,7 +41,7 @@ function init({
     initialKeyStates = {},
     safeEvictionKeys = [],
     maxCachedKeysCount = 1000,
-    shouldSyncMultipleInstances = Boolean(global.localStorage),
+    shouldSyncMultipleInstances = !!global.localStorage,
     debugSetState = false,
     enablePerformanceMetrics = false,
     skippableCollectionMemberIDs = [],
