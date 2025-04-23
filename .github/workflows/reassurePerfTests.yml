@@ -24,7 +24,10 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
-      - name: Run reassure baseline tests
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run Reassure baseline tests
         run: npx reassure --baseline
 
       - name: Checkout PR head SHA
@@ -32,10 +35,10 @@ jobs:
           git fetch origin ${{ github.event.pull_request.head.sha }} --no-tags --depth=1
           git switch --force --detach ${{ github.event.pull_request.head.sha }}
           
-      - name: Reinstall node_modules
+      - name: Reinstall dependencies
         run: npm install --force
 
-      - name: Run reassure delta tests
+      - name: Run Reassure delta tests
         run: npx reassure --branch
 
       - name: Validate output.json
