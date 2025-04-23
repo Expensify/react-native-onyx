@@ -646,7 +646,7 @@ describe('Onyx', () => {
             let connections: Array<{key: string; connection: Connection}> = [];
 
             return initOnyx({
-                maxCachedKeysCount: 5,
+                maxCachedKeysCount: 3,
             })
                 .then(() => {
                     connections = range.map((number) => {
