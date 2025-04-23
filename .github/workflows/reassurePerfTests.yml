@@ -16,19 +16,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
         with:
-          fetch-depth: 0
+          ref: ${{ github.event.pull_request.base.ref }}
 
       # v4
       - name: Setup Node
-        uses: ./.github/actions/composite/setupNode
+        uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e
+        with:
+          node-version-file: '.nvmrc'
 
       - name: Run reassure baseline tests
         run: npx reassure --baseline
 
-      - name: Checkout PR head ref
+      - name: Checkout PR head SHA
         run: |
-          git fetch origin ${{ github.event.pull_request.head.ref }} --no-tags --depth=1
-          git switch --force --detach ${{ github.event.pull_request.head.ref }}
+          git fetch origin ${{ github.event.pull_request.head.sha }} --no-tags --depth=1
+          git switch --force --detach ${{ github.event.pull_request.head.sha }}
           
       - name: Reinstall node_modules
         run: npm install --force
