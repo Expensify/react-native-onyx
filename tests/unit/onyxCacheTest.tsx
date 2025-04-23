@@ -638,7 +638,7 @@ describe('Onyx', () => {
         });
 
         it('Should clean cache when connections to eviction keys happen', () => {
-            // Given Storage with 10 different keys
+            // Given storage with some data
             StorageMock.getItem.mockResolvedValue('"mockValue"');
             const range = generateRange(0, 10);
             const keyPrefix = ONYX_KEYS.COLLECTION.MOCK_COLLECTION;
@@ -686,7 +686,6 @@ describe('Onyx', () => {
             const evictableKey1 = `${testKeys.SAFE_FOR_EVICTION}1`;
             const evictableKey2 = `${testKeys.SAFE_FOR_EVICTION}2`;
             const evictableKey3 = `${testKeys.SAFE_FOR_EVICTION}3`;
-            // Additional key to trigger eviction
             const triggerKey = `${testKeys.SAFE_FOR_EVICTION}trigger`;
 
             StorageMock.getItem.mockResolvedValue('"mockValue"');
@@ -703,11 +702,10 @@ describe('Onyx', () => {
             ];
             StorageMock.getAllKeys.mockResolvedValue(allKeys);
 
-            // SAFE_FOR_EVICTION pattern will make all evictableKey* keys evictable
             return initOnyx({
                 keys: testKeys,
-                maxCachedKeysCount: 3, // Only allow 3 keys in cache
-                evictableKeys: [testKeys.SAFE_FOR_EVICTION], // This makes all evictable_* keys evictable
+                maxCachedKeysCount: 3,
+                evictableKeys: [testKeys.SAFE_FOR_EVICTION],
             })
                 .then(() => {
                     // Verify keys are correctly identified as evictable or not
@@ -758,16 +756,15 @@ describe('Onyx', () => {
                 NOT_SAFE_FOR_EVICTION: 'critical_',
             };
 
-            const criticalKey1 = `${testKeys.NOT_SAFE_FOR_EVICTION}1`; // Oldest key (first connected)
-            const criticalKey2 = `${testKeys.NOT_SAFE_FOR_EVICTION}2`; // Second oldest
-            const criticalKey3 = `${testKeys.NOT_SAFE_FOR_EVICTION}3`; // Most recent
-            const evictableKey1 = `${testKeys.SAFE_FOR_EVICTION}1`; // Safe key to evict
+            const criticalKey1 = `${testKeys.NOT_SAFE_FOR_EVICTION}1`;
+            const criticalKey2 = `${testKeys.NOT_SAFE_FOR_EVICTION}2`;
+            const criticalKey3 = `${testKeys.NOT_SAFE_FOR_EVICTION}3`;
+            const evictableKey1 = `${testKeys.SAFE_FOR_EVICTION}1`;
             // Additional trigger key for natural eviction
             const triggerKey = `${testKeys.SAFE_FOR_EVICTION}trigger`;
 
             StorageMock.getItem.mockResolvedValue('"mockValue"');
             const allKeys = [
-                // Only one key that's safe to evict
                 evictableKey1,
                 triggerKey,
                 // Keys that should not be evicted
@@ -777,14 +774,12 @@ describe('Onyx', () => {
             ];
             StorageMock.getAllKeys.mockResolvedValue(allKeys);
 
-            // Both evictableKey1 and triggerKey should be evictable
             return initOnyx({
                 keys: testKeys,
-                maxCachedKeysCount: 2, // Only allow 2 keys in cache
-                evictableKeys: [testKeys.SAFE_FOR_EVICTION], // This pattern matches both evictable keys
+                maxCachedKeysCount: 2,
+                evictableKeys: [testKeys.SAFE_FOR_EVICTION],
             })
                 .then(() => {
-                    // Connect to keys in LRU order (oldest first)
                     Onyx.connect({key: criticalKey1, callback: jest.fn()}); // Should never be evicted
                     Onyx.connect({key: criticalKey2, callback: jest.fn()}); // Should never be evicted
                     Onyx.connect({key: criticalKey3, callback: jest.fn()}); // Should never be evicted
@@ -798,7 +793,6 @@ describe('Onyx', () => {
                 .then(waitForPromisesToResolve)
                 .then(() => {
                     // evictableKey1 should be evicted since it's an evictable key
-                    // and triggerKey is the most recently connected one
                     expect(cache.hasCacheForKey(evictableKey1)).toBe(false);
 
                     // Non-evictable keys should remain in cache
