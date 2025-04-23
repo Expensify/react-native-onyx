@@ -1,4 +1,3 @@
-/* eslint-disable rulesdir/onyx-props-must-have-default */
 import type {ErrorInfo, ReactNode} from 'react';
 import React from 'react';
 import {render, cleanup} from '@testing-library/react-native';
