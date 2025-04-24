@@ -250,7 +250,7 @@ describe('OnyxUtils', () => {
         test('one call removing one key', async () => {
             await measureFunction(() => OnyxCache.removeLastAccessedKey(`${collectionKey}5000`), {
                 beforeEach: async () => {
-                    mockedReportActionsKeys.forEach((key) => OnyxCache.addLastAccessedKey(key, OnyxUtils.isCollectionKey(key)));
+                    mockedReportActionsKeys.forEach((key) => OnyxCache.addLastAccessedKey(key, false));
                 },
                 afterEach: async () => {
                     mockedReportActionsKeys.forEach((key) => OnyxCache.removeLastAccessedKey(key));
@@ -261,9 +261,9 @@ describe('OnyxUtils', () => {
 
     describe('addLastAccessedKey', () => {
         test('one call adding one key', async () => {
-            await measureFunction(() => OnyxCache.addLastAccessedKey(`${collectionKey}5000`, OnyxUtils.isCollectionKey(`${collectionKey}5000`)), {
+            await measureFunction(() => OnyxCache.addLastAccessedKey(`${collectionKey}5000`, false), {
                 beforeEach: async () => {
-                    mockedReportActionsKeys.forEach((key) => OnyxCache.addLastAccessedKey(key, OnyxUtils.isCollectionKey(key)));
+                    mockedReportActionsKeys.forEach((key) => OnyxCache.addLastAccessedKey(key, false));
                 },
                 afterEach: async () => {
                     mockedReportActionsKeys.forEach((key) => OnyxCache.removeLastAccessedKey(key));
@@ -279,7 +279,7 @@ describe('OnyxUtils', () => {
         };
 
         test('one call adding 1k keys', async () => {
-            await measureAsyncFunction(() => OnyxCache.addEvictableKeysToRecentlyAccessedList(OnyxUtils.isCollectionKey), {
+            await measureAsyncFunction(() => OnyxCache.addEvictableKeysToRecentlyAccessedList(() => false), {
                 beforeEach: async () => {
                     await Onyx.multiSet(data);
                 },
@@ -565,8 +565,8 @@ describe('OnyxUtils', () => {
 
             await measureAsyncFunction(() => OnyxUtils.evictStorageAndRetry(error, onyxMethod, '', null), {
                 beforeEach: async () => {
-                    mockedReportActionsKeys.forEach((key) => OnyxCache.addLastAccessedKey(key, OnyxUtils.isCollectionKey(key)));
-                    OnyxCache.addLastAccessedKey(`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}1`, OnyxUtils.isCollectionKey(`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}1`));
+                    mockedReportActionsKeys.forEach((key) => OnyxCache.addLastAccessedKey(key, false));
+                    OnyxCache.addLastAccessedKey(`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}1`, false);
                 },
                 afterEach: async () => {
                     mockedReportActionsKeys.forEach((key) => OnyxCache.removeLastAccessedKey(key));
