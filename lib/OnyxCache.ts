@@ -244,7 +244,7 @@ class OnyxCache {
         }
 
         const iterator = this.recentKeys.values();
-        const safeKeysToRemove: OnyxKey[] = [];
+        const keysToRemove: OnyxKey[] = [];
 
         const recentKeysArray = Array.from(this.recentKeys);
         const mostRecentKey = recentKeysArray[recentKeysArray.length - 1];
@@ -255,12 +255,12 @@ class OnyxCache {
             // Don't consider the most recently accessed key for eviction
             // This ensures we don't immediately evict a key we just added
             if (key !== undefined && key !== mostRecentKey && this.isEvictableKey(key)) {
-                safeKeysToRemove.push(key);
+                keysToRemove.push(key);
             }
             iterResult = iterator.next();
         }
 
-        safeKeysToRemove.forEach((key) => {
+        keysToRemove.forEach((key) => {
             delete this.storageMap[key];
             this.recentKeys.delete(key);
         });
