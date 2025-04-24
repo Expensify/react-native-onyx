@@ -767,6 +767,12 @@ describe('OnyxUtils', () => {
 
             await measureFunction(() => OnyxUtils.unsubscribeFromKey(subscriptionID), {
                 beforeEach: async () => {
+                    function fibonacci(num: number): number {
+                        if (num === 1) return 0;
+                        if (num === 2) return 1;
+                        return fibonacci(num - 1) + fibonacci(num - 2);
+                    }
+                    fibonacci(15);
                     subscriptionID = OnyxUtils.subscribeToKey({
                         key,
                         initWithStoredValues: false,
