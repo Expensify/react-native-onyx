@@ -1,47 +1,48 @@
 name: Reassure Performance Tests
 
 on:
-    pull_request:
-        types: [opened, synchronize]
-        branches-ignore: [staging, production]
-        paths-ignore: [tests/**, '**.md', '**.sh']
+  pull_request:
+    types: [opened, synchronize]
+    branches-ignore: [staging, production]
+    paths-ignore: ['**.md', '**.sh']
+
 jobs:
-    perf-tests:
-        if: ${{ github.actor != 'OSBotify' }}
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout
-              # v4
-              uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
-              with:
-                  fetch-depth: 0
+  # Note: We run baseline and delta performance checks in the same runner to reduce hardware variance across machines
+  perf-tests:
+    if: ${{ github.actor != 'OSBotify' }}
+    runs-on: ubuntu-latest
+    steps:
+      # v4
+      - name: Checkout
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
 
-            - name: Setup Node
-              # v4
-              uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e
-              with:
-                  node-version-file: '.nvmrc'
+      # v4
+      - name: Setup Node
+        uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e
+        with:
+          node-version-file: '.nvmrc'
 
-            - name: Set dummy git credentials
-              run: |
-                  git config --global user.email "test@test.com"
-                  git config --global user.name "Test"
-            - name: Run performance testing script
-              shell: bash
-              run: |
-                  set -e
-                  BASELINE_BRANCH=${BASELINE_BRANCH:="main"}
-                  git fetch origin "$BASELINE_BRANCH" --no-tags --depth=1
-                  git switch "$BASELINE_BRANCH"
-                  npm install --force
-                  npm install reassure
-                  npx reassure --baseline
-                  git switch --force --detach -
-                  npm install --force
-                  npm install reassure
-                  npx reassure --branch
-            - name: Validate output.json
-              id: validateReassureOutput
-              uses: ./.github/actions/validateReassureOutput
-              with:
-                  DURATION_DEVIATION_PERCENTAGE: 20
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run Reassure baseline tests
+        run: npx reassure --baseline
+
+      - name: Checkout PR head SHA
+        run: |
+          git fetch origin ${{ github.event.pull_request.head.sha }} --no-tags --depth=1
+          git switch --force --detach ${{ github.event.pull_request.head.sha }}
+          
+      - name: Reinstall dependencies
+        run: npm install --force
+
+      - name: Run Reassure delta tests
+        run: npx reassure --branch
+
+      - name: Validate output.json
+        id: validateReassureOutput
+        uses: ./.github/actions/javascript/validateReassureOutput
+        with:
+          DURATION_DEVIATION_PERCENTAGE: 20
