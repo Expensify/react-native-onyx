@@ -742,7 +742,7 @@ describe('OnyxUtils', () => {
                         if (num === 2) return 1;
                         return fibonacci(num - 1) + fibonacci(num - 2);
                     }
-                    fibonacci(15);
+                    fibonacci(30);
                     const callback = createDeferredTask();
                     subscriptionID = OnyxUtils.subscribeToKey({
                         key: collectionKey,
