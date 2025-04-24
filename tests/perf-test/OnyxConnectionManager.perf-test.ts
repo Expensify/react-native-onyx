@@ -45,7 +45,7 @@ describe('OnyxConnectionManager', () => {
         Onyx.init({
             keys: ONYXKEYS,
             maxCachedKeysCount: 100000,
-            safeEvictionKeys: [ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY],
+            evictableKeys: [ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY],
             skippableCollectionMemberIDs: ['skippable-id'],
         });
     });
