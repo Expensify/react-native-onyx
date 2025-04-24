@@ -260,10 +260,10 @@ class OnyxCache {
             iterResult = iterator.next();
         }
 
-        keysToRemove.forEach((key) => {
+        for (const key of keysToRemove) {
             delete this.storageMap[key];
             this.recentKeys.delete(key);
-        });
+        }
     }
 
     /** Set the recent keys list size */

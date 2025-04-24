@@ -1,4 +1,3 @@
-/* eslint-disable rulesdir/onyx-props-must-have-default */
 import type {ErrorInfo, ReactNode} from 'react';
 import React from 'react';
 import {render, cleanup} from '@testing-library/react-native';
@@ -189,9 +188,9 @@ describe('Only the specific property changes when using withOnyx() and ', () => 
         return runAllAssertionsForCollection(TestComponentWithOnyx).then(() => {
             // Expect that the selector always gets called with the full object
             // from the onyx state, and not with the selector result value (string in this case).
-            // eslint-disable-next-line @typescript-eslint/prefer-for-of
-            for (let i = 0; i < mockedSelector.mock.calls.length; i++) {
-                const firstArg = mockedSelector.mock.calls[i][0];
+
+            for (const mockedCall of mockedSelector.mock.calls) {
+                const firstArg = mockedCall[0];
                 expect(firstArg).toBeDefined();
                 expect(firstArg).toBeInstanceOf(Object);
             }
