@@ -231,10 +231,9 @@ class OnyxCache {
             numKeysToRemove--;
         }
 
-        // eslint-disable-next-line @typescript-eslint/prefer-for-of
-        for (let i = 0; i < temp.length; ++i) {
-            delete this.storageMap[temp[i]];
-            this.recentKeys.delete(temp[i]);
+        for (const key of temp) {
+            delete this.storageMap[key];
+            this.recentKeys.delete(key);
         }
     }
 
