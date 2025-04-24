@@ -259,7 +259,7 @@ class OnyxCache {
             }
             iterResult = iterator.next();
         }
-        console.log('safeKeysToRemove', safeKeysToRemove);
+
         safeKeysToRemove.forEach((key) => {
             delete this.storageMap[key];
             this.recentKeys.delete(key);
