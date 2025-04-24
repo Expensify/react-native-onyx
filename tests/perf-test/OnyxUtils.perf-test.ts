@@ -272,14 +272,14 @@ describe('OnyxUtils', () => {
         });
     });
 
-    describe('addAllSafeEvictionKeysToRecentlyAccessedList', () => {
+    describe('addEvictableKeysToRecentlyAccessedList', () => {
         const data = {
             ...getRandomReportActions(collectionKey, 1000),
             ...getRandomReportActions(ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY, 1000),
         };
 
         test('one call adding 1k keys', async () => {
-            await measureAsyncFunction(() => OnyxCache.addAllSafeEvictionKeysToRecentlyAccessedList(OnyxUtils.isCollectionKey), {
+            await measureAsyncFunction(() => OnyxCache.addEvictableKeysToRecentlyAccessedList(OnyxUtils.isCollectionKey), {
                 beforeEach: async () => {
                     await Onyx.multiSet(data);
                 },

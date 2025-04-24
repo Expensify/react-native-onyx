@@ -96,7 +96,7 @@ If the requested key is a collection, it will return an object with all the coll
 recently accessed key should be at the head and the most
 recently accessed key at the tail.</p>
 </dd>
-<dt><a href="#addAllSafeEvictionKeysToRecentlyAccessedList">addAllSafeEvictionKeysToRecentlyAccessedList()</a></dt>
+<dt><a href="#addEvictableKeysToRecentlyAccessedList">addEvictableKeysToRecentlyAccessedList()</a></dt>
 <dd><p>Take all the keys that are safe to evict and add them to
 the recently accessed list when initializing the app. This
 enables keys that have not recently been accessed to be
@@ -364,9 +364,9 @@ recently accessed key should be at the head and the most
 recently accessed key at the tail.
 
 **Kind**: global function  
-<a name="addAllSafeEvictionKeysToRecentlyAccessedList"></a>
+<a name="addEvictableKeysToRecentlyAccessedList"></a>
 
-## addAllSafeEvictionKeysToRecentlyAccessedList()
+## addEvictableKeysToRecentlyAccessedList()
 Take all the keys that are safe to evict and add them to
 the recently accessed list when initializing the app. This
 enables keys that have not recently been accessed to be

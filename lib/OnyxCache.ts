@@ -82,7 +82,7 @@ class OnyxCache {
             'isEvictableKey',
             'removeLastAccessedKey',
             'addLastAccessedKey',
-            'addAllSafeEvictionKeysToRecentlyAccessedList',
+            'addEvictableKeysToRecentlyAccessedList',
             'getKeyForEviction',
         );
     }
@@ -337,11 +337,11 @@ class OnyxCache {
      * enables keys that have not recently been accessed to be
      * removed.
      */
-    addAllSafeEvictionKeysToRecentlyAccessedList(isCollectionKeyFn: (key: OnyxKey) => boolean): Promise<void> {
+    addEvictableKeysToRecentlyAccessedList(isCollectionKeyFn: (key: OnyxKey) => boolean): Promise<void> {
         return Storage.getAllKeys().then((keys: string[]) => {
-            this.evictionAllowList.forEach((safeEvictionKey) => {
+            this.evictionAllowList.forEach((evictableKey) => {
                 keys.forEach((key: string) => {
-                    if (!this.isKeyMatch(safeEvictionKey, key)) {
+                    if (!this.isKeyMatch(evictableKey, key)) {
                         return;
                     }
 
