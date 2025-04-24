@@ -79,7 +79,7 @@ class OnyxCache {
             'setAllKeys',
             'setEvictionAllowList',
             'getEvictionBlocklist',
-            'isSafeEvictionKey',
+            'isEvictableKey',
             'removeLastAccessedKey',
             'addLastAccessedKey',
             'addAllSafeEvictionKeysToRecentlyAccessedList',
@@ -254,12 +254,12 @@ class OnyxCache {
             const key = iterResult.value;
             // Don't consider the most recently accessed key for eviction
             // This ensures we don't immediately evict a key we just added
-            if (key !== undefined && key !== mostRecentKey && this.isSafeEvictionKey(key)) {
+            if (key !== undefined && key !== mostRecentKey && this.isEvictableKey(key)) {
                 safeKeysToRemove.push(key);
             }
             iterResult = iterator.next();
         }
-
+        console.log('safeKeysToRemove', safeKeysToRemove);
         safeKeysToRemove.forEach((key) => {
             delete this.storageMap[key];
             this.recentKeys.delete(key);
@@ -295,7 +295,7 @@ class OnyxCache {
      * Checks to see if this key has been flagged as safe for removal.
      * @param testKey - Key to check
      */
-    isSafeEvictionKey(testKey: OnyxKey): boolean {
+    isEvictableKey(testKey: OnyxKey): boolean {
         return this.evictionAllowList.some((key) => this.isKeyMatch(key, testKey));
     }
 
@@ -323,7 +323,7 @@ class OnyxCache {
      */
     addLastAccessedKey(key: OnyxKey, isCollectionKey: boolean): void {
         // Only specific keys belong in this list since we cannot remove an entire collection.
-        if (isCollectionKey || !this.isSafeEvictionKey(key)) {
+        if (isCollectionKey || !this.isEvictableKey(key)) {
             return;
         }
 

@@ -113,13 +113,6 @@ function getDeferredInitTask(): DeferredTask {
 }
 
 /**
- * Getter - returns the eviction block list.
- */
-function getEvictionBlocklist(): Record<OnyxKey, string[] | undefined> {
-    return cache.getEvictionBlocklist();
-}
-
-/**
  * Getter - returns the skippable collection member IDs.
  */
 function getSkippableCollectionMemberIDs(): Set<string> {
@@ -1011,7 +1004,7 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, valu
  * run out of storage the least recently accessed key can be removed.
  */
 function addKeyToRecentlyAccessedIfNeeded<TKey extends OnyxKey>(mapping: Mapping<TKey>): void {
-    if (!cache.isSafeEvictionKey(mapping.key)) {
+    if (!cache.isEvictableKey(mapping.key)) {
         return;
     }
 
@@ -1424,7 +1417,6 @@ const OnyxUtils = {
     doAllCollectionItemsBelongToSameParent,
     subscribeToKey,
     unsubscribeFromKey,
-    getEvictionBlocklist,
     getSkippableCollectionMemberIDs,
     setSkippableCollectionMemberIDs,
 };

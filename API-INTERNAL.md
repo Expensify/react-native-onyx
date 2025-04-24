@@ -71,7 +71,7 @@ is associated with a collection of keys.</p>
 <dd><p>Checks to see if a provided key is the exact configured key of our connected subscriber
 or if the provided key is a collection member key (in case our configured key is a &quot;collection key&quot;)</p>
 </dd>
-<dt><a href="#isSafeEvictionKey">isSafeEvictionKey()</a></dt>
+<dt><a href="#isEvictableKey">isEvictableKey()</a></dt>
 <dd><p>Checks to see if this key has been flagged as safe for removal.</p>
 </dd>
 <dt><a href="#getCollectionKey">getCollectionKey(key)</a> ⇒</dt>
@@ -319,9 +319,9 @@ Checks to see if a provided key is the exact configured key of our connected sub
 or if the provided key is a collection member key (in case our configured key is a "collection key")
 
 **Kind**: global function  
-<a name="isSafeEvictionKey"></a>
+<a name="isEvictableKey"></a>
 
-## isSafeEvictionKey()
+## isEvictableKey()
 Checks to see if this key has been flagged as safe for removal.
 
 **Kind**: global function  

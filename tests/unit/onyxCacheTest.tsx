@@ -535,9 +535,7 @@ describe('Onyx', () => {
             let connections: Array<{key: string; connection: Connection}> = [];
 
             // Given Onyx is configured with max 5 keys in cache
-            return initOnyx({
-                maxCachedKeysCount: 5,
-            })
+            return initOnyx({maxCachedKeysCount: 5})
                 .then(() => {
                     // Given 10 connections for different keys
                     connections = range.map((number) => {
@@ -709,11 +707,11 @@ describe('Onyx', () => {
             })
                 .then(() => {
                     // Verify keys are correctly identified as evictable or not
-                    expect(cache.isSafeEvictionKey?.(evictableKey1)).toBe(true);
-                    expect(cache.isSafeEvictionKey?.(evictableKey2)).toBe(true);
-                    expect(cache.isSafeEvictionKey?.(evictableKey3)).toBe(true);
-                    expect(cache.isSafeEvictionKey?.(triggerKey)).toBe(true);
-                    expect(cache.isSafeEvictionKey?.(criticalKey1)).toBe(false);
+                    expect(cache.isEvictableKey?.(evictableKey1)).toBe(true);
+                    expect(cache.isEvictableKey?.(evictableKey2)).toBe(true);
+                    expect(cache.isEvictableKey?.(evictableKey3)).toBe(true);
+                    expect(cache.isEvictableKey?.(triggerKey)).toBe(true);
+                    expect(cache.isEvictableKey?.(criticalKey1)).toBe(false);
 
                     // Connect to non-evictable keys first
                     Onyx.connect({key: criticalKey1, callback: jest.fn()});
