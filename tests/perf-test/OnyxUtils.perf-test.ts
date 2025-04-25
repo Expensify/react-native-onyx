@@ -279,12 +279,19 @@ describe('OnyxUtils', () => {
         };
 
         test('one call adding 1k keys', async () => {
-            await measureAsyncFunction(() => OnyxCache.addEvictableKeysToRecentlyAccessedList(() => false), {
-                beforeEach: async () => {
-                    await Onyx.multiSet(data);
+            await measureAsyncFunction(
+                () =>
+                    OnyxCache.addEvictableKeysToRecentlyAccessedList(
+                        () => false,
+                        () => Promise.resolve(new Set(Object.keys(data))),
+                    ),
+                {
+                    beforeEach: async () => {
+                        await Onyx.multiSet(data);
+                    },
+                    afterEach: clearOnyxAfterEachMeasure,
                 },
-                afterEach: clearOnyxAfterEachMeasure,
-            });
+            );
         });
     });
 

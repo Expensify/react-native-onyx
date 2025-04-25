@@ -336,11 +336,13 @@ class OnyxCache {
      * the recently accessed list when initializing the app. This
      * enables keys that have not recently been accessed to be
      * removed.
+     * @param isCollectionKeyFn - Function to determine if a key is a collection key
+     * @param getAllKeysFn - Function to get all keys, defaults to Storage.getAllKeys
      */
-    addEvictableKeysToRecentlyAccessedList(isCollectionKeyFn: (key: OnyxKey) => boolean): Promise<void> {
-        return Storage.getAllKeys().then((keys: string[]) => {
+    addEvictableKeysToRecentlyAccessedList(isCollectionKeyFn: (key: OnyxKey) => boolean, getAllKeysFn: () => Promise<Set<OnyxKey>>): Promise<void> {
+        return getAllKeysFn().then((keys: Set<OnyxKey>) => {
             this.evictionAllowList.forEach((evictableKey) => {
-                keys.forEach((key: string) => {
+                keys.forEach((key: OnyxKey) => {
                     if (!this.isKeyMatch(evictableKey, key)) {
                         return;
                     }
