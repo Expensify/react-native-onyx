@@ -737,12 +737,6 @@ describe('OnyxUtils', () => {
 
             await measureAsyncFunction(
                 async () => {
-                    function fibonacci(num: number): number {
-                        if (num === 1) return 0;
-                        if (num === 2) return 1;
-                        return fibonacci(num - 1) + fibonacci(num - 2);
-                    }
-                    fibonacci(30);
                     const callback = createDeferredTask();
                     subscriptionID = OnyxUtils.subscribeToKey({
                         key: collectionKey,
