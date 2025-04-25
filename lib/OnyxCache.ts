@@ -3,7 +3,6 @@ import bindAll from 'lodash/bindAll';
 import type {ValueOf} from 'type-fest';
 import utils from './utils';
 import type {OnyxKey, OnyxValue} from './types';
-import Storage from './storage';
 import * as Str from './Str';
 
 // Task constants
