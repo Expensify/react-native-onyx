@@ -45,4 +45,5 @@ jobs:
         id: validateReassureOutput
         uses: ./.github/actions/javascript/validateReassureOutput
         with:
-          DURATION_DEVIATION_PERCENTAGE: 20
+          ALLOWED_DURATION_DEVIATION: 10
+          ALLOWED_RELATIVE_DURATION_DEVIATION: 20
