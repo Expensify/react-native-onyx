@@ -3,7 +3,7 @@ import {act} from '@testing-library/react-native';
 import Onyx from '../../lib';
 import type {Connection} from '../../lib/OnyxConnectionManager';
 import connectionManager from '../../lib/OnyxConnectionManager';
-import OnyxUtils from '../../lib/OnyxUtils';
+import OnyxCache from '../../lib/OnyxCache';
 import StorageMock from '../../lib/storage';
 import type {OnyxKey, WithOnyxConnectOptions} from '../../lib/types';
 import type GenericCollection from '../utils/GenericCollection';
@@ -477,7 +477,7 @@ describe('OnyxConnectionManager', () => {
 
     describe('addToEvictionBlockList / removeFromEvictionBlockList', () => {
         it('should add and remove connections from the eviction block list correctly', async () => {
-            const evictionBlocklist = OnyxUtils.getEvictionBlocklist();
+            const evictionBlocklist = OnyxCache.getEvictionBlocklist();
 
             connectionsMap.set('connectionID1', {subscriptionID: 0, onyxKey: ONYXKEYS.TEST_KEY, callbacks: new Map(), isConnectionMade: true});
             connectionsMap.get('connectionID1')?.callbacks.set('callbackID1', () => undefined);

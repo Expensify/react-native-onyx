@@ -451,7 +451,7 @@ type InitOptions = {
      * This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged
      * as "safe" for removal. Any components subscribing to these keys must also implement a canEvict option. See the README for more info.
      */
-    safeEvictionKeys?: OnyxKey[];
+    evictableKeys?: OnyxKey[];
 
     /**
      * Sets how many recent keys should we try to keep in cache
