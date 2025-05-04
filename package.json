@@ -1,6 +1,6 @@
 {
   "name": "react-native-onyx",
-  "version": "2.0.100",
+  "version": "2.0.104",
   "author": "Expensify, Inc.",
   "homepage": "https://expensify.com",
   "description": "State management for React Native",
@@ -32,12 +32,14 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "jest",
+    "perf-test": "npx reassure",
     "build": "tsc -p tsconfig.build.json",
     "build:watch": "nodemon --watch lib --ext js,json,ts,tsx --exec \"npm run build && npm pack\"",
     "prebuild:docs": "npm run build",
     "build:docs": "ts-node buildDocs.ts",
     "lint-tests": "eslint tests/**",
-    "prettier": "prettier --write ."
+    "prettier": "prettier --write .",
+    "gh-actions-build": "./.github/scripts/buildActions.sh"
   },
   "dependencies": {
     "ascii-table": "0.0.9",
@@ -67,8 +69,10 @@
     "@types/underscore": "^1.11.15",
     "@typescript-eslint/eslint-plugin": "^6.19.0",
     "@typescript-eslint/parser": "^6.19.0",
+    "@vercel/ncc": "0.38.1",
+    "date-fns": "^4.1.0",
     "eslint": "^8.56.0",
-    "eslint-config-expensify": "^2.0.44",
+    "eslint-config-expensify": "^2.0.81",
     "eslint-config-prettier": "^8.8.0",
     "eslint-plugin-import": "^2.29.1",
     "eslint-plugin-jsx-a11y": "^6.8.0",
@@ -89,7 +93,7 @@
     "react-native-nitro-sqlite": "^9.1.8",
     "react-native-performance": "^2.0.0",
     "react-test-renderer": "18.1.0",
-    "reassure": "^0.11.0",
+    "reassure": "1.4.0",
     "ts-node": "^10.9.2",
     "type-fest": "^3.12.0",
     "typescript": "^5.4.5"

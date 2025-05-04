@@ -1,6 +1,5 @@
 /* eslint-disable no-continue */
 import _ from 'underscore';
-import lodashPick from 'lodash/pick';
 import * as Logger from './Logger';
 import cache, {TASK} from './OnyxCache';
 import * as PerformanceUtils from './PerformanceUtils';
@@ -39,9 +38,9 @@ import decorateWithMetrics from './metrics';
 function init({
     keys = {},
     initialKeyStates = {},
-    safeEvictionKeys = [],
+    evictableKeys = [],
     maxCachedKeysCount = 1000,
-    shouldSyncMultipleInstances = Boolean(global.localStorage),
+    shouldSyncMultipleInstances = !!global.localStorage,
     debugSetState = false,
     enablePerformanceMetrics = false,
     skippableCollectionMemberIDs = [],
@@ -71,10 +70,12 @@ function init({
         cache.setRecentKeysLimit(maxCachedKeysCount);
     }
 
-    OnyxUtils.initStoreValues(keys, initialKeyStates, safeEvictionKeys);
+    OnyxUtils.initStoreValues(keys, initialKeyStates, evictableKeys);
 
     // Initialize all of our keys with data provided then give green light to any pending connections
-    Promise.all([OnyxUtils.addAllSafeEvictionKeysToRecentlyAccessedList(), OnyxUtils.initializeWithDefaultKeyStates()]).then(OnyxUtils.getDeferredInitTask().resolve);
+    Promise.all([cache.addEvictableKeysToRecentlyAccessedList(OnyxUtils.isCollectionKey, OnyxUtils.getAllKeys), OnyxUtils.initializeWithDefaultKeyStates()]).then(
+        OnyxUtils.getDeferredInitTask().resolve,
+    );
 }
 
 /**
@@ -620,65 +621,6 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
     return cache.captureTask(TASK.CLEAR, promise) as Promise<void>;
 }
 
-function updateSnapshots(data: OnyxUpdate[]) {
-    const snapshotCollectionKey = OnyxUtils.getSnapshotKey();
-    if (!snapshotCollectionKey) return [];
-
-    const promises: Array<() => Promise<void>> = [];
-
-    const snapshotCollection = OnyxUtils.getCachedCollection(snapshotCollectionKey);
-    const snapshotCollectionKeyLength = snapshotCollectionKey.length;
-
-    Object.entries(snapshotCollection).forEach(([snapshotKey, snapshotValue]) => {
-        // Snapshots may not be present in cache. We don't know how to update them so we skip.
-        if (!snapshotValue) {
-            return;
-        }
-
-        let updatedData: Record<string, unknown> = {};
-
-        data.forEach(({key, value}) => {
-            // snapshots are normal keys so we want to skip update if they are written to Onyx
-            if (OnyxUtils.isCollectionMemberKey(snapshotCollectionKey, key, snapshotCollectionKeyLength)) {
-                return;
-            }
-
-            if (typeof snapshotValue !== 'object' || !('data' in snapshotValue)) {
-                return;
-            }
-
-            const snapshotData = snapshotValue.data;
-            if (!snapshotData || !snapshotData[key]) {
-                return;
-            }
-
-            if (Array.isArray(value) || Array.isArray(snapshotData[key])) {
-                updatedData[key] = value || [];
-                return;
-            }
-
-            if (value === null) {
-                updatedData[key] = value;
-                return;
-            }
-
-            const oldValue = updatedData[key] || {};
-            const newValue = lodashPick(value, Object.keys(snapshotData[key]));
-
-            updatedData = {...updatedData, [key]: Object.assign(oldValue, newValue)};
-        });
-
-        // Skip the update if there's no data to be merged
-        if (utils.isEmptyObject(updatedData)) {
-            return;
-        }
-
-        promises.push(() => merge(snapshotKey, {data: updatedData}));
-    });
-
-    return promises;
-}
-
 /**
  * Insert API responses and lifecycle data into Onyx
  *
@@ -804,7 +746,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
         }
     });
 
-    const snapshotPromises = updateSnapshots(data);
+    const snapshotPromises = OnyxUtils.updateSnapshots(data, merge);
 
     // We need to run the snapshot updates before the other updates so the snapshot data can be updated before the loading state in the snapshot
     const finalPromises = snapshotPromises.concat(promises);
