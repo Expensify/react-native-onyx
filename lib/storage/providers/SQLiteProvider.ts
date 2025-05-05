@@ -9,6 +9,11 @@ import type StorageProvider from './types';
 import utils from '../../utils';
 import type {KeyList, KeyValuePairList} from './types';
 
+// By default, NitroSQLite does not accept nullish values due to current limitations in Nitro Modules.
+// This flag enables a feature in NitroSQLite that allows for nullish values to be passed to operations, such as "execute" or "executeBatch".
+// Simple null handling can potentially add a minor performance overhead,
+// since parameters and results from SQLite queries need to be parsed from and to JavaScript nullish values.
+// https://github.com/margelo/react-native-nitro-sqlite#sending-and-receiving-nullish-values
 enableSimpleNullHandling();
 
 /**
