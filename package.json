@@ -28,6 +28,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
+    "prepare": "npm run build",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "jest",
@@ -86,10 +87,11 @@
     "prop-types": "^15.7.2",
     "react": "18.2.0",
     "react-dom": "^18.2.0",
-    "react-native": "0.71.2",
+    "react-native": "0.76.3",
     "react-native-device-info": "^10.3.0",
+    "react-native-nitro-modules": "^0.24.1",
+    "react-native-nitro-sqlite": "^9.1.8",
     "react-native-performance": "^2.0.0",
-    "react-native-quick-sqlite": "^8.0.6",
     "react-test-renderer": "18.1.0",
     "reassure": "1.4.0",
     "ts-node": "^10.9.2",
@@ -99,10 +101,12 @@
   "peerDependencies": {
     "idb-keyval": "^6.2.1",
     "react": ">=18.1.0",
+    "react-native": ">=0.75.0",
     "react-dom": ">=18.1.0",
     "react-native-device-info": "^10.3.0",
-    "react-native-performance": "^5.1.0",
-    "react-native-quick-sqlite": "^8.0.0-beta.2"
+    "react-native-nitro-modules": ">=0.24.1",
+    "react-native-nitro-sqlite": "^9.1.4",
+    "react-native-performance": "^5.1.0"
   },
   "peerDependenciesMeta": {
     "idb-keyval": {
@@ -111,7 +115,10 @@
     "react-native-performance": {
       "optional": true
     },
-    "react-native-quick-sqlite": {
+    "react-native-nitro-modules": {
+      "optional": true
+    },
+    "react-native-nitro-sqlite": {
       "optional": true
     },
     "react-native-device-info": {
