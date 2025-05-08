@@ -11,11 +11,11 @@ function isEmptyObject<T>(obj: T | EmptyValue): obj is EmptyValue {
 // Mostly copied from https://medium.com/@lubaka.a/how-to-remove-lodash-performance-improvement-b306669ad0e1
 
 /**
- * Checks whether the given value can be merged. It has to be an object, but not an array, RegExp or Date.
+ * Checks whether the given value can be merged. It has to be an object, but not an array, RegExp, Date or Blob.
  */
 function isMergeableObject(value: unknown): value is Record<string, unknown> {
     const isNonNullObject = value != null ? typeof value === 'object' : false;
-    return isNonNullObject && !(value instanceof RegExp) && !(value instanceof Date) && !Array.isArray(value);
+    return isNonNullObject && !(value instanceof RegExp) && !(value instanceof Date) && !(value instanceof Blob) && !Array.isArray(value);
 }
 
 /**
