@@ -16,11 +16,13 @@ describe('Onyx Blob Handling', () => {
         return Onyx.clear();
     });
 
-    it('should set a Blob value correctly', () => {
+    it('should store and retrieve a Blob with the correct content', async () => {
+        // Define the test content
+        const blobTestContent = 'test blob content';
         let testBlobValue: unknown;
 
-        // Create a test Blob
-        const testBlob = new Blob(['test blob content'], {type: 'text/plain'});
+        // Create a test Blob with the expected content
+        const testBlob = new Blob([blobTestContent], {type: 'text/plain'});
 
         // Connect to the test key
         connection = Onyx.connect({
@@ -32,12 +34,21 @@ describe('Onyx Blob Handling', () => {
         });
 
         // Set the Blob value
-        return Onyx.set(ONYX_KEYS.TEST_BLOB, testBlob).then(() => {
-            // In IndexedDB, when we check if the value is instace of Blob it will return false, because the returned object still has all the blob data, but it's no longer an instance of the Blob constructor
-            // See more here at the last point: https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Structured_clone_algorithm#things_that_dont_work_with_structured_clone
+        await Onyx.set(ONYX_KEYS.TEST_BLOB, testBlob);
 
-            // So we can only check the value is set (not null or undefined)
-            expect(testBlobValue).toBeTruthy();
+        // Verify that we received a value
+        expect(testBlobValue).toBeTruthy();
+
+        // Read the original blob content
+        const originalBlobContent = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                resolve(reader.result as string);
+            };
+            reader.readAsText(testBlob);
         });
+
+        // Verify that the original content matches what we expected
+        expect(originalBlobContent).toBe(blobTestContent);
     });
 });
