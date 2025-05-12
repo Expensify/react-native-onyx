@@ -2,7 +2,7 @@
  * The SQLiteStorage provider stores everything in a key/value store by
  * converting the value to a JSON string
  */
-import type {BatchQueryResult, QuickSQLiteConnection} from 'react-native-quick-sqlite';
+import type {BatchQueryResult, QuickSQLiteConnection, SQLBatchTuple} from 'react-native-quick-sqlite';
 import {open} from 'react-native-quick-sqlite';
 import {getFreeDiskStorage} from 'react-native-device-info';
 import type StorageProvider from './types';
@@ -12,6 +12,54 @@ import type {OnyxKey, OnyxValue} from '../../types';
 
 const DB_NAME = 'OnyxDB';
 let db: QuickSQLiteConnection;
+
+function replacer(key: string, value: unknown) {
+    if (key === utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK) return undefined;
+    return value;
+}
+
+type JSONReplacePatch = [string, string[], any];
+
+function getReplacePatches(storageKey: string, value: any): JSONReplacePatch[] {
+    const patches: JSONReplacePatch[] = [];
+
+    // eslint-disable-next-line rulesdir/prefer-early-return
+    function recurse(obj: any, path: string[] = []) {
+        if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+            if (obj.ONYX_INTERNALS__REPLACE_OBJECT_MARK) {
+                const copy = {...obj};
+                delete copy.ONYX_INTERNALS__REPLACE_OBJECT_MARK;
+
+                patches.push([storageKey, [...path], copy]);
+                return;
+            }
+
+            // eslint-disable-next-line guard-for-in, no-restricted-syntax
+            for (const key in obj) {
+                recurse(obj[key], [...path, key]);
+            }
+        }
+    }
+
+    recurse(value);
+    return patches;
+}
+
+function generateJSONReplaceSQLBatch(patches: JSONReplacePatch[]): [string, string[][]] {
+    const sql = `
+        UPDATE keyvaluepairs
+        SET valueJSON = JSON_REPLACE(valueJSON, :jsonPath, JSON(:value))
+        WHERE record_key = :key;
+    `;
+
+    const queryArguments = patches.map(([key, pathArray, value]) => {
+        const jsonPath = `$.${pathArray.join('.')}`;
+        // return {key, jsonPath, value: JSON.stringify(value)};
+        return [jsonPath, JSON.stringify(value), key];
+    });
+
+    return [sql.trim(), queryArguments];
+}
 
 const provider: StorageProvider = {
     /**
@@ -61,47 +109,40 @@ const provider: StorageProvider = {
         return db.executeBatchAsync([['REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, json(?));', stringifiedPairs]]);
     },
     multiMerge(pairs) {
-        const nonNullishPairs: KeyValuePairList = [];
-        const nonNullishPairsKeys: OnyxKey[] = [];
+        const commands: SQLBatchTuple[] = [];
 
+        const patchQuery = `INSERT INTO keyvaluepairs (record_key, valueJSON)
+            VALUES (:key, JSON(:value))
+            ON CONFLICT DO UPDATE
+            SET valueJSON = JSON_PATCH(valueJSON, JSON(:value));
+        `;
+        const patchQueryArguments: string[][] = [];
+        const replaceQuery = `UPDATE keyvaluepairs
+            SET valueJSON = JSON_REPLACE(valueJSON, ?, JSON(?))
+            WHERE record_key = ?;
+        `;
+        const replaceQueryArguments: string[][] = [];
+
+        const nonNullishPairs = pairs.filter((pair) => pair[1] !== undefined);
         // eslint-disable-next-line @typescript-eslint/prefer-for-of
-        for (let i = 0; i < pairs.length; i++) {
-            const pair = pairs[i];
-            if (pair[1] !== undefined) {
-                nonNullishPairs.push(pair);
-                nonNullishPairsKeys.push(pair[0]);
+        for (let i = 0; i < nonNullishPairs.length; i++) {
+            const pair = nonNullishPairs[i];
+            const value = JSON.stringify(pair[1], replacer);
+            patchQueryArguments.push([pair[0], value]);
+
+            const patches = getReplacePatches(pair[0], pair[1]);
+            const [sql, args] = generateJSONReplaceSQLBatch(patches);
+            if (args.length > 0) {
+                replaceQueryArguments.push(...args);
             }
         }
 
-        if (nonNullishPairs.length === 0) {
-            return Promise.resolve();
+        commands.push([patchQuery, patchQueryArguments]);
+        if (replaceQueryArguments.length > 0) {
+            commands.push([replaceQuery, replaceQueryArguments]);
         }
 
-        return this.multiGet(nonNullishPairsKeys).then((storagePairs) => {
-            // multiGet() is not guaranteed to return the data in the same order we asked with "nonNullishPairsKeys",
-            // so we use a map to associate keys to their existing values correctly.
-            const existingMap = new Map<OnyxKey, OnyxValue<OnyxKey>>();
-            // eslint-disable-next-line @typescript-eslint/prefer-for-of
-            for (let i = 0; i < storagePairs.length; i++) {
-                existingMap.set(storagePairs[i][0], storagePairs[i][1]);
-            }
-
-            const newPairs: KeyValuePairList = [];
-
-            // eslint-disable-next-line @typescript-eslint/prefer-for-of
-            for (let i = 0; i < nonNullishPairs.length; i++) {
-                const key = nonNullishPairs[i][0];
-                const newValue = nonNullishPairs[i][1];
-
-                const existingValue = existingMap.get(key) ?? {};
-
-                const mergedValue = utils.fastMerge(existingValue, newValue, true, false, true);
-
-                newPairs.push([key, mergedValue]);
-            }
-
-            return this.multiSet(newPairs);
-        });
+        return db.executeBatchAsync(commands);
     },
     mergeItem(key, preMergedValue) {
         // Since Onyx already merged the existing value with the changes, we can just set the value directly.
