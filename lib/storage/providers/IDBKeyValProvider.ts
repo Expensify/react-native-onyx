@@ -55,8 +55,8 @@ const provider: StorageProvider = {
                 return Promise.all(upsertMany);
             });
         }),
-    mergeItem: (key, deltaChange) => {
-        return provider.multiMerge([[key, deltaChange]]).then((result) => {
+    mergeItem: (key, change) => {
+        return provider.multiMerge([[key, change]]).then((result) => {
             if (Array.isArray(result) && result.length === 1 && result[0] === undefined) {
                 return Promise.resolve(result.at(0));
             }
