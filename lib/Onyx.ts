@@ -321,53 +321,37 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
             if (!validChanges.length) {
                 return Promise.resolve();
             }
-            const batchedDeltaChanges = OnyxUtils.applyMerge(undefined, validChanges, false);
-
-            // Case (1): When there is no existing value in storage, we want to set the value instead of merge it.
-            // Case (2): The presence of a top-level `null` in the merge queue instructs us to drop the whole existing value.
-            // In this case, we can't simply merge the batched changes with the existing value, because then the null in the merge queue would have no effect
-            const shouldSetValue = !existingValue || mergeQueue[key].includes(null);
 
             // Clean up the write queue, so we don't apply these changes again
             delete mergeQueue[key];
             delete mergeQueuePromise[key];
 
-            const logMergeCall = (hasChanged = true) => {
+            // If the last change is null, we remove the key from storage and cache and update the subscriber immediately.
+            if (validChanges.at(-1) === null) {
+                OnyxUtils.remove(key);
                 // Logging properties only since values could be sensitive things we don't want to log
-                Logger.logInfo(`merge called for key: ${key}${_.isObject(batchedDeltaChanges) ? ` properties: ${_.keys(batchedDeltaChanges).join(',')}` : ''} hasChanged: ${hasChanged}`);
-            };
-
-            // If the batched changes equal null, we want to remove the key from storage, to reduce storage size
-            const {wasRemoved} = OnyxUtils.removeNullValues(key, batchedDeltaChanges);
-
-            // Calling "OnyxUtils.removeNullValues" removes the key from storage and cache and updates the subscriber.
-            // Therefore, we don't need to further broadcast and update the value so we can return early.
-            if (wasRemoved) {
-                logMergeCall();
+                Logger.logInfo(`merge called for key: ${key} wasRemoved: true`);
                 return Promise.resolve();
             }
 
-            // For providers that can't handle delta changes, we need to merge the batched changes with the existing value beforehand.
-            // The "preMergedValue" will be directly "set" in storage instead of being merged
-            // Therefore we merge the batched changes with the existing value to get the final merged value that will be stored.
-            // We can remove null values from the "preMergedValue", because "null" implicates that the user wants to remove a value from storage.
-            const preMergedValue = OnyxUtils.applyMerge(shouldSetValue ? undefined : existingValue, [batchedDeltaChanges], true);
+            // We merge the valid changes with the existing value to get the final merged value that will be stored.
+            // We want to remove nested null values from the new value, because null implicates that the user wants to remove a value from storage.
+            const newValue = OnyxUtils.applyMerge(existingValue, validChanges, true);
+            const hasChanged = cache.hasValueChanged(key, newValue);
 
-            // In cache, we don't want to remove the key if it's null to improve performance and speed up the next merge.
-            const hasChanged = cache.hasValueChanged(key, preMergedValue);
-
-            logMergeCall(hasChanged);
+            // Logging properties only since values could be sensitive things we don't want to log
+            Logger.logInfo(`merge called for key: ${key}${_.isObject(newValue) ? ` properties: ${_.keys(newValue).join(',')}` : ''} hasChanged: ${hasChanged}`);
 
             // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
-            const updatePromise = OnyxUtils.broadcastUpdate(key, preMergedValue as OnyxValue<TKey>, hasChanged);
+            const updatePromise = OnyxUtils.broadcastUpdate(key, newValue as OnyxValue<TKey>, hasChanged);
 
             // If the value has not changed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
             if (!hasChanged) {
                 return updatePromise;
             }
 
-            return Storage.mergeItem(key, batchedDeltaChanges as OnyxValue<TKey>, preMergedValue as OnyxValue<TKey>, shouldSetValue).then(() => {
-                OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, changes, preMergedValue);
+            return Storage.setItem(key, newValue as OnyxValue<TKey>).then(() => {
+                OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, changes, newValue);
                 return updatePromise;
             });
         } catch (error) {
