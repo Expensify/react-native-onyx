@@ -389,7 +389,7 @@ type OnyxMultiSetInput = Partial<OnyxInputKeyValueMapping>;
 /**
  * This represents the value that can be passed to `Onyx.merge` and to `Onyx.update` with the method "MERGE"
  */
-type OnyxMergeInput<TKey extends OnyxKey> = OnyxInput<TKey>;
+type OnyxMergeInput<TKey extends OnyxKey> = OnyxInput<TKey> | null;
 
 /**
  * This represents the value that can be passed to `Onyx.merge` and to `Onyx.update` with the method "MERGE"
