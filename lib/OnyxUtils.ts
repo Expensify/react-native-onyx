@@ -4,7 +4,7 @@ import lodashClone from 'lodash/clone';
 import type {ValueOf} from 'type-fest';
 import lodashPick from 'lodash/pick';
 import DevTools from './DevTools';
-import * as Logger from './Logger';
+import Logger from './Logger';
 import type Onyx from './Onyx';
 import cache, {TASK} from './OnyxCache';
 import * as PerformanceUtils from './PerformanceUtils';

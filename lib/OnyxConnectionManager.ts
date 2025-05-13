@@ -1,5 +1,5 @@
 import bindAll from 'lodash/bindAll';
-import * as Logger from './Logger';
+import Logger from './Logger';
 import type {ConnectOptions} from './Onyx';
 import OnyxUtils from './OnyxUtils';
 import * as Str from './Str';

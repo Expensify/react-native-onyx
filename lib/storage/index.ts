@@ -1,4 +1,4 @@
-import * as Logger from '../Logger';
+import Logger from '../Logger';
 
 import PlatformStorage from './platforms';
 import InstanceSync from './InstanceSync';

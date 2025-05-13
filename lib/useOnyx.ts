@@ -10,7 +10,7 @@ import type {CollectionKeyBase, KeyValueMapping, OnyxCollection, OnyxKey, OnyxVa
 import useLiveRef from './useLiveRef';
 import usePrevious from './usePrevious';
 import decorateWithMetrics from './metrics';
-import * as Logger from './Logger';
+import Logger from './Logger';
 
 type BaseUseOnyxOptions = {
     /**

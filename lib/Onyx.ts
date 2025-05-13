@@ -1,6 +1,6 @@
 /* eslint-disable no-continue */
 import _ from 'underscore';
-import * as Logger from './Logger';
+import Logger from './Logger';
 import cache, {TASK} from './OnyxCache';
 import * as PerformanceUtils from './PerformanceUtils';
 import Storage from './storage';
