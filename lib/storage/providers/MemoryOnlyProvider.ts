@@ -40,6 +40,15 @@ const provider: StorageProvider = {
     },
 
     /**
+     * Get the value of a given key or return `null` if it's not available in memory
+     */
+    getItemSync(key) {
+        const value = store[key] as OnyxValue<typeof key>;
+
+        return value === undefined ? (null as OnyxValue<typeof key>) : value;
+    },
+
+    /**
      * Get multiple key-value pairs for the give array of keys in a batch.
      */
     multiGet(keys) {
@@ -74,9 +83,8 @@ const provider: StorageProvider = {
     /**
      * Merging an existing value with a new one
      */
-    mergeItem(key, _deltaChanges, preMergedValue) {
-        // Since Onyx already merged the existing value with the changes, we can just set the value directly
-        return this.setItem(key, preMergedValue);
+    mergeItem(key, change) {
+        return this.multiMerge([[key, change]]);
     },
 
     /**

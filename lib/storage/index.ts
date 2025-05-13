@@ -28,33 +28,34 @@ function degradePerformance(error: Error) {
 }
 
 /**
+ * Runs a piece of code synchronously and degrades performance if certain errors are thrown
+ */
+function tryOrDegradePerformanceSync<T, Callback extends (() => Promise<T>) | (() => T)>(fn: Callback): ReturnType<Callback> {
+    try {
+        return fn() as ReturnType<Callback>;
+    } catch (error) {
+        // Test for known critical errors that the storage provider throws, e.g. when storage is full
+        if (error instanceof Error) {
+            // IndexedDB error when storage is full (https://github.com/Expensify/App/issues/29403)
+            if (error.message.includes('Internal error opening backing store for indexedDB.open')) {
+                degradePerformance(error);
+            }
+
+            // catch the error if DB connection can not be established/DB can not be created
+            if (error.message.includes('IDBKeyVal store could not be created')) {
+                degradePerformance(error);
+            }
+        }
+
+        throw error;
+    }
+}
+
+/**
  * Runs a piece of code and degrades performance if certain errors are thrown
  */
-function tryOrDegradePerformance<T>(fn: () => Promise<T> | T, waitForInitialization = true): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-        const promise = waitForInitialization ? initPromise : Promise.resolve();
-
-        promise.then(() => {
-            try {
-                resolve(fn());
-            } catch (error) {
-                // Test for known critical errors that the storage provider throws, e.g. when storage is full
-                if (error instanceof Error) {
-                    // IndexedDB error when storage is full (https://github.com/Expensify/App/issues/29403)
-                    if (error.message.includes('Internal error opening backing store for indexedDB.open')) {
-                        degradePerformance(error);
-                    }
-
-                    // catch the error if DB connection can not be established/DB can not be created
-                    if (error.message.includes('IDBKeyVal store could not be created')) {
-                        degradePerformance(error);
-                    }
-                }
-
-                reject(error);
-            }
-        });
-    });
+function tryOrDegradePerformance<T>(fn: () => Promise<T> | T, waitForInitialization = true) {
+    return (waitForInitialization ? initPromise : Promise.resolve()).then(() => tryOrDegradePerformanceSync(fn));
 }
 
 const storage: Storage = {
@@ -79,6 +80,11 @@ const storage: Storage = {
      * Get the value of a given key or return `null` if it's not available
      */
     getItem: (key) => tryOrDegradePerformance(() => provider.getItem(key)),
+
+    /**
+     * Get the value of a given key synchronously or return `null` if it's not available
+     */
+    getItemSync: (key) => tryOrDegradePerformanceSync(() => provider.getItemSync(key)),
 
     /**
      * Get multiple key-value pairs for the give array of keys in a batch

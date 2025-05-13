@@ -23,6 +23,30 @@ const provider: StorageProvider = {
 
         idbKeyValStore = newIdbKeyValStore;
     },
+
+    /**
+     * Get the value of a given key
+     */
+    getItem: (key) =>
+        get(key, idbKeyValStore)
+            // idb-keyval returns undefined for missing items, but this needs to return null so that idb-keyval does the same thing as SQLiteStorage.
+            .then((val) => (val === undefined ? null : val)),
+
+    /**
+     * Get the value of a given key synchronously
+     */
+    getItemSync: () => {
+        throw new Error('getItemSync is only supported on mobile platforms (iOS, Android)');
+    },
+
+    /**
+     * Get the values of multiple keys
+     */
+    multiGet: (keysParam) => getMany(keysParam, idbKeyValStore).then((values) => values.map((value, index) => [keysParam[index], value])),
+
+    /**
+     * Set the value of a given key
+     */
     setItem: (key, value) => {
         if (value === null) {
             provider.removeItem(key);
@@ -30,7 +54,39 @@ const provider: StorageProvider = {
 
         return set(key, value, idbKeyValStore);
     },
-    multiGet: (keysParam) => getMany(keysParam, idbKeyValStore).then((values) => values.map((value, index) => [keysParam[index], value])),
+
+    /**
+     * Stores multiple key-value pairs in a batch
+     */
+    multiSet: (pairs) => {
+        const pairsWithoutNull = pairs.filter(([key, value]) => {
+            if (value === null) {
+                provider.removeItem(key);
+                return false;
+            }
+
+            return true;
+        });
+
+        return setMany(pairsWithoutNull, idbKeyValStore);
+    },
+
+    /**
+     * Merging an existing value with a new one
+     */
+    mergeItem: (key, change) => {
+        return provider.multiMerge([[key, change]]).then((result) => {
+            if (Array.isArray(result) && result.length === 1 && result[0] === undefined) {
+                return Promise.resolve(result.at(0));
+            }
+
+            return Promise.resolve(undefined);
+        });
+    },
+
+    /**
+     * Merge the values of multiple keys
+     */
     multiMerge: (pairs) =>
         idbKeyValStore('readwrite', (store) => {
             // Note: we are using the manual store transaction here, to fit the read and update
@@ -55,35 +111,30 @@ const provider: StorageProvider = {
                 return Promise.all(upsertMany);
             });
         }),
-    mergeItem: (key, change) => {
-        return provider.multiMerge([[key, change]]).then((result) => {
-            if (Array.isArray(result) && result.length === 1 && result[0] === undefined) {
-                return Promise.resolve(result.at(0));
-            }
 
-            return Promise.resolve(undefined);
-        });
-    },
-    multiSet: (pairs) => {
-        const pairsWithoutNull = pairs.filter(([key, value]) => {
-            if (value === null) {
-                provider.removeItem(key);
-                return false;
-            }
-
-            return true;
-        });
-
-        return setMany(pairsWithoutNull, idbKeyValStore);
-    },
-    clear: () => clear(idbKeyValStore),
-    getAllKeys: () => keys(idbKeyValStore),
-    getItem: (key) =>
-        get(key, idbKeyValStore)
-            // idb-keyval returns undefined for missing items, but this needs to return null so that idb-keyval does the same thing as SQLiteStorage.
-            .then((val) => (val === undefined ? null : val)),
+    /**
+     * Remove the value of a given key
+     */
     removeItem: (key) => del(key, idbKeyValStore),
+
+    /**
+     * Remove the values of multiple keys
+     */
     removeItems: (keysParam) => delMany(keysParam, idbKeyValStore),
+
+    /**
+     * Clear the storage
+     */
+    clear: () => clear(idbKeyValStore),
+
+    /**
+     * Get all keys
+     */
+    getAllKeys: () => keys(idbKeyValStore),
+
+    /**
+     * Get the size of the database
+     */
     getDatabaseSize() {
         if (!window.navigator || !window.navigator.storage) {
             throw new Error('StorageManager browser API unavailable');

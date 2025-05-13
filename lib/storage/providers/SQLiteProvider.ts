@@ -2,7 +2,7 @@
  * The SQLiteStorage provider stores everything in a key/value store by
  * converting the value to a JSON string
  */
-import type {BatchQueryResult, NitroSQLiteConnection} from 'react-native-nitro-sqlite';
+import type {BatchQueryResult, NitroSQLiteConnection, QueryResult} from 'react-native-nitro-sqlite';
 import {enableSimpleNullHandling, open} from 'react-native-nitro-sqlite';
 import {getFreeDiskStorage} from 'react-native-device-info';
 import type StorageProvider from './types';
@@ -40,6 +40,23 @@ type PageCountResult = {
     page_count: number;
 };
 
+/**
+ * Validates the result of a GET query
+ */
+function validateGet(result: QueryResult<OnyxSQLiteKeyValuePair>) {
+    const rows = result.rows;
+    if (!rows || rows?.length === 0) {
+        return null;
+    }
+
+    const firstResult = rows?.item(0);
+    if (firstResult == null) {
+        return null;
+    }
+
+    return JSON.parse(firstResult.valueJSON);
+}
+
 const DB_NAME = 'OnyxDB';
 let db: NitroSQLiteConnection;
 
@@ -48,6 +65,7 @@ const provider: StorageProvider = {
      * The name of the provider that can be printed to the logs
      */
     name: 'SQLiteProvider',
+
     /**
      * Initializes the storage provider
      */
@@ -62,20 +80,25 @@ const provider: StorageProvider = {
         db.execute('PRAGMA synchronous=NORMAL;');
         db.execute('PRAGMA journal_mode=WAL;');
     },
+
+    /**
+     * Gets the value of a given key
+     */
     getItem(key) {
-        return db.executeAsync<OnyxSQLiteKeyValuePair>('SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key = ?;', [key]).then(({rows}) => {
-            if (!rows || rows?.length === 0) {
-                return null;
-            }
-            const result = rows?.item(0);
-
-            if (result == null) {
-                return null;
-            }
-
-            return JSON.parse(result.valueJSON);
-        });
+        return db.executeAsync<OnyxSQLiteKeyValuePair>('SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key = ?;', [key]).then(validateGet);
     },
+
+    /**
+     * Gets the value of a given key synchronously
+     */
+    getItemSync(key) {
+        const result = db.execute<OnyxSQLiteKeyValuePair>('SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key = ?;', [key]);
+        return validateGet(result);
+    },
+
+    /**
+     * Gets the values of multiple keys
+     */
     multiGet(keys) {
         const placeholders = keys.map(() => '?').join(',');
         const command = `SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
@@ -85,9 +108,17 @@ const provider: StorageProvider = {
             return (result ?? []) as KeyValuePairList;
         });
     },
+
+    /**
+     * Sets the value of a given key
+     */
     setItem(key, value) {
         return db.executeAsync('REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);', [key, JSON.stringify(value)]);
     },
+
+    /**
+     * Sets the values of multiple keys
+     */
     multiSet(pairs) {
         const query = 'REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, json(?));';
         const params = pairs.map((pair) => [pair[0], JSON.stringify(pair[1] === undefined ? null : pair[1])]);
@@ -96,6 +127,17 @@ const provider: StorageProvider = {
         }
         return db.executeBatchAsync([{query, params}]);
     },
+
+    /**
+     * Merges the value of a given key with a new value
+     */
+    mergeItem(key, change) {
+        return this.multiMerge([[key, change]]) as Promise<BatchQueryResult>;
+    },
+
+    /**
+     * Merges the value of a given key with a new value
+     */
     multiMerge(pairs) {
         // Note: We use `ON CONFLICT DO UPDATE` here instead of `INSERT OR REPLACE INTO`
         // so the new JSON value is merged into the old one if there's an existing value
@@ -113,22 +155,39 @@ const provider: StorageProvider = {
 
         return db.executeBatchAsync([{query, params}]);
     },
-    mergeItem(key, change) {
-        return this.multiMerge([[key, change]]) as Promise<BatchQueryResult>;
+
+    /**
+     * Removes the value of a given key
+     */
+    removeItem: (key) => db.executeAsync('DELETE FROM keyvaluepairs WHERE record_key = ?;', [key]),
+
+    /**
+     * Removes the values of multiple keys
+     */
+    removeItems: (keys) => {
+        const placeholders = keys.map(() => '?').join(',');
+        const query = `DELETE FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
+        return db.executeAsync(query, keys);
     },
+
+    /**
+     * Clears the database
+     */
+    clear: () => db.executeAsync('DELETE FROM keyvaluepairs;', []),
+
+    /**
+     * Gets all the keys in the database
+     */
     getAllKeys: () =>
         db.executeAsync('SELECT record_key FROM keyvaluepairs;').then(({rows}) => {
             // eslint-disable-next-line no-underscore-dangle
             const result = rows?._array.map((row) => row.record_key);
             return (result ?? []) as KeyList;
         }),
-    removeItem: (key) => db.executeAsync('DELETE FROM keyvaluepairs WHERE record_key = ?;', [key]),
-    removeItems: (keys) => {
-        const placeholders = keys.map(() => '?').join(',');
-        const query = `DELETE FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
-        return db.executeAsync(query, keys);
-    },
-    clear: () => db.executeAsync('DELETE FROM keyvaluepairs;', []),
+
+    /**
+     * Gets the size of the database
+     */
     getDatabaseSize() {
         return Promise.all([db.executeAsync<PageSizeResult>('PRAGMA page_size;'), db.executeAsync<PageCountResult>('PRAGMA page_count;'), getFreeDiskStorage()]).then(
             ([pageSizeResult, pageCountResult, bytesRemaining]) => {
