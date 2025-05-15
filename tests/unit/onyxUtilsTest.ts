@@ -203,7 +203,7 @@ describe('OnyxUtils', () => {
         it('should apply the replacement markers if the we have properties with objects being removed and added back during the changes', () => {
             const result = OnyxUtils.batchMergeChanges(testMergeChanges);
 
-            expect(result).toEqual({
+            expect(result.result).toEqual({
                 b: {
                     d: {
                         i: 'i',
@@ -217,6 +217,61 @@ describe('OnyxUtils', () => {
                     },
                 },
             });
+            expect(result.replaceNullPatches).toEqual([
+                [['b', 'd'], {i: 'i'}],
+                [['b', 'd'], {i: 'i', j: 'j'}],
+                [['b', 'g'], {k: 'k'}],
+            ]);
+        });
+
+        it('should 2', () => {
+            const result = OnyxUtils.batchMergeChanges([
+                {
+                    // Removing the "originalMessage" object in this update.
+                    // Any subsequent changes to this object should completely replace the existing object in store.
+                    originalMessage: null,
+                },
+                {
+                    // This change should completely replace "originalMessage" existing object in store.
+                    originalMessage: {
+                        errorMessage: 'newErrorMessage',
+                    },
+                    receipt: {
+                        // Removing the "nestedObject" object in this update.
+                        // Any subsequent changes to this object should completely replace the existing object in store.
+                        nestedObject: null,
+                    },
+                },
+                {
+                    receipt: {
+                        receiptID: null,
+                        filename: 'newFilename',
+                        // This change should completely replace "receipt" existing object in store.
+                        nestedObject: {
+                            nestedKey2: 'newNestedKey2',
+                        },
+                    },
+                },
+            ]);
+
+            expect(result.result).toEqual({
+                originalMessage: {
+                    errorMessage: 'newErrorMessage',
+                    [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                },
+                receipt: {
+                    receiptID: null,
+                    filename: 'newFilename',
+                    nestedObject: {
+                        nestedKey2: 'newNestedKey2',
+                        [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                    },
+                },
+            });
+            expect(result.replaceNullPatches).toEqual([
+                [['originalMessage'], {errorMessage: 'newErrorMessage'}],
+                [['receipt', 'nestedObject'], {nestedKey2: 'newNestedKey2'}],
+            ]);
         });
     });
 });

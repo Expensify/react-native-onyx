@@ -1,5 +1,5 @@
 import type {BatchQueryResult, QueryResult} from 'react-native-quick-sqlite';
-import type {OnyxKey, OnyxValue} from '../../types';
+import type {MixedOperationsQueue, OnyxKey, OnyxValue} from '../../types';
 
 type KeyValuePair = [OnyxKey, OnyxValue<OnyxKey>];
 type KeyList = OnyxKey[];
@@ -39,7 +39,7 @@ type StorageProvider = {
     /**
      * Multiple merging of existing and new values in a batch
      */
-    multiMerge: (pairs: KeyValuePairList) => Promise<BatchQueryResult | IDBValidKey[] | void>;
+    multiMerge: (pairs: KeyValuePairList, mergeReplaceNullPatches?: MixedOperationsQueue['mergeReplaceNullPatches']) => Promise<BatchQueryResult | IDBValidKey[] | void>;
 
     /**
      * Merges an existing value with a new one

@@ -2,13 +2,13 @@
  * The SQLiteStorage provider stores everything in a key/value store by
  * converting the value to a JSON string
  */
+import {getFreeDiskStorage} from 'react-native-device-info';
 import type {BatchQueryResult, QuickSQLiteConnection, SQLBatchTuple} from 'react-native-quick-sqlite';
 import {open} from 'react-native-quick-sqlite';
-import {getFreeDiskStorage} from 'react-native-device-info';
-import type StorageProvider from './types';
+import type {FastMergeReplaceNullPatch} from '../../utils';
 import utils from '../../utils';
+import type StorageProvider from './types';
 import type {KeyList, KeyValuePairList} from './types';
-import type {OnyxKey, OnyxValue} from '../../types';
 
 const DB_NAME = 'OnyxDB';
 let db: QuickSQLiteConnection;
@@ -18,47 +18,13 @@ function replacer(key: string, value: unknown) {
     return value;
 }
 
-type JSONReplacePatch = [string, string[], any];
-
-function getReplacePatches(storageKey: string, value: any): JSONReplacePatch[] {
-    const patches: JSONReplacePatch[] = [];
-
-    // eslint-disable-next-line rulesdir/prefer-early-return
-    function recurse(obj: any, path: string[] = []) {
-        if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
-            if (obj.ONYX_INTERNALS__REPLACE_OBJECT_MARK) {
-                const copy = {...obj};
-                delete copy.ONYX_INTERNALS__REPLACE_OBJECT_MARK;
-
-                patches.push([storageKey, [...path], copy]);
-                return;
-            }
-
-            // eslint-disable-next-line guard-for-in, no-restricted-syntax
-            for (const key in obj) {
-                recurse(obj[key], [...path, key]);
-            }
-        }
-    }
-
-    recurse(value);
-    return patches;
-}
-
-function generateJSONReplaceSQLBatch(patches: JSONReplacePatch[]): [string, string[][]] {
-    const sql = `
-        UPDATE keyvaluepairs
-        SET valueJSON = JSON_REPLACE(valueJSON, :jsonPath, JSON(:value))
-        WHERE record_key = :key;
-    `;
-
-    const queryArguments = patches.map(([key, pathArray, value]) => {
+function generateJSONReplaceSQLQueries(key: string, patches: FastMergeReplaceNullPatch[]): string[][] {
+    const queries = patches.map(([pathArray, value]) => {
         const jsonPath = `$.${pathArray.join('.')}`;
-        // return {key, jsonPath, value: JSON.stringify(value)};
         return [jsonPath, JSON.stringify(value), key];
     });
 
-    return [sql.trim(), queryArguments];
+    return queries;
 }
 
 const provider: StorageProvider = {
@@ -108,7 +74,7 @@ const provider: StorageProvider = {
         }
         return db.executeBatchAsync([['REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, json(?));', stringifiedPairs]]);
     },
-    multiMerge(pairs) {
+    multiMerge(pairs, mergeReplaceNullPatches) {
         const commands: SQLBatchTuple[] = [];
 
         const patchQuery = `INSERT INTO keyvaluepairs (record_key, valueJSON)
@@ -124,16 +90,20 @@ const provider: StorageProvider = {
         const replaceQueryArguments: string[][] = [];
 
         const nonNullishPairs = pairs.filter((pair) => pair[1] !== undefined);
+
         // eslint-disable-next-line @typescript-eslint/prefer-for-of
         for (let i = 0; i < nonNullishPairs.length; i++) {
             const pair = nonNullishPairs[i];
             const value = JSON.stringify(pair[1], replacer);
             patchQueryArguments.push([pair[0], value]);
 
-            const patches = getReplacePatches(pair[0], pair[1]);
-            const [sql, args] = generateJSONReplaceSQLBatch(patches);
-            if (args.length > 0) {
-                replaceQueryArguments.push(...args);
+            const patches = mergeReplaceNullPatches?.[pair[0]] ?? [];
+            if (patches.length > 0) {
+                const queries = generateJSONReplaceSQLQueries(pair[0], patches);
+
+                if (queries.length > 0) {
+                    replaceQueryArguments.push(...queries);
+                }
             }
         }
 

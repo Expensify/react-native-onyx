@@ -3,6 +3,7 @@ import type {BuiltIns} from 'type-fest/source/internal';
 import type OnyxUtils from './OnyxUtils';
 import type {WithOnyxInstance, WithOnyxState} from './withOnyx/types';
 import type {OnyxMethod} from './OnyxUtils';
+import type {FastMergeReplaceNullPatch} from './utils';
 
 /**
  * Utility type that excludes `null` from the type `TValue`.
@@ -490,6 +491,7 @@ type GenericFunction = (...args: any[]) => any;
  */
 type MixedOperationsQueue = {
     merge: OnyxInputKeyValueMapping;
+    mergeReplaceNullPatches: {[TKey in OnyxKey]: FastMergeReplaceNullPatch[]};
     set: OnyxInputKeyValueMapping;
 };
 

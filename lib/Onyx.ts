@@ -319,7 +319,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
             if (!validChanges.length) {
                 return Promise.resolve();
             }
-            const batchedDeltaChanges = OnyxUtils.batchMergeChanges(validChanges);
+            const batchedDeltaChanges = OnyxUtils.batchMergeChanges(validChanges).result;
 
             // Case (1): When there is no existing value in storage, we want to set the value instead of merge it.
             // Case (2): The presence of a top-level `null` in the merge queue instructs us to drop the whole existing value.
@@ -391,7 +391,11 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
  * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
  * @param collection Object collection keyed by individual collection member keys and values
  */
-function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
+function mergeCollection<TKey extends CollectionKeyBase, TMap>(
+    collectionKey: TKey,
+    collection: OnyxMergeCollectionInput<TKey, TMap>,
+    mergeReplaceNullPatches?: MixedOperationsQueue['mergeReplaceNullPatches'],
+): Promise<void> {
     if (!OnyxUtils.isValidNonEmptyCollectionForMerge(collection)) {
         Logger.logInfo('mergeCollection() called with invalid or empty value. Skipping this update.');
         return Promise.resolve();
@@ -476,7 +480,7 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TK
             // New keys will be added via multiSet while existing keys will be updated using multiMerge
             // This is because setting a key that doesn't exist yet with multiMerge will throw errors
             if (keyValuePairsForExistingCollection.length > 0) {
-                promises.push(Storage.multiMerge(keyValuePairsForExistingCollection));
+                promises.push(Storage.multiMerge(keyValuePairsForExistingCollection, mergeReplaceNullPatches));
             }
 
             if (keyValuePairsForNewCollection.length > 0) {
@@ -773,21 +777,28 @@ function update(data: OnyxUpdate[]): Promise<void> {
                 const batchedChanges = OnyxUtils.batchMergeChanges(operations);
                 if (operations[0] === null) {
                     // eslint-disable-next-line no-param-reassign
-                    queue.set[key] = batchedChanges;
+                    queue.set[key] = batchedChanges.result;
                 } else {
                     // eslint-disable-next-line no-param-reassign
-                    queue.merge[key] = batchedChanges;
+                    queue.merge[key] = batchedChanges.result;
+                    if (batchedChanges.replaceNullPatches.length > 0) {
+                        // eslint-disable-next-line no-param-reassign
+                        queue.mergeReplaceNullPatches[key] = batchedChanges.replaceNullPatches;
+                    }
                 }
                 return queue;
             },
             {
                 merge: {},
+                mergeReplaceNullPatches: {},
                 set: {},
             },
         );
 
         if (!utils.isEmptyObject(batchedCollectionUpdates.merge)) {
-            promises.push(() => mergeCollection(collectionKey, batchedCollectionUpdates.merge as Collection<CollectionKey, unknown, unknown>));
+            promises.push(() =>
+                mergeCollection(collectionKey, batchedCollectionUpdates.merge as Collection<CollectionKey, unknown, unknown>, batchedCollectionUpdates.mergeReplaceNullPatches),
+            );
         }
         if (!utils.isEmptyObject(batchedCollectionUpdates.set)) {
             promises.push(() => multiSet(batchedCollectionUpdates.set));
@@ -795,7 +806,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
     });
 
     Object.entries(updateQueue).forEach(([key, operations]) => {
-        const batchedChanges = OnyxUtils.batchMergeChanges(operations);
+        const batchedChanges = OnyxUtils.batchMergeChanges(operations).result;
 
         if (operations[0] === null) {
             promises.push(() => set(key, batchedChanges));

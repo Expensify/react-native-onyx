@@ -28,6 +28,7 @@ import type {
     OnyxValue,
     Selector,
 } from './types';
+import type {FastMergeResult} from './utils';
 import utils from './utils';
 import type {WithOnyxState} from './withOnyx/types';
 import type {DeferredTask} from './createDeferredTask';
@@ -1264,7 +1265,7 @@ function applyMerge<TValue extends OnyxInput<OnyxKey> | undefined, TChange exten
 
     if (changes.some((change) => change && typeof change === 'object')) {
         // Object values are then merged one after the other
-        return changes.reduce((modifiedData, change) => utils.fastMerge(modifiedData, change, true, false, true), (existingValue || {}) as TChange);
+        return changes.reduce((modifiedData, change) => utils.fastMerge(modifiedData, change, true, false, true).result, (existingValue || {}) as TChange);
     }
 
     // If we have anything else we can't merge it so we'll
@@ -1272,21 +1273,34 @@ function applyMerge<TValue extends OnyxInput<OnyxKey> | undefined, TChange exten
     return lastChange as TChange;
 }
 
-function batchMergeChanges<TChange extends OnyxInput<OnyxKey> | undefined>(changes: TChange[]): TChange {
+function batchMergeChanges<TChange extends OnyxInput<OnyxKey> | undefined>(changes: TChange[]): FastMergeResult<TChange> {
     const lastChange = changes?.at(-1);
 
     if (Array.isArray(lastChange)) {
-        return lastChange;
+        return {result: lastChange, replaceNullPatches: []};
     }
 
     if (changes.some((change) => change && typeof change === 'object')) {
         // Object values are then merged one after the other
-        return changes.reduce((modifiedData, change) => utils.fastMerge(modifiedData, change, false, true, false), {} as TChange);
+        return changes.reduce<FastMergeResult<TChange>>(
+            (modifiedData, change) => {
+                const fastMergeResult = utils.fastMerge(modifiedData.result, change, false, true, false);
+                // eslint-disable-next-line no-param-reassign
+                modifiedData.result = fastMergeResult.result;
+                // eslint-disable-next-line no-param-reassign
+                modifiedData.replaceNullPatches = [...modifiedData.replaceNullPatches, ...fastMergeResult.replaceNullPatches];
+                return modifiedData;
+            },
+            {
+                result: {} as TChange,
+                replaceNullPatches: [],
+            },
+        );
     }
 
     // If we have anything else we can't merge it so we'll
     // simply return the last value that was queued
-    return lastChange as TChange;
+    return {result: lastChange as TChange, replaceNullPatches: []};
 }
 
 /**
@@ -1296,7 +1310,7 @@ function initializeWithDefaultKeyStates(): Promise<void> {
     return Storage.multiGet(Object.keys(defaultKeyStates)).then((pairs) => {
         const existingDataAsObject = Object.fromEntries(pairs);
 
-        const merged = utils.fastMerge(existingDataAsObject, defaultKeyStates, true, false, false);
+        const merged = utils.fastMerge(existingDataAsObject, defaultKeyStates, true, false, false).result;
         cache.merge(merged ?? {});
 
         Object.entries(merged ?? {}).forEach(([key, value]) => keyChanged(key, value, existingDataAsObject));

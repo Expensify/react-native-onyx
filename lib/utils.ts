@@ -5,6 +5,17 @@ import type {ConnectOptions, OnyxInput, OnyxKey} from './types';
 type EmptyObject = Record<string, never>;
 type EmptyValue = EmptyObject | null | undefined;
 
+type FastMergeReplaceNullPatch = [string[], unknown];
+
+type FastMergeMetadata = {
+    replaceNullPatches: FastMergeReplaceNullPatch[];
+};
+
+type FastMergeResult<TValue> = {
+    result: TValue;
+    replaceNullPatches: FastMergeReplaceNullPatch[];
+};
+
 const ONYX_INTERNALS__REPLACE_OBJECT_MARK = 'ONYX_INTERNALS__REPLACE_OBJECT_MARK';
 
 /** Checks whether the given object is an object and not null/undefined. */
@@ -39,6 +50,8 @@ function mergeObject<TObject extends Record<string, unknown>>(
     shouldRemoveNestedNulls: boolean,
     isBatchingMergeChanges: boolean,
     shouldReplaceMarkedObjects: boolean,
+    metadata: FastMergeMetadata,
+    basePath: string[] = [],
 ): TObject {
     const destination: Record<string, unknown> = {};
 
@@ -98,6 +111,7 @@ function mergeObject<TObject extends Record<string, unknown>>(
                 // effectively replace them in the next condition.
                 if (isBatchingMergeChanges && targetValue === null) {
                     (targetValueWithFallback as Record<string, unknown>)[ONYX_INTERNALS__REPLACE_OBJECT_MARK] = true;
+                    metadata.replaceNullPatches.push([[...basePath, key], {...sourceValue}]);
                 }
 
                 // Then, when merging the batched changes with the Onyx value, if a nested object of the batched changes
@@ -110,7 +124,10 @@ function mergeObject<TObject extends Record<string, unknown>>(
                     delete (destination[key] as Record<string, unknown>).ONYX_INTERNALS__REPLACE_OBJECT_MARK;
                 } else {
                     // For the normal situations we'll just call `fastMerge()` again to merge the nested object.
-                    destination[key] = fastMerge(targetValueWithFallback, sourceValue, shouldRemoveNestedNulls, isBatchingMergeChanges, shouldReplaceMarkedObjects);
+                    destination[key] = fastMerge(targetValueWithFallback, sourceValue, shouldRemoveNestedNulls, isBatchingMergeChanges, shouldReplaceMarkedObjects, metadata, [
+                        ...basePath,
+                        key,
+                    ]).result;
                 }
             } else {
                 destination[key] = sourceValue;
@@ -126,22 +143,38 @@ function mergeObject<TObject extends Record<string, unknown>>(
  *
  * We generally want to remove null values from objects written to disk and cache, because it decreases the amount of data stored in memory and on disk.
  */
-function fastMerge<TValue>(target: TValue, source: TValue, shouldRemoveNestedNulls: boolean, isBatchingMergeChanges: boolean, shouldReplaceMarkedObjects: boolean): TValue {
+function fastMerge<TValue>(
+    target: TValue,
+    source: TValue,
+    shouldRemoveNestedNulls: boolean,
+    isBatchingMergeChanges: boolean,
+    shouldReplaceMarkedObjects: boolean,
+    metadata?: FastMergeMetadata,
+    basePath: string[] = [],
+): FastMergeResult<TValue> {
+    if (!metadata) {
+        // eslint-disable-next-line no-param-reassign
+        metadata = {
+            replaceNullPatches: [],
+        };
+    }
+
     // We have to ignore arrays and nullish values here,
     // otherwise "mergeObject" will throw an error,
     // because it expects an object as "source"
     if (Array.isArray(source) || source === null || source === undefined) {
-        return source;
+        return {result: source, replaceNullPatches: metadata.replaceNullPatches};
     }
 
-    return mergeObject(target, source as Record<string, unknown>, shouldRemoveNestedNulls, isBatchingMergeChanges, shouldReplaceMarkedObjects) as TValue;
+    const mergedValue = mergeObject(target, source as Record<string, unknown>, shouldRemoveNestedNulls, isBatchingMergeChanges, shouldReplaceMarkedObjects, metadata, basePath) as TValue;
+
+    return {result: mergedValue, replaceNullPatches: metadata.replaceNullPatches};
 }
 
 /** Deep removes the nested null values from the given value. */
 function removeNestedNullValues<TValue extends OnyxInput<OnyxKey> | null>(value: TValue): TValue {
     if (typeof value === 'object' && !Array.isArray(value)) {
-        const objectValue = value as Record<string, unknown>;
-        return fastMerge(objectValue, objectValue, true, false, true) as TValue;
+        return fastMerge(value, value, true, false, true).result;
     }
 
     return value;
@@ -245,3 +278,4 @@ export default {
     hasWithOnyxInstance,
     ONYX_INTERNALS__REPLACE_OBJECT_MARK,
 };
+export type {FastMergeResult, FastMergeReplaceNullPatch};
