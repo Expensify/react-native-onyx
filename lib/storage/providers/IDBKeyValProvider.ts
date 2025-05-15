@@ -49,7 +49,10 @@ const provider: StorageProvider = {
 
                 const upsertMany = pairsWithoutNull.map(([key, value], index) => {
                     const prev = values[index];
-                    const newValue = utils.fastMerge(prev as Record<string, unknown>, value as Record<string, unknown>, true, false, true).result;
+                    const newValue = utils.fastMerge(prev as Record<string, unknown>, value as Record<string, unknown>, {
+                        shouldRemoveNestedNulls: true,
+                        shouldReplaceMarkedObjects: true,
+                    }).result;
                     return promisifyRequest(store.put(newValue, key));
                 });
                 return Promise.all(upsertMany);

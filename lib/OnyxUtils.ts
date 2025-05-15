@@ -1265,7 +1265,14 @@ function applyMerge<TValue extends OnyxInput<OnyxKey> | undefined, TChange exten
 
     if (changes.some((change) => change && typeof change === 'object')) {
         // Object values are then merged one after the other
-        return changes.reduce((modifiedData, change) => utils.fastMerge(modifiedData, change, true, false, true).result, (existingValue || {}) as TChange);
+        return changes.reduce(
+            (modifiedData, change) =>
+                utils.fastMerge(modifiedData, change, {
+                    shouldRemoveNestedNulls: true,
+                    shouldReplaceMarkedObjects: true,
+                }).result,
+            (existingValue || {}) as TChange,
+        );
     }
 
     // If we have anything else we can't merge it so we'll
@@ -1284,7 +1291,7 @@ function batchMergeChanges<TChange extends OnyxInput<OnyxKey> | undefined>(chang
         // Object values are then merged one after the other
         return changes.reduce<FastMergeResult<TChange>>(
             (modifiedData, change) => {
-                const fastMergeResult = utils.fastMerge(modifiedData.result, change, false, true, false);
+                const fastMergeResult = utils.fastMerge(modifiedData.result, change, {isBatchingMergeChanges: true});
                 // eslint-disable-next-line no-param-reassign
                 modifiedData.result = fastMergeResult.result;
                 // eslint-disable-next-line no-param-reassign
@@ -1310,7 +1317,9 @@ function initializeWithDefaultKeyStates(): Promise<void> {
     return Storage.multiGet(Object.keys(defaultKeyStates)).then((pairs) => {
         const existingDataAsObject = Object.fromEntries(pairs);
 
-        const merged = utils.fastMerge(existingDataAsObject, defaultKeyStates, true, false, false).result;
+        const merged = utils.fastMerge(existingDataAsObject, defaultKeyStates, {
+            shouldRemoveNestedNulls: true,
+        }).result;
         cache.merge(merged ?? {});
 
         Object.entries(merged ?? {}).forEach(([key, value]) => keyChanged(key, value, existingDataAsObject));
@@ -1373,7 +1382,7 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
             // Performance improvement
             // If the mapping is connected to an onyx key that is not a collection
             // we can skip the call to getAllKeys() and return an array with a single item
-            if (Boolean(mapping.key) && typeof mapping.key === 'string' && !isCollectionKey(mapping.key) && cache.getAllKeys().has(mapping.key)) {
+            if (!!mapping.key && typeof mapping.key === 'string' && !isCollectionKey(mapping.key) && cache.getAllKeys().has(mapping.key)) {
                 return new Set([mapping.key]);
             }
             return getAllKeys();

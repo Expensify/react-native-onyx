@@ -89,7 +89,9 @@ describe('fastMerge', () => {
     });
 
     it('should merge an object with an empty object and remove deeply nested null values', () => {
-        const result = utils.fastMerge({}, testObjectWithNullishValues, true, false, false);
+        const result = utils.fastMerge({}, testObjectWithNullishValues, {
+            shouldRemoveNestedNulls: true,
+        });
 
         expect(result.result).toEqual(testObjectWithNullValuesRemoved);
     });
@@ -102,20 +104,27 @@ describe('fastMerge', () => {
 
     it('should replace an object with an array', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = utils.fastMerge(testObject, [1, 2, 3] as any, true, false, false);
+        const result = utils.fastMerge(testObject, [1, 2, 3] as any, {
+            shouldRemoveNestedNulls: true,
+        });
 
         expect(result.result).toEqual([1, 2, 3]);
     });
 
     it('should replace an array with an object', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = utils.fastMerge([1, 2, 3] as any, testObject, true, false, false);
+        const result = utils.fastMerge([1, 2, 3] as any, testObject, {
+            shouldRemoveNestedNulls: true,
+        });
 
         expect(result.result).toEqual(testObject);
     });
 
     it('should add the "ONYX_INTERNALS__REPLACE_OBJECT_MARK" flag to the target object when its source is set to null and "isBatchingMergeChanges" is true', () => {
-        const result = utils.fastMerge(testMergeChanges[1], testMergeChanges[0], true, true, false);
+        const result = utils.fastMerge(testMergeChanges[1], testMergeChanges[0], {
+            shouldRemoveNestedNulls: true,
+            isBatchingMergeChanges: true,
+        });
 
         expect(result.result).toEqual({
             b: {
@@ -141,9 +150,10 @@ describe('fastMerge', () => {
                     h: 'h',
                 },
             },
-            true,
-            false,
-            true,
+            {
+                shouldRemoveNestedNulls: true,
+                shouldReplaceMarkedObjects: true,
+            },
         );
 
         expect(result.result).toEqual({
