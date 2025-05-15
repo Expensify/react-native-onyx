@@ -43,9 +43,9 @@ type StorageProvider = {
 
     /**
      * Merges an existing value with a new one
-     * @param preMergedValue - the pre-merged data from `Onyx.applyMerge`
+     * @param change - the change to merge with the existing value
      */
-    mergeItem: <TKey extends OnyxKey>(key: TKey, preMergedValue: OnyxValue<TKey>) => Promise<BatchQueryResult | void>;
+    mergeItem: <TKey extends OnyxKey>(key: TKey, change: OnyxValue<TKey>) => Promise<BatchQueryResult | void>;
 
     /**
      * Returns all keys available in storage

@@ -3,7 +3,7 @@
  * converting the value to a JSON string
  */
 import {getFreeDiskStorage} from 'react-native-device-info';
-import type {BatchQueryResult, QuickSQLiteConnection, SQLBatchTuple} from 'react-native-quick-sqlite';
+import type {QuickSQLiteConnection, SQLBatchTuple} from 'react-native-quick-sqlite';
 import {open} from 'react-native-quick-sqlite';
 import type {FastMergeReplaceNullPatch} from '../../utils';
 import utils from '../../utils';
@@ -114,9 +114,9 @@ const provider: StorageProvider = {
 
         return db.executeBatchAsync(commands);
     },
-    mergeItem(key, preMergedValue) {
+    mergeItem(key, change) {
         // Since Onyx already merged the existing value with the changes, we can just set the value directly.
-        return this.setItem(key, preMergedValue) as Promise<BatchQueryResult>;
+        return this.multiMerge([[key, change]]);
     },
     getAllKeys: () =>
         db.executeAsync('SELECT record_key FROM keyvaluepairs;').then(({rows}) => {
