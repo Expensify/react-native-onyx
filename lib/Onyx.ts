@@ -757,7 +757,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
                 // Remove the collection-related key from the updateQueue so that it won't be processed individually.
                 delete updateQueue[key];
 
-                const batchedChanges = OnyxUtils.batchMergeChanges(operations);
+                const batchedChanges = OnyxUtils.mergeChanges(operations);
                 if (operations[0] === null) {
                     // eslint-disable-next-line no-param-reassign
                     queue.set[key] = batchedChanges.result;
@@ -789,13 +789,16 @@ function update(data: OnyxUpdate[]): Promise<void> {
     });
 
     Object.entries(updateQueue).forEach(([key, operations]) => {
-        const batchedChanges = OnyxUtils.batchMergeChanges(operations).result;
-
         if (operations[0] === null) {
+            const batchedChanges = OnyxUtils.mergeChanges(operations).result;
             promises.push(() => set(key, batchedChanges));
-        } else {
-            promises.push(() => merge(key, batchedChanges));
+            return;
         }
+
+        const mergePromises = operations.map((operation) => {
+            return merge(key, operation);
+        });
+        promises.push(() => mergePromises.at(0) ?? Promise.resolve());
     });
 
     const snapshotPromises = updateSnapshots(data);
