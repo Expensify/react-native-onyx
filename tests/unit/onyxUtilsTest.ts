@@ -151,15 +151,15 @@ describe('OnyxUtils', () => {
         });
     });
 
-    describe('applyMerge', () => {
+    describe('mergeChanges', () => {
         it("should return the last change if it's an array", () => {
-            const result = OnyxUtils.applyMerge(testObject, [...testMergeChanges, [0, 1, 2]]);
+            const result = OnyxUtils.mergeChanges([...testMergeChanges, [0, 1, 2]], testObject);
 
             expect(result).toEqual([0, 1, 2]);
         });
 
         it("should return the last change if the changes aren't objects", () => {
-            const result = OnyxUtils.applyMerge(testObject, ['a', 0, 'b', 1]);
+            const result = OnyxUtils.mergeChanges(['a', 0, 'b', 1], testObject);
 
             expect(result).toEqual(1);
         });
@@ -180,7 +180,7 @@ describe('OnyxUtils', () => {
                 },
             };
 
-            const result = OnyxUtils.applyMerge(testObject, [batchedChanges]);
+            const result = OnyxUtils.mergeChanges([batchedChanges], testObject);
 
             expect(result).toEqual({
                 a: 'a',
@@ -197,11 +197,9 @@ describe('OnyxUtils', () => {
                 },
             });
         });
-    });
 
-    describe('batchMergeChanges', () => {
         it('should apply the replacement markers if the we have properties with objects being removed and added back during the changes', () => {
-            const result = OnyxUtils.batchMergeChanges(testMergeChanges);
+            const result = OnyxUtils.mergeChanges(testMergeChanges);
 
             expect(result.result).toEqual({
                 b: {
@@ -225,7 +223,7 @@ describe('OnyxUtils', () => {
         });
 
         it('should 2', () => {
-            const result = OnyxUtils.batchMergeChanges([
+            const result = OnyxUtils.mergeChanges([
                 {
                     // Removing the "originalMessage" object in this update.
                     // Any subsequent changes to this object should completely replace the existing object in store.

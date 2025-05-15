@@ -1252,35 +1252,12 @@ function prepareKeyValuePairsForStorage(data: Record<OnyxKey, OnyxInput<OnyxKey>
 }
 
 /**
- * Merges an array of changes with an existing value
+ * Merges an array of changes with an existing value or creates a single change
  *
- * @param changes Array of changes that should be applied to the existing value
+ * @param changes Array of changes that should be merged
+ * @param existingValue The existing value that should be merged with the changes
  */
-function applyMerge<TValue extends OnyxInput<OnyxKey> | undefined, TChange extends OnyxInput<OnyxKey> | undefined>(existingValue: TValue, changes: TChange[]): TChange {
-    const lastChange = changes?.at(-1);
-
-    if (Array.isArray(lastChange)) {
-        return lastChange;
-    }
-
-    if (changes.some((change) => change && typeof change === 'object')) {
-        // Object values are then merged one after the other
-        return changes.reduce(
-            (modifiedData, change) =>
-                utils.fastMerge(modifiedData, change, {
-                    shouldRemoveNestedNulls: true,
-                    shouldReplaceMarkedObjects: true,
-                }).result,
-            (existingValue || {}) as TChange,
-        );
-    }
-
-    // If we have anything else we can't merge it so we'll
-    // simply return the last value that was queued
-    return lastChange as TChange;
-}
-
-function batchMergeChanges<TChange extends OnyxInput<OnyxKey> | undefined>(changes: TChange[]): FastMergeResult<TChange> {
+function mergeChanges<TValue extends OnyxInput<OnyxKey> | undefined, TChange extends OnyxInput<OnyxKey> | undefined>(changes: TChange[], existingValue?: TValue): FastMergeResult<TChange> {
     const lastChange = changes?.at(-1);
 
     if (Array.isArray(lastChange)) {
@@ -1299,7 +1276,7 @@ function batchMergeChanges<TChange extends OnyxInput<OnyxKey> | undefined>(chang
                 return modifiedData;
             },
             {
-                result: {} as TChange,
+                result: (existingValue ?? {}) as TChange,
                 replaceNullPatches: [],
             },
         );
@@ -1319,6 +1296,7 @@ function initializeWithDefaultKeyStates(): Promise<void> {
 
         const merged = utils.fastMerge(existingDataAsObject, defaultKeyStates, {
             shouldRemoveNestedNulls: true,
+            shouldReplaceMarkedObjects: true,
         }).result;
         cache.merge(merged ?? {});
 
@@ -1509,7 +1487,7 @@ const OnyxUtils = {
     hasPendingMergeForKey,
     removeNullValues,
     prepareKeyValuePairsForStorage,
-    applyMerge,
+    mergeChanges,
     initializeWithDefaultKeyStates,
     getSnapshotKey,
     multiGet,
@@ -1521,7 +1499,6 @@ const OnyxUtils = {
     getEvictionBlocklist,
     getSkippableCollectionMemberIDs,
     setSkippableCollectionMemberIDs,
-    batchMergeChanges,
 };
 
 GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
