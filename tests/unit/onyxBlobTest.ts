@@ -1,4 +1,4 @@
-import {Connection} from '../../lib';
+import type {Connection} from '../../lib';
 import Onyx from '../../lib/Onyx';
 
 // Define test keys
@@ -36,19 +36,7 @@ describe('Onyx Blob Handling', () => {
         // Set the Blob value
         await Onyx.set(ONYX_KEYS.TEST_BLOB, testBlob);
 
-        // Verify that we received a value
-        expect(testBlobValue).toBeTruthy();
-
-        // Read the original blob content
-        const originalBlobContent = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-                resolve(reader.result as string);
-            };
-            reader.readAsText(testBlob);
-        });
-
-        // Verify that the original content matches what we expected
-        expect(originalBlobContent).toBe(blobTestContent);
+        // Verify that the value is an instance of Blob
+        expect(testBlobValue instanceof Blob).toBeTruthy();
     });
 });

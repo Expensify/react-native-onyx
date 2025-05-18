@@ -106,7 +106,7 @@ function fastMerge<TValue>(target: TValue, source: TValue, shouldRemoveNestedNul
 
 /** Deep removes the nested null values from the given value. */
 function removeNestedNullValues<TValue extends OnyxInput<OnyxKey> | null>(value: TValue): TValue {
-    if (typeof value === 'object' && !Array.isArray(value)) {
+    if (isMergeableObject(value)) {
         const objectValue = value as Record<string, unknown>;
         return fastMerge(objectValue, objectValue) as TValue;
     }
