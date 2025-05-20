@@ -18,7 +18,6 @@ describe('[Utils.js]', () => {
         await measureFunction(() =>
             utils.fastMerge(target, source, {
                 shouldRemoveNestedNulls: true,
-                shouldReplaceMarkedObjects: true,
             }),
         );
     });
