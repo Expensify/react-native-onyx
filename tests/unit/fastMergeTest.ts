@@ -54,7 +54,7 @@ const testMergeChanges: DeepObject[] = [
 
 describe('fastMerge', () => {
     it('should merge an object with another object and remove nested null values', () => {
-        const result = utils.fastMerge(testObject, testObjectWithNullishValues, true, false, false);
+        const result = utils.fastMerge(testObject, testObjectWithNullishValues, {shouldRemoveNestedNulls: true});
 
         expect(result.result).toEqual({
             a: 'a',
@@ -71,7 +71,7 @@ describe('fastMerge', () => {
     });
 
     it('should merge an object with another object and not remove nested null values', () => {
-        const result = utils.fastMerge(testObject, testObjectWithNullishValues, false, false, false);
+        const result = utils.fastMerge(testObject, testObjectWithNullishValues);
 
         expect(result.result).toEqual({
             a: 'a',
