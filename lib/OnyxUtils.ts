@@ -1268,7 +1268,7 @@ function mergeChanges<TValue extends OnyxInput<OnyxKey> | undefined, TChange ext
         // Object values are then merged one after the other
         return changes.reduce<FastMergeResult<TChange>>(
             (modifiedData, change) => {
-                const fastMergeResult = utils.fastMerge(modifiedData.result, change, {isBatchingMergeChanges: true});
+                const fastMergeResult = utils.fastMerge(modifiedData.result, change, {shouldMarkRemovedObjects: true});
                 // eslint-disable-next-line no-param-reassign
                 modifiedData.result = fastMergeResult.result;
                 // eslint-disable-next-line no-param-reassign

@@ -12,7 +12,7 @@ type FastMergeOptions = {
     shouldRemoveNestedNulls?: boolean;
 
     /** If true, it means that we are batching merge changes before applying them to the Onyx value, so we must use a special logic to handle these changes. */
-    isBatchingMergeChanges?: boolean;
+    shouldMarkRemovedObjects?: boolean;
 
     /** If true, any nested objects that contains the internal "ONYX_INTERNALS__REPLACE_OBJECT_MARK" flag will be completely replaced instead of merged. */
     shouldReplaceMarkedObjects?: boolean;
@@ -136,16 +136,33 @@ function mergeObject<TObject extends Record<string, unknown>>(
         }
 
         const targetProperty = targetObject?.[key];
-        const targetWithMarks = getTargetPropertyWithRemovalMark(targetProperty, sourceProperty, options, metadata, basePath);
-        const {finalDestinationProperty, stopTraversing} = replaceMarkedObjects(sourceProperty, options);
+        const targetPropertyWithMarks = (targetProperty ?? {}) as Record<string, unknown>;
 
-        if (stopTraversing) {
-            destination[key] = finalDestinationProperty;
+        // If we are batching merge changes and the previous merge change (targetValue) is null,
+        // it means we want to fully replace this object when merging the batched changes with the Onyx value.
+        // To achieve this, we first mark these nested objects with an internal flag. With the desired objects
+        // marked, when calling this method again with "shouldReplaceMarkedObjects" set to true we can proceed
+        // effectively replace them in the next condition.
+        if (options?.shouldMarkRemovedObjects && targetProperty === null) {
+            targetPropertyWithMarks[ONYX_INTERNALS__REPLACE_OBJECT_MARK] = true;
+            metadata.replaceNullPatches.push([[...basePath], {...sourceProperty}]);
+        }
+
+        // Later, when merging the batched changes with the Onyx value, if a nested object of the batched changes
+        // has the internal flag set, we replace the entire destination object with the source one and remove
+        // the flag.
+        if (options.shouldReplaceMarkedObjects && sourceProperty[ONYX_INTERNALS__REPLACE_OBJECT_MARK]) {
+            // We do a spread here in order to have a new object reference and allow us to delete the internal flag
+            // of the merged object only.
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const {ONYX_INTERNALS__REPLACE_OBJECT_MARK: _mark, ...sourcePropertyWithoutMark} = sourceProperty;
+
+            destination[key] = sourcePropertyWithoutMark;
             // eslint-disable-next-line no-continue
             continue;
         }
 
-        destination[key] = fastMerge(targetWithMarks, sourceProperty, options, metadata, [...basePath, key]).result;
+        destination[key] = fastMerge(targetPropertyWithMarks, sourceProperty, options, metadata, [...basePath, key]).result;
     }
 
     return destination as TObject;
@@ -166,51 +183,12 @@ function isMergeableObject<TObject extends Record<string, unknown>>(value: unkno
     return isNonNullObject && !(value instanceof RegExp) && !(value instanceof Date) && !Array.isArray(value);
 }
 
-function getTargetPropertyWithRemovalMark<TObject extends Record<string, unknown>>(
-    targetProperty: unknown,
-    sourceProperty: Record<string, unknown>,
-    options: FastMergeOptions,
-    metadata: FastMergeMetadata,
-    basePath: string[] = [],
-): TObject {
-    const targetPropertyWithMarks = (targetProperty ?? {}) as Record<string, unknown>;
-
-    // If we are batching merge changes and the previous merge change (targetValue) is null,
-    // it means we want to fully replace this object when merging the batched changes with the Onyx value.
-    // To achieve this, we first mark these nested objects with an internal flag. With the desired objects
-    // marked, when calling this method again with "shouldReplaceMarkedObjects" set to true we can proceed
-    // effectively replace them in the next condition.
-    if (options?.isBatchingMergeChanges && targetProperty === null) {
-        targetPropertyWithMarks[ONYX_INTERNALS__REPLACE_OBJECT_MARK] = true;
-        metadata.replaceNullPatches.push([[...basePath], {...sourceProperty}]);
-    }
-
-    return targetPropertyWithMarks as TObject;
-}
-
-function replaceMarkedObjects<TObject extends Record<string, unknown>>(sourceProperty: TObject, options: FastMergeOptions): {finalDestinationProperty?: TObject; stopTraversing: boolean} {
-    // Then, when merging the batched changes with the Onyx value, if a nested object of the batched changes
-    // has the internal flag set, we replace the entire destination object with the source one and remove
-    // the flag.
-    if (options.shouldReplaceMarkedObjects && sourceProperty[ONYX_INTERNALS__REPLACE_OBJECT_MARK]) {
-        // We do a spread here in order to have a new object reference and allow us to delete the internal flag
-        // of the merged object only.
-
-        const destinationProperty = {...sourceProperty};
-        delete destinationProperty.ONYX_INTERNALS__REPLACE_OBJECT_MARK;
-        return {finalDestinationProperty: destinationProperty, stopTraversing: true};
-    }
-
-    // For the normal situations we'll just call `fastMerge()` again to merge the nested object.
-    return {stopTraversing: false};
-}
-
 /** Deep removes the nested null values from the given value. */
 function removeNestedNullValues<TValue extends OnyxInput<OnyxKey> | null>(value: TValue): TValue {
     if (typeof value === 'object' && !Array.isArray(value)) {
         return fastMerge(value, value, {
             shouldRemoveNestedNulls: true,
-            isBatchingMergeChanges: false,
+            shouldMarkRemovedObjects: false,
             shouldReplaceMarkedObjects: false,
         }).result;
     }
