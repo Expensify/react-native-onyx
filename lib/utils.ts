@@ -131,6 +131,8 @@ function mergeObject<TObject extends Record<string, unknown>>(
         if (!isMergeableObject(sourceProperty)) {
             // If source value is any other value we need to set the source value it directly.
             destination[key] = sourceProperty;
+            // eslint-disable-next-line no-continue
+            continue;
         }
 
         const targetProperty = targetObject?.[key];
