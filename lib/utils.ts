@@ -10,8 +10,10 @@ type FastMergeReplaceNullPatch = [string[], unknown];
 type FastMergeOptions = {
     /** If true, null object values will be removed. */
     shouldRemoveNestedNulls?: boolean;
+
     /** If true, it means that we are batching merge changes before applying them to the Onyx value, so we must use a special logic to handle these changes. */
     isBatchingMergeChanges?: boolean;
+
     /** If true, any nested objects that contains the internal "ONYX_INTERNALS__REPLACE_OBJECT_MARK" flag will be completely replaced instead of merged. */
     shouldReplaceMarkedObjects?: boolean;
 };
@@ -24,6 +26,7 @@ type FastMergeMetadata = {
 type FastMergeResult<TValue> = {
     /** The result of the merge. */
     result: TValue;
+
     /** The path to the object that contains the internal "ONYX_INTERNALS__REPLACE_OBJECT_MARK" flag. */
     replaceNullPatches: FastMergeReplaceNullPatch[];
 };
