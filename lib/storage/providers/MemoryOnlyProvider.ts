@@ -94,7 +94,7 @@ const provider: StorageProvider = {
             set(key, newValue);
         });
 
-        return Promise.resolve([]);
+        return Promise.resolve();
     },
 
     /**

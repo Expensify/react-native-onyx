@@ -1,9 +1,13 @@
-import type {BatchQueryResult, QueryResult} from 'react-native-quick-sqlite';
 import type {MixedOperationsQueue, OnyxKey, OnyxValue} from '../../types';
 
 type KeyValuePair = [OnyxKey, OnyxValue<OnyxKey>];
 type KeyList = OnyxKey[];
 type KeyValuePairList = KeyValuePair[];
+
+type DatabaseSize = {
+    bytesUsed: number;
+    bytesRemaining: number;
+};
 
 type OnStorageKeyChanged = <TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>) => void;
 
@@ -29,23 +33,23 @@ type StorageProvider = {
     /**
      * Sets the value for a given key. The only requirement is that the value should be serializable to JSON string
      */
-    setItem: <TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>) => Promise<QueryResult | void>;
+    setItem: <TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>) => Promise<void>;
 
     /**
      * Stores multiple key-value pairs in a batch
      */
-    multiSet: (pairs: KeyValuePairList) => Promise<BatchQueryResult | void>;
+    multiSet: (pairs: KeyValuePairList) => Promise<void>;
 
     /**
      * Multiple merging of existing and new values in a batch
      */
-    multiMerge: (pairs: KeyValuePairList, mergeReplaceNullPatches?: MixedOperationsQueue['mergeReplaceNullPatches']) => Promise<BatchQueryResult | IDBValidKey[] | void>;
+    multiMerge: (pairs: KeyValuePairList, mergeReplaceNullPatches?: MixedOperationsQueue['mergeReplaceNullPatches']) => Promise<void>;
 
     /**
      * Merges an existing value with a new one
      * @param change - the change to merge with the existing value
      */
-    mergeItem: <TKey extends OnyxKey>(key: TKey, change: OnyxValue<TKey>) => Promise<BatchQueryResult | void>;
+    mergeItem: <TKey extends OnyxKey>(key: TKey, change: OnyxValue<TKey>) => Promise<void>;
 
     /**
      * Returns all keys available in storage
@@ -55,22 +59,22 @@ type StorageProvider = {
     /**
      * Removes given key and its value from storage
      */
-    removeItem: (key: OnyxKey) => Promise<QueryResult | void>;
+    removeItem: (key: OnyxKey) => Promise<void>;
 
     /**
      * Removes given keys and their values from storage
      */
-    removeItems: (keys: KeyList) => Promise<QueryResult | void>;
+    removeItems: (keys: KeyList) => Promise<void>;
 
     /**
      * Clears absolutely everything from storage
      */
-    clear: () => Promise<QueryResult | void>;
+    clear: () => Promise<void>;
 
     /**
      * Gets the total bytes of the database file
      */
-    getDatabaseSize: () => Promise<{bytesUsed: number; bytesRemaining: number}>;
+    getDatabaseSize: () => Promise<DatabaseSize>;
 
     /**
      * @param onStorageKeyChanged Storage synchronization mechanism keeping all opened tabs in sync

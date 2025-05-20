@@ -55,7 +55,7 @@ const provider: StorageProvider = {
                     }).result;
                     return promisifyRequest(store.put(newValue, key));
                 });
-                return Promise.all(upsertMany);
+                return Promise.all(upsertMany).then(() => undefined);
             });
         }),
     mergeItem(key, change) {

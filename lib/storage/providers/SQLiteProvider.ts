@@ -65,14 +65,14 @@ const provider: StorageProvider = {
         });
     },
     setItem(key, value) {
-        return db.executeAsync('REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);', [key, JSON.stringify(value)]);
+        return db.executeAsync('REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);', [key, JSON.stringify(value)]).then(() => undefined);
     },
     multiSet(pairs) {
         const stringifiedPairs = pairs.map((pair) => [pair[0], JSON.stringify(pair[1] === undefined ? null : pair[1])]);
         if (utils.isEmptyObject(stringifiedPairs)) {
             return Promise.resolve();
         }
-        return db.executeBatchAsync([['REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, json(?));', stringifiedPairs]]);
+        return db.executeBatchAsync([['REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, json(?));', stringifiedPairs]]).then(() => undefined);
     },
     multiMerge(pairs, mergeReplaceNullPatches) {
         const commands: SQLBatchTuple[] = [];
@@ -112,7 +112,7 @@ const provider: StorageProvider = {
             commands.push([replaceQuery, replaceQueryArguments]);
         }
 
-        return db.executeBatchAsync(commands);
+        return db.executeBatchAsync(commands).then(() => undefined);
     },
     mergeItem(key, change) {
         // Since Onyx already merged the existing value with the changes, we can just set the value directly.
@@ -124,13 +124,13 @@ const provider: StorageProvider = {
             const result = rows?._array.map((row) => row.record_key);
             return (result ?? []) as KeyList;
         }),
-    removeItem: (key) => db.executeAsync('DELETE FROM keyvaluepairs WHERE record_key = ?;', [key]),
+    removeItem: (key) => db.executeAsync('DELETE FROM keyvaluepairs WHERE record_key = ?;', [key]).then(() => undefined),
     removeItems: (keys) => {
         const placeholders = keys.map(() => '?').join(',');
         const query = `DELETE FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
-        return db.executeAsync(query, keys);
+        return db.executeAsync(query, keys).then(() => undefined);
     },
-    clear: () => db.executeAsync('DELETE FROM keyvaluepairs;', []),
+    clear: () => db.executeAsync('DELETE FROM keyvaluepairs;', []).then(() => undefined),
     getDatabaseSize() {
         return Promise.all([db.executeAsync('PRAGMA page_size;'), db.executeAsync('PRAGMA page_count;'), getFreeDiskStorage()]).then(([pageSizeResult, pageCountResult, bytesRemaining]) => {
             const pageSize: number = pageSizeResult.rows?.item(0).page_size;
