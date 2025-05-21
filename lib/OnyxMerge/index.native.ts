@@ -1,11 +1,12 @@
 import _ from 'underscore';
-import * as Logger from './Logger';
-import OnyxUtils from './OnyxUtils';
-import type {OnyxKey, OnyxValue} from './types';
-import cache from './OnyxCache';
-import Storage from './storage';
+import * as Logger from '../Logger';
+import OnyxUtils from '../OnyxUtils';
+import type {OnyxKey, OnyxValue} from '../types';
+import cache from '../OnyxCache';
+import Storage from '../storage';
+import type {ApplyMerge, ApplyMergeResult} from './types';
 
-function applyMerge<TKey extends OnyxKey>(key: TKey, existingValue: OnyxValue<TKey>, validChanges: unknown[]): Promise<void> {
+const applyMerge: ApplyMerge = <TKey extends OnyxKey>(key: TKey, existingValue: OnyxValue<TKey>, validChanges: unknown[]): Promise<ApplyMergeResult> => {
     // If any of the changes is null, we need to discard the existing value.
     const baseValue = validChanges.includes(null) ? undefined : existingValue;
 
@@ -27,14 +28,14 @@ function applyMerge<TKey extends OnyxKey>(key: TKey, existingValue: OnyxValue<TK
 
     // If the value has not changed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
     if (!hasChanged) {
-        return updatePromise;
+        return Promise.resolve({mergedValue, updatePromise});
     }
 
-    return Storage.mergeItem(key, batchedChanges as OnyxValue<TKey>, replaceNullPatches).then(() => {
-        OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, validChanges, mergedValue);
-        return updatePromise;
-    });
-}
+    return Storage.mergeItem(key, batchedChanges as OnyxValue<TKey>, replaceNullPatches).then(() => ({
+        mergedValue,
+        updatePromise,
+    }));
+};
 
 const OnyxMerge = {
     applyMerge,

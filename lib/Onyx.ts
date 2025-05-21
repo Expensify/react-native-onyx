@@ -34,7 +34,7 @@ import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
 import * as GlobalSettings from './GlobalSettings';
 import decorateWithMetrics from './metrics';
-import OnyxMerge from './OnyxMerge.native';
+import OnyxMerge from './OnyxMerge/index.native';
 
 /** Initialize the store with actions and listening for storage events */
 function init({
@@ -325,7 +325,10 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
                 return Promise.resolve();
             }
 
-            return OnyxMerge.applyMerge(key, existingValue, validChanges);
+            return OnyxMerge.applyMerge(key, existingValue, validChanges).then(({mergedValue, updatePromise}) => {
+                OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, changes, mergedValue);
+                return updatePromise;
+            });
         } catch (error) {
             Logger.logAlert(`An error occurred while applying merge for key: ${key}, Error: ${error}`);
             return Promise.resolve();
