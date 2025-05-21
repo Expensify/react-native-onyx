@@ -133,7 +133,7 @@ function mergeObject<TObject extends Record<string, unknown>>(
         // When calling fastMerge again with "shouldReplaceMarkedObjects" enabled, the marked objects will be removed.
         if (options.objectRemovalMode === 'mark' && targetProperty === null) {
             targetProperty = {[ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true};
-            metadata.replaceNullPatches.push([[...basePath], {...sourceProperty}]);
+            metadata.replaceNullPatches.push([[...basePath, key], {...sourceProperty}]);
         }
 
         // Later, when merging the batched changes with the Onyx value, if a nested object of the batched changes
