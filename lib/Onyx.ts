@@ -307,7 +307,6 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
         }
 
         try {
-            // We first only merge the changes, so we use OnyxUtils.mergeChanges() to combine all the changes into just one.
             const validChanges = mergeQueue[key].filter((change) => {
                 const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(change, existingValue);
                 if (!isCompatible) {
