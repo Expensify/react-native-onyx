@@ -331,7 +331,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
                 return Promise.resolve();
             }
 
-            const {result: mergedValue} = OnyxUtils.mergeAndMarkChanges(validChanges, existingValue);
+            const {result: mergedValue} = OnyxUtils.mergeChanges(validChanges, existingValue);
 
             // In cache, we don't want to remove the key if it's null to improve performance and speed up the next merge.
             const hasChanged = cache.hasValueChanged(key, mergedValue);
@@ -427,10 +427,12 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(
 
             const existingKeyCollection = existingKeys.reduce((obj: OnyxInputKeyValueMapping, key) => {
                 const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(resultCollection[key], cachedCollectionForExistingKeys[key]);
+
                 if (!isCompatible) {
                     Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'mergeCollection', existingValueType, newValueType));
                     return obj;
                 }
+
                 // eslint-disable-next-line no-param-reassign
                 obj[key] = resultCollection[key];
                 return obj;
