@@ -307,7 +307,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
         }
 
         try {
-            // We first only merge the changes, so we use OnyxUtils.batchMergeChanges() to combine all the changes into just one.
+            // We first only merge the changes, so we use OnyxUtils.mergeChanges() to combine all the changes into just one.
             const validChanges = mergeQueue[key].filter((change) => {
                 const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(change, existingValue);
                 if (!isCompatible) {
@@ -332,7 +332,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
                 return Promise.resolve();
             }
 
-            const {result: mergedValue} = OnyxUtils.mergeChanges(validChanges, existingValue);
+            const {result: mergedValue} = OnyxUtils.mergeAndMarkChanges(validChanges, existingValue);
 
             // In cache, we don't want to remove the key if it's null to improve performance and speed up the next merge.
             const hasChanged = cache.hasValueChanged(key, mergedValue);
@@ -757,7 +757,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
                 // Remove the collection-related key from the updateQueue so that it won't be processed individually.
                 delete updateQueue[key];
 
-                const batchedChanges = OnyxUtils.mergeChanges(operations);
+                const batchedChanges = OnyxUtils.mergeAndMarkChanges(operations);
                 if (operations[0] === null) {
                     // eslint-disable-next-line no-param-reassign
                     queue.set[key] = batchedChanges.result;
@@ -790,7 +790,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
 
     Object.entries(updateQueue).forEach(([key, operations]) => {
         if (operations[0] === null) {
-            const batchedChanges = OnyxUtils.mergeChanges(operations).result;
+            const batchedChanges = OnyxUtils.mergeAndMarkChanges(operations).result;
             promises.push(() => set(key, batchedChanges));
             return;
         }

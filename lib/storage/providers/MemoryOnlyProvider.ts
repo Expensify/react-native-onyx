@@ -88,7 +88,7 @@ const provider: StorageProvider = {
             const existingValue = store[key] as Record<string, unknown>;
             const newValue = utils.fastMerge(existingValue, value as Record<string, unknown>, {
                 shouldRemoveNestedNulls: true,
-                shouldReplaceMarkedObjects: true,
+                objectRemovalMode: 'replace',
             }).result as OnyxValue<OnyxKey>;
 
             set(key, newValue);

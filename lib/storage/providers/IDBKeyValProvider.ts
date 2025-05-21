@@ -51,7 +51,7 @@ const provider: StorageProvider = {
                     const prev = values[index];
                     const newValue = utils.fastMerge(prev as Record<string, unknown>, value as Record<string, unknown>, {
                         shouldRemoveNestedNulls: true,
-                        shouldReplaceMarkedObjects: true,
+                        objectRemovalMode: 'replace',
                     }).result;
                     return promisifyRequest(store.put(newValue, key));
                 });

@@ -151,7 +151,7 @@ describe('OnyxUtils', () => {
         });
     });
 
-    describe('mergeChanges', () => {
+    describe('mergeAndMarkChanges', () => {
         it("should return the last change if it's an array", () => {
             const result = OnyxUtils.mergeChanges([...testMergeChanges, [0, 1, 2]], testObject);
 
@@ -199,7 +199,7 @@ describe('OnyxUtils', () => {
         });
 
         it('should apply the replacement markers if the we have properties with objects being removed and added back during the changes', () => {
-            const result = OnyxUtils.mergeChanges(testMergeChanges);
+            const result = OnyxUtils.mergeAndMarkChanges(testMergeChanges);
 
             expect(result.result).toEqual({
                 b: {
@@ -223,7 +223,7 @@ describe('OnyxUtils', () => {
         });
 
         it('should 2', () => {
-            const result = OnyxUtils.mergeChanges([
+            const result = OnyxUtils.mergeAndMarkChanges([
                 {
                     // Removing the "originalMessage" object in this update.
                     // Any subsequent changes to this object should completely replace the existing object in store.

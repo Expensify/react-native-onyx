@@ -120,10 +120,10 @@ describe('fastMerge', () => {
         expect(result.result).toEqual(testObject);
     });
 
-    it('should add the "ONYX_INTERNALS__REPLACE_OBJECT_MARK" flag to the target object when its source is set to null and "isBatchingMergeChanges" is true', () => {
+    it('should add the "ONYX_INTERNALS__REPLACE_OBJECT_MARK" flag to the merged object when the change is set to null and "objectRemovalMode" is set to "mark"', () => {
         const result = utils.fastMerge(testMergeChanges[1], testMergeChanges[0], {
             shouldRemoveNestedNulls: true,
-            shouldMarkRemovedObjects: true,
+            objectRemovalMode: 'mark',
         });
 
         expect(result.result).toEqual({
@@ -152,7 +152,7 @@ describe('fastMerge', () => {
             },
             {
                 shouldRemoveNestedNulls: true,
-                shouldReplaceMarkedObjects: true,
+                objectRemovalMode: 'replace',
             },
         );
 

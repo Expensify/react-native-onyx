@@ -11,8 +11,12 @@ type FastMergeOptions = {
     /** If true, null object values will be removed. */
     shouldRemoveNestedNulls?: boolean;
 
-    /** If true, it means that we are batching merge changes before applying them to the Onyx value, so we must use a special logic to handle these changes. */
-    shouldMarkRemovedObjects?: boolean;
+    /**
+     * If set to "mark", we will mark objects that are set to null instead of simply removing them,
+     * so that we can batch changes together, without loosing information about the object removal.
+     * If set to "replace", we will completely replace the marked objects with the new value instead of merging them.
+     * */
+    objectRemovalMode?: 'mark' | 'replace' | 'none';
 
     /** If true, any nested objects that contains the internal "ONYX_INTERNALS__REPLACE_OBJECT_MARK" flag will be completely replaced instead of merged. */
     shouldReplaceMarkedObjects?: boolean;
@@ -53,11 +57,9 @@ function fastMerge<TValue>(target: TValue, source: TValue, options?: FastMergeOp
         return {result: source, replaceNullPatches: metadata.replaceNullPatches};
     }
 
-    const optionsWithDefaults = {
-        shouldRemoveNestedNulls: false,
-        isBatchingMergeChanges: false,
-        shouldReplaceMarkedObjects: false,
-        ...options,
+    const optionsWithDefaults: FastMergeOptions = {
+        shouldRemoveNestedNulls: options?.shouldRemoveNestedNulls ?? false,
+        objectRemovalMode: options?.objectRemovalMode ?? 'none',
     };
 
     const mergedValue = mergeObject(target, source as Record<string, unknown>, optionsWithDefaults, metadata, basePath) as TValue;
@@ -90,80 +92,65 @@ function mergeObject<TObject extends Record<string, unknown>>(
     // If "shouldRemoveNestedNulls" is true, we want to remove null values from the merged object
     // and therefore we need to omit keys where either the source or target value is null.
     if (targetObject) {
-        // eslint-disable-next-line no-restricted-syntax, guard-for-in
-        for (const key in targetObject) {
+        Object.keys(targetObject).forEach((key) => {
             const targetProperty = targetObject?.[key];
-            if (targetProperty === undefined) {
-                // eslint-disable-next-line no-continue
-                continue;
-            }
+            const sourceProperty = source?.[key];
 
             // If "shouldRemoveNestedNulls" is true, we want to remove (nested) null values from the merged object.
             // If either the source or target value is null, we want to omit the key from the merged object.
-            const sourceProperty = source?.[key];
-            const isSourceOrTargetNull = targetProperty === null || sourceProperty === null;
-            const shouldOmitTargetKey = options.shouldRemoveNestedNulls && isSourceOrTargetNull;
+            const shouldOmitNullishProperty = options.shouldRemoveNestedNulls && (targetProperty === null || sourceProperty === null);
 
-            if (!shouldOmitTargetKey) {
-                destination[key] = targetProperty;
+            if (targetProperty === undefined || shouldOmitNullishProperty) {
+                return;
             }
-        }
+
+            destination[key] = targetProperty;
+        });
     }
 
     // After copying over all keys from the target object, we want to merge the source object into the destination object.
-    // eslint-disable-next-line no-restricted-syntax, guard-for-in
-    for (const key in source) {
+    Object.keys(source).forEach((key) => {
+        let targetProperty = targetObject?.[key];
         const sourceProperty = source?.[key] as Record<string, unknown>;
-        if (sourceProperty === undefined) {
-            // eslint-disable-next-line no-continue
-            continue;
+
+        // If "shouldRemoveNestedNulls" is true, we want to remove (nested) null values from the merged object.
+        // If either the source value is null, we want to omit the key from the merged object.
+        const shouldOmitNullishProperty = options.shouldRemoveNestedNulls && sourceProperty === null;
+
+        if (sourceProperty === undefined || shouldOmitNullishProperty) {
+            return;
         }
 
-        // If "shouldRemoveNestedNulls" is set to true and the source value is null,
-        // we don't want to set/merge the source value into the merged object.
-        const shouldOmitSourceKey = options.shouldRemoveNestedNulls && sourceProperty === null;
-        if (shouldOmitSourceKey) {
-            // eslint-disable-next-line no-continue
-            continue;
-        }
-
-        // If the source value is a mergable object, we want to merge it into the target value.
+        // If source value is not a mergable object, we need to set the source value it directly.
         if (!isMergeableObject(sourceProperty)) {
-            // If source value is any other value we need to set the source value it directly.
             destination[key] = sourceProperty;
-            // eslint-disable-next-line no-continue
-            continue;
+            return;
         }
 
-        const targetProperty = targetObject?.[key];
-        const targetPropertyWithMarks = (targetProperty ?? {}) as Record<string, unknown>;
-
-        // If we are batching merge changes and the previous merge change (targetValue) is null,
+        // If "shouldMarkRemovedObjects" is enabled and the previous merge change (targetProperty) is null,
         // it means we want to fully replace this object when merging the batched changes with the Onyx value.
-        // To achieve this, we first mark these nested objects with an internal flag. With the desired objects
-        // marked, when calling this method again with "shouldReplaceMarkedObjects" set to true we can proceed
-        // effectively replace them in the next condition.
-        if (options?.shouldMarkRemovedObjects && targetProperty === null) {
-            targetPropertyWithMarks[ONYX_INTERNALS__REPLACE_OBJECT_MARK] = true;
+        // To achieve this, we first mark these nested objects with an internal flag.
+        // When calling fastMerge again with "shouldReplaceMarkedObjects" enabled, the marked objects will be removed.
+        if (options.objectRemovalMode === 'mark' && targetProperty === null) {
+            targetProperty = {[ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true};
             metadata.replaceNullPatches.push([[...basePath], {...sourceProperty}]);
         }
 
         // Later, when merging the batched changes with the Onyx value, if a nested object of the batched changes
         // has the internal flag set, we replace the entire destination object with the source one and remove
         // the flag.
-        if (options.shouldReplaceMarkedObjects && sourceProperty[ONYX_INTERNALS__REPLACE_OBJECT_MARK]) {
+        if (options.objectRemovalMode === 'replace' && sourceProperty[ONYX_INTERNALS__REPLACE_OBJECT_MARK]) {
             // We do a spread here in order to have a new object reference and allow us to delete the internal flag
             // of the merged object only.
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const {ONYX_INTERNALS__REPLACE_OBJECT_MARK: _mark, ...sourcePropertyWithoutMark} = sourceProperty;
-
-            destination[key] = sourcePropertyWithoutMark;
-            // eslint-disable-next-line no-continue
-            continue;
+            delete sourceProperty[ONYX_INTERNALS__REPLACE_OBJECT_MARK];
+            // const {ONYX_INTERNALS__REPLACE_OBJECT_MARK: _mark, ...sourcePropertyWithoutMark} = sourceProperty;
+            destination[key] = sourceProperty;
+            return;
         }
 
-        destination[key] = fastMerge(targetPropertyWithMarks, sourceProperty, options, metadata, [...basePath, key]).result;
-    }
+        destination[key] = fastMerge(targetProperty, sourceProperty, options, metadata, [...basePath, key]).result;
+    });
 
     return destination as TObject;
 }
@@ -188,8 +175,7 @@ function removeNestedNullValues<TValue extends OnyxInput<OnyxKey> | null>(value:
     if (typeof value === 'object' && !Array.isArray(value)) {
         return fastMerge(value, value, {
             shouldRemoveNestedNulls: true,
-            shouldMarkRemovedObjects: false,
-            shouldReplaceMarkedObjects: false,
+            objectRemovalMode: 'replace',
         }).result;
     }
 
@@ -294,4 +280,4 @@ export default {
     hasWithOnyxInstance,
     ONYX_INTERNALS__REPLACE_OBJECT_MARK,
 };
-export type {FastMergeResult, FastMergeReplaceNullPatch};
+export type {FastMergeResult, FastMergeReplaceNullPatch, FastMergeOptions};

@@ -167,7 +167,7 @@ class OnyxCache {
         this.storageMap = {
             ...utils.fastMerge(this.storageMap, data, {
                 shouldRemoveNestedNulls: true,
-                shouldReplaceMarkedObjects: true,
+                objectRemovalMode: 'replace',
             }).result,
         };
 
@@ -232,6 +232,10 @@ class OnyxCache {
         const temp = [];
         while (numKeysToRemove > 0) {
             const value = iterator.next().value;
+            if (value === undefined) {
+                break;
+            }
+
             temp.push(value);
             numKeysToRemove--;
         }

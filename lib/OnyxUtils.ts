@@ -28,7 +28,7 @@ import type {
     OnyxValue,
     Selector,
 } from './types';
-import type {FastMergeResult} from './utils';
+import type {FastMergeOptions, FastMergeResult} from './utils';
 import utils from './utils';
 import type {WithOnyxState} from './withOnyx/types';
 import type {DeferredTask} from './createDeferredTask';
@@ -1251,13 +1251,28 @@ function prepareKeyValuePairsForStorage(data: Record<OnyxKey, OnyxInput<OnyxKey>
     }, []);
 }
 
+function mergeChanges<TValue extends OnyxInput<OnyxKey> | undefined, TChange extends OnyxInput<OnyxKey> | undefined>(changes: TChange[], existingValue?: TValue): FastMergeResult<TChange> {
+    return applyMerge('merge', changes, existingValue);
+}
+
+function mergeAndMarkChanges<TValue extends OnyxInput<OnyxKey> | undefined, TChange extends OnyxInput<OnyxKey> | undefined>(
+    changes: TChange[],
+    existingValue?: TValue,
+): FastMergeResult<TChange> {
+    return applyMerge('mark', changes, existingValue);
+}
+
 /**
  * Merges an array of changes with an existing value or creates a single change
  *
  * @param changes Array of changes that should be merged
  * @param existingValue The existing value that should be merged with the changes
  */
-function mergeChanges<TValue extends OnyxInput<OnyxKey> | undefined, TChange extends OnyxInput<OnyxKey> | undefined>(changes: TChange[], existingValue?: TValue): FastMergeResult<TChange> {
+function applyMerge<TValue extends OnyxInput<OnyxKey> | undefined, TChange extends OnyxInput<OnyxKey> | undefined>(
+    mode: 'merge' | 'mark',
+    changes: TChange[],
+    existingValue?: TValue,
+): FastMergeResult<TChange> {
     const lastChange = changes?.at(-1);
 
     if (Array.isArray(lastChange)) {
@@ -1268,11 +1283,14 @@ function mergeChanges<TValue extends OnyxInput<OnyxKey> | undefined, TChange ext
         // Object values are then merged one after the other
         return changes.reduce<FastMergeResult<TChange>>(
             (modifiedData, change) => {
-                const fastMergeResult = utils.fastMerge(modifiedData.result, change, {shouldMarkRemovedObjects: true});
+                const options: FastMergeOptions = mode === 'merge' ? {shouldRemoveNestedNulls: true, objectRemovalMode: 'replace'} : {objectRemovalMode: 'mark'};
+                const {result, replaceNullPatches} = utils.fastMerge(modifiedData.result, change, options);
+
                 // eslint-disable-next-line no-param-reassign
-                modifiedData.result = fastMergeResult.result;
+                modifiedData.result = result;
                 // eslint-disable-next-line no-param-reassign
-                modifiedData.replaceNullPatches = [...modifiedData.replaceNullPatches, ...fastMergeResult.replaceNullPatches];
+                modifiedData.replaceNullPatches = [...modifiedData.replaceNullPatches, ...replaceNullPatches];
+
                 return modifiedData;
             },
             {
@@ -1296,7 +1314,6 @@ function initializeWithDefaultKeyStates(): Promise<void> {
 
         const merged = utils.fastMerge(existingDataAsObject, defaultKeyStates, {
             shouldRemoveNestedNulls: true,
-            shouldReplaceMarkedObjects: true,
         }).result;
         cache.merge(merged ?? {});
 
@@ -1488,6 +1505,7 @@ const OnyxUtils = {
     removeNullValues,
     prepareKeyValuePairsForStorage,
     mergeChanges,
+    mergeAndMarkChanges,
     initializeWithDefaultKeyStates,
     getSnapshotKey,
     multiGet,
