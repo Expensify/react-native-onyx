@@ -70,7 +70,7 @@ const provider: StorageProvider = {
             }
 
             return true;
-        });
+        }) as Array<[IDBValidKey, unknown]>;
 
         return setMany(pairsWithoutNull, idbKeyValStore);
     },

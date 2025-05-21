@@ -8,7 +8,7 @@ import {open} from 'react-native-quick-sqlite';
 import type {FastMergeReplaceNullPatch} from '../../utils';
 import utils from '../../utils';
 import type StorageProvider from './types';
-import type {KeyList, KeyValuePairList} from './types';
+import type {StorageKeyList, StorageKeyValuePair} from './types';
 
 const DB_NAME = 'OnyxDB';
 let db: QuickSQLiteConnection;
@@ -61,7 +61,7 @@ const provider: StorageProvider = {
         return db.executeAsync(command, keys).then(({rows}) => {
             // eslint-disable-next-line no-underscore-dangle
             const result = rows?._array.map((row) => [row.record_key, JSON.parse(row.valueJSON)]);
-            return (result ?? []) as KeyValuePairList;
+            return (result ?? []) as StorageKeyValuePair[];
         });
     },
     setItem(key, value) {
@@ -74,7 +74,7 @@ const provider: StorageProvider = {
         }
         return db.executeBatchAsync([['REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, json(?));', stringifiedPairs]]).then(() => undefined);
     },
-    multiMerge(pairs, mergeReplaceNullPatches) {
+    multiMerge(pairs) {
         const commands: SQLBatchTuple[] = [];
 
         const patchQuery = `INSERT INTO keyvaluepairs (record_key, valueJSON)
@@ -93,13 +93,14 @@ const provider: StorageProvider = {
 
         // eslint-disable-next-line @typescript-eslint/prefer-for-of
         for (let i = 0; i < nonNullishPairs.length; i++) {
-            const pair = nonNullishPairs[i];
-            const value = JSON.stringify(pair[1], replacer);
-            patchQueryArguments.push([pair[0], value]);
+            const [key, value, replaceNullPatches] = nonNullishPairs[i];
 
-            const patches = mergeReplaceNullPatches?.[pair[0]] ?? [];
+            const valueAfterReplace = JSON.stringify(value, replacer);
+            patchQueryArguments.push([key, valueAfterReplace]);
+
+            const patches = replaceNullPatches ?? [];
             if (patches.length > 0) {
-                const queries = generateJSONReplaceSQLQueries(pair[0], patches);
+                const queries = generateJSONReplaceSQLQueries(key, patches);
 
                 if (queries.length > 0) {
                     replaceQueryArguments.push(...queries);
@@ -114,15 +115,15 @@ const provider: StorageProvider = {
 
         return db.executeBatchAsync(commands).then(() => undefined);
     },
-    mergeItem(key, change) {
+    mergeItem(key, change, replaceNullPatches) {
         // Since Onyx already merged the existing value with the changes, we can just set the value directly.
-        return this.multiMerge([[key, change]]);
+        return this.multiMerge([[key, change, replaceNullPatches]]);
     },
     getAllKeys: () =>
         db.executeAsync('SELECT record_key FROM keyvaluepairs;').then(({rows}) => {
             // eslint-disable-next-line no-underscore-dangle
             const result = rows?._array.map((row) => row.record_key);
-            return (result ?? []) as KeyList;
+            return (result ?? []) as StorageKeyList;
         }),
     removeItem: (key) => db.executeAsync('DELETE FROM keyvaluepairs WHERE record_key = ?;', [key]).then(() => undefined),
     removeItems: (keys) => {

@@ -139,11 +139,6 @@ whatever it is we attempted to do.</p>
 <dt><a href="#broadcastUpdate">broadcastUpdate()</a></dt>
 <dd><p>Notifies subscribers and writes current value to cache</p>
 </dd>
-<dt><a href="#removeNullValues">removeNullValues()</a> ⇒</dt>
-<dd><p>Removes a key from storage if the value is null.
-Otherwise removes all nested null values in objects,
-if shouldRemoveNestedNulls is true and returns the object.</p>
-</dd>
 <dt><a href="#prepareKeyValuePairsForStorage">prepareKeyValuePairsForStorage()</a> ⇒</dt>
 <dd><p>Storage expects array like: [[&quot;@MyApp_user&quot;, value_1], [&quot;@MyApp_key&quot;, value_2]]
 This method transforms an object like {&#39;@MyApp_user&#39;: myUserValue, &#39;@MyApp_key&#39;: myKeyValue}
@@ -463,14 +458,6 @@ whatever it is we attempted to do.
 
 ## broadcastUpdate()
 Notifies subscribers and writes current value to cache
-
-**Kind**: global function  
-<a name="removeNullValues"></a>
-
-## removeNullValues() ⇒
-Removes a key from storage if the value is null.
-Otherwise removes all nested null values in objects,
-if shouldRemoveNestedNulls is true and returns the object.
 
 **Kind**: global function  
 **Returns**: The value without null values and a boolean "wasRemoved", which indicates if the key got removed completely  

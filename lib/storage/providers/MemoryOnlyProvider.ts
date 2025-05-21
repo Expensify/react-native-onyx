@@ -1,7 +1,7 @@
 import _ from 'underscore';
 import utils from '../../utils';
 import type StorageProvider from './types';
-import type {KeyValuePair} from './types';
+import type {StorageKeyValuePair} from './types';
 import type {OnyxKey, OnyxValue} from '../../types';
 
 type Store = Record<OnyxKey, OnyxValue<OnyxKey>>;
@@ -49,7 +49,7 @@ const provider: StorageProvider = {
                 new Promise((resolve) => {
                     this.getItem(key).then((value) => resolve([key, value]));
                 }),
-        ) as Array<Promise<KeyValuePair>>;
+        ) as Array<Promise<StorageKeyValuePair>>;
         return Promise.all(getPromises);
     },
 

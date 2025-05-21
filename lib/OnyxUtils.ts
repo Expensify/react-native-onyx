@@ -20,6 +20,7 @@ import type {
     DefaultConnectOptions,
     KeyValueMapping,
     Mapping,
+    MultiMergeReplaceNullPatches,
     OnyxCollection,
     OnyxEntry,
     OnyxInput,
@@ -35,6 +36,7 @@ import type {DeferredTask} from './createDeferredTask';
 import createDeferredTask from './createDeferredTask';
 import * as GlobalSettings from './GlobalSettings';
 import decorateWithMetrics from './metrics';
+import type {StorageKeyValuePair} from './storage/providers/types';
 
 // Method constants
 const METHOD = {
@@ -1204,34 +1206,6 @@ function hasPendingMergeForKey(key: OnyxKey): boolean {
     return !!mergeQueue[key];
 }
 
-type RemoveNullValuesOutput<Value extends OnyxInput<OnyxKey> | undefined> = {
-    value: Value;
-    wasRemoved: boolean;
-};
-
-/**
- * Removes a key from storage if the value is null.
- * Otherwise removes all nested null values in objects,
- * if shouldRemoveNestedNulls is true and returns the object.
- *
- * @returns The value without null values and a boolean "wasRemoved", which indicates if the key got removed completely
- */
-function removeNullValues<Value extends OnyxInput<OnyxKey> | undefined>(key: OnyxKey, value: Value, shouldRemoveNestedNulls = true): RemoveNullValuesOutput<Value> {
-    if (value === null) {
-        remove(key);
-        return {value, wasRemoved: true};
-    }
-
-    if (value === undefined) {
-        return {value, wasRemoved: false};
-    }
-
-    // We can remove all null values in an object by merging it with itself
-    // utils.fastMerge recursively goes through the object and removes all null values
-    // Passing two identical objects as source and target to fastMerge will not change it, but only remove the null values
-    return {value: shouldRemoveNestedNulls ? utils.removeNestedNullValues(value) : value, wasRemoved: false};
-}
-
 /**
  * Storage expects array like: [["@MyApp_user", value_1], ["@MyApp_key", value_2]]
  * This method transforms an object like {'@MyApp_user': myUserValue, '@MyApp_key': myKeyValue}
@@ -1239,16 +1213,27 @@ function removeNullValues<Value extends OnyxInput<OnyxKey> | undefined>(key: Ony
 
 * @return an array of key - value pairs <[key, value]>
  */
-function prepareKeyValuePairsForStorage(data: Record<OnyxKey, OnyxInput<OnyxKey>>, shouldRemoveNestedNulls: boolean): Array<[OnyxKey, OnyxInput<OnyxKey>]> {
-    return Object.entries(data).reduce<Array<[OnyxKey, OnyxInput<OnyxKey>]>>((pairs, [key, value]) => {
-        const {value: valueAfterRemoving, wasRemoved} = removeNullValues(key, value, shouldRemoveNestedNulls);
+function prepareKeyValuePairsForStorage(
+    data: Record<OnyxKey, OnyxInput<OnyxKey>>,
+    shouldRemoveNestedNulls?: boolean,
+    replaceNullPatches?: MultiMergeReplaceNullPatches,
+): StorageKeyValuePair[] {
+    const pairs: StorageKeyValuePair[] = [];
 
-        if (!wasRemoved && valueAfterRemoving !== undefined) {
-            pairs.push([key, valueAfterRemoving]);
+    Object.entries(data).forEach(([key, value]) => {
+        if (value === null) {
+            remove(key);
+            return;
         }
 
-        return pairs;
-    }, []);
+        const valueWithoutNestedNullValues = shouldRemoveNestedNulls ?? true ? utils.removeNestedNullValues(value) : value;
+
+        if (valueWithoutNestedNullValues !== undefined) {
+            pairs.push([key, valueWithoutNestedNullValues, replaceNullPatches?.[key]]);
+        }
+    });
+
+    return pairs;
 }
 
 function mergeChanges<TValue extends OnyxInput<OnyxKey> | undefined, TChange extends OnyxInput<OnyxKey> | undefined>(changes: TChange[], existingValue?: TValue): FastMergeResult<TChange> {
@@ -1502,7 +1487,6 @@ const OnyxUtils = {
     evictStorageAndRetry,
     broadcastUpdate,
     hasPendingMergeForKey,
-    removeNullValues,
     prepareKeyValuePairsForStorage,
     mergeChanges,
     mergeAndMarkChanges,

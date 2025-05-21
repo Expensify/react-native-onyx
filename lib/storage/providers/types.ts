@@ -1,8 +1,8 @@
-import type {MixedOperationsQueue, OnyxKey, OnyxValue} from '../../types';
+import type {OnyxKey, OnyxValue} from '../../types';
+import type {FastMergeReplaceNullPatch} from '../../utils';
 
-type KeyValuePair = [OnyxKey, OnyxValue<OnyxKey>];
-type KeyList = OnyxKey[];
-type KeyValuePairList = KeyValuePair[];
+type StorageKeyValuePair = [key: OnyxKey, value: OnyxValue<OnyxKey>, replaceNullPatches?: FastMergeReplaceNullPatch[]];
+type StorageKeyList = OnyxKey[];
 
 type DatabaseSize = {
     bytesUsed: number;
@@ -28,7 +28,7 @@ type StorageProvider = {
     /**
      * Get multiple key-value pairs for the given array of keys in a batch
      */
-    multiGet: (keys: KeyList) => Promise<KeyValuePairList>;
+    multiGet: (keys: StorageKeyList) => Promise<StorageKeyValuePair[]>;
 
     /**
      * Sets the value for a given key. The only requirement is that the value should be serializable to JSON string
@@ -38,23 +38,23 @@ type StorageProvider = {
     /**
      * Stores multiple key-value pairs in a batch
      */
-    multiSet: (pairs: KeyValuePairList) => Promise<void>;
+    multiSet: (pairs: StorageKeyValuePair[]) => Promise<void>;
 
     /**
      * Multiple merging of existing and new values in a batch
      */
-    multiMerge: (pairs: KeyValuePairList, mergeReplaceNullPatches?: MixedOperationsQueue['mergeReplaceNullPatches']) => Promise<void>;
+    multiMerge: (pairs: StorageKeyValuePair[]) => Promise<void>;
 
     /**
      * Merges an existing value with a new one
      * @param change - the change to merge with the existing value
      */
-    mergeItem: <TKey extends OnyxKey>(key: TKey, change: OnyxValue<TKey>) => Promise<void>;
+    mergeItem: <TKey extends OnyxKey>(key: TKey, change: OnyxValue<TKey>, replaceNullPatches?: FastMergeReplaceNullPatch[]) => Promise<void>;
 
     /**
      * Returns all keys available in storage
      */
-    getAllKeys: () => Promise<KeyList>;
+    getAllKeys: () => Promise<StorageKeyList>;
 
     /**
      * Removes given key and its value from storage
@@ -64,7 +64,7 @@ type StorageProvider = {
     /**
      * Removes given keys and their values from storage
      */
-    removeItems: (keys: KeyList) => Promise<void>;
+    removeItems: (keys: StorageKeyList) => Promise<void>;
 
     /**
      * Clears absolutely everything from storage
@@ -83,4 +83,4 @@ type StorageProvider = {
 };
 
 export default StorageProvider;
-export type {KeyList, KeyValuePair, KeyValuePairList, OnStorageKeyChanged};
+export type {StorageKeyList, StorageKeyValuePair, OnStorageKeyChanged};

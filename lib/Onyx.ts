@@ -27,6 +27,7 @@ import type {
     OnyxValue,
     OnyxInput,
     OnyxMethodMap,
+    MultiMergeReplaceNullPatches,
 } from './types';
 import OnyxUtils from './OnyxUtils';
 import logMessages from './logMessages';
@@ -169,38 +170,31 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>): Promis
         return Promise.resolve();
     }
 
-    // If the value is null, we remove the key from storage
-    const {value: valueAfterRemoving, wasRemoved} = OnyxUtils.removeNullValues(key, value);
-
-    const logSetCall = (hasChanged = true) => {
-        // Logging properties only since values could be sensitive things we don't want to log
-        Logger.logInfo(`set called for key: ${key}${_.isObject(value) ? ` properties: ${_.keys(value).join(',')}` : ''} hasChanged: ${hasChanged}`);
-    };
-
-    // Calling "OnyxUtils.removeNullValues" removes the key from storage and cache and updates the subscriber.
+    // If the change is null, we can just delete the key.
     // Therefore, we don't need to further broadcast and update the value so we can return early.
-    if (wasRemoved) {
-        logSetCall();
+    if (value === null) {
+        OnyxUtils.remove(key);
+        Logger.logInfo(`set called for key: ${key} => null passed, so key was removed`);
         return Promise.resolve();
     }
 
-    const valueWithoutNullValues = valueAfterRemoving as OnyxValue<TKey>;
-    const hasChanged = cache.hasValueChanged(key, valueWithoutNullValues);
+    const valueWithoutNestedNullValues = utils.removeNestedNullValues(value) as OnyxValue<TKey>;
+    const hasChanged = cache.hasValueChanged(key, valueWithoutNestedNullValues);
 
-    logSetCall(hasChanged);
+    Logger.logInfo(`set called for key: ${key}${_.isObject(value) ? ` properties: ${_.keys(value).join(',')}` : ''} hasChanged: ${hasChanged}`);
 
     // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
-    const updatePromise = OnyxUtils.broadcastUpdate(key, valueWithoutNullValues, hasChanged);
+    const updatePromise = OnyxUtils.broadcastUpdate(key, valueWithoutNestedNullValues, hasChanged);
 
     // If the value has not changed or the key got removed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
     if (!hasChanged) {
         return updatePromise;
     }
 
-    return Storage.setItem(key, valueWithoutNullValues)
-        .catch((error) => OnyxUtils.evictStorageAndRetry(error, set, key, valueWithoutNullValues))
+    return Storage.setItem(key, valueWithoutNestedNullValues)
+        .catch((error) => OnyxUtils.evictStorageAndRetry(error, set, key, valueWithoutNestedNullValues))
         .then(() => {
-            OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNullValues);
+            OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
             return updatePromise;
         });
 }
@@ -323,10 +317,10 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
             delete mergeQueue[key];
             delete mergeQueuePromise[key];
 
-            // Calling "OnyxUtils.remove" removes the key from storage and cache and updates the subscriber.
+            // If the last change is null, we can just delete the key.
             // Therefore, we don't need to further broadcast and update the value so we can return early.
             if (validChanges.at(-1) === null) {
-                Logger.logInfo(`merge called for key: ${key} was removed`);
+                Logger.logInfo(`merge called for key: ${key} => null passed, so key was removed`);
                 OnyxUtils.remove(key);
                 return Promise.resolve();
             }
@@ -376,7 +370,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
 function mergeCollection<TKey extends CollectionKeyBase, TMap>(
     collectionKey: TKey,
     collection: OnyxMergeCollectionInput<TKey, TMap>,
-    mergeReplaceNullPatches?: MixedOperationsQueue['mergeReplaceNullPatches'],
+    mergeReplaceNullPatches?: MultiMergeReplaceNullPatches,
 ): Promise<void> {
     if (!OnyxUtils.isValidNonEmptyCollectionForMerge(collection)) {
         Logger.logInfo('mergeCollection() called with invalid or empty value. Skipping this update.');
@@ -449,7 +443,7 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(
             // When (multi-)merging the values with the existing values in storage,
             // we don't want to remove nested null values from the data that we pass to the storage layer,
             // because the storage layer uses them to remove nested keys from storage natively.
-            const keyValuePairsForExistingCollection = OnyxUtils.prepareKeyValuePairsForStorage(existingKeyCollection, false);
+            const keyValuePairsForExistingCollection = OnyxUtils.prepareKeyValuePairsForStorage(existingKeyCollection, false, mergeReplaceNullPatches);
 
             // We can safely remove nested null values when using (multi-)set,
             // because we will simply overwrite the existing values in storage.
@@ -464,7 +458,7 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(
             // New keys will be added via multiSet while existing keys will be updated using multiMerge
             // This is because setting a key that doesn't exist yet with multiMerge will throw errors
             if (keyValuePairsForExistingCollection.length > 0) {
-                promises.push(Storage.multiMerge(keyValuePairsForExistingCollection, mergeReplaceNullPatches));
+                promises.push(Storage.multiMerge(keyValuePairsForExistingCollection));
             }
 
             if (keyValuePairsForNewCollection.length > 0) {
