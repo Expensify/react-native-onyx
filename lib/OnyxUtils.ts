@@ -1236,14 +1236,11 @@ function prepareKeyValuePairsForStorage(
     return pairs;
 }
 
-function mergeChanges<TValue extends OnyxInput<OnyxKey> | undefined, TChange extends OnyxInput<OnyxKey> | undefined>(changes: TChange[], existingValue?: TValue): FastMergeResult<TChange> {
+function mergeChanges<TValue extends OnyxInput<OnyxKey> | undefined>(changes: TValue[], existingValue?: TValue): FastMergeResult<TValue> {
     return applyMerge('merge', changes, existingValue);
 }
 
-function mergeAndMarkChanges<TValue extends OnyxInput<OnyxKey> | undefined, TChange extends OnyxInput<OnyxKey> | undefined>(
-    changes: TChange[],
-    existingValue?: TValue,
-): FastMergeResult<TChange> {
+function mergeAndMarkChanges<TValue extends OnyxInput<OnyxKey> | undefined>(changes: TValue[], existingValue?: TValue): FastMergeResult<TValue> {
     return applyMerge('mark', changes, existingValue);
 }
 
@@ -1253,11 +1250,7 @@ function mergeAndMarkChanges<TValue extends OnyxInput<OnyxKey> | undefined, TCha
  * @param changes Array of changes that should be merged
  * @param existingValue The existing value that should be merged with the changes
  */
-function applyMerge<TValue extends OnyxInput<OnyxKey> | undefined, TChange extends OnyxInput<OnyxKey> | undefined>(
-    mode: 'merge' | 'mark',
-    changes: TChange[],
-    existingValue?: TValue,
-): FastMergeResult<TChange> {
+function applyMerge<TValue extends OnyxInput<OnyxKey> | undefined>(mode: 'merge' | 'mark', changes: TValue[], existingValue?: TValue): FastMergeResult<TValue> {
     const lastChange = changes?.at(-1);
 
     if (Array.isArray(lastChange)) {
@@ -1266,7 +1259,7 @@ function applyMerge<TValue extends OnyxInput<OnyxKey> | undefined, TChange exten
 
     if (changes.some((change) => change && typeof change === 'object')) {
         // Object values are then merged one after the other
-        return changes.reduce<FastMergeResult<TChange>>(
+        return changes.reduce<FastMergeResult<TValue>>(
             (modifiedData, change) => {
                 const options: FastMergeOptions = mode === 'merge' ? {shouldRemoveNestedNulls: true, objectRemovalMode: 'replace'} : {objectRemovalMode: 'mark'};
                 const {result, replaceNullPatches} = utils.fastMerge(modifiedData.result, change, options);
@@ -1279,7 +1272,7 @@ function applyMerge<TValue extends OnyxInput<OnyxKey> | undefined, TChange exten
                 return modifiedData;
             },
             {
-                result: (existingValue ?? {}) as TChange,
+                result: (existingValue ?? {}) as TValue,
                 replaceNullPatches: [],
             },
         );
@@ -1287,7 +1280,7 @@ function applyMerge<TValue extends OnyxInput<OnyxKey> | undefined, TChange exten
 
     // If we have anything else we can't merge it so we'll
     // simply return the last value that was queued
-    return {result: lastChange as TChange, replaceNullPatches: []};
+    return {result: lastChange as TValue, replaceNullPatches: []};
 }
 
 /**

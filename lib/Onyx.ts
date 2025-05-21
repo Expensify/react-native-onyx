@@ -1,4 +1,3 @@
-/* eslint-disable no-continue */
 import _ from 'underscore';
 import lodashPick from 'lodash/pick';
 import * as Logger from './Logger';
@@ -35,6 +34,7 @@ import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
 import * as GlobalSettings from './GlobalSettings';
 import decorateWithMetrics from './metrics';
+import OnyxMerge from './OnyxMerge.native';
 
 /** Initialize the store with actions and listening for storage events */
 function init({
@@ -325,26 +325,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
                 return Promise.resolve();
             }
 
-            const {result: mergedValue} = OnyxUtils.mergeChanges(validChanges, existingValue);
-
-            // In cache, we don't want to remove the key if it's null to improve performance and speed up the next merge.
-            const hasChanged = cache.hasValueChanged(key, mergedValue);
-
-            // Logging properties only since values could be sensitive things we don't want to log.
-            Logger.logInfo(`merge called for key: ${key}${_.isObject(mergedValue) ? ` properties: ${_.keys(mergedValue).join(',')}` : ''} hasChanged: ${hasChanged}`);
-
-            // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
-            const updatePromise = OnyxUtils.broadcastUpdate(key, mergedValue as OnyxValue<TKey>, hasChanged);
-
-            // If the value has not changed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
-            if (!hasChanged) {
-                return updatePromise;
-            }
-
-            return Storage.setItem(key, mergedValue as OnyxValue<TKey>).then(() => {
-                OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, changes, mergedValue);
-                return updatePromise;
-            });
+            return OnyxMerge.applyMerge(key, existingValue, validChanges);
         } catch (error) {
             Logger.logAlert(`An error occurred while applying merge for key: ${key}, Error: ${error}`);
             return Promise.resolve();
