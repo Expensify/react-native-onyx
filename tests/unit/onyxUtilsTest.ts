@@ -151,15 +151,15 @@ describe('OnyxUtils', () => {
         });
     });
 
-    describe('mergeAndMarkChanges', () => {
+    describe('mergeChanges', () => {
         it("should return the last change if it's an array", () => {
-            const result = OnyxUtils.mergeChanges([...testMergeChanges, [0, 1, 2]], testObject);
+            const {result} = OnyxUtils.mergeAndMarkChanges([...testMergeChanges, [0, 1, 2]], testObject);
 
             expect(result).toEqual([0, 1, 2]);
         });
 
         it("should return the last change if the changes aren't objects", () => {
-            const result = OnyxUtils.mergeChanges(['a', 0, 'b', 1], testObject);
+            const {result} = OnyxUtils.mergeChanges(['a', 0, 'b', 1], testObject);
 
             expect(result).toEqual(1);
         });
@@ -180,7 +180,7 @@ describe('OnyxUtils', () => {
                 },
             };
 
-            const result = OnyxUtils.mergeChanges([batchedChanges], testObject);
+            const {result} = OnyxUtils.mergeChanges([batchedChanges], testObject);
 
             expect(result).toEqual({
                 a: 'a',
@@ -197,11 +197,13 @@ describe('OnyxUtils', () => {
                 },
             });
         });
+    });
 
+    describe('mergeAndMarkChanges', () => {
         it('should apply the replacement markers if the we have properties with objects being removed and added back during the changes', () => {
-            const result = OnyxUtils.mergeAndMarkChanges(testMergeChanges);
+            const {result, replaceNullPatches} = OnyxUtils.mergeAndMarkChanges(testMergeChanges);
 
-            expect(result.result).toEqual({
+            expect(result).toEqual({
                 b: {
                     d: {
                         i: 'i',
@@ -215,7 +217,7 @@ describe('OnyxUtils', () => {
                     },
                 },
             });
-            expect(result.replaceNullPatches).toEqual([
+            expect(replaceNullPatches).toEqual([
                 [['b', 'd'], {i: 'i'}],
                 [['b', 'd'], {i: 'i', j: 'j'}],
                 [['b', 'g'], {k: 'k'}],
@@ -223,7 +225,7 @@ describe('OnyxUtils', () => {
         });
 
         it('should 2', () => {
-            const result = OnyxUtils.mergeAndMarkChanges([
+            const {result, replaceNullPatches} = OnyxUtils.mergeAndMarkChanges([
                 {
                     // Removing the "originalMessage" object in this update.
                     // Any subsequent changes to this object should completely replace the existing object in store.
@@ -252,7 +254,7 @@ describe('OnyxUtils', () => {
                 },
             ]);
 
-            expect(result.result).toEqual({
+            expect(result).toEqual({
                 originalMessage: {
                     errorMessage: 'newErrorMessage',
                     [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
@@ -266,7 +268,8 @@ describe('OnyxUtils', () => {
                     },
                 },
             });
-            expect(result.replaceNullPatches).toEqual([
+
+            expect(replaceNullPatches).toEqual([
                 [['originalMessage'], {errorMessage: 'newErrorMessage'}],
                 [['receipt', 'nestedObject'], {nestedKey2: 'newNestedKey2'}],
             ]);
