@@ -1418,6 +1418,7 @@ function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge): Array<
 
             const oldValue = updatedData[key] || {};
             const newValue = lodashPick(value, Object.keys(snapshotData[key]));
+
             updatedData = {...updatedData, [key]: Object.assign(oldValue, newValue)};
         });
 
