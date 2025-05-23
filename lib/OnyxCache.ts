@@ -188,6 +188,7 @@ class OnyxCache {
             this.addKey(key);
             this.addToAccessedKeys(key);
 
+            // In cache, we don't want to remove the key if it's null to improve performance and speed up the next merge.
             if (value === null || value === undefined) {
                 this.addNullishStorageKey(key);
             } else {

@@ -38,4 +38,6 @@ function logHmmm(message: string, parameters?: Parameters) {
     logger({message: `[Onyx] ${message}`, level: 'hmmm', parameters});
 }
 
-export {registerLogger, logInfo, logAlert, logHmmm};
+const Logger = {registerLogger, logInfo, logAlert, logHmmm};
+
+export default Logger;

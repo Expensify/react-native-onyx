@@ -1,6 +1,6 @@
 /* eslint-disable no-continue */
 import _ from 'underscore';
-import * as Logger from './Logger';
+import Logger from './Logger';
 import cache, {TASK} from './OnyxCache';
 import * as PerformanceUtils from './PerformanceUtils';
 import Storage from './storage';
@@ -33,6 +33,7 @@ import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
 import * as GlobalSettings from './GlobalSettings';
 import decorateWithMetrics from './metrics';
+import OnyxMerge from './OnyxMerge';
 
 /** Initialize the store with actions and listening for storage events */
 function init({
@@ -289,99 +290,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
         }
     }
 
-    const mergeQueue = OnyxUtils.getMergeQueue();
-    const mergeQueuePromise = OnyxUtils.getMergeQueuePromise();
-
-    // Top-level undefined values are ignored
-    // Therefore, we need to prevent adding them to the merge queue
-    if (changes === undefined) {
-        return mergeQueue[key] ? mergeQueuePromise[key] : Promise.resolve();
-    }
-
-    // Merge attempts are batched together. The delta should be applied after a single call to get() to prevent a race condition.
-    // Using the initial value from storage in subsequent merge attempts will lead to an incorrect final merged value.
-    if (mergeQueue[key]) {
-        mergeQueue[key].push(changes);
-        return mergeQueuePromise[key];
-    }
-    mergeQueue[key] = [changes];
-
-    mergeQueuePromise[key] = OnyxUtils.get(key).then((existingValue) => {
-        // Calls to Onyx.set after a merge will terminate the current merge process and clear the merge queue
-        if (mergeQueue[key] == null) {
-            return Promise.resolve();
-        }
-
-        try {
-            // We first only merge the changes, so we can provide these to the native implementation (SQLite uses only delta changes in "JSON_PATCH" to merge)
-            // We don't want to remove null values from the "batchedDeltaChanges", because SQLite uses them to remove keys from storage natively.
-            const validChanges = mergeQueue[key].filter((change) => {
-                const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(change, existingValue);
-                if (!isCompatible) {
-                    Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'merge', existingValueType, newValueType));
-                }
-                return isCompatible;
-            }) as Array<OnyxInput<TKey>>;
-
-            if (!validChanges.length) {
-                return Promise.resolve();
-            }
-            const batchedDeltaChanges = OnyxUtils.applyMerge(undefined, validChanges, false);
-
-            // Case (1): When there is no existing value in storage, we want to set the value instead of merge it.
-            // Case (2): The presence of a top-level `null` in the merge queue instructs us to drop the whole existing value.
-            // In this case, we can't simply merge the batched changes with the existing value, because then the null in the merge queue would have no effect
-            const shouldSetValue = !existingValue || mergeQueue[key].includes(null);
-
-            // Clean up the write queue, so we don't apply these changes again
-            delete mergeQueue[key];
-            delete mergeQueuePromise[key];
-
-            const logMergeCall = (hasChanged = true) => {
-                // Logging properties only since values could be sensitive things we don't want to log
-                Logger.logInfo(`merge called for key: ${key}${_.isObject(batchedDeltaChanges) ? ` properties: ${_.keys(batchedDeltaChanges).join(',')}` : ''} hasChanged: ${hasChanged}`);
-            };
-
-            // If the batched changes equal null, we want to remove the key from storage, to reduce storage size
-            const {wasRemoved} = OnyxUtils.removeNullValues(key, batchedDeltaChanges);
-
-            // Calling "OnyxUtils.removeNullValues" removes the key from storage and cache and updates the subscriber.
-            // Therefore, we don't need to further broadcast and update the value so we can return early.
-            if (wasRemoved) {
-                logMergeCall();
-                return Promise.resolve();
-            }
-
-            // For providers that can't handle delta changes, we need to merge the batched changes with the existing value beforehand.
-            // The "preMergedValue" will be directly "set" in storage instead of being merged
-            // Therefore we merge the batched changes with the existing value to get the final merged value that will be stored.
-            // We can remove null values from the "preMergedValue", because "null" implicates that the user wants to remove a value from storage.
-            const preMergedValue = OnyxUtils.applyMerge(shouldSetValue ? undefined : existingValue, [batchedDeltaChanges], true);
-
-            // In cache, we don't want to remove the key if it's null to improve performance and speed up the next merge.
-            const hasChanged = cache.hasValueChanged(key, preMergedValue);
-
-            logMergeCall(hasChanged);
-
-            // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
-            const updatePromise = OnyxUtils.broadcastUpdate(key, preMergedValue as OnyxValue<TKey>, hasChanged);
-
-            // If the value has not changed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
-            if (!hasChanged) {
-                return updatePromise;
-            }
-
-            return Storage.mergeItem(key, batchedDeltaChanges as OnyxValue<TKey>, preMergedValue as OnyxValue<TKey>, shouldSetValue).then(() => {
-                OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, changes, preMergedValue);
-                return updatePromise;
-            });
-        } catch (error) {
-            Logger.logAlert(`An error occurred while applying merge for key: ${key}, Error: ${error}`);
-            return Promise.resolve();
-        }
-    });
-
-    return mergeQueuePromise[key];
+    return OnyxMerge.merge(key, changes);
 }
 
 /**
