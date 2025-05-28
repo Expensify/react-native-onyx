@@ -1448,7 +1448,7 @@ describe('Onyx', () => {
         const snapshot1 = `${ONYX_KEYS.COLLECTION.SNAPSHOT}1`;
 
         const initialValue = {name: 'Fluffy'};
-        const finalValue = {name: 'Kitty'};
+        const finalValue = {name: 'Kitty', nickName: 'Fitse'};
 
         await Onyx.set(cat, initialValue);
         await Onyx.set(snapshot1, {data: {[cat]: initialValue}});
