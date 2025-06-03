@@ -300,7 +300,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             // we log an alert so it can be acknowledged by the consumer. Additionally, we won't log alerts
             // if there's a `Onyx.clear()` task in progress.
             if (options?.canBeMissing === false && newStatus === 'loaded' && !isOnyxValueDefined && !OnyxCache.hasPendingTask(TASK.CLEAR)) {
-                Logger.logAlert(`useOnyx returned no data for key with canBeMissing set to false.`, {key, showAlert: true});
+                Logger.logAlert(`useOnyx returned no data for key with canBeMissing set to false for key ${key}`, {showAlert: true});
             }
         }
 
