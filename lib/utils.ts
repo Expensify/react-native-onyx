@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/prefer-for-of */
-
 import type {ConnectOptions, OnyxInput, OnyxKey} from './types';
 
 type EmptyObject = Record<string, never>;
@@ -185,8 +183,7 @@ function filterObject<TValue>(obj: Record<string, TValue>, condition: string | s
     const result: Record<string, TValue> = {};
     const entries = Object.entries(obj);
 
-    for (let i = 0; i < entries.length; i++) {
-        const [key, value] = entries[i];
+    for (const [key, value] of entries) {
         let shouldInclude: boolean;
 
         if (Array.isArray(condition)) {
@@ -194,7 +191,7 @@ function filterObject<TValue>(obj: Record<string, TValue>, condition: string | s
         } else if (typeof condition === 'string') {
             shouldInclude = key === condition;
         } else {
-            shouldInclude = condition(entries[i]);
+            shouldInclude = condition([key, value]);
         }
 
         if (include ? shouldInclude : !shouldInclude) {

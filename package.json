@@ -1,6 +1,6 @@
 {
   "name": "react-native-onyx",
-  "version": "2.0.96",
+  "version": "2.0.108",
   "author": "Expensify, Inc.",
   "homepage": "https://expensify.com",
   "description": "State management for React Native",
@@ -28,15 +28,18 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
+    "prepare": "npm run build",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "jest",
+    "perf-test": "npx reassure",
     "build": "tsc -p tsconfig.build.json",
     "build:watch": "nodemon --watch lib --ext js,json,ts,tsx --exec \"npm run build && npm pack\"",
     "prebuild:docs": "npm run build",
     "build:docs": "ts-node buildDocs.ts",
     "lint-tests": "eslint tests/**",
-    "prettier": "prettier --write ."
+    "prettier": "prettier --write .",
+    "gh-actions-build": "./.github/scripts/buildActions.sh"
   },
   "dependencies": {
     "ascii-table": "0.0.9",
@@ -66,8 +69,10 @@
     "@types/underscore": "^1.11.15",
     "@typescript-eslint/eslint-plugin": "^6.19.0",
     "@typescript-eslint/parser": "^6.19.0",
+    "@vercel/ncc": "0.38.1",
+    "date-fns": "^4.1.0",
     "eslint": "^8.56.0",
-    "eslint-config-expensify": "^2.0.44",
+    "eslint-config-expensify": "^2.0.81",
     "eslint-config-prettier": "^8.8.0",
     "eslint-plugin-import": "^2.29.1",
     "eslint-plugin-jsx-a11y": "^6.8.0",
@@ -82,12 +87,13 @@
     "prop-types": "^15.7.2",
     "react": "18.2.0",
     "react-dom": "^18.2.0",
-    "react-native": "0.71.2",
+    "react-native": "0.76.3",
     "react-native-device-info": "^10.3.0",
+    "react-native-nitro-modules": "^0.24.1",
+    "react-native-nitro-sqlite": "^9.1.8",
     "react-native-performance": "^2.0.0",
-    "react-native-quick-sqlite": "^8.0.6",
     "react-test-renderer": "18.1.0",
-    "reassure": "^0.11.0",
+    "reassure": "1.4.0",
     "ts-node": "^10.9.2",
     "type-fest": "^3.12.0",
     "typescript": "^5.4.5"
@@ -95,10 +101,12 @@
   "peerDependencies": {
     "idb-keyval": "^6.2.1",
     "react": ">=18.1.0",
+    "react-native": ">=0.75.0",
     "react-dom": ">=18.1.0",
     "react-native-device-info": "^10.3.0",
-    "react-native-performance": "^5.1.0",
-    "react-native-quick-sqlite": "^8.0.0-beta.2"
+    "react-native-nitro-modules": ">=0.24.1",
+    "react-native-nitro-sqlite": "^9.1.4",
+    "react-native-performance": "^5.1.0"
   },
   "peerDependenciesMeta": {
     "idb-keyval": {
@@ -107,7 +115,10 @@
     "react-native-performance": {
       "optional": true
     },
-    "react-native-quick-sqlite": {
+    "react-native-nitro-modules": {
+      "optional": true
+    },
+    "react-native-nitro-sqlite": {
       "optional": true
     },
     "react-native-device-info": {
@@ -115,7 +126,7 @@
     }
   },
   "engines": {
-    "node": ">=20.18.1",
+    "node": ">=20.19.1",
     "npm": ">=10.8.2"
   },
   "sideEffects": false

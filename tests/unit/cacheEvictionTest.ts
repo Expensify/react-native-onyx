@@ -19,7 +19,7 @@ test('Cache eviction', () => {
             // When we initialize Onyx and mark the set collection key as a safeEvictionKey
             Onyx.init({
                 keys: ONYX_KEYS,
-                safeEvictionKeys: [ONYX_KEYS.COLLECTION.TEST_KEY],
+                evictableKeys: [ONYX_KEYS.COLLECTION.TEST_KEY],
             });
 
             // And connect to this key

@@ -72,11 +72,12 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = BaseUseOnyxOptions & U
 
 type FetchStatus = 'loading' | 'loaded';
 
-type ResultMetadata = {
+type ResultMetadata<TValue> = {
     status: FetchStatus;
+    sourceValue?: NonNullable<TValue> | undefined;
 };
 
-type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata];
+type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata<TValue>];
 
 /**
  * Gets the cached value from the Onyx cache. If the key is a collection key, it will return all the values in the collection.
@@ -158,6 +159,9 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     // Indicates if we should get the newest cached value from Onyx during `getSnapshot()` execution.
     const shouldGetCachedValueRef = useRef(true);
 
+    // Inside useOnyx.ts, we need to track the sourceValue separately
+    const sourceValueRef = useRef<NonNullable<TReturnValue> | undefined>(undefined);
+
     useEffect(() => {
         // These conditions will ensure we can only handle dynamic collection member keys from the same collection.
         if (options?.allowDynamicKey || previousKey === key) {
@@ -205,8 +209,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             return;
         }
 
-        if (!OnyxUtils.isSafeEvictionKey(key)) {
-            throw new Error(`canEvict can't be used on key '${key}'. This key must explicitly be flagged as safe for removal by adding it to Onyx.init({safeEvictionKeys: []}).`);
+        if (!OnyxCache.isEvictableKey(key)) {
+            throw new Error(`canEvict can't be used on key '${key}'. This key must explicitly be flagged as safe for removal by adding it to Onyx.init({evictableKeys: []}).`);
         }
 
         if (options.canEvict) {
@@ -284,11 +288,18 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
             // If the new value is `null` we default it to `undefined` to ensure the consumer gets a consistent result from the hook.
             const newStatus = newFetchStatus ?? 'loaded';
-            resultRef.current = [previousValueRef.current ?? undefined, {status: newStatus}];
+            resultRef.current = [
+                previousValueRef.current ?? undefined,
+                {
+                    status: newStatus,
+                    sourceValue: sourceValueRef.current,
+                },
+            ];
 
             // If `canBeMissing` is set to `false` and the Onyx value of that key is not defined,
-            // we log an alert so it can be acknowledged by the consumer.
-            if (options?.canBeMissing === false && newStatus === 'loaded' && !isOnyxValueDefined) {
+            // we log an alert so it can be acknowledged by the consumer. Additionally, we won't log alerts
+            // if there's a `Onyx.clear()` task in progress.
+            if (options?.canBeMissing === false && newStatus === 'loaded' && !isOnyxValueDefined && !OnyxCache.hasPendingTask(TASK.CLEAR)) {
                 Logger.logAlert(`useOnyx returned no data for key with canBeMissing set to false.`, {key, showAlert: true});
             }
         }
@@ -303,7 +314,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
             connectionRef.current = connectionManager.connect<CollectionKeyBase>({
                 key,
-                callback: () => {
+                callback: (value, callbackKey, sourceValue) => {
                     isConnectingRef.current = false;
                     onStoreChangeFnRef.current = onStoreChange;
 
@@ -313,6 +324,9 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
                     // Signals that we want to get the newest cached value again in `getSnapshot()`.
                     shouldGetCachedValueRef.current = true;
+
+                    // sourceValue is unknown type, so we need to cast it to the correct type.
+                    sourceValueRef.current = sourceValue as NonNullable<TReturnValue>;
 
                     // Finally, we signal that the store changed, making `getSnapshot()` be called again.
                     onStoreChange();

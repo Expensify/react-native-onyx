@@ -1,7 +1,7 @@
 import {act, renderHook} from '@testing-library/react-native';
 import type {OnyxCollection, OnyxEntry} from '../../lib';
 import Onyx, {useOnyx} from '../../lib';
-import OnyxUtils from '../../lib/OnyxUtils';
+import OnyxCache from '../../lib/OnyxCache';
 import StorageMock from '../../lib/storage';
 import type GenericCollection from '../utils/GenericCollection';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
@@ -19,7 +19,7 @@ const ONYXKEYS = {
 
 Onyx.init({
     keys: ONYXKEYS,
-    safeEvictionKeys: [ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY],
+    evictableKeys: [ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY],
     skippableCollectionMemberIDs: ['skippable-id'],
 });
 
@@ -773,7 +773,7 @@ describe('useOnyx', () => {
 
             expect(result1.current[0]).toBeUndefined();
             expect(result1.current[1].status).toEqual('loaded');
-            expect(logAlertFn).not.toBeCalledWith(alertMessage);
+            expect(logAlertFn).not.toBeCalled();
 
             await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'test'));
 
@@ -782,7 +782,7 @@ describe('useOnyx', () => {
             await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, null));
 
             expect(result1.current[0]).toBeUndefined();
-            expect(logAlertFn).not.toBeCalledWith(alertMessage);
+            expect(logAlertFn).not.toBeCalled();
         });
 
         it('should not log an alert if Onyx doesn\'t return data, "canBeMissing" property is false but "initWithStoredValues" is also false', async () => {
@@ -791,7 +791,7 @@ describe('useOnyx', () => {
             expect(result1.current[0]).toBeUndefined();
             expect(result1.current[1].status).toEqual('loaded');
 
-            expect(logAlertFn).not.toBeCalledWith(alertMessage);
+            expect(logAlertFn).not.toBeCalled();
         });
 
         it('should log an alert if Onyx doesn\'t return data in loaded state and "canBeMissing" property is false', async () => {
@@ -799,7 +799,7 @@ describe('useOnyx', () => {
 
             expect(result1.current[0]).toBeUndefined();
             expect(result1.current[1].status).toEqual('loading');
-            expect(logAlertFn).not.toBeCalledWith(alertMessage);
+            expect(logAlertFn).not.toBeCalled();
 
             await act(async () => waitForPromisesToResolve());
 
@@ -830,7 +830,7 @@ describe('useOnyx', () => {
 
             expect(result1.current[0]).toBeUndefined();
             expect(result1.current[1].status).toEqual('loading');
-            expect(logAlertFn).not.toBeCalledWith(alertMessage);
+            expect(logAlertFn).not.toBeCalled();
 
             await act(async () => waitForPromisesToResolve());
 
@@ -877,11 +877,36 @@ describe('useOnyx', () => {
             expect(logAlertFn).toHaveBeenCalledTimes(2);
             expect(logAlertFn).toHaveBeenNthCalledWith(2, alertMessage, {key: ONYXKEYS.TEST_KEY, showAlert: true});
         });
+
+        it('should not log an alert if "canBeMissing" property is false but there is a Onyx.clear() task in progress', async () => {
+            const {result: result1} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {canBeMissing: false}));
+
+            expect(result1.current[0]).toBeUndefined();
+            expect(result1.current[1].status).toEqual('loading');
+            expect(logAlertFn).not.toBeCalled();
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result1.current[0]).toBeUndefined();
+            expect(result1.current[1].status).toEqual('loaded');
+            expect(logAlertFn).toHaveBeenCalledTimes(1);
+            expect(logAlertFn).toHaveBeenNthCalledWith(1, alertMessage, {key: ONYXKEYS.TEST_KEY, showAlert: true});
+
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'test'));
+
+            expect(result1.current[0]).toBe('test');
+
+            logAlertFn.mockReset();
+            await act(async () => Onyx.clear());
+
+            expect(result1.current[0]).toBeUndefined();
+            expect(logAlertFn).not.toBeCalled();
+        });
     });
 
     // This test suite must be the last one to avoid problems when running the other tests here.
     describe('canEvict', () => {
-        const error = (key: string) => `canEvict can't be used on key '${key}'. This key must explicitly be flagged as safe for removal by adding it to Onyx.init({safeEvictionKeys: []}).`;
+        const error = (key: string) => `canEvict can't be used on key '${key}'. This key must explicitly be flagged as safe for removal by adding it to Onyx.init({evictableKeys: []}).`;
 
         beforeEach(() => {
             jest.spyOn(console, 'error').mockImplementation(jest.fn);
@@ -914,7 +939,7 @@ describe('useOnyx', () => {
 
             await act(async () => waitForPromisesToResolve());
 
-            const evictionBlocklist = OnyxUtils.getEvictionBlocklist();
+            const evictionBlocklist = OnyxCache.getEvictionBlocklist();
             expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]).toHaveLength(1);
         });
 
@@ -928,7 +953,7 @@ describe('useOnyx', () => {
 
             await act(async () => waitForPromisesToResolve());
 
-            const evictionBlocklist = OnyxUtils.getEvictionBlocklist();
+            const evictionBlocklist = OnyxCache.getEvictionBlocklist();
             expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]).toHaveLength(1);
             expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry2`]).toBeUndefined();
 
@@ -949,7 +974,7 @@ describe('useOnyx', () => {
 
             await act(async () => waitForPromisesToResolve());
 
-            const evictionBlocklist = OnyxUtils.getEvictionBlocklist();
+            const evictionBlocklist = OnyxCache.getEvictionBlocklist();
             expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]).toHaveLength(1);
 
             await act(async () => {
