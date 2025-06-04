@@ -26,7 +26,7 @@
 <dt><a href="#setSkippableCollectionMemberIDs">setSkippableCollectionMemberIDs()</a></dt>
 <dd><p>Setter - sets the skippable collection member IDs.</p>
 </dd>
-<dt><a href="#initStoreValues">initStoreValues(keys, initialKeyStates, safeEvictionKeys)</a></dt>
+<dt><a href="#initStoreValues">initStoreValues(keys, initialKeyStates, evictableKeys)</a></dt>
 <dd><p>Sets the initial values for the Onyx store</p>
 </dd>
 <dt><a href="#maybeFlushBatchUpdates">maybeFlushBatchUpdates()</a></dt>
@@ -71,7 +71,7 @@ is associated with a collection of keys.</p>
 <dd><p>Checks to see if a provided key is the exact configured key of our connected subscriber
 or if the provided key is a collection member key (in case our configured key is a &quot;collection key&quot;)</p>
 </dd>
-<dt><a href="#isSafeEvictionKey">isSafeEvictionKey()</a></dt>
+<dt><a href="#isEvictableKey">isEvictableKey()</a></dt>
 <dd><p>Checks to see if this key has been flagged as safe for removal.</p>
 </dd>
 <dt><a href="#getCollectionKey">getCollectionKey(key)</a> ⇒</dt>
@@ -96,7 +96,7 @@ If the requested key is a collection, it will return an object with all the coll
 recently accessed key should be at the head and the most
 recently accessed key at the tail.</p>
 </dd>
-<dt><a href="#addAllSafeEvictionKeysToRecentlyAccessedList">addAllSafeEvictionKeysToRecentlyAccessedList()</a></dt>
+<dt><a href="#addEvictableKeysToRecentlyAccessedList">addEvictableKeysToRecentlyAccessedList()</a></dt>
 <dd><p>Take all the keys that are safe to evict and add them to
 the recently accessed list when initializing the app. This
 enables keys that have not recently been accessed to be
@@ -208,7 +208,7 @@ Setter - sets the skippable collection member IDs.
 **Kind**: global function  
 <a name="initStoreValues"></a>
 
-## initStoreValues(keys, initialKeyStates, safeEvictionKeys)
+## initStoreValues(keys, initialKeyStates, evictableKeys)
 Sets the initial values for the Onyx store
 
 **Kind**: global function  
@@ -217,7 +217,7 @@ Sets the initial values for the Onyx store
 | --- | --- |
 | keys | `ONYXKEYS` constants object from Onyx.init() |
 | initialKeyStates | initial data to set when `init()` and `clear()` are called |
-| safeEvictionKeys | This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal. |
+| evictableKeys | This is an array of keys (individual or collection patterns) that are eligible for automatic removal when storage limits are reached. |
 
 <a name="maybeFlushBatchUpdates"></a>
 
@@ -314,9 +314,9 @@ Checks to see if a provided key is the exact configured key of our connected sub
 or if the provided key is a collection member key (in case our configured key is a "collection key")
 
 **Kind**: global function  
-<a name="isSafeEvictionKey"></a>
+<a name="isEvictableKey"></a>
 
-## isSafeEvictionKey()
+## isEvictableKey()
 Checks to see if this key has been flagged as safe for removal.
 
 **Kind**: global function  
@@ -359,9 +359,9 @@ recently accessed key should be at the head and the most
 recently accessed key at the tail.
 
 **Kind**: global function  
-<a name="addAllSafeEvictionKeysToRecentlyAccessedList"></a>
+<a name="addEvictableKeysToRecentlyAccessedList"></a>
 
-## addAllSafeEvictionKeysToRecentlyAccessedList()
+## addEvictableKeysToRecentlyAccessedList()
 Take all the keys that are safe to evict and add them to
 the recently accessed list when initializing the app. This
 enables keys that have not recently been accessed to be

@@ -3,12 +3,12 @@ import {act} from '@testing-library/react-native';
 import Onyx from '../../lib';
 import type {Connection} from '../../lib/OnyxConnectionManager';
 import connectionManager from '../../lib/OnyxConnectionManager';
-import OnyxUtils from '../../lib/OnyxUtils';
+import OnyxCache from '../../lib/OnyxCache';
 import StorageMock from '../../lib/storage';
 import type {OnyxKey, WithOnyxConnectOptions} from '../../lib/types';
-import type {WithOnyxInstance} from '../../lib/withOnyx/types';
 import type GenericCollection from '../utils/GenericCollection';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
+import generateEmptyWithOnyxInstance from '../utils/generateEmptyWithOnyxInstance';
 
 // We need access to some internal properties of `connectionManager` during the tests but they are private,
 // so this workaround allows us to have access to them.
@@ -18,16 +18,6 @@ const connectionsMap = connectionManager['connectionsMap'];
 const generateConnectionID = connectionManager['generateConnectionID'];
 // eslint-disable-next-line dot-notation
 const getSessionID = () => connectionManager['sessionID'];
-
-function generateEmptyWithOnyxInstance() {
-    return new (class {
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
-        setStateProxy() {}
-
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
-        setWithOnyxState() {}
-    })() as unknown as WithOnyxInstance;
-}
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -487,7 +477,7 @@ describe('OnyxConnectionManager', () => {
 
     describe('addToEvictionBlockList / removeFromEvictionBlockList', () => {
         it('should add and remove connections from the eviction block list correctly', async () => {
-            const evictionBlocklist = OnyxUtils.getEvictionBlocklist();
+            const evictionBlocklist = OnyxCache.getEvictionBlocklist();
 
             connectionsMap.set('connectionID1', {subscriptionID: 0, onyxKey: ONYXKEYS.TEST_KEY, callbacks: new Map(), isConnectionMade: true});
             connectionsMap.get('connectionID1')?.callbacks.set('callbackID1', () => undefined);

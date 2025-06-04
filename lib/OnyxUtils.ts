@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/prefer-for-of */
 /* eslint-disable no-continue */
 import {deepEqual} from 'fast-equals';
 import lodashClone from 'lodash/clone';
@@ -26,6 +25,7 @@ import type {
     OnyxInput,
     OnyxKey,
     OnyxMergeCollectionInput,
+    OnyxUpdate,
     OnyxValue,
     Selector,
 } from './types';
@@ -62,17 +62,6 @@ let onyxCollectionKeySet = new Set<OnyxKey>();
 
 // Holds a mapping of the connected key to the subscriptionID for faster lookups
 const onyxKeyToSubscriptionIDs = new Map();
-
-// Holds a list of keys that have been directly subscribed to or recently modified from least to most recent
-let recentlyAccessedKeys: OnyxKey[] = [];
-
-// Holds a list of keys that are safe to remove when we reach max storage. If a key does not match with
-// whatever appears in this list it will NEVER be a candidate for eviction.
-let evictionAllowList: OnyxKey[] = [];
-
-// Holds a map of keys and connection arrays whose keys will never be automatically evicted as
-// long as we have at least one subscriber that returns false for the canEvict property.
-const evictionBlocklist: Record<OnyxKey, string[] | undefined> = {};
 
 // Optional user-provided key value states set when Onyx initializes or clears
 let defaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
@@ -127,13 +116,6 @@ function getDeferredInitTask(): DeferredTask {
 }
 
 /**
- * Getter - returns the eviction block list.
- */
-function getEvictionBlocklist(): Record<OnyxKey, string[] | undefined> {
-    return evictionBlocklist;
-}
-
-/**
  * Getter - returns the skippable collection member IDs.
  */
 function getSkippableCollectionMemberIDs(): Set<string> {
@@ -152,9 +134,9 @@ function setSkippableCollectionMemberIDs(ids: Set<string>): void {
  *
  * @param keys - `ONYXKEYS` constants object from Onyx.init()
  * @param initialKeyStates - initial data to set when `init()` and `clear()` are called
- * @param safeEvictionKeys - This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal.
+ * @param evictableKeys - This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal.
  */
-function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Partial<KeyValueMapping>, safeEvictionKeys: OnyxKey[]): void {
+function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Partial<KeyValueMapping>, evictableKeys: OnyxKey[]): void {
     // We need the value of the collection keys later for checking if a
     // key is a collection. We store it in a map for faster lookup.
     const collectionValues = Object.values(keys.COLLECTION ?? {}) as string[];
@@ -169,7 +151,7 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
     DevTools.initState(initialKeyStates);
 
     // Let Onyx know about which keys are safe to evict
-    evictionAllowList = safeEvictionKeys;
+    cache.setEvictionAllowList(evictableKeys);
 
     if (typeof keys.COLLECTION === 'object' && typeof keys.COLLECTION.SNAPSHOT === 'string') {
         snapshotKey = keys.COLLECTION.SNAPSHOT;
@@ -502,11 +484,6 @@ function isKeyMatch(configKey: OnyxKey, key: OnyxKey): boolean {
     return isCollectionKey(configKey) ? Str.startsWith(key, configKey) : configKey === key;
 }
 
-/** Checks to see if this key has been flagged as safe for removal. */
-function isSafeEvictionKey(testKey: OnyxKey): boolean {
-    return evictionAllowList.some((key) => isKeyMatch(key, testKey));
-}
-
 /**
  * Extracts the collection identifier of a given collection member key.
  *
@@ -578,47 +555,6 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Partial<Ma
     return val;
 }
 
-/**
- * Remove a key from the recently accessed key list.
- */
-function removeLastAccessedKey(key: OnyxKey): void {
-    recentlyAccessedKeys = recentlyAccessedKeys.filter((recentlyAccessedKey) => recentlyAccessedKey !== key);
-}
-
-/**
- * Add a key to the list of recently accessed keys. The least
- * recently accessed key should be at the head and the most
- * recently accessed key at the tail.
- */
-function addLastAccessedKey(key: OnyxKey): void {
-    // Only specific keys belong in this list since we cannot remove an entire collection.
-    if (isCollectionKey(key) || !isSafeEvictionKey(key)) {
-        return;
-    }
-
-    removeLastAccessedKey(key);
-    recentlyAccessedKeys.push(key);
-}
-
-/**
- * Take all the keys that are safe to evict and add them to
- * the recently accessed list when initializing the app. This
- * enables keys that have not recently been accessed to be
- * removed.
- */
-function addAllSafeEvictionKeysToRecentlyAccessedList(): Promise<void> {
-    return getAllKeys().then((keys) => {
-        evictionAllowList.forEach((safeEvictionKey) => {
-            keys.forEach((key) => {
-                if (!isKeyMatch(safeEvictionKey, key)) {
-                    return;
-                }
-                addLastAccessedKey(key);
-            });
-        });
-    });
-}
-
 function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collectionMemberKeys?: string[]): NonNullable<OnyxCollection<KeyValueMapping[TKey]>> {
     const allKeys = collectionMemberKeys || cache.getAllKeys();
     const collection: OnyxCollection<KeyValueMapping[TKey]> = {};
@@ -653,8 +589,8 @@ function keysChanged<TKey extends CollectionKeyBase>(
     collectionKey: TKey,
     partialCollection: OnyxCollection<KeyValueMapping[TKey]>,
     partialPreviousCollection: OnyxCollection<KeyValueMapping[TKey]> | undefined,
-    notifyRegularSubscibers = true,
-    notifyWithOnyxSubscibers = true,
+    notifyConnectSubscribers = true,
+    notifyWithOnyxSubscribers = true,
 ): void {
     // We prepare the "cached collection" which is the entire collection + the new partial data that
     // was merged in via mergeCollection().
@@ -667,8 +603,9 @@ function keysChanged<TKey extends CollectionKeyBase>(
     // and does not represent all of the combined keys and values for a collection key. It is just the "new" data that was merged in via mergeCollection().
     const stateMappingKeys = Object.keys(callbackToStateMapping);
     const collectionKeyLength = collectionKey.length;
-    for (let i = 0; i < stateMappingKeys.length; i++) {
-        const subscriber = callbackToStateMapping[stateMappingKeys[i]];
+
+    for (const stateMappingKey of stateMappingKeys) {
+        const subscriber = callbackToStateMapping[stateMappingKey];
         if (!subscriber) {
             continue;
         }
@@ -690,7 +627,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
 
         // Regular Onyx.connect() subscriber found.
         if (typeof subscriber.callback === 'function') {
-            if (!notifyRegularSubscibers) {
+            if (!notifyConnectSubscribers) {
                 continue;
             }
 
@@ -705,9 +642,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
                 // If they are not using waitForCollectionCallback then we notify the subscriber with
                 // the new merged data but only for any keys in the partial collection.
                 const dataKeys = Object.keys(partialCollection ?? {});
-                for (let j = 0; j < dataKeys.length; j++) {
-                    const dataKey = dataKeys[j];
-
+                for (const dataKey of dataKeys) {
                     if (deepEqual(cachedCollection[dataKey], previousCollection[dataKey])) {
                         continue;
                     }
@@ -734,7 +669,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
 
         // React component subscriber found.
         if (utils.hasWithOnyxInstance(subscriber)) {
-            if (!notifyWithOnyxSubscibers) {
+            if (!notifyWithOnyxSubscribers) {
                 continue;
             }
 
@@ -764,8 +699,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
                     const prevCollection = prevState?.[subscriber.statePropertyName] ?? {};
                     const finalCollection = lodashClone(prevCollection);
                     const dataKeys = Object.keys(partialCollection ?? {});
-                    for (let j = 0; j < dataKeys.length; j++) {
-                        const dataKey = dataKeys[j];
+                    for (const dataKey of dataKeys) {
                         finalCollection[dataKey] = cachedCollection[dataKey];
                     }
 
@@ -854,9 +788,9 @@ function keyChanged<TKey extends OnyxKey>(
 ): void {
     // Add or remove this key from the recentlyAccessedKeys lists
     if (value !== null) {
-        addLastAccessedKey(key);
+        cache.addLastAccessedKey(key, isCollectionKey(key));
     } else {
-        removeLastAccessedKey(key);
+        cache.removeLastAccessedKey(key);
     }
 
     // We get the subscribers interested in the key that has just changed. If the subscriber's  key is a collection key then we will
@@ -884,8 +818,8 @@ function keyChanged<TKey extends OnyxKey>(
 
     const cachedCollections: Record<string, ReturnType<typeof getCachedCollection>> = {};
 
-    for (let i = 0; i < stateMappingKeys.length; i++) {
-        const subscriber = callbackToStateMapping[stateMappingKeys[i]];
+    for (const stateMappingKey of stateMappingKeys) {
+        const subscriber = callbackToStateMapping[stateMappingKey];
         if (!subscriber || !isKeyMatch(subscriber.key, key) || !canUpdateSubscriber(subscriber)) {
             continue;
         }
@@ -1071,9 +1005,12 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: Mapping<TKey>, valu
  * run out of storage the least recently accessed key can be removed.
  */
 function addKeyToRecentlyAccessedIfNeeded<TKey extends OnyxKey>(mapping: Mapping<TKey>): void {
-    if (!isSafeEvictionKey(mapping.key)) {
+    if (!cache.isEvictableKey(mapping.key)) {
         return;
     }
+
+    // Add the key to recentKeys first (this makes it the most recent key)
+    cache.addToAccessedKeys(mapping.key);
 
     // Try to free some cache whenever we connect to a safe eviction key
     cache.removeLeastRecentlyUsedKeys();
@@ -1084,7 +1021,7 @@ function addKeyToRecentlyAccessedIfNeeded<TKey extends OnyxKey>(mapping: Mapping
             throw new Error(`Cannot subscribe to safe eviction key '${mapping.key}' without providing a canEvict value.`);
         }
 
-        addLastAccessedKey(mapping.key);
+        cache.addLastAccessedKey(mapping.key, isCollectionKey(mapping.key));
     }
 }
 
@@ -1168,7 +1105,7 @@ function evictStorageAndRetry<TMethod extends typeof Onyx.set | typeof Onyx.mult
     }
 
     // Find the first key that we can remove that has no subscribers in our blocklist
-    const keyForRemoval = recentlyAccessedKeys.find((key) => !evictionBlocklist[key]);
+    const keyForRemoval = cache.getKeyForEviction();
     if (!keyForRemoval) {
         // If we have no acceptable keys to remove then we are possibly trying to save mission critical data. If this is the case,
         // then we should stop retrying as there is not much the user can do to fix this. Instead of getting them stuck in an infinite loop we
@@ -1445,6 +1382,64 @@ function unsubscribeFromKey(subscriptionID: number): void {
     delete callbackToStateMapping[subscriptionID];
 }
 
+function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge): Array<() => Promise<void>> {
+    const snapshotCollectionKey = OnyxUtils.getSnapshotKey();
+    if (!snapshotCollectionKey) return [];
+
+    const promises: Array<() => Promise<void>> = [];
+
+    const snapshotCollection = OnyxUtils.getCachedCollection(snapshotCollectionKey);
+    const snapshotCollectionKeyLength = snapshotCollectionKey.length;
+
+    Object.entries(snapshotCollection).forEach(([snapshotEntryKey, snapshotEntryValue]) => {
+        // Snapshots may not be present in cache. We don't know how to update them so we skip.
+        if (!snapshotEntryValue) {
+            return;
+        }
+
+        let updatedData: Record<string, unknown> = {};
+
+        data.forEach(({key, value}) => {
+            // snapshots are normal keys so we want to skip update if they are written to Onyx
+            if (OnyxUtils.isCollectionMemberKey(snapshotCollectionKey, key, snapshotCollectionKeyLength)) {
+                return;
+            }
+
+            if (typeof snapshotEntryValue !== 'object' || !('data' in snapshotEntryValue)) {
+                return;
+            }
+
+            const snapshotData = snapshotEntryValue.data;
+            if (!snapshotData || !snapshotData[key]) {
+                return;
+            }
+
+            if (Array.isArray(value) || Array.isArray(snapshotData[key])) {
+                updatedData[key] = value || [];
+                return;
+            }
+
+            if (value === null) {
+                updatedData[key] = value;
+                return;
+            }
+
+            const oldValue = updatedData[key] || {};
+
+            updatedData = {...updatedData, [key]: Object.assign(oldValue, value)};
+        });
+
+        // Skip the update if there's no data to be merged
+        if (utils.isEmptyObject(updatedData)) {
+            return;
+        }
+
+        promises.push(() => mergeFn(snapshotEntryKey, {data: updatedData}));
+    });
+
+    return promises;
+}
+
 const OnyxUtils = {
     METHOD,
     getMergeQueue,
@@ -1462,11 +1457,7 @@ const OnyxUtils = {
     isCollectionMemberKey,
     splitCollectionMemberKey,
     isKeyMatch,
-    isSafeEvictionKey,
     tryGetCachedValue,
-    removeLastAccessedKey,
-    addLastAccessedKey,
-    addAllSafeEvictionKeysToRecentlyAccessedList,
     getCachedCollection,
     keysChanged,
     keyChanged,
@@ -1491,9 +1482,13 @@ const OnyxUtils = {
     doAllCollectionItemsBelongToSameParent,
     subscribeToKey,
     unsubscribeFromKey,
-    getEvictionBlocklist,
     getSkippableCollectionMemberIDs,
     setSkippableCollectionMemberIDs,
+    storeKeyBySubscriptions,
+    deleteKeyBySubscriptions,
+    addKeyToRecentlyAccessedIfNeeded,
+    reduceCollectionWithSelector,
+    updateSnapshots,
 };
 
 GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
@@ -1515,7 +1510,7 @@ GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
     // @ts-expect-error Reassign
     getCollectionKeys = decorateWithMetrics(getCollectionKeys, 'OnyxUtils.getCollectionKeys');
     // @ts-expect-error Reassign
-    addAllSafeEvictionKeysToRecentlyAccessedList = decorateWithMetrics(addAllSafeEvictionKeysToRecentlyAccessedList, 'OnyxUtils.addAllSafeEvictionKeysToRecentlyAccessedList');
+    addEvictableKeysToRecentlyAccessedList = decorateWithMetrics(cache.addEvictableKeysToRecentlyAccessedList, 'OnyxCache.addEvictableKeysToRecentlyAccessedList');
     // @ts-expect-error Reassign
     keysChanged = decorateWithMetrics(keysChanged, 'OnyxUtils.keysChanged');
     // @ts-expect-error Reassign

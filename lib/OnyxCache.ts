@@ -3,6 +3,7 @@ import bindAll from 'lodash/bindAll';
 import type {ValueOf} from 'type-fest';
 import utils from './utils';
 import type {OnyxKey, OnyxValue} from './types';
+import * as Str from './Str';
 
 // Task constants
 const TASK = {
@@ -39,6 +40,15 @@ class OnyxCache {
     /** Maximum size of the keys store din cache */
     private maxRecentKeysSize = 0;
 
+    /** List of keys that are safe to remove when we reach max storage */
+    private evictionAllowList: OnyxKey[] = [];
+
+    /** Map of keys and connection arrays whose keys will never be automatically evicted */
+    private evictionBlocklist: Record<OnyxKey, string[] | undefined> = {};
+
+    /** List of keys that have been directly subscribed to or recently modified from least to most recent */
+    private recentlyAccessedKeys: OnyxKey[] = [];
+
     constructor() {
         this.storageKeys = new Set();
         this.nullishStorageKeys = new Set();
@@ -62,9 +72,17 @@ class OnyxCache {
             'hasPendingTask',
             'getTaskPromise',
             'captureTask',
+            'addToAccessedKeys',
             'removeLeastRecentlyUsedKeys',
             'setRecentKeysLimit',
             'setAllKeys',
+            'setEvictionAllowList',
+            'getEvictionBlocklist',
+            'isEvictableKey',
+            'removeLastAccessedKey',
+            'addLastAccessedKey',
+            'addEvictableKeysToRecentlyAccessedList',
+            'getKeyForEviction',
         );
     }
 
@@ -224,26 +242,31 @@ class OnyxCache {
 
     /** Remove keys that don't fall into the range of recently used keys */
     removeLeastRecentlyUsedKeys(): void {
-        let numKeysToRemove = this.recentKeys.size - this.maxRecentKeysSize;
+        const numKeysToRemove = this.recentKeys.size - this.maxRecentKeysSize;
         if (numKeysToRemove <= 0) {
             return;
         }
-        const iterator = this.recentKeys.values();
-        const temp = [];
-        while (numKeysToRemove > 0) {
-            const value = iterator.next().value;
-            if (value === undefined) {
-                break;
-            }
 
-            temp.push(value);
-            numKeysToRemove--;
+        const iterator = this.recentKeys.values();
+        const keysToRemove: OnyxKey[] = [];
+
+        const recentKeysArray = Array.from(this.recentKeys);
+        const mostRecentKey = recentKeysArray[recentKeysArray.length - 1];
+
+        let iterResult = iterator.next();
+        while (!iterResult.done) {
+            const key = iterResult.value;
+            // Don't consider the most recently accessed key for eviction
+            // This ensures we don't immediately evict a key we just added
+            if (key !== undefined && key !== mostRecentKey && this.isEvictableKey(key)) {
+                keysToRemove.push(key);
+            }
+            iterResult = iterator.next();
         }
 
-        // eslint-disable-next-line @typescript-eslint/prefer-for-of
-        for (let i = 0; i < temp.length; ++i) {
-            delete this.storageMap[temp[i]];
-            this.recentKeys.delete(temp[i]);
+        for (const key of keysToRemove) {
+            delete this.storageMap[key];
+            this.recentKeys.delete(key);
         }
     }
 
@@ -255,6 +278,90 @@ class OnyxCache {
     /** Check if the value has changed */
     hasValueChanged(key: OnyxKey, value: OnyxValue<OnyxKey>): boolean {
         return !deepEqual(this.storageMap[key], value);
+    }
+
+    /**
+     * Sets the list of keys that are considered safe for eviction
+     * @param keys - Array of OnyxKeys that are safe to evict
+     */
+    setEvictionAllowList(keys: OnyxKey[]): void {
+        this.evictionAllowList = keys;
+    }
+
+    /**
+     * Get the eviction block list that prevents keys from being evicted
+     */
+    getEvictionBlocklist(): Record<OnyxKey, string[] | undefined> {
+        return this.evictionBlocklist;
+    }
+
+    /**
+     * Checks to see if this key has been flagged as safe for removal.
+     * @param testKey - Key to check
+     */
+    isEvictableKey(testKey: OnyxKey): boolean {
+        return this.evictionAllowList.some((key) => this.isKeyMatch(key, testKey));
+    }
+
+    /**
+     * Check if a given key matches a pattern key
+     * @param configKey - Pattern that may contain a wildcard
+     * @param key - Key to test against the pattern
+     */
+    private isKeyMatch(configKey: OnyxKey, key: OnyxKey): boolean {
+        const isCollectionKey = configKey.endsWith('_');
+        return isCollectionKey ? Str.startsWith(key, configKey) : configKey === key;
+    }
+
+    /**
+     * Remove a key from the recently accessed key list.
+     */
+    removeLastAccessedKey(key: OnyxKey): void {
+        this.recentlyAccessedKeys = this.recentlyAccessedKeys.filter((recentlyAccessedKey) => recentlyAccessedKey !== key);
+    }
+
+    /**
+     * Add a key to the list of recently accessed keys. The least
+     * recently accessed key should be at the head and the most
+     * recently accessed key at the tail.
+     */
+    addLastAccessedKey(key: OnyxKey, isCollectionKey: boolean): void {
+        // Only specific keys belong in this list since we cannot remove an entire collection.
+        if (isCollectionKey || !this.isEvictableKey(key)) {
+            return;
+        }
+
+        this.removeLastAccessedKey(key);
+        this.recentlyAccessedKeys.push(key);
+    }
+
+    /**
+     * Take all the keys that are safe to evict and add them to
+     * the recently accessed list when initializing the app. This
+     * enables keys that have not recently been accessed to be
+     * removed.
+     * @param isCollectionKeyFn - Function to determine if a key is a collection key
+     * @param getAllKeysFn - Function to get all keys, defaults to Storage.getAllKeys
+     */
+    addEvictableKeysToRecentlyAccessedList(isCollectionKeyFn: (key: OnyxKey) => boolean, getAllKeysFn: () => Promise<Set<OnyxKey>>): Promise<void> {
+        return getAllKeysFn().then((keys: Set<OnyxKey>) => {
+            this.evictionAllowList.forEach((evictableKey) => {
+                keys.forEach((key: OnyxKey) => {
+                    if (!this.isKeyMatch(evictableKey, key)) {
+                        return;
+                    }
+
+                    this.addLastAccessedKey(key, isCollectionKeyFn(key));
+                });
+            });
+        });
+    }
+
+    /**
+     * Finds a key that can be safely evicted
+     */
+    getKeyForEviction(): OnyxKey | undefined {
+        return this.recentlyAccessedKeys.find((key) => !this.evictionBlocklist[key]);
     }
 }
 

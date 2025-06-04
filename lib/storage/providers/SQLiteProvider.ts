@@ -2,16 +2,47 @@
  * The SQLiteStorage provider stores everything in a key/value store by
  * converting the value to a JSON string
  */
+import type {BatchQueryCommand, NitroSQLiteConnection} from 'react-native-nitro-sqlite';
+import {enableSimpleNullHandling, open} from 'react-native-nitro-sqlite';
 import {getFreeDiskStorage} from 'react-native-device-info';
-import type {QuickSQLiteConnection, SQLBatchTuple} from 'react-native-quick-sqlite';
-import {open} from 'react-native-quick-sqlite';
 import type {FastMergeReplaceNullPatch} from '../../utils';
 import utils from '../../utils';
 import type StorageProvider from './types';
 import type {StorageKeyList, StorageKeyValuePair} from './types';
 
+// By default, NitroSQLite does not accept nullish values due to current limitations in Nitro Modules.
+// This flag enables a feature in NitroSQLite that allows for nullish values to be passed to operations, such as "execute" or "executeBatch".
+// Simple null handling can potentially add a minor performance overhead,
+// since parameters and results from SQLite queries need to be parsed from and to JavaScript nullish values.
+// https://github.com/margelo/react-native-nitro-sqlite#sending-and-receiving-nullish-values
+enableSimpleNullHandling();
+
+/**
+ * The type of the key-value pair stored in the SQLite database
+ * @property record_key - the key of the record
+ * @property valueJSON - the value of the record in JSON string format
+ */
+type OnyxSQLiteKeyValuePair = {
+    record_key: string;
+    valueJSON: string;
+};
+
+/**
+ * The result of the `PRAGMA page_size`, which gets the page size of the SQLite database
+ */
+type PageSizeResult = {
+    page_size: number;
+};
+
+/**
+ * The result of the `PRAGMA page_count`, which gets the page count of the SQLite database
+ */
+type PageCountResult = {
+    page_count: number;
+};
+
 const DB_NAME = 'OnyxDB';
-let db: QuickSQLiteConnection;
+let db: NitroSQLiteConnection;
 
 function replacer(key: string, value: unknown) {
     if (key === utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK) return undefined;
@@ -47,18 +78,23 @@ const provider: StorageProvider = {
         db.execute('PRAGMA journal_mode=WAL;');
     },
     getItem(key) {
-        return db.executeAsync('SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key = ?;', [key]).then(({rows}) => {
+        return db.executeAsync<OnyxSQLiteKeyValuePair>('SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key = ?;', [key]).then(({rows}) => {
             if (!rows || rows?.length === 0) {
                 return null;
             }
             const result = rows?.item(0);
+
+            if (result == null) {
+                return null;
+            }
+
             return JSON.parse(result.valueJSON);
         });
     },
     multiGet(keys) {
         const placeholders = keys.map(() => '?').join(',');
         const command = `SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
-        return db.executeAsync(command, keys).then(({rows}) => {
+        return db.executeAsync<OnyxSQLiteKeyValuePair>(command, keys).then(({rows}) => {
             // eslint-disable-next-line no-underscore-dangle
             const result = rows?._array.map((row) => [row.record_key, JSON.parse(row.valueJSON)]);
             return (result ?? []) as StorageKeyValuePair[];
@@ -68,14 +104,15 @@ const provider: StorageProvider = {
         return db.executeAsync('REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);', [key, JSON.stringify(value)]).then(() => undefined);
     },
     multiSet(pairs) {
-        const stringifiedPairs = pairs.map((pair) => [pair[0], JSON.stringify(pair[1] === undefined ? null : pair[1])]);
-        if (utils.isEmptyObject(stringifiedPairs)) {
+        const query = 'REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, json(?));';
+        const params = pairs.map((pair) => [pair[0], JSON.stringify(pair[1] === undefined ? null : pair[1])]);
+        if (utils.isEmptyObject(params)) {
             return Promise.resolve();
         }
-        return db.executeBatchAsync([['REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, json(?));', stringifiedPairs]]).then(() => undefined);
+        return db.executeBatchAsync([{query, params}]).then(() => undefined);
     },
     multiMerge(pairs) {
-        const commands: SQLBatchTuple[] = [];
+        const commands: BatchQueryCommand[] = [];
 
         const patchQuery = `INSERT INTO keyvaluepairs (record_key, valueJSON)
             VALUES (:key, JSON(:value))
@@ -108,9 +145,9 @@ const provider: StorageProvider = {
             }
         }
 
-        commands.push([patchQuery, patchQueryArguments]);
+        commands.push({query: patchQuery, params: patchQueryArguments});
         if (replaceQueryArguments.length > 0) {
-            commands.push([replaceQuery, replaceQueryArguments]);
+            commands.push({query: replaceQuery, params: replaceQueryArguments});
         }
 
         return db.executeBatchAsync(commands).then(() => undefined);
@@ -133,15 +170,18 @@ const provider: StorageProvider = {
     },
     clear: () => db.executeAsync('DELETE FROM keyvaluepairs;', []).then(() => undefined),
     getDatabaseSize() {
-        return Promise.all([db.executeAsync('PRAGMA page_size;'), db.executeAsync('PRAGMA page_count;'), getFreeDiskStorage()]).then(([pageSizeResult, pageCountResult, bytesRemaining]) => {
-            const pageSize: number = pageSizeResult.rows?.item(0).page_size;
-            const pageCount: number = pageCountResult.rows?.item(0).page_count;
-            return {
-                bytesUsed: pageSize * pageCount,
-                bytesRemaining,
-            };
-        });
+        return Promise.all([db.executeAsync<PageSizeResult>('PRAGMA page_size;'), db.executeAsync<PageCountResult>('PRAGMA page_count;'), getFreeDiskStorage()]).then(
+            ([pageSizeResult, pageCountResult, bytesRemaining]) => {
+                const pageSize = pageSizeResult.rows?.item(0)?.page_size ?? 0;
+                const pageCount = pageCountResult.rows?.item(0)?.page_count ?? 0;
+                return {
+                    bytesUsed: pageSize * pageCount,
+                    bytesRemaining,
+                };
+            },
+        );
     },
 };
 
 export default provider;
+export type {OnyxSQLiteKeyValuePair};
