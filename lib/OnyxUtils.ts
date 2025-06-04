@@ -20,6 +20,7 @@ import type {
     DefaultConnectOptions,
     KeyValueMapping,
     Mapping,
+    MultiMergeReplaceNullPatches,
     OnyxCollection,
     OnyxEntry,
     OnyxInput,
@@ -28,13 +29,14 @@ import type {
     OnyxValue,
     Selector,
 } from './types';
-import type {FastMergeResult} from './utils';
+import type {FastMergeOptions, FastMergeResult} from './utils';
 import utils from './utils';
 import type {WithOnyxState} from './withOnyx/types';
 import type {DeferredTask} from './createDeferredTask';
 import createDeferredTask from './createDeferredTask';
 import * as GlobalSettings from './GlobalSettings';
 import decorateWithMetrics from './metrics';
+import type {StorageKeyValuePair} from './storage/providers/types';
 
 // Method constants
 const METHOD = {
@@ -1204,34 +1206,6 @@ function hasPendingMergeForKey(key: OnyxKey): boolean {
     return !!mergeQueue[key];
 }
 
-type RemoveNullValuesOutput<Value extends OnyxInput<OnyxKey> | undefined> = {
-    value: Value;
-    wasRemoved: boolean;
-};
-
-/**
- * Removes a key from storage if the value is null.
- * Otherwise removes all nested null values in objects,
- * if shouldRemoveNestedNulls is true and returns the object.
- *
- * @returns The value without null values and a boolean "wasRemoved", which indicates if the key got removed completely
- */
-function removeNullValues<Value extends OnyxInput<OnyxKey> | undefined>(key: OnyxKey, value: Value, shouldRemoveNestedNulls = true): RemoveNullValuesOutput<Value> {
-    if (value === null) {
-        remove(key);
-        return {value, wasRemoved: true};
-    }
-
-    if (value === undefined) {
-        return {value, wasRemoved: false};
-    }
-
-    // We can remove all null values in an object by merging it with itself
-    // utils.fastMerge recursively goes through the object and removes all null values
-    // Passing two identical objects as source and target to fastMerge will not change it, but only remove the null values
-    return {value: shouldRemoveNestedNulls ? utils.removeNestedNullValues(value) : value, wasRemoved: false};
-}
-
 /**
  * Storage expects array like: [["@MyApp_user", value_1], ["@MyApp_key", value_2]]
  * This method transforms an object like {'@MyApp_user': myUserValue, '@MyApp_key': myKeyValue}
@@ -1239,41 +1213,44 @@ function removeNullValues<Value extends OnyxInput<OnyxKey> | undefined>(key: Ony
 
 * @return an array of key - value pairs <[key, value]>
  */
-function prepareKeyValuePairsForStorage(data: Record<OnyxKey, OnyxInput<OnyxKey>>, shouldRemoveNestedNulls: boolean): Array<[OnyxKey, OnyxInput<OnyxKey>]> {
-    return Object.entries(data).reduce<Array<[OnyxKey, OnyxInput<OnyxKey>]>>((pairs, [key, value]) => {
-        const {value: valueAfterRemoving, wasRemoved} = removeNullValues(key, value, shouldRemoveNestedNulls);
+function prepareKeyValuePairsForStorage(
+    data: Record<OnyxKey, OnyxInput<OnyxKey>>,
+    shouldRemoveNestedNulls?: boolean,
+    replaceNullPatches?: MultiMergeReplaceNullPatches,
+): StorageKeyValuePair[] {
+    const pairs: StorageKeyValuePair[] = [];
 
-        if (!wasRemoved && valueAfterRemoving !== undefined) {
-            pairs.push([key, valueAfterRemoving]);
+    Object.entries(data).forEach(([key, value]) => {
+        if (value === null) {
+            remove(key);
+            return;
         }
 
-        return pairs;
-    }, []);
+        const valueWithoutNestedNullValues = shouldRemoveNestedNulls ?? true ? utils.removeNestedNullValues(value) : value;
+
+        if (valueWithoutNestedNullValues !== undefined) {
+            pairs.push([key, valueWithoutNestedNullValues, replaceNullPatches?.[key]]);
+        }
+    });
+
+    return pairs;
+}
+
+function mergeChanges<TValue extends OnyxInput<OnyxKey> | undefined>(changes: TValue[], existingValue?: TValue): FastMergeResult<TValue> {
+    return applyMerge('merge', changes, existingValue);
+}
+
+function mergeAndMarkChanges<TValue extends OnyxInput<OnyxKey> | undefined>(changes: TValue[], existingValue?: TValue): FastMergeResult<TValue> {
+    return applyMerge('mark', changes, existingValue);
 }
 
 /**
- * Merges an array of changes with an existing value
+ * Merges an array of changes with an existing value or creates a single change
  *
- * @param changes Array of changes that should be applied to the existing value
+ * @param changes Array of changes that should be merged
+ * @param existingValue The existing value that should be merged with the changes
  */
-function applyMerge<TValue extends OnyxInput<OnyxKey> | undefined, TChange extends OnyxInput<OnyxKey> | undefined>(existingValue: TValue, changes: TChange[]): TChange {
-    const lastChange = changes?.at(-1);
-
-    if (Array.isArray(lastChange)) {
-        return lastChange;
-    }
-
-    if (changes.some((change) => change && typeof change === 'object')) {
-        // Object values are then merged one after the other
-        return changes.reduce((modifiedData, change) => utils.fastMerge(modifiedData, change, true, false, true).result, (existingValue || {}) as TChange);
-    }
-
-    // If we have anything else we can't merge it so we'll
-    // simply return the last value that was queued
-    return lastChange as TChange;
-}
-
-function batchMergeChanges<TChange extends OnyxInput<OnyxKey> | undefined>(changes: TChange[]): FastMergeResult<TChange> {
+function applyMerge<TValue extends OnyxInput<OnyxKey> | undefined>(mode: 'merge' | 'mark', changes: TValue[], existingValue?: TValue): FastMergeResult<TValue> {
     const lastChange = changes?.at(-1);
 
     if (Array.isArray(lastChange)) {
@@ -1282,17 +1259,20 @@ function batchMergeChanges<TChange extends OnyxInput<OnyxKey> | undefined>(chang
 
     if (changes.some((change) => change && typeof change === 'object')) {
         // Object values are then merged one after the other
-        return changes.reduce<FastMergeResult<TChange>>(
+        return changes.reduce<FastMergeResult<TValue>>(
             (modifiedData, change) => {
-                const fastMergeResult = utils.fastMerge(modifiedData.result, change, false, true, false);
+                const options: FastMergeOptions = mode === 'merge' ? {shouldRemoveNestedNulls: true, objectRemovalMode: 'replace'} : {objectRemovalMode: 'mark'};
+                const {result, replaceNullPatches} = utils.fastMerge(modifiedData.result, change, options);
+
                 // eslint-disable-next-line no-param-reassign
-                modifiedData.result = fastMergeResult.result;
+                modifiedData.result = result;
                 // eslint-disable-next-line no-param-reassign
-                modifiedData.replaceNullPatches = [...modifiedData.replaceNullPatches, ...fastMergeResult.replaceNullPatches];
+                modifiedData.replaceNullPatches = [...modifiedData.replaceNullPatches, ...replaceNullPatches];
+
                 return modifiedData;
             },
             {
-                result: {} as TChange,
+                result: (existingValue ?? {}) as TValue,
                 replaceNullPatches: [],
             },
         );
@@ -1300,7 +1280,7 @@ function batchMergeChanges<TChange extends OnyxInput<OnyxKey> | undefined>(chang
 
     // If we have anything else we can't merge it so we'll
     // simply return the last value that was queued
-    return {result: lastChange as TChange, replaceNullPatches: []};
+    return {result: lastChange as TValue, replaceNullPatches: []};
 }
 
 /**
@@ -1310,7 +1290,9 @@ function initializeWithDefaultKeyStates(): Promise<void> {
     return Storage.multiGet(Object.keys(defaultKeyStates)).then((pairs) => {
         const existingDataAsObject = Object.fromEntries(pairs);
 
-        const merged = utils.fastMerge(existingDataAsObject, defaultKeyStates, true, false, false).result;
+        const merged = utils.fastMerge(existingDataAsObject, defaultKeyStates, {
+            shouldRemoveNestedNulls: true,
+        }).result;
         cache.merge(merged ?? {});
 
         Object.entries(merged ?? {}).forEach(([key, value]) => keyChanged(key, value, existingDataAsObject));
@@ -1373,7 +1355,7 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
             // Performance improvement
             // If the mapping is connected to an onyx key that is not a collection
             // we can skip the call to getAllKeys() and return an array with a single item
-            if (Boolean(mapping.key) && typeof mapping.key === 'string' && !isCollectionKey(mapping.key) && cache.getAllKeys().has(mapping.key)) {
+            if (!!mapping.key && typeof mapping.key === 'string' && !isCollectionKey(mapping.key) && cache.getAllKeys().has(mapping.key)) {
                 return new Set([mapping.key]);
             }
             return getAllKeys();
@@ -1498,9 +1480,9 @@ const OnyxUtils = {
     evictStorageAndRetry,
     broadcastUpdate,
     hasPendingMergeForKey,
-    removeNullValues,
     prepareKeyValuePairsForStorage,
-    applyMerge,
+    mergeChanges,
+    mergeAndMarkChanges,
     initializeWithDefaultKeyStates,
     getSnapshotKey,
     multiGet,
@@ -1512,7 +1494,6 @@ const OnyxUtils = {
     getEvictionBlocklist,
     getSkippableCollectionMemberIDs,
     setSkippableCollectionMemberIDs,
-    batchMergeChanges,
 };
 
 GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {

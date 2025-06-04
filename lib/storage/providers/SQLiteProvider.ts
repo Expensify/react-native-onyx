@@ -3,12 +3,12 @@
  * converting the value to a JSON string
  */
 import {getFreeDiskStorage} from 'react-native-device-info';
-import type {BatchQueryResult, QuickSQLiteConnection, SQLBatchTuple} from 'react-native-quick-sqlite';
+import type {QuickSQLiteConnection, SQLBatchTuple} from 'react-native-quick-sqlite';
 import {open} from 'react-native-quick-sqlite';
 import type {FastMergeReplaceNullPatch} from '../../utils';
 import utils from '../../utils';
 import type StorageProvider from './types';
-import type {KeyList, KeyValuePairList} from './types';
+import type {StorageKeyList, StorageKeyValuePair} from './types';
 
 const DB_NAME = 'OnyxDB';
 let db: QuickSQLiteConnection;
@@ -61,20 +61,20 @@ const provider: StorageProvider = {
         return db.executeAsync(command, keys).then(({rows}) => {
             // eslint-disable-next-line no-underscore-dangle
             const result = rows?._array.map((row) => [row.record_key, JSON.parse(row.valueJSON)]);
-            return (result ?? []) as KeyValuePairList;
+            return (result ?? []) as StorageKeyValuePair[];
         });
     },
     setItem(key, value) {
-        return db.executeAsync('REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);', [key, JSON.stringify(value)]);
+        return db.executeAsync('REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);', [key, JSON.stringify(value)]).then(() => undefined);
     },
     multiSet(pairs) {
         const stringifiedPairs = pairs.map((pair) => [pair[0], JSON.stringify(pair[1] === undefined ? null : pair[1])]);
         if (utils.isEmptyObject(stringifiedPairs)) {
             return Promise.resolve();
         }
-        return db.executeBatchAsync([['REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, json(?));', stringifiedPairs]]);
+        return db.executeBatchAsync([['REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, json(?));', stringifiedPairs]]).then(() => undefined);
     },
-    multiMerge(pairs, mergeReplaceNullPatches) {
+    multiMerge(pairs) {
         const commands: SQLBatchTuple[] = [];
 
         const patchQuery = `INSERT INTO keyvaluepairs (record_key, valueJSON)
@@ -93,13 +93,14 @@ const provider: StorageProvider = {
 
         // eslint-disable-next-line @typescript-eslint/prefer-for-of
         for (let i = 0; i < nonNullishPairs.length; i++) {
-            const pair = nonNullishPairs[i];
-            const value = JSON.stringify(pair[1], replacer);
-            patchQueryArguments.push([pair[0], value]);
+            const [key, value, replaceNullPatches] = nonNullishPairs[i];
 
-            const patches = mergeReplaceNullPatches?.[pair[0]] ?? [];
+            const valueAfterReplace = JSON.stringify(value, replacer);
+            patchQueryArguments.push([key, valueAfterReplace]);
+
+            const patches = replaceNullPatches ?? [];
             if (patches.length > 0) {
-                const queries = generateJSONReplaceSQLQueries(pair[0], patches);
+                const queries = generateJSONReplaceSQLQueries(key, patches);
 
                 if (queries.length > 0) {
                     replaceQueryArguments.push(...queries);
@@ -112,25 +113,25 @@ const provider: StorageProvider = {
             commands.push([replaceQuery, replaceQueryArguments]);
         }
 
-        return db.executeBatchAsync(commands);
+        return db.executeBatchAsync(commands).then(() => undefined);
     },
-    mergeItem(key, preMergedValue) {
+    mergeItem(key, change, replaceNullPatches) {
         // Since Onyx already merged the existing value with the changes, we can just set the value directly.
-        return this.setItem(key, preMergedValue) as Promise<BatchQueryResult>;
+        return this.multiMerge([[key, change, replaceNullPatches]]);
     },
     getAllKeys: () =>
         db.executeAsync('SELECT record_key FROM keyvaluepairs;').then(({rows}) => {
             // eslint-disable-next-line no-underscore-dangle
             const result = rows?._array.map((row) => row.record_key);
-            return (result ?? []) as KeyList;
+            return (result ?? []) as StorageKeyList;
         }),
-    removeItem: (key) => db.executeAsync('DELETE FROM keyvaluepairs WHERE record_key = ?;', [key]),
+    removeItem: (key) => db.executeAsync('DELETE FROM keyvaluepairs WHERE record_key = ?;', [key]).then(() => undefined),
     removeItems: (keys) => {
         const placeholders = keys.map(() => '?').join(',');
         const query = `DELETE FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
-        return db.executeAsync(query, keys);
+        return db.executeAsync(query, keys).then(() => undefined);
     },
-    clear: () => db.executeAsync('DELETE FROM keyvaluepairs;', []),
+    clear: () => db.executeAsync('DELETE FROM keyvaluepairs;', []).then(() => undefined),
     getDatabaseSize() {
         return Promise.all([db.executeAsync('PRAGMA page_size;'), db.executeAsync('PRAGMA page_count;'), getFreeDiskStorage()]).then(([pageSizeResult, pageCountResult, bytesRemaining]) => {
             const pageSize: number = pageSizeResult.rows?.item(0).page_size;

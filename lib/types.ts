@@ -486,12 +486,14 @@ type InitOptions = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type GenericFunction = (...args: any[]) => any;
 
+type MultiMergeReplaceNullPatches = {[TKey in OnyxKey]: FastMergeReplaceNullPatch[]};
+
 /**
  * Represents a combination of Merge and Set operations that should be executed in Onyx
  */
 type MixedOperationsQueue = {
     merge: OnyxInputKeyValueMapping;
-    mergeReplaceNullPatches: {[TKey in OnyxKey]: FastMergeReplaceNullPatch[]};
+    mergeReplaceNullPatches: MultiMergeReplaceNullPatches;
     set: OnyxInputKeyValueMapping;
 };
 
@@ -533,5 +535,6 @@ export type {
     OnyxValue,
     Selector,
     WithOnyxConnectOptions,
+    MultiMergeReplaceNullPatches,
     MixedOperationsQueue,
 };

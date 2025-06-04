@@ -164,7 +164,12 @@ class OnyxCache {
             throw new Error('data passed to cache.merge() must be an Object of onyx key/value pairs');
         }
 
-        this.storageMap = {...utils.fastMerge(this.storageMap, data, true, false, true).result};
+        this.storageMap = {
+            ...utils.fastMerge(this.storageMap, data, {
+                shouldRemoveNestedNulls: true,
+                objectRemovalMode: 'replace',
+            }).result,
+        };
 
         Object.entries(data).forEach(([key, value]) => {
             this.addKey(key);
@@ -227,6 +232,10 @@ class OnyxCache {
         const temp = [];
         while (numKeysToRemove > 0) {
             const value = iterator.next().value;
+            if (value === undefined) {
+                break;
+            }
+
             temp.push(value);
             numKeysToRemove--;
         }

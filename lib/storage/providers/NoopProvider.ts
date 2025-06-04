@@ -54,7 +54,7 @@ const provider: StorageProvider = {
      * This function also removes all nested null values from an object.
      */
     multiMerge() {
-        return Promise.resolve([]);
+        return Promise.resolve();
     },
 
     /**

@@ -1,4 +1,3 @@
-/* eslint-disable no-continue */
 import _ from 'underscore';
 import lodashPick from 'lodash/pick';
 import * as Logger from './Logger';
@@ -27,6 +26,7 @@ import type {
     OnyxValue,
     OnyxInput,
     OnyxMethodMap,
+    MultiMergeReplaceNullPatches,
 } from './types';
 import OnyxUtils from './OnyxUtils';
 import logMessages from './logMessages';
@@ -34,6 +34,7 @@ import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
 import * as GlobalSettings from './GlobalSettings';
 import decorateWithMetrics from './metrics';
+import OnyxMerge from './OnyxMerge/index.native';
 
 /** Initialize the store with actions and listening for storage events */
 function init({
@@ -41,7 +42,7 @@ function init({
     initialKeyStates = {},
     safeEvictionKeys = [],
     maxCachedKeysCount = 1000,
-    shouldSyncMultipleInstances = Boolean(global.localStorage),
+    shouldSyncMultipleInstances = !!global.localStorage,
     debugSetState = false,
     enablePerformanceMetrics = false,
     skippableCollectionMemberIDs = [],
@@ -169,38 +170,31 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>): Promis
         return Promise.resolve();
     }
 
-    // If the value is null, we remove the key from storage
-    const {value: valueAfterRemoving, wasRemoved} = OnyxUtils.removeNullValues(key, value);
-
-    const logSetCall = (hasChanged = true) => {
-        // Logging properties only since values could be sensitive things we don't want to log
-        Logger.logInfo(`set called for key: ${key}${_.isObject(value) ? ` properties: ${_.keys(value).join(',')}` : ''} hasChanged: ${hasChanged}`);
-    };
-
-    // Calling "OnyxUtils.removeNullValues" removes the key from storage and cache and updates the subscriber.
+    // If the change is null, we can just delete the key.
     // Therefore, we don't need to further broadcast and update the value so we can return early.
-    if (wasRemoved) {
-        logSetCall();
+    if (value === null) {
+        OnyxUtils.remove(key);
+        Logger.logInfo(`set called for key: ${key} => null passed, so key was removed`);
         return Promise.resolve();
     }
 
-    const valueWithoutNullValues = valueAfterRemoving as OnyxValue<TKey>;
-    const hasChanged = cache.hasValueChanged(key, valueWithoutNullValues);
+    const valueWithoutNestedNullValues = utils.removeNestedNullValues(value) as OnyxValue<TKey>;
+    const hasChanged = cache.hasValueChanged(key, valueWithoutNestedNullValues);
 
-    logSetCall(hasChanged);
+    Logger.logInfo(`set called for key: ${key}${_.isObject(value) ? ` properties: ${_.keys(value).join(',')}` : ''} hasChanged: ${hasChanged}`);
 
     // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
-    const updatePromise = OnyxUtils.broadcastUpdate(key, valueWithoutNullValues, hasChanged);
+    const updatePromise = OnyxUtils.broadcastUpdate(key, valueWithoutNestedNullValues, hasChanged);
 
     // If the value has not changed or the key got removed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
     if (!hasChanged) {
         return updatePromise;
     }
 
-    return Storage.setItem(key, valueWithoutNullValues)
-        .catch((error) => OnyxUtils.evictStorageAndRetry(error, set, key, valueWithoutNullValues))
+    return Storage.setItem(key, valueWithoutNestedNullValues)
+        .catch((error) => OnyxUtils.evictStorageAndRetry(error, set, key, valueWithoutNestedNullValues))
         .then(() => {
-            OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNullValues);
+            OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
             return updatePromise;
         });
 }
@@ -307,7 +301,6 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
         }
 
         try {
-            // We first only merge the changes, so we use OnyxUtils.batchMergeChanges() to combine all the changes into just one.
             const validChanges = mergeQueue[key].filter((change) => {
                 const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(change, existingValue);
                 if (!isCompatible) {
@@ -319,54 +312,21 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
             if (!validChanges.length) {
                 return Promise.resolve();
             }
-            const batchedDeltaChanges = OnyxUtils.batchMergeChanges(validChanges).result;
-
-            // Case (1): When there is no existing value in storage, we want to set the value instead of merge it.
-            // Case (2): The presence of a top-level `null` in the merge queue instructs us to drop the whole existing value.
-            // In this case, we can't simply merge the batched changes with the existing value, because then the null in the merge queue would have no effect.
-            const shouldSetValue = !existingValue || mergeQueue[key].includes(null);
 
             // Clean up the write queue, so we don't apply these changes again.
             delete mergeQueue[key];
             delete mergeQueuePromise[key];
 
-            const logMergeCall = (hasChanged = true) => {
-                // Logging properties only since values could be sensitive things we don't want to log.
-                Logger.logInfo(`merge called for key: ${key}${_.isObject(batchedDeltaChanges) ? ` properties: ${_.keys(batchedDeltaChanges).join(',')}` : ''} hasChanged: ${hasChanged}`);
-            };
-
-            // If the batched changes equal null, we want to remove the key from storage, to reduce storage size.
-            const {wasRemoved} = OnyxUtils.removeNullValues(key, batchedDeltaChanges);
-
-            // Calling "OnyxUtils.removeNullValues" removes the key from storage and cache and updates the subscriber.
+            // If the last change is null, we can just delete the key.
             // Therefore, we don't need to further broadcast and update the value so we can return early.
-            if (wasRemoved) {
-                logMergeCall();
+            if (validChanges.at(-1) === null) {
+                Logger.logInfo(`merge called for key: ${key} => null passed, so key was removed`);
+                OnyxUtils.remove(key);
                 return Promise.resolve();
             }
 
-            // If "shouldSetValue" is true, it means that we want to completely replace the existing value with the batched changes,
-            // so we pass `undefined` to OnyxUtils.applyMerge() first parameter to make it use "batchedDeltaChanges" to
-            // create a new object for us.
-            // If "shouldSetValue" is false, it means that we want to merge the batched changes into the existing value,
-            // so we pass "existingValue" to the first parameter.
-            const resultValue = OnyxUtils.applyMerge(shouldSetValue ? undefined : existingValue, [batchedDeltaChanges]);
-
-            // In cache, we don't want to remove the key if it's null to improve performance and speed up the next merge.
-            const hasChanged = cache.hasValueChanged(key, resultValue);
-
-            logMergeCall(hasChanged);
-
-            // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
-            const updatePromise = OnyxUtils.broadcastUpdate(key, resultValue as OnyxValue<TKey>, hasChanged);
-
-            // If the value has not changed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
-            if (!hasChanged) {
-                return updatePromise;
-            }
-
-            return Storage.mergeItem(key, resultValue as OnyxValue<TKey>).then(() => {
-                OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, changes, resultValue);
+            return OnyxMerge.applyMerge(key, existingValue, validChanges).then(({mergedValue, updatePromise}) => {
+                OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, changes, mergedValue);
                 return updatePromise;
             });
         } catch (error) {
@@ -394,7 +354,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
 function mergeCollection<TKey extends CollectionKeyBase, TMap>(
     collectionKey: TKey,
     collection: OnyxMergeCollectionInput<TKey, TMap>,
-    mergeReplaceNullPatches?: MixedOperationsQueue['mergeReplaceNullPatches'],
+    mergeReplaceNullPatches?: MultiMergeReplaceNullPatches,
 ): Promise<void> {
     if (!OnyxUtils.isValidNonEmptyCollectionForMerge(collection)) {
         Logger.logInfo('mergeCollection() called with invalid or empty value. Skipping this update.');
@@ -445,10 +405,12 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(
 
             const existingKeyCollection = existingKeys.reduce((obj: OnyxInputKeyValueMapping, key) => {
                 const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(resultCollection[key], cachedCollectionForExistingKeys[key]);
+
                 if (!isCompatible) {
                     Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'mergeCollection', existingValueType, newValueType));
                     return obj;
                 }
+
                 // eslint-disable-next-line no-param-reassign
                 obj[key] = resultCollection[key];
                 return obj;
@@ -465,7 +427,7 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(
             // When (multi-)merging the values with the existing values in storage,
             // we don't want to remove nested null values from the data that we pass to the storage layer,
             // because the storage layer uses them to remove nested keys from storage natively.
-            const keyValuePairsForExistingCollection = OnyxUtils.prepareKeyValuePairsForStorage(existingKeyCollection, false);
+            const keyValuePairsForExistingCollection = OnyxUtils.prepareKeyValuePairsForStorage(existingKeyCollection, false, mergeReplaceNullPatches);
 
             // We can safely remove nested null values when using (multi-)set,
             // because we will simply overwrite the existing values in storage.
@@ -480,7 +442,7 @@ function mergeCollection<TKey extends CollectionKeyBase, TMap>(
             // New keys will be added via multiSet while existing keys will be updated using multiMerge
             // This is because setting a key that doesn't exist yet with multiMerge will throw errors
             if (keyValuePairsForExistingCollection.length > 0) {
-                promises.push(Storage.multiMerge(keyValuePairsForExistingCollection, mergeReplaceNullPatches));
+                promises.push(Storage.multiMerge(keyValuePairsForExistingCollection));
             }
 
             if (keyValuePairsForNewCollection.length > 0) {
@@ -774,7 +736,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
                 // Remove the collection-related key from the updateQueue so that it won't be processed individually.
                 delete updateQueue[key];
 
-                const batchedChanges = OnyxUtils.batchMergeChanges(operations);
+                const batchedChanges = OnyxUtils.mergeAndMarkChanges(operations);
                 if (operations[0] === null) {
                     // eslint-disable-next-line no-param-reassign
                     queue.set[key] = batchedChanges.result;
@@ -806,13 +768,16 @@ function update(data: OnyxUpdate[]): Promise<void> {
     });
 
     Object.entries(updateQueue).forEach(([key, operations]) => {
-        const batchedChanges = OnyxUtils.batchMergeChanges(operations).result;
-
         if (operations[0] === null) {
+            const batchedChanges = OnyxUtils.mergeAndMarkChanges(operations).result;
             promises.push(() => set(key, batchedChanges));
-        } else {
-            promises.push(() => merge(key, batchedChanges));
+            return;
         }
+
+        const mergePromises = operations.map((operation) => {
+            return merge(key, operation);
+        });
+        promises.push(() => mergePromises.at(0) ?? Promise.resolve());
     });
 
     const snapshotPromises = updateSnapshots(data);

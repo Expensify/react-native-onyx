@@ -15,6 +15,10 @@ describe('[Utils.js]', () => {
         const target = getMockedPersonalDetails(1000);
         const source = getMockedPersonalDetails(500);
 
-        await measureFunction(() => utils.fastMerge(target, source, true, false, false));
+        await measureFunction(() =>
+            utils.fastMerge(target, source, {
+                shouldRemoveNestedNulls: true,
+            }),
+        );
     });
 });
