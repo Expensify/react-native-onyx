@@ -1517,8 +1517,6 @@ GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
     // @ts-expect-error Reassign
     getCollectionKeys = decorateWithMetrics(getCollectionKeys, 'OnyxUtils.getCollectionKeys');
     // @ts-expect-error Reassign
-    addEvictableKeysToRecentlyAccessedList = decorateWithMetrics(cache.addEvictableKeysToRecentlyAccessedList, 'OnyxCache.addEvictableKeysToRecentlyAccessedList');
-    // @ts-expect-error Reassign
     keysChanged = decorateWithMetrics(keysChanged, 'OnyxUtils.keysChanged');
     // @ts-expect-error Reassign
     keyChanged = decorateWithMetrics(keyChanged, 'OnyxUtils.keyChanged');
