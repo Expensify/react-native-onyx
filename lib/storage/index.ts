@@ -131,9 +131,9 @@ const storage: Storage = {
      * Multiple merging of existing and new values in a batch
      * This function also removes all nested null values from an object.
      */
-    multiMerge: (pairs, mergeReplaceNullPatches) =>
+    multiMerge: (pairs) =>
         tryOrDegradePerformance(() => {
-            const promise = provider.multiMerge(pairs, mergeReplaceNullPatches);
+            const promise = provider.multiMerge(pairs);
 
             if (shouldKeepInstancesSync) {
                 return promise.then(() => InstanceSync.multiMerge(pairs.map((pair) => pair[0])));

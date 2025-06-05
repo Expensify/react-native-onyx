@@ -153,7 +153,7 @@ describe('OnyxUtils', () => {
 
     describe('mergeChanges', () => {
         it("should return the last change if it's an array", () => {
-            const {result} = OnyxUtils.mergeAndMarkChanges([...testMergeChanges, [0, 1, 2]], testObject);
+            const {result} = OnyxUtils.mergeChanges([...testMergeChanges, [0, 1, 2]], testObject);
 
             expect(result).toEqual([0, 1, 2]);
         });
