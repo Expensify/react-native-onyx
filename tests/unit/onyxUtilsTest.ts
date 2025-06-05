@@ -151,15 +151,15 @@ describe('OnyxUtils', () => {
         });
     });
 
-    describe('applyMerge', () => {
+    describe('mergeChanges', () => {
         it("should return the last change if it's an array", () => {
-            const result = OnyxUtils.applyMerge(testObject, [...testMergeChanges, [0, 1, 2]]);
+            const {result} = OnyxUtils.mergeChanges([...testMergeChanges, [0, 1, 2]], testObject);
 
             expect(result).toEqual([0, 1, 2]);
         });
 
         it("should return the last change if the changes aren't objects", () => {
-            const result = OnyxUtils.applyMerge(testObject, ['a', 0, 'b', 1]);
+            const {result} = OnyxUtils.mergeChanges(['a', 0, 'b', 1], testObject);
 
             expect(result).toEqual(1);
         });
@@ -180,7 +180,7 @@ describe('OnyxUtils', () => {
                 },
             };
 
-            const result = OnyxUtils.applyMerge(testObject, [batchedChanges]);
+            const {result} = OnyxUtils.mergeChanges([batchedChanges], testObject);
 
             expect(result).toEqual({
                 a: 'a',
@@ -199,9 +199,9 @@ describe('OnyxUtils', () => {
         });
     });
 
-    describe('batchMergeChanges', () => {
+    describe('mergeAndMarkChanges', () => {
         it('should apply the replacement markers if the we have properties with objects being removed and added back during the changes', () => {
-            const result = OnyxUtils.batchMergeChanges(testMergeChanges);
+            const {result, replaceNullPatches} = OnyxUtils.mergeAndMarkChanges(testMergeChanges);
 
             expect(result).toEqual({
                 b: {
@@ -217,6 +217,62 @@ describe('OnyxUtils', () => {
                     },
                 },
             });
+            expect(replaceNullPatches).toEqual([
+                [['b', 'd'], {i: 'i'}],
+                [['b', 'd'], {i: 'i', j: 'j'}],
+                [['b', 'g'], {k: 'k'}],
+            ]);
+        });
+
+        it('should 2', () => {
+            const {result, replaceNullPatches} = OnyxUtils.mergeAndMarkChanges([
+                {
+                    // Removing the "originalMessage" object in this update.
+                    // Any subsequent changes to this object should completely replace the existing object in store.
+                    originalMessage: null,
+                },
+                {
+                    // This change should completely replace "originalMessage" existing object in store.
+                    originalMessage: {
+                        errorMessage: 'newErrorMessage',
+                    },
+                    receipt: {
+                        // Removing the "nestedObject" object in this update.
+                        // Any subsequent changes to this object should completely replace the existing object in store.
+                        nestedObject: null,
+                    },
+                },
+                {
+                    receipt: {
+                        receiptID: null,
+                        filename: 'newFilename',
+                        // This change should completely replace "receipt" existing object in store.
+                        nestedObject: {
+                            nestedKey2: 'newNestedKey2',
+                        },
+                    },
+                },
+            ]);
+
+            expect(result).toEqual({
+                originalMessage: {
+                    errorMessage: 'newErrorMessage',
+                    [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                },
+                receipt: {
+                    receiptID: null,
+                    filename: 'newFilename',
+                    nestedObject: {
+                        nestedKey2: 'newNestedKey2',
+                        [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                    },
+                },
+            });
+
+            expect(replaceNullPatches).toEqual([
+                [['originalMessage'], {errorMessage: 'newErrorMessage'}],
+                [['receipt', 'nestedObject'], {nestedKey2: 'newNestedKey2'}],
+            ]);
         });
     });
 });

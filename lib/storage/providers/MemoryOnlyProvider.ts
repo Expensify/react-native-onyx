@@ -1,7 +1,7 @@
 import _ from 'underscore';
 import utils from '../../utils';
 import type StorageProvider from './types';
-import type {KeyValuePair} from './types';
+import type {StorageKeyValuePair} from './types';
 import type {OnyxKey, OnyxValue} from '../../types';
 
 type Store = Record<OnyxKey, OnyxValue<OnyxKey>>;
@@ -49,7 +49,7 @@ const provider: StorageProvider = {
                 new Promise((resolve) => {
                     this.getItem(key).then((value) => resolve([key, value]));
                 }),
-        ) as Array<Promise<KeyValuePair>>;
+        ) as Array<Promise<StorageKeyValuePair>>;
         return Promise.all(getPromises);
     },
 
@@ -74,9 +74,9 @@ const provider: StorageProvider = {
     /**
      * Merging an existing value with a new one
      */
-    mergeItem(key, preMergedValue) {
+    mergeItem(key, change) {
         // Since Onyx already merged the existing value with the changes, we can just set the value directly.
-        return this.setItem(key, preMergedValue);
+        return this.multiMerge([[key, change]]);
     },
 
     /**
@@ -86,12 +86,15 @@ const provider: StorageProvider = {
     multiMerge(pairs) {
         _.forEach(pairs, ([key, value]) => {
             const existingValue = store[key] as Record<string, unknown>;
-            const newValue = utils.fastMerge(existingValue, value as Record<string, unknown>, true, false, true) as OnyxValue<OnyxKey>;
+            const newValue = utils.fastMerge(existingValue, value as Record<string, unknown>, {
+                shouldRemoveNestedNulls: true,
+                objectRemovalMode: 'replace',
+            }).result as OnyxValue<OnyxKey>;
 
             set(key, newValue);
         });
 
-        return Promise.resolve([]);
+        return Promise.resolve();
     },
 
     /**
