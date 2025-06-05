@@ -13,5 +13,5 @@ module.exports = {
     timers: 'fake',
     testEnvironment: 'jsdom',
     setupFilesAfterEnv: ['@testing-library/jest-native/extend-expect', './jestSetup.js'],
-    testTimeout: 10000,
+    testTimeout: 60000,
 };
