@@ -33,7 +33,7 @@ import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
 import * as GlobalSettings from './GlobalSettings';
 import decorateWithMetrics from './metrics';
-import OnyxMerge from './OnyxMerge/index.native';
+import OnyxMerge from './OnyxMerge';
 
 /** Initialize the store with actions and listening for storage events */
 function init({
