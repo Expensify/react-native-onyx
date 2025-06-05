@@ -4,9 +4,9 @@ import OnyxUtils from '../OnyxUtils';
 import type {OnyxKey, OnyxValue} from '../types';
 import cache from '../OnyxCache';
 import Storage from '../storage';
-import type {ApplyMerge, ApplyMergeResult} from './types';
+import type {ApplyMerge} from './types';
 
-const applyMerge: ApplyMerge = <TKey extends OnyxKey>(key: TKey, existingValue: OnyxValue<TKey>, validChanges: unknown[]): Promise<ApplyMergeResult> => {
+const applyMerge: ApplyMerge = <TKey extends OnyxKey>(key: TKey, existingValue: OnyxValue<TKey>, validChanges: unknown[]) => {
     // If any of the changes is null, we need to discard the existing value.
     const baseValue = validChanges.includes(null) ? undefined : existingValue;
 

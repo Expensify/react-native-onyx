@@ -11,13 +11,10 @@ type FastMergeOptions = {
 
     /**
      * If set to "mark", we will mark objects that are set to null instead of simply removing them,
-     * so that we can batch changes together, without loosing information about the object removal.
+     * so that we can batch changes together, without losing information about the object removal.
      * If set to "replace", we will completely replace the marked objects with the new value instead of merging them.
      * */
     objectRemovalMode?: 'mark' | 'replace' | 'none';
-
-    /** If true, any nested objects that contains the internal "ONYX_INTERNALS__REPLACE_OBJECT_MARK" flag will be completely replaced instead of merged. */
-    shouldReplaceMarkedObjects?: boolean;
 };
 
 type FastMergeMetadata = {
@@ -128,7 +125,7 @@ function mergeObject<TObject extends Record<string, unknown>>(
         // If "shouldMarkRemovedObjects" is enabled and the previous merge change (targetProperty) is null,
         // it means we want to fully replace this object when merging the batched changes with the Onyx value.
         // To achieve this, we first mark these nested objects with an internal flag.
-        // When calling fastMerge again with "shouldReplaceMarkedObjects" enabled, the marked objects will be removed.
+        // When calling fastMerge again with "mark" removal mode, the marked objects will be removed.
         if (options.objectRemovalMode === 'mark' && targetProperty === null) {
             targetProperty = {[ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true};
             metadata.replaceNullPatches.push([[...basePath, key], {...sourceProperty}]);
@@ -138,11 +135,8 @@ function mergeObject<TObject extends Record<string, unknown>>(
         // has the internal flag set, we replace the entire destination object with the source one and remove
         // the flag.
         if (options.objectRemovalMode === 'replace' && sourceProperty[ONYX_INTERNALS__REPLACE_OBJECT_MARK]) {
-            // We do a spread here in order to have a new object reference and allow us to delete the internal flag
-            // of the merged object only.
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             delete sourceProperty[ONYX_INTERNALS__REPLACE_OBJECT_MARK];
-            // const {ONYX_INTERNALS__REPLACE_OBJECT_MARK: _mark, ...sourcePropertyWithoutMark} = sourceProperty;
             destination[key] = sourceProperty;
             return;
         }
@@ -158,10 +152,9 @@ function isEmptyObject<T>(obj: T | EmptyValue): obj is EmptyValue {
     return typeof obj === 'object' && Object.keys(obj || {}).length === 0;
 }
 
-// Mostly copied from https://medium.com/@lubaka.a/how-to-remove-lodash-performance-improvement-b306669ad0e1
-
 /**
  * Checks whether the given value can be merged. It has to be an object, but not an array, RegExp or Date.
+ * Mostly copied from https://medium.com/@lubaka.a/how-to-remove-lodash-performance-improvement-b306669ad0e1.
  */
 function isMergeableObject<TObject extends Record<string, unknown>>(value: unknown): value is TObject {
     const isNonNullObject = value != null ? typeof value === 'object' : false;
