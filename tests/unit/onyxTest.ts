@@ -31,6 +31,7 @@ Onyx.init({
         [ONYX_KEYS.KEY_WITH_UNDERSCORE]: 'default',
     },
     skippableCollectionMemberIDs: ['skippable-id'],
+    mergeAllPropsSnapshotKeys: [ONYX_KEYS.COLLECTION.ANIMALS],
 });
 
 describe('Onyx', () => {
@@ -1445,13 +1446,17 @@ describe('Onyx', () => {
 
     it('should update Snapshot when its data changed', async () => {
         const cat = `${ONYX_KEYS.COLLECTION.ANIMALS}cat`;
+        const people = `${ONYX_KEYS.COLLECTION.PEOPLE}1`;
         const snapshot1 = `${ONYX_KEYS.COLLECTION.SNAPSHOT}1`;
 
         const initialValue = {name: 'Fluffy'};
-        const finalValue = {name: 'Kitty', nickName: 'Fitse'};
+        const finalValuePeople = {name: 'Kitty'};
+        const finalValueCat = {name: 'Kitty', nickName: 'Fitse'};
+        const onyxUpdate = {name: 'Kitty', nickName: 'Fitse'};
 
         await Onyx.set(cat, initialValue);
-        await Onyx.set(snapshot1, {data: {[cat]: initialValue}});
+        await Onyx.set(people, initialValue);
+        await Onyx.set(snapshot1, {data: {[cat]: initialValue, [people]: initialValue}});
 
         const callback = jest.fn();
 
@@ -1462,11 +1467,14 @@ describe('Onyx', () => {
 
         await waitForPromisesToResolve();
 
-        await Onyx.update([{key: cat, value: finalValue, onyxMethod: Onyx.METHOD.MERGE}]);
+        await Onyx.update([
+            {key: cat, value: onyxUpdate, onyxMethod: Onyx.METHOD.MERGE},
+            {key: people, value: onyxUpdate, onyxMethod: Onyx.METHOD.MERGE},
+        ]);
 
         expect(callback).toBeCalledTimes(2);
-        expect(callback).toHaveBeenNthCalledWith(1, {data: {[cat]: initialValue}}, snapshot1);
-        expect(callback).toHaveBeenNthCalledWith(2, {data: {[cat]: finalValue}}, snapshot1);
+        expect(callback).toHaveBeenNthCalledWith(1, {data: {[cat]: initialValue, [people]: initialValue}}, snapshot1);
+        expect(callback).toHaveBeenNthCalledWith(2, {data: {[cat]: finalValueCat, [people]: finalValuePeople}}, snapshot1);
     });
 
     describe('update', () => {
