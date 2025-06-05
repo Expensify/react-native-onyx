@@ -2,6 +2,7 @@
 import {deepEqual} from 'fast-equals';
 import lodashClone from 'lodash/clone';
 import type {ValueOf} from 'type-fest';
+import lodashPick from 'lodash/pick';
 import DevTools from './DevTools';
 import * as Logger from './Logger';
 import type Onyx from './Onyx';
@@ -71,6 +72,8 @@ const lastConnectionCallbackData = new Map<number, OnyxValue<OnyxKey>>();
 
 let snapshotKey: OnyxKey | null = null;
 
+let mergeAllPropsSnapshotKeys: string[] | undefined = [];
+
 // Keeps track of the last subscriptionID that was used so we can keep incrementing it
 let lastSubscriptionID = 0;
 
@@ -82,6 +85,10 @@ let skippableCollectionMemberIDs = new Set<string>();
 
 function getSnapshotKey(): OnyxKey | null {
     return snapshotKey;
+}
+
+function getMergeAllPropsSnapshotKeys(): string[] | undefined {
+    return mergeAllPropsSnapshotKeys;
 }
 
 /**
@@ -133,7 +140,7 @@ function setSkippableCollectionMemberIDs(ids: Set<string>): void {
  * @param initialKeyStates - initial data to set when `init()` and `clear()` are called
  * @param evictableKeys - This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal.
  */
-function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Partial<KeyValueMapping>, evictableKeys: OnyxKey[]): void {
+function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Partial<KeyValueMapping>, evictableKeys: OnyxKey[], mergeAllSnapshotKeys?: string[]): void {
     // We need the value of the collection keys later for checking if a
     // key is a collection. We store it in a map for faster lookup.
     const collectionValues = Object.values(keys.COLLECTION ?? {}) as string[];
@@ -152,6 +159,7 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
 
     if (typeof keys.COLLECTION === 'object' && typeof keys.COLLECTION.SNAPSHOT === 'string') {
         snapshotKey = keys.COLLECTION.SNAPSHOT;
+        mergeAllPropsSnapshotKeys = mergeAllSnapshotKeys;
     }
 }
 
@@ -1416,8 +1424,13 @@ function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge): Array<
             }
 
             const oldValue = updatedData[key] || {};
+            const mergeAllSnapshotKeys = getMergeAllPropsSnapshotKeys();
+            const newValue =
+                mergeAllSnapshotKeys && mergeAllSnapshotKeys.some((collectionKey) => isCollectionMemberKey(collectionKey, key, collectionKey.length))
+                    ? value
+                    : lodashPick(value, Object.keys(snapshotData[key]));
 
-            updatedData = {...updatedData, [key]: Object.assign(oldValue, value)};
+            updatedData = {...updatedData, [key]: Object.assign(oldValue, newValue)};
         });
 
         // Skip the update if there's no data to be merged
@@ -1467,6 +1480,7 @@ const OnyxUtils = {
     applyMerge,
     initializeWithDefaultKeyStates,
     getSnapshotKey,
+    getMergeAllPropsSnapshotKeys,
     multiGet,
     tupleGet,
     isValidNonEmptyCollectionForMerge,
