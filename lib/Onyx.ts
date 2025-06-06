@@ -238,6 +238,11 @@ function multiSet(data: OnyxMultiSetInput): Promise<void> {
 
     const updatePromises = keyValuePairsToSet.map(([key, value]) => {
         const prevValue = cache.get(key, false);
+        // When we use multiSet to set a key we want to clear the current delta changes from Onyx.merge that were queued
+        // before the value was set. If Onyx.merge is currently reading the old value from storage, it will then not apply the changes.
+        if (OnyxUtils.hasPendingMergeForKey(key)) {
+            delete OnyxUtils.getMergeQueue()[key];
+        }
 
         // Update cache and optimistically inform subscribers on the next tick
         cache.set(key, value);

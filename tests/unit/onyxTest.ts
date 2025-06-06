@@ -1448,7 +1448,7 @@ describe('Onyx', () => {
         const snapshot1 = `${ONYX_KEYS.COLLECTION.SNAPSHOT}1`;
 
         const initialValue = {name: 'Fluffy'};
-        const finalValue = {name: 'Kitty'};
+        const finalValue = {name: 'Kitty', nickName: 'Fitse'};
 
         await Onyx.set(cat, initialValue);
         await Onyx.set(snapshot1, {data: {[cat]: initialValue}});
@@ -2028,6 +2028,26 @@ describe('Onyx', () => {
                 [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
                 [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
             });
+        });
+        it('should clear pending merge for a key during multiSet()', async () => {
+            const testKey = `${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`;
+
+            // Mock the merge queue with the correct type
+            const mockMergeQueue: Record<string, unknown[]> = {
+                [testKey]: [{some: 'mergeData'}],
+            };
+
+            // Mock the utility functions
+            jest.spyOn(OnyxUtils, 'hasPendingMergeForKey').mockImplementation((key) => key === testKey);
+            jest.spyOn(OnyxUtils, 'getMergeQueue').mockImplementation(() => mockMergeQueue);
+
+            await Onyx.multiSet({
+                [testKey]: {id: 'entry1_id', name: 'entry1_name'},
+            });
+
+            expect(mockMergeQueue[testKey]).toBeUndefined();
+
+            jest.restoreAllMocks();
         });
     });
 });
