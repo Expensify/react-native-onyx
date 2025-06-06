@@ -139,18 +139,13 @@ whatever it is we attempted to do.</p>
 <dt><a href="#broadcastUpdate">broadcastUpdate()</a></dt>
 <dd><p>Notifies subscribers and writes current value to cache</p>
 </dd>
-<dt><a href="#removeNullValues">removeNullValues()</a> ⇒</dt>
-<dd><p>Removes a key from storage if the value is null.
-Otherwise removes all nested null values in objects,
-if shouldRemoveNestedNulls is true and returns the object.</p>
-</dd>
 <dt><a href="#prepareKeyValuePairsForStorage">prepareKeyValuePairsForStorage()</a> ⇒</dt>
 <dd><p>Storage expects array like: [[&quot;@MyApp_user&quot;, value_1], [&quot;@MyApp_key&quot;, value_2]]
 This method transforms an object like {&#39;@MyApp_user&#39;: myUserValue, &#39;@MyApp_key&#39;: myKeyValue}
 to an array of key-value pairs in the above format and removes key-value pairs that are being set to null</p>
 </dd>
-<dt><a href="#applyMerge">applyMerge(changes)</a></dt>
-<dd><p>Merges an array of changes with an existing value</p>
+<dt><a href="#mergeChanges">mergeChanges(changes)</a></dt>
+<dd><p>Merges an array of changes with an existing value or creates a single change</p>
 </dd>
 <dt><a href="#initializeWithDefaultKeyStates">initializeWithDefaultKeyStates()</a></dt>
 <dd><p>Merge user provided default key value pairs.</p>
@@ -465,14 +460,6 @@ whatever it is we attempted to do.
 Notifies subscribers and writes current value to cache
 
 **Kind**: global function  
-<a name="removeNullValues"></a>
-
-## removeNullValues() ⇒
-Removes a key from storage if the value is null.
-Otherwise removes all nested null values in objects,
-if shouldRemoveNestedNulls is true and returns the object.
-
-**Kind**: global function  
 **Returns**: The value without null values and a boolean "wasRemoved", which indicates if the key got removed completely  
 <a name="prepareKeyValuePairsForStorage"></a>
 
@@ -483,10 +470,10 @@ to an array of key-value pairs in the above format and removes key-value pairs t
 
 **Kind**: global function  
 **Returns**: an array of key - value pairs <[key, value]>  
-<a name="applyMerge"></a>
+<a name="mergeChanges"></a>
 
-## applyMerge(changes)
-Merges an array of changes with an existing value
+## mergeChanges(changes)
+Merges an array of changes with an existing value or creates a single change
 
 **Kind**: global function  
 
