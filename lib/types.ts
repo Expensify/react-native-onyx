@@ -3,6 +3,7 @@ import type {BuiltIns} from 'type-fest/source/internal';
 import type OnyxUtils from './OnyxUtils';
 import type {WithOnyxInstance, WithOnyxState} from './withOnyx/types';
 import type {OnyxMethod} from './OnyxUtils';
+import type {FastMergeReplaceNullPatch} from './utils';
 
 /**
  * Utility type that excludes `null` from the type `TValue`.
@@ -485,11 +486,14 @@ type InitOptions = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type GenericFunction = (...args: any[]) => any;
 
+type MultiMergeReplaceNullPatches = {[TKey in OnyxKey]: FastMergeReplaceNullPatch[]};
+
 /**
  * Represents a combination of Merge and Set operations that should be executed in Onyx
  */
 type MixedOperationsQueue = {
     merge: OnyxInputKeyValueMapping;
+    mergeReplaceNullPatches: MultiMergeReplaceNullPatches;
     set: OnyxInputKeyValueMapping;
 };
 
@@ -531,5 +535,6 @@ export type {
     OnyxValue,
     Selector,
     WithOnyxConnectOptions,
+    MultiMergeReplaceNullPatches,
     MixedOperationsQueue,
 };
