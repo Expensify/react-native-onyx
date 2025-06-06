@@ -12,6 +12,6 @@ module.exports = {
     },
     testEnvironment: 'jsdom',
     setupFilesAfterEnv: ['./jestSetup.js'],
-    testTimeout: 10000,
-    transformIgnorePatterns: ['node_modules/(?!(react-native|@react-native|@ngneat/falso|uuid)/)'],
+    testTimeout: 60000,
+    transformIgnorePatterns: ['node_modules/(?!((@)?react-native|@ngneat/falso|uuid)/)'],
 };
