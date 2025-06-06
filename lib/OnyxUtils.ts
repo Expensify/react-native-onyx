@@ -139,6 +139,7 @@ function setSkippableCollectionMemberIDs(ids: Set<string>): void {
  * @param keys - `ONYXKEYS` constants object from Onyx.init()
  * @param initialKeyStates - initial data to set when `init()` and `clear()` are called
  * @param evictableKeys - This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal.
+ * @param mergeAllSnapshotKeys - Array of collection keys whose backend returned data can be directly merged into snapshot without selectively picking the existing keys in the existing snapshot data.
  */
 function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Partial<KeyValueMapping>, evictableKeys: OnyxKey[], mergeAllSnapshotKeys?: string[]): void {
     // We need the value of the collection keys later for checking if a
