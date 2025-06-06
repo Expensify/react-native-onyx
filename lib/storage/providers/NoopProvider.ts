@@ -22,6 +22,13 @@ const provider: StorageProvider = {
     },
 
     /**
+     * Get the value of a given key synchronously or return `null` if it's not available in memory
+     */
+    getItemSync(key) {
+        return null as OnyxValue<typeof key>;
+    },
+
+    /**
      * Get multiple key-value pairs for the give array of keys in a batch.
      */
     multiGet() {
