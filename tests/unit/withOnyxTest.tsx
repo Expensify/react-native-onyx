@@ -1,5 +1,5 @@
 import React from 'react';
-import {act, render} from '@testing-library/react-native';
+import {act, render, configure as configureRNTL, resetToDefaults as resetRNTLToDefaults} from '@testing-library/react-native';
 import Onyx, {withOnyx} from '../../lib';
 import type {ViewWithTextOnyxProps, ViewWithTextProps} from '../components/ViewWithText';
 import ViewWithText from '../components/ViewWithText';
@@ -33,6 +33,17 @@ Onyx.init({
 beforeEach(() => Onyx.clear());
 
 describe('withOnyxTest', () => {
+    beforeAll(() => {
+        // Disables concurrent rendering as it breaks withOnyx() tests.
+        configureRNTL({
+            concurrentRoot: false,
+        });
+    });
+
+    afterAll(() => {
+        resetRNTLToDefaults();
+    });
+
     it('should render immediately with the test data when using withOnyx', () => {
         const onRender = jest.fn();
 

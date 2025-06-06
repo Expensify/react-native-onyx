@@ -6,7 +6,7 @@ import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
 import OnyxUtils from './OnyxUtils';
 import * as GlobalSettings from './GlobalSettings';
-import type {CollectionKeyBase, KeyValueMapping, OnyxCollection, OnyxKey, OnyxValue} from './types';
+import type {CollectionKeyBase, OnyxKey, OnyxValue} from './types';
 import useLiveRef from './useLiveRef';
 import usePrevious from './usePrevious';
 import decorateWithMetrics from './metrics';
@@ -78,35 +78,6 @@ type ResultMetadata<TValue> = {
 };
 
 type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata<TValue>];
-
-/**
- * Gets the cached value from the Onyx cache. If the key is a collection key, it will return all the values in the collection.
- * It is a fork of `tryGetCachedValue` from `OnyxUtils` caused by different selector logic in `useOnyx`. It should be unified in the future, when `withOnyx` is removed.
- */
-function tryGetCachedValue<TKey extends OnyxKey>(key: TKey): OnyxValue<OnyxKey> {
-    if (!OnyxUtils.isCollectionKey(key)) {
-        return OnyxCache.get(key);
-    }
-
-    const allCacheKeys = OnyxCache.getAllKeys();
-
-    // It is possible we haven't loaded all keys yet so we do not know if the
-    // collection actually exists.
-    if (allCacheKeys.size === 0) {
-        return;
-    }
-
-    const values: OnyxCollection<KeyValueMapping[TKey]> = {};
-    allCacheKeys.forEach((cacheKey) => {
-        if (!cacheKey.startsWith(key)) {
-            return;
-        }
-
-        values[cacheKey] = OnyxCache.get(cacheKey);
-    });
-
-    return values;
-}
 
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     key: TKey,
@@ -233,7 +204,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // update `newValueRef` when `Onyx.connect()` callback is fired.
         if (isFirstConnectionRef.current || shouldGetCachedValueRef.current) {
             // Gets the value from cache and maps it with selector. It changes `null` to `undefined` for `useOnyx` compatibility.
-            const value = tryGetCachedValue(key) as OnyxValue<TKey>;
+            const value = OnyxUtils.tryGetCachedValue(key) as OnyxValue<TKey>;
             const selectedValue = selectorRef.current ? selectorRef.current(value) : value;
             newValueRef.current = (selectedValue ?? undefined) as TReturnValue | undefined;
 

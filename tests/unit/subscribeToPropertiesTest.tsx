@@ -1,6 +1,6 @@
 import type {ErrorInfo, ReactNode} from 'react';
 import React from 'react';
-import {render, cleanup} from '@testing-library/react-native';
+import {render, cleanup, configure as configureRNTL, resetToDefaults as resetRNTLToDefaults} from '@testing-library/react-native';
 import Onyx, {withOnyx} from '../../lib';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import type {ViewWithObjectProps} from '../components/ViewWithObject';
@@ -42,6 +42,17 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps> {
 }
 
 describe('Only the specific property changes when using withOnyx() and ', () => {
+    beforeAll(() => {
+        // Disables concurrent rendering as it breaks withOnyx() tests.
+        configureRNTL({
+            concurrentRoot: false,
+        });
+    });
+
+    afterAll(() => {
+        resetRNTLToDefaults();
+    });
+
     // Cleanup (ie. unmount) all rendered components and clear out Onyx after each test so that each test starts
     // with a clean slate
     afterEach(() => {
