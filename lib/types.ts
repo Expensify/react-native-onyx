@@ -485,7 +485,7 @@ type InitOptions = {
      * Array of collection keys whose backend returned data can be directly merged into
      * snapshot without selectively picking the existing keys in the existing snapshot data.
      */
-    mergeAllPropsSnapshotKeys?: string[];
+    fullyMergedSnapshotKeys?: string[];
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

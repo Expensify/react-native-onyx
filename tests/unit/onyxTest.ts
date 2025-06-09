@@ -31,7 +31,7 @@ Onyx.init({
         [ONYX_KEYS.KEY_WITH_UNDERSCORE]: 'default',
     },
     skippableCollectionMemberIDs: ['skippable-id'],
-    mergeAllPropsSnapshotKeys: [ONYX_KEYS.COLLECTION.ANIMALS],
+    fullyMergedSnapshotKeys: [ONYX_KEYS.COLLECTION.ANIMALS],
 });
 
 describe('Onyx', () => {
