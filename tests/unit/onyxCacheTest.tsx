@@ -1,6 +1,5 @@
 import React from 'react';
-import {render} from '@testing-library/react-native';
-
+import {render, configure as configureRNTL, resetToDefaults as resetRNTLToDefaults} from '@testing-library/react-native';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import type {ViewWithTextOnyxProps, ViewWithTextProps} from '../components/ViewWithText';
 import ViewWithText from '../components/ViewWithText';
@@ -18,6 +17,17 @@ import type {CacheTask} from '../../lib/OnyxCache';
 const MOCK_TASK = 'mockTask' as CacheTask;
 
 describe('Onyx', () => {
+    beforeAll(() => {
+        // Disables concurrent rendering as it breaks withOnyx() tests.
+        configureRNTL({
+            concurrentRoot: false,
+        });
+    });
+
+    afterAll(() => {
+        resetRNTLToDefaults();
+    });
+
     describe('Cache Service', () => {
         /** @type OnyxCache */
         let cache: typeof OnyxCache;

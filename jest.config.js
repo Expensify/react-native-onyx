@@ -10,8 +10,8 @@ module.exports = {
         __DEV__: true,
         WebSocket: {},
     },
-    timers: 'fake',
     testEnvironment: 'jsdom',
-    setupFilesAfterEnv: ['@testing-library/jest-native/extend-expect', './jestSetup.js'],
+    setupFilesAfterEnv: ['./jestSetup.js'],
     testTimeout: 60000,
+    transformIgnorePatterns: ['node_modules/(?!((@)?react-native|@ngneat/falso|uuid)/)'],
 };
