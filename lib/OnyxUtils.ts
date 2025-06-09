@@ -72,7 +72,7 @@ const lastConnectionCallbackData = new Map<number, OnyxValue<OnyxKey>>();
 
 let snapshotKey: OnyxKey | null = null;
 
-let mergeAllPropsSnapshotKeys: string[] | undefined = [];
+let fullyMergedSnapshotKeys: string[] | undefined = [];
 
 // Keeps track of the last subscriptionID that was used so we can keep incrementing it
 let lastSubscriptionID = 0;
@@ -87,8 +87,8 @@ function getSnapshotKey(): OnyxKey | null {
     return snapshotKey;
 }
 
-function getMergeAllPropsSnapshotKeys(): string[] | undefined {
-    return mergeAllPropsSnapshotKeys;
+function getFullyMergedSnapshotKeys(): string[] | undefined {
+    return fullyMergedSnapshotKeys;
 }
 
 /**
@@ -139,9 +139,9 @@ function setSkippableCollectionMemberIDs(ids: Set<string>): void {
  * @param keys - `ONYXKEYS` constants object from Onyx.init()
  * @param initialKeyStates - initial data to set when `init()` and `clear()` are called
  * @param evictableKeys - This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal.
- * @param mergeAllSnapshotKeys - Array of collection keys whose backend returned data can be directly merged into snapshot without selectively picking the existing keys in the existing snapshot data.
+ * @param fullyMergedSnapshotKeys - Array of collection keys whose backend returned data can be directly merged into snapshot without selectively picking the existing keys in the existing snapshot data.
  */
-function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Partial<KeyValueMapping>, evictableKeys: OnyxKey[], mergeAllSnapshotKeys?: string[]): void {
+function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Partial<KeyValueMapping>, evictableKeys: OnyxKey[], fullyMergedSnapshotKeysParam?: string[]): void {
     // We need the value of the collection keys later for checking if a
     // key is a collection. We store it in a map for faster lookup.
     const collectionValues = Object.values(keys.COLLECTION ?? {}) as string[];
@@ -160,7 +160,7 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
 
     if (typeof keys.COLLECTION === 'object' && typeof keys.COLLECTION.SNAPSHOT === 'string') {
         snapshotKey = keys.COLLECTION.SNAPSHOT;
-        mergeAllPropsSnapshotKeys = mergeAllSnapshotKeys;
+        fullyMergedSnapshotKeys = fullyMergedSnapshotKeysParam;
     }
 }
 
@@ -1425,9 +1425,9 @@ function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge): Array<
             }
 
             const oldValue = updatedData[key] || {};
-            const mergeAllSnapshotKeys = getMergeAllPropsSnapshotKeys();
+            const fullyMergedKeys = getFullyMergedSnapshotKeys();
             const newValue =
-                mergeAllSnapshotKeys && mergeAllSnapshotKeys.some((collectionKey) => isCollectionMemberKey(collectionKey, key, collectionKey.length))
+                fullyMergedKeys && fullyMergedKeys.some((collectionKey) => isCollectionMemberKey(collectionKey, key, collectionKey.length))
                     ? value
                     : lodashPick(value, Object.keys(snapshotData[key]));
 
@@ -1481,7 +1481,6 @@ const OnyxUtils = {
     applyMerge,
     initializeWithDefaultKeyStates,
     getSnapshotKey,
-    getMergeAllPropsSnapshotKeys,
     multiGet,
     tupleGet,
     isValidNonEmptyCollectionForMerge,
