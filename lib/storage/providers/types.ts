@@ -1,9 +1,13 @@
-import type {BatchQueryResult, QueryResult} from 'react-native-nitro-sqlite';
 import type {OnyxKey, OnyxValue} from '../../types';
+import type {FastMergeReplaceNullPatch} from '../../utils';
 
-type KeyValuePair = [OnyxKey, OnyxValue<OnyxKey>];
-type KeyList = OnyxKey[];
-type KeyValuePairList = KeyValuePair[];
+type StorageKeyValuePair = [key: OnyxKey, value: OnyxValue<OnyxKey>, replaceNullPatches?: FastMergeReplaceNullPatch[]];
+type StorageKeyList = OnyxKey[];
+
+type DatabaseSize = {
+    bytesUsed: number;
+    bytesRemaining: number;
+};
 
 type OnStorageKeyChanged = <TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>) => void;
 
@@ -24,55 +28,53 @@ type StorageProvider = {
     /**
      * Get multiple key-value pairs for the given array of keys in a batch
      */
-    multiGet: (keys: KeyList) => Promise<KeyValuePairList>;
+    multiGet: (keys: StorageKeyList) => Promise<StorageKeyValuePair[]>;
 
     /**
      * Sets the value for a given key. The only requirement is that the value should be serializable to JSON string
      */
-    setItem: <TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>) => Promise<QueryResult | void>;
+    setItem: <TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>) => Promise<void>;
 
     /**
      * Stores multiple key-value pairs in a batch
      */
-    multiSet: (pairs: KeyValuePairList) => Promise<BatchQueryResult | void>;
+    multiSet: (pairs: StorageKeyValuePair[]) => Promise<void>;
 
     /**
      * Multiple merging of existing and new values in a batch
      */
-    multiMerge: (pairs: KeyValuePairList) => Promise<BatchQueryResult | IDBValidKey[] | void>;
+    multiMerge: (pairs: StorageKeyValuePair[]) => Promise<void>;
 
     /**
-     * Merges an existing value with a new one by leveraging JSON_PATCH
-     * @param deltaChanges - the delta for a specific key
-     * @param preMergedValue - the pre-merged data from `Onyx.applyMerge`
-     * @param shouldSetValue - whether the data should be set instead of merged
+     * Merges an existing value with a new one
+     * @param change - the change to merge with the existing value
      */
-    mergeItem: <TKey extends OnyxKey>(key: TKey, deltaChanges: OnyxValue<TKey>, preMergedValue: OnyxValue<TKey>, shouldSetValue?: boolean) => Promise<BatchQueryResult | void>;
+    mergeItem: <TKey extends OnyxKey>(key: TKey, change: OnyxValue<TKey>, replaceNullPatches?: FastMergeReplaceNullPatch[]) => Promise<void>;
 
     /**
      * Returns all keys available in storage
      */
-    getAllKeys: () => Promise<KeyList>;
+    getAllKeys: () => Promise<StorageKeyList>;
 
     /**
      * Removes given key and its value from storage
      */
-    removeItem: (key: OnyxKey) => Promise<QueryResult | void>;
+    removeItem: (key: OnyxKey) => Promise<void>;
 
     /**
      * Removes given keys and their values from storage
      */
-    removeItems: (keys: KeyList) => Promise<QueryResult | void>;
+    removeItems: (keys: StorageKeyList) => Promise<void>;
 
     /**
      * Clears absolutely everything from storage
      */
-    clear: () => Promise<QueryResult | void>;
+    clear: () => Promise<void>;
 
     /**
      * Gets the total bytes of the database file
      */
-    getDatabaseSize: () => Promise<{bytesUsed: number; bytesRemaining: number}>;
+    getDatabaseSize: () => Promise<DatabaseSize>;
 
     /**
      * @param onStorageKeyChanged Storage synchronization mechanism keeping all opened tabs in sync
@@ -81,4 +83,4 @@ type StorageProvider = {
 };
 
 export default StorageProvider;
-export type {KeyList, KeyValuePair, KeyValuePairList, OnStorageKeyChanged};
+export type {StorageKeyList, StorageKeyValuePair, OnStorageKeyChanged};

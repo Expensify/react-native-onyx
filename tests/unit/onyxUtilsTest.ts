@@ -1,5 +1,68 @@
 import Onyx from '../../lib';
 import OnyxUtils from '../../lib/OnyxUtils';
+import type {DeepRecord} from '../../lib/types';
+import utils from '../../lib/utils';
+
+const testObject: DeepRecord<string, unknown> = {
+    a: 'a',
+    b: {
+        c: 'c',
+        d: {
+            e: 'e',
+            f: 'f',
+        },
+        g: 'g',
+    },
+};
+
+const testMergeChanges: Array<DeepRecord<string, unknown>> = [
+    {
+        b: {
+            d: {
+                h: 'h',
+            },
+        },
+    },
+    {
+        b: {
+            // Removing "d" object.
+            d: null,
+            h: 'h',
+        },
+    },
+    {
+        b: {
+            // Adding back "d" property with a object.
+            // The "ONYX_INTERNALS__REPLACE_OBJECT_MARK" marker property should be added here when batching merge changes.
+            d: {
+                i: 'i',
+            },
+        },
+    },
+    {
+        b: {
+            // Removing "d" object again.
+            d: null,
+            // Removing "g" object.
+            g: null,
+        },
+    },
+    {
+        b: {
+            // Adding back "d" property with a object.
+            // The "ONYX_INTERNALS__REPLACE_OBJECT_MARK" marker property should be added here when batching merge changes.
+            d: {
+                i: 'i',
+                j: 'j',
+            },
+            // Adding back "g" property with a object.
+            // The "ONYX_INTERNALS__REPLACE_OBJECT_MARK" marker property should be added here when batching merge changes.
+            g: {
+                k: 'k',
+            },
+        },
+    },
+];
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -85,6 +148,131 @@ describe('OnyxUtils', () => {
             expect(() => {
                 OnyxUtils.getCollectionKey('');
             }).toThrowError("Invalid '' key provided, only collection keys are allowed.");
+        });
+    });
+
+    describe('mergeChanges', () => {
+        it("should return the last change if it's an array", () => {
+            const {result} = OnyxUtils.mergeChanges([...testMergeChanges, [0, 1, 2]], testObject);
+
+            expect(result).toEqual([0, 1, 2]);
+        });
+
+        it("should return the last change if the changes aren't objects", () => {
+            const {result} = OnyxUtils.mergeChanges(['a', 0, 'b', 1], testObject);
+
+            expect(result).toEqual(1);
+        });
+
+        it('should merge data correctly when applying batched changes', () => {
+            const batchedChanges: DeepRecord<string, unknown> = {
+                b: {
+                    d: {
+                        i: 'i',
+                        j: 'j',
+                        [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                    },
+                    h: 'h',
+                    g: {
+                        [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                        k: 'k',
+                    },
+                },
+            };
+
+            const {result} = OnyxUtils.mergeChanges([batchedChanges], testObject);
+
+            expect(result).toEqual({
+                a: 'a',
+                b: {
+                    c: 'c',
+                    d: {
+                        i: 'i',
+                        j: 'j',
+                    },
+                    h: 'h',
+                    g: {
+                        k: 'k',
+                    },
+                },
+            });
+        });
+    });
+
+    describe('mergeAndMarkChanges', () => {
+        it('should apply the replacement markers if the we have properties with objects being removed and added back during the changes', () => {
+            const {result, replaceNullPatches} = OnyxUtils.mergeAndMarkChanges(testMergeChanges);
+
+            expect(result).toEqual({
+                b: {
+                    d: {
+                        i: 'i',
+                        j: 'j',
+                        [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                    },
+                    h: 'h',
+                    g: {
+                        [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                        k: 'k',
+                    },
+                },
+            });
+            expect(replaceNullPatches).toEqual([
+                [['b', 'd'], {i: 'i'}],
+                [['b', 'd'], {i: 'i', j: 'j'}],
+                [['b', 'g'], {k: 'k'}],
+            ]);
+        });
+
+        it('should 2', () => {
+            const {result, replaceNullPatches} = OnyxUtils.mergeAndMarkChanges([
+                {
+                    // Removing the "originalMessage" object in this update.
+                    // Any subsequent changes to this object should completely replace the existing object in store.
+                    originalMessage: null,
+                },
+                {
+                    // This change should completely replace "originalMessage" existing object in store.
+                    originalMessage: {
+                        errorMessage: 'newErrorMessage',
+                    },
+                    receipt: {
+                        // Removing the "nestedObject" object in this update.
+                        // Any subsequent changes to this object should completely replace the existing object in store.
+                        nestedObject: null,
+                    },
+                },
+                {
+                    receipt: {
+                        receiptID: null,
+                        filename: 'newFilename',
+                        // This change should completely replace "receipt" existing object in store.
+                        nestedObject: {
+                            nestedKey2: 'newNestedKey2',
+                        },
+                    },
+                },
+            ]);
+
+            expect(result).toEqual({
+                originalMessage: {
+                    errorMessage: 'newErrorMessage',
+                    [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                },
+                receipt: {
+                    receiptID: null,
+                    filename: 'newFilename',
+                    nestedObject: {
+                        nestedKey2: 'newNestedKey2',
+                        [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                    },
+                },
+            });
+
+            expect(replaceNullPatches).toEqual([
+                [['originalMessage'], {errorMessage: 'newErrorMessage'}],
+                [['receipt', 'nestedObject'], {nestedKey2: 'newNestedKey2'}],
+            ]);
         });
     });
 });
