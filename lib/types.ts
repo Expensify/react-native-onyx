@@ -482,8 +482,7 @@ type InitOptions = {
     skippableCollectionMemberIDs?: string[];
 
     /**
-     * Array of collection keys whose backend returned data can be directly merged into
-     * snapshot without selectively picking the existing keys in the existing snapshot data.
+     * Array of snapshot collection keys where full merge is supported and data structure can be changed after merge.
      * For e.g. if oldSnapshotData is {report_1: {name 'Fitsum'}} and BE update is {report_1: {name:'Fitsum2', nickName:'Fitse'}}
      * if it is fullyMergedSnapshotkey the `nickName` prop that didn't exist in the previous data will be merged
      * otherwise only existing prop will be picked from the BE update and merged (in this case only name).
