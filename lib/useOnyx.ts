@@ -162,6 +162,11 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     // Inside useOnyx.ts, we need to track the sourceValue separately
     const sourceValueRef = useRef<NonNullable<TReturnValue> | undefined>(undefined);
 
+    // On every data fetch through this hook, we reset sourceValueRef.current to begin new batching
+    useEffect(() => {
+        sourceValueRef.current = undefined;
+    });
+
     useEffect(() => {
         // These conditions will ensure we can only handle dynamic collection member keys from the same collection.
         if (options?.allowDynamicKey || previousKey === key) {
@@ -271,9 +276,9 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // For the other cases we will only deal with object reference checks, so just a shallow equality check is enough.
         let areValuesEqual: boolean;
         if (selectorRef.current) {
-            areValuesEqual = deepEqual(previousValueRef.current ?? undefined, newValueRef.current);
+            areValuesEqual = deepEqual(previousValueRef.current ?? undefined, newValueRef.current) && deepEqual(resultRef.current?.[1]?.sourceValue, sourceValueRef.current);
         } else {
-            areValuesEqual = shallowEqual(previousValueRef.current ?? undefined, newValueRef.current);
+            areValuesEqual = shallowEqual(previousValueRef.current ?? undefined, newValueRef.current) && shallowEqual(resultRef.current?.[1]?.sourceValue, sourceValueRef.current);
         }
 
         // We update the cached value and the result in the following conditions:
@@ -326,7 +331,16 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                     shouldGetCachedValueRef.current = true;
 
                     // sourceValue is unknown type, so we need to cast it to the correct type.
-                    sourceValueRef.current = sourceValue as NonNullable<TReturnValue>;
+                    if (sourceValue) {
+                        if (!sourceValueRef.current) {
+                            sourceValueRef.current = sourceValue as NonNullable<TReturnValue>;
+                        } else if (typeof sourceValue === 'object' && typeof sourceValueRef.current === 'object' && !Array.isArray(sourceValue) && !Array.isArray(sourceValueRef.current)) {
+                            // Only objects can be merged together
+                            sourceValueRef.current = {...sourceValueRef.current, ...sourceValue};
+                        } else {
+                            sourceValueRef.current = sourceValue as NonNullable<TReturnValue>;
+                        }
+                    }
 
                     // Finally, we signal that the store changed, making `getSnapshot()` be called again.
                     onStoreChange();
