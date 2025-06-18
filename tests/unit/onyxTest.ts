@@ -4,6 +4,7 @@ import Onyx from '../../lib';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import OnyxUtils from '../../lib/OnyxUtils';
 import type OnyxCache from '../../lib/OnyxCache';
+import StorageMock from '../../lib/storage';
 import type {DeepRecord, OnyxCollection, OnyxUpdate} from '../../lib/types';
 import type GenericCollection from '../utils/GenericCollection';
 import type {Connection} from '../../lib/OnyxConnectionManager';
@@ -1738,11 +1739,8 @@ describe('Onyx', () => {
 
             await Onyx.update(queuedUpdates);
 
-            expect(result).toEqual({
-                [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {
-                    someKey: 'someValueChanged',
-                },
-            });
+            expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {someKey: 'someValueChanged'}});
+            expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual({someKey: 'someValueChanged'});
         });
 
         describe('should replace the old value after a null merge in a nested property when batching updates', () => {
@@ -1797,6 +1795,7 @@ describe('Onyx', () => {
                 await Onyx.update(queuedUpdates);
 
                 expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult});
+                expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual(entry1ExpectedResult);
             });
 
             it('setting new object after null merge', async () => {
@@ -1869,6 +1868,7 @@ describe('Onyx', () => {
                 await Onyx.update(queuedUpdates);
 
                 expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult});
+                expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual(entry1ExpectedResult);
             });
 
             it('setting new object after null merge of a primitive property', async () => {
@@ -1929,6 +1929,7 @@ describe('Onyx', () => {
                 await Onyx.update(queuedUpdates);
 
                 expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult});
+                expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual(entry1ExpectedResult);
             });
 
             describe('mergeCollection', () => {
@@ -2008,6 +2009,10 @@ describe('Onyx', () => {
                         [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult,
                         [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`]: entry2ExpectedResult,
                     });
+                    expect(await StorageMock.multiGet([`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`, `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`])).toEqual([
+                        [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`, entry1ExpectedResult],
+                        [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`, entry2ExpectedResult],
+                    ]);
                 });
             });
         });
@@ -2042,6 +2047,7 @@ describe('Onyx', () => {
                 await waitForPromisesToResolve();
 
                 expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {someKey: 'someValueChanged'}});
+                expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual({someKey: 'someValueChanged'});
             });
 
             describe('should replace the old value after a null merge in a nested property when batching merges', () => {
@@ -2087,6 +2093,7 @@ describe('Onyx', () => {
                     await waitForPromisesToResolve();
 
                     expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult});
+                    expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual(entry1ExpectedResult);
                 });
 
                 it('setting new object after null merge', async () => {
@@ -2146,6 +2153,7 @@ describe('Onyx', () => {
                     await waitForPromisesToResolve();
 
                     expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult});
+                    expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual(entry1ExpectedResult);
                 });
 
                 it('setting new object after null merge of a primitive property', async () => {
@@ -2197,6 +2205,7 @@ describe('Onyx', () => {
                     await waitForPromisesToResolve();
 
                     expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult});
+                    expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual(entry1ExpectedResult);
                 });
             });
 
