@@ -135,9 +135,11 @@ function mergeObject<TObject extends Record<string, unknown>>(
         // has the internal flag set, we replace the entire destination object with the source one and remove
         // the flag.
         if (options.objectRemovalMode === 'replace' && sourceProperty[ONYX_INTERNALS__REPLACE_OBJECT_MARK]) {
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            delete sourceProperty[ONYX_INTERNALS__REPLACE_OBJECT_MARK];
-            destination[key] = sourceProperty;
+            // We do a spread here in order to have a new object reference and allow us to delete the internal flag
+            // of the merged object only.
+            const sourcePropertyWithoutMark = {...sourceProperty};
+            delete sourcePropertyWithoutMark.ONYX_INTERNALS__REPLACE_OBJECT_MARK;
+            destination[key] = sourcePropertyWithoutMark;
             return;
         }
 

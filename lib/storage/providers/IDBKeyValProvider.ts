@@ -53,6 +53,7 @@ const provider: StorageProvider = {
                         shouldRemoveNestedNulls: true,
                         objectRemovalMode: 'replace',
                     }).result;
+
                     return promisifyRequest(store.put(newValue, key));
                 });
                 return Promise.all(upsertMany).then(() => undefined);

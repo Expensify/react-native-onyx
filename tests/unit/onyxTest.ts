@@ -1930,6 +1930,86 @@ describe('Onyx', () => {
 
                 expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult});
             });
+
+            describe('mergeCollection', () => {
+                it('replacing old object after null merge', async () => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const entry1: DeepRecord<string, any> = {
+                        sub_entry1: {
+                            id: 'sub_entry1',
+                            someKey: 'someValue',
+                        },
+                    };
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const entry2: DeepRecord<string, any> = {
+                        sub_entry2: {
+                            id: 'sub_entry2',
+                            someKey: 'someValue',
+                        },
+                    };
+                    await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1});
+                    await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`]: entry2});
+
+                    const entry1ExpectedResult = lodashCloneDeep(entry1);
+                    const entry2ExpectedResult = lodashCloneDeep(entry2);
+                    const queuedUpdates: OnyxUpdate[] = [];
+
+                    queuedUpdates.push(
+                        {
+                            key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                            onyxMethod: 'merge',
+                            value: {
+                                // Removing the "sub_entry1" object in this update.
+                                // Any subsequent changes to this object should completely replace the existing object in store.
+                                sub_entry1: null,
+                            },
+                        },
+                        {
+                            key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`,
+                            onyxMethod: 'merge',
+                            value: {
+                                // Removing the "sub_entry2" object in this update.
+                                // Any subsequent changes to this object should completely replace the existing object in store.
+                                sub_entry2: null,
+                            },
+                        },
+                    );
+                    delete entry1ExpectedResult.sub_entry1;
+                    delete entry2ExpectedResult.sub_entry2;
+
+                    queuedUpdates.push(
+                        {
+                            key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                            onyxMethod: 'merge',
+                            value: {
+                                // This change should completely replace "sub_entry1" existing object in store.
+                                sub_entry1: {
+                                    newKey: 'newValue',
+                                },
+                            },
+                        },
+                        {
+                            key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`,
+                            onyxMethod: 'merge',
+                            value: {
+                                // This change should completely replace "sub_entry2" existing object in store.
+                                sub_entry2: {
+                                    newKey: 'newValue',
+                                },
+                            },
+                        },
+                    );
+                    entry1ExpectedResult.sub_entry1 = {newKey: 'newValue'};
+                    entry2ExpectedResult.sub_entry2 = {newKey: 'newValue'};
+
+                    await Onyx.update(queuedUpdates);
+
+                    expect(result).toEqual({
+                        [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult,
+                        [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`]: entry2ExpectedResult,
+                    });
+                });
+            });
         });
 
         describe('merge', () => {
