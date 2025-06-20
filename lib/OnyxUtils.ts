@@ -1424,7 +1424,7 @@ function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge): Array<
         if (utils.isEmptyObject(updatedData)) {
             return;
         }
-
+        // test
         promises.push(() => mergeFn(snapshotEntryKey, {data: updatedData}));
     });
 
