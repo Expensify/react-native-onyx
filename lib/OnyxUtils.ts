@@ -2,7 +2,6 @@
 import {deepEqual} from 'fast-equals';
 import lodashClone from 'lodash/clone';
 import type {ValueOf} from 'type-fest';
-import lodashPick from 'lodash/pick';
 import DevTools from './DevTools';
 import * as Logger from './Logger';
 import type Onyx from './Onyx';
@@ -1421,10 +1420,8 @@ function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge): Array<
             }
 
             const oldValue = updatedData[key] || {};
-            const fullyMergedKeys = getFullyMergedSnapshotKeys();
-            const newValue = fullyMergedKeys.some((collectionKey) => isCollectionMemberKey(collectionKey, key)) ? value : lodashPick(value, Object.keys(snapshotData[key]));
 
-            updatedData = {...updatedData, [key]: Object.assign(oldValue, newValue)};
+            updatedData = {...updatedData, [key]: Object.assign(oldValue, value)};
         });
 
         // Skip the update if there's no data to be merged
