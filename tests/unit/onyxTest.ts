@@ -1932,6 +1932,74 @@ describe('Onyx', () => {
                 expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual(entry1ExpectedResult);
             });
 
+            it('replacing nested object during updates', async () => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const entry1: DeepRecord<string, any> | undefined = {
+                    id: 'entry1',
+                    someKey: 'someValue',
+                };
+                await Onyx.multiSet({
+                    [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {
+                        id: 'entry1',
+                        someKey: 'someValue',
+                    },
+                });
+
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                let entry1ExpectedResult = lodashCloneDeep(entry1) as DeepRecord<string, any> | undefined;
+                const queuedUpdates: OnyxUpdate[] = [];
+
+                queuedUpdates.push({
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                    onyxMethod: 'merge',
+                    // Removing the entire object in this update.
+                    // Any subsequent changes to this key should completely replace the old value.
+                    value: null,
+                });
+                entry1ExpectedResult = undefined;
+
+                queuedUpdates.push({
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                    onyxMethod: 'merge',
+                    // This change should completely replace `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1` old value.
+                    value: {
+                        someKey: 'someValueChanged',
+                        someNestedObject: {
+                            someNestedKey: 'someNestedValue',
+                        },
+                    },
+                });
+                entry1ExpectedResult = {someKey: 'someValueChanged', someNestedObject: {someNestedKey: 'someNestedValue'}};
+
+                queuedUpdates.push({
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                    onyxMethod: 'merge',
+                    value: {
+                        // Removing the "sub_entry1" object in this update.
+                        // Any subsequent changes to this key should completely replace the old update's value.
+                        someNestedObject: null,
+                    },
+                });
+                delete entry1ExpectedResult.someNestedObject;
+
+                queuedUpdates.push({
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                    onyxMethod: 'merge',
+                    // This change should completely replace `someNestedObject` old update's value.
+                    value: {
+                        someNestedObject: {
+                            someNestedKeyChanged: 'someNestedValueChange',
+                        },
+                    },
+                });
+                entry1ExpectedResult.someNestedObject = {someNestedKeyChanged: 'someNestedValueChange'};
+
+                await Onyx.update(queuedUpdates);
+
+                expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult});
+                expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual(entry1ExpectedResult);
+            });
+
             describe('mergeCollection', () => {
                 it('replacing old object after null merge', async () => {
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any

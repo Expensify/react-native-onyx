@@ -716,7 +716,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
 
     Object.entries(updateQueue).forEach(([key, operations]) => {
         if (operations[0] === null) {
-            const batchedChanges = OnyxUtils.mergeAndMarkChanges(operations).result;
+            const batchedChanges = OnyxUtils.mergeChanges(operations).result;
             promises.push(() => set(key, batchedChanges));
             return;
         }
