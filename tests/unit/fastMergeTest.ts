@@ -1,7 +1,7 @@
-import type {DeepRecord} from '../../lib/types';
+import type {GenericDeepRecord} from '../../lib/types';
 import utils from '../../lib/utils';
 
-type DeepObject = DeepRecord<string, unknown> | unknown[];
+type DeepObject = GenericDeepRecord | unknown[];
 
 const testObject: DeepObject = {
     a: 'a',

@@ -5,7 +5,7 @@ import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import OnyxUtils from '../../lib/OnyxUtils';
 import type OnyxCache from '../../lib/OnyxCache';
 import StorageMock from '../../lib/storage';
-import type {DeepRecord, OnyxCollection, OnyxUpdate} from '../../lib/types';
+import type {GenericDeepRecord, OnyxCollection, OnyxUpdate} from '../../lib/types';
 import type GenericCollection from '../utils/GenericCollection';
 import type {Connection} from '../../lib/OnyxConnectionManager';
 
@@ -858,7 +858,6 @@ describe('Onyx', () => {
             // When we pass it to Onyx.update
             // @ts-expect-error This is an invalid call to Onyx.update
             Onyx.update(data);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (error) {
             if (error instanceof Error) {
                 // Then we should expect the error message below
@@ -875,7 +874,6 @@ describe('Onyx', () => {
             // When we pass it to Onyx.update
             // @ts-expect-error This is an invalid call to Onyx.update
             Onyx.update(data);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (error) {
             if (error instanceof Error) {
                 // Then we should expect the error message below
@@ -1757,8 +1755,7 @@ describe('Onyx', () => {
             });
 
             it('replacing old object after null merge', async () => {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const entry1: DeepRecord<string, any> = {
+                const entry1: GenericDeepRecord = {
                     sub_entry1: {
                         id: 'sub_entry1',
                         someKey: 'someValue',
@@ -1799,8 +1796,7 @@ describe('Onyx', () => {
             });
 
             it('setting new object after null merge', async () => {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const entry1: DeepRecord<string, any> = {
+                const entry1: GenericDeepRecord = {
                     sub_entry1: {
                         id: 'sub_entry1',
                         someKey: 'someValue',
@@ -1872,8 +1868,7 @@ describe('Onyx', () => {
             });
 
             it('setting new object after null merge of a primitive property', async () => {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const entry1: DeepRecord<string, any> = {
+                const entry1: GenericDeepRecord = {
                     sub_entry1: {
                         id: 'sub_entry1',
                         someKey: 'someValue',
@@ -1933,8 +1928,7 @@ describe('Onyx', () => {
             });
 
             it('replacing nested object during updates', async () => {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const entry1: DeepRecord<string, any> | undefined = {
+                const entry1: GenericDeepRecord | undefined = {
                     id: 'entry1',
                     someKey: 'someValue',
                 };
@@ -1945,8 +1939,7 @@ describe('Onyx', () => {
                     },
                 });
 
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                let entry1ExpectedResult = lodashCloneDeep(entry1) as DeepRecord<string, any> | undefined;
+                let entry1ExpectedResult = lodashCloneDeep(entry1) as GenericDeepRecord | undefined;
                 const queuedUpdates: OnyxUpdate[] = [];
 
                 queuedUpdates.push({
@@ -2002,15 +1995,14 @@ describe('Onyx', () => {
 
             describe('mergeCollection', () => {
                 it('replacing old object after null merge', async () => {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const entry1: DeepRecord<string, any> = {
+                    const entry1: GenericDeepRecord = {
                         sub_entry1: {
                             id: 'sub_entry1',
                             someKey: 'someValue',
                         },
                     };
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const entry2: DeepRecord<string, any> = {
+
+                    const entry2: GenericDeepRecord = {
                         sub_entry2: {
                             id: 'sub_entry2',
                             someKey: 'someValue',
@@ -2132,8 +2124,7 @@ describe('Onyx', () => {
                 });
 
                 it('replacing old object after null merge', async () => {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const entry1: DeepRecord<string, any> = {
+                    const entry1: GenericDeepRecord = {
                         sub_entry1: {
                             id: 'sub_entry1',
                             someKey: 'someValue',
@@ -2165,8 +2156,7 @@ describe('Onyx', () => {
                 });
 
                 it('setting new object after null merge', async () => {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const entry1: DeepRecord<string, any> = {
+                    const entry1: GenericDeepRecord = {
                         sub_entry1: {
                             id: 'sub_entry1',
                             someKey: 'someValue',
@@ -2225,8 +2215,7 @@ describe('Onyx', () => {
                 });
 
                 it('setting new object after null merge of a primitive property', async () => {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const entry1: DeepRecord<string, any> = {
+                    const entry1: GenericDeepRecord = {
                         sub_entry1: {
                             id: 'sub_entry1',
                             someKey: 'someValue',

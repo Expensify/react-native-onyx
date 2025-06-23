@@ -1,9 +1,9 @@
 import Onyx from '../../lib';
 import OnyxUtils from '../../lib/OnyxUtils';
-import type {DeepRecord} from '../../lib/types';
+import type {GenericDeepRecord} from '../../lib/types';
 import utils from '../../lib/utils';
 
-const testObject: DeepRecord<string, unknown> = {
+const testObject: GenericDeepRecord = {
     a: 'a',
     b: {
         c: 'c',
@@ -15,7 +15,7 @@ const testObject: DeepRecord<string, unknown> = {
     },
 };
 
-const testMergeChanges: Array<DeepRecord<string, unknown>> = [
+const testMergeChanges: GenericDeepRecord[] = [
     {
         b: {
             d: {
@@ -165,7 +165,7 @@ describe('OnyxUtils', () => {
         });
 
         it('should merge data correctly when applying batched changes', () => {
-            const batchedChanges: DeepRecord<string, unknown> = {
+            const batchedChanges: GenericDeepRecord = {
                 b: {
                     d: {
                         i: 'i',

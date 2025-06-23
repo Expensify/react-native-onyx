@@ -20,7 +20,7 @@ type FastMergeOptions = {
      * If set to "mark", we will mark objects that are set to null instead of simply removing them,
      * so that we can batch changes together, without losing information about the object removal.
      * If set to "replace", we will completely replace the marked objects with the new value instead of merging them.
-     * */
+     */
     objectRemovalMode?: 'mark' | 'replace' | 'none';
 };
 
