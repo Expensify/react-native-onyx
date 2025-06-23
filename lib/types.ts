@@ -486,7 +486,13 @@ type InitOptions = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type GenericFunction = (...args: any[]) => any;
 
-type MultiMergeReplaceNullPatches = {[TKey in OnyxKey]: FastMergeReplaceNullPatch[]};
+/**
+ * Represents a record where the key is a collection member key and the value is a list of
+ * tuples that we'll use to replace the nested objects of that collection member record with something else.
+ */
+type MultiMergeReplaceNullPatches = {
+    [TKey in OnyxKey]: FastMergeReplaceNullPatch[];
+};
 
 /**
  * Represents a combination of Merge and Set operations that should be executed in Onyx

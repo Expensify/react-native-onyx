@@ -23,6 +23,7 @@ const applyMerge: ApplyMerge = <TKey extends OnyxKey>(key: TKey, existingValue: 
         return Promise.resolve({mergedValue, updatePromise});
     }
 
+    // For web platforms we use `setItem` since the object was already merged with its changes before.
     return Storage.setItem(key, mergedValue as OnyxValue<TKey>).then(() => ({
         mergedValue,
         updatePromise,

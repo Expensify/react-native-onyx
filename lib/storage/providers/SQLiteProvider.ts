@@ -44,11 +44,17 @@ type PageCountResult = {
 const DB_NAME = 'OnyxDB';
 let db: NitroSQLiteConnection;
 
-function replacer(key: string, value: unknown) {
+/**
+ * Prevents the stringifying of the object markers.
+ */
+function objectMarkRemover(key: string, value: unknown) {
     if (key === utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK) return undefined;
     return value;
 }
 
+/**
+ * Transforms the replace null patches into SQL queries to be passed to JSON_REPLACE.
+ */
 function generateJSONReplaceSQLQueries(key: string, patches: FastMergeReplaceNullPatch[]): string[][] {
     const queries = patches.map(([pathArray, value]) => {
         const jsonPath = `$.${pathArray.join('.')}`;
@@ -114,12 +120,15 @@ const provider: StorageProvider = {
     multiMerge(pairs) {
         const commands: BatchQueryCommand[] = [];
 
+        // Query to merge the change into the DB value.
         const patchQuery = `INSERT INTO keyvaluepairs (record_key, valueJSON)
             VALUES (:key, JSON(:value))
             ON CONFLICT DO UPDATE
             SET valueJSON = JSON_PATCH(valueJSON, JSON(:value));
         `;
         const patchQueryArguments: string[][] = [];
+
+        // Query to fully replace the nested objects of the DB value.
         const replaceQuery = `UPDATE keyvaluepairs
             SET valueJSON = JSON_REPLACE(valueJSON, ?, JSON(?))
             WHERE record_key = ?;
@@ -128,12 +137,9 @@ const provider: StorageProvider = {
 
         const nonNullishPairs = pairs.filter((pair) => pair[1] !== undefined);
 
-        // eslint-disable-next-line @typescript-eslint/prefer-for-of
-        for (let i = 0; i < nonNullishPairs.length; i++) {
-            const [key, value, replaceNullPatches] = nonNullishPairs[i];
-
-            const valueAfterReplace = JSON.stringify(value, replacer);
-            patchQueryArguments.push([key, valueAfterReplace]);
+        for (const [key, value, replaceNullPatches] of nonNullishPairs) {
+            const changeWithoutMarkers = JSON.stringify(value, objectMarkRemover);
+            patchQueryArguments.push([key, changeWithoutMarkers]);
 
             const patches = replaceNullPatches ?? [];
             if (patches.length > 0) {

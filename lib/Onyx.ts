@@ -356,6 +356,8 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
  *
  * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
  * @param collection Object collection keyed by individual collection member keys and values
+ * @param mergeReplaceNullPatches Record where the key is a collection member key and the value is a list of
+ * tuples that we'll use to replace the nested objects of that collection member record with something else.
  */
 function mergeCollection<TKey extends CollectionKeyBase, TMap>(
     collectionKey: TKey,

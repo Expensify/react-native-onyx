@@ -31,6 +31,8 @@ const applyMerge: ApplyMerge = <TKey extends OnyxKey>(key: TKey, existingValue: 
         return Promise.resolve({mergedValue, updatePromise});
     }
 
+    // For native platforms we use `mergeItem` that will take advantage of JSON_PATCH and JSON_REPLACE SQL operations to
+    // merge the object in a performant way.
     return Storage.mergeItem(key, batchedChanges as OnyxValue<TKey>, replaceNullPatches).then(() => ({
         mergedValue,
         updatePromise,

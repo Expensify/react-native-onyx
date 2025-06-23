@@ -138,7 +138,7 @@ describe('fastMerge', () => {
         expect(result.replaceNullPatches).toEqual([[['b', 'd'], {h: 'h'}]]);
     });
 
-    it('should completely replace the target object with its source when the source has the "ONYX_INTERNALS__REPLACE_OBJECT_MARK" flag and "shouldReplaceMarkedObjects" is true', () => {
+    it('should completely replace the target object with its source when the source has the "ONYX_INTERNALS__REPLACE_OBJECT_MARK" flag and "objectRemovalMode" is set to "replace"', () => {
         const result = utils.fastMerge(
             testObject,
             {

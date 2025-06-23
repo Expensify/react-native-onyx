@@ -1147,8 +1147,8 @@ function hasPendingMergeForKey(key: OnyxKey): boolean {
  * Storage expects array like: [["@MyApp_user", value_1], ["@MyApp_key", value_2]]
  * This method transforms an object like {'@MyApp_user': myUserValue, '@MyApp_key': myKeyValue}
  * to an array of key-value pairs in the above format and removes key-value pairs that are being set to null
-
-* @return an array of key - value pairs <[key, value]>
+ *
+ * @return an array of key - value pairs <[key, value]>
  */
 function prepareKeyValuePairsForStorage(
     data: Record<OnyxKey, OnyxInput<OnyxKey>>,
@@ -1173,10 +1173,23 @@ function prepareKeyValuePairsForStorage(
     return pairs;
 }
 
+/**
+ * Merges an array of changes with an existing value or creates a single change.
+ *
+ * @param changes Array of changes that should be merged
+ * @param existingValue The existing value that should be merged with the changes
+ */
 function mergeChanges<TValue extends OnyxInput<OnyxKey> | undefined, TChange extends OnyxInput<OnyxKey> | undefined>(changes: TChange[], existingValue?: TValue): FastMergeResult<TChange> {
     return applyMerge('merge', changes, existingValue);
 }
 
+/**
+ * Merges an array of changes with an existing value or creates a single change.
+ * It will also mark deep nested objects that need to be entirely replaced during the merge.
+ *
+ * @param changes Array of changes that should be merged
+ * @param existingValue The existing value that should be merged with the changes
+ */
 function mergeAndMarkChanges<TValue extends OnyxInput<OnyxKey> | undefined, TChange extends OnyxInput<OnyxKey> | undefined>(
     changes: TChange[],
     existingValue?: TValue,
@@ -1185,7 +1198,7 @@ function mergeAndMarkChanges<TValue extends OnyxInput<OnyxKey> | undefined, TCha
 }
 
 /**
- * Merges an array of changes with an existing value or creates a single change
+ * Merges an array of changes with an existing value or creates a single change.
  *
  * @param changes Array of changes that should be merged
  * @param existingValue The existing value that should be merged with the changes

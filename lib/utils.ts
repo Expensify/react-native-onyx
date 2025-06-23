@@ -3,6 +3,13 @@ import type {ConnectOptions, OnyxInput, OnyxKey} from './types';
 type EmptyObject = Record<string, never>;
 type EmptyValue = EmptyObject | null | undefined;
 
+/**
+ * A tuple where the first value is the path to the nested object that contains the
+ * internal `ONYX_INTERNALS__REPLACE_OBJECT_MARK` flag, and the second value is the data we want to replace
+ * in that path.
+ *
+ * This tuple will be used in SQLiteProvider to replace the nested object using `JSON_REPLACE`.
+ * */
 type FastMergeReplaceNullPatch = [string[], unknown];
 
 type FastMergeOptions = {
@@ -18,7 +25,7 @@ type FastMergeOptions = {
 };
 
 type FastMergeMetadata = {
-    /** The path to the object that contains the internal "ONYX_INTERNALS__REPLACE_OBJECT_MARK" flag. */
+    /** The list of tuples that will be used in SQLiteProvider to replace the nested objects using `JSON_REPLACE`. */
     replaceNullPatches: FastMergeReplaceNullPatch[];
 };
 
