@@ -103,8 +103,7 @@ describe('fastMerge', () => {
     });
 
     it('should replace an object with an array', () => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = utils.fastMerge(testObject, [1, 2, 3] as any, {
+        const result = utils.fastMerge(testObject, [1, 2, 3], {
             shouldRemoveNestedNulls: true,
         });
 
@@ -112,8 +111,7 @@ describe('fastMerge', () => {
     });
 
     it('should replace an array with an object', () => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = utils.fastMerge([1, 2, 3] as any, testObject, {
+        const result = utils.fastMerge([1, 2, 3], testObject, {
             shouldRemoveNestedNulls: true,
         });
 
