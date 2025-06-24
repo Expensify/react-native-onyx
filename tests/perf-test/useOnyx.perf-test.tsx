@@ -5,6 +5,7 @@ import {measureRenders} from 'reassure';
 import type {FetchStatus, OnyxEntry, OnyxKey, OnyxValue, ResultMetadata, UseOnyxOptions} from '../../lib';
 import Onyx, {useOnyx} from '../../lib';
 import StorageMock from '../../lib/storage';
+import OnyxUtils from '../../lib/OnyxUtils';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -49,6 +50,7 @@ function UseOnyxWrapper({onyxKey, onyxOptions}: UseOnyxWrapperProps) {
 
 const clearOnyxAfterEachMeasure = async () => {
     await Onyx.clear();
+    OnyxUtils.clearInternals();
 };
 
 describe('useOnyx', () => {
@@ -61,6 +63,7 @@ describe('useOnyx', () => {
 
     afterEach(async () => {
         await Onyx.clear();
+        OnyxUtils.clearInternals();
     });
 
     describe('misc', () => {

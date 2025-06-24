@@ -25,6 +25,7 @@ const mockedReportActionsMap = getRandomReportActions(collectionKey);
 
 const clearOnyxAfterEachMeasure = async () => {
     await Onyx.clear();
+    OnyxUtils.clearInternals();
 };
 
 describe('Onyx', () => {
@@ -39,6 +40,7 @@ describe('Onyx', () => {
 
     afterEach(async () => {
         await Onyx.clear();
+        OnyxUtils.clearInternals();
     });
 
     describe('set', () => {

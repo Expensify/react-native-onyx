@@ -45,6 +45,7 @@ const mockedReportActionsKeys = Object.keys(mockedReportActionsMap);
 
 const clearOnyxAfterEachMeasure = async () => {
     await Onyx.clear();
+    OnyxUtils.clearInternals();
 };
 
 describe('OnyxUtils', () => {
@@ -60,6 +61,7 @@ describe('OnyxUtils', () => {
 
     afterEach(async () => {
         await Onyx.clear();
+        OnyxUtils.clearInternals();
     });
 
     describe('getMergeQueue', () => {
