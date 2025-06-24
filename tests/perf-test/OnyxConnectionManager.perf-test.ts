@@ -4,7 +4,6 @@ import type {Connection} from '../../lib/OnyxConnectionManager';
 import connectionManager from '../../lib/OnyxConnectionManager';
 import createDeferredTask from '../../lib/createDeferredTask';
 import {getRandomReportActions} from '../utils/collections/reportActions';
-import OnyxUtils from '../../lib/OnyxUtils';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -39,7 +38,6 @@ const resetConectionManagerAfterEachMeasure = () => {
 
 const clearOnyxAfterEachMeasure = async () => {
     await Onyx.clear();
-    OnyxUtils.clearInternals();
 };
 
 describe('OnyxConnectionManager', () => {

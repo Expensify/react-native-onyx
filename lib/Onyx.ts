@@ -152,7 +152,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>): Promis
         }
     }
 
-    // Onyx.set will ignore `undefined` values as inputs, therefore we can return early....
+    // Onyx.set will ignore `undefined` values as inputs, therefore we can return early.
     if (value === undefined) {
         return Promise.resolve();
     }
