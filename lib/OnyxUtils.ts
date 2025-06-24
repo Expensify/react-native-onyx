@@ -72,7 +72,7 @@ const lastConnectionCallbackData = new Map<number, OnyxValue<OnyxKey>>();
 
 let snapshotKey: OnyxKey | null = null;
 
-let fullyMergedSnapshotKeys: string[] = [];
+let fullyMergedSnapshotKeys: Set<string> | undefined;
 
 // Keeps track of the last subscriptionID that was used so we can keep incrementing it
 let lastSubscriptionID = 0;
@@ -87,7 +87,7 @@ function getSnapshotKey(): OnyxKey | null {
     return snapshotKey;
 }
 
-function getFullyMergedSnapshotKeys(): string[] {
+function getFullyMergedSnapshotKeys(): Set<string> | undefined {
     return fullyMergedSnapshotKeys;
 }
 
@@ -160,7 +160,7 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
 
     if (typeof keys.COLLECTION === 'object' && typeof keys.COLLECTION.SNAPSHOT === 'string') {
         snapshotKey = keys.COLLECTION.SNAPSHOT;
-        fullyMergedSnapshotKeys = fullyMergedSnapshotKeysParam ?? [];
+        fullyMergedSnapshotKeys = new Set(fullyMergedSnapshotKeysParam ?? []);
     }
 }
 
@@ -1422,7 +1422,15 @@ function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge): Array<
 
             const oldValue = updatedData[key] || {};
             const fullyMergedKeys = getFullyMergedSnapshotKeys();
-            const newValue = fullyMergedKeys.some((collectionKey) => isCollectionMemberKey(collectionKey, key)) ? value : lodashPick(value, Object.keys(snapshotData[key]));
+            let collectionKey: string | undefined;
+            try {
+                collectionKey = getCollectionKey(key);
+            } catch (e) {
+                // If getCollectionKey() throws an error it means the key is not a collection key.
+                collectionKey = undefined;
+            }
+            const shouldFullyMerge = fullyMergedKeys?.has(collectionKey || key);
+            const newValue = shouldFullyMerge ? value : lodashPick(value, Object.keys(snapshotData[key]));
 
             updatedData = {...updatedData, [key]: Object.assign(oldValue, newValue)};
         });
