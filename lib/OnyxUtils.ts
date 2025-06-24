@@ -1432,9 +1432,9 @@ function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge): Array<
 }
 
 function clearInternals(): void {
-    callbackToStateMapping = {};
-    onyxKeyToSubscriptionIDs = new Map();
-    lastConnectionCallbackData = new Map();
+    // callbackToStateMapping = {};
+    // onyxKeyToSubscriptionIDs = new Map();
+    // lastConnectionCallbackData = new Map();
 }
 
 const OnyxUtils = {
