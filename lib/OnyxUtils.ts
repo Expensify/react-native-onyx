@@ -87,10 +87,6 @@ function getSnapshotKey(): OnyxKey | null {
     return snapshotKey;
 }
 
-function getFullyMergedSnapshotKeys(): Set<string> | undefined {
-    return fullyMergedSnapshotKeys;
-}
-
 /**
  * Getter - returns the merge queue.
  */
@@ -1421,7 +1417,6 @@ function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge): Array<
             }
 
             const oldValue = updatedData[key] || {};
-            const fullyMergedKeys = getFullyMergedSnapshotKeys();
             let collectionKey: string | undefined;
             try {
                 collectionKey = getCollectionKey(key);
@@ -1429,7 +1424,7 @@ function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge): Array<
                 // If getCollectionKey() throws an error it means the key is not a collection key.
                 collectionKey = undefined;
             }
-            const shouldFullyMerge = fullyMergedKeys?.has(collectionKey || key);
+            const shouldFullyMerge = fullyMergedSnapshotKeys?.has(collectionKey || key);
             const newValue = shouldFullyMerge ? value : lodashPick(value, Object.keys(snapshotData[key]));
 
             updatedData = {...updatedData, [key]: Object.assign(oldValue, newValue)};
