@@ -28,7 +28,7 @@ jobs:
         run: npm install
 
       - name: Run Reassure baseline tests
-        run: npx reassure --baseline
+        run: npx reassure --baseline --verbose
 
       - name: Checkout PR head SHA
         run: |
@@ -39,7 +39,7 @@ jobs:
         run: npm install --force
 
       - name: Run Reassure delta tests
-        run: npx reassure --branch
+        run: npx reassure --branch --verbose
 
       - name: Validate output.json
         id: validateReassureOutput
