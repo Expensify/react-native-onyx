@@ -14,4 +14,5 @@ module.exports = {
     setupFilesAfterEnv: ['./jestSetup.js'],
     testTimeout: 60000,
     transformIgnorePatterns: ['node_modules/(?!((@)?react-native|@ngneat/falso|uuid)/)'],
+    testSequencer: './jest-sequencer.js',
 };

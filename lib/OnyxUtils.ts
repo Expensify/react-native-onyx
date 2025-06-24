@@ -49,17 +49,17 @@ const METHOD = {
 type OnyxMethod = ValueOf<typeof METHOD>;
 
 // Key/value store of Onyx key and arrays of values to merge
-const mergeQueue: Record<OnyxKey, Array<OnyxValue<OnyxKey>>> = {};
-const mergeQueuePromise: Record<OnyxKey, Promise<void>> = {};
+let mergeQueue: Record<OnyxKey, Array<OnyxValue<OnyxKey>>> = {};
+let mergeQueuePromise: Record<OnyxKey, Promise<void>> = {};
 
 // Holds a mapping of all the React components that want their state subscribed to a store key
-const callbackToStateMapping: Record<string, Mapping<OnyxKey>> = {};
+let callbackToStateMapping: Record<string, Mapping<OnyxKey>> = {};
 
 // Keeps a copy of the values of the onyx collection keys as a map for faster lookups
 let onyxCollectionKeySet = new Set<OnyxKey>();
 
 // Holds a mapping of the connected key to the subscriptionID for faster lookups
-const onyxKeyToSubscriptionIDs = new Map();
+let onyxKeyToSubscriptionIDs = new Map();
 
 // Optional user-provided key value states set when Onyx initializes or clears
 let defaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
@@ -68,7 +68,7 @@ let batchUpdatesPromise: Promise<void> | null = null;
 let batchUpdatesQueue: Array<() => void> = [];
 
 // Used for comparison with a new update to avoid invoking the Onyx.connect callback with the same data.
-const lastConnectionCallbackData = new Map<number, OnyxValue<OnyxKey>>();
+let lastConnectionCallbackData = new Map<number, OnyxValue<OnyxKey>>();
 
 let snapshotKey: OnyxKey | null = null;
 
@@ -1450,6 +1450,18 @@ function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge): Array<
     return promises;
 }
 
+/**
+ * Clear internal variables used in this file, useful in test environments.
+ */
+function clearOnyxUtilsInternals() {
+    mergeQueue = {};
+    mergeQueuePromise = {};
+    callbackToStateMapping = {};
+    onyxKeyToSubscriptionIDs = new Map();
+    batchUpdatesQueue = [];
+    lastConnectionCallbackData = new Map();
+}
+
 const OnyxUtils = {
     METHOD,
     getMergeQueue,
@@ -1551,3 +1563,4 @@ GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
 
 export type {OnyxMethod};
 export default OnyxUtils;
+export {clearOnyxUtilsInternals};
