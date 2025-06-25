@@ -150,6 +150,9 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
     // Let Onyx know about which keys are safe to evict
     cache.setEvictionAllowList(evictableKeys);
 
+    // Set collection keys in cache for optimized storage
+    cache.setCollectionKeys(onyxCollectionKeySet);
+
     if (typeof keys.COLLECTION === 'object' && typeof keys.COLLECTION.SNAPSHOT === 'string') {
         snapshotKey = keys.COLLECTION.SNAPSHOT;
     }
@@ -522,23 +525,30 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Partial<Ma
     let val = cache.get(key);
 
     if (isCollectionKey(key)) {
-        const allCacheKeys = cache.getAllKeys();
+        // Try optimized collection data retrieval first
+        const collectionData = cache.getCollectionData(key);
+        if (collectionData && Object.keys(collectionData).length > 0) {
+            val = collectionData;
+        } else {
+            // Fallback to original logic
+            const allCacheKeys = cache.getAllKeys();
 
-        // It is possible we haven't loaded all keys yet so we do not know if the
-        // collection actually exists.
-        if (allCacheKeys.size === 0) {
-            return;
-        }
-
-        const values: OnyxCollection<KeyValueMapping[TKey]> = {};
-        allCacheKeys.forEach((cacheKey) => {
-            if (!cacheKey.startsWith(key)) {
+            // It is possible we haven't loaded all keys yet so we do not know if the
+            // collection actually exists.
+            if (allCacheKeys.size === 0) {
                 return;
             }
 
-            values[cacheKey] = cache.get(cacheKey);
-        });
-        val = values;
+            const values: OnyxCollection<KeyValueMapping[TKey]> = {};
+            allCacheKeys.forEach((cacheKey) => {
+                if (!cacheKey.startsWith(key)) {
+                    return;
+                }
+
+                values[cacheKey] = cache.get(cacheKey);
+            });
+            val = values;
+        }
     }
 
     if (mapping?.selector) {
@@ -553,6 +563,26 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Partial<Ma
 }
 
 function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collectionMemberKeys?: string[]): NonNullable<OnyxCollection<KeyValueMapping[TKey]>> {
+    // Use optimized collection data retrieval
+    const collectionData = cache.getCollectionData(collectionKey);
+    if (collectionData) {
+        // If we have specific member keys, filter the collection
+        if (collectionMemberKeys) {
+            const filteredCollection: OnyxCollection<KeyValueMapping[TKey]> = {};
+            collectionMemberKeys.forEach((key) => {
+                if (collectionData[key] !== undefined) {
+                    filteredCollection[key] = collectionData[key];
+                } else if (cache.hasNullishStorageKey(key)) {
+                    filteredCollection[key] = cache.get(key);
+                }
+            });
+            return filteredCollection;
+        }
+        // Return a copy to avoid mutations affecting the cache
+        return {...collectionData};
+    }
+
+    // Fallback to original implementation if collection data not available
     const allKeys = collectionMemberKeys || cache.getAllKeys();
     const collection: OnyxCollection<KeyValueMapping[TKey]> = {};
 
@@ -1293,6 +1323,9 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
             // can send data back to the subscriber. Note that multiple keys can match as a subscriber could either be
             // subscribed to a "collection key" or a single key.
             const matchingKeys: string[] = [];
+
+            // For now, use the original key matching logic to ensure compatibility
+            // TODO: Optimize this after ensuring the cache collection data is always properly populated
             keys.forEach((key) => {
                 if (!isKeyMatch(mapping.key, key)) {
                     return;
