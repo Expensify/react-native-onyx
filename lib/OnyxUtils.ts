@@ -525,14 +525,12 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Partial<Ma
     let val = cache.get(key);
 
     if (isCollectionKey(key)) {
-        // Try optimized collection data retrieval first
         const collectionData = cache.getCollectionData(key);
-        if (collectionData && Object.keys(collectionData).length > 0) {
+        const allCacheKeys = cache.getAllKeys();
+        if (collectionData !== undefined && allCacheKeys.size > 0) {
             val = collectionData;
         } else {
             // Fallback to original logic
-            const allCacheKeys = cache.getAllKeys();
-
             // It is possible we haven't loaded all keys yet so we do not know if the
             // collection actually exists.
             if (allCacheKeys.size === 0) {
@@ -563,9 +561,10 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Partial<Ma
 }
 
 function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collectionMemberKeys?: string[]): NonNullable<OnyxCollection<KeyValueMapping[TKey]>> {
-    // Use optimized collection data retrieval
+    // Use optimized collection data retrieval when cache is populated
     const collectionData = cache.getCollectionData(collectionKey);
-    if (collectionData) {
+    const allKeys = collectionMemberKeys || cache.getAllKeys();
+    if (collectionData !== undefined && (Array.isArray(allKeys) ? allKeys.length > 0 : allKeys.size > 0)) {
         // If we have specific member keys, filter the collection
         if (collectionMemberKeys) {
             const filteredCollection: OnyxCollection<KeyValueMapping[TKey]> = {};
@@ -583,7 +582,6 @@ function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey
     }
 
     // Fallback to original implementation if collection data not available
-    const allKeys = collectionMemberKeys || cache.getAllKeys();
     const collection: OnyxCollection<KeyValueMapping[TKey]> = {};
 
     const collectionKeyLength = collectionKey.length;
@@ -1324,8 +1322,7 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
             // subscribed to a "collection key" or a single key.
             const matchingKeys: string[] = [];
 
-            // For now, use the original key matching logic to ensure compatibility
-            // TODO: Optimize this after ensuring the cache collection data is always properly populated
+            // Use original key matching logic for reliability
             keys.forEach((key) => {
                 if (!isKeyMatch(mapping.key, key)) {
                     return;
