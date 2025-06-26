@@ -47,6 +47,7 @@ jobs:
           name: results
           path: .reassure/
           if-no-files-found: ignore
+          include-hidden-files: true
 
       - name: Validate output.json
         id: validateReassureOutput
