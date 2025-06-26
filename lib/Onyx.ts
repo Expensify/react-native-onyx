@@ -131,7 +131,7 @@ function disconnect(connection: Connection): void {
  * @param key ONYXKEY to set
  * @param value value to store
  */
-function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>): Promise<void> {
+function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options: {skipNullValuesCheck: boolean}): Promise<void> {
     // When we use Onyx.set to set a key we want to clear the current delta changes from Onyx.merge that were queued
     // before the value was set. If Onyx.merge is currently reading the old value from storage, it will then not apply the changes.
     if (OnyxUtils.hasPendingMergeForKey(key)) {
@@ -171,7 +171,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>): Promis
     }
 
     // If the value is null, we remove the key from storage
-    const {value: valueAfterRemoving, wasRemoved} = OnyxUtils.removeNullValues(key, value);
+    const {value: valueAfterRemoving, wasRemoved} = OnyxUtils.removeNullValues(key, value, !options.skipNullValuesCheck);
 
     const logSetCall = (hasChanged = true) => {
         // Logging properties only since values could be sensitive things we don't want to log
