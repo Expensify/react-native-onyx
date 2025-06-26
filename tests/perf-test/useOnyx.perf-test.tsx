@@ -51,7 +51,7 @@ const clearOnyxAfterEachMeasure = async () => {
     await Onyx.clear();
 };
 
-describe.skip('useOnyx', () => {
+describe('useOnyx', () => {
     beforeAll(async () => {
         Onyx.init({
             keys: ONYXKEYS,
