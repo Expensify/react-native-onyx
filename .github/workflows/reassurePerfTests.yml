@@ -10,7 +10,7 @@ jobs:
   # Note: We run baseline and delta performance checks in the same runner to reduce hardware variance across machines
   perf-tests:
     if: ${{ github.actor != 'OSBotify' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-v4
     steps:
       # v4
       - name: Checkout
@@ -24,22 +24,38 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
-      - name: Install dependencies
-        run: npm install
+      # - name: Install dependencies
+      #   run: npm install
 
-      - name: Run Reassure baseline tests
-        run: npx reassure --baseline
+      # - name: Run Reassure baseline tests
+      #   run: npx reassure --baseline --verbose
 
-      - name: Checkout PR head SHA
+      # - name: Checkout PR head SHA
+      #   run: |
+      #     git fetch origin ${{ github.event.pull_request.head.sha }} --no-tags --depth=1
+      #     git switch --force --detach ${{ github.event.pull_request.head.sha }}
+          
+      # - name: Reinstall dependencies
+      #   run: npm install --force
+
+      # - name: Run Reassure delta tests
+      #   run: npx reassure --branch --verbose
+      - name: Run Reassure tests
         run: |
+          npm install --force || (rm -rf node_modules && npm install --force)
+          npx reassure --baseline --verbose
           git fetch origin ${{ github.event.pull_request.head.sha }} --no-tags --depth=1
           git switch --force --detach ${{ github.event.pull_request.head.sha }}
-          
-      - name: Reinstall dependencies
-        run: npm install --force
+          npm install --force || (rm -rf node_modules && npm install --force)
+          npx reassure --branch --verbose
 
-      - name: Run Reassure delta tests
-        run: npx reassure --branch
+      - name: Upload Reassure results
+        uses: actions/upload-artifact@v4
+        with:
+          name: results
+          path: .reassure/
+          if-no-files-found: ignore
+          include-hidden-files: true
 
       - name: Validate output.json
         id: validateReassureOutput
