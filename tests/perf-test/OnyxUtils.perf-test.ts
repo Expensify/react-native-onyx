@@ -325,7 +325,6 @@ describe('OnyxUtils', () => {
                     });
                 },
                 afterEach: async () => {
-                    await clearOnyxAfterEachMeasure();
                     mockedReportActionsKeys.forEach((key) => {
                         const id = subscriptionMap.get(key);
                         if (id) {
@@ -333,6 +332,7 @@ describe('OnyxUtils', () => {
                         }
                     });
                     subscriptionMap.clear();
+                    await clearOnyxAfterEachMeasure();
                 },
             });
         });
@@ -355,11 +355,11 @@ describe('OnyxUtils', () => {
                     }
                 },
                 afterEach: async () => {
-                    await clearOnyxAfterEachMeasure();
                     subscriptionIDs.forEach((id) => {
                         OnyxUtils.unsubscribeFromKey(id);
                     });
                     subscriptionIDs.clear();
+                    await clearOnyxAfterEachMeasure();
                 },
             });
         });
@@ -388,10 +388,10 @@ describe('OnyxUtils', () => {
                         subscriptionID = OnyxUtils.subscribeToKey({key: collectionKey, callback: jest.fn(), initWithStoredValues: false});
                     },
                     afterEach: async () => {
-                        await clearOnyxAfterEachMeasure();
                         if (subscriptionID) {
                             OnyxUtils.unsubscribeFromKey(subscriptionID);
                         }
+                        await clearOnyxAfterEachMeasure();
                     },
                 },
             );
@@ -421,10 +421,10 @@ describe('OnyxUtils', () => {
                         subscriptionID = OnyxUtils.subscribeToKey({key: collectionKey, callback: jest.fn(), initWithStoredValues: false});
                     },
                     afterEach: async () => {
-                        await clearOnyxAfterEachMeasure();
                         if (subscriptionID) {
                             OnyxUtils.unsubscribeFromKey(subscriptionID);
                         }
+                        await clearOnyxAfterEachMeasure();
                     },
                 },
             );
@@ -470,10 +470,10 @@ describe('OnyxUtils', () => {
                         await Onyx.multiSet(mockedReportActionsMap);
                     },
                     afterEach: async () => {
-                        await clearOnyxAfterEachMeasure();
                         if (subscriptionID) {
                             OnyxUtils.unsubscribeFromKey(subscriptionID);
                         }
+                        await clearOnyxAfterEachMeasure();
                     },
                 },
             );
@@ -499,7 +499,6 @@ describe('OnyxUtils', () => {
                         });
                     },
                     afterEach: async () => {
-                        await clearOnyxAfterEachMeasure();
                         mockedReportActionsKeys.forEach((key) => {
                             const id = subscriptionMap.get(key);
                             if (id) {
@@ -507,6 +506,7 @@ describe('OnyxUtils', () => {
                             }
                         });
                         subscriptionMap.clear();
+                        await clearOnyxAfterEachMeasure();
                     },
                 },
             );
@@ -530,7 +530,6 @@ describe('OnyxUtils', () => {
                     });
                 },
                 afterEach: async () => {
-                    await clearOnyxAfterEachMeasure();
                     mockedReportActionsKeys.forEach((key) => {
                         const id = subscriptionMap.get(key);
                         if (id) {
@@ -538,6 +537,7 @@ describe('OnyxUtils', () => {
                         }
                     });
                     subscriptionMap.clear();
+                    await clearOnyxAfterEachMeasure();
                 },
             });
         });
@@ -730,8 +730,8 @@ describe('OnyxUtils', () => {
                         await StorageMock.multiSet(Object.entries(mockedReportActionsMap).map(([k, v]) => [k, v]));
                     },
                     afterEach: async () => {
-                        await clearOnyxAfterEachMeasure();
                         OnyxUtils.unsubscribeFromKey(subscriptionID);
+                        await clearOnyxAfterEachMeasure();
                     },
                 },
             );
@@ -757,8 +757,8 @@ describe('OnyxUtils', () => {
                         await StorageMock.multiSet(Object.entries(mockedReportActionsMap).map(([k, v]) => [k, v]));
                     },
                     afterEach: async () => {
-                        await clearOnyxAfterEachMeasure();
                         OnyxUtils.unsubscribeFromKey(subscriptionID);
+                        await clearOnyxAfterEachMeasure();
                     },
                 },
             );
@@ -826,9 +826,9 @@ describe('OnyxUtils', () => {
                     });
                 },
                 afterEach: async () => {
-                    await clearOnyxAfterEachMeasure();
                     OnyxUtils.deleteKeyBySubscriptions(subscriptionID);
                     OnyxUtils.unsubscribeFromKey(subscriptionID);
+                    await clearOnyxAfterEachMeasure();
                 },
             });
         });
@@ -848,8 +848,8 @@ describe('OnyxUtils', () => {
                     OnyxUtils.storeKeyBySubscriptions(key, subscriptionID);
                 },
                 afterEach: async () => {
-                    await clearOnyxAfterEachMeasure();
                     OnyxUtils.unsubscribeFromKey(subscriptionID);
+                    await clearOnyxAfterEachMeasure();
                 },
             });
         });
@@ -869,8 +869,8 @@ describe('OnyxUtils', () => {
                     }),
                 {
                     afterEach: async () => {
-                        await clearOnyxAfterEachMeasure();
                         OnyxCache.removeLastAccessedKey(key);
+                        await clearOnyxAfterEachMeasure();
                     },
                 },
             );
