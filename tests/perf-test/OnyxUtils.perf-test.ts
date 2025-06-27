@@ -4,7 +4,7 @@ import type {OnyxKey, Selector} from '../../lib';
 import Onyx from '../../lib';
 import StorageMock from '../../lib/storage';
 import OnyxCache from '../../lib/OnyxCache';
-import OnyxUtils from '../../lib/OnyxUtils';
+import OnyxUtils, {clearOnyxUtilsInternals} from '../../lib/OnyxUtils';
 import type GenericCollection from '../utils/GenericCollection';
 import type {Mapping, OnyxUpdate} from '../../lib/Onyx';
 import createDeferredTask from '../../lib/createDeferredTask';
@@ -44,6 +44,7 @@ const mockedReportActionsMap = getRandomReportActions(collectionKey);
 const mockedReportActionsKeys = Object.keys(mockedReportActionsMap);
 
 const clearOnyxAfterEachMeasure = async () => {
+    clearOnyxUtilsInternals();
     await Onyx.clear();
 };
 
@@ -59,6 +60,7 @@ describe('OnyxUtils', () => {
     });
 
     afterEach(async () => {
+        clearOnyxUtilsInternals();
         await Onyx.clear();
     });
 
