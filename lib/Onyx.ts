@@ -72,7 +72,7 @@ function init({
 
     OnyxUtils.initStoreValues(keys, initialKeyStates, evictableKeys);
 
-    // Initialize all of our keys with data provided then give green light to any pending connections.....
+    // Initialize all of our keys with data provided then give green light to any pending connections......
     Promise.all([cache.addEvictableKeysToRecentlyAccessedList(OnyxUtils.isCollectionKey, OnyxUtils.getAllKeys), OnyxUtils.initializeWithDefaultKeyStates()]).then(
         OnyxUtils.getDeferredInitTask().resolve,
     );
