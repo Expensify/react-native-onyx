@@ -28,7 +28,7 @@ Values of type <code>Object</code> get merged with the old value, whilst for <co
 applied in the order they were called. Note: <code>Onyx.set()</code> calls do not work this way so use caution when mixing
 <code>Onyx.merge()</code> and <code>Onyx.set()</code>.</p>
 </dd>
-<dt><a href="#mergeCollection">mergeCollection(collectionKey, collection)</a></dt>
+<dt><a href="#mergeCollection">mergeCollection(collectionKey, collection, mergeReplaceNullPatches)</a></dt>
 <dd><p>Merges a collection based on their keys</p>
 </dd>
 <dt><a href="#clear">clear(keysToPreserve)</a></dt>
@@ -157,7 +157,7 @@ Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Wor
 ```
 <a name="mergeCollection"></a>
 
-## mergeCollection(collectionKey, collection)
+## mergeCollection(collectionKey, collection, mergeReplaceNullPatches)
 Merges a collection based on their keys
 
 **Kind**: global function  
@@ -166,6 +166,7 @@ Merges a collection based on their keys
 | --- | --- |
 | collectionKey | e.g. `ONYXKEYS.COLLECTION.REPORT` |
 | collection | Object collection keyed by individual collection member keys and values |
+| mergeReplaceNullPatches | Record where the key is a collection member key and the value is a list of tuples that we'll use to replace the nested objects of that collection member record with something else. |
 
 **Example**  
 ```js
