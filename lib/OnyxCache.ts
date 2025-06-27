@@ -47,7 +47,7 @@ class OnyxCache {
     private evictionBlocklist: Record<OnyxKey, string[] | undefined> = {};
 
     /** List of keys that have been directly subscribed to or recently modified from least to most recent */
-    private recentlyAccessedKeys: OnyxKey[] = [];
+    private recentlyAccessedKeys = new Set<OnyxKey>();
 
     constructor() {
         this.storageKeys = new Set();
@@ -317,7 +317,7 @@ class OnyxCache {
      * Remove a key from the recently accessed key list.
      */
     removeLastAccessedKey(key: OnyxKey): void {
-        this.recentlyAccessedKeys = this.recentlyAccessedKeys.filter((recentlyAccessedKey) => recentlyAccessedKey !== key);
+        this.recentlyAccessedKeys.delete(key);
     }
 
     /**
@@ -332,7 +332,7 @@ class OnyxCache {
         }
 
         this.removeLastAccessedKey(key);
-        this.recentlyAccessedKeys.push(key);
+        this.recentlyAccessedKeys.add(key);
     }
 
     /**
@@ -361,7 +361,12 @@ class OnyxCache {
      * Finds a key that can be safely evicted
      */
     getKeyForEviction(): OnyxKey | undefined {
-        return this.recentlyAccessedKeys.find((key) => !this.evictionBlocklist[key]);
+        for (const key of this.recentlyAccessedKeys) {
+            if (!this.evictionBlocklist[key]) {
+                return key;
+            }
+        }
+        return undefined;
     }
 }
 

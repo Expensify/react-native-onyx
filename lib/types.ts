@@ -481,6 +481,14 @@ type InitOptions = {
      * Additionally, any subscribers from these keys to won't receive any data from Onyx.
      */
     skippableCollectionMemberIDs?: string[];
+
+    /**
+     * Array of snapshot collection keys where full merge is supported and data structure can be changed after merge.
+     * For e.g. if oldSnapshotData is {report_1: {name 'Fitsum'}} and BE update is {report_1: {name:'Fitsum2', nickName:'Fitse'}}
+     * if it is fullyMergedSnapshotkey the `nickName` prop that didn't exist in the previous data will be merged
+     * otherwise only existing prop will be picked from the BE update and merged (in this case only name).
+     */
+    fullyMergedSnapshotKeys?: string[];
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

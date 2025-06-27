@@ -2,6 +2,7 @@
 import {deepEqual} from 'fast-equals';
 import lodashClone from 'lodash/clone';
 import type {ValueOf} from 'type-fest';
+import lodashPick from 'lodash/pick';
 import DevTools from './DevTools';
 import * as Logger from './Logger';
 import type Onyx from './Onyx';
@@ -74,6 +75,8 @@ const lastConnectionCallbackData = new Map<number, OnyxValue<OnyxKey>>();
 
 let snapshotKey: OnyxKey | null = null;
 
+let fullyMergedSnapshotKeys: Set<string> | undefined;
+
 // Keeps track of the last subscriptionID that was used so we can keep incrementing it
 let lastSubscriptionID = 0;
 
@@ -135,8 +138,9 @@ function setSkippableCollectionMemberIDs(ids: Set<string>): void {
  * @param keys - `ONYXKEYS` constants object from Onyx.init()
  * @param initialKeyStates - initial data to set when `init()` and `clear()` are called
  * @param evictableKeys - This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal.
+ * @param fullyMergedSnapshotKeys - Array of snapshot collection keys where full merge is supported and data structure can be changed after merge.
  */
-function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Partial<KeyValueMapping>, evictableKeys: OnyxKey[]): void {
+function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Partial<KeyValueMapping>, evictableKeys: OnyxKey[], fullyMergedSnapshotKeysParam?: string[]): void {
     // We need the value of the collection keys later for checking if a
     // key is a collection. We store it in a map for faster lookup.
     const collectionValues = Object.values(keys.COLLECTION ?? {}) as string[];
@@ -155,6 +159,7 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
 
     if (typeof keys.COLLECTION === 'object' && typeof keys.COLLECTION.SNAPSHOT === 'string') {
         snapshotKey = keys.COLLECTION.SNAPSHOT;
+        fullyMergedSnapshotKeys = new Set(fullyMergedSnapshotKeysParam ?? []);
     }
 }
 
@@ -449,8 +454,8 @@ function isCollectionKey(key: OnyxKey): key is CollectionKeyBase {
     return onyxCollectionKeySet.has(key);
 }
 
-function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collectionKey: TCollectionKey, key: string, collectionKeyLength: number): key is `${TCollectionKey}${string}` {
-    return key.startsWith(collectionKey) && key.length > collectionKeyLength;
+function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collectionKey: TCollectionKey, key: string): key is `${TCollectionKey}${string}` {
+    return key.startsWith(collectionKey) && key.length > collectionKey.length;
 }
 
 /**
@@ -464,7 +469,7 @@ function splitCollectionMemberKey<TKey extends CollectionKey, CollectionKeyType 
     key: TKey,
     collectionKey?: string,
 ): [CollectionKeyType, string] {
-    if (collectionKey && !isCollectionMemberKey(collectionKey, key, collectionKey.length)) {
+    if (collectionKey && !isCollectionMemberKey(collectionKey, key)) {
         throw new Error(`Invalid '${collectionKey}' collection key provided, it isn't compatible with '${key}' key.`);
     }
 
@@ -559,14 +564,12 @@ function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey
     const allKeys = collectionMemberKeys || cache.getAllKeys();
     const collection: OnyxCollection<KeyValueMapping[TKey]> = {};
 
-    const collectionKeyLength = collectionKey.length;
-
     // forEach exists on both Set and Array
     allKeys.forEach((key) => {
         // If we don't have collectionMemberKeys array then we have to check whether a key is a collection member key.
         // Because in that case the keys will be coming from `cache.getAllKeys()` and we need to filter out the keys that
         // are not part of the collection.
-        if (!collectionMemberKeys && !isCollectionMemberKey(collectionKey, key, collectionKeyLength)) {
+        if (!collectionMemberKeys && !isCollectionMemberKey(collectionKey, key)) {
             return;
         }
 
@@ -602,7 +605,6 @@ function keysChanged<TKey extends CollectionKeyBase>(
     // individual collection key member for the collection that is being updated. It is important to note that the collection parameter cane be a PARTIAL collection
     // and does not represent all of the combined keys and values for a collection key. It is just the "new" data that was merged in via mergeCollection().
     const stateMappingKeys = Object.keys(callbackToStateMapping);
-    const collectionKeyLength = collectionKey.length;
 
     for (const stateMappingKey of stateMappingKeys) {
         const subscriber = callbackToStateMapping[stateMappingKey];
@@ -623,7 +625,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
         /**
          * e.g. Onyx.connect({key: `${ONYXKEYS.COLLECTION.REPORT}{reportID}`, callback: ...});
          */
-        const isSubscribedToCollectionMemberKey = isCollectionMemberKey(collectionKey, subscriber.key, collectionKeyLength);
+        const isSubscribedToCollectionMemberKey = isCollectionMemberKey(collectionKey, subscriber.key);
 
         // Regular Onyx.connect() subscriber found.
         if (typeof subscriber.callback === 'function') {
@@ -1409,7 +1411,6 @@ function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge): Array<
     const promises: Array<() => Promise<void>> = [];
 
     const snapshotCollection = OnyxUtils.getCachedCollection(snapshotCollectionKey);
-    const snapshotCollectionKeyLength = snapshotCollectionKey.length;
 
     Object.entries(snapshotCollection).forEach(([snapshotEntryKey, snapshotEntryValue]) => {
         // Snapshots may not be present in cache. We don't know how to update them so we skip.
@@ -1421,7 +1422,7 @@ function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge): Array<
 
         data.forEach(({key, value}) => {
             // snapshots are normal keys so we want to skip update if they are written to Onyx
-            if (OnyxUtils.isCollectionMemberKey(snapshotCollectionKey, key, snapshotCollectionKeyLength)) {
+            if (OnyxUtils.isCollectionMemberKey(snapshotCollectionKey, key)) {
                 return;
             }
 
@@ -1445,8 +1446,17 @@ function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge): Array<
             }
 
             const oldValue = updatedData[key] || {};
+            let collectionKey: string | undefined;
+            try {
+                collectionKey = getCollectionKey(key);
+            } catch (e) {
+                // If getCollectionKey() throws an error it means the key is not a collection key.
+                collectionKey = undefined;
+            }
+            const shouldFullyMerge = fullyMergedSnapshotKeys?.has(collectionKey || key);
+            const newValue = shouldFullyMerge ? value : lodashPick(value, Object.keys(snapshotData[key]));
 
-            updatedData = {...updatedData, [key]: Object.assign(oldValue, value)};
+            updatedData = {...updatedData, [key]: Object.assign(oldValue, newValue)};
         });
 
         // Skip the update if there's no data to be merged
