@@ -1324,12 +1324,21 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
             // can send data back to the subscriber. Note that multiple keys can match as a subscriber could either be
             // subscribed to a "collection key" or a single key.
             const matchingKeys: string[] = [];
-            keys.forEach((key) => {
-                if (!isKeyMatch(mapping.key, key)) {
-                    return;
+
+            // Performance optimization: For single key subscriptions, avoid O(n) iteration
+            if (!isCollectionKey(mapping.key)) {
+                if (keys.has(mapping.key)) {
+                    matchingKeys.push(mapping.key);
                 }
-                matchingKeys.push(key);
-            });
+            } else {
+                // Collection case - need to iterate through all keys to find matches (O(n))
+                keys.forEach((key) => {
+                    if (!isKeyMatch(mapping.key, key)) {
+                        return;
+                    }
+                    matchingKeys.push(key);
+                });
+            }
             // If the key being connected to does not exist we initialize the value with null. For subscribers that connected
             // directly via connect() they will simply get a null value sent to them without any information about which key matched
             // since there are none matched. In withOnyx() we wait for all connected keys to return a value before rendering the child
