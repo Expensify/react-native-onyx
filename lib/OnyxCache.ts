@@ -153,7 +153,6 @@ class OnyxCache {
         if (shouldReindexCache) {
             this.addToAccessedKeys(key);
         }
-
         return this.storageMap[key];
     }
 
@@ -169,10 +168,10 @@ class OnyxCache {
         // since it will either be set to a non nullish value or removed from the cache completely.
         this.nullishStorageKeys.delete(key);
 
+        const collectionKey = this.getCollectionKey(key);
         if (value === null || value === undefined) {
             delete this.storageMap[key];
             // Remove from collection index if it's a collection member
-            const collectionKey = this.getCollectionKey(key);
             if (collectionKey && this.collectionIndex[collectionKey]) {
                 this.collectionIndex[collectionKey].delete(key);
             }
@@ -182,7 +181,6 @@ class OnyxCache {
         this.storageMap[key] = value;
 
         // Update collection index if this is a collection member
-        const collectionKey = this.getCollectionKey(key);
         if (collectionKey) {
             if (!this.collectionIndex[collectionKey]) {
                 this.collectionIndex[collectionKey] = new Set();
@@ -221,24 +219,23 @@ class OnyxCache {
             throw new Error('data passed to cache.merge() must be an Object of onyx key/value pairs');
         }
 
-        // Merge all data into storageMap
         this.storageMap = {...utils.fastMerge(this.storageMap, data)};
 
         Object.entries(data).forEach(([key, value]) => {
             this.addKey(key);
             this.addToAccessedKeys(key);
 
+            const collectionKey = this.getCollectionKey(key);
+
             if (value === null || value === undefined) {
                 this.addNullishStorageKey(key);
                 // Remove from collection index if it's a collection member
-                const collectionKey = this.getCollectionKey(key);
                 if (collectionKey && this.collectionIndex[collectionKey]) {
                     this.collectionIndex[collectionKey].delete(key);
                 }
             } else {
                 this.nullishStorageKeys.delete(key);
                 // Update collection index if this is a collection member
-                const collectionKey = this.getCollectionKey(key);
                 if (collectionKey) {
                     if (!this.collectionIndex[collectionKey]) {
                         this.collectionIndex[collectionKey] = new Set();
