@@ -1182,7 +1182,7 @@ function prepareKeyValuePairsForStorage(
  * @param existingValue The existing value that should be merged with the changes
  */
 function mergeChanges<TValue extends OnyxInput<OnyxKey> | undefined, TChange extends OnyxInput<OnyxKey> | undefined>(changes: TChange[], existingValue?: TValue): FastMergeResult<TChange> {
-    return applyMerge('merge', changes, existingValue);
+    return mergeInternal('merge', changes, existingValue);
 }
 
 /**
@@ -1196,7 +1196,7 @@ function mergeAndMarkChanges<TValue extends OnyxInput<OnyxKey> | undefined, TCha
     changes: TChange[],
     existingValue?: TValue,
 ): FastMergeResult<TChange> {
-    return applyMerge('mark', changes, existingValue);
+    return mergeInternal('mark', changes, existingValue);
 }
 
 /**
@@ -1205,7 +1205,7 @@ function mergeAndMarkChanges<TValue extends OnyxInput<OnyxKey> | undefined, TCha
  * @param changes Array of changes that should be merged
  * @param existingValue The existing value that should be merged with the changes
  */
-function applyMerge<TValue extends OnyxInput<OnyxKey> | undefined, TChange extends OnyxInput<OnyxKey> | undefined>(
+function mergeInternal<TValue extends OnyxInput<OnyxKey> | undefined, TChange extends OnyxInput<OnyxKey> | undefined>(
     mode: 'merge' | 'mark',
     changes: TChange[],
     existingValue?: TValue,

@@ -123,7 +123,7 @@ function mergeObject<TObject extends Record<string, unknown>>(
             return;
         }
 
-        // If source value is not a mergable object, we need to set the source value it directly.
+        // If the source value is not a mergable object, we need to set the key directly.
         if (!isMergeableObject(sourceProperty)) {
             destination[key] = sourceProperty;
             return;
