@@ -152,14 +152,12 @@ describe('OnyxUtils', () => {
     });
 
     describe('isCollectionMemberKey', () => {
-        const collectionKeyLength = collectionKey.length;
-
         test('one call with correct key', async () => {
-            await measureFunction(() => OnyxUtils.isCollectionMemberKey(collectionKey, `${collectionKey}entry1`, collectionKeyLength));
+            await measureFunction(() => OnyxUtils.isCollectionMemberKey(collectionKey, `${collectionKey}entry1`));
         });
 
         test('one call with wrong key', async () => {
-            await measureFunction(() => OnyxUtils.isCollectionMemberKey(collectionKey, `${ONYXKEYS.COLLECTION.TEST_KEY_2}entry1`, collectionKeyLength));
+            await measureFunction(() => OnyxUtils.isCollectionMemberKey(collectionKey, `${ONYXKEYS.COLLECTION.TEST_KEY_2}entry1`));
         });
     });
 
