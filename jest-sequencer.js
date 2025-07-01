@@ -14,7 +14,16 @@ class TestSequencer extends Sequencer {
 
     sort(tests) {
         const copyTests = [...tests];
-        return copyTests.sort((testA, testB) => (testA.path > testB.path ? 1 : -1));
+        // return copyTests.sort((testA, testB) => (testA.path > testB.path ? 1 : -1));
+        return copyTests.sort((testA, testB) => {
+            const isAOnyx = testA.path.includes('OnyxUtils.perf-test.ts');
+            const isBOnyx = testB.path.includes('OnyxUtils.perf-test.ts');
+
+            if (isAOnyx && !isBOnyx) return -1;
+            if (!isAOnyx && isBOnyx) return 1;
+
+            return testA.path.localeCompare(testB.path);
+        });
     }
 }
 
