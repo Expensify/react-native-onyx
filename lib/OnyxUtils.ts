@@ -582,6 +582,7 @@ function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey
             });
             return filteredCollection;
         }
+
         // Return a copy to avoid mutations affecting the cache
         return {...collectionData};
     }
