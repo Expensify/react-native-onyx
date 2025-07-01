@@ -171,6 +171,7 @@ class OnyxCache {
         const collectionKey = this.getCollectionKey(key);
         if (value === null || value === undefined) {
             delete this.storageMap[key];
+
             // Remove from collection index if it's a collection member
             if (collectionKey && this.getCollectionMemberKeys(collectionKey)) {
                 this.collectionIndex[collectionKey].delete(key);
@@ -229,12 +230,14 @@ class OnyxCache {
 
             if (value === null || value === undefined) {
                 this.addNullishStorageKey(key);
+
                 // Remove from collection index if it's a collection member
                 if (collectionKey && this.getCollectionMemberKeys(collectionKey)) {
                     this.collectionIndex[collectionKey].delete(key);
                 }
             } else {
                 this.nullishStorageKeys.delete(key);
+
                 // Update collection index if this is a collection member
                 if (collectionKey) {
                     if (!this.getCollectionMemberKeys(collectionKey)) {
@@ -311,6 +314,7 @@ class OnyxCache {
 
         for (const key of keysToRemove) {
             delete this.storageMap[key];
+
             // Update collection index if this is a collection member
             const collectionKey = this.getCollectionKey(key);
             if (collectionKey && this.getCollectionMemberKeys(collectionKey)) {
@@ -425,6 +429,7 @@ class OnyxCache {
      */
     setCollectionKeys(collectionKeys: Set<OnyxKey>): void {
         this.collectionKeys = collectionKeys;
+
         // Initialize collection indexes for existing collection keys
         collectionKeys.forEach((collectionKey) => {
             if (this.getCollectionMemberKeys(collectionKey)) {
