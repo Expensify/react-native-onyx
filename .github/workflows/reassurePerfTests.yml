@@ -48,10 +48,12 @@ jobs:
 
       - name: Reassure tests
         run: |
+          git log --oneline --graph --decorate --all -n 10
           npm ci
           npx reassure --baseline --verbose
           git fetch origin ${{ github.event.pull_request.head.sha }} --no-tags --depth=1
           git switch --force --detach ${{ github.event.pull_request.head.sha }}
+          git log --oneline --graph --decorate --all -n 10
           npm ci
           npx reassure --branch --verbose
 
