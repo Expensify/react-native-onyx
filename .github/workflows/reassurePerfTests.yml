@@ -29,22 +29,31 @@ jobs:
           npm ci
           npx reassure check-stability --verbose
 
-      - name: Install dependencies
-        run: npm ci
+      # - name: Install dependencies
+      #   run: npm ci
 
-      - name: Run Reassure baseline tests
-        run: npx reassure --baseline --verbose
+      # - name: Run Reassure baseline tests
+      #   run: npx reassure --baseline --verbose
 
-      - name: Checkout PR head SHA
+      # - name: Checkout PR head SHA
+      #   run: |
+      #     git fetch origin ${{ github.event.pull_request.head.sha }} --no-tags --depth=1
+      #     git switch --force --detach ${{ github.event.pull_request.head.sha }}
+          
+      # - name: Reinstall dependencies
+      #   run: npm ci
+
+      # - name: Run Reassure delta tests
+      #   run: npx reassure --branch --verbose
+
+      - name: Reassure tests
         run: |
+          npm ci
+          npx reassure --baseline --verbose
           git fetch origin ${{ github.event.pull_request.head.sha }} --no-tags --depth=1
           git switch --force --detach ${{ github.event.pull_request.head.sha }}
-          
-      - name: Reinstall dependencies
-        run: npm ci
-
-      - name: Run Reassure delta tests
-        run: npx reassure --branch --verbose
+          npm ci
+          npx reassure --branch --verbose
 
       - name: Upload Reassure results
         uses: actions/upload-artifact@v4
