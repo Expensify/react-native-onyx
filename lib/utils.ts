@@ -33,7 +33,7 @@ type FastMergeResult<TValue> = {
     /** The result of the merge. */
     result: TValue;
 
-    /** The path to the object that contains the internal "ONYX_INTERNALS__REPLACE_OBJECT_MARK" flag. */
+    /** The list of tuples that will be used in SQLiteProvider to replace the nested objects using `JSON_REPLACE`. */
     replaceNullPatches: FastMergeReplaceNullPatch[];
 };
 
@@ -116,7 +116,7 @@ function mergeObject<TObject extends Record<string, unknown>>(
         const sourceProperty = source?.[key] as Record<string, unknown>;
 
         // If "shouldRemoveNestedNulls" is true, we want to remove (nested) null values from the merged object.
-        // If either the source value is null, we want to omit the key from the merged object.
+        // If the source value is null, we want to omit the key from the merged object.
         const shouldOmitNullishProperty = options.shouldRemoveNestedNulls && sourceProperty === null;
 
         if (sourceProperty === undefined || shouldOmitNullishProperty) {
@@ -184,18 +184,18 @@ function removeNestedNullValues<TValue extends OnyxInput<OnyxKey> | null>(value:
 
     // eslint-disable-next-line no-restricted-syntax, guard-for-in
     for (const key in value) {
-        const newValue = value[key];
+        const propertyValue = value[key];
 
-        if (newValue === null || newValue === undefined) {
+        if (propertyValue === null || propertyValue === undefined) {
             // eslint-disable-next-line no-continue
             continue;
         }
 
-        if (typeof newValue === 'object' && !Array.isArray(newValue)) {
-            const valueWithoutNestedNulls = removeNestedNullValues(newValue);
+        if (typeof propertyValue === 'object' && !Array.isArray(propertyValue)) {
+            const valueWithoutNestedNulls = removeNestedNullValues(propertyValue);
             result[key] = valueWithoutNestedNulls;
         } else {
-            result[key] = newValue;
+            result[key] = propertyValue;
         }
     }
 
