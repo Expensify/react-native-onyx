@@ -494,9 +494,6 @@ type InitOptions = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type GenericFunction = (...args: any[]) => any;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type GenericDeepRecord = DeepRecord<string, any>;
-
 /**
  * Represents a record where the key is a collection member key and the value is a list of
  * tuples that we'll use to replace the nested objects of that collection member record with something else.
@@ -554,5 +551,4 @@ export type {
     WithOnyxConnectOptions,
     MultiMergeReplaceNullPatches,
     MixedOperationsQueue,
-    GenericDeepRecord,
 };

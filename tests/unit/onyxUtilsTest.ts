@@ -1,6 +1,6 @@
 import Onyx from '../../lib';
 import OnyxUtils from '../../lib/OnyxUtils';
-import type {GenericDeepRecord} from '../../lib/types';
+import type {GenericDeepRecord} from '../types';
 import utils from '../../lib/utils';
 
 const testObject: GenericDeepRecord = {

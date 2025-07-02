@@ -1,7 +1,7 @@
 import {randAggregation, randBoolean, randWord} from '@ngneat/falso';
 import {format} from 'date-fns';
 import {createCollection} from './createCollection';
-import type {GenericDeepRecord} from '../../../lib/types';
+import type {GenericDeepRecord} from '../../types';
 
 const getRandomDate = (): string => {
     const randomTimestamp = Math.random() * new Date().getTime();

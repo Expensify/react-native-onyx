@@ -1,5 +1,5 @@
-import type {GenericDeepRecord} from '../../lib/types';
 import utils from '../../lib/utils';
+import type {GenericDeepRecord} from '../types';
 
 type DeepObject = GenericDeepRecord | unknown[];
 

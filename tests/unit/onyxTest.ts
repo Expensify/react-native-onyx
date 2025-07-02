@@ -5,7 +5,8 @@ import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import OnyxUtils from '../../lib/OnyxUtils';
 import type OnyxCache from '../../lib/OnyxCache';
 import StorageMock from '../../lib/storage';
-import type {GenericDeepRecord, OnyxCollection, OnyxUpdate} from '../../lib/types';
+import type {OnyxCollection, OnyxUpdate} from '../../lib/types';
+import type {GenericDeepRecord} from '../types';
 import type GenericCollection from '../utils/GenericCollection';
 import type {Connection} from '../../lib/OnyxConnectionManager';
 
