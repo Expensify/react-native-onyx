@@ -23,7 +23,7 @@
 <dt><a href="#setSkippableCollectionMemberIDs">setSkippableCollectionMemberIDs()</a></dt>
 <dd><p>Setter - sets the skippable collection member IDs.</p>
 </dd>
-<dt><a href="#initStoreValues">initStoreValues(keys, initialKeyStates, evictableKeys)</a></dt>
+<dt><a href="#initStoreValues">initStoreValues(keys, initialKeyStates, evictableKeys, fullyMergedSnapshotKeys)</a></dt>
 <dd><p>Sets the initial values for the Onyx store</p>
 </dd>
 <dt><a href="#maybeFlushBatchUpdates">maybeFlushBatchUpdates()</a></dt>
@@ -131,7 +131,7 @@ to an array of key-value pairs in the above format and removes key-value pairs t
 <dd><p>Merges an array of changes with an existing value or creates a single change.
 It will also mark deep nested objects that need to be entirely replaced during the merge.</p>
 </dd>
-<dt><a href="#applyMerge">applyMerge(changes, existingValue)</a></dt>
+<dt><a href="#mergeInternal">mergeInternal(changes, existingValue)</a></dt>
 <dd><p>Merges an array of changes with an existing value or creates a single change.</p>
 </dd>
 <dt><a href="#initializeWithDefaultKeyStates">initializeWithDefaultKeyStates()</a></dt>
@@ -148,6 +148,9 @@ It will also mark deep nested objects that need to be entirely replaced during t
 </dd>
 <dt><a href="#unsubscribeFromKey">unsubscribeFromKey(subscriptionID)</a></dt>
 <dd><p>Disconnects and removes the listener from the Onyx key.</p>
+</dd>
+<dt><a href="#clearOnyxUtilsInternals">clearOnyxUtilsInternals()</a></dt>
+<dd><p>Clear internal variables used in this file, useful in test environments.</p>
 </dd>
 </dl>
 
@@ -189,7 +192,7 @@ Setter - sets the skippable collection member IDs.
 **Kind**: global function  
 <a name="initStoreValues"></a>
 
-## initStoreValues(keys, initialKeyStates, evictableKeys)
+## initStoreValues(keys, initialKeyStates, evictableKeys, fullyMergedSnapshotKeys)
 Sets the initial values for the Onyx store
 
 **Kind**: global function  
@@ -199,6 +202,7 @@ Sets the initial values for the Onyx store
 | keys | `ONYXKEYS` constants object from Onyx.init() |
 | initialKeyStates | initial data to set when `init()` and `clear()` are called |
 | evictableKeys | This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal. |
+| fullyMergedSnapshotKeys | Array of snapshot collection keys where full merge is supported and data structure can be changed after merge. |
 
 <a name="maybeFlushBatchUpdates"></a>
 
@@ -446,9 +450,9 @@ It will also mark deep nested objects that need to be entirely replaced during t
 | changes | Array of changes that should be merged |
 | existingValue | The existing value that should be merged with the changes |
 
-<a name="applyMerge"></a>
+<a name="mergeInternal"></a>
 
-## applyMerge(changes, existingValue)
+## mergeInternal(changes, existingValue)
 Merges an array of changes with an existing value or creates a single change.
 
 **Kind**: global function  
@@ -499,3 +503,9 @@ Disconnects and removes the listener from the Onyx key.
 | --- | --- |
 | subscriptionID | Subscription ID returned by calling `OnyxUtils.subscribeToKey()`. |
 
+<a name="clearOnyxUtilsInternals"></a>
+
+## clearOnyxUtilsInternals()
+Clear internal variables used in this file, useful in test environments.
+
+**Kind**: global function  
