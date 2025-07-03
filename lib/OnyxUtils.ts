@@ -3,6 +3,7 @@ import {deepEqual} from 'fast-equals';
 import lodashClone from 'lodash/clone';
 import type {ValueOf} from 'type-fest';
 import lodashPick from 'lodash/pick';
+import _ from 'underscore';
 import DevTools from './DevTools';
 import * as Logger from './Logger';
 import type Onyx from './Onyx';
@@ -1508,6 +1509,14 @@ function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge): Array<
     return promises;
 }
 
+function logKeyChanged(onyxMethod: Extract<OnyxMethod, 'set' | 'merge'>, key: OnyxKey, value: unknown, hasChanged: boolean) {
+    Logger.logInfo(`${onyxMethod} called for key: ${key}${_.isObject(value) ? ` properties: ${_.keys(value).join(',')}` : ''} hasChanged: ${hasChanged}`);
+}
+
+function logKeyRemoved(onyxMethod: Extract<OnyxMethod, 'set' | 'merge'>, key: OnyxKey) {
+    Logger.logInfo(`${onyxMethod} called for key: ${key} => null passed, so key was removed`);
+}
+
 /**
  * Clear internal variables used in this file, useful in test environments.
  */
@@ -1569,6 +1578,8 @@ const OnyxUtils = {
     addKeyToRecentlyAccessedIfNeeded,
     reduceCollectionWithSelector,
     updateSnapshots,
+    logKeyChanged,
+    logKeyRemoved,
 };
 
 GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {

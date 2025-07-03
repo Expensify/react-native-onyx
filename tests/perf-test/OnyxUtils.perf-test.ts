@@ -616,7 +616,7 @@ describe('OnyxUtils', () => {
         });
     });
 
-    describe('applyMerge', () => {
+    describe('mergeChanges', () => {
         test('one call merging 5 changes', async () => {
             const reportAction = mockedReportActionsMap[`${collectionKey}0`];
             const changedReportAction1 = createRandomReportAction(Number(reportAction.reportActionID));

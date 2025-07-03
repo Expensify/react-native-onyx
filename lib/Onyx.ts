@@ -1,4 +1,3 @@
-import _ from 'underscore';
 import * as Logger from './Logger';
 import cache, {TASK} from './OnyxCache';
 import * as PerformanceUtils from './PerformanceUtils';
@@ -176,14 +175,14 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>): Promis
     // Therefore, we don't need to further broadcast and update the value so we can return early.
     if (value === null) {
         OnyxUtils.remove(key);
-        Logger.logInfo(`set called for key: ${key} => null passed, so key was removed`);
+        OnyxUtils.logKeyRemoved(OnyxUtils.METHOD.SET, key);
         return Promise.resolve();
     }
 
     const valueWithoutNestedNullValues = utils.removeNestedNullValues(value) as OnyxValue<TKey>;
     const hasChanged = cache.hasValueChanged(key, valueWithoutNestedNullValues);
 
-    Logger.logInfo(`set called for key: ${key}${_.isObject(value) ? ` properties: ${_.keys(value).join(',')}` : ''} hasChanged: ${hasChanged}`);
+    OnyxUtils.logKeyChanged(OnyxUtils.METHOD.SET, key, value, hasChanged);
 
     // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
     const updatePromise = OnyxUtils.broadcastUpdate(key, valueWithoutNestedNullValues, hasChanged);
@@ -327,8 +326,8 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
             // If the last change is null, we can just delete the key.
             // Therefore, we don't need to further broadcast and update the value so we can return early.
             if (validChanges.at(-1) === null) {
-                Logger.logInfo(`merge called for key: ${key} => null passed, so key was removed`);
                 OnyxUtils.remove(key);
+                OnyxUtils.logKeyRemoved(OnyxUtils.METHOD.MERGE, key);
                 return Promise.resolve();
             }
 
