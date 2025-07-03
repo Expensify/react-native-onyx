@@ -149,6 +149,11 @@ It will also mark deep nested objects that need to be entirely replaced during t
 <dt><a href="#unsubscribeFromKey">unsubscribeFromKey(subscriptionID)</a></dt>
 <dd><p>Disconnects and removes the listener from the Onyx key.</p>
 </dd>
+<dt><a href="#mergeCollectionWithPatches">mergeCollectionWithPatches(collectionKey, collection, mergeReplaceNullPatches)</a></dt>
+<dd><p>Merges a collection based on their keys.
+Serves as core implementation for <code>Onyx.mergeCollection()</code> public function, the difference being
+that this internal function allows passing an additional <code>mergeReplaceNullPatches</code> parameter.</p>
+</dd>
 <dt><a href="#clearOnyxUtilsInternals">clearOnyxUtilsInternals()</a></dt>
 <dd><p>Clear internal variables used in this file, useful in test environments.</p>
 </dd>
@@ -502,6 +507,21 @@ Disconnects and removes the listener from the Onyx key.
 | Param | Description |
 | --- | --- |
 | subscriptionID | Subscription ID returned by calling `OnyxUtils.subscribeToKey()`. |
+
+<a name="mergeCollectionWithPatches"></a>
+
+## mergeCollectionWithPatches(collectionKey, collection, mergeReplaceNullPatches)
+Merges a collection based on their keys.
+Serves as core implementation for `Onyx.mergeCollection()` public function, the difference being
+that this internal function allows passing an additional `mergeReplaceNullPatches` parameter.
+
+**Kind**: global function  
+
+| Param | Description |
+| --- | --- |
+| collectionKey | e.g. `ONYXKEYS.COLLECTION.REPORT` |
+| collection | Object collection keyed by individual collection member keys and values |
+| mergeReplaceNullPatches | Record where the key is a collection member key and the value is a list of tuples that we'll use to replace the nested objects of that collection member record with something else. |
 
 <a name="clearOnyxUtilsInternals"></a>
 

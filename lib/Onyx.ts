@@ -24,7 +24,6 @@ import type {
     OnyxValue,
     OnyxInput,
     OnyxMethodMap,
-    MultiMergeReplaceNullPatches,
 } from './types';
 import OnyxUtils from './OnyxUtils';
 import logMessages from './logMessages';
@@ -345,7 +344,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
 }
 
 /**
- * Merges a collection based on their keys
+ * Merges a collection based on their keys.
  *
  * @example
  *
@@ -356,125 +355,9 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
  *
  * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
  * @param collection Object collection keyed by individual collection member keys and values
- * @param mergeReplaceNullPatches Record where the key is a collection member key and the value is a list of
- * tuples that we'll use to replace the nested objects of that collection member record with something else.
  */
-function mergeCollection<TKey extends CollectionKeyBase, TMap>(
-    collectionKey: TKey,
-    collection: OnyxMergeCollectionInput<TKey, TMap>,
-    mergeReplaceNullPatches?: MultiMergeReplaceNullPatches,
-): Promise<void> {
-    if (!OnyxUtils.isValidNonEmptyCollectionForMerge(collection)) {
-        Logger.logInfo('mergeCollection() called with invalid or empty value. Skipping this update.');
-        return Promise.resolve();
-    }
-
-    let resultCollection: OnyxInputKeyValueMapping = collection;
-    let resultCollectionKeys = Object.keys(resultCollection);
-
-    // Confirm all the collection keys belong to the same parent
-    if (!OnyxUtils.doAllCollectionItemsBelongToSameParent(collectionKey, resultCollectionKeys)) {
-        return Promise.resolve();
-    }
-
-    const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
-    if (skippableCollectionMemberIDs.size) {
-        resultCollection = resultCollectionKeys.reduce((result: OnyxInputKeyValueMapping, key) => {
-            try {
-                const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key, collectionKey);
-                // If the collection member key is a skippable one we set its value to null.
-                // eslint-disable-next-line no-param-reassign
-                result[key] = !skippableCollectionMemberIDs.has(collectionMemberID) ? resultCollection[key] : null;
-            } catch {
-                // Something went wrong during split, so we assign the data to result anyway.
-                // eslint-disable-next-line no-param-reassign
-                result[key] = resultCollection[key];
-            }
-
-            return result;
-        }, {});
-    }
-    resultCollectionKeys = Object.keys(resultCollection);
-
-    return OnyxUtils.getAllKeys()
-        .then((persistedKeys) => {
-            // Split to keys that exist in storage and keys that don't
-            const keys = resultCollectionKeys.filter((key) => {
-                if (resultCollection[key] === null) {
-                    OnyxUtils.remove(key);
-                    return false;
-                }
-                return true;
-            });
-
-            const existingKeys = keys.filter((key) => persistedKeys.has(key));
-
-            const cachedCollectionForExistingKeys = OnyxUtils.getCachedCollection(collectionKey, existingKeys);
-
-            const existingKeyCollection = existingKeys.reduce((obj: OnyxInputKeyValueMapping, key) => {
-                const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(resultCollection[key], cachedCollectionForExistingKeys[key]);
-
-                if (!isCompatible) {
-                    Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'mergeCollection', existingValueType, newValueType));
-                    return obj;
-                }
-
-                // eslint-disable-next-line no-param-reassign
-                obj[key] = resultCollection[key];
-                return obj;
-            }, {}) as Record<OnyxKey, OnyxInput<TKey>>;
-
-            const newCollection: Record<OnyxKey, OnyxInput<TKey>> = {};
-            keys.forEach((key) => {
-                if (persistedKeys.has(key)) {
-                    return;
-                }
-                newCollection[key] = resultCollection[key];
-            });
-
-            // When (multi-)merging the values with the existing values in storage,
-            // we don't want to remove nested null values from the data that we pass to the storage layer,
-            // because the storage layer uses them to remove nested keys from storage natively.
-            const keyValuePairsForExistingCollection = OnyxUtils.prepareKeyValuePairsForStorage(existingKeyCollection, false, mergeReplaceNullPatches);
-
-            // We can safely remove nested null values when using (multi-)set,
-            // because we will simply overwrite the existing values in storage.
-            const keyValuePairsForNewCollection = OnyxUtils.prepareKeyValuePairsForStorage(newCollection, true);
-
-            const promises = [];
-
-            // We need to get the previously existing values so we can compare the new ones
-            // against them, to avoid unnecessary subscriber updates.
-            const previousCollectionPromise = Promise.all(existingKeys.map((key) => OnyxUtils.get(key).then((value) => [key, value]))).then(Object.fromEntries);
-
-            // New keys will be added via multiSet while existing keys will be updated using multiMerge
-            // This is because setting a key that doesn't exist yet with multiMerge will throw errors
-            if (keyValuePairsForExistingCollection.length > 0) {
-                promises.push(Storage.multiMerge(keyValuePairsForExistingCollection));
-            }
-
-            if (keyValuePairsForNewCollection.length > 0) {
-                promises.push(Storage.multiSet(keyValuePairsForNewCollection));
-            }
-
-            // finalMergedCollection contains all the keys that were merged, without the keys of incompatible updates
-            const finalMergedCollection = {...existingKeyCollection, ...newCollection};
-
-            // Prefill cache if necessary by calling get() on any existing keys and then merge original data to cache
-            // and update all subscribers
-            const promiseUpdate = previousCollectionPromise.then((previousCollection) => {
-                cache.merge(finalMergedCollection);
-                return OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, finalMergedCollection, previousCollection);
-            });
-
-            return Promise.all(promises)
-                .catch((error) => OnyxUtils.evictStorageAndRetry(error, mergeCollection, collectionKey, resultCollection))
-                .then(() => {
-                    OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE_COLLECTION, undefined, resultCollection);
-                    return promiseUpdate;
-                });
-        })
-        .then(() => undefined);
+function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
+    return OnyxUtils.mergeCollectionWithPatches(collectionKey, collection);
 }
 
 /**
@@ -708,7 +591,11 @@ function update(data: OnyxUpdate[]): Promise<void> {
 
         if (!utils.isEmptyObject(batchedCollectionUpdates.merge)) {
             promises.push(() =>
-                mergeCollection(collectionKey, batchedCollectionUpdates.merge as Collection<CollectionKey, unknown, unknown>, batchedCollectionUpdates.mergeReplaceNullPatches),
+                OnyxUtils.mergeCollectionWithPatches(
+                    collectionKey,
+                    batchedCollectionUpdates.merge as Collection<CollectionKey, unknown, unknown>,
+                    batchedCollectionUpdates.mergeReplaceNullPatches,
+                ),
             );
         }
         if (!utils.isEmptyObject(batchedCollectionUpdates.set)) {
