@@ -1,7 +1,7 @@
 import {randAggregation, randBoolean, randWord} from '@ngneat/falso';
 import {format} from 'date-fns';
 import {createCollection} from './createCollection';
-import type {DeepRecord} from '../../../lib/types';
+import type {GenericDeepRecord} from '../../types';
 
 const getRandomDate = (): string => {
     const randomTimestamp = Math.random() * new Date().getTime();
@@ -19,8 +19,7 @@ const getRandomReportActions = (collection: string, length = 10000) =>
         length,
     );
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export default function createRandomReportAction(index: number): DeepRecord<string, any> {
+export default function createRandomReportAction(index: number): GenericDeepRecord {
     return {
         actionName: randWord(),
         reportActionID: index.toString(),

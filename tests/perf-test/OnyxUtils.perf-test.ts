@@ -610,22 +610,13 @@ describe('OnyxUtils', () => {
         });
     });
 
-    describe('removeNullValues', () => {
-        test('one call with one heavy object', async () => {
-            const key = `${collectionKey}0`;
-            const reportAction = mockedReportActionsMap[`${collectionKey}0`];
-
-            await measureFunction(() => OnyxUtils.removeNullValues(key, reportAction, true));
-        });
-    });
-
     describe('prepareKeyValuePairsForStorage', () => {
         test('one call with 10k heavy objects', async () => {
             await measureFunction(() => OnyxUtils.prepareKeyValuePairsForStorage(mockedReportActionsMap, false));
         });
     });
 
-    describe('applyMerge', () => {
+    describe('mergeChanges', () => {
         test('one call merging 5 changes', async () => {
             const reportAction = mockedReportActionsMap[`${collectionKey}0`];
             const changedReportAction1 = createRandomReportAction(Number(reportAction.reportActionID));
@@ -634,9 +625,7 @@ describe('OnyxUtils', () => {
             const changedReportAction4 = createRandomReportAction(Number(reportAction.reportActionID));
             const changedReportAction5 = createRandomReportAction(Number(reportAction.reportActionID));
 
-            await measureFunction(() =>
-                OnyxUtils.applyMerge(reportAction, [changedReportAction1, changedReportAction2, changedReportAction3, changedReportAction4, changedReportAction5], false),
-            );
+            await measureFunction(() => OnyxUtils.mergeChanges([changedReportAction1, changedReportAction2, changedReportAction3, changedReportAction4, changedReportAction5], reportAction));
         });
     });
 

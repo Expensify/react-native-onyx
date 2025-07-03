@@ -3,6 +3,7 @@ import type {BuiltIns} from 'type-fest/source/internal';
 import type OnyxUtils from './OnyxUtils';
 import type {WithOnyxInstance, WithOnyxState} from './withOnyx/types';
 import type {OnyxMethod} from './OnyxUtils';
+import type {FastMergeReplaceNullPatch} from './utils';
 
 /**
  * Utility type that excludes `null` from the type `TValue`.
@@ -494,10 +495,19 @@ type InitOptions = {
 type GenericFunction = (...args: any[]) => any;
 
 /**
+ * Represents a record where the key is a collection member key and the value is a list of
+ * tuples that we'll use to replace the nested objects of that collection member record with something else.
+ */
+type MultiMergeReplaceNullPatches = {
+    [TKey in OnyxKey]: FastMergeReplaceNullPatch[];
+};
+
+/**
  * Represents a combination of Merge and Set operations that should be executed in Onyx
  */
 type MixedOperationsQueue = {
     merge: OnyxInputKeyValueMapping;
+    mergeReplaceNullPatches: MultiMergeReplaceNullPatches;
     set: OnyxInputKeyValueMapping;
 };
 
@@ -539,5 +549,6 @@ export type {
     OnyxValue,
     Selector,
     WithOnyxConnectOptions,
+    MultiMergeReplaceNullPatches,
     MixedOperationsQueue,
 };

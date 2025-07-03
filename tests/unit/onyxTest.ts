@@ -1,9 +1,12 @@
 import lodashClone from 'lodash/clone';
+import lodashCloneDeep from 'lodash/cloneDeep';
 import Onyx from '../../lib';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import OnyxUtils from '../../lib/OnyxUtils';
 import type OnyxCache from '../../lib/OnyxCache';
+import StorageMock from '../../lib/storage';
 import type {OnyxCollection, OnyxUpdate} from '../../lib/types';
+import type {GenericDeepRecord} from '../types';
 import type GenericCollection from '../utils/GenericCollection';
 import type {Connection} from '../../lib/OnyxConnectionManager';
 
@@ -857,7 +860,6 @@ describe('Onyx', () => {
             // When we pass it to Onyx.update
             // @ts-expect-error This is an invalid call to Onyx.update
             Onyx.update(data);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (error) {
             if (error instanceof Error) {
                 // Then we should expect the error message below
@@ -874,7 +876,6 @@ describe('Onyx', () => {
             // When we pass it to Onyx.update
             // @ts-expect-error This is an invalid call to Onyx.update
             Onyx.update(data);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (error) {
             if (error instanceof Error) {
                 // Then we should expect the error message below
@@ -1711,7 +1712,572 @@ describe('Onyx', () => {
                 });
         });
 
+        it('should replace the old value after a null merge in the top-level object when batching updates', async () => {
+            let result: unknown;
+            connection = Onyx.connect({
+                key: ONYX_KEYS.COLLECTION.TEST_UPDATE,
+                waitForCollectionCallback: true,
+                callback: (value) => {
+                    result = value;
+                },
+            });
+
+            await Onyx.multiSet({
+                [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {
+                    id: 'entry1',
+                    someKey: 'someValue',
+                },
+            });
+
+            const queuedUpdates: OnyxUpdate[] = [
+                {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                    onyxMethod: 'merge',
+                    // Removing the entire object in this update.
+                    // Any subsequent changes to this key should completely replace the old value.
+                    value: null,
+                },
+                {
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                    onyxMethod: 'merge',
+                    // This change should completely replace `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1` old value.
+                    value: {
+                        someKey: 'someValueChanged',
+                    },
+                },
+            ];
+
+            await Onyx.update(queuedUpdates);
+
+            expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {someKey: 'someValueChanged'}});
+            expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual({someKey: 'someValueChanged'});
+        });
+
+        describe('should replace the old value after a null merge in a nested property when batching updates', () => {
+            let result: unknown;
+
+            beforeEach(() => {
+                connection = Onyx.connect({
+                    key: ONYX_KEYS.COLLECTION.TEST_UPDATE,
+                    waitForCollectionCallback: true,
+                    callback: (value) => {
+                        result = value;
+                    },
+                });
+            });
+
+            it('replacing old object after null merge', async () => {
+                const entry1: GenericDeepRecord = {
+                    sub_entry1: {
+                        id: 'sub_entry1',
+                        someKey: 'someValue',
+                    },
+                };
+                await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1});
+
+                const entry1ExpectedResult = lodashCloneDeep(entry1);
+                const queuedUpdates: OnyxUpdate[] = [];
+
+                queuedUpdates.push({
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                    onyxMethod: 'merge',
+                    value: {
+                        // Removing the "sub_entry1" object in this update.
+                        // Any subsequent changes to this object should completely replace the existing object in store.
+                        sub_entry1: null,
+                    },
+                });
+                delete entry1ExpectedResult.sub_entry1;
+
+                queuedUpdates.push({
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                    onyxMethod: 'merge',
+                    value: {
+                        // This change should completely replace "sub_entry1" existing object in store.
+                        sub_entry1: {
+                            newKey: 'newValue',
+                        },
+                    },
+                });
+                entry1ExpectedResult.sub_entry1 = {newKey: 'newValue'};
+
+                await Onyx.update(queuedUpdates);
+
+                expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult});
+                expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual(entry1ExpectedResult);
+            });
+
+            it('setting new object after null merge', async () => {
+                const entry1: GenericDeepRecord = {
+                    sub_entry1: {
+                        id: 'sub_entry1',
+                        someKey: 'someValue',
+                        someNestedObject: {
+                            someNestedKey: 'someNestedValue',
+                            anotherNestedObject: {
+                                anotherNestedKey: 'anotherNestedValue',
+                            },
+                        },
+                    },
+                };
+                await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1});
+
+                const entry1ExpectedResult = lodashCloneDeep(entry1);
+                const queuedUpdates: OnyxUpdate[] = [];
+
+                queuedUpdates.push({
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                    onyxMethod: 'merge',
+                    value: {
+                        sub_entry1: {
+                            someNestedObject: {
+                                // Introducing a new "anotherNestedObject2" object in this update.
+                                anotherNestedObject2: {
+                                    anotherNestedKey2: 'anotherNestedValue2',
+                                },
+                            },
+                        },
+                    },
+                });
+                entry1ExpectedResult.sub_entry1.someNestedObject.anotherNestedObject2 = {anotherNestedKey2: 'anotherNestedValue2'};
+
+                queuedUpdates.push({
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                    onyxMethod: 'merge',
+                    value: {
+                        sub_entry1: {
+                            someNestedObject: {
+                                // Removing the "anotherNestedObject2" object in this update.
+                                // This property was only introduced in a previous update, so we don't need to care
+                                // about an old existing value because there isn't one.
+                                anotherNestedObject2: null,
+                            },
+                        },
+                    },
+                });
+                delete entry1ExpectedResult.sub_entry1.someNestedObject.anotherNestedObject2;
+
+                queuedUpdates.push({
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                    onyxMethod: 'merge',
+                    value: {
+                        sub_entry1: {
+                            someNestedObject: {
+                                // Introducing the "anotherNestedObject2" object again with this update.
+                                anotherNestedObject2: {
+                                    newNestedKey2: 'newNestedValue2',
+                                },
+                            },
+                        },
+                    },
+                });
+                entry1ExpectedResult.sub_entry1.someNestedObject.anotherNestedObject2 = {newNestedKey2: 'newNestedValue2'};
+
+                await Onyx.update(queuedUpdates);
+
+                expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult});
+                expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual(entry1ExpectedResult);
+            });
+
+            it('setting new object after null merge of a primitive property', async () => {
+                const entry1: GenericDeepRecord = {
+                    sub_entry1: {
+                        id: 'sub_entry1',
+                        someKey: 'someValue',
+                        someNestedObject: {
+                            someNestedKey: 'someNestedValue',
+                            anotherNestedObject: {
+                                anotherNestedKey: 'anotherNestedValue',
+                            },
+                        },
+                    },
+                };
+                await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1});
+
+                const entry1ExpectedResult = lodashCloneDeep(entry1);
+                const queuedUpdates: OnyxUpdate[] = [];
+
+                queuedUpdates.push({
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                    onyxMethod: 'merge',
+                    value: {
+                        sub_entry1: {
+                            someNestedObject: {
+                                anotherNestedObject: {
+                                    // Removing the "anotherNestedKey" property in this update.
+                                    // This property's existing value in store is a primitive value, so we don't need to care
+                                    // about it when merging new values in any next updates.
+                                    anotherNestedKey: null,
+                                },
+                            },
+                        },
+                    },
+                });
+                delete entry1ExpectedResult.sub_entry1.someNestedObject.anotherNestedObject.anotherNestedKey;
+
+                queuedUpdates.push({
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                    onyxMethod: 'merge',
+                    value: {
+                        sub_entry1: {
+                            someNestedObject: {
+                                anotherNestedObject: {
+                                    // Setting a new object to the "anotherNestedKey" property.
+                                    anotherNestedKey: {
+                                        newNestedKey: 'newNestedValue',
+                                    },
+                                },
+                            },
+                        },
+                    },
+                });
+                entry1ExpectedResult.sub_entry1.someNestedObject.anotherNestedObject.anotherNestedKey = {newNestedKey: 'newNestedValue'};
+
+                await Onyx.update(queuedUpdates);
+
+                expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult});
+                expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual(entry1ExpectedResult);
+            });
+
+            it('replacing nested object during updates', async () => {
+                const entry1: GenericDeepRecord | undefined = {
+                    id: 'entry1',
+                    someKey: 'someValue',
+                };
+                await Onyx.multiSet({
+                    [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {
+                        id: 'entry1',
+                        someKey: 'someValue',
+                    },
+                });
+
+                let entry1ExpectedResult = lodashCloneDeep(entry1) as GenericDeepRecord | undefined;
+                const queuedUpdates: OnyxUpdate[] = [];
+
+                queuedUpdates.push({
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                    onyxMethod: 'merge',
+                    // Removing the entire object in this update.
+                    // Any subsequent changes to this key should completely replace the old value.
+                    value: null,
+                });
+                entry1ExpectedResult = undefined;
+
+                queuedUpdates.push({
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                    onyxMethod: 'merge',
+                    // This change should completely replace `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1` old value.
+                    value: {
+                        someKey: 'someValueChanged',
+                        someNestedObject: {
+                            someNestedKey: 'someNestedValue',
+                        },
+                    },
+                });
+                entry1ExpectedResult = {someKey: 'someValueChanged', someNestedObject: {someNestedKey: 'someNestedValue'}};
+
+                queuedUpdates.push({
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                    onyxMethod: 'merge',
+                    value: {
+                        // Removing the "sub_entry1" object in this update.
+                        // Any subsequent changes to this key should completely replace the old update's value.
+                        someNestedObject: null,
+                    },
+                });
+                delete entry1ExpectedResult.someNestedObject;
+
+                queuedUpdates.push({
+                    key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                    onyxMethod: 'merge',
+                    // This change should completely replace `someNestedObject` old update's value.
+                    value: {
+                        someNestedObject: {
+                            someNestedKeyChanged: 'someNestedValueChange',
+                        },
+                    },
+                });
+                entry1ExpectedResult.someNestedObject = {someNestedKeyChanged: 'someNestedValueChange'};
+
+                await Onyx.update(queuedUpdates);
+
+                expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult});
+                expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual(entry1ExpectedResult);
+            });
+
+            describe('mergeCollection', () => {
+                it('replacing old object after null merge', async () => {
+                    const entry1: GenericDeepRecord = {
+                        sub_entry1: {
+                            id: 'sub_entry1',
+                            someKey: 'someValue',
+                        },
+                    };
+
+                    const entry2: GenericDeepRecord = {
+                        sub_entry2: {
+                            id: 'sub_entry2',
+                            someKey: 'someValue',
+                        },
+                    };
+                    await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1});
+                    await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`]: entry2});
+
+                    const entry1ExpectedResult = lodashCloneDeep(entry1);
+                    const entry2ExpectedResult = lodashCloneDeep(entry2);
+                    const queuedUpdates: OnyxUpdate[] = [];
+
+                    queuedUpdates.push(
+                        {
+                            key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                            onyxMethod: 'merge',
+                            value: {
+                                // Removing the "sub_entry1" object in this update.
+                                // Any subsequent changes to this object should completely replace the existing object in store.
+                                sub_entry1: null,
+                            },
+                        },
+                        {
+                            key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`,
+                            onyxMethod: 'merge',
+                            value: {
+                                // Removing the "sub_entry2" object in this update.
+                                // Any subsequent changes to this object should completely replace the existing object in store.
+                                sub_entry2: null,
+                            },
+                        },
+                    );
+                    delete entry1ExpectedResult.sub_entry1;
+                    delete entry2ExpectedResult.sub_entry2;
+
+                    queuedUpdates.push(
+                        {
+                            key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
+                            onyxMethod: 'merge',
+                            value: {
+                                // This change should completely replace "sub_entry1" existing object in store.
+                                sub_entry1: {
+                                    newKey: 'newValue',
+                                },
+                            },
+                        },
+                        {
+                            key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`,
+                            onyxMethod: 'merge',
+                            value: {
+                                // This change should completely replace "sub_entry2" existing object in store.
+                                sub_entry2: {
+                                    newKey: 'newValue',
+                                },
+                            },
+                        },
+                    );
+                    entry1ExpectedResult.sub_entry1 = {newKey: 'newValue'};
+                    entry2ExpectedResult.sub_entry2 = {newKey: 'newValue'};
+
+                    await Onyx.update(queuedUpdates);
+
+                    expect(result).toEqual({
+                        [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult,
+                        [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`]: entry2ExpectedResult,
+                    });
+                    expect(await StorageMock.multiGet([`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`, `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`])).toEqual([
+                        [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`, entry1ExpectedResult],
+                        [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`, entry2ExpectedResult],
+                    ]);
+                });
+            });
+        });
+
         describe('merge', () => {
+            it('should replace the old value after a null merge in the top-level object when batching merges', async () => {
+                let result: unknown;
+                connection = Onyx.connect({
+                    key: ONYX_KEYS.COLLECTION.TEST_UPDATE,
+                    waitForCollectionCallback: true,
+                    callback: (value) => {
+                        result = value;
+                    },
+                });
+
+                await Onyx.multiSet({
+                    [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {
+                        id: 'entry1',
+                        someKey: 'someValue',
+                    },
+                });
+
+                // Removing the entire object in this merge.
+                // Any subsequent changes to this key should completely replace the old value.
+                Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`, null);
+
+                // This change should completely replace `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1` old value.
+                Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`, {
+                    someKey: 'someValueChanged',
+                });
+
+                await waitForPromisesToResolve();
+
+                expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {someKey: 'someValueChanged'}});
+                expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual({someKey: 'someValueChanged'});
+            });
+
+            describe('should replace the old value after a null merge in a nested property when batching merges', () => {
+                let result: unknown;
+
+                beforeEach(() => {
+                    connection = Onyx.connect({
+                        key: ONYX_KEYS.COLLECTION.TEST_UPDATE,
+                        waitForCollectionCallback: true,
+                        callback: (value) => {
+                            result = value;
+                        },
+                    });
+                });
+
+                it('replacing old object after null merge', async () => {
+                    const entry1: GenericDeepRecord = {
+                        sub_entry1: {
+                            id: 'sub_entry1',
+                            someKey: 'someValue',
+                        },
+                    };
+                    await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1});
+
+                    const entry1ExpectedResult = lodashCloneDeep(entry1);
+
+                    Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`, {
+                        // Removing the "sub_entry1" object in this merge.
+                        // Any subsequent changes to this object should completely replace the existing object in store.
+                        sub_entry1: null,
+                    });
+                    delete entry1ExpectedResult.sub_entry1;
+
+                    Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`, {
+                        // This change should completely replace "sub_entry1" existing object in store.
+                        sub_entry1: {
+                            newKey: 'newValue',
+                        },
+                    });
+                    entry1ExpectedResult.sub_entry1 = {newKey: 'newValue'};
+
+                    await waitForPromisesToResolve();
+
+                    expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult});
+                    expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual(entry1ExpectedResult);
+                });
+
+                it('setting new object after null merge', async () => {
+                    const entry1: GenericDeepRecord = {
+                        sub_entry1: {
+                            id: 'sub_entry1',
+                            someKey: 'someValue',
+                            someNestedObject: {
+                                someNestedKey: 'someNestedValue',
+                                anotherNestedObject: {
+                                    anotherNestedKey: 'anotherNestedValue',
+                                },
+                            },
+                        },
+                    };
+                    await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1});
+
+                    const entry1ExpectedResult = lodashCloneDeep(entry1);
+
+                    Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`, {
+                        sub_entry1: {
+                            someNestedObject: {
+                                // Introducing a new "anotherNestedObject2" object in this merge.
+                                anotherNestedObject2: {
+                                    anotherNestedKey2: 'anotherNestedValue2',
+                                },
+                            },
+                        },
+                    });
+                    entry1ExpectedResult.sub_entry1.someNestedObject.anotherNestedObject2 = {anotherNestedKey2: 'anotherNestedValue2'};
+
+                    Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`, {
+                        sub_entry1: {
+                            someNestedObject: {
+                                // Removing the "anotherNestedObject2" object in this merge.
+                                // This property was only introduced in a previous merge, so we don't need to care
+                                // about an old existing value because there isn't one.
+                                anotherNestedObject2: null,
+                            },
+                        },
+                    });
+                    delete entry1ExpectedResult.sub_entry1.someNestedObject.anotherNestedObject2;
+
+                    Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`, {
+                        sub_entry1: {
+                            someNestedObject: {
+                                // Introducing the "anotherNestedObject2" object again with this update.
+                                anotherNestedObject2: {
+                                    newNestedKey2: 'newNestedValue2',
+                                },
+                            },
+                        },
+                    });
+                    entry1ExpectedResult.sub_entry1.someNestedObject.anotherNestedObject2 = {newNestedKey2: 'newNestedValue2'};
+
+                    await waitForPromisesToResolve();
+
+                    expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult});
+                    expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual(entry1ExpectedResult);
+                });
+
+                it('setting new object after null merge of a primitive property', async () => {
+                    const entry1: GenericDeepRecord = {
+                        sub_entry1: {
+                            id: 'sub_entry1',
+                            someKey: 'someValue',
+                            someNestedObject: {
+                                someNestedKey: 'someNestedValue',
+                                anotherNestedObject: {
+                                    anotherNestedKey: 'anotherNestedValue',
+                                },
+                            },
+                        },
+                    };
+                    await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1});
+
+                    const entry1ExpectedResult = lodashCloneDeep(entry1);
+
+                    Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`, {
+                        sub_entry1: {
+                            someNestedObject: {
+                                anotherNestedObject: {
+                                    // Removing the "anotherNestedKey" property in this merge.
+                                    // This property's existing value in store is a primitive value, so we don't need to care
+                                    // about it when merging new values in any next merges.
+                                    anotherNestedKey: null,
+                                },
+                            },
+                        },
+                    });
+                    delete entry1ExpectedResult.sub_entry1.someNestedObject.anotherNestedObject.anotherNestedKey;
+
+                    Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`, {
+                        sub_entry1: {
+                            someNestedObject: {
+                                anotherNestedObject: {
+                                    // Setting a new object to the "anotherNestedKey" property.
+                                    anotherNestedKey: {
+                                        newNestedKey: 'newNestedValue',
+                                    },
+                                },
+                            },
+                        },
+                    });
+                    entry1ExpectedResult.sub_entry1.someNestedObject.anotherNestedObject.anotherNestedKey = {newNestedKey: 'newNestedValue'};
+
+                    await waitForPromisesToResolve();
+
+                    expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult});
+                    expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual(entry1ExpectedResult);
+                });
+            });
+
             it('should remove a deeply nested null when merging an existing key', () => {
                 let result: unknown;
 

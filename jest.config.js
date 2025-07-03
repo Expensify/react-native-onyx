@@ -15,4 +15,8 @@ module.exports = {
     testTimeout: 60000,
     transformIgnorePatterns: ['node_modules/(?!((@)?react-native|@ngneat/falso|uuid)/)'],
     testSequencer: './jest-sequencer.js',
+    moduleNameMapper: {
+        // Redirect all imports of OnyxMerge to its web version during unit tests.
+        '^(.*)/OnyxMerge$': '<rootDir>/lib/OnyxMerge/index.ts',
+    },
 };

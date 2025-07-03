@@ -29,7 +29,7 @@ applied in the order they were called. Note: <code>Onyx.set()</code> calls do no
 <code>Onyx.merge()</code> and <code>Onyx.set()</code>.</p>
 </dd>
 <dt><a href="#mergeCollection">mergeCollection(collectionKey, collection)</a></dt>
-<dd><p>Merges a collection based on their keys</p>
+<dd><p>Merges a collection based on their keys.</p>
 </dd>
 <dt><a href="#clear">clear(keysToPreserve)</a></dt>
 <dd><p>Clear out all the data in the store</p>
@@ -158,7 +158,7 @@ Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Wor
 <a name="mergeCollection"></a>
 
 ## mergeCollection(collectionKey, collection)
-Merges a collection based on their keys
+Merges a collection based on their keys.
 
 **Kind**: global function  
 
