@@ -172,14 +172,34 @@ function isMergeableObject<TObject extends Record<string, unknown>>(value: unkno
 
 /** Deep removes the nested null values from the given value. */
 function removeNestedNullValues<TValue extends OnyxInput<OnyxKey> | null>(value: TValue): TValue {
-    if (typeof value === 'object' && !Array.isArray(value)) {
-        return fastMerge(value, value, {
-            shouldRemoveNestedNulls: true,
-            objectRemovalMode: 'replace',
-        }).result;
+    if (value === null || value === undefined) {
+        return value;
     }
 
-    return value;
+    if (typeof value !== 'object' || Array.isArray(value)) {
+        return value;
+    }
+
+    const result: Record<string, unknown> = {};
+
+    // eslint-disable-next-line no-restricted-syntax, guard-for-in
+    for (const key in value) {
+        const propertyValue = value[key];
+
+        if (propertyValue === null || propertyValue === undefined) {
+            // eslint-disable-next-line no-continue
+            continue;
+        }
+
+        if (typeof propertyValue === 'object' && !Array.isArray(propertyValue)) {
+            const valueWithoutNestedNulls = removeNestedNullValues(propertyValue);
+            result[key] = valueWithoutNestedNulls;
+        } else {
+            result[key] = propertyValue;
+        }
+    }
+
+    return result as TValue;
 }
 
 /** Formats the action name by uppercasing and adding the key if provided. */

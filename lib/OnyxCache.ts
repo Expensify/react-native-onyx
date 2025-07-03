@@ -31,6 +31,9 @@ class OnyxCache {
     /** A map of cached values */
     private storageMap: Record<OnyxKey, OnyxValue<OnyxKey>>;
 
+    /** Index mapping collection keys to their member keys for O(1) lookup */
+    private collectionIndex: Record<OnyxKey, Set<OnyxKey>>;
+
     /**
      * Captured pending tasks for already running storage methods
      * Using a map yields better performance on operations such a delete
@@ -49,11 +52,15 @@ class OnyxCache {
     /** List of keys that have been directly subscribed to or recently modified from least to most recent */
     private recentlyAccessedKeys = new Set<OnyxKey>();
 
+    /** Set of collection keys for fast lookup */
+    private collectionKeys = new Set<OnyxKey>();
+
     constructor() {
         this.storageKeys = new Set();
         this.nullishStorageKeys = new Set();
         this.recentKeys = new Set();
         this.storageMap = {};
+        this.collectionIndex = {};
         this.pendingPromises = new Map();
 
         // bind all public methods to prevent problems with `this`
@@ -83,6 +90,11 @@ class OnyxCache {
             'addLastAccessedKey',
             'addEvictableKeysToRecentlyAccessedList',
             'getKeyForEviction',
+            'setCollectionKeys',
+            'isCollectionKey',
+            'getCollectionKey',
+            'getCollectionData',
+            'getCollectionMemberKeys',
         );
     }
 
@@ -156,12 +168,26 @@ class OnyxCache {
         // since it will either be set to a non nullish value or removed from the cache completely.
         this.nullishStorageKeys.delete(key);
 
+        const collectionKey = this.getCollectionKey(key);
         if (value === null || value === undefined) {
             delete this.storageMap[key];
+
+            // Remove from collection index if it's a collection member
+            if (collectionKey && this.getCollectionMemberKeys(collectionKey)) {
+                this.collectionIndex[collectionKey].delete(key);
+            }
             return undefined;
         }
 
         this.storageMap[key] = value;
+
+        // Update collection index if this is a collection member
+        if (collectionKey) {
+            if (!this.getCollectionMemberKeys(collectionKey)) {
+                this.collectionIndex[collectionKey] = new Set();
+            }
+            this.collectionIndex[collectionKey].add(key);
+        }
 
         return value;
     }
@@ -169,6 +195,18 @@ class OnyxCache {
     /** Forget the cached value for the given key */
     drop(key: OnyxKey): void {
         delete this.storageMap[key];
+
+        // Update collection index if this is a collection member
+        const collectionKey = this.getCollectionKey(key);
+        if (collectionKey && this.getCollectionMemberKeys(collectionKey)) {
+            this.collectionIndex[collectionKey].delete(key);
+        }
+
+        // If this is a collection key, clear its index
+        if (this.isCollectionKey(key)) {
+            delete this.collectionIndex[key];
+        }
+
         this.storageKeys.delete(key);
         this.recentKeys.delete(key);
     }
@@ -193,10 +231,25 @@ class OnyxCache {
             this.addKey(key);
             this.addToAccessedKeys(key);
 
+            const collectionKey = this.getCollectionKey(key);
+
             if (value === null || value === undefined) {
                 this.addNullishStorageKey(key);
+
+                // Remove from collection index if it's a collection member
+                if (collectionKey && this.getCollectionMemberKeys(collectionKey)) {
+                    this.collectionIndex[collectionKey].delete(key);
+                }
             } else {
                 this.nullishStorageKeys.delete(key);
+
+                // Update collection index if this is a collection member
+                if (collectionKey) {
+                    if (!this.getCollectionMemberKeys(collectionKey)) {
+                        this.collectionIndex[collectionKey] = new Set();
+                    }
+                    this.collectionIndex[collectionKey].add(key);
+                }
             }
         });
     }
@@ -266,6 +319,12 @@ class OnyxCache {
 
         for (const key of keysToRemove) {
             delete this.storageMap[key];
+
+            // Update collection index if this is a collection member
+            const collectionKey = this.getCollectionKey(key);
+            if (collectionKey && this.getCollectionMemberKeys(collectionKey)) {
+                this.collectionIndex[collectionKey].delete(key);
+            }
             this.recentKeys.delete(key);
         }
     }
@@ -277,7 +336,8 @@ class OnyxCache {
 
     /** Check if the value has changed */
     hasValueChanged(key: OnyxKey, value: OnyxValue<OnyxKey>): boolean {
-        return !deepEqual(this.storageMap[key], value);
+        const currentValue = this.get(key, false);
+        return !deepEqual(currentValue, value);
     }
 
     /**
@@ -367,6 +427,67 @@ class OnyxCache {
             }
         }
         return undefined;
+    }
+
+    /**
+     * Set the collection keys for optimized storage
+     */
+    setCollectionKeys(collectionKeys: Set<OnyxKey>): void {
+        this.collectionKeys = collectionKeys;
+
+        // Initialize collection indexes for existing collection keys
+        collectionKeys.forEach((collectionKey) => {
+            if (this.getCollectionMemberKeys(collectionKey)) {
+                return;
+            }
+            this.collectionIndex[collectionKey] = new Set();
+        });
+    }
+
+    /**
+     * Check if a key is a collection key
+     */
+    isCollectionKey(key: OnyxKey): boolean {
+        return this.collectionKeys.has(key);
+    }
+
+    /**
+     * Get the collection key for a given member key
+     */
+    getCollectionKey(key: OnyxKey): OnyxKey | null {
+        for (const collectionKey of this.collectionKeys) {
+            if (key.startsWith(collectionKey) && key.length > collectionKey.length) {
+                return collectionKey;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Get all data for a collection key
+     */
+    getCollectionData(collectionKey: OnyxKey): Record<OnyxKey, OnyxValue<OnyxKey>> | undefined {
+        const memberKeys = this.getCollectionMemberKeys(collectionKey);
+        if (!memberKeys || memberKeys.size === 0) {
+            return undefined;
+        }
+
+        const collectionData: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
+        memberKeys.forEach((memberKey) => {
+            const value = this.storageMap[memberKey];
+            if (value !== undefined) {
+                collectionData[memberKey] = value;
+            }
+        });
+
+        return collectionData;
+    }
+
+    /**
+     * Get all member keys for a collection key
+     */
+    getCollectionMemberKeys(collectionKey: OnyxKey): Set<OnyxKey> | undefined {
+        return this.collectionIndex[collectionKey];
     }
 }
 
