@@ -49,15 +49,19 @@ const provider: StorageProvider = {
 
                 const upsertMany = pairsWithoutNull.map(([key, value], index) => {
                     const prev = values[index];
-                    const newValue = utils.fastMerge(prev as Record<string, unknown>, value as Record<string, unknown>);
+                    const newValue = utils.fastMerge(prev as Record<string, unknown>, value as Record<string, unknown>, {
+                        shouldRemoveNestedNulls: true,
+                        objectRemovalMode: 'replace',
+                    }).result;
+
                     return promisifyRequest(store.put(newValue, key));
                 });
-                return Promise.all(upsertMany);
+                return Promise.all(upsertMany).then(() => undefined);
             });
         }),
-    mergeItem(key, _deltaChanges, preMergedValue) {
-        // Since Onyx also merged the existing value with the changes, we can just set the value directly
-        return provider.setItem(key, preMergedValue);
+    mergeItem(key, change) {
+        // Since Onyx already merged the existing value with the changes, we can just set the value directly.
+        return provider.multiMerge([[key, change]]);
     },
     multiSet: (pairs) => {
         const pairsWithoutNull = pairs.filter(([key, value]) => {
@@ -67,7 +71,7 @@ const provider: StorageProvider = {
             }
 
             return true;
-        });
+        }) as Array<[IDBValidKey, unknown]>;
 
         return setMany(pairsWithoutNull, idbKeyValStore);
     },
