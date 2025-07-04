@@ -16,7 +16,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
         with:
-          fetch-depth: 0
+          ref: ${{ github.event.pull_request.base.ref }}
+          # fetch-depth: 0
 
       # v4
       - name: Setup Node
@@ -24,27 +25,22 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
-      # - name: Reassure stability check
-      #   run: |
-      #     npm ci
-      #     npx reassure check-stability --verbose
+      - name: Install dependencies
+        run: npm ci
 
-      # - name: Install dependencies
-      #   run: npm ci
+      - name: Reassure stability check
+        run: npx reassure check-stability --verbose
 
-      # - name: Run Reassure baseline tests
-      #   run: npx reassure --baseline --verbose
-
-      # - name: Checkout PR head SHA
-      #   run: |
-      #     git fetch origin ${{ github.event.pull_request.head.sha }} --no-tags --depth=1
-      #     git switch --force --detach ${{ github.event.pull_request.head.sha }}
+      - name: Checkout PR head SHA
+        run: |
+          git fetch origin ${{ github.event.pull_request.head.sha }} --no-tags --depth=1
+          git switch --force --detach ${{ github.event.pull_request.head.sha }}
           
-      # - name: Reinstall dependencies
-      #   run: npm ci
+      - name: Reinstall dependencies
+        run: npm ci
 
-      # - name: Run Reassure delta tests
-      #   run: npx reassure --branch --verbose
+      - name: Run Reassure delta tests
+        run: npx reassure --branch --verbose
 
       # - name: Reassure tests
       #   run: |
@@ -57,41 +53,41 @@ jobs:
       #     npm ci
       #     npx reassure --branch --verbose
 
-      - name: Set dummy git credentials
-        run: |
-            git config --global user.email "test@test.com"
-            git config --global user.name "Test"
+      # - name: Set dummy git credentials
+      #   run: |
+      #       git config --global user.email "test@test.com"
+      #       git config --global user.name "Test"
 
-      - name: Get common ancestor commit
-        run: |
-          git fetch origin main
-          common_ancestor=$(git merge-base "${{ github.sha }}" origin/main)
-          echo "COMMIT_HASH=$common_ancestor" >> "$GITHUB_ENV"
+      # - name: Get common ancestor commit
+      #   run: |
+      #     git fetch origin main
+      #     common_ancestor=$(git merge-base "${{ github.sha }}" origin/main)
+      #     echo "COMMIT_HASH=$common_ancestor" >> "$GITHUB_ENV"
 
-      - name: Clean up deleted files
-        run: |
-          DELETED_FILES=$(git diff --name-only --diff-filter=D "$COMMIT_HASH" "${{ github.sha }}")
-          for file in $DELETED_FILES; do
-            if [ -n "$file" ]; then
-              rm -f "$file"
-              echo "Deleted file: $file"
-            fi
-          done
+      # - name: Clean up deleted files
+      #   run: |
+      #     DELETED_FILES=$(git diff --name-only --diff-filter=D "$COMMIT_HASH" "${{ github.sha }}")
+      #     for file in $DELETED_FILES; do
+      #       if [ -n "$file" ]; then
+      #         rm -f "$file"
+      #         echo "Deleted file: $file"
+      #       fi
+      #     done
 
-      - name: Run performance testing script
-        shell: bash
-        run: |
-          set -e
-          BASELINE_BRANCH=${BASELINE_BRANCH:="main"}
-          git fetch origin "$BASELINE_BRANCH" --no-tags --depth=1
-          git switch "$BASELINE_BRANCH"
-          npm install --force || (rm -rf node_modules && npm install --force) 
-          NODE_OPTIONS=--experimental-vm-modules npx reassure --baseline
-          git switch --force --detach -
-          git merge --no-commit --allow-unrelated-histories "$BASELINE_BRANCH" -X ours
-          git checkout --ours .
-          npm install --force || (rm -rf node_modules && npm install --force)
-          NODE_OPTIONS=--experimental-vm-modules npx reassure --branch
+      # - name: Run performance testing script
+      #   shell: bash
+      #   run: |
+      #     set -e
+      #     BASELINE_BRANCH=${BASELINE_BRANCH:="main"}
+      #     git fetch origin "$BASELINE_BRANCH" --no-tags --depth=1
+      #     git switch "$BASELINE_BRANCH"
+      #     npm install --force || (rm -rf node_modules && npm install --force) 
+      #     NODE_OPTIONS=--experimental-vm-modules npx reassure --baseline
+      #     git switch --force --detach -
+      #     git merge --no-commit --allow-unrelated-histories "$BASELINE_BRANCH" -X ours
+      #     git checkout --ours .
+      #     npm install --force || (rm -rf node_modules && npm install --force)
+      #     NODE_OPTIONS=--experimental-vm-modules npx reassure --branch
 
       - name: Upload Reassure results
         uses: actions/upload-artifact@v4
