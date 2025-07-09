@@ -19,6 +19,7 @@ async function run() {
         const regressionOutput: CompareResult = JSON.parse(fs.readFileSync('.reassure/output.json', 'utf8'));
         const allowedDurationDeviation = Number(core.getInput('ALLOWED_DURATION_DEVIATION', {required: true}));
         const durationDeviationPercentage = Number(core.getInput('ALLOWED_RELATIVE_DURATION_DEVIATION', {required: true}));
+        const isValidatingStability = Boolean(core.getInput('IS_VALIDATING_STABILITY', {required: true}));
 
         if (regressionOutput.significant === undefined || regressionOutput.significant.length === 0) {
             console.log('No significant data available. Exiting...');
@@ -77,7 +78,15 @@ async function run() {
 
         const shouldFailWorkflow = outputs.some((output) => output.isDeviationExceeded);
         if (shouldFailWorkflow) {
-            core.setFailed(`🔴 Duration deviation exceeded the allowed ranges in one or more measurements.`);
+            if (isValidatingStability) {
+                core.setFailed(
+                    `🔴 Duration deviation exceeded the allowed ranges in one or more measurements during the stability checks.
+                    Please rerun the workflow again.
+                    `,
+                );
+            } else {
+                core.setFailed(`🔴 Duration deviation exceeded the allowed ranges in one or more measurements.`);
+            }
         }
 
         return true;
