@@ -439,6 +439,17 @@ type OnyxUpdate = {
 }[OnyxMethod];
 
 /**
+ * Represents the options used in `Onyx.set()` method.
+ */
+type SetOptions = {
+    /** Skip the deep equality check against the cached value. Improves performance for large objects. */
+    skipCacheCheck?: boolean;
+
+    /** Skip pruning null values from the object. Improves performance for large objects. */
+    skipNullRemoval?: boolean;
+};
+
+/**
  * Represents the options used in `Onyx.init()` method.
  */
 type InitOptions = {
@@ -548,6 +559,7 @@ export type {
     OnyxUpdate,
     OnyxValue,
     Selector,
+    SetOptions,
     WithOnyxConnectOptions,
     MultiMergeReplaceNullPatches,
     MixedOperationsQueue,
