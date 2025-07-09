@@ -24,6 +24,7 @@ import type {
     OnyxValue,
     OnyxInput,
     OnyxMethodMap,
+    SetOptions,
 } from './types';
 import OnyxUtils from './OnyxUtils';
 import logMessages from './logMessages';
@@ -130,8 +131,9 @@ function disconnect(connection: Connection): void {
  *
  * @param key ONYXKEY to set
  * @param value value to store
+ * @param options optional configuration object
  */
-function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>): Promise<void> {
+function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options?: SetOptions): Promise<void> {
     // When we use Onyx.set to set a key we want to clear the current delta changes from Onyx.merge that were queued
     // before the value was set. If Onyx.merge is currently reading the old value from storage, it will then not apply the changes.
     if (OnyxUtils.hasPendingMergeForKey(key)) {
@@ -178,8 +180,8 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>): Promis
         return Promise.resolve();
     }
 
-    const valueWithoutNestedNullValues = utils.removeNestedNullValues(value) as OnyxValue<TKey>;
-    const hasChanged = cache.hasValueChanged(key, valueWithoutNestedNullValues);
+    const valueWithoutNestedNullValues = (options?.skipNullRemoval ? value : utils.removeNestedNullValues(value)) as OnyxValue<TKey>;
+    const hasChanged = options?.skipCacheCheck ? true : cache.hasValueChanged(key, valueWithoutNestedNullValues);
 
     OnyxUtils.logKeyChanged(OnyxUtils.METHOD.SET, key, value, hasChanged);
 
@@ -732,4 +734,4 @@ function applyDecorators() {
 }
 
 export default Onyx;
-export type {OnyxUpdate, Mapping, ConnectOptions};
+export type {OnyxUpdate, Mapping, ConnectOptions, SetOptions};
