@@ -612,10 +612,9 @@ function update(data: OnyxUpdate[]): Promise<void> {
             return;
         }
 
-        const mergePromises = operations.map((operation) => {
-            return merge(key, operation);
+        operations.forEach((operation) => {
+            promises.push(() => merge(key, operation));
         });
-        promises.push(() => mergePromises.at(0) ?? Promise.resolve());
     });
 
     const snapshotPromises = OnyxUtils.updateSnapshots(data, merge);
