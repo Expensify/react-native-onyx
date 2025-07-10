@@ -637,7 +637,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
  * });
  *
  * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
- * @param collection Object collection keyed by individual collection member keys and values.
+ * @param collection Object collection keyed by individual collection member keys and values..
  */
 function setCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
     let resultCollection: OnyxInputKeyValueMapping = collection;
