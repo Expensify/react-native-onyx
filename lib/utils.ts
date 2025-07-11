@@ -176,8 +176,12 @@ function removeNestedNullValues<TValue extends OnyxInput<OnyxKey> | null>(value:
         return value;
     }
 
-    if (typeof value !== 'object' || Array.isArray(value)) {
+    if (typeof value !== 'object') {
         return value;
+    }
+
+    if (Array.isArray(value)) {
+        return [...value] as TValue;
     }
 
     const result: Record<string, unknown> = {};
