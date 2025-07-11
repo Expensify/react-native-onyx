@@ -180,7 +180,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options
         return Promise.resolve();
     }
 
-    const valueWithoutNestedNullValues = (options?.skipNullRemoval ? value : utils.removeNestedNullValues(value)) as OnyxValue<TKey>;
+    const valueWithoutNestedNullValues = (options?.skipNullRemoval ? {...value} : utils.removeNestedNullValues(value)) as OnyxValue<TKey>;
     const hasChanged = options?.skipCacheCheck ? true : cache.hasValueChanged(key, valueWithoutNestedNullValues);
 
     OnyxUtils.logKeyChanged(OnyxUtils.METHOD.SET, key, value, hasChanged);

@@ -172,12 +172,12 @@ function isMergeableObject<TObject extends Record<string, unknown>>(value: unkno
 
 /** Deep removes the nested null values from the given value. */
 function removeNestedNullValues<TValue extends OnyxInput<OnyxKey> | null>(value: TValue): TValue {
-    if (value === null || value === undefined) {
+    if (value === null || value === undefined || typeof value !== 'object') {
         return value;
     }
 
-    if (typeof value !== 'object' || Array.isArray(value)) {
-        return value;
+    if (Array.isArray(value)) {
+        return [...value] as TValue;
     }
 
     const result: Record<string, unknown> = {};
