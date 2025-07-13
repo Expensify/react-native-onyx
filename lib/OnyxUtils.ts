@@ -695,7 +695,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
 
                 const subscriberCallback = subscriber.callback as DefaultConnectCallback<TKey>;
                 subscriberCallback(cachedCollection[subscriber.key], subscriber.key as TKey);
-                lastConnectionData.set(subscriber,key, cachedCollection[subscriber.key]);
+                lastConnectionCallbackData.set(subscriber.subscriptionID, cachedCollection[subscriber.key]);
                 continue;
             }
 
