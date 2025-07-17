@@ -81,7 +81,7 @@ function init({
 
 /**
  * Connects to an Onyx key given the options passed and listens to its changes.
- * @deprecated Use `Onyx.connectWithoutView()` instead.
+ * This method will be deprecated soon. Please use `Onyx.connectWithoutView()` instead.
  *
  * @example
  * ```ts
