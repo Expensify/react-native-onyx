@@ -2,6 +2,7 @@ import Onyx from '../../lib';
 import OnyxUtils from '../../lib/OnyxUtils';
 import type {GenericDeepRecord} from '../types';
 import utils from '../../lib/utils';
+import type {Collection} from '../../lib/types';
 
 const testObject: GenericDeepRecord = {
     a: 'a',
@@ -119,6 +120,93 @@ describe('OnyxUtils', () => {
             expect(() => {
                 OnyxUtils.splitCollectionMemberKey(`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, ONYXKEYS.COLLECTION.TEST_LEVEL_KEY);
             }).toThrowError("Invalid 'test_level_' collection key provided, it isn't compatible with 'test_id1' key.");
+        });
+    });
+
+    describe('keysChanged', () => {
+        beforeEach(() => {
+            Onyx.clear();
+        });
+
+        afterEach(() => {
+            Onyx.clear();
+        });
+
+        it('should call callback when data actually changes for collection member key subscribers', async () => {
+            const callbackSpy = jest.fn();
+            const entryKey = `${ONYXKEYS.COLLECTION.TEST_KEY}123`;
+            const connection = Onyx.connect({
+                key: entryKey,
+                callback: callbackSpy,
+                initWithStoredValues: false,
+            });
+
+            const entryData = {value: 'updated_data'};
+
+            // Create partial collection data that includes our member key
+            const collection = {
+                [entryKey]: entryData,
+            } as Collection<string, {value: string}>;
+
+            // Clear the callback spy to focus on the keysChanged behavior
+            callbackSpy.mockClear();
+
+            await Onyx.setCollection(ONYXKEYS.COLLECTION.TEST_KEY, collection);
+
+            // Verify the subscriber callback was called
+            expect(callbackSpy).toHaveBeenCalledTimes(1);
+            expect(callbackSpy).toHaveBeenCalledWith(entryData, entryKey);
+
+            await Onyx.disconnect(connection);
+        });
+
+        it('should set lastConnectionCallbackData for collection member key subscribers', async () => {
+            const entryKey = `${ONYXKEYS.COLLECTION.TEST_KEY}456`;
+            const initialEntryData = {value: 'initial_data'};
+            const updatedEntryData = {value: 'updated_data'};
+            const newEntryData = {value: 'new_data'};
+            const callbackSpy = jest.fn();
+
+            const connection = await Onyx.connect({
+                key: entryKey,
+                callback: callbackSpy,
+                initWithStoredValues: false,
+            });
+
+            // Create partial collection data that includes our member key
+            const initialCollection = {
+                [entryKey]: initialEntryData,
+            } as Collection<string, {value: string}>;
+
+            // Clear the callback spy to focus on the keysChanged behavior
+            callbackSpy.mockClear();
+
+            OnyxUtils.keysChanged(
+                ONYXKEYS.COLLECTION.TEST_KEY,
+                {[entryKey]: updatedEntryData}, // new collection
+                initialCollection, // previous collection
+                true, // notify connect subscribers
+            );
+
+            // Should be called again because data changed
+            expect(callbackSpy).toHaveBeenCalledTimes(1);
+            expect(callbackSpy).toHaveBeenCalledWith(undefined, entryKey);
+
+            // Clear the callback spy to focus on the keyChanged behavior
+            callbackSpy.mockClear();
+
+            OnyxUtils.keyChanged(
+                entryKey,
+                newEntryData, // Second update with different data
+                updatedEntryData, // previous entry  data
+                () => true, // notify connect subscribers
+            );
+
+            // Should be called again because data changed
+            expect(callbackSpy).toHaveBeenCalledTimes(1);
+            expect(callbackSpy).toHaveBeenCalledWith(newEntryData, entryKey);
+
+            await Onyx.disconnect(connection);
         });
     });
 
