@@ -81,10 +81,11 @@ function init({
 
 /**
  * Connects to an Onyx key given the options passed and listens to its changes.
+ * @deprecated Use `Onyx.connectWithoutView()` instead.
  *
  * @example
  * ```ts
- * const connection = Onyx.connect({
+ * const connection = Onyx.connectWithoutView({
  *     key: ONYXKEYS.SESSION,
  *     callback: onSessionChange,
  * });
@@ -108,11 +109,39 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
 }
 
 /**
+ * Connects to an Onyx key given the options passed and listens to its changes.
+ *
+ * @example
+ * ```ts
+ * const connection = Onyx.connectWithoutView({
+ *     key: ONYXKEYS.SESSION,
+ *     callback: onSessionChange,
+ * });
+ * ```
+ *
+ * @param connectOptions The options object that will define the behavior of the connection.
+ * @param connectOptions.key The Onyx key to subscribe to.
+ * @param connectOptions.callback A function that will be called when the Onyx data we are subscribed changes.
+ * @param connectOptions.waitForCollectionCallback If set to `true`, it will return the entire collection to the callback as a single object.
+ * @param connectOptions.withOnyxInstance The `withOnyx` class instance to be internally passed. **Only used inside `withOnyx()` HOC.**
+ * @param connectOptions.statePropertyName The name of the component's prop that is connected to the Onyx key. **Only used inside `withOnyx()` HOC.**
+ * @param connectOptions.displayName The component's display name. **Only used inside `withOnyx()` HOC.**
+ * @param connectOptions.selector This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook or `withOnyx()` HOC.**
+ *        Using this setting on `useOnyx()` or `withOnyx()` can have very positive performance benefits because the component will only re-render
+ *        when the subset of data changes. Otherwise, any change of data on any property would normally
+ *        cause the component to re-render (and that can be expensive from a performance standpoint).
+ * @returns The connection object to use when calling `Onyx.disconnect()`.
+ */
+function connectWithoutView<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Connection {
+    return connectionManager.connect(connectOptions);
+}
+
+/**
  * Disconnects and removes the listener from the Onyx key.
  *
  * @example
  * ```ts
- * const connection = Onyx.connect({
+ * const connection = Onyx.connectWithoutView({
  *     key: ONYXKEYS.SESSION,
  *     callback: onSessionChange,
  * });
@@ -120,7 +149,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
  * Onyx.disconnect(connection);
  * ```
  *
- * @param connection Connection object returned by calling `Onyx.connect()`.
+ * @param connection Connection object returned by calling `Onyx.connect()` or `Onyx.connectWithoutView()`.
  */
 function disconnect(connection: Connection): void {
     connectionManager.disconnect(connection);
@@ -700,6 +729,7 @@ function setCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey
 const Onyx = {
     METHOD: OnyxUtils.METHOD,
     connect,
+    connectWithoutView,
     disconnect,
     set,
     multiSet,
@@ -717,6 +747,8 @@ function applyDecorators() {
     /* eslint-disable rulesdir/prefer-actions-set-data */
     // @ts-expect-error Reassign
     connect = decorateWithMetrics(connect, 'Onyx.connect');
+    // @ts-expect-error Reassign
+    connectWithoutView = decorateWithMetrics(connectWithoutView, 'Onyx.connectWithoutView');
     // @ts-expect-error Reassign
     set = decorateWithMetrics(set, 'Onyx.set');
     // @ts-expect-error Reassign
