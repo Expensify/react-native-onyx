@@ -48,13 +48,6 @@ type BaseUseOnyxOptions = {
     canBeMissing?: boolean;
 };
 
-type UseOnyxInitialValueOption<TInitialValue> = {
-    /**
-     * This value will be returned by the hook on the first render while the data is being read from Onyx.
-     */
-    initialValue?: TInitialValue;
-};
-
 type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (data: OnyxValue<TKey> | undefined) => TReturnValue;
 
 type UseOnyxSelectorOption<TKey extends OnyxKey, TReturnValue> = {
@@ -68,7 +61,7 @@ type UseOnyxSelectorOption<TKey extends OnyxKey, TReturnValue> = {
     selector?: UseOnyxSelector<TKey, TReturnValue>;
 };
 
-type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = BaseUseOnyxOptions & UseOnyxInitialValueOption<TReturnValue> & UseOnyxSelectorOption<TKey, TReturnValue>;
+type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = BaseUseOnyxOptions & UseOnyxSelectorOption<TKey, TReturnValue>;
 
 type FetchStatus = 'loading' | 'loaded';
 
@@ -81,14 +74,10 @@ type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata<TV
 
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     key: TKey,
-    options?: BaseUseOnyxOptions & UseOnyxInitialValueOption<TReturnValue> & Required<UseOnyxSelectorOption<TKey, TReturnValue>>,
+    options?: BaseUseOnyxOptions & Required<UseOnyxSelectorOption<TKey, TReturnValue>>,
     dependencies?: DependencyList,
 ): UseOnyxResult<TReturnValue>;
-function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
-    key: TKey,
-    options?: BaseUseOnyxOptions & UseOnyxInitialValueOption<NoInfer<TReturnValue>>,
-    dependencies?: DependencyList,
-): UseOnyxResult<TReturnValue>;
+function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey, options?: BaseUseOnyxOptions, dependencies?: DependencyList): UseOnyxResult<TReturnValue>;
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     key: TKey,
     options?: UseOnyxOptions<TKey, TReturnValue>,
@@ -226,13 +215,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             newFetchStatus = 'loading';
         }
 
-        // If data is not present in cache and `initialValue` is set during the first connection,
-        // we set the new value to `initialValue` and fetch status to `loaded` since we already have some data to return to the consumer.
-        if (isFirstConnectionRef.current && !hasCacheForKey && options?.initialValue !== undefined) {
-            newValueRef.current = options.initialValue;
-            newFetchStatus = 'loaded';
-        }
-
         // We do a deep equality check if `selector` is defined, since each `tryGetCachedValue()` call will
         // generate a plain new primitive/object/array that was created using the `selector` function.
         // For the other cases we will only deal with object reference checks, so just a shallow equality check is enough.
@@ -272,7 +254,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         }
 
         return resultRef.current;
-    }, [options?.initWithStoredValues, options?.allowStaleData, options?.initialValue, options?.canBeMissing, key, selectorRef]);
+    }, [options?.initWithStoredValues, options?.allowStaleData, options?.canBeMissing, key, selectorRef]);
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {

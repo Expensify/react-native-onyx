@@ -15,7 +15,7 @@ import connectionManager from '../OnyxConnectionManager';
 
 // This is a list of keys that can exist on a `mapping`, but are not directly related to loading data from Onyx. When the keys of a mapping are looped over to check
 // if a key has changed, it's a good idea to skip looking at these properties since they would have unexpected results.
-const mappingPropertiesToIgnoreChangesTo: Array<string | number | symbol> = ['initialValue', 'allowStaleData'];
+const mappingPropertiesToIgnoreChangesTo: Array<string | number | symbol> = ['allowStaleData'];
 
 /**
  * Returns the display name of a component
@@ -85,12 +85,8 @@ export default function <TComponentProps, TOnyxProps>(
 
                 const cachedState = mapOnyxToStateEntries(mapOnyxToState).reduce<WithOnyxState<TOnyxProps>>((resultObj, [propName, mapping]) => {
                     const key = Str.result(mapping.key as GenericFunction, props);
-                    let value = OnyxUtils.tryGetCachedValue(key, mapping as Mapping<OnyxKey>);
+                    const value = OnyxUtils.tryGetCachedValue(key, mapping as Mapping<OnyxKey>);
                     const hasCacheForKey = cache.hasCacheForKey(key);
-
-                    if (!hasCacheForKey && !value && mapping.initialValue) {
-                        value = mapping.initialValue;
-                    }
 
                     /**
                      * If we have a pending merge for a key it could mean that data is being set via Onyx.merge() and someone expects a component to have this data immediately.
@@ -247,15 +243,8 @@ export default function <TComponentProps, TOnyxProps>(
                             return result;
                         }
 
-                        const initialValue = mapOnyxToState[key].initialValue;
-
-                        // If initialValue is there and the state contains something different it means
-                        // an update has already been received and we can discard the value we are trying to hydrate
-                        if (initialValue !== undefined && prevState[key] !== undefined && prevState[key] !== initialValue && prevState[key] !== null) {
-                            // eslint-disable-next-line no-param-reassign
-                            result[key] = prevState[key];
-                        } else if (prevState[key] !== undefined && prevState[key] !== null) {
-                            // if value is already there (without initial value) then we can discard the value we are trying to hydrate
+                        // if value is already there then we can discard the value we are trying to hydrate
+                        if (prevState[key] !== undefined && prevState[key] !== null) {
                             // eslint-disable-next-line no-param-reassign
                             result[key] = prevState[key];
                         } else if (stateUpdate[key] !== null) {

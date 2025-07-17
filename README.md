@@ -196,16 +196,7 @@ export default withOnyx({
 })(App);
 ```
 
-Differently from `useOnyx()`, `withOnyx()` will delay the rendering of the wrapped component until all keys/entities have been fetched and passed to the component, this can be convenient for simple cases. This however, can really delay your application if many entities are connected to the same component, you can pass an `initialValue` to each key to allow Onyx to eagerly render your component with this value.
-
-```javascript
-export default withOnyx({
-    session: {
-        key: ONYXKEYS.SESSION,
-        initialValue: {}
-    },
-})(App);
-```
+Differently from `useOnyx()`, `withOnyx()` will delay the rendering of the wrapped component until all keys/entities have been fetched and passed to the component, this can be convenient for simple cases. This however, can really delay your application if many entities are connected to the same component.
 
 Additionally, if your component has many keys/entities when your component will mount but will receive many updates as data is fetched from DB and passed down to it, as every key that gets fetched will trigger a `setState` on the `withOnyx` HOC. This might cause re-renders on the initial mounting, preventing the component from mounting/rendering in reasonable time, making your app feel slow and even delaying animations.
 
@@ -221,8 +212,7 @@ const App = ({session, markReadyForHydration}) => (
 // Second argument to funciton is `shouldDelayUpdates`
 export default withOnyx({
     session: {
-        key: ONYXKEYS.SESSION,
-        initialValue: {}
+        key: ONYXKEYS.SESSION
     },
 }, true)(App);
 ```
