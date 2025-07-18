@@ -95,7 +95,11 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     dependencies: DependencyList = [],
 ): UseOnyxResult<TReturnValue> {
     const connectionRef = useRef<Connection | null>(null);
-    const previousKey = usePrevious(key);
+    let updatedKey = key;
+    if (OnyxUtils.isCollectionKey(key) && key.endsWith('_')) {
+        updatedKey = `${key}undefined` as TKey;
+    }
+    const previousKey = usePrevious(updatedKey);
 
     // Used to stabilize the selector reference and avoid unnecessary calls to `getSnapshot()`.
     const selectorRef = useLiveRef(options?.selector);
@@ -135,27 +139,31 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
     useEffect(() => {
         // These conditions will ensure we can only handle dynamic collection member keys from the same collection.
-        if (options?.allowDynamicKey || previousKey === key) {
+        if (options?.allowDynamicKey || previousKey === updatedKey) {
             return;
         }
 
         try {
             const previousCollectionKey = OnyxUtils.splitCollectionMemberKey(previousKey)[0];
-            const collectionKey = OnyxUtils.splitCollectionMemberKey(key)[0];
+            const collectionKey = OnyxUtils.splitCollectionMemberKey(updatedKey)[0];
 
-            if (OnyxUtils.isCollectionMemberKey(previousCollectionKey, previousKey) && OnyxUtils.isCollectionMemberKey(collectionKey, key) && previousCollectionKey === collectionKey) {
+            if (
+                OnyxUtils.isCollectionMemberKey(previousCollectionKey, previousKey) &&
+                OnyxUtils.isCollectionMemberKey(collectionKey, updatedKey) &&
+                previousCollectionKey === collectionKey
+            ) {
                 return;
             }
         } catch (e) {
             throw new Error(
-                `'${previousKey}' key can't be changed to '${key}'. useOnyx() only supports dynamic keys if they are both collection member keys from the same collection e.g. from 'collection_id1' to 'collection_id2'.`,
+                `'${previousKey}' key can't be changed to '${updatedKey}'. useOnyx() only supports dynamic keys if they are both collection member keys from the same collection e.g. from 'collection_id1' to 'collection_id2'.`,
             );
         }
 
         throw new Error(
-            `'${previousKey}' key can't be changed to '${key}'. useOnyx() only supports dynamic keys if they are both collection member keys from the same collection e.g. from 'collection_id1' to 'collection_id2'.`,
+            `'${previousKey}' key can't be changed to '${updatedKey}'. useOnyx() only supports dynamic keys if they are both collection member keys from the same collection e.g. from 'collection_id1' to 'collection_id2'.`,
         );
-    }, [previousKey, key, options?.allowDynamicKey]);
+    }, [previousKey, updatedKey, options?.allowDynamicKey]);
 
     useEffect(() => {
         // This effect will only run if the `dependencies` array changes. If it changes it will force the hook
@@ -176,8 +184,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             return;
         }
 
-        if (!OnyxCache.isEvictableKey(key)) {
-            throw new Error(`canEvict can't be used on key '${key}'. This key must explicitly be flagged as safe for removal by adding it to Onyx.init({evictableKeys: []}).`);
+        if (!OnyxCache.isEvictableKey(updatedKey)) {
+            throw new Error(`canEvict can't be used on key '${updatedKey}'. This key must explicitly be flagged as safe for removal by adding it to Onyx.init({evictableKeys: []}).`);
         }
 
         if (options.canEvict) {
@@ -185,7 +193,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         } else {
             connectionManager.addToEvictionBlockList(connectionRef.current);
         }
-    }, [key, options?.canEvict]);
+    }, [updatedKey, options?.canEvict]);
 
     const getSnapshot = useCallback(() => {
         let isOnyxValueDefined = true;
@@ -200,7 +208,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // update `newValueRef` when `Onyx.connect()` callback is fired.
         if (isFirstConnectionRef.current || shouldGetCachedValueRef.current) {
             // Gets the value from cache and maps it with selector. It changes `null` to `undefined` for `useOnyx` compatibility.
-            const value = OnyxUtils.tryGetCachedValue(key) as OnyxValue<TKey>;
+            const value = OnyxUtils.tryGetCachedValue(updatedKey) as OnyxValue<TKey>;
             const selectedValue = selectorRef.current ? selectorRef.current(value) : value;
             newValueRef.current = (selectedValue ?? undefined) as TReturnValue | undefined;
 
@@ -213,7 +221,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             shouldGetCachedValueRef.current = false;
         }
 
-        const hasCacheForKey = OnyxCache.hasCacheForKey(key);
+        const hasCacheForKey = OnyxCache.hasCacheForKey(updatedKey);
 
         // Since the fetch status can be different given the use cases below, we define the variable right away.
         let newFetchStatus: FetchStatus | undefined;
@@ -221,7 +229,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // If we have pending merge operations for the key during the first connection, we set the new value to `undefined`
         // and fetch status to `loading` to simulate that it is still being loaded until we have the most updated data.
         // If `allowStaleData` is `true` this logic will be ignored and cached value will be used, even if it's stale data.
-        if (isFirstConnectionRef.current && OnyxUtils.hasPendingMergeForKey(key) && !options?.allowStaleData) {
+        if (isFirstConnectionRef.current && OnyxUtils.hasPendingMergeForKey(updatedKey) && !options?.allowStaleData) {
             newValueRef.current = undefined;
             newFetchStatus = 'loading';
         }
@@ -267,12 +275,12 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             // we log an alert so it can be acknowledged by the consumer. Additionally, we won't log alerts
             // if there's a `Onyx.clear()` task in progress.
             if (options?.canBeMissing === false && newStatus === 'loaded' && !isOnyxValueDefined && !OnyxCache.hasPendingTask(TASK.CLEAR)) {
-                Logger.logAlert(`useOnyx returned no data for key with canBeMissing set to false for key ${key}`, {showAlert: true});
+                Logger.logAlert(`useOnyx returned no data for key with canBeMissing set to false for key ${updatedKey}`, {showAlert: true});
             }
         }
 
         return resultRef.current;
-    }, [options?.initWithStoredValues, options?.allowStaleData, options?.initialValue, options?.canBeMissing, key, selectorRef]);
+    }, [options?.initWithStoredValues, options?.allowStaleData, options?.initialValue, options?.canBeMissing, updatedKey, selectorRef]);
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
@@ -280,7 +288,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             onStoreChangeFnRef.current = onStoreChange;
 
             connectionRef.current = connectionManager.connect<CollectionKeyBase>({
-                key,
+                key: updatedKey,
                 callback: (value, callbackKey, sourceValue) => {
                     isConnectingRef.current = false;
                     onStoreChangeFnRef.current = onStoreChange;
@@ -299,7 +307,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                     onStoreChange();
                 },
                 initWithStoredValues: options?.initWithStoredValues,
-                waitForCollectionCallback: OnyxUtils.isCollectionKey(key) as true,
+                waitForCollectionCallback: OnyxUtils.isCollectionKey(updatedKey) as true,
                 reuseConnection: options?.reuseConnection,
             });
 
@@ -316,7 +324,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                 onStoreChangeFnRef.current = null;
             };
         },
-        [key, options?.initWithStoredValues, options?.reuseConnection, checkEvictableKey],
+        [updatedKey, options?.initWithStoredValues, options?.reuseConnection, checkEvictableKey],
     );
 
     const getSnapshotDecorated = useMemo(() => {
