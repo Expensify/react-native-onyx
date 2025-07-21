@@ -406,7 +406,7 @@ If a platform needs to use a separate library (like using MMVK for react-native)
 
 [Docs](./API.md)
 
-# Storage Eviction
+# Cache Eviction
 
 Different platforms come with varying storage capacities and Onyx has a way to gracefully fail when those storage limits are encountered. When Onyx fails to set or modify a key the following steps are taken:
 1. Onyx looks at a list of recently accessed keys (access is defined as subscribed to or modified) and locates the key that was least recently accessed
