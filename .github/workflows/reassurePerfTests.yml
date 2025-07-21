@@ -16,7 +16,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
         with:
-          ref: ${{ github.event.pull_request.base.ref }}
+          ref: ${{ github.event.pull_request.head.sha }}
 
       # v4
       - name: Setup Node
@@ -33,7 +33,7 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           retry_on: error
-          command: node .github/actions/javascript/reassureStabilityCheck/index.js
+          command: node .github/actions/javascript/reassureStabilityCheck
         env:
           ALLOWED_DURATION_DEVIATION: 10
           ALLOWED_RELATIVE_DURATION_DEVIATION: 20

@@ -24969,7 +24969,7 @@ function run() {
             console.log('Running Reassure stability check...');
             (0, child_process_1.execSync)('npx reassure check-stability --verbose', { stdio: 'inherit' });
             console.log('Validating Reassure stability results...');
-            (0, child_process_1.execSync)('node .github/actions/javascript/validateReassureOutput/index.js', { stdio: 'inherit' });
+            (0, child_process_1.execSync)('node .github/actions/javascript/validateReassureOutput', { stdio: 'inherit' });
             return true;
         }
         catch (error) {
