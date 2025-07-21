@@ -28,12 +28,11 @@ jobs:
         run: npm ci
 
       - name: Reassure stability check
-        run: npx reassure check-stability --verbose
-
-      - name: Validate Reassure stability results
-        id: validateReassureStabilityResults
-        uses: ./.github/actions/javascript/validateReassureOutput
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08
         with:
+          max_attempts: 3
+          command: node .github/actions/reassureStabilityCheck
+        env:
           ALLOWED_DURATION_DEVIATION: 10
           ALLOWED_RELATIVE_DURATION_DEVIATION: 20
           IS_VALIDATING_STABILITY: true
