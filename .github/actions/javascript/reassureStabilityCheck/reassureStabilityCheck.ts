@@ -12,7 +12,7 @@ async function run() {
         execSync('npx reassure check-stability --verbose', {stdio: 'inherit'});
 
         console.log('Validating Reassure stability results...');
-        execSync('node .github/actions/javascript/validateReassureOutput', {stdio: 'inherit'});
+        execSync('node .github/actions/javascript/validateReassureOutput/index.js', {stdio: 'inherit'});
 
         return true;
     } catch (error) {
