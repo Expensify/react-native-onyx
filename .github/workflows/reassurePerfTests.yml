@@ -33,7 +33,7 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           retry_on: error
-          command: node .github/actions/reassureStabilityCheck
+          command: node .github/actions/javascript/reassureStabilityCheck
         env:
           ALLOWED_DURATION_DEVIATION: 10
           ALLOWED_RELATIVE_DURATION_DEVIATION: 20
