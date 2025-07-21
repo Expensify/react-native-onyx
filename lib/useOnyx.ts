@@ -12,7 +12,9 @@ import usePrevious from './usePrevious';
 import decorateWithMetrics from './metrics';
 import * as Logger from './Logger';
 
-type BaseUseOnyxOptions = {
+type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (data: OnyxValue<TKey> | undefined) => TReturnValue;
+
+type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
     /**
      * Determines if this key in this subscription is safe to be evicted.
      */
@@ -46,11 +48,7 @@ type BaseUseOnyxOptions = {
      * is not there, it will log an alert, as it means we are using data that no one loaded and that's most probably a bug.
      */
     canBeMissing?: boolean;
-};
 
-type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (data: OnyxValue<TKey> | undefined) => TReturnValue;
-
-type UseOnyxSelectorOption<TKey extends OnyxKey, TReturnValue> = {
     /**
      * This will be used to subscribe to a subset of an Onyx key's data.
      * Using this setting on `useOnyx` can have very positive performance benefits because the component will only re-render
@@ -61,8 +59,6 @@ type UseOnyxSelectorOption<TKey extends OnyxKey, TReturnValue> = {
     selector?: UseOnyxSelector<TKey, TReturnValue>;
 };
 
-type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = BaseUseOnyxOptions & UseOnyxSelectorOption<TKey, TReturnValue>;
-
 type FetchStatus = 'loading' | 'loaded';
 
 type ResultMetadata<TValue> = {
@@ -72,12 +68,6 @@ type ResultMetadata<TValue> = {
 
 type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata<TValue>];
 
-function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
-    key: TKey,
-    options?: BaseUseOnyxOptions & Required<UseOnyxSelectorOption<TKey, TReturnValue>>,
-    dependencies?: DependencyList,
-): UseOnyxResult<TReturnValue>;
-function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey, options?: BaseUseOnyxOptions, dependencies?: DependencyList): UseOnyxResult<TReturnValue>;
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     key: TKey,
     options?: UseOnyxOptions<TKey, TReturnValue>,
