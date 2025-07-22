@@ -1,6 +1,6 @@
 {
   "name": "react-native-onyx",
-  "version": "2.0.128",
+  "version": "2.0.129",
   "author": "Expensify, Inc.",
   "homepage": "https://expensify.com",
   "description": "State management for React Native",
