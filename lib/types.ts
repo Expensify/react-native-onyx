@@ -444,9 +444,6 @@ type OnyxUpdate = {
 type SetOptions = {
     /** Skip the deep equality check against the cached value. Improves performance for large objects. */
     skipCacheCheck?: boolean;
-
-    /** Skip pruning null values from the object. Improves performance for large objects. */
-    skipNullRemoval?: boolean;
 };
 
 /**

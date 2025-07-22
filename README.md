@@ -61,30 +61,23 @@ The data will then be cached and stored via [`AsyncStorage`](https://github.com/
 
 ### Performance Options for Large Objects
 
-For performance-critical scenarios with large objects, `Onyx.set()` accepts optional flags to skip expensive operations:
+For performance-critical scenarios with large objects, `Onyx.set()` accepts optional flag to skip expensive operations:
 
 ```javascript
 Onyx.set(ONYXKEYS.LARGE_DATA, computedValue, {
     skipCacheCheck: true,     // Skip deep equality check
-    skipNullRemoval: true,    // Skip null value pruning
 });
 ```
 
 **Options:**
 - `skipCacheCheck`: Skips the deep equality comparison with the cached value. By default, Onyx compares new values against cached ones to avoid unnecessary updates. For large objects, this comparison can be expensive.
-- `skipNullRemoval`: Skips the removal of `null` values from nested objects. By default, Onyx removes `null` values before storage. Use this when `null` values are meaningful in your data structure.
 
 #### When to Use SetOptions
 - **Use `skipCacheCheck: true`** for:
   - Large objects where deep equality checking is expensive
   - Values that you know have changed
 
-- **Use `skipNullRemoval: true`** for:
-  - Computed values where `null` represents a legitimate result
-  - Data structures where `null` has semantic meaning
-  - Values that should preserve their exact structure
-
-**Note**: These options are recommended only for large objects where performance is critical. Most use cases should use the standard `Onyx.set(key, value)` syntax.
+**Note**: These option is recommended only for large objects where performance is critical. Most use cases should use the standard `Onyx.set(key, value)` syntax.
 
 ## Merging data
 
