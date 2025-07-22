@@ -25,10 +25,19 @@ jobs:
           node-version-file: '.nvmrc'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
-      - name: Run Reassure baseline tests
-        run: npx reassure --baseline --verbose
+      - name: Reassure stability check
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          retry_on: error
+          command: node .github/actions/javascript/reassureStabilityCheck
+        env:
+          ALLOWED_DURATION_DEVIATION: 10
+          ALLOWED_RELATIVE_DURATION_DEVIATION: 20
+          IS_VALIDATING_STABILITY: true
 
       - name: Checkout PR head SHA
         run: |
@@ -36,7 +45,7 @@ jobs:
           git switch --force --detach ${{ github.event.pull_request.head.sha }}
           
       - name: Reinstall dependencies
-        run: npm install --force
+        run: npm ci
 
       - name: Run Reassure delta tests
         run: npx reassure --branch --verbose
@@ -49,9 +58,10 @@ jobs:
           if-no-files-found: ignore
           include-hidden-files: true
 
-      - name: Validate output.json
-        id: validateReassureOutput
+      - name: Validate Reassure results
+        id: validateReassureResults
         uses: ./.github/actions/javascript/validateReassureOutput
         with:
           ALLOWED_DURATION_DEVIATION: 10
           ALLOWED_RELATIVE_DURATION_DEVIATION: 20
+          IS_VALIDATING_STABILITY: false

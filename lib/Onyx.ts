@@ -24,6 +24,7 @@ import type {
     OnyxValue,
     OnyxInput,
     OnyxMethodMap,
+    SetOptions,
 } from './types';
 import OnyxUtils from './OnyxUtils';
 import logMessages from './logMessages';
@@ -80,10 +81,11 @@ function init({
 
 /**
  * Connects to an Onyx key given the options passed and listens to its changes.
+ * This method will be deprecated soon. Please use `Onyx.connectWithoutView()` instead.
  *
  * @example
  * ```ts
- * const connection = Onyx.connect({
+ * const connection = Onyx.connectWithoutView({
  *     key: ONYXKEYS.SESSION,
  *     callback: onSessionChange,
  * });
@@ -107,11 +109,39 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
 }
 
 /**
+ * Connects to an Onyx key given the options passed and listens to its changes.
+ *
+ * @example
+ * ```ts
+ * const connection = Onyx.connectWithoutView({
+ *     key: ONYXKEYS.SESSION,
+ *     callback: onSessionChange,
+ * });
+ * ```
+ *
+ * @param connectOptions The options object that will define the behavior of the connection.
+ * @param connectOptions.key The Onyx key to subscribe to.
+ * @param connectOptions.callback A function that will be called when the Onyx data we are subscribed changes.
+ * @param connectOptions.waitForCollectionCallback If set to `true`, it will return the entire collection to the callback as a single object.
+ * @param connectOptions.withOnyxInstance The `withOnyx` class instance to be internally passed. **Only used inside `withOnyx()` HOC.**
+ * @param connectOptions.statePropertyName The name of the component's prop that is connected to the Onyx key. **Only used inside `withOnyx()` HOC.**
+ * @param connectOptions.displayName The component's display name. **Only used inside `withOnyx()` HOC.**
+ * @param connectOptions.selector This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook or `withOnyx()` HOC.**
+ *        Using this setting on `useOnyx()` or `withOnyx()` can have very positive performance benefits because the component will only re-render
+ *        when the subset of data changes. Otherwise, any change of data on any property would normally
+ *        cause the component to re-render (and that can be expensive from a performance standpoint).
+ * @returns The connection object to use when calling `Onyx.disconnect()`.
+ */
+function connectWithoutView<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Connection {
+    return connectionManager.connect(connectOptions);
+}
+
+/**
  * Disconnects and removes the listener from the Onyx key.
  *
  * @example
  * ```ts
- * const connection = Onyx.connect({
+ * const connection = Onyx.connectWithoutView({
  *     key: ONYXKEYS.SESSION,
  *     callback: onSessionChange,
  * });
@@ -119,7 +149,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
  * Onyx.disconnect(connection);
  * ```
  *
- * @param connection Connection object returned by calling `Onyx.connect()`.
+ * @param connection Connection object returned by calling `Onyx.connect()` or `Onyx.connectWithoutView()`.
  */
 function disconnect(connection: Connection): void {
     connectionManager.disconnect(connection);
@@ -130,8 +160,9 @@ function disconnect(connection: Connection): void {
  *
  * @param key ONYXKEY to set
  * @param value value to store
+ * @param options optional configuration object
  */
-function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>): Promise<void> {
+function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options?: SetOptions): Promise<void> {
     // When we use Onyx.set to set a key we want to clear the current delta changes from Onyx.merge that were queued
     // before the value was set. If Onyx.merge is currently reading the old value from storage, it will then not apply the changes.
     if (OnyxUtils.hasPendingMergeForKey(key)) {
@@ -179,7 +210,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>): Promis
     }
 
     const valueWithoutNestedNullValues = utils.removeNestedNullValues(value) as OnyxValue<TKey>;
-    const hasChanged = cache.hasValueChanged(key, valueWithoutNestedNullValues);
+    const hasChanged = options?.skipCacheCheck ? true : cache.hasValueChanged(key, valueWithoutNestedNullValues);
 
     OnyxUtils.logKeyChanged(OnyxUtils.METHOD.SET, key, value, hasChanged);
 
@@ -610,10 +641,9 @@ function update(data: OnyxUpdate[]): Promise<void> {
             return;
         }
 
-        const mergePromises = operations.map((operation) => {
-            return merge(key, operation);
+        operations.forEach((operation) => {
+            promises.push(() => merge(key, operation));
         });
-        promises.push(() => mergePromises.at(0) ?? Promise.resolve());
     });
 
     const snapshotPromises = OnyxUtils.updateSnapshots(data, merge);
@@ -699,6 +729,7 @@ function setCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey
 const Onyx = {
     METHOD: OnyxUtils.METHOD,
     connect,
+    connectWithoutView,
     disconnect,
     set,
     multiSet,
@@ -717,6 +748,8 @@ function applyDecorators() {
     // @ts-expect-error Reassign
     connect = decorateWithMetrics(connect, 'Onyx.connect');
     // @ts-expect-error Reassign
+    connectWithoutView = decorateWithMetrics(connectWithoutView, 'Onyx.connectWithoutView');
+    // @ts-expect-error Reassign
     set = decorateWithMetrics(set, 'Onyx.set');
     // @ts-expect-error Reassign
     multiSet = decorateWithMetrics(multiSet, 'Onyx.multiSet');
@@ -732,4 +765,4 @@ function applyDecorators() {
 }
 
 export default Onyx;
-export type {OnyxUpdate, Mapping, ConnectOptions};
+export type {OnyxUpdate, Mapping, ConnectOptions, SetOptions};

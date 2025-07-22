@@ -59,6 +59,26 @@ API.Authenticate(params)
 
 The data will then be cached and stored via [`AsyncStorage`](https://github.com/react-native-async-storage/async-storage).
 
+### Performance Options for Large Objects
+
+For performance-critical scenarios with large objects, `Onyx.set()` accepts optional flag to skip expensive operations:
+
+```javascript
+Onyx.set(ONYXKEYS.LARGE_DATA, computedValue, {
+    skipCacheCheck: true,     // Skip deep equality check
+});
+```
+
+**Options:**
+- `skipCacheCheck`: Skips the deep equality comparison with the cached value. By default, Onyx compares new values against cached ones to avoid unnecessary updates. For large objects, this comparison can be expensive.
+
+#### When to Use SetOptions
+- **Use `skipCacheCheck: true`** for:
+  - Large objects where deep equality checking is expensive
+  - Values that you know have changed
+
+**Note**: These option is recommended only for large objects where performance is critical. Most use cases should use the standard `Onyx.set(key, value)` syntax.
+
 ## Merging data
 
 We can also use `Onyx.merge()` to merge new `Object` or `Array` data in with existing data.
@@ -169,16 +189,7 @@ export default withOnyx({
 })(App);
 ```
 
-Differently from `useOnyx()`, `withOnyx()` will delay the rendering of the wrapped component until all keys/entities have been fetched and passed to the component, this can be convenient for simple cases. This however, can really delay your application if many entities are connected to the same component, you can pass an `initialValue` to each key to allow Onyx to eagerly render your component with this value.
-
-```javascript
-export default withOnyx({
-    session: {
-        key: ONYXKEYS.SESSION,
-        initialValue: {}
-    },
-})(App);
-```
+Differently from `useOnyx()`, `withOnyx()` will delay the rendering of the wrapped component until all keys/entities have been fetched and passed to the component, this can be convenient for simple cases. This however, can really delay your application if many entities are connected to the same component.
 
 Additionally, if your component has many keys/entities when your component will mount but will receive many updates as data is fetched from DB and passed down to it, as every key that gets fetched will trigger a `setState` on the `withOnyx` HOC. This might cause re-renders on the initial mounting, preventing the component from mounting/rendering in reasonable time, making your app feel slow and even delaying animations.
 
@@ -194,8 +205,7 @@ const App = ({session, markReadyForHydration}) => (
 // Second argument to funciton is `shouldDelayUpdates`
 export default withOnyx({
     session: {
-        key: ONYXKEYS.SESSION,
-        initialValue: {}
+        key: ONYXKEYS.SESSION
     },
 }, true)(App);
 ```
@@ -379,7 +389,7 @@ If a platform needs to use a separate library (like using MMVK for react-native)
 
 [Docs](./API.md)
 
-# Storage Eviction
+# Cache Eviction
 
 Different platforms come with varying storage capacities and Onyx has a way to gracefully fail when those storage limits are encountered. When Onyx fails to set or modify a key the following steps are taken:
 1. Onyx looks at a list of recently accessed keys (access is defined as subscribed to or modified) and locates the key that was least recently accessed

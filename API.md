@@ -9,12 +9,16 @@
 <dd><p>Initialize the store with actions and listening for storage events</p>
 </dd>
 <dt><a href="#connect">connect(connectOptions)</a> ⇒</dt>
+<dd><p>Connects to an Onyx key given the options passed and listens to its changes.
+This method will be deprecated soon. Please use <code>Onyx.connectWithoutView()</code> instead.</p>
+</dd>
+<dt><a href="#connectWithoutView">connectWithoutView(connectOptions)</a> ⇒</dt>
 <dd><p>Connects to an Onyx key given the options passed and listens to its changes.</p>
 </dd>
 <dt><a href="#disconnect">disconnect(connection)</a></dt>
 <dd><p>Disconnects and removes the listener from the Onyx key.</p>
 </dd>
-<dt><a href="#set">set(key, value)</a></dt>
+<dt><a href="#set">set(key, value, options)</a></dt>
 <dd><p>Write a value to our store with the given key</p>
 </dd>
 <dt><a href="#multiSet">multiSet(data)</a></dt>
@@ -66,6 +70,7 @@ Initialize the store with actions and listening for storage events
 
 ## connect(connectOptions) ⇒
 Connects to an Onyx key given the options passed and listens to its changes.
+This method will be deprecated soon. Please use `Onyx.connectWithoutView()` instead.
 
 **Kind**: global function  
 **Returns**: The connection object to use when calling `Onyx.disconnect()`.  
@@ -83,7 +88,33 @@ Connects to an Onyx key given the options passed and listens to its changes.
 
 **Example**  
 ```ts
-const connection = Onyx.connect({
+const connection = Onyx.connectWithoutView({
+    key: ONYXKEYS.SESSION,
+    callback: onSessionChange,
+});
+```
+<a name="connectWithoutView"></a>
+
+## connectWithoutView(connectOptions) ⇒
+Connects to an Onyx key given the options passed and listens to its changes.
+
+**Kind**: global function  
+**Returns**: The connection object to use when calling `Onyx.disconnect()`.  
+
+| Param | Description |
+| --- | --- |
+| connectOptions | The options object that will define the behavior of the connection. |
+| connectOptions.key | The Onyx key to subscribe to. |
+| connectOptions.callback | A function that will be called when the Onyx data we are subscribed changes. |
+| connectOptions.waitForCollectionCallback | If set to `true`, it will return the entire collection to the callback as a single object. |
+| connectOptions.withOnyxInstance | The `withOnyx` class instance to be internally passed. **Only used inside `withOnyx()` HOC.** |
+| connectOptions.statePropertyName | The name of the component's prop that is connected to the Onyx key. **Only used inside `withOnyx()` HOC.** |
+| connectOptions.displayName | The component's display name. **Only used inside `withOnyx()` HOC.** |
+| connectOptions.selector | This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook or `withOnyx()` HOC.**        Using this setting on `useOnyx()` or `withOnyx()` can have very positive performance benefits because the component will only re-render        when the subset of data changes. Otherwise, any change of data on any property would normally        cause the component to re-render (and that can be expensive from a performance standpoint). |
+
+**Example**  
+```ts
+const connection = Onyx.connectWithoutView({
     key: ONYXKEYS.SESSION,
     callback: onSessionChange,
 });
@@ -97,11 +128,11 @@ Disconnects and removes the listener from the Onyx key.
 
 | Param | Description |
 | --- | --- |
-| connection | Connection object returned by calling `Onyx.connect()`. |
+| connection | Connection object returned by calling `Onyx.connect()` or `Onyx.connectWithoutView()`. |
 
 **Example**  
 ```ts
-const connection = Onyx.connect({
+const connection = Onyx.connectWithoutView({
     key: ONYXKEYS.SESSION,
     callback: onSessionChange,
 });
@@ -110,7 +141,7 @@ Onyx.disconnect(connection);
 ```
 <a name="set"></a>
 
-## set(key, value)
+## set(key, value, options)
 Write a value to our store with the given key
 
 **Kind**: global function  
@@ -119,6 +150,7 @@ Write a value to our store with the given key
 | --- | --- |
 | key | ONYXKEY to set |
 | value | value to store |
+| options | optional configuration object |
 
 <a name="multiSet"></a>
 
