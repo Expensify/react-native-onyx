@@ -10,7 +10,6 @@ import type {
     ConnectOptions,
     InitOptions,
     KeyValueMapping,
-    CallbackToStateMapping,
     OnyxInputKeyValueMapping,
     OnyxCollection,
     MixedOperationsQueue,
@@ -753,4 +752,4 @@ function applyDecorators() {
 }
 
 export default Onyx;
-export type {OnyxUpdate, CallbackToStateMapping, ConnectOptions, SetOptions};
+export type {OnyxUpdate, ConnectOptions, SetOptions};
