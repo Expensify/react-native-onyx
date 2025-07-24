@@ -126,61 +126,13 @@ type Selector<TKey extends OnyxKey, TReturnType> = (value: OnyxEntry<KeyValueMap
 
 /**
  * Represents a single Onyx entry, that can be either `TOnyxValue` or `undefined` if it doesn't exist.
- *
- * It can be used to specify data retrieved from Onyx e.g. `withOnyx` HOC mappings.
- *
- * @example
- * ```ts
- * import Onyx, {OnyxEntry, withOnyx} from 'react-native-onyx';
- *
- * type OnyxProps = {
- *     userAccount: OnyxEntry<Account>;
- * };
- *
- * type Props = OnyxProps & {
- *     prop1: string;
- * };
- *
- * function Component({prop1, userAccount}: Props) {
- *     // ...
- * }
- *
- * export default withOnyx<Props, OnyxProps>({
- *     userAccount: {
- *         key: ONYXKEYS.ACCOUNT,
- *     },
- * })(Component);
- * ```
+ * It can be used to specify data retrieved from Onyx.
  */
 type OnyxEntry<TOnyxValue> = TOnyxValue | undefined;
 
 /**
  * Represents an Onyx collection of entries, that can be either a record of `TOnyxValue`s or `undefined` if it is empty or doesn't exist.
- *
- * It can be used to specify collection data retrieved from Onyx e.g. `withOnyx` HOC mappings.
- *
- * @example
- * ```ts
- * import Onyx, {OnyxCollection, withOnyx} from 'react-native-onyx';
- *
- * type OnyxProps = {
- *     reports: OnyxCollection<Report>;
- * };
- *
- * type Props = OnyxProps & {
- *     prop1: string;
- * };
- *
- * function Component({prop1, reports}: Props) {
- *     // ...
- * }
- *
- * export default withOnyx<Props, OnyxProps>({
- *     reports: {
- *         key: ONYXKEYS.COLLECTION.REPORT,
- *     },
- * })(Component);
- * ```
+ * It can be used to specify collection data retrieved from Onyx.
  */
 type OnyxCollection<TOnyxValue> = OnyxEntry<Record<string, TOnyxValue | undefined>>;
 
@@ -529,7 +481,6 @@ export type {
     OnyxValue,
     Selector,
     SetOptions,
-    // WithOnyxConnectOptions,
     MultiMergeReplaceNullPatches,
     MixedOperationsQueue,
 };

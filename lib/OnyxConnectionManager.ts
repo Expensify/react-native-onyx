@@ -70,7 +70,7 @@ type Connection = {
 };
 
 /**
- * Manages Onyx connections of `Onyx.connect()`, `useOnyx()` and `withOnyx()` subscribers.
+ * Manages Onyx connections of `Onyx.connect()` and `useOnyx()` subscribers.
  */
 class OnyxConnectionManager {
     /**

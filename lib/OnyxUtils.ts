@@ -712,8 +712,7 @@ function keyChanged<TKey extends OnyxKey>(
     }
 
     // We get the subscribers interested in the key that has just changed. If the subscriber's  key is a collection key then we will
-    // notify them if the key that changed is a collection member. Or if it is a regular key notify them when there is an exact match. Depending on whether the subscriber
-    // was connected via withOnyx we will call setState() directly on the withOnyx instance. If it is a regular connection we will pass the data to the provided callback.
+    // notify them if the key that changed is a collection member. Or if it is a regular key notify them when there is an exact match.
     // Given the amount of times this function is called we need to make sure we are not iterating over all subscribers every time. On the other hand, we don't need to
     // do the same in keysChanged, because we only call that function when a collection key changes, and it doesn't happen that often.
     // For performance reason, we look for the given key and later if don't find it we look for the collection key, instead of checking if it is a collection key first.
@@ -776,22 +775,15 @@ function keyChanged<TKey extends OnyxKey>(
 }
 
 /**
- * Sends the data obtained from the keys to the connection. It either:
- *     - sets state on the withOnyxInstances
- *     - triggers the callback function
+ * Sends the data obtained from the keys to the connection.
  */
 function sendDataToConnection<TKey extends OnyxKey>(mapping: CallbackToStateMapping<TKey>, value: OnyxValue<TKey> | null, matchedKey: TKey | undefined): void {
     // If the mapping no longer exists then we should not send any data.
-    // This means our subscriber disconnected or withOnyx wrapped component unmounted.
+    // This means our subscriber was disconnected.
     if (!callbackToStateMapping[mapping.subscriptionID]) {
         return;
     }
 
-    // When there are no matching keys in "Onyx.connect", we pass null to "sendDataToConnection" explicitly,
-    // to allow the withOnyx instance to set the value in the state initially and therefore stop the loading state once all
-    // required keys have been set.
-    // If we would pass undefined to setWithOnyxInstance instead, withOnyx would not set the value in the state.
-    // withOnyx will internally replace null values with undefined and never pass null values to wrapped components.
     // For regular callbacks, we never want to pass null values, but always just undefined if a value is not set in cache or storage.
     const valueToPass = value === null ? undefined : value;
     const lastValue = lastConnectionCallbackData.get(mapping.subscriptionID);
@@ -1135,8 +1127,7 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
             }
             // If the key being connected to does not exist we initialize the value with null. For subscribers that connected
             // directly via connect() they will simply get a null value sent to them without any information about which key matched
-            // since there are none matched. In withOnyx() we wait for all connected keys to return a value before rendering the child
-            // component. This null value will be filtered out so that the connected component can utilize defaultProps.
+            // since there are none matched.
             if (matchingKeys.length === 0) {
                 if (mapping.key && !isCollectionKey(mapping.key)) {
                     cache.addNullishStorageKey(mapping.key);

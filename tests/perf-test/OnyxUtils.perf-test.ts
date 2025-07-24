@@ -1,12 +1,12 @@
 import {measureAsyncFunction, measureFunction} from 'reassure';
 import createRandomReportAction, {getRandomReportActions} from '../utils/collections/reportActions';
-import type {OnyxKey, Selector} from '../../lib';
+import type {Selector} from '../../lib';
 import Onyx from '../../lib';
 import StorageMock from '../../lib/storage';
 import OnyxCache from '../../lib/OnyxCache';
 import OnyxUtils, {clearOnyxUtilsInternals} from '../../lib/OnyxUtils';
 import type GenericCollection from '../utils/GenericCollection';
-import type {CallbackToStateMapping, OnyxUpdate} from '../../lib/Onyx';
+import type {OnyxUpdate} from '../../lib/Onyx';
 import createDeferredTask from '../../lib/createDeferredTask';
 import type {OnyxInputKeyValueMapping} from '../../lib/types';
 
@@ -333,7 +333,7 @@ describe('OnyxUtils', () => {
     });
 
     describe('sendDataToConnection', () => {
-        test('one call with 10k heavy objects passing to a regular subscriber', async () => {
+        test('one call with 10k heavy objects', async () => {
             let subscriptionID = -1;
 
             await measureFunction(
@@ -343,37 +343,7 @@ describe('OnyxUtils', () => {
                             key: collectionKey,
                             subscriptionID,
                             callback: jest.fn(),
-                        } as CallbackToStateMapping<OnyxKey>,
-                        mockedReportActionsMap,
-                        undefined,
-                    ),
-                {
-                    beforeEach: async () => {
-                        await Onyx.multiSet(mockedReportActionsMap);
-                        subscriptionID = OnyxUtils.subscribeToKey({key: collectionKey, callback: jest.fn(), initWithStoredValues: false});
-                    },
-                    afterEach: async () => {
-                        if (subscriptionID) {
-                            OnyxUtils.unsubscribeFromKey(subscriptionID);
-                        }
-                        await clearOnyxAfterEachMeasure();
-                    },
-                },
-            );
-        });
-
-        test('one call with 10k heavy objects passing to a withOnyx subscriber with selector', async () => {
-            let subscriptionID = -1;
-
-            await measureFunction(
-                () =>
-                    OnyxUtils.sendDataToConnection(
-                        {
-                            key: collectionKey,
-                            subscriptionID,
-                            callback: jest.fn(),
-                            selector: generateTestSelector(),
-                        } as CallbackToStateMapping<OnyxKey>,
+                        },
                         mockedReportActionsMap,
                         undefined,
                     ),
@@ -419,7 +389,7 @@ describe('OnyxUtils', () => {
                         callback: () => {
                             callback.resolve?.();
                         },
-                    } as CallbackToStateMapping<OnyxKey>);
+                    });
 
                     return callback.promise;
                 },
