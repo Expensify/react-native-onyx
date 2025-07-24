@@ -4,7 +4,6 @@ import type {ConnectOptions} from './Onyx';
 import OnyxUtils from './OnyxUtils';
 import * as Str from './Str';
 import type {CollectionConnectCallback, DefaultConnectCallback, DefaultConnectOptions, OnyxKey, OnyxValue} from './types';
-import utils from './utils';
 import cache from './OnyxCache';
 
 type ConnectCallback = DefaultConnectCallback<OnyxKey> | CollectionConnectCallback<OnyxKey>;
@@ -126,12 +125,10 @@ class OnyxConnectionManager {
         // - `initWithStoredValues` is `false`. This flag changes the subscription flow when set to `false`, so the connection can't be reused.
         // - `key` is a collection key AND `waitForCollectionCallback` is `undefined/false`. This combination needs a new connection at every subscription
         //   in order to send all the collection entries, so the connection can't be reused.
-        // - `withOnyxInstance` is defined inside `connectOptions`. That means the subscriber is a `withOnyx` HOC and therefore doesn't support connection reuse.
         if (
             reuseConnection === false ||
             initWithStoredValues === false ||
-            (!utils.hasWithOnyxInstance(connectOptions) && OnyxUtils.isCollectionKey(key) && (waitForCollectionCallback === undefined || waitForCollectionCallback === false)) ||
-            utils.hasWithOnyxInstance(connectOptions)
+            (OnyxUtils.isCollectionKey(key) && (waitForCollectionCallback === undefined || waitForCollectionCallback === false))
         ) {
             suffix += `,uniqueID=${Str.guid()}`;
         }
@@ -169,24 +166,18 @@ class OnyxConnectionManager {
 
         // If there is no connection yet for that connection ID, we create a new one.
         if (!connectionMetadata) {
-            let callback: ConnectCallback | undefined;
-
-            // If the subscriber is a `withOnyx` HOC we don't define `callback` as the HOC will use
-            // its own logic to handle the data.
-            if (!utils.hasWithOnyxInstance(connectOptions)) {
-                callback = (value, key, sourceValue) => {
-                    const createdConnection = this.connectionsMap.get(connectionID);
-                    if (createdConnection) {
-                        // We signal that the first connection was made and now any new subscribers
-                        // can fire their callbacks immediately with the cached value when connecting.
-                        createdConnection.isConnectionMade = true;
-                        createdConnection.cachedCallbackValue = value;
-                        createdConnection.cachedCallbackKey = key;
-                        createdConnection.sourceValue = sourceValue;
-                        this.fireCallbacks(connectionID);
-                    }
-                };
-            }
+            const callback: ConnectCallback = (value, key, sourceValue) => {
+                const createdConnection = this.connectionsMap.get(connectionID);
+                if (createdConnection) {
+                    // We signal that the first connection was made and now any new subscribers
+                    // can fire their callbacks immediately with the cached value when connecting.
+                    createdConnection.isConnectionMade = true;
+                    createdConnection.cachedCallbackValue = value;
+                    createdConnection.cachedCallbackKey = key;
+                    createdConnection.sourceValue = sourceValue;
+                    this.fireCallbacks(connectionID);
+                }
+            };
 
             subscriptionID = OnyxUtils.subscribeToKey({
                 ...connectOptions,

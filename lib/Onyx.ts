@@ -1,6 +1,5 @@
 import * as Logger from './Logger';
 import cache, {TASK} from './OnyxCache';
-import * as PerformanceUtils from './PerformanceUtils';
 import Storage from './storage';
 import utils from './utils';
 import DevTools from './DevTools';
@@ -11,7 +10,7 @@ import type {
     ConnectOptions,
     InitOptions,
     KeyValueMapping,
-    Mapping,
+    CallbackToStateMapping,
     OnyxInputKeyValueMapping,
     OnyxCollection,
     MixedOperationsQueue,
@@ -41,7 +40,6 @@ function init({
     evictableKeys = [],
     maxCachedKeysCount = 1000,
     shouldSyncMultipleInstances = !!global.localStorage,
-    debugSetState = false,
     enablePerformanceMetrics = false,
     skippableCollectionMemberIDs = [],
     fullyMergedSnapshotKeys = [],
@@ -61,10 +59,6 @@ function init({
             cache.set(key, value);
             OnyxUtils.keyChanged(key, value as OnyxValue<typeof key>, prevValue);
         });
-    }
-
-    if (debugSetState) {
-        PerformanceUtils.setShouldDebugSetState(true);
     }
 
     if (maxCachedKeysCount > 0) {
@@ -765,4 +759,4 @@ function applyDecorators() {
 }
 
 export default Onyx;
-export type {OnyxUpdate, Mapping, ConnectOptions, SetOptions};
+export type {OnyxUpdate, CallbackToStateMapping, ConnectOptions, SetOptions};
