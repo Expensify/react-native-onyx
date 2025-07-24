@@ -226,11 +226,15 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             newFetchStatus = 'loading';
         }
 
-        // Use deep equality for all selectors to maintain existing behavior
-        // TODO: Optimize based on memoizeOutput setting once we resolve the loading state issue
+        // Optimized equality checking - eliminated redundant deep equality:
+        // - Memoized selectors already handle deep equality internally, so we can use fast reference equality
+        // - Non-selector cases use shallow equality for object reference checks
+        // - Normalize null to undefined to ensure consistent comparison (both represent "no value")
         let areValuesEqual: boolean;
         if (memoizedSelector) {
-            areValuesEqual = deepEqual(previousValueRef.current ?? undefined, newValueRef.current);
+            const normalizedPrevious = previousValueRef.current ?? undefined;
+            const normalizedNew = newValueRef.current ?? undefined;
+            areValuesEqual = normalizedPrevious === normalizedNew;
         } else {
             areValuesEqual = shallowEqual(previousValueRef.current ?? undefined, newValueRef.current);
         }
