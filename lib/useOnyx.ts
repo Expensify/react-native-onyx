@@ -149,7 +149,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [...dependencies]);
 
-    // Mimics withOnyx's checkEvictableKeys() behavior.
     const checkEvictableKey = useCallback(() => {
         if (options?.canEvict === undefined || !connectionRef.current) {
             return;
