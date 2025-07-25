@@ -9,7 +9,6 @@ import type {
     CollectionKey,
     CollectionKeyBase,
     ConnectOptions,
-    InitOptions,
     KeyValueMapping,
     Mapping,
     OnyxInputKeyValueMapping,
@@ -24,6 +23,7 @@ import type {
     OnyxValue,
     OnyxInput,
     OnyxMethodMap,
+    InitOptions,
     SetOptions,
 } from './types';
 import OnyxUtils from './OnyxUtils';
@@ -32,6 +32,7 @@ import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
 import * as GlobalSettings from './GlobalSettings';
 import decorateWithMetrics from './metrics';
+import {createStorageManager, getStorageManager} from './storage-eviction';
 import OnyxMerge from './OnyxMerge';
 
 /** Initialize the store with actions and listening for storage events */
@@ -45,6 +46,7 @@ function init({
     enablePerformanceMetrics = false,
     skippableCollectionMemberIDs = [],
     fullyMergedSnapshotKeys = [],
+    storageManager,
 }: InitOptions): void {
     if (enablePerformanceMetrics) {
         GlobalSettings.setPerformanceMetricsEnabled(true);
@@ -72,6 +74,20 @@ function init({
     }
 
     OnyxUtils.initStoreValues(keys, initialKeyStates, evictableKeys, fullyMergedSnapshotKeys);
+
+    // Initialize StorageManager for persistent storage eviction
+    if (storageManager && typeof storageManager === 'object') {
+        try {
+            const manager = createStorageManager(storageManager);
+            if (manager) {
+                manager.initialize().catch((error) => {
+                    Logger.logAlert(`Failed to initialize StorageManager: ${error}`);
+                });
+            }
+        } catch (error) {
+            Logger.logAlert(`Failed to create StorageManager: ${error}`);
+        }
+    }
 
     // Initialize all of our keys with data provided then give green light to any pending connections
     Promise.all([cache.addEvictableKeysToRecentlyAccessedList(OnyxUtils.isCollectionKey, OnyxUtils.getAllKeys), OnyxUtils.initializeWithDefaultKeyStates()]).then(
@@ -225,6 +241,16 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options
     return Storage.setItem(key, valueWithoutNestedNullValues)
         .catch((error) => OnyxUtils.evictStorageAndRetry(error, set, key, valueWithoutNestedNullValues))
         .then(() => {
+            // Track storage usage for eviction system
+            try {
+                const storageManager = getStorageManager();
+                if (storageManager) {
+                    storageManager.trackKeySet(key);
+                }
+            } catch (error) {
+                Logger.logInfo(`Failed to track key set: ${error}`);
+            }
+
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
             return updatePromise;
         });
@@ -276,6 +302,18 @@ function multiSet(data: OnyxMultiSetInput): Promise<void> {
     return Storage.multiSet(keyValuePairsToSet)
         .catch((error) => OnyxUtils.evictStorageAndRetry(error, multiSet, newData))
         .then(() => {
+            // Track storage usage for eviction system
+            try {
+                const storageManager = getStorageManager();
+                if (storageManager) {
+                    keyValuePairsToSet.forEach(([key]) => {
+                        storageManager.trackKeySet(key);
+                    });
+                }
+            } catch (error) {
+                Logger.logInfo(`Failed to track multiset keys: ${error}`);
+            }
+
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MULTI_SET, undefined, newData);
             return Promise.all(updatePromises);
         })
@@ -362,6 +400,14 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
             }
 
             return OnyxMerge.applyMerge(key, existingValue, validChanges).then(({mergedValue, updatePromise}) => {
+                try {
+                    const storageManager = getStorageManager();
+                    if (storageManager) {
+                        storageManager.trackKeySet(key);
+                    }
+                } catch (error) {
+                    Logger.logInfo(`Failed to track merge key: ${error}`);
+                }
                 OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, changes, mergedValue);
                 return updatePromise;
             });

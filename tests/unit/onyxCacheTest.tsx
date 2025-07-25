@@ -455,6 +455,7 @@ describe('Onyx', () => {
                 keys: ONYX_KEYS,
                 evictableKeys: [ONYX_KEYS.COLLECTION.MOCK_COLLECTION],
                 maxCachedKeysCount: 10,
+                storageManager: undefined,
                 ...overrides,
             });
 
