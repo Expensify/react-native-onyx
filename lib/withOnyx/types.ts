@@ -12,20 +12,6 @@ type BaseMapping<TComponentProps, TOnyxProps> = {
 };
 
 /**
- * Represents the base mapping options when an Onyx collection key is supplied.
- */
-type CollectionBaseMapping<TOnyxKey extends CollectionKeyBase> = {
-    initialValue?: OnyxCollection<KeyValueMapping[TOnyxKey]>;
-};
-
-/**
- * Represents the base mapping options when an Onyx non-collection key is supplied.
- */
-type EntryBaseMapping<TOnyxKey extends OnyxKey> = {
-    initialValue?: OnyxEntry<KeyValueMapping[TOnyxKey]>;
-};
-
-/**
  * Represents the string / function `key` mapping option between an Onyx key and the component's prop.
  *
  * If `key` is `string`, the type of the Onyx value that is associated with `key` must match with the type of the component's prop,
@@ -98,7 +84,6 @@ type BaseMappingFunctionKeyAndSelector<TComponentProps, TOnyxProps, TReturnType,
  * Represents the mapping options between an Onyx key and the component's prop with all its possibilities.
  */
 type Mapping<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TOnyxKey extends OnyxKey> = BaseMapping<TComponentProps, TOnyxProps> &
-    EntryBaseMapping<TOnyxKey> &
     (
         | BaseMappingKey<TComponentProps, TOnyxProps, TOnyxProp, TOnyxKey, OnyxEntry<KeyValueMapping[TOnyxKey]>>
         | BaseMappingStringKeyAndSelector<TComponentProps, TOnyxProps, TOnyxProps[TOnyxProp], TOnyxKey>
@@ -117,7 +102,6 @@ type WithOnyxMapping<TComponentProps, TOnyxProps> = Mapping<TComponentProps, TOn
  * Represents the mapping options between an Onyx collection key without suffix and the component's prop with all its possibilities.
  */
 type CollectionMapping<TComponentProps, TOnyxProps, TOnyxProp extends keyof TOnyxProps, TOnyxKey extends CollectionKeyBase> = BaseMapping<TComponentProps, TOnyxProps> &
-    CollectionBaseMapping<TOnyxKey> &
     (
         | BaseMappingKey<TComponentProps, TOnyxProps, TOnyxProp, TOnyxKey, OnyxCollection<KeyValueMapping[TOnyxKey]>>
         | BaseMappingStringKeyAndSelector<TComponentProps, TOnyxProps, ExtractOnyxCollectionValue<TOnyxProps[TOnyxProp]>, TOnyxKey>

@@ -5,7 +5,7 @@
  */
 import type {OnyxKey} from '../../types';
 import NoopProvider from '../providers/NoopProvider';
-import type {KeyList, OnStorageKeyChanged} from '../providers/types';
+import type {StorageKeyList, OnStorageKeyChanged} from '../providers/types';
 import type StorageProvider from '../providers/types';
 
 const SYNC_ONYX = 'SYNC_ONYX';
@@ -19,7 +19,7 @@ function raiseStorageSyncEvent(onyxKey: OnyxKey) {
     global.localStorage.removeItem(SYNC_ONYX);
 }
 
-function raiseStorageSyncManyKeysEvent(onyxKeys: KeyList) {
+function raiseStorageSyncManyKeysEvent(onyxKeys: StorageKeyList) {
     onyxKeys.forEach((onyxKey) => {
         raiseStorageSyncEvent(onyxKey);
     });
@@ -54,12 +54,12 @@ const InstanceSync = {
     multiSet: raiseStorageSyncManyKeysEvent,
     mergeItem: raiseStorageSyncEvent,
     clear: (clearImplementation: () => void) => {
-        let allKeys: KeyList;
+        let allKeys: StorageKeyList;
 
         // The keys must be retrieved before storage is cleared or else the list of keys would be empty
         return storage
             .getAllKeys()
-            .then((keys: KeyList) => {
+            .then((keys: StorageKeyList) => {
                 allKeys = keys;
             })
             .then(() => clearImplementation())

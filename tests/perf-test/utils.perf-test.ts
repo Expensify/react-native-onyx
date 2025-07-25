@@ -25,7 +25,11 @@ describe('utils', () => {
         test('one call', async () => {
             const target = getRandomReportActions(collectionKey, 1000);
             const source = getRandomReportActions(collectionKey, 500);
-            await measureFunction(() => utils.fastMerge(target, source));
+            await measureFunction(() =>
+                utils.fastMerge(target, source, {
+                    shouldRemoveNestedNulls: true,
+                }),
+            );
         });
     });
 
