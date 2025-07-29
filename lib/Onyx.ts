@@ -76,7 +76,7 @@ function init({
     OnyxUtils.initStoreValues(keys, initialKeyStates, evictableKeys, fullyMergedSnapshotKeys);
 
     // Initialize StorageManager for persistent storage eviction
-    if (storageManager && typeof storageManager === 'object') {
+    if (storageManager) {
         try {
             const manager = createStorageManager(storageManager);
             if (manager) {
@@ -241,7 +241,6 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options
     return Storage.setItem(key, valueWithoutNestedNullValues)
         .catch((error) => OnyxUtils.evictStorageAndRetry(error, set, key, valueWithoutNestedNullValues))
         .then(() => {
-            // Track storage usage for eviction system
             try {
                 const storageManager = getStorageManager();
                 if (storageManager) {
@@ -302,7 +301,6 @@ function multiSet(data: OnyxMultiSetInput): Promise<void> {
     return Storage.multiSet(keyValuePairsToSet)
         .catch((error) => OnyxUtils.evictStorageAndRetry(error, multiSet, newData))
         .then(() => {
-            // Track storage usage for eviction system
             try {
                 const storageManager = getStorageManager();
                 if (storageManager) {
