@@ -1,6 +1,5 @@
 import * as Logger from './Logger';
 import cache, {TASK} from './OnyxCache';
-import * as PerformanceUtils from './PerformanceUtils';
 import Storage from './storage';
 import utils from './utils';
 import DevTools from './DevTools';
@@ -11,7 +10,7 @@ import type {
     ConnectOptions,
     InitOptions,
     KeyValueMapping,
-    Mapping,
+    CallbackToStateMapping,
     OnyxInputKeyValueMapping,
     OnyxCollection,
     MixedOperationsQueue,
@@ -41,7 +40,6 @@ function init({
     evictableKeys = [],
     maxCachedKeysCount = 1000,
     shouldSyncMultipleInstances = !!global.localStorage,
-    debugSetState = false,
     enablePerformanceMetrics = false,
     skippableCollectionMemberIDs = [],
     fullyMergedSnapshotKeys = [],
@@ -61,10 +59,6 @@ function init({
             cache.set(key, value);
             OnyxUtils.keyChanged(key, value as OnyxValue<typeof key>, prevValue);
         });
-    }
-
-    if (debugSetState) {
-        PerformanceUtils.setShouldDebugSetState(true);
     }
 
     if (maxCachedKeysCount > 0) {
@@ -95,11 +89,8 @@ function init({
  * @param connectOptions.key The Onyx key to subscribe to.
  * @param connectOptions.callback A function that will be called when the Onyx data we are subscribed changes.
  * @param connectOptions.waitForCollectionCallback If set to `true`, it will return the entire collection to the callback as a single object.
- * @param connectOptions.withOnyxInstance The `withOnyx` class instance to be internally passed. **Only used inside `withOnyx()` HOC.**
- * @param connectOptions.statePropertyName The name of the component's prop that is connected to the Onyx key. **Only used inside `withOnyx()` HOC.**
- * @param connectOptions.displayName The component's display name. **Only used inside `withOnyx()` HOC.**
- * @param connectOptions.selector This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook or `withOnyx()` HOC.**
- *        Using this setting on `useOnyx()` or `withOnyx()` can have very positive performance benefits because the component will only re-render
+ * @param connectOptions.selector This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook.**
+ *        Using this setting on `useOnyx()` can have very positive performance benefits because the component will only re-render
  *        when the subset of data changes. Otherwise, any change of data on any property would normally
  *        cause the component to re-render (and that can be expensive from a performance standpoint).
  * @returns The connection object to use when calling `Onyx.disconnect()`.
@@ -123,11 +114,8 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
  * @param connectOptions.key The Onyx key to subscribe to.
  * @param connectOptions.callback A function that will be called when the Onyx data we are subscribed changes.
  * @param connectOptions.waitForCollectionCallback If set to `true`, it will return the entire collection to the callback as a single object.
- * @param connectOptions.withOnyxInstance The `withOnyx` class instance to be internally passed. **Only used inside `withOnyx()` HOC.**
- * @param connectOptions.statePropertyName The name of the component's prop that is connected to the Onyx key. **Only used inside `withOnyx()` HOC.**
- * @param connectOptions.displayName The component's display name. **Only used inside `withOnyx()` HOC.**
- * @param connectOptions.selector This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook or `withOnyx()` HOC.**
- *        Using this setting on `useOnyx()` or `withOnyx()` can have very positive performance benefits because the component will only re-render
+ * @param connectOptions.selector This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook.**
+ *        Using this setting on `useOnyx()` can have very positive performance benefits because the component will only re-render
  *        when the subset of data changes. Otherwise, any change of data on any property would normally
  *        cause the component to re-render (and that can be expensive from a performance standpoint).
  * @returns The connection object to use when calling `Onyx.disconnect()`.
@@ -765,4 +753,4 @@ function applyDecorators() {
 }
 
 export default Onyx;
-export type {OnyxUpdate, Mapping, ConnectOptions, SetOptions};
+export type {OnyxUpdate, CallbackToStateMapping, ConnectOptions, SetOptions};
