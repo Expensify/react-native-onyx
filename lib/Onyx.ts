@@ -74,23 +74,10 @@ function init({
     }
 
     OnyxUtils.initStoreValues(keys, initialKeyStates, evictableKeys, fullyMergedSnapshotKeys);
-
-    // Initialize StorageManager for persistent storage eviction
-    if (storageManager) {
-        try {
-            const manager = createStorageManager(storageManager);
-            if (manager) {
-                manager.initialize().catch((error) => {
-                    Logger.logAlert(`Failed to initialize StorageManager: ${error}`);
-                });
-            }
-        } catch (error) {
-            Logger.logAlert(`Failed to create StorageManager: ${error}`);
-        }
-    }
+    const manager = createStorageManager(storageManager);
 
     // Initialize all of our keys with data provided then give green light to any pending connections
-    Promise.all([cache.addEvictableKeysToRecentlyAccessedList(OnyxUtils.isCollectionKey, OnyxUtils.getAllKeys), OnyxUtils.initializeWithDefaultKeyStates()]).then(
+    Promise.all([cache.addEvictableKeysToRecentlyAccessedList(OnyxUtils.isCollectionKey, OnyxUtils.getAllKeys), OnyxUtils.initializeWithDefaultKeyStates(), manager?.initialize()]).then(
         OnyxUtils.getDeferredInitTask().resolve,
     );
 }

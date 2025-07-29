@@ -46,7 +46,7 @@ describe('Storage Eviction Tests', () => {
                 evictableKeys: ['test_key'],
                 maxIdleDays: 7,
                 maxAgeDays: 30,
-                                cleanupInterval: 5 * 60 * 1000,
+                cleanupInterval: 5 * 60 * 1000,
             };
 
             storageManager = createStorageManager(config);
@@ -81,7 +81,7 @@ describe('Storage Eviction Tests', () => {
                 evictableKeys: ['test_key'],
                 maxIdleDays: 7,
                 maxAgeDays: 30,
-                                cleanupInterval: 5 * 60 * 1000,
+                cleanupInterval: 5 * 60 * 1000,
             };
 
             storageManager = createStorageManager(config);
@@ -90,8 +90,8 @@ describe('Storage Eviction Tests', () => {
             // Initialize with existing metadata
             const existingMetadata: StorageMetadata = {
                 lastAccessed: Date.now() - 1000,
-                                createdAt: Date.now() - 10000,
-                            };
+                createdAt: Date.now() - 10000,
+            };
 
             storageGetItemSpy.mockImplementation((key) => {
                 if (key === '__onyx_meta_test_key') {
@@ -130,7 +130,7 @@ describe('Storage Eviction Tests', () => {
                 evictableKeys: ['old_key'],
                 maxIdleDays: 7, // 7 days
                 maxAgeDays: 30,
-                                cleanupInterval: 5 * 60 * 1000,
+                cleanupInterval: 5 * 60 * 1000,
             };
 
             storageManager = createStorageManager(config);
@@ -140,8 +140,8 @@ describe('Storage Eviction Tests', () => {
             const tenDaysAgo = Date.now() - 10 * 24 * 60 * 60 * 1000;
             const oldMetadata: StorageMetadata = {
                 lastAccessed: tenDaysAgo,
-                                createdAt: tenDaysAgo,
-                            };
+                createdAt: tenDaysAgo,
+            };
 
             storageGetAllKeysSpy.mockResolvedValue(['old_key']);
             storageGetItemSpy.mockImplementation((key) => {
@@ -168,7 +168,7 @@ describe('Storage Eviction Tests', () => {
                 evictableKeys: ['recent_key'],
                 maxIdleDays: 7,
                 maxAgeDays: 30,
-                                cleanupInterval: 5 * 60 * 1000,
+                cleanupInterval: 5 * 60 * 1000,
             };
 
             storageManager = createStorageManager(config);
@@ -178,8 +178,8 @@ describe('Storage Eviction Tests', () => {
             const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
             const recentMetadata: StorageMetadata = {
                 lastAccessed: threeDaysAgo,
-                                createdAt: threeDaysAgo,
-                            };
+                createdAt: threeDaysAgo,
+            };
 
             storageGetAllKeysSpy.mockResolvedValue(['recent_key']);
             storageGetItemSpy.mockImplementation((key) => {
@@ -210,7 +210,7 @@ describe('Storage Eviction Tests', () => {
                 evictableKeys: ['very_old_key'],
                 maxIdleDays: 7,
                 maxAgeDays: 30, // 30 days max age
-                                cleanupInterval: 5 * 60 * 1000,
+                cleanupInterval: 5 * 60 * 1000,
             };
 
             storageManager = createStorageManager(config);
@@ -222,8 +222,8 @@ describe('Storage Eviction Tests', () => {
 
             const veryOldMetadata: StorageMetadata = {
                 lastAccessed: yesterday, // Accessed recently
-                                createdAt: fortyDaysAgo, // But created 40 days ago
-                            };
+                createdAt: fortyDaysAgo, // But created 40 days ago
+            };
 
             storageGetAllKeysSpy.mockResolvedValue(['very_old_key']);
             storageGetItemSpy.mockImplementation((key) => {
@@ -250,7 +250,7 @@ describe('Storage Eviction Tests', () => {
                 evictableKeys: ['new_key'],
                 maxIdleDays: 7,
                 maxAgeDays: 30,
-                                cleanupInterval: 5 * 60 * 1000,
+                cleanupInterval: 5 * 60 * 1000,
             };
 
             storageManager = createStorageManager(config);
@@ -260,9 +260,8 @@ describe('Storage Eviction Tests', () => {
             const fiveDaysAgo = Date.now() - 5 * 24 * 60 * 60 * 1000;
             const newMetadata: StorageMetadata = {
                 lastAccessed: fiveDaysAgo,
-                accessCount: 1, // Low access count
                 createdAt: fiveDaysAgo, // But recently created
-                            };
+            };
 
             storageGetAllKeysSpy.mockResolvedValue(['new_key']);
             storageGetItemSpy.mockImplementation((key) => {
@@ -293,7 +292,7 @@ describe('Storage Eviction Tests', () => {
                 evictableKeys: ['evictable_key'], // Only this key is evictable
                 maxIdleDays: 1, // Very short time to trigger eviction
                 maxAgeDays: 1,
-                                cleanupInterval: 5 * 60 * 1000,
+                cleanupInterval: 5 * 60 * 1000,
             };
 
             storageManager = createStorageManager(config);
@@ -303,8 +302,8 @@ describe('Storage Eviction Tests', () => {
             const oldTime = Date.now() - 10 * 24 * 60 * 60 * 1000; // 10 days ago
             const oldMetadata: StorageMetadata = {
                 lastAccessed: oldTime,
-                                createdAt: oldTime,
-                            };
+                createdAt: oldTime,
+            };
 
             storageGetAllKeysSpy.mockResolvedValue(['evictable_key', 'protected_key']);
             storageGetItemSpy.mockImplementation((key) => {
@@ -333,7 +332,7 @@ describe('Storage Eviction Tests', () => {
                 evictableKeys: ['temp_'], // Pattern: keys starting with 'temp_'
                 maxIdleDays: 1,
                 maxAgeDays: 1,
-                                cleanupInterval: 5 * 60 * 1000,
+                cleanupInterval: 5 * 60 * 1000,
             };
 
             storageManager = createStorageManager(config);
@@ -342,8 +341,8 @@ describe('Storage Eviction Tests', () => {
             const oldTime = Date.now() - 10 * 24 * 60 * 60 * 1000;
             const oldMetadata: StorageMetadata = {
                 lastAccessed: oldTime,
-                                createdAt: oldTime,
-                            };
+                createdAt: oldTime,
+            };
 
             storageGetAllKeysSpy.mockResolvedValue(['temp_file1', 'temp_file2', 'permanent_file']);
             storageGetItemSpy.mockImplementation((key) => {
@@ -371,7 +370,7 @@ describe('Storage Eviction Tests', () => {
                 evictableKeys: [], // No keys are evictable
                 maxIdleDays: 1,
                 maxAgeDays: 1,
-                                cleanupInterval: 5 * 60 * 1000,
+                cleanupInterval: 5 * 60 * 1000,
             };
 
             storageManager = createStorageManager(config);
@@ -380,8 +379,8 @@ describe('Storage Eviction Tests', () => {
             const oldTime = Date.now() - 10 * 24 * 60 * 60 * 1000;
             const oldMetadata: StorageMetadata = {
                 lastAccessed: oldTime,
-                                createdAt: oldTime,
-                            };
+                createdAt: oldTime,
+            };
 
             storageGetAllKeysSpy.mockResolvedValue(['some_key', 'another_key']);
             storageGetItemSpy.mockImplementation((key) => {
@@ -410,7 +409,7 @@ describe('Storage Eviction Tests', () => {
                 evictableKeys: ['test_key'],
                 maxIdleDays: 1,
                 maxAgeDays: 1,
-                                cleanupInterval: 5 * 60 * 1000,
+                cleanupInterval: 5 * 60 * 1000,
             };
 
             storageManager = createStorageManager(config);
@@ -419,8 +418,8 @@ describe('Storage Eviction Tests', () => {
             const oldTime = Date.now() - 10 * 24 * 60 * 60 * 1000;
             const oldMetadata: StorageMetadata = {
                 lastAccessed: oldTime,
-                                createdAt: oldTime,
-                            };
+                createdAt: oldTime,
+            };
 
             storageGetAllKeysSpy.mockResolvedValue(['test_key']);
             storageGetItemSpy.mockImplementation((key) => {

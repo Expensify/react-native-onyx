@@ -17,8 +17,6 @@ class StorageManager {
 
     private evictableKeys: string[] = [];
 
-    private lastCleanup = 0;
-
     private isInitialized = false;
 
     private monitoringInterval: NodeJS.Timeout | null = null;
@@ -83,7 +81,6 @@ class StorageManager {
     private trackExistingKeys(keys: OnyxKey[]): Promise<Array<void | QueryResult<QueryResultRow>>> {
         const dataKeys = keys.filter((key) => !key.startsWith('__onyx_meta_'));
         const evictableDataKeys = dataKeys.filter((key) => this.isKeyEvictable(key));
-
         Logger.logInfo(`[StorageManager] Filtering keys: ${dataKeys.length} total, ${evictableDataKeys.length} evictable`);
 
         const trackingPromises = evictableDataKeys.map((key) => this.initializeKeyTracking(key));
@@ -234,25 +231,44 @@ class StorageManager {
     shouldPerformCleanup(): boolean {
         const now = Date.now();
 
-        if (now - this.lastCleanup < this.config.cleanupInterval) {
-            return false;
-        }
-
         if (!this.config.enabled) {
+            Logger.logInfo('Storage eviction is disabled');
             return false;
         }
 
-        if (this.getEvictableKeysCount() === 0) {
+        const evictableCount = this.getEvictableKeysCount();
+        Logger.logInfo(`Evictable keys count: ${evictableCount}, total keys: ${this.keyInfoMap.size}`);
+
+        if (evictableCount === 0) {
+            Logger.logInfo('No evictable keys found');
+            // Debug: log all tracked keys and evictable patterns
+            const allKeys = Array.from(this.keyInfoMap.keys());
+            Logger.logInfo(`All tracked keys: [${allKeys.join(', ')}]`);
+            Logger.logInfo(`Evictable patterns: [${this.evictableKeys.join(', ')}]`);
             return false;
         }
 
+        let expiredCount = 0;
         for (const keyInfo of this.keyInfoMap.values()) {
-            if (this.isKeyEvictable(keyInfo.key) && this.shouldEvictKey(keyInfo)) {
-                Logger.logInfo('Found expired keys, cleanup needed');
-                return true;
+            if (this.isKeyEvictable(keyInfo.key)) {
+                const shouldEvict = this.shouldEvictKey(keyInfo);
+                const daysSinceAccess = (now - keyInfo.lastAccessed) / (1000 * 60 * 60 * 24);
+                const ageInDays = (now - keyInfo.createdAt) / (1000 * 60 * 60 * 24);
+
+                Logger.logInfo(`Key ${keyInfo.key}: age=${ageInDays.toFixed(4)}d, idle=${daysSinceAccess.toFixed(4)}d, shouldEvict=${shouldEvict}`);
+
+                if (shouldEvict) {
+                    expiredCount++;
+                }
             }
         }
 
+        if (expiredCount > 0) {
+            Logger.logInfo(`Found ${expiredCount} expired keys, cleanup needed`);
+            return true;
+        }
+
+        Logger.logInfo('No expired keys found');
         return false;
     }
 
@@ -275,7 +291,7 @@ class StorageManager {
                 if (this.shouldPerformCleanup() && !this.cleanupInProgress) {
                     Logger.logInfo(`Automatic cleanup triggered - evictableKeys: ${this.getEvictableKeysCount()}`);
 
-                    this.cleanupInProgress = true;
+                    // Don't set cleanupInProgress here - let performCleanup() handle it
                     this.performCleanup()
                         .then((result) => {
                             Logger.logInfo(
@@ -286,9 +302,6 @@ class StorageManager {
                         })
                         .catch((error) => {
                             Logger.logAlert(`Monitor cleanup failed: ${error}`);
-                        })
-                        .finally(() => {
-                            this.cleanupInProgress = false;
                         });
                 }
             } catch (error) {
@@ -375,8 +388,6 @@ class StorageManager {
                 for (const key of successfulKeysSet) {
                     this.trackKeyRemoval(key);
                 }
-
-                this.lastCleanup = Date.now();
 
                 Logger.logInfo(`Storage cleanup completed: cleaned ${cleanedKeys.length} keys`);
 
