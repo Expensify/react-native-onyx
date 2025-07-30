@@ -386,6 +386,156 @@ describe('useOnyx', () => {
             expect(result.current[0]).toEqual('id - test_id, name - test_name - selector changed');
             expect(result.current[1].status).toEqual('loaded');
         });
+
+        it('should memoize selector output and return same reference when input unchanged', async () => {
+            Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name', count: 1});
+
+            const {result} = renderHook(() =>
+                useOnyx(ONYXKEYS.TEST_KEY, {
+                    // @ts-expect-error bypass
+                    selector: (entry: OnyxEntry<{id: string; name: string; count: number}>) => ({
+                        id: entry?.id,
+                        name: entry?.name,
+                    }),
+                }),
+            );
+
+            await act(async () => waitForPromisesToResolve());
+
+            const firstResult = result.current[0];
+
+            // Trigger another render without changing the data
+            await act(async () => waitForPromisesToResolve());
+
+            // Should return the exact same reference due to memoization
+            expect(result.current[0]).toBe(firstResult);
+        });
+
+        it('should return new reference when selector input changes', async () => {
+            Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name'});
+
+            const {result} = renderHook(() =>
+                useOnyx(ONYXKEYS.TEST_KEY, {
+                    // @ts-expect-error bypass
+                    selector: (entry: OnyxEntry<{id: string; name: string}>) => ({
+                        id: entry?.id,
+                        name: entry?.name,
+                    }),
+                }),
+            );
+
+            await act(async () => waitForPromisesToResolve());
+
+            const firstResult = result.current[0];
+
+            // Change the data
+            await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, {id: 'changed_id'}));
+
+            // Should return a new reference since data changed
+            expect(result.current[0]).not.toBe(firstResult);
+            expect(result.current[0]).toEqual({id: 'changed_id', name: 'test_name'});
+        });
+
+        it('should memoize selector output using deep equality check', async () => {
+            let selectorCallCount = 0;
+
+            Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name'});
+
+            const {result} = renderHook(() =>
+                useOnyx(ONYXKEYS.TEST_KEY, {
+                    // @ts-expect-error bypass
+                    selector: (entry: OnyxEntry<{id: string; name: string}>) => {
+                        selectorCallCount++;
+                        return {id: entry?.id, name: entry?.name};
+                    },
+                }),
+            );
+
+            await act(async () => waitForPromisesToResolve());
+
+            const firstResult = result.current[0];
+            const initialCallCount = selectorCallCount;
+
+            // Add a property that will change object reference but keep selected data same
+            await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, {extraProp: 'new'}));
+
+            // Selector should be called again due to input object reference change
+            expect(selectorCallCount).toBe(initialCallCount + 1);
+            // But output should be the same reference due to deep equality check in memoized selector
+            expect(result.current[0]).toBe(firstResult);
+        });
+
+        it('should use reference equality for memoized selectors instead of deep equality', async () => {
+            // This test verifies the optimization where memoized selectors use reference equality
+            const complexObject = {
+                nested: {
+                    array: [1, 2, 3],
+                    object: {prop: 'value'},
+                },
+            };
+
+            Onyx.set(ONYXKEYS.TEST_KEY, complexObject);
+
+            const {result} = renderHook(() =>
+                useOnyx(ONYXKEYS.TEST_KEY, {
+                    // @ts-expect-error bypass
+                    selector: (entry: OnyxEntry<typeof complexObject>) => entry?.nested,
+                }),
+            );
+
+            await act(async () => waitForPromisesToResolve());
+
+            const firstResult = result.current[0];
+
+            // Set the exact same object reference
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, complexObject));
+
+            // Should return same reference due to memoization
+            expect(result.current[0]).toBe(firstResult);
+
+            // Set different object with same content
+            const differentObjectSameContent = {
+                nested: {
+                    array: [1, 2, 3],
+                    object: {prop: 'value'},
+                },
+            };
+
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, differentObjectSameContent));
+
+            // Should return same reference due to deep equality in memoized selector
+            expect(result.current[0]).toBe(firstResult);
+        });
+
+        it('should memoize primitive selector results correctly', async () => {
+            Onyx.set(ONYXKEYS.TEST_KEY, {count: 5, name: 'test'});
+
+            const {result} = renderHook(() =>
+                useOnyx(ONYXKEYS.TEST_KEY, {
+                    // @ts-expect-error bypass
+                    selector: (entry: OnyxEntry<{count: number; name: string}>) => entry?.count || 0,
+                }),
+            );
+
+            await act(async () => waitForPromisesToResolve());
+
+            const firstResult = result.current[0];
+            expect(firstResult).toBe(5);
+
+            // Change unrelated property
+            await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, {name: 'changed'}));
+
+            // Should return the same primitive value (number 5)
+            expect(result.current[0]).toBe(firstResult);
+            expect(result.current[0]).toBe(5);
+
+            // Change the selected property
+            await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, {count: 10}));
+
+            // Should return new value
+            expect(result.current[0]).not.toBe(firstResult);
+            expect(result.current[0]).toBe(10);
+        });
     });
 
     describe('allowStaleData', () => {
