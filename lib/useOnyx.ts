@@ -67,6 +67,38 @@ type ResultMetadata<TValue> = {
 
 type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata<TValue>];
 
+// Global snapshot cache for ultimate performance
+const globalSnapshotCache = new Map<string, any>();
+const selectorIdMap = new WeakMap<UseOnyxSelector<any, any>, string>();
+let selectorCounter = 0;
+
+// Generate unique ID for selector functions
+function getSelectorId(selector: UseOnyxSelector<any, any>): string {
+    if (!selectorIdMap.has(selector)) {
+        selectorIdMap.set(selector, `selector_${++selectorCounter}`);
+    }
+    return selectorIdMap.get(selector)!;
+}
+
+// Fast cache key generation without JSON.stringify
+function generateCacheKey<TKey extends OnyxKey, TReturnValue>(key: TKey, options?: UseOnyxOptions<TKey, TReturnValue>): string {
+    const selectorId = options?.selector ? getSelectorId(options.selector) : 'no_selector';
+    // Create options hash without expensive JSON.stringify
+    const initWithStoredValues = options?.initWithStoredValues ?? true;
+    const allowStaleData = options?.allowStaleData ?? false;
+    const canBeMissing = options?.canBeMissing ?? true;
+    return `${key}_${selectorId}_${initWithStoredValues}_${allowStaleData}_${canBeMissing}`;
+}
+
+// Invalidate cache entries for a specific key
+function invalidateCacheForKey(keyToInvalidate: string) {
+    for (const cacheKey of globalSnapshotCache.keys()) {
+        if (cacheKey.startsWith(`${keyToInvalidate}_`)) {
+            globalSnapshotCache.delete(cacheKey);
+        }
+    }
+}
+
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     key: TKey,
     options?: UseOnyxOptions<TKey, TReturnValue>,
@@ -133,6 +165,14 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     // Inside useOnyx.ts, we need to track the sourceValue separately
     const sourceValueRef = useRef<NonNullable<TReturnValue> | undefined>(undefined);
 
+    // Cache the cache key to avoid regenerating it every getSnapshot call
+    const cacheKeyRef = useRef<string | null>(null);
+
+    // Generate cache key once and reuse
+    if (!cacheKeyRef.current) {
+        cacheKeyRef.current = generateCacheKey(key, options);
+    }
+
     useEffect(() => {
         // These conditions will ensure we can only handle dynamic collection member keys from the same collection.
         if (options?.allowDynamicKey || previousKey === key) {
@@ -188,11 +228,22 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     }, [key, options?.canEvict]);
 
     const getSnapshot = useCallback(() => {
+        const cacheKey = cacheKeyRef.current!;
+
+        const cachedResult = globalSnapshotCache.get(cacheKey);
+        if (cachedResult !== undefined) {
+            // console.log('[p] cache hit for key:', key, 'cacheKey:', cacheKey);
+            resultRef.current = cachedResult;
+            return cachedResult;
+        }
+
         let isOnyxValueDefined = true;
 
         // We return the initial result right away during the first connection if `initWithStoredValues` is set to `false`.
         if (isFirstConnectionRef.current && options?.initWithStoredValues === false) {
-            return resultRef.current;
+            const result = resultRef.current;
+            globalSnapshotCache.set(cacheKey, result);
+            return result;
         }
 
         // We get the value from cache while the first connection to Onyx is being made,
@@ -267,6 +318,9 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             }
         }
 
+        // Cache the result globally for other useOnyx instances
+        globalSnapshotCache.set(cacheKey, resultRef.current);
+
         return resultRef.current;
     }, [options?.initWithStoredValues, options?.allowStaleData, options?.canBeMissing, key, memoizedSelector]);
 
@@ -290,6 +344,9 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
                     // sourceValue is unknown type, so we need to cast it to the correct type.
                     sourceValueRef.current = sourceValue as NonNullable<TReturnValue>;
+
+                    // Invalidate global cache for this key when data changes
+                    invalidateCacheForKey(key as string);
 
                     // Finally, we signal that the store changed, making `getSnapshot()` be called again.
                     onStoreChange();
