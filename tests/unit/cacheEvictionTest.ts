@@ -20,6 +20,9 @@ test('Cache eviction', () => {
             Onyx.init({
                 keys: ONYX_KEYS,
                 evictableKeys: [ONYX_KEYS.COLLECTION.TEST_KEY],
+                storageManager: {
+                    enabled: false,
+                },
             });
 
             // And connect to this key

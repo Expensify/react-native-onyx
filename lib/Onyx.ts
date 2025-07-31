@@ -9,7 +9,6 @@ import type {
     CollectionKey,
     CollectionKeyBase,
     ConnectOptions,
-    InitOptions,
     KeyValueMapping,
     Mapping,
     OnyxInputKeyValueMapping,
@@ -24,6 +23,7 @@ import type {
     OnyxValue,
     OnyxInput,
     OnyxMethodMap,
+    InitOptions,
     SetOptions,
 } from './types';
 import OnyxUtils from './OnyxUtils';
@@ -32,6 +32,7 @@ import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
 import * as GlobalSettings from './GlobalSettings';
 import decorateWithMetrics from './metrics';
+import storageManager from './OnyxStorageManager';
 import OnyxMerge from './OnyxMerge';
 
 /** Initialize the store with actions and listening for storage events */
@@ -45,6 +46,7 @@ function init({
     enablePerformanceMetrics = false,
     skippableCollectionMemberIDs = [],
     fullyMergedSnapshotKeys = [],
+    storageManager: storageManagerConfig,
 }: InitOptions): void {
     if (enablePerformanceMetrics) {
         GlobalSettings.setPerformanceMetricsEnabled(true);
@@ -74,9 +76,11 @@ function init({
     OnyxUtils.initStoreValues(keys, initialKeyStates, evictableKeys, fullyMergedSnapshotKeys);
 
     // Initialize all of our keys with data provided then give green light to any pending connections
-    Promise.all([cache.addEvictableKeysToRecentlyAccessedList(OnyxUtils.isCollectionKey, OnyxUtils.getAllKeys), OnyxUtils.initializeWithDefaultKeyStates()]).then(
-        OnyxUtils.getDeferredInitTask().resolve,
-    );
+    Promise.all([
+        cache.addEvictableKeysToRecentlyAccessedList(OnyxUtils.isCollectionKey, OnyxUtils.getAllKeys),
+        OnyxUtils.initializeWithDefaultKeyStates(),
+        storageManager.initialize(storageManagerConfig ?? {}),
+    ]).then(OnyxUtils.getDeferredInitTask().resolve);
 }
 
 /**
@@ -225,6 +229,12 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options
     return Storage.setItem(key, valueWithoutNestedNullValues)
         .catch((error) => OnyxUtils.evictStorageAndRetry(error, set, key, valueWithoutNestedNullValues))
         .then(() => {
+            try {
+                storageManager.trackKeySet(key);
+            } catch (error) {
+                Logger.logInfo(`Failed to track key set: ${error}`);
+            }
+
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
             return updatePromise;
         });
@@ -276,6 +286,14 @@ function multiSet(data: OnyxMultiSetInput): Promise<void> {
     return Storage.multiSet(keyValuePairsToSet)
         .catch((error) => OnyxUtils.evictStorageAndRetry(error, multiSet, newData))
         .then(() => {
+            try {
+                keyValuePairsToSet.forEach(([key]) => {
+                    storageManager.trackKeySet(key);
+                });
+            } catch (error) {
+                Logger.logInfo(`Failed to track multiset keys: ${error}`);
+            }
+
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MULTI_SET, undefined, newData);
             return Promise.all(updatePromises);
         })
@@ -362,6 +380,11 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
             }
 
             return OnyxMerge.applyMerge(key, existingValue, validChanges).then(({mergedValue, updatePromise}) => {
+                try {
+                    storageManager.trackKeySet(key);
+                } catch (error) {
+                    Logger.logInfo(`Failed to track merge key: ${error}`);
+                }
                 OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, changes, mergedValue);
                 return updatePromise;
             });
