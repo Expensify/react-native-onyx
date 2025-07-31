@@ -67,8 +67,8 @@ type ResultMetadata<TValue> = {
 
 type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata<TValue>];
 
-// Global snapshot cache for ultimate performance
-const globalSnapshotCache = new Map<string, any>();
+// Global snapshot cache for ultimate performance - separate cache per Onyx key
+const globalSnapshotCache = new Map<string, Map<string, any>>();
 const selectorIdMap = new WeakMap<UseOnyxSelector<any, any>, string>();
 let selectorCounter = 0;
 
@@ -80,23 +80,19 @@ function getSelectorId(selector: UseOnyxSelector<any, any>): string {
     return selectorIdMap.get(selector)!;
 }
 
-// Fast cache key generation without JSON.stringify
-function generateCacheKey<TKey extends OnyxKey, TReturnValue>(key: TKey, options?: UseOnyxOptions<TKey, TReturnValue>): string {
+// Fast cache key generation for selector/options combination
+function generateSelectorKey<TKey extends OnyxKey, TReturnValue>(options?: UseOnyxOptions<TKey, TReturnValue>): string {
     const selectorId = options?.selector ? getSelectorId(options.selector) : 'no_selector';
     // Create options hash without expensive JSON.stringify
     const initWithStoredValues = options?.initWithStoredValues ?? true;
     const allowStaleData = options?.allowStaleData ?? false;
     const canBeMissing = options?.canBeMissing ?? true;
-    return `${key}_${selectorId}_${initWithStoredValues}_${allowStaleData}_${canBeMissing}`;
+    return `${selectorId}_${initWithStoredValues}_${allowStaleData}_${canBeMissing}`;
 }
 
-// Invalidate cache entries for a specific key
+// O(1) cache invalidation - just delete the entire cache for this key
 function invalidateCacheForKey(keyToInvalidate: string) {
-    for (const cacheKey of globalSnapshotCache.keys()) {
-        if (cacheKey.startsWith(`${keyToInvalidate}_`)) {
-            globalSnapshotCache.delete(cacheKey);
-        }
-    }
+    globalSnapshotCache.delete(keyToInvalidate);
 }
 
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
@@ -165,12 +161,12 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     // Inside useOnyx.ts, we need to track the sourceValue separately
     const sourceValueRef = useRef<NonNullable<TReturnValue> | undefined>(undefined);
 
-    // Cache the cache key to avoid regenerating it every getSnapshot call
-    const cacheKeyRef = useRef<string | null>(null);
+    // Cache the selector key to avoid regenerating it every getSnapshot call
+    const selectorKeyRef = useRef<string | null>(null);
 
-    // Generate cache key once and reuse
-    if (!cacheKeyRef.current) {
-        cacheKeyRef.current = generateCacheKey(key, options);
+    // Generate selector key once and reuse
+    if (!selectorKeyRef.current) {
+        selectorKeyRef.current = generateSelectorKey(options);
     }
 
     useEffect(() => {
@@ -228,13 +224,17 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     }, [key, options?.canEvict]);
 
     const getSnapshot = useCallback(() => {
-        const cacheKey = cacheKeyRef.current!;
+        const selectorKey = selectorKeyRef.current!;
+        const keyStr = key as string;
 
-        const cachedResult = globalSnapshotCache.get(cacheKey);
-        if (cachedResult !== undefined) {
-            // console.log('[p] cache hit for key:', key, 'cacheKey:', cacheKey);
-            resultRef.current = cachedResult;
-            return cachedResult;
+        // Check if we have any cache for this Onyx key
+        const keyCache = globalSnapshotCache.get(keyStr);
+        if (keyCache) {
+            const cachedResult = keyCache.get(selectorKey);
+            if (cachedResult !== undefined) {
+                resultRef.current = cachedResult;
+                return cachedResult;
+            }
         }
 
         let isOnyxValueDefined = true;
@@ -242,7 +242,11 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // We return the initial result right away during the first connection if `initWithStoredValues` is set to `false`.
         if (isFirstConnectionRef.current && options?.initWithStoredValues === false) {
             const result = resultRef.current;
-            globalSnapshotCache.set(cacheKey, result);
+            // Store in nested cache structure
+            if (!globalSnapshotCache.has(keyStr)) {
+                globalSnapshotCache.set(keyStr, new Map());
+            }
+            globalSnapshotCache.get(keyStr)!.set(selectorKey, result);
             return result;
         }
 
@@ -319,7 +323,10 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         }
 
         // Cache the result globally for other useOnyx instances
-        globalSnapshotCache.set(cacheKey, resultRef.current);
+        if (!globalSnapshotCache.has(keyStr)) {
+            globalSnapshotCache.set(keyStr, new Map());
+        }
+        globalSnapshotCache.get(keyStr)!.set(selectorKey, resultRef.current);
 
         return resultRef.current;
     }, [options?.initWithStoredValues, options?.allowStaleData, options?.canBeMissing, key, memoizedSelector]);
