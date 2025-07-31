@@ -39,7 +39,7 @@ import type {DeferredTask} from './createDeferredTask';
 import createDeferredTask from './createDeferredTask';
 import * as GlobalSettings from './GlobalSettings';
 import decorateWithMetrics from './metrics';
-import {getStorageManager} from './storage-eviction';
+import storageManager from './OnyxStorageManager';
 import type {StorageKeyValuePair} from './storage/providers/types';
 import logMessages from './logMessages';
 
@@ -1111,10 +1111,7 @@ function remove<TKey extends OnyxKey>(key: TKey): Promise<void> {
     cache.drop(key);
     scheduleSubscriberUpdate(key, undefined as OnyxValue<TKey>, prevValue);
     return Storage.removeItem(key).then(() => {
-        const storageManager = getStorageManager();
-        if (storageManager) {
-            storageManager.trackKeyRemoval(key);
-        }
+        storageManager.trackKeyRemoval(key);
         return undefined;
     });
 }

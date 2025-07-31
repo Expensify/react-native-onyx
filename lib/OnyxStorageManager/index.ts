@@ -1,4 +1,4 @@
-import type {QueryResult, QueryResultRow} from 'react-native-nitro-sqlite';
+import bindAll from 'lodash/bindAll';
 import type {OnyxKey} from '../types';
 import Storage from '../storage';
 import * as Logger from '../Logger';
@@ -6,43 +6,89 @@ import type {StorageUsageConfig, StorageKeyInfo, StorageMetadata} from './types'
 import {DEFAULT_STORAGE_CONFIG} from './types';
 
 const MILLISECONDS_PER_DAY = 1000 * 60 * 60 * 24;
+const METADATA_KEY_PREFIX = '__onyx_meta_';
 
-type StorageManagerConfig = Partial<StorageUsageConfig>;
-type StorageCleanupResult = {cleanedKeys: OnyxKey[]; timeElapsed: number; errors: string[]};
+/**
+ * Represents the result of a storage cleanup operation.
+ * @property cleanedKeys - An array of Onyx keys that were successfully cleaned/evicted.
+ * @property timeElapsed - The time taken (in milliseconds) to perform the cleanup.
+ * @property errors - An array of error messages encountered during the cleanup process.
+ */
+type StorageCleanupResult = {
+    cleanedKeys: OnyxKey[];
+    timeElapsed: number;
+    errors: string[];
+};
 
-class StorageManager {
+type CleanupExecutionResult = {
+    successfulKeys: OnyxKey[];
+    failedKeys: OnyxKey[];
+};
+
+class OnyxStorageManager {
+    /**
+     * Stores metadata and tracking information for each Onyx key in storage.
+     * Used to determine when a key was last accessed, created, etc.
+     */
     private keyInfoMap = new Map<OnyxKey, StorageKeyInfo>();
 
+    /**
+     * Current configuration for storage usage and eviction policies.
+     * Controls parameters like max idle days, max age, and which keys are evictable.
+     */
     public config: StorageUsageConfig;
 
+    /**
+     * List of keys that are eligible for eviction based on the current config.
+     * Only these keys will be considered for automatic cleanup.
+     */
     private evictableKeys: string[] = [];
 
+    /**
+     * Indicates whether the storage manager has been initialized.
+     * Prevents redundant initialization and ensures setup is only performed once.
+     */
     private isInitialized = false;
 
+    /**
+     * Reference to the interval timer used for periodic monitoring and cleanup.
+     * If null, monitoring is not currently active.
+     */
     private monitoringInterval: NodeJS.Timeout | null = null;
 
+    /**
+     * Flag indicating whether the storage manager is currently monitoring for cleanup.
+     * Used to prevent multiple monitoring intervals from being started.
+     */
     private isMonitoring = false;
 
+    /**
+     * Flag indicating whether a cleanup operation is currently in progress.
+     * Prevents concurrent cleanups and ensures only one cleanup runs at a time.
+     */
     private cleanupInProgress = false;
 
-    /**
-     * Creates a new StorageManager instance.
-     * @param config - Partial configuration object to override default settings
-     */
-    constructor(config: Partial<StorageUsageConfig> = {}) {
-        this.config = {...DEFAULT_STORAGE_CONFIG, ...config};
+    constructor() {
+        this.config = {...DEFAULT_STORAGE_CONFIG};
         this.setEvictableKeys(this.config.evictableKeys);
+
+        bindAll(this, 'initialize', 'trackKeySet', 'trackKeyRemoval', 'setEvictableKeys', 'shouldPerformCleanup', 'performCleanup');
     }
 
     /**
      * Initializes the StorageManager by setting up tracking, starting monitoring, and performing initial cleanup if needed.
+     * @param config - Configuration object to override default settings
      * @returns Promise that resolves when initialization is complete
      */
-    initialize(): Promise<void> {
+    initialize(config: Partial<StorageUsageConfig> = {}): Promise<void> {
         if (this.isInitialized) {
             Logger.logInfo('StorageManager already initialized');
             return Promise.resolve();
         }
+
+        // Update config with provided values
+        this.config = {...DEFAULT_STORAGE_CONFIG, ...config};
+        this.setEvictableKeys(this.config.evictableKeys);
 
         Logger.logInfo('Initializing StorageManager...');
 
@@ -65,7 +111,7 @@ class StorageManager {
             });
     }
 
-    private initializeTracking(): Promise<void | Array<void | QueryResult<QueryResultRow>>> {
+    private initializeTracking(): Promise<void | void[]> {
         Logger.logInfo('Initializing storage usage tracking...');
 
         return Storage.getAllKeys()
@@ -78,7 +124,7 @@ class StorageManager {
             });
     }
 
-    private trackExistingKeys(keys: OnyxKey[]): Promise<Array<void | QueryResult<QueryResultRow>>> {
+    private trackExistingKeys(keys: OnyxKey[]): Promise<void[]> {
         const dataKeys = keys.filter((key) => !key.startsWith('__onyx_meta_'));
         const evictableDataKeys = dataKeys.filter((key) => this.isKeyEvictable(key));
         Logger.logInfo(`[StorageManager] Filtering keys: ${dataKeys.length} total, ${evictableDataKeys.length} evictable`);
@@ -88,15 +134,15 @@ class StorageManager {
         return Promise.all(trackingPromises);
     }
 
-    private initializeKeyTracking(key: OnyxKey): Promise<void | QueryResult<QueryResultRow>> {
+    private initializeKeyTracking(key: OnyxKey): Promise<void> {
         const now = Date.now();
 
         return this.loadMetadata(key)
             .then((metadata) => {
                 const keyInfo = {
                     key,
-                    lastAccessed: metadata?.lastAccessed || now,
-                    createdAt: metadata?.createdAt || now,
+                    lastAccessed: metadata?.lastAccessed ?? now,
+                    createdAt: metadata?.createdAt ?? now,
                 };
 
                 this.keyInfoMap.set(key, keyInfo);
@@ -177,7 +223,7 @@ class StorageManager {
 
     /**
      * Updates the list of keys that are eligible for eviction.
-     * @param keys - Array of key names or patterns (patterns ending with '_' match prefixes)
+     * @param keys - Array of Onyx keys or collection keys
      */
     setEvictableKeys(keys: string[]): void {
         this.evictableKeys = keys;
@@ -185,7 +231,12 @@ class StorageManager {
 
     private isKeyEvictable(key: OnyxKey): boolean {
         return this.evictableKeys.some((pattern) => {
-            return pattern.endsWith('_') ? key.startsWith(pattern) : key === pattern;
+            // If pattern ends with underscore, treat it as a prefix pattern
+            if (pattern.endsWith('_')) {
+                return key.startsWith(pattern);
+            }
+            // Otherwise, exact match
+            return key === pattern;
         });
     }
 
@@ -200,10 +251,10 @@ class StorageManager {
     }
 
     private getMetadataKey(key: OnyxKey): string {
-        return `__onyx_meta_${key}`;
+        return `${METADATA_KEY_PREFIX}${key}`;
     }
 
-    private saveMetadata(key: OnyxKey, metadata: StorageMetadata): Promise<void | QueryResult<QueryResultRow>> {
+    private saveMetadata(key: OnyxKey, metadata: StorageMetadata): Promise<void> {
         const metadataKey = this.getMetadataKey(key);
 
         return Storage.setItem(metadataKey, metadata).catch((error) => {
@@ -252,8 +303,8 @@ class StorageManager {
         for (const keyInfo of this.keyInfoMap.values()) {
             if (this.isKeyEvictable(keyInfo.key)) {
                 const shouldEvict = this.shouldEvictKey(keyInfo);
-                const daysSinceAccess = (now - keyInfo.lastAccessed) / (1000 * 60 * 60 * 24);
-                const ageInDays = (now - keyInfo.createdAt) / (1000 * 60 * 60 * 24);
+                const daysSinceAccess = (now - keyInfo.lastAccessed) / MILLISECONDS_PER_DAY;
+                const ageInDays = (now - keyInfo.createdAt) / MILLISECONDS_PER_DAY;
 
                 Logger.logInfo(`Key ${keyInfo.key}: age=${ageInDays.toFixed(4)}d, idle=${daysSinceAccess.toFixed(4)}d, shouldEvict=${shouldEvict}`);
 
@@ -308,24 +359,6 @@ class StorageManager {
                 Logger.logInfo(`Storage monitoring error: ${error}`);
             }
         }, this.config.cleanupInterval);
-    }
-
-    private stopMonitoring(): void {
-        if (this.monitoringInterval) {
-            clearInterval(this.monitoringInterval);
-            this.monitoringInterval = null;
-        }
-        this.isMonitoring = false;
-        Logger.logInfo('Storage monitoring stopped');
-    }
-
-    /**
-     * Shuts down the StorageManager, stopping monitoring and cleaning up resources.
-     */
-    shutdown(): void {
-        this.stopMonitoring();
-        this.isInitialized = false;
-        Logger.logInfo('StorageManager shutdown completed');
     }
 
     /**
@@ -412,7 +445,7 @@ class StorageManager {
         return daysSinceAccess > this.config.maxIdleDays || ageInDays > this.config.maxAgeDays;
     }
 
-    private executeCleanup(keysToEvict: StorageKeyInfo[]): Promise<{successfulKeys: OnyxKey[]; failedKeys: OnyxKey[]}> {
+    private executeCleanup(keysToEvict: StorageKeyInfo[]): Promise<CleanupExecutionResult> {
         const successfulKeys: OnyxKey[] = [];
         const failedKeys: OnyxKey[] = [];
 
@@ -431,93 +464,33 @@ class StorageManager {
     }
 }
 
-let storageManagerInstance: StorageManager | null = null;
+const storageManager = new OnyxStorageManager();
 
 /**
- * Creates a new StorageManager instance with the provided configuration.
- * If config is false, returns null to disable storage management.
- * @param config - Configuration object or false to disable
- * @returns StorageManager instance or null if disabled
- */
-function createStorageManager(config: StorageManagerConfig | false = {}): StorageManager | null {
-    if (config === false) {
-        if (storageManagerInstance) {
-            storageManagerInstance.shutdown();
-            storageManagerInstance = null;
-        }
-        return null;
-    }
-
-    if (config) {
-        if (config.maxIdleDays !== undefined && config.maxIdleDays < 0) {
-            Logger.logAlert('Invalid maxIdleDays: must be >= 0');
-            return null;
-        }
-        if (config.maxAgeDays !== undefined && config.maxAgeDays < 0) {
-            Logger.logAlert('Invalid maxAgeDays: must be >= 0');
-            return null;
-        }
-        if (config.cleanupInterval !== undefined && config.cleanupInterval < 1000) {
-            Logger.logAlert('Invalid cleanupInterval: must be >= 1000ms');
-            return null;
-        }
-    }
-
-    if (storageManagerInstance) {
-        Logger.logInfo('Shutting down existing StorageManager instance');
-        storageManagerInstance.shutdown();
-    }
-
-    storageManagerInstance = new StorageManager(config);
-    return storageManagerInstance;
-}
-
-/**
- * Returns the current StorageManager instance.
- * @returns Current StorageManager instance or null if not initialized
- */
-function getStorageManager(): StorageManager | null {
-    return storageManagerInstance;
-}
-
-/**
- * Enables storage eviction for the current StorageManager instance.
+ * Enables storage eviction for the StorageManager instance.
  * Allows automatic cleanup of expired keys based on configured rules.
  */
 function enableStorageEviction(): void {
-    if (!storageManagerInstance) {
-        Logger.logInfo('Cannot enable storage eviction: StorageManager not initialized');
-        return;
-    }
-
-    storageManagerInstance.config.enabled = true;
+    storageManager.config.enabled = true;
     Logger.logInfo('Storage eviction enabled');
 }
 
 /**
- * Disables storage eviction for the current StorageManager instance.
+ * Disables storage eviction for the StorageManager instance.
  * Prevents automatic cleanup of keys regardless of age or idle time.
  */
 function disableStorageEviction(): void {
-    if (!storageManagerInstance) {
-        Logger.logInfo('Cannot disable storage eviction: StorageManager not initialized');
-        return;
-    }
-
-    storageManagerInstance.config.enabled = false;
+    storageManager.config.enabled = false;
     Logger.logInfo('Storage eviction disabled');
 }
 
 /**
  * Checks if storage eviction is currently enabled.
- * @returns true if eviction is enabled, false otherwise or if StorageManager is not initialized
+ * @returns true if eviction is enabled, false otherwise
  */
 function isStorageEvictionEnabled(): boolean {
-    if (!storageManagerInstance) {
-        return false;
-    }
-
-    return storageManagerInstance.config.enabled;
+    return storageManager.config.enabled;
 }
 
-export {StorageManager, createStorageManager, getStorageManager, enableStorageEviction, disableStorageEviction, isStorageEvictionEnabled, DEFAULT_STORAGE_CONFIG};
+export default storageManager;
+export {OnyxStorageManager, enableStorageEviction, disableStorageEviction, isStorageEvictionEnabled, DEFAULT_STORAGE_CONFIG};

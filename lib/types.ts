@@ -3,7 +3,7 @@ import type {BuiltIns} from 'type-fest/source/internal';
 import type OnyxUtils from './OnyxUtils';
 import type {WithOnyxInstance, WithOnyxState} from './withOnyx/types';
 import type {OnyxMethod} from './OnyxUtils';
-import type {StorageUsageConfig} from './storage-eviction/types';
+import type {StorageUsageConfig} from './OnyxStorageManager/types';
 import type {FastMergeReplaceNullPatch} from './utils';
 
 /**
@@ -501,10 +501,8 @@ type InitOptions = {
 
     /**
      * Configuration for persistent storage eviction system.
-     * Set to `false` to disable storage eviction entirely.
-     * @default undefined (uses default storage eviction configuration)
      */
-    storageManager?: Partial<StorageUsageConfig> | false;
+    storageManager?: Partial<StorageUsageConfig>;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

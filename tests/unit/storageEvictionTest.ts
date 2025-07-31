@@ -1,9 +1,8 @@
 import {jest} from '@jest/globals';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import Storage from '../../lib/storage';
-import type {StorageManager} from '../../lib/storage-eviction';
-import {createStorageManager} from '../../lib/storage-eviction';
-import type {StorageUsageConfig, StorageMetadata} from '../../lib/storage-eviction/types';
+import {OnyxStorageManager} from '../../lib/OnyxStorageManager';
+import type {StorageUsageConfig, StorageMetadata} from '../../lib/OnyxStorageManager/types';
 
 // Mock the Storage module
 const storageSetItemSpy = jest.spyOn(Storage, 'setItem').mockImplementation(() => Promise.resolve());
@@ -12,27 +11,21 @@ const storageRemoveItemSpy = jest.spyOn(Storage, 'removeItem').mockImplementatio
 const storageGetAllKeysSpy = jest.spyOn(Storage, 'getAllKeys').mockImplementation(() => Promise.resolve([]));
 
 describe('Storage Eviction Tests', () => {
-    let storageManager: StorageManager | null;
+    let storageManager: OnyxStorageManager;
     const originalDateNow = Date.now;
 
     beforeEach(() => {
         // Clear all mocks
         jest.clearAllMocks();
 
-        // Reset storage manager
-        storageManager = null;
-
         // Reset Date.now to current time
         Date.now = originalDateNow;
+
+        // Create a fresh instance for each test
+        storageManager = new OnyxStorageManager();
     });
 
     afterEach(() => {
-        // Cleanup storage manager
-        if (storageManager) {
-            storageManager.shutdown();
-            storageManager = null;
-        }
-
         // Restore Date.now
         Date.now = originalDateNow;
     });
@@ -49,9 +42,6 @@ describe('Storage Eviction Tests', () => {
                 cleanupInterval: 5 * 60 * 1000,
             };
 
-            storageManager = createStorageManager(config);
-            expect(storageManager).not.toBeNull();
-
             // Mock that the key exists in storage but no metadata
             storageGetAllKeysSpy.mockResolvedValue(['test_key']);
             storageGetItemSpy.mockImplementation((key) => {
@@ -62,7 +52,7 @@ describe('Storage Eviction Tests', () => {
             });
 
             // Initialize the storage manager
-            await storageManager!.initialize();
+            await storageManager.initialize(config);
             await waitForPromisesToResolve();
 
             // Verify metadata was created for the evictable key
@@ -84,9 +74,6 @@ describe('Storage Eviction Tests', () => {
                 cleanupInterval: 5 * 60 * 1000,
             };
 
-            storageManager = createStorageManager(config);
-            expect(storageManager).not.toBeNull();
-
             // Initialize with existing metadata
             const existingMetadata: StorageMetadata = {
                 lastAccessed: Date.now() - 1000,
@@ -100,14 +87,14 @@ describe('Storage Eviction Tests', () => {
                 return Promise.resolve(null);
             });
 
-            await storageManager!.initialize();
+            await storageManager.initialize(config);
             await waitForPromisesToResolve();
 
             // Track a key access
             const accessTime = Date.now();
             Date.now = jest.fn(() => accessTime);
 
-            storageManager!.trackKeySet('test_key');
+            storageManager.trackKeySet('test_key');
             await waitForPromisesToResolve();
 
             // Verify metadata was updated with new access
@@ -133,9 +120,6 @@ describe('Storage Eviction Tests', () => {
                 cleanupInterval: 5 * 60 * 1000,
             };
 
-            storageManager = createStorageManager(config);
-            expect(storageManager).not.toBeNull();
-
             // Create metadata for a key that hasn't been accessed for 10 days (> 7 days)
             const tenDaysAgo = Date.now() - 10 * 24 * 60 * 60 * 1000;
             const oldMetadata: StorageMetadata = {
@@ -151,11 +135,11 @@ describe('Storage Eviction Tests', () => {
                 return Promise.resolve('some_value');
             });
 
-            await storageManager!.initialize();
+            await storageManager.initialize(config);
             await waitForPromisesToResolve();
 
             // Perform cleanup
-            const result = await storageManager!.performCleanup();
+            const result = await storageManager.performCleanup();
 
             // Verify the old key was removed
             expect(result.cleanedKeys).toContain('old_key');
@@ -170,9 +154,6 @@ describe('Storage Eviction Tests', () => {
                 maxAgeDays: 30,
                 cleanupInterval: 5 * 60 * 1000,
             };
-
-            storageManager = createStorageManager(config);
-            expect(storageManager).not.toBeNull();
 
             // Create metadata for a key accessed 3 days ago (< 7 days)
             const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
@@ -189,11 +170,11 @@ describe('Storage Eviction Tests', () => {
                 return Promise.resolve('some_value');
             });
 
-            await storageManager!.initialize();
+            await storageManager.initialize(config);
             await waitForPromisesToResolve();
 
             // Perform cleanup
-            const result = await storageManager!.performCleanup();
+            const result = await storageManager.performCleanup();
 
             // Verify the recent key was NOT removed
             expect(result.cleanedKeys).not.toContain('recent_key');
@@ -213,9 +194,6 @@ describe('Storage Eviction Tests', () => {
                 cleanupInterval: 5 * 60 * 1000,
             };
 
-            storageManager = createStorageManager(config);
-            expect(storageManager).not.toBeNull();
-
             // Create metadata for a key that's 40 days old (> 30 days) but accessed recently
             const fortyDaysAgo = Date.now() - 40 * 24 * 60 * 60 * 1000;
             const yesterday = Date.now() - 1 * 24 * 60 * 60 * 1000;
@@ -233,11 +211,11 @@ describe('Storage Eviction Tests', () => {
                 return Promise.resolve('some_value');
             });
 
-            await storageManager!.initialize();
+            await storageManager.initialize(config);
             await waitForPromisesToResolve();
 
             // Perform cleanup
-            const result = await storageManager!.performCleanup();
+            const result = await storageManager.performCleanup();
 
             // Verify the old key was removed despite recent access
             expect(result.cleanedKeys).toContain('very_old_key');
@@ -252,9 +230,6 @@ describe('Storage Eviction Tests', () => {
                 maxAgeDays: 30,
                 cleanupInterval: 5 * 60 * 1000,
             };
-
-            storageManager = createStorageManager(config);
-            expect(storageManager).not.toBeNull();
 
             // Create metadata for a new key (< 30 days old)
             const fiveDaysAgo = Date.now() - 5 * 24 * 60 * 60 * 1000;
@@ -271,11 +246,11 @@ describe('Storage Eviction Tests', () => {
                 return Promise.resolve('some_value');
             });
 
-            await storageManager!.initialize();
+            await storageManager.initialize(config);
             await waitForPromisesToResolve();
 
             // Perform cleanup
-            const result = await storageManager!.performCleanup();
+            const result = await storageManager.performCleanup();
 
             // Verify the new key was NOT removed
             expect(result.cleanedKeys).not.toContain('new_key');
@@ -295,9 +270,6 @@ describe('Storage Eviction Tests', () => {
                 cleanupInterval: 5 * 60 * 1000,
             };
 
-            storageManager = createStorageManager(config);
-            expect(storageManager).not.toBeNull();
-
             // Create old metadata for both evictable and non-evictable keys
             const oldTime = Date.now() - 10 * 24 * 60 * 60 * 1000; // 10 days ago
             const oldMetadata: StorageMetadata = {
@@ -313,11 +285,11 @@ describe('Storage Eviction Tests', () => {
                 return Promise.resolve('some_value');
             });
 
-            await storageManager!.initialize();
+            await storageManager.initialize(config);
             await waitForPromisesToResolve();
 
             // Perform cleanup
-            const result = await storageManager!.performCleanup();
+            const result = await storageManager.performCleanup();
 
             // Verify only the evictable key was removed
             expect(result.cleanedKeys).toContain('evictable_key');
@@ -335,9 +307,6 @@ describe('Storage Eviction Tests', () => {
                 cleanupInterval: 5 * 60 * 1000,
             };
 
-            storageManager = createStorageManager(config);
-            expect(storageManager).not.toBeNull();
-
             const oldTime = Date.now() - 10 * 24 * 60 * 60 * 1000;
             const oldMetadata: StorageMetadata = {
                 lastAccessed: oldTime,
@@ -352,11 +321,11 @@ describe('Storage Eviction Tests', () => {
                 return Promise.resolve('some_value');
             });
 
-            await storageManager!.initialize();
+            await storageManager.initialize(config);
             await waitForPromisesToResolve();
 
             // Perform cleanup
-            const result = await storageManager!.performCleanup();
+            const result = await storageManager.performCleanup();
 
             // Verify only temp_ prefixed keys were removed
             expect(result.cleanedKeys).toContain('temp_file1');
@@ -373,9 +342,6 @@ describe('Storage Eviction Tests', () => {
                 cleanupInterval: 5 * 60 * 1000,
             };
 
-            storageManager = createStorageManager(config);
-            expect(storageManager).not.toBeNull();
-
             const oldTime = Date.now() - 10 * 24 * 60 * 60 * 1000;
             const oldMetadata: StorageMetadata = {
                 lastAccessed: oldTime,
@@ -390,11 +356,11 @@ describe('Storage Eviction Tests', () => {
                 return Promise.resolve('some_value');
             });
 
-            await storageManager!.initialize();
+            await storageManager.initialize(config);
             await waitForPromisesToResolve();
 
             // Perform cleanup
-            const result = await storageManager!.performCleanup();
+            const result = await storageManager.performCleanup();
 
             // Verify no keys were removed
             expect(result.cleanedKeys).toHaveLength(0);
@@ -412,9 +378,6 @@ describe('Storage Eviction Tests', () => {
                 cleanupInterval: 5 * 60 * 1000,
             };
 
-            storageManager = createStorageManager(config);
-            expect(storageManager).not.toBeNull();
-
             const oldTime = Date.now() - 10 * 24 * 60 * 60 * 1000;
             const oldMetadata: StorageMetadata = {
                 lastAccessed: oldTime,
@@ -429,11 +392,11 @@ describe('Storage Eviction Tests', () => {
                 return Promise.resolve('some_value');
             });
 
-            await storageManager!.initialize();
+            await storageManager.initialize(config);
             await waitForPromisesToResolve();
 
             // Perform cleanup
-            const result = await storageManager!.performCleanup();
+            const result = await storageManager.performCleanup();
 
             // Verify no cleanup was performed
             expect(result.errors).toContain('Storage eviction is disabled');
