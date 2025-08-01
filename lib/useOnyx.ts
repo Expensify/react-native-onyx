@@ -69,7 +69,7 @@ type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata<TV
 
 // Global snapshot cache for ultimate performance - separate cache per Onyx key
 const globalSnapshotCache = new Map<string, Map<string, any>>();
-const selectorIdMap = new WeakMap<UseOnyxSelector<any, any>, string>();
+const selectorIdMap = new Map<UseOnyxSelector<any, any>, string>();
 let selectorCounter = 0;
 
 // Generate unique ID for selector functions
@@ -397,5 +397,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 }
 
 export default useOnyx;
+export {globalSnapshotCache, selectorIdMap};
 
 export type {FetchStatus, ResultMetadata, UseOnyxResult, UseOnyxOptions};

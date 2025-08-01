@@ -6,6 +6,7 @@ import StorageMock from '../../lib/storage';
 import type GenericCollection from '../utils/GenericCollection';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import * as Logger from '../../lib/Logger';
+import {globalSnapshotCache, selectorIdMap} from '../../lib/useOnyx';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -23,7 +24,11 @@ Onyx.init({
     skippableCollectionMemberIDs: ['skippable-id'],
 });
 
-beforeEach(() => Onyx.clear());
+beforeEach(async () => {
+    await Onyx.clear();
+    globalSnapshotCache.clear();
+    selectorIdMap.clear();
+});
 
 describe('useOnyx', () => {
     describe('dynamic key', () => {
@@ -677,6 +682,68 @@ describe('useOnyx', () => {
             expect(result1.current[1].status).toEqual('loaded');
 
             expect(result2.current[0]).toEqual('test');
+            expect(result2.current[1].status).toEqual('loaded');
+        });
+
+        it('"allowStaleData" should work correctly for the same key if more than one hook is using it', async () => {
+            Onyx.set(ONYXKEYS.TEST_KEY, 'test1');
+
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test3');
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test4');
+
+            const {result: result1} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {allowStaleData: true}));
+
+            expect(result1.current[0]).toEqual('test1');
+            expect(result1.current[1].status).toEqual('loaded');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result1.current[0]).toEqual('test4');
+            expect(result1.current[1].status).toEqual('loaded');
+
+            // Second hook
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test5');
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test6');
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test7');
+
+            const {result: result2} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {allowStaleData: true}));
+
+            expect(result2.current[0]).toEqual('test4');
+            expect(result2.current[1].status).toEqual('loaded');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result2.current[0]).toEqual('test7');
+            expect(result2.current[1].status).toEqual('loaded');
+        });
+
+        it('"initWithStoredValues" should work correctly for the same key if more than one hook is using it', async () => {
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test1');
+
+            const {result: result1} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {initWithStoredValues: false}));
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result1.current[0]).toBeUndefined();
+            expect(result1.current[1].status).toEqual('loaded');
+
+            await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, 'test2'));
+
+            expect(result1.current[0]).toEqual('test2');
+            expect(result1.current[1].status).toEqual('loaded');
+
+            // Second hook
+            const {result: result2} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {initWithStoredValues: false}));
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result2.current[0]).toBeUndefined();
+            expect(result2.current[1].status).toEqual('loaded');
+
+            await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, 'test3'));
+
+            expect(result2.current[0]).toEqual('test3');
             expect(result2.current[1].status).toEqual('loaded');
         });
     });
