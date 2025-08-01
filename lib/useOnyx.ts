@@ -164,9 +164,10 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     // Cache the selector key to avoid regenerating it every getSnapshot call
     const selectorKeyRef = useRef<string | null>(null);
 
-    // Generate selector key once and reuse
-    if (!selectorKeyRef.current) {
-        selectorKeyRef.current = generateSelectorKey(options);
+    // Generate selector key and update when selector changes
+    const currentSelectorKey = generateSelectorKey(options);
+    if (selectorKeyRef.current !== currentSelectorKey) {
+        selectorKeyRef.current = currentSelectorKey;
     }
 
     useEffect(() => {
@@ -201,6 +202,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             return;
         }
 
+        // Invalidate cache when dependencies change so selector runs with new closure values
+        invalidateCacheForKey(key as string);
         shouldGetCachedValueRef.current = true;
         onStoreChangeFnRef.current();
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -228,8 +231,9 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         const keyStr = key as string;
 
         // Check if we have any cache for this Onyx key
+        // Don't use cache for first connection with initWithStoredValues: false
         const keyCache = globalSnapshotCache.get(keyStr);
-        if (keyCache) {
+        if (keyCache && !(isFirstConnectionRef.current && options?.initWithStoredValues === false)) {
             const cachedResult = keyCache.get(selectorKey);
             if (cachedResult !== undefined) {
                 resultRef.current = cachedResult;
