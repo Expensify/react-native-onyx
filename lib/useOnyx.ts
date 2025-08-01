@@ -10,6 +10,7 @@ import type {CollectionKeyBase, OnyxKey, OnyxValue} from './types';
 import usePrevious from './usePrevious';
 import decorateWithMetrics from './metrics';
 import * as Logger from './Logger';
+import onyxSnapshotCache from './OnyxSnapshotCache';
 
 type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (data: OnyxValue<TKey> | undefined) => TReturnValue;
 
@@ -66,34 +67,6 @@ type ResultMetadata<TValue> = {
 };
 
 type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata<TValue>];
-
-// Global snapshot cache for ultimate performance - separate cache per Onyx key
-const globalSnapshotCache = new Map<string, Map<string, any>>();
-const selectorIdMap = new Map<UseOnyxSelector<any, any>, string>();
-let selectorCounter = 0;
-
-// Generate unique ID for selector functions
-function getSelectorId(selector: UseOnyxSelector<any, any>): string {
-    if (!selectorIdMap.has(selector)) {
-        selectorIdMap.set(selector, `selector_${++selectorCounter}`);
-    }
-    return selectorIdMap.get(selector)!;
-}
-
-// Fast cache key generation for selector/options combination
-function generateSelectorKey<TKey extends OnyxKey, TReturnValue>(options?: UseOnyxOptions<TKey, TReturnValue>): string {
-    const selectorId = options?.selector ? getSelectorId(options.selector) : 'no_selector';
-    // Create options hash without expensive JSON.stringify
-    const initWithStoredValues = options?.initWithStoredValues ?? true;
-    const allowStaleData = options?.allowStaleData ?? false;
-    const canBeMissing = options?.canBeMissing ?? true;
-    return `${selectorId}_${initWithStoredValues}_${allowStaleData}_${canBeMissing}`;
-}
-
-// O(1) cache invalidation - just delete the entire cache for this key
-function invalidateCacheForKey(keyToInvalidate: string) {
-    globalSnapshotCache.delete(keyToInvalidate);
-}
 
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     key: TKey,
@@ -165,7 +138,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     const selectorKeyRef = useRef<string | null>(null);
 
     // Generate selector key and update when selector changes
-    const currentSelectorKey = generateSelectorKey(options);
+    const currentSelectorKey = onyxSnapshotCache.generateSelectorKey(options);
     if (selectorKeyRef.current !== currentSelectorKey) {
         selectorKeyRef.current = currentSelectorKey;
     }
@@ -203,7 +176,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         }
 
         // Invalidate cache when dependencies change so selector runs with new closure values
-        invalidateCacheForKey(key as string);
+        onyxSnapshotCache.invalidateForKey(key as string);
         shouldGetCachedValueRef.current = true;
         onStoreChangeFnRef.current();
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -232,9 +205,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
         // Check if we have any cache for this Onyx key
         // Don't use cache for first connection with initWithStoredValues: false
-        const keyCache = globalSnapshotCache.get(keyStr);
-        if (keyCache && !(isFirstConnectionRef.current && options?.initWithStoredValues === false)) {
-            const cachedResult = keyCache.get(selectorKey);
+        if (!(isFirstConnectionRef.current && options?.initWithStoredValues === false)) {
+            const cachedResult = onyxSnapshotCache.getCachedResult(keyStr, selectorKey);
             if (cachedResult !== undefined) {
                 resultRef.current = cachedResult;
                 return cachedResult;
@@ -246,11 +218,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // We return the initial result right away during the first connection if `initWithStoredValues` is set to `false`.
         if (isFirstConnectionRef.current && options?.initWithStoredValues === false) {
             const result = resultRef.current;
-            // Store in nested cache structure
-            if (!globalSnapshotCache.has(keyStr)) {
-                globalSnapshotCache.set(keyStr, new Map());
-            }
-            globalSnapshotCache.get(keyStr)!.set(selectorKey, result);
+            // Store result in snapshot cache
+            onyxSnapshotCache.setCachedResult(keyStr, selectorKey, result);
             return result;
         }
 
@@ -326,11 +295,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             }
         }
 
-        // Cache the result globally for other useOnyx instances
-        if (!globalSnapshotCache.has(keyStr)) {
-            globalSnapshotCache.set(keyStr, new Map());
-        }
-        globalSnapshotCache.get(keyStr)!.set(selectorKey, resultRef.current);
+        // Cache the result for other useOnyx instances
+        onyxSnapshotCache.setCachedResult(keyStr, selectorKey, resultRef.current);
 
         return resultRef.current;
     }, [options?.initWithStoredValues, options?.allowStaleData, options?.canBeMissing, key, memoizedSelector]);
@@ -356,8 +322,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                     // sourceValue is unknown type, so we need to cast it to the correct type.
                     sourceValueRef.current = sourceValue as NonNullable<TReturnValue>;
 
-                    // Invalidate global cache for this key when data changes
-                    invalidateCacheForKey(key as string);
+                    // Invalidate snapshot cache for this key when data changes
+                    onyxSnapshotCache.invalidateForKey(key as string);
 
                     // Finally, we signal that the store changed, making `getSnapshot()` be called again.
                     onStoreChange();
@@ -401,6 +367,5 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 }
 
 export default useOnyx;
-export {globalSnapshotCache, selectorIdMap};
 
-export type {FetchStatus, ResultMetadata, UseOnyxResult, UseOnyxOptions};
+export type {FetchStatus, ResultMetadata, UseOnyxResult, UseOnyxOptions, UseOnyxSelector};

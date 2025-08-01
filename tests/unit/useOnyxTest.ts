@@ -6,7 +6,7 @@ import StorageMock from '../../lib/storage';
 import type GenericCollection from '../utils/GenericCollection';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import * as Logger from '../../lib/Logger';
-import {globalSnapshotCache, selectorIdMap} from '../../lib/useOnyx';
+import onyxSnapshotCache from '../../lib/OnyxSnapshotCache';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -26,8 +26,8 @@ Onyx.init({
 
 beforeEach(async () => {
     await Onyx.clear();
-    globalSnapshotCache.clear();
-    selectorIdMap.clear();
+    onyxSnapshotCache.clear();
+    onyxSnapshotCache.clearSelectorIds();
 });
 
 describe('useOnyx', () => {
