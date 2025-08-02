@@ -2,28 +2,11 @@ import bindAll from 'lodash/bindAll';
 import type {OnyxKey} from '../types';
 import Storage from '../storage';
 import * as Logger from '../Logger';
-import type {StorageUsageConfig, StorageKeyInfo, StorageMetadata} from './types';
+import type {StorageUsageConfig, StorageKeyInfo, StorageMetadata, StorageCleanupResult, CleanupExecutionResult} from './types';
 import {DEFAULT_STORAGE_CONFIG} from './types';
 
 const MILLISECONDS_PER_DAY = 1000 * 60 * 60 * 24;
 const METADATA_KEY_PREFIX = '__onyx_meta_';
-
-/**
- * Represents the result of a storage cleanup operation.
- * @property cleanedKeys - An array of Onyx keys that were successfully cleaned/evicted.
- * @property timeElapsed - The time taken (in milliseconds) to perform the cleanup.
- * @property errors - An array of error messages encountered during the cleanup process.
- */
-type StorageCleanupResult = {
-    cleanedKeys: OnyxKey[];
-    timeElapsed: number;
-    errors: string[];
-};
-
-type CleanupExecutionResult = {
-    successfulKeys: OnyxKey[];
-    failedKeys: OnyxKey[];
-};
 
 class OnyxStorageManager {
     /**
@@ -42,7 +25,7 @@ class OnyxStorageManager {
      * List of keys that are eligible for eviction based on the current config.
      * Only these keys will be considered for automatic cleanup.
      */
-    private evictableKeys: string[] = [];
+    private evictableKeys: OnyxKey[] = [];
 
     /**
      * Indicates whether the storage manager has been initialized.
@@ -111,7 +94,7 @@ class OnyxStorageManager {
             });
     }
 
-    private initializeTracking(): Promise<void | void[]> {
+    private initializeTracking(): Promise<void> {
         Logger.logInfo('Initializing storage usage tracking...');
 
         return Storage.getAllKeys()
@@ -119,19 +102,20 @@ class OnyxStorageManager {
                 Logger.logInfo(`Found ${allKeys.length} keys in storage`);
                 return this.trackExistingKeys(allKeys);
             })
+            .then(() => undefined)
             .catch((error) => {
                 Logger.logAlert(`Failed to initialize storage tracking: ${error}`);
             });
     }
 
-    private trackExistingKeys(keys: OnyxKey[]): Promise<void[]> {
-        const dataKeys = keys.filter((key) => !key.startsWith('__onyx_meta_'));
+    private trackExistingKeys(keys: OnyxKey[]): Promise<void> {
+        const dataKeys = keys.filter((key) => !key.startsWith(METADATA_KEY_PREFIX));
         const evictableDataKeys = dataKeys.filter((key) => this.isKeyEvictable(key));
         Logger.logInfo(`[StorageManager] Filtering keys: ${dataKeys.length} total, ${evictableDataKeys.length} evictable`);
 
         const trackingPromises = evictableDataKeys.map((key) => this.initializeKeyTracking(key));
 
-        return Promise.all(trackingPromises);
+        return Promise.all(trackingPromises).then(() => undefined);
     }
 
     private initializeKeyTracking(key: OnyxKey): Promise<void> {
@@ -139,7 +123,7 @@ class OnyxStorageManager {
 
         return this.loadMetadata(key)
             .then((metadata) => {
-                const keyInfo = {
+                const keyInfo: StorageKeyInfo = {
                     key,
                     lastAccessed: metadata?.lastAccessed ?? now,
                     createdAt: metadata?.createdAt ?? now,
@@ -181,7 +165,7 @@ class OnyxStorageManager {
 
     private updateKeyInfo(key: OnyxKey, now: number, isEvictable: boolean, isNewKey = false): void {
         const existing = this.keyInfoMap.get(key);
-        const keyInfo = {
+        const keyInfo: StorageKeyInfo = {
             key,
             lastAccessed: now,
             createdAt: isNewKey ? now : existing?.createdAt || now,
@@ -190,7 +174,7 @@ class OnyxStorageManager {
         this.keyInfoMap.set(key, keyInfo);
 
         if (isEvictable) {
-            const metadata = {
+            const metadata: StorageMetadata = {
                 lastAccessed: now,
                 createdAt: keyInfo.createdAt,
             };
@@ -225,17 +209,15 @@ class OnyxStorageManager {
      * Updates the list of keys that are eligible for eviction.
      * @param keys - Array of Onyx keys or collection keys
      */
-    setEvictableKeys(keys: string[]): void {
+    setEvictableKeys(keys: OnyxKey[]): void {
         this.evictableKeys = keys;
     }
 
     private isKeyEvictable(key: OnyxKey): boolean {
         return this.evictableKeys.some((pattern) => {
-            // If pattern ends with underscore, treat it as a prefix pattern
             if (pattern.endsWith('_')) {
                 return key.startsWith(pattern);
             }
-            // Otherwise, exact match
             return key === pattern;
         });
     }

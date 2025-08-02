@@ -69,6 +69,23 @@ const DEFAULT_STORAGE_CONFIG: StorageUsageConfig = {
     evictableKeys: [],
 };
 
-export type {StorageUsageConfig, StorageKeyInfo, StorageMetadata};
+/**
+ * Represents the result of a storage cleanup operation.
+ * @property cleanedKeys - An array of Onyx keys that were successfully cleaned/evicted.
+ * @property timeElapsed - The time taken (in milliseconds) to perform the cleanup.
+ * @property errors - An array of error messages encountered during the cleanup process.
+ */
+type StorageCleanupResult = {
+    cleanedKeys: OnyxKey[];
+    timeElapsed: number;
+    errors: string[];
+};
+
+type CleanupExecutionResult = {
+    successfulKeys: OnyxKey[];
+    failedKeys: OnyxKey[];
+};
+
+export type {StorageUsageConfig, StorageKeyInfo, StorageMetadata, StorageCleanupResult, CleanupExecutionResult};
 
 export {DEFAULT_STORAGE_CONFIG};

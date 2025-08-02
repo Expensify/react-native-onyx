@@ -229,12 +229,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options
     return Storage.setItem(key, valueWithoutNestedNullValues)
         .catch((error) => OnyxUtils.evictStorageAndRetry(error, set, key, valueWithoutNestedNullValues))
         .then(() => {
-            try {
-                storageManager.trackKeySet(key);
-            } catch (error) {
-                Logger.logInfo(`Failed to track key set: ${error}`);
-            }
-
+            storageManager.trackKeySet(key);
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
             return updatePromise;
         });
@@ -286,14 +281,9 @@ function multiSet(data: OnyxMultiSetInput): Promise<void> {
     return Storage.multiSet(keyValuePairsToSet)
         .catch((error) => OnyxUtils.evictStorageAndRetry(error, multiSet, newData))
         .then(() => {
-            try {
-                keyValuePairsToSet.forEach(([key]) => {
-                    storageManager.trackKeySet(key);
-                });
-            } catch (error) {
-                Logger.logInfo(`Failed to track multiset keys: ${error}`);
-            }
-
+            keyValuePairsToSet.forEach(([key]) => {
+                storageManager.trackKeySet(key);
+            });
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MULTI_SET, undefined, newData);
             return Promise.all(updatePromises);
         })
@@ -380,11 +370,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
             }
 
             return OnyxMerge.applyMerge(key, existingValue, validChanges).then(({mergedValue, updatePromise}) => {
-                try {
-                    storageManager.trackKeySet(key);
-                } catch (error) {
-                    Logger.logInfo(`Failed to track merge key: ${error}`);
-                }
+                storageManager.trackKeySet(key);
                 OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, changes, mergedValue);
                 return updatePromise;
             });
