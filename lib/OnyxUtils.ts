@@ -1082,9 +1082,8 @@ function scheduleSubscriberUpdate<TKey extends OnyxKey>(
     previousValue: OnyxValue<TKey>,
     canUpdateSubscriber: (subscriber?: Mapping<OnyxKey>) => boolean = () => true,
 ): Promise<void> {
-    const promise = Promise.resolve().then(() => keyChanged(key, value, previousValue, canUpdateSubscriber, true, false));
-    batchUpdates(() => keyChanged(key, value, previousValue, canUpdateSubscriber, false, true));
-    return Promise.all([maybeFlushBatchUpdates(), promise]).then(() => undefined);
+    batchUpdates(() => keyChanged(key, value, previousValue, canUpdateSubscriber));
+    return maybeFlushBatchUpdates().then(() => undefined);
 }
 
 /**
@@ -1097,9 +1096,8 @@ function scheduleNotifyCollectionSubscribers<TKey extends OnyxKey>(
     value: OnyxCollection<KeyValueMapping[TKey]>,
     previousValue?: OnyxCollection<KeyValueMapping[TKey]>,
 ): Promise<void> {
-    const promise = Promise.resolve().then(() => keysChanged(key, value, previousValue, true, false));
-    batchUpdates(() => keysChanged(key, value, previousValue, false, true));
-    return Promise.all([maybeFlushBatchUpdates(), promise]).then(() => undefined);
+    batchUpdates(() => keysChanged(key, value, previousValue));
+    return maybeFlushBatchUpdates().then(() => undefined);
 }
 
 /**
