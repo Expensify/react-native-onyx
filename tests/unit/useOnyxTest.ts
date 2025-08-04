@@ -290,7 +290,8 @@ describe('useOnyx', () => {
             });
             expect(result.current[1].status).toEqual('loaded');
 
-            await act(async () => Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`, null));
+            Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`, null);
+            await act(async () => waitForPromisesToResolve());
 
             expect(result.current[0]).toEqual({
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: 'entry1_id',
@@ -660,7 +661,8 @@ describe('useOnyx', () => {
 
             expect(result1.current[0]).toBe('test');
 
-            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, null));
+            Onyx.set(ONYXKEYS.TEST_KEY, null);
+            await act(async () => waitForPromisesToResolve());
 
             expect(result1.current[0]).toBeUndefined();
             expect(logAlertFn).not.toBeCalled();
@@ -693,7 +695,8 @@ describe('useOnyx', () => {
 
             expect(result1.current[0]).toBe('test');
 
-            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, null));
+            Onyx.set(ONYXKEYS.TEST_KEY, null);
+            await act(async () => waitForPromisesToResolve());
 
             expect(result1.current[0]).toBeUndefined();
             expect(logAlertFn).toHaveBeenCalledTimes(2);
@@ -724,7 +727,8 @@ describe('useOnyx', () => {
 
             expect(result1.current[0]).toBe('test_changed');
 
-            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, null));
+            Onyx.set(ONYXKEYS.TEST_KEY, null);
+            await act(async () => waitForPromisesToResolve());
 
             expect(result1.current[0]).toBeUndefined();
             expect(logAlertFn).toHaveBeenCalledTimes(2);
@@ -752,7 +756,8 @@ describe('useOnyx', () => {
 
             expect(result1.current[0]).toBe('test_changed');
 
-            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, null));
+            Onyx.set(ONYXKEYS.TEST_KEY, null);
+            await act(async () => waitForPromisesToResolve());
 
             expect(result1.current[0]).toBe('undefined_changed');
             expect(logAlertFn).toHaveBeenCalledTimes(2);
