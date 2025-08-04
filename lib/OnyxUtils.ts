@@ -12,6 +12,7 @@ import * as PerformanceUtils from './PerformanceUtils';
 import * as Str from './Str';
 import unstable_batchedUpdates from './batch';
 import Storage from './storage';
+import * as CollectionKeyUtils from './CollectionKeyUtils';
 import type {
     CollectionKey,
     CollectionKeyBase,
@@ -152,6 +153,9 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
         acc.add(val);
         return acc;
     }, new Set<OnyxKey>());
+
+    // Initialize the shared collection key utility
+    CollectionKeyUtils.setCollectionKeys(onyxCollectionKeySet);
 
     // Set our default key states to use when initializing and clearing Onyx data
     defaultKeyStates = initialKeyStates;
@@ -458,11 +462,11 @@ function getCollectionKeys(): Set<OnyxKey> {
  * is associated with a collection of keys.
  */
 function isCollectionKey(key: OnyxKey): key is CollectionKeyBase {
-    return onyxCollectionKeySet.has(key);
+    return CollectionKeyUtils.isCollectionKey(key);
 }
 
 function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collectionKey: TCollectionKey, key: string): key is `${TCollectionKey}${string}` {
-    return key.startsWith(collectionKey) && key.length > collectionKey.length;
+    return CollectionKeyUtils.isCollectionMemberKey(collectionKey, key);
 }
 
 /**
@@ -493,7 +497,7 @@ function splitCollectionMemberKey<TKey extends CollectionKey, CollectionKeyType 
  * or if the provided key is a collection member key (in case our configured key is a "collection key")
  */
 function isKeyMatch(configKey: OnyxKey, key: OnyxKey): boolean {
-    return isCollectionKey(configKey) ? Str.startsWith(key, configKey) : configKey === key;
+    return CollectionKeyUtils.isKeyMatch(configKey, key);
 }
 
 /**
@@ -509,24 +513,7 @@ function isKeyMatch(configKey: OnyxKey, key: OnyxKey): boolean {
  * @returns The plain collection key or throws an Error if the key is not a collection one.
  */
 function getCollectionKey(key: CollectionKey): string {
-    // Start by finding the position of the last underscore in the string
-    let lastUnderscoreIndex = key.lastIndexOf('_');
-
-    // Iterate backwards to find the longest key that ends with '_'
-    while (lastUnderscoreIndex > 0) {
-        const possibleKey = key.slice(0, lastUnderscoreIndex + 1);
-
-        // Check if the substring is a key in the Set
-        if (isCollectionKey(possibleKey)) {
-            // Return the matching key and the rest of the string
-            return possibleKey;
-        }
-
-        // Move to the next underscore to check smaller possible keys
-        lastUnderscoreIndex = key.lastIndexOf('_', lastUnderscoreIndex - 1);
-    }
-
-    throw new Error(`Invalid '${key}' key provided, only collection keys are allowed.`);
+    return CollectionKeyUtils.getCollectionKey(key);
 }
 
 /**
