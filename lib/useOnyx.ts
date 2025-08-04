@@ -205,7 +205,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
         // Check if we have any cache for this Onyx key
         // Don't use cache for first connection with initWithStoredValues: false
-        if (!(isFirstConnectionRef.current && options?.initWithStoredValues === false)) {
+        // Also don't use cache during active data updates (when shouldGetCachedValueRef is true)
+        if (!(isFirstConnectionRef.current && options?.initWithStoredValues === false) && !shouldGetCachedValueRef.current) {
             const cachedResult = onyxSnapshotCache.getCachedResult(keyStr, selectorKey);
             if (cachedResult !== undefined) {
                 resultRef.current = cachedResult;

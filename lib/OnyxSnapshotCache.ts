@@ -68,10 +68,22 @@ class OnyxSnapshotCache {
     }
 
     /**
-     * O(1) cache invalidation - just delete the entire cache for this key
+     * O(1) cache invalidation - delete cache for this key and related collection keys
      */
     invalidateForKey(keyToInvalidate: string): void {
+        // Always invalidate the exact key
         this.snapshotCache.delete(keyToInvalidate);
+        
+        // For collection member keys, also invalidate the parent collection
+        if (keyToInvalidate.includes('_')) {
+            const baseKey = keyToInvalidate.split('_')[0];
+            // Invalidate all related collection members
+            for (const [cacheKey] of this.snapshotCache) {
+                if (cacheKey.startsWith(baseKey + '_') || cacheKey === baseKey) {
+                    this.snapshotCache.delete(cacheKey);
+                }
+            }
+        }
     }
 
     /**
