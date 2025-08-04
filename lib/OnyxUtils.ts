@@ -39,7 +39,6 @@ import type {DeferredTask} from './createDeferredTask';
 import createDeferredTask from './createDeferredTask';
 import * as GlobalSettings from './GlobalSettings';
 import decorateWithMetrics from './metrics';
-import storageManager from './OnyxStorageManager';
 import type {StorageKeyValuePair} from './storage/providers/types';
 import logMessages from './logMessages';
 
@@ -1110,10 +1109,7 @@ function remove<TKey extends OnyxKey>(key: TKey): Promise<void> {
     const prevValue = cache.get(key, false) as OnyxValue<TKey>;
     cache.drop(key);
     scheduleSubscriberUpdate(key, undefined as OnyxValue<TKey>, prevValue);
-    return Storage.removeItem(key).then(() => {
-        storageManager.trackKeyRemoval(key);
-        return undefined;
-    });
+    return Storage.removeItem(key).then(() => undefined);
 }
 
 function reportStorageQuota(): Promise<void> {

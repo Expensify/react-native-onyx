@@ -208,7 +208,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options
     // If the change is null, we can just delete the key.
     // Therefore, we don't need to further broadcast and update the value so we can return early.
     if (value === null) {
-        OnyxUtils.remove(key);
+        OnyxUtils.remove(key).then(() => storageManager.trackKeyRemoval(key));
         OnyxUtils.logKeyRemoved(OnyxUtils.METHOD.SET, key);
         return Promise.resolve();
     }
@@ -364,7 +364,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
             // If the last change is null, we can just delete the key.
             // Therefore, we don't need to further broadcast and update the value so we can return early.
             if (validChanges.at(-1) === null) {
-                OnyxUtils.remove(key);
+                OnyxUtils.remove(key).then(() => storageManager.trackKeyRemoval(key));
                 OnyxUtils.logKeyRemoved(OnyxUtils.METHOD.MERGE, key);
                 return Promise.resolve();
             }

@@ -4,6 +4,7 @@ import Storage from '../storage';
 import * as Logger from '../Logger';
 import type {StorageUsageConfig, StorageKeyInfo, StorageMetadata, StorageCleanupResult, CleanupExecutionResult} from './types';
 import {DEFAULT_STORAGE_CONFIG} from './types';
+import OnyxUtils from '../OnyxUtils';
 
 const MILLISECONDS_PER_DAY = 1000 * 60 * 60 * 24;
 const METADATA_KEY_PREFIX = '__onyx_meta_';
@@ -214,12 +215,7 @@ class OnyxStorageManager {
     }
 
     private isKeyEvictable(key: OnyxKey): boolean {
-        return this.evictableKeys.some((pattern) => {
-            if (pattern.endsWith('_')) {
-                return key.startsWith(pattern);
-            }
-            return key === pattern;
-        });
+        return this.evictableKeys.some((pattern) => key === pattern || OnyxUtils.isCollectionMemberKey(pattern, key));
     }
 
     private getEvictableKeysCount(): number {
