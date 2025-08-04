@@ -132,6 +132,30 @@ describe('useOnyx', () => {
     });
 
     describe('misc', () => {
+        it('should initially return loading state while loading non-existent key, and then return `undefined` and loaded state', async () => {
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loading');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should initially return loading state while loading non-existent collection key, and then return `undefined` and loaded state', async () => {
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.COLLECTION.TEST_KEY));
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loading');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
         it('should return value and loaded state when loading cached key', async () => {
             Onyx.set(ONYXKEYS.TEST_KEY, 'test');
 
