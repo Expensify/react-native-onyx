@@ -2,7 +2,6 @@ import bindAll from 'lodash/bindAll';
 import type {OnyxKey} from '../types';
 import Storage from '../storage';
 import * as Logger from '../Logger';
-import {isCollectionKey, isKeyMatch} from '../CollectionKeyUtils';
 import type {StorageUsageConfig, StorageKeyInfo, StorageMetadata, StorageCleanupResult, CleanupExecutionResult} from './types';
 import {DEFAULT_STORAGE_CONFIG} from './types';
 
@@ -216,7 +215,10 @@ class OnyxStorageManager {
 
     private isKeyEvictable(key: OnyxKey): boolean {
         return this.evictableKeys.some((pattern) => {
-            return isKeyMatch(pattern, key);
+            if (pattern.endsWith('_')) {
+                return key.startsWith(pattern);
+            }
+            return key === pattern;
         });
     }
 

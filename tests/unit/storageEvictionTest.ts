@@ -2,7 +2,6 @@ import {jest} from '@jest/globals';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import Storage from '../../lib/storage';
 import {OnyxStorageManager} from '../../lib/OnyxStorageManager';
-import * as CollectionKeyUtils from '../../lib/CollectionKeyUtils';
 import type {StorageUsageConfig, StorageMetadata} from '../../lib/OnyxStorageManager/types';
 
 // Mock the Storage module
@@ -300,8 +299,6 @@ describe('Storage Eviction Tests', () => {
         });
 
         it('should support key patterns with underscore suffix', async () => {
-            CollectionKeyUtils.setCollectionKeys(new Set(['temp_']));
-
             const config: StorageUsageConfig = {
                 enabled: true,
                 evictableKeys: ['temp_'], // Pattern: keys starting with 'temp_'
