@@ -4,7 +4,6 @@ import Storage from '../../lib/storage';
 import {OnyxStorageManager} from '../../lib/OnyxStorageManager';
 import type {StorageUsageConfig, StorageMetadata} from '../../lib/OnyxStorageManager/types';
 
-// Mock the Storage module
 const storageSetItemSpy = jest.spyOn(Storage, 'setItem').mockImplementation(() => Promise.resolve());
 const storageGetItemSpy = jest.spyOn(Storage, 'getItem').mockImplementation(() => Promise.resolve(null));
 const storageRemoveItemSpy = jest.spyOn(Storage, 'removeItem').mockImplementation(() => Promise.resolve());
@@ -15,13 +14,10 @@ describe('Storage Eviction Tests', () => {
     const originalDateNow = Date.now;
 
     beforeEach(() => {
-        // Clear all mocks
         jest.clearAllMocks();
 
-        // Reset Date.now to current time
         Date.now = originalDateNow;
 
-        // Create a fresh instance for each test
         storageManager = new OnyxStorageManager();
     });
 
@@ -32,8 +28,6 @@ describe('Storage Eviction Tests', () => {
 
     describe('Metadata Creation', () => {
         it('should create metadata when key is accessed for the first time', async () => {
-            // Test scenario 1: If there is no metadata key in storage it should be created when key was accessed
-
             const config: StorageUsageConfig = {
                 enabled: true,
                 evictableKeys: ['test_key'],
@@ -42,20 +36,17 @@ describe('Storage Eviction Tests', () => {
                 cleanupInterval: 5 * 60 * 1000,
             };
 
-            // Mock that the key exists in storage but no metadata
             storageGetAllKeysSpy.mockResolvedValue(['test_key']);
             storageGetItemSpy.mockImplementation((key) => {
                 if (key === '__onyx_meta_test_key') {
-                    return Promise.resolve(null); // No metadata exists
+                    return Promise.resolve(null);
                 }
-                return Promise.resolve('some_value'); // Key has value
+                return Promise.resolve('some_value');
             });
 
-            // Initialize the storage manager
             await storageManager.initialize(config);
             await waitForPromisesToResolve();
 
-            // Verify metadata was created for the evictable key
             expect(storageSetItemSpy).toHaveBeenCalledWith(
                 '__onyx_meta_test_key',
                 expect.objectContaining({
@@ -74,7 +65,6 @@ describe('Storage Eviction Tests', () => {
                 cleanupInterval: 5 * 60 * 1000,
             };
 
-            // Initialize with existing metadata
             const existingMetadata: StorageMetadata = {
                 lastAccessed: Date.now() - 1000,
                 createdAt: Date.now() - 10000,
@@ -90,19 +80,17 @@ describe('Storage Eviction Tests', () => {
             await storageManager.initialize(config);
             await waitForPromisesToResolve();
 
-            // Track a key access
             const accessTime = Date.now();
             Date.now = jest.fn(() => accessTime);
 
             storageManager.trackKeySet('test_key');
             await waitForPromisesToResolve();
 
-            // Verify metadata was updated with new access
             expect(storageSetItemSpy).toHaveBeenCalledWith(
                 '__onyx_meta_test_key',
                 expect.objectContaining({
                     lastAccessed: accessTime,
-                    createdAt: existingMetadata.createdAt, // Should remain same
+                    createdAt: existingMetadata.createdAt,
                 }),
             );
         });
@@ -173,10 +161,8 @@ describe('Storage Eviction Tests', () => {
             await storageManager.initialize(config);
             await waitForPromisesToResolve();
 
-            // Perform cleanup
             const result = await storageManager.performCleanup();
 
-            // Verify the recent key was NOT removed
             expect(result.cleanedKeys).not.toContain('recent_key');
             expect(storageRemoveItemSpy).not.toHaveBeenCalledWith('recent_key');
         });
@@ -184,13 +170,11 @@ describe('Storage Eviction Tests', () => {
 
     describe('Automatic Cleanup - Age', () => {
         it('should automatically clean up items older than maxAgeDays regardless of access', async () => {
-            // Test scenario 3: When the item is longer in storage than provided in the config it should be removed automatically
-
             const config: StorageUsageConfig = {
                 enabled: true,
                 evictableKeys: ['very_old_key'],
                 maxIdleDays: 7,
-                maxAgeDays: 30, // 30 days max age
+                maxAgeDays: 30,
                 cleanupInterval: 5 * 60 * 1000,
             };
 
@@ -214,7 +198,6 @@ describe('Storage Eviction Tests', () => {
             await storageManager.initialize(config);
             await waitForPromisesToResolve();
 
-            // Perform cleanup
             const result = await storageManager.performCleanup();
 
             // Verify the old key was removed despite recent access
@@ -249,7 +232,6 @@ describe('Storage Eviction Tests', () => {
             await storageManager.initialize(config);
             await waitForPromisesToResolve();
 
-            // Perform cleanup
             const result = await storageManager.performCleanup();
 
             // Verify the new key was NOT removed
@@ -260,8 +242,6 @@ describe('Storage Eviction Tests', () => {
 
     describe('Evictable Keys Filter', () => {
         it('should only remove items which keys are added to evictableKeys', async () => {
-            // Test scenario 4: Only remove items which keys are added to evictableKeys
-
             const config: StorageUsageConfig = {
                 enabled: true,
                 evictableKeys: ['evictable_key'], // Only this key is evictable
@@ -288,7 +268,6 @@ describe('Storage Eviction Tests', () => {
             await storageManager.initialize(config);
             await waitForPromisesToResolve();
 
-            // Perform cleanup
             const result = await storageManager.performCleanup();
 
             // Verify only the evictable key was removed
@@ -301,7 +280,7 @@ describe('Storage Eviction Tests', () => {
         it('should support key patterns with underscore suffix', async () => {
             const config: StorageUsageConfig = {
                 enabled: true,
-                evictableKeys: ['temp_'], // Pattern: keys starting with 'temp_'
+                evictableKeys: ['temp_'],
                 maxIdleDays: 1,
                 maxAgeDays: 1,
                 cleanupInterval: 5 * 60 * 1000,
@@ -324,7 +303,6 @@ describe('Storage Eviction Tests', () => {
             await storageManager.initialize(config);
             await waitForPromisesToResolve();
 
-            // Perform cleanup
             const result = await storageManager.performCleanup();
 
             // Verify only temp_ prefixed keys were removed
@@ -336,7 +314,7 @@ describe('Storage Eviction Tests', () => {
         it('should not evict anything when evictableKeys is empty', async () => {
             const config: StorageUsageConfig = {
                 enabled: true,
-                evictableKeys: [], // No keys are evictable
+                evictableKeys: [],
                 maxIdleDays: 1,
                 maxAgeDays: 1,
                 cleanupInterval: 5 * 60 * 1000,
@@ -359,7 +337,6 @@ describe('Storage Eviction Tests', () => {
             await storageManager.initialize(config);
             await waitForPromisesToResolve();
 
-            // Perform cleanup
             const result = await storageManager.performCleanup();
 
             // Verify no keys were removed
@@ -395,7 +372,6 @@ describe('Storage Eviction Tests', () => {
             await storageManager.initialize(config);
             await waitForPromisesToResolve();
 
-            // Perform cleanup
             const result = await storageManager.performCleanup();
 
             // Verify no cleanup was performed
