@@ -165,24 +165,25 @@ class OnyxStorageManager {
     }
 
     private updateKeyInfo(key: OnyxKey, now: number, isEvictable: boolean, isNewKey = false): void {
-        const existing = this.keyInfoMap.get(key);
+        if (!isEvictable) {
+            return;
+        }
+
         const keyInfo: StorageKeyInfo = {
             key,
             lastAccessed: now,
-            createdAt: isNewKey ? now : existing?.createdAt || now,
+            createdAt: isNewKey ? now : this.keyInfoMap.get(key)?.createdAt ?? now,
         };
 
         this.keyInfoMap.set(key, keyInfo);
 
-        if (isEvictable) {
-            const metadata: StorageMetadata = {
-                lastAccessed: now,
-                createdAt: keyInfo.createdAt,
-            };
-            this.saveMetadata(key, metadata).catch((error) => {
-                Logger.logInfo(`Failed to save metadata for ${key}: ${error}`);
-            });
-        }
+        const metadata: StorageMetadata = {
+            lastAccessed: now,
+            createdAt: keyInfo.createdAt,
+        };
+        this.saveMetadata(key, metadata).catch((error) => {
+            Logger.logInfo(`Failed to save metadata for ${key}: ${error}`);
+        });
     }
 
     /**
@@ -195,10 +196,14 @@ class OnyxStorageManager {
             return;
         }
 
+        if (!this.isKeyEvictable(key)) {
+            return;
+        }
+
         const removedKeyInfo = this.keyInfoMap.get(key);
         this.keyInfoMap.delete(key);
 
-        if (removedKeyInfo && this.isKeyEvictable(key)) {
+        if (removedKeyInfo) {
             const metadataKey = this.getMetadataKey(key);
             Storage.removeItem(metadataKey).catch((error) => {
                 Logger.logInfo(`Failed to remove metadata for ${key}: ${error}`);
