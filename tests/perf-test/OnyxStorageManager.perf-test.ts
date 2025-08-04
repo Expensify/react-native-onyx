@@ -1,7 +1,6 @@
 import {measureAsyncFunction, measureFunction} from 'reassure';
 import Onyx from '../../lib';
 import storageManager from '../../lib/OnyxStorageManager';
-import type {StorageUsageConfig} from '../../lib/OnyxStorageManager/types';
 import {getRandomReportActions} from '../utils/collections/reportActions';
 import type {OnyxKey} from '../../lib/types';
 
