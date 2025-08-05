@@ -75,30 +75,43 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     const connectionRef = useRef<Connection | null>(null);
     const previousKey = usePrevious(key);
 
+    const currentDependenciesRef = useRef(dependencies);
+    currentDependenciesRef.current = dependencies;
+
+    const currentSelectorRef = useRef(options?.selector);
+    currentSelectorRef.current = options?.selector;
+
     // Create memoized version of selector for performance
     const memoizedSelector = useMemo(() => {
         if (!options?.selector) return null;
 
         let lastInput: OnyxValue<TKey> | undefined;
         let lastOutput: TReturnValue;
+        let lastDependencies: DependencyList = [];
         let hasComputed = false;
 
         return (input: OnyxValue<TKey> | undefined): TReturnValue => {
-            // Always recompute when input changes
-            if (!hasComputed || lastInput !== input) {
-                const newOutput = options.selector!(input);
+            const currentDependencies = currentDependenciesRef.current;
+            const currentSelector = currentSelectorRef.current;
+
+            // Recompute if input changed, dependencies changed, or first time
+            const dependenciesChanged = !deepEqual(lastDependencies, currentDependencies);
+            if (!hasComputed || lastInput !== input || dependenciesChanged) {
+                const newOutput = currentSelector!(input);
 
                 // Deep equality mode: only update if output actually changed
-                if (!hasComputed || !deepEqual(lastOutput, newOutput)) {
+                if (!hasComputed || !deepEqual(lastOutput, newOutput) || dependenciesChanged) {
                     lastInput = input;
                     lastOutput = newOutput;
+                    lastDependencies = [...currentDependencies];
                     hasComputed = true;
                 }
             }
 
             return lastOutput;
         };
-    }, [options?.selector]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [options?.selector, ...dependencies]);
 
     // Stores the previous cached value as it's necessary to compare with the new value in `getSnapshot()`.
     // We initialize it to `null` to simulate that we don't have any value from cache yet.
