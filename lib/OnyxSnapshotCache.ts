@@ -39,9 +39,9 @@ class OnyxSnapshotCache {
     }
 
     /**
-     * Fast cache key generation for selector/options combination
+     * Fast cache key generation for useOnyx options combination
      */
-    generateSelectorKey<TKey extends OnyxKey, TReturnValue>(options?: UseOnyxOptions<TKey, TReturnValue>): string {
+    generateCacheKey<TKey extends OnyxKey, TReturnValue>(options?: UseOnyxOptions<TKey, TReturnValue>): string {
         const selectorId = options?.selector ? this.getSelectorId(options.selector) : 'no_selector';
         // Create options hash without expensive JSON.stringify
         const initWithStoredValues = options?.initWithStoredValues ?? true;
@@ -51,21 +51,21 @@ class OnyxSnapshotCache {
     }
 
     /**
-     * Get cached snapshot result for a key and selector combination
+     * Get cached snapshot result for a key and cache key combination
      */
-    getCachedResult(key: string, selectorKey: string): any {
+    getCachedResult(key: string, cacheKey: string): any {
         const keyCache = this.snapshotCache.get(key);
-        return keyCache?.get(selectorKey);
+        return keyCache?.get(cacheKey);
     }
 
     /**
-     * Set cached snapshot result for a key and selector combination
+     * Set cached snapshot result for a key and cache key combination
      */
-    setCachedResult(key: string, selectorKey: string, result: any): void {
+    setCachedResult(key: string, cacheKey: string, result: any): void {
         if (!this.snapshotCache.has(key)) {
             this.snapshotCache.set(key, new Map());
         }
-        this.snapshotCache.get(key)!.set(selectorKey, result);
+        this.snapshotCache.get(key)!.set(cacheKey, result);
     }
 
     /**
