@@ -157,10 +157,22 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         );
     }, [previousKey, key, options?.allowDynamicKey]);
 
+    // Track previous dependencies to prevent infinite loops
+    const previousDependenciesRef = useRef<DependencyList>([]);
+
     useEffect(() => {
         // This effect will only run if the `dependencies` array changes. If it changes it will force the hook
         // to trigger a `getSnapshot()` update by calling the stored `onStoreChange()` function reference, thus
         // re-running the hook and returning the latest value to the consumer.
+
+        // Deep equality check to prevent infinite loops when dependencies array reference changes
+        // but content remains the same
+        if (deepEqual(previousDependenciesRef.current, dependencies)) {
+            return;
+        }
+
+        previousDependenciesRef.current = dependencies;
+
         if (connectionRef.current === null || isConnectingRef.current || !onStoreChangeFnRef.current) {
             return;
         }
