@@ -110,8 +110,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
             return lastOutput;
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [options?.selector, ...dependencies]);
+    }, [options?.selector]);
 
     // Stores the previous cached value as it's necessary to compare with the new value in `getSnapshot()`.
     // We initialize it to `null` to simulate that we don't have any value from cache yet.
