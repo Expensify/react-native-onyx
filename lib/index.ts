@@ -23,9 +23,10 @@ import useOnyx from './useOnyx';
 import withOnyx from './withOnyx';
 import type {WithOnyxState} from './withOnyx/types';
 import type {OnyxSQLiteKeyValuePair} from './storage/providers/SQLiteProvider';
+import {enableStorageEviction, disableStorageEviction, isStorageEvictionEnabled} from './OnyxStorageManager';
 
 export default Onyx;
-export {useOnyx, withOnyx};
+export {useOnyx, withOnyx, enableStorageEviction, disableStorageEviction, isStorageEvictionEnabled};
 export type {
     ConnectOptions,
     CustomTypeOptions,

@@ -389,31 +389,41 @@ If a platform needs to use a separate library (like using MMVK for react-native)
 
 [Docs](./API.md)
 
-# Cache Eviction
+# Eviction Systems
 
-Different platforms come with varying storage capacities and Onyx has a way to gracefully fail when those storage limits are encountered. When Onyx fails to set or modify a key the following steps are taken:
-1. Onyx looks at a list of recently accessed keys (access is defined as subscribed to or modified) and locates the key that was least recently accessed
-2. It then deletes this key and retries the original operation
+Onyx provides two different eviction systems to manage memory and storage efficiently:
 
-By default, Onyx will not evict anything from storage and will presume all keys are "unsafe" to remove unless explicitly told otherwise.
+## Cache Eviction
+
+Cache eviction manages **in-memory** data when the cache reaches its configured size limit. This system removes data from memory (cache) but keeps it in persistent storage.
+
+**How it works:**
+1. When cache size exceeds `maxCachedKeysCount`, `removeLeastRecentlyUsedKeys()` is triggered
+2. It calculates how many keys need to be removed to stay within the limit
+3. It iterates through the least recently accessed keys (in access order)
+4. It removes evictable keys from memory cache, preserving the most recently accessed key
+5. The data remains in persistent storage and can be reloaded when needed
 
 **To flag a key as safe for removal:**
 - Add the key to the `evictableKeys` option in `Onyx.init(options)`
 - Implement `canEvict` in the Onyx config for each component subscribing to a key
 - The key will only be deleted when all subscribers return `true` for `canEvict`
 
-e.g.
+
+**Configuration:**
 ```js
 Onyx.init({
     evictableKeys: [ONYXKEYS.COLLECTION.REPORT_ACTIONS],
+    maxCachedKeysCount: 10000, // Maximum number of keys to keep in memory
 });
 ```
 
+**Component-level control:**
 ```js
 const ReportActionsView = ({reportID, isActiveReport}) => {
     const [reportActions] = useOnyx(
         `${ONYXKEYS.COLLECTION.REPORT_ACTIONS}${reportID}_`,
-        {canEvict: () => !isActiveReport}
+        {canEvict: () => !isActiveReport} 
     );
 
     return (
@@ -422,9 +432,54 @@ const ReportActionsView = ({reportID, isActiveReport}) => {
         </View>
     );
 };
-
-export default ReportActionsView;
 ```
+## Storage Eviction
+
+Storage eviction manages **persistent storage** by automatically removing old or unused data from disk based on age and usage patterns. This system permanently removes data from both memory and storage to free up disk space.
+
+**How it works:**
+1. Tracks when keys are accessed and created
+2. Runs periodic cleanup based on configured intervals
+3. Removes keys that exceed age limits or have been idle too long
+4. Only removes keys explicitly marked as evictable
+5. Permanently deletes data from both cache and persistent storage
+
+**Configuration:**
+```js
+import {enableStorageEviction, disableStorageEviction, isStorageEvictionEnabled} from 'react-native-onyx';
+
+Onyx.init({
+    storageEvictionConfig: {
+        enabled: true,
+        maxIdleDays: 7,        // Remove keys unused for 7 days
+        maxAgeDays: 30,        // Remove keys older than 30 days
+        cleanupInterval: 300000, // Check every 5 minutes
+        evictableKeys: [ONYXKEYS.COLLECTION.REPORT_ACTIONS],
+    },
+});
+
+// Enable storage eviction
+enableStorageEviction();
+
+// Disable storage eviction
+disableStorageEviction();
+
+// Check if storage eviction is enabled
+if (isStorageEvictionEnabled()) {
+    console.log('Storage eviction is active');
+}
+
+## Key Differences
+
+| Feature | Cache Eviction | Storage Eviction |
+|---------|----------------|------------------|
+| **Target** | In-memory cache | Persistent storage |
+| **Data Recovery** | Data remains in storage, can be reloaded | Data is permanently deleted |
+| **Purpose** | Memory management | Disk space management |
+| **Trigger** | Cache size limits | Time-based (age/idle time) |
+| **Frequency** | On-demand when needed | Periodic background process |
+| **Configuration** | `evictableKeys`, `maxCachedKeysCount` | `storageEvictionConfig` |
+| **Reversible** | Yes, data can be reloaded | No, data is permanently removed |
 
 # Benchmarks
 
