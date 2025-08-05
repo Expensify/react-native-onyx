@@ -536,6 +536,222 @@ describe('useOnyx', () => {
             expect(result.current[0]).not.toBe(firstResult);
             expect(result.current[0]).toBe(10);
         });
+
+        it('should recompute selector when dependencies change even if input data stays the same', async () => {
+            const testCollection = {
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}1`]: {id: '1', value: 'item1'},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}2`]: {id: '2', value: 'item2'},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}3`]: {id: '3', value: 'item3'},
+            };
+
+            await act(async () => Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, testCollection as GenericCollection));
+
+            let filterIds = ['1'];
+            let selectorCallCount = 0;
+
+            const {result, rerender} = renderHook(() =>
+                useOnyx(
+                    ONYXKEYS.COLLECTION.TEST_KEY,
+                    {
+                        selector: (collection) => {
+                            selectorCallCount++;
+                            return filterIds.map((id) => (collection as OnyxCollection<GenericCollection>)?.[`${ONYXKEYS.COLLECTION.TEST_KEY}${id}`]).filter(Boolean);
+                        },
+                    },
+                    [filterIds],
+                ),
+            );
+
+            await act(async () => waitForPromisesToResolve());
+
+            // Record count after initial stabilization
+            const initialCallCount = selectorCallCount;
+            const initialResult = result.current[0];
+
+            // Should return item with id '1'
+            expect(initialResult).toEqual([{id: '1', value: 'item1'}]);
+
+            // Change dependencies without changing underlying data
+            await act(async () => {
+                filterIds = ['1', '2'];
+                rerender(ONYXKEYS.COLLECTION.TEST_KEY);
+            });
+
+            // Selector should recompute and return items with id '1' and '2'
+            expect(result.current[0]).toEqual([
+                {id: '1', value: 'item1'},
+                {id: '2', value: 'item2'},
+            ]);
+            expect(selectorCallCount).toBeGreaterThan(initialCallCount);
+
+            // Record count after first dependency change
+            const firstChangeCallCount = selectorCallCount;
+
+            // Change dependencies again
+            await act(async () => {
+                filterIds = ['2', '3'];
+                rerender(ONYXKEYS.COLLECTION.TEST_KEY);
+            });
+
+            // Selector should recompute and return items with id '2' and '3'
+            expect(result.current[0]).toEqual([
+                {id: '2', value: 'item2'},
+                {id: '3', value: 'item3'},
+            ]);
+            expect(selectorCallCount).toBeGreaterThan(firstChangeCallCount);
+        });
+
+        it('should handle complex dependency scenarios with multiple values', async () => {
+            type TestItem = {id: string; category: string; priority: number};
+            const testData = {
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}item1`]: {id: 'item1', category: 'A', priority: 1},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}item2`]: {id: 'item2', category: 'B', priority: 2},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}item3`]: {id: 'item3', category: 'A', priority: 3},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}item4`]: {id: 'item4', category: 'B', priority: 4},
+            };
+
+            await act(async () => Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, testData as GenericCollection));
+
+            let categoryFilter = 'A';
+            let sortAscending = true;
+
+            const {result, rerender} = renderHook(() =>
+                useOnyx(
+                    ONYXKEYS.COLLECTION.TEST_KEY,
+                    {
+                        selector: (collection) => {
+                            const typedCollection = collection as OnyxCollection<TestItem>;
+                            if (!typedCollection) return [];
+
+                            const filtered = Object.values(typedCollection).filter((item) => item?.category === categoryFilter);
+
+                            return filtered.sort((a, b) => (sortAscending ? (a?.priority ?? 0) - (b?.priority ?? 0) : (b?.priority ?? 0) - (a?.priority ?? 0)));
+                        },
+                    },
+                    [categoryFilter, sortAscending],
+                ),
+            );
+
+            await act(async () => waitForPromisesToResolve());
+
+            // Should return category A items sorted ascending
+            expect(result.current[0]).toEqual([
+                {id: 'item1', category: 'A', priority: 1},
+                {id: 'item3', category: 'A', priority: 3},
+            ]);
+
+            // Change sort order only
+            await act(async () => {
+                sortAscending = false;
+                rerender(ONYXKEYS.COLLECTION.TEST_KEY);
+            });
+
+            // Should return category A items sorted descending
+            expect(result.current[0]).toEqual([
+                {id: 'item3', category: 'A', priority: 3},
+                {id: 'item1', category: 'A', priority: 1},
+            ]);
+
+            // Change category filter
+            await act(async () => {
+                categoryFilter = 'B';
+                rerender(ONYXKEYS.COLLECTION.TEST_KEY);
+            });
+
+            // Should return category B items sorted descending
+            expect(result.current[0]).toEqual([
+                {id: 'item4', category: 'B', priority: 4},
+                {id: 'item2', category: 'B', priority: 2},
+            ]);
+        });
+
+        it('should not trigger unnecessary recomputations when dependencies remain the same', async () => {
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, {value: 'test'}));
+
+            const dependencies = ['constant'];
+            let selectorCallCount = 0;
+
+            const {result, rerender} = renderHook(() =>
+                useOnyx(
+                    ONYXKEYS.TEST_KEY,
+                    {
+                        selector: (data) => {
+                            selectorCallCount++;
+                            return `${dependencies.join(',')}:${(data as {value?: string})?.value}`;
+                        },
+                    },
+                    dependencies,
+                ),
+            );
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBe('constant:test');
+            expect(selectorCallCount).toBe(1);
+
+            // Force rerender without changing dependencies
+            await act(async () => {
+                rerender(ONYXKEYS.COLLECTION.TEST_KEY);
+            });
+
+            // Selector should not recompute since dependencies haven't changed
+            expect(result.current[0]).toBe('constant:test');
+            expect(selectorCallCount).toBe(1);
+
+            // Update underlying data
+            await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, {value: 'updated'}));
+
+            // Selector should recompute due to data change
+            expect(result.current[0]).toBe('constant:updated');
+            expect(selectorCallCount).toBe(2);
+        });
+
+        it('should handle dependencies with deep equality changes', async () => {
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, {items: ['a', 'b', 'c']}));
+
+            let config = {includeItems: ['a', 'b']};
+            let selectorCallCount = 0;
+
+            const {result, rerender} = renderHook(() =>
+                useOnyx(
+                    ONYXKEYS.TEST_KEY,
+                    {
+                        selector: (data) => {
+                            selectorCallCount++;
+                            const typedData = data as {items?: string[]};
+                            if (!typedData?.items) return [];
+                            return typedData.items.filter((item: string) => config.includeItems.includes(item));
+                        },
+                    },
+                    [config],
+                ),
+            );
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual(['a', 'b']);
+            expect(selectorCallCount).toBe(1);
+
+            // Change config to new object with same content
+            await act(async () => {
+                config = {includeItems: ['a', 'b']};
+                rerender(ONYXKEYS.COLLECTION.TEST_KEY);
+            });
+
+            // Should not recompute since deep equality shows no change
+            expect(result.current[0]).toEqual(['a', 'b']);
+            expect(selectorCallCount).toBe(1);
+
+            // Change config content
+            await act(async () => {
+                config = {includeItems: ['b', 'c']};
+                rerender(ONYXKEYS.COLLECTION.TEST_KEY);
+            });
+
+            // Should recompute due to content change
+            expect(result.current[0]).toEqual(['b', 'c']);
+            expect(selectorCallCount).toBe(2);
+        });
     });
 
     describe('allowStaleData', () => {
