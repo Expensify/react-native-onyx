@@ -1377,9 +1377,7 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
             // since there are none matched. In withOnyx() we wait for all connected keys to return a value before rendering the child
             // component. This null value will be filtered out so that the connected component can utilize defaultProps.
             if (matchingKeys.length === 0) {
-                if (mapping.key && !isCollectionKey(mapping.key)) {
-                    cache.addNullishStorageKey(mapping.key);
-                }
+                cache.addNullishStorageKey(mapping.key);
 
                 // Here we cannot use batching because the nullish value is expected to be set immediately for default props
                 // or they will be undefined.
