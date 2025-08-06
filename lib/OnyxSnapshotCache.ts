@@ -17,15 +17,22 @@ class OnyxSnapshotCache {
      */
     private selectorIdMap: Map<UseOnyxSelector<any, any>, string>;
 
-    /**
-     * Counter for generating unique selector IDs
-     */
-    private selectorCounter: number;
-
     constructor() {
         this.snapshotCache = new Map();
         this.selectorIdMap = new Map();
-        this.selectorCounter = 0;
+    }
+
+    /**
+     * Hash string to generate deterministic ID
+     */
+    private hashString(str: string): string {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = (hash << 5) - hash + char;
+            hash = hash & hash; // Convert to 32-bit integer
+        }
+        return Math.abs(hash).toString(36);
     }
 
     /**
@@ -33,7 +40,11 @@ class OnyxSnapshotCache {
      */
     getSelectorId(selector: UseOnyxSelector<any, any>): string {
         if (!this.selectorIdMap.has(selector)) {
-            this.selectorIdMap.set(selector, `selector_${++this.selectorCounter}`);
+            const funcStr = selector.toString();
+            const funcName = selector.name || 'anonymous';
+            const hash = this.hashString(funcStr);
+            const id = `${funcName}_${hash}`;
+            this.selectorIdMap.set(selector, id);
         }
         return this.selectorIdMap.get(selector)!;
     }
@@ -99,7 +110,6 @@ class OnyxSnapshotCache {
      */
     clearSelectorIds(): void {
         this.selectorIdMap.clear();
-        this.selectorCounter = 0;
     }
 }
 
