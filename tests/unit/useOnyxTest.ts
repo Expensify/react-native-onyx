@@ -1,4 +1,4 @@
-import {act, renderHook} from '@testing-library/react-native';
+import {act, renderHook, waitFor} from '@testing-library/react-native';
 import type {OnyxCollection, OnyxEntry} from '../../lib';
 import Onyx, {useOnyx} from '../../lib';
 import OnyxCache from '../../lib/OnyxCache';
@@ -199,9 +199,8 @@ describe('useOnyx', () => {
             expect(result2.current[1].status).toEqual('loaded');
 
             Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
-            await act(async () => waitForPromisesToResolve());
 
-            expect(result1.current[0]).toEqual('test2');
+            await waitFor(() => expect(result1.current[0]).toEqual('test2'));
             expect(result1.current[1].status).toEqual('loaded');
             expect(result2.current[0]).toEqual('test2');
             expect(result2.current[1].status).toEqual('loaded');
@@ -232,9 +231,8 @@ describe('useOnyx', () => {
             expect(result3.current[1].status).toEqual('loaded');
 
             Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
-            await act(async () => waitForPromisesToResolve());
 
-            expect(result1.current[0]).toEqual('test2');
+            await waitFor(() => expect(result1.current[0]).toEqual('test2'));
             expect(result1.current[1].status).toEqual('loaded');
             expect(result2.current[0]).toEqual('test2');
             expect(result2.current[1].status).toEqual('loaded');
@@ -291,12 +289,13 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
 
             Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`, null);
-            await act(async () => waitForPromisesToResolve());
 
-            expect(result.current[0]).toEqual({
-                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: 'entry1_id',
-                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry3`]: 'entry3_id',
-            });
+            await waitFor(() =>
+                expect(result.current[0]).toEqual({
+                    [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: 'entry1_id',
+                    [`${ONYXKEYS.COLLECTION.TEST_KEY}entry3`]: 'entry3_id',
+                }),
+            );
             expect(result.current[1].status).toEqual('loaded');
         });
 
@@ -812,9 +811,8 @@ describe('useOnyx', () => {
             expect(result1.current[0]).toBe('test');
 
             Onyx.set(ONYXKEYS.TEST_KEY, null);
-            await act(async () => waitForPromisesToResolve());
 
-            expect(result1.current[0]).toBeUndefined();
+            await waitFor(() => expect(result1.current[0]).toBeUndefined());
             expect(logAlertFn).not.toBeCalled();
         });
 
@@ -846,9 +844,8 @@ describe('useOnyx', () => {
             expect(result1.current[0]).toBe('test');
 
             Onyx.set(ONYXKEYS.TEST_KEY, null);
-            await act(async () => waitForPromisesToResolve());
 
-            expect(result1.current[0]).toBeUndefined();
+            await waitFor(() => expect(result1.current[0]).toBeUndefined());
             expect(logAlertFn).toHaveBeenCalledTimes(2);
             expect(logAlertFn).toHaveBeenNthCalledWith(2, alertMessage, {showAlert: true});
         });
@@ -878,9 +875,8 @@ describe('useOnyx', () => {
             expect(result1.current[0]).toBe('test_changed');
 
             Onyx.set(ONYXKEYS.TEST_KEY, null);
-            await act(async () => waitForPromisesToResolve());
 
-            expect(result1.current[0]).toBeUndefined();
+            await waitFor(() => expect(result1.current[0]).toBeUndefined());
             expect(logAlertFn).toHaveBeenCalledTimes(2);
             expect(logAlertFn).toHaveBeenNthCalledWith(2, alertMessage, {showAlert: true});
         });
@@ -907,9 +903,8 @@ describe('useOnyx', () => {
             expect(result1.current[0]).toBe('test_changed');
 
             Onyx.set(ONYXKEYS.TEST_KEY, null);
-            await act(async () => waitForPromisesToResolve());
 
-            expect(result1.current[0]).toBe('undefined_changed');
+            await waitFor(() => expect(result1.current[0]).toBe('undefined_changed'));
             expect(logAlertFn).toHaveBeenCalledTimes(2);
             expect(logAlertFn).toHaveBeenNthCalledWith(2, alertMessage, {showAlert: true});
         });
