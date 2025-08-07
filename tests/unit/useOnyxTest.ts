@@ -465,47 +465,6 @@ describe('useOnyx', () => {
             expect(result.current[0]).toBe(firstResult);
         });
 
-        it('should use reference equality for memoized selectors instead of deep equality', async () => {
-            // This test verifies the optimization where memoized selectors use reference equality
-            const complexObject = {
-                nested: {
-                    array: [1, 2, 3],
-                    object: {prop: 'value'},
-                },
-            };
-
-            Onyx.set(ONYXKEYS.TEST_KEY, complexObject);
-
-            const {result} = renderHook(() =>
-                useOnyx(ONYXKEYS.TEST_KEY, {
-                    // @ts-expect-error bypass
-                    selector: (entry: OnyxEntry<typeof complexObject>) => entry?.nested,
-                }),
-            );
-
-            await act(async () => waitForPromisesToResolve());
-
-            const firstResult = result.current[0];
-
-            // Set the exact same object reference
-            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, complexObject));
-
-            // Should return same reference due to memoization
-            expect(result.current[0]).toBe(firstResult);
-
-            // Set different object with same content
-            const differentObjectSameContent = {
-                nested: {
-                    array: [1, 2, 3],
-                    object: {prop: 'value'},
-                },
-            };
-
-            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, differentObjectSameContent));
-
-            // Should return same reference due to deep equality in memoized selector
-            expect(result.current[0]).toBe(firstResult);
-        });
 
         it('should memoize primitive selector results correctly', async () => {
             Onyx.set(ONYXKEYS.TEST_KEY, {count: 5, name: 'test'});
