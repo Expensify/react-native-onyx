@@ -465,7 +465,6 @@ describe('useOnyx', () => {
             expect(result.current[0]).toBe(firstResult);
         });
 
-
         it('should memoize primitive selector results correctly', async () => {
             Onyx.set(ONYXKEYS.TEST_KEY, {count: 5, name: 'test'});
 
