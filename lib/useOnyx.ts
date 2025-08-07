@@ -90,7 +90,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                 const newOutput = options.selector!(input);
 
                 // Deep equality mode: only update if output actually changed
-                const areEqual = hasComputed && deepEqual(lastOutput, newOutput);
+                const areEqual = deepEqual(lastOutput, newOutput);
 
                 if (!hasComputed || !areEqual) {
                     lastInput = input;
