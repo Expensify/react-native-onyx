@@ -662,12 +662,8 @@ function keysChanged<TKey extends CollectionKeyBase>(
 
         // Regular Onyx.connect() subscriber found.
         if (typeof subscriber.callback === 'function') {
-            // Check if it's a useOnyx subscriber
-            if (subscriber.isUseOnyxSubscriber && !notifyUseOnyxHookSubscribers) {
-                continue;
-            }
-            // Check if it's a regular Onyx.connect() subscriber
-            if (!subscriber.isUseOnyxSubscriber && !notifyConnectSubscribers) {
+            // Check if it's a useOnyx or a regular Onyx.connect() subscriber
+            if ((subscriber.isUseOnyxSubscriber && !notifyUseOnyxHookSubscribers) || (!subscriber.isUseOnyxSubscriber && !notifyConnectSubscribers)) {
                 continue;
             }
 
@@ -868,12 +864,8 @@ function keyChanged<TKey extends OnyxKey>(
 
         // Subscriber is a regular call to connect() and provided a callback
         if (typeof subscriber.callback === 'function') {
-            // Check if it's a useOnyx subscriber
-            if (subscriber.isUseOnyxSubscriber && !notifyUseOnyxHookSubscribers) {
-                continue;
-            }
-            // Check if it's a regular Onyx.connect() subscriber
-            if (!subscriber.isUseOnyxSubscriber && !notifyConnectSubscribers) {
+            // Check if it's a useOnyx or a regular Onyx.connect() subscriber
+            if ((subscriber.isUseOnyxSubscriber && !notifyUseOnyxHookSubscribers) || (!subscriber.isUseOnyxSubscriber && !notifyConnectSubscribers)) {
                 continue;
             }
             if (lastConnectionCallbackData.has(subscriber.subscriptionID) && lastConnectionCallbackData.get(subscriber.subscriptionID) === value) {
