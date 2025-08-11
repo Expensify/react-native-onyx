@@ -10,6 +10,7 @@ import type {CollectionKeyBase, OnyxKey, OnyxValue} from './types';
 import usePrevious from './usePrevious';
 import decorateWithMetrics from './metrics';
 import * as Logger from './Logger';
+import useLiveRef from './useLiveRef';
 
 type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (data: OnyxValue<TKey> | undefined) => TReturnValue;
 
@@ -75,11 +76,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     const connectionRef = useRef<Connection | null>(null);
     const previousKey = usePrevious(key);
 
-    const currentDependenciesRef = useRef(dependencies);
-    currentDependenciesRef.current = dependencies;
-
-    const currentSelectorRef = useRef(options?.selector);
-    currentSelectorRef.current = options?.selector;
+    const currentDependenciesRef = useLiveRef(dependencies);
+    const currentSelectorRef = useLiveRef(options?.selector);
 
     // Create memoized version of selector for performance
     const memoizedSelector = useMemo(() => {
