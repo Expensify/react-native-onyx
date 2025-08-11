@@ -199,7 +199,6 @@ describe('useOnyx', () => {
             expect(result2.current[1].status).toEqual('loaded');
 
             await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, 'test2'));
-            await act(async () => waitForPromisesToResolve());
 
             expect(result1.current[0]).toEqual('test2');
             expect(result1.current[1].status).toEqual('loaded');
@@ -232,7 +231,6 @@ describe('useOnyx', () => {
             expect(result3.current[1].status).toEqual('loaded');
 
             await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, 'test2'));
-            await act(async () => waitForPromisesToResolve());
 
             expect(result1.current[0]).toEqual('test2');
             expect(result1.current[1].status).toEqual('loaded');
