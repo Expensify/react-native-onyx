@@ -10,12 +10,12 @@ class OnyxSnapshotCache {
     /**
      * Snapshot cache for ultimate performance - separate cache per Onyx key
      */
-    private snapshotCache: Map<string, Map<string, any>>;
+    private snapshotCache: Map<string, Map<string, unknown>>;
 
     /**
      * Maps selector functions to unique IDs for cache key generation
      */
-    private selectorIdMap: Map<UseOnyxSelector<any, any>, string>;
+    private selectorIdMap: Map<UseOnyxSelector<OnyxKey, unknown>, string>;
 
     /**
      * Counter for generating incremental selector IDs
@@ -31,12 +31,13 @@ class OnyxSnapshotCache {
     /**
      * Generate unique ID for selector functions using incrementing numbers
      */
-    getSelectorId(selector: UseOnyxSelector<any, any>): string {
-        if (!this.selectorIdMap.has(selector)) {
+    getSelectorId<TKey extends OnyxKey, TReturnValue>(selector: UseOnyxSelector<TKey, TReturnValue>): string {
+        const typedSelector = selector as unknown as UseOnyxSelector<OnyxKey, unknown>;
+        if (!this.selectorIdMap.has(typedSelector)) {
             const id = `selector_${this.selectorIdCounter++}`;
-            this.selectorIdMap.set(selector, id);
+            this.selectorIdMap.set(typedSelector, id);
         }
-        return this.selectorIdMap.get(selector)!;
+        return this.selectorIdMap.get(typedSelector)!;
     }
 
     /**
@@ -54,15 +55,15 @@ class OnyxSnapshotCache {
     /**
      * Get cached snapshot result for a key and cache key combination
      */
-    getCachedResult(key: string, cacheKey: string): any {
+    getCachedResult<T>(key: string, cacheKey: string): T | undefined {
         const keyCache = this.snapshotCache.get(key);
-        return keyCache?.get(cacheKey);
+        return keyCache?.get(cacheKey) as T | undefined;
     }
 
     /**
      * Set cached snapshot result for a key and cache key combination
      */
-    setCachedResult(key: string, cacheKey: string, result: any): void {
+    setCachedResult<T>(key: string, cacheKey: string, result: T): void {
         if (!this.snapshotCache.has(key)) {
             this.snapshotCache.set(key, new Map());
         }

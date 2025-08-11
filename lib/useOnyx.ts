@@ -209,7 +209,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // Don't use cache for first connection with initWithStoredValues: false
         // Also don't use cache during active data updates (when shouldGetCachedValueRef is true)
         if (!(isFirstConnectionRef.current && options?.initWithStoredValues === false) && !shouldGetCachedValueRef.current) {
-            const cachedResult = onyxSnapshotCache.getCachedResult(keyStr, cacheKey);
+            const cachedResult = onyxSnapshotCache.getCachedResult<UseOnyxResult<TReturnValue>>(keyStr, cacheKey);
             if (cachedResult !== undefined) {
                 resultRef.current = cachedResult;
                 return cachedResult;
@@ -222,7 +222,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         if (isFirstConnectionRef.current && options?.initWithStoredValues === false) {
             const result = resultRef.current;
             // Store result in snapshot cache
-            onyxSnapshotCache.setCachedResult(keyStr, cacheKey, result);
+            onyxSnapshotCache.setCachedResult<UseOnyxResult<TReturnValue>>(keyStr, cacheKey, result);
             return result;
         }
 
@@ -298,7 +298,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             }
         }
 
-        onyxSnapshotCache.setCachedResult(keyStr, cacheKey, resultRef.current);
+        onyxSnapshotCache.setCachedResult<UseOnyxResult<TReturnValue>>(keyStr, cacheKey, resultRef.current);
 
         return resultRef.current;
     }, [options?.initWithStoredValues, options?.allowStaleData, options?.canBeMissing, key, memoizedSelector]);
