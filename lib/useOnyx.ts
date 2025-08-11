@@ -95,20 +95,23 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             // Recompute if input changed, dependencies changed, or first time
             const dependenciesChanged = !deepEqual(lastDependencies, currentDependencies);
             if (!hasComputed || lastInput !== input || dependenciesChanged) {
-                const newOutput = currentSelector?.(input);
+                // Only proceed if we have a valid selector
+                if (currentSelector) {
+                    const newOutput = currentSelector(input);
 
-                // Deep equality mode: only update if output actually changed
-                if (!hasComputed || !deepEqual(lastOutput, newOutput) || dependenciesChanged) {
-                    lastInput = input;
-                    lastOutput = newOutput;
-                    lastDependencies = [...currentDependencies];
-                    hasComputed = true;
+                    // Deep equality mode: only update if output actually changed
+                    if (!hasComputed || !deepEqual(lastOutput, newOutput) || dependenciesChanged) {
+                        lastInput = input;
+                        lastOutput = newOutput;
+                        lastDependencies = [...currentDependencies];
+                        hasComputed = true;
+                    }
                 }
             }
 
             return lastOutput;
         };
-    }, [options?.selector]);
+    }, [currentDependenciesRef, currentSelectorRef, options?.selector]);
 
     // Stores the previous cached value as it's necessary to compare with the new value in `getSnapshot()`.
     // We initialize it to `null` to simulate that we don't have any value from cache yet.
