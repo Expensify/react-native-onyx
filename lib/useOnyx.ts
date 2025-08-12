@@ -93,7 +93,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             const currentSelector = currentSelectorRef.current;
 
             // Recompute if input changed, dependencies changed, or first time
-            const dependenciesChanged = !deepEqual(lastDependencies, currentDependencies);
+            const dependenciesChanged = !shallowEqual(lastDependencies, currentDependencies);
             if (!hasComputed || lastInput !== input || dependenciesChanged) {
                 // Only proceed if we have a valid selector
                 if (currentSelector) {
@@ -180,7 +180,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
         // Deep equality check to prevent infinite loops when dependencies array reference changes
         // but content remains the same
-        if (deepEqual(previousDependenciesRef.current, dependencies)) {
+        if (shallowEqual(previousDependenciesRef.current, dependencies)) {
             return;
         }
 
