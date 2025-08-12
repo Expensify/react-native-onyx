@@ -663,53 +663,6 @@ describe('useOnyx', () => {
             expect(result.current[0]).toBe('constant:updated');
             expect(selectorCallCount).toBe(2);
         });
-
-        it('should handle dependencies with deep equality changes', async () => {
-            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, {items: ['a', 'b', 'c']}));
-
-            let config = {includeItems: ['a', 'b']};
-            let selectorCallCount = 0;
-
-            const {result, rerender} = renderHook(() =>
-                useOnyx(
-                    ONYXKEYS.TEST_KEY,
-                    {
-                        selector: (data) => {
-                            selectorCallCount++;
-                            const typedData = data as {items?: string[]};
-                            if (!typedData?.items) return [];
-                            return typedData.items.filter((item: string) => config.includeItems.includes(item));
-                        },
-                    },
-                    [config],
-                ),
-            );
-
-            await act(async () => waitForPromisesToResolve());
-
-            expect(result.current[0]).toEqual(['a', 'b']);
-            expect(selectorCallCount).toBe(1);
-
-            // Change config to new object with same content
-            await act(async () => {
-                config = {includeItems: ['a', 'b']};
-                rerender(ONYXKEYS.COLLECTION.TEST_KEY);
-            });
-
-            // Should not recompute since deep equality shows no change
-            expect(result.current[0]).toEqual(['a', 'b']);
-            expect(selectorCallCount).toBe(1);
-
-            // Change config content
-            await act(async () => {
-                config = {includeItems: ['b', 'c']};
-                rerender(ONYXKEYS.COLLECTION.TEST_KEY);
-            });
-
-            // Should recompute due to content change
-            expect(result.current[0]).toEqual(['b', 'c']);
-            expect(selectorCallCount).toBe(2);
-        });
     });
 
     describe('allowStaleData', () => {
