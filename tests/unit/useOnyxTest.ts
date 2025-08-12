@@ -291,6 +291,8 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
 
             await act(async () => Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`, null));
+            // Onyx.merge() with null value resolves immediately, but notifies subscribers asynchronously.
+            // waitForPromisesToResolve() ensures these async operations complete before test assertions run.
             await act(async () => waitForPromisesToResolve());
 
             expect(result.current[0]).toEqual({
@@ -818,6 +820,8 @@ describe('useOnyx', () => {
             expect(result1.current[0]).toBe('test');
 
             await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, null));
+            // Onyx.set() with null value resolves immediately, but notifies subscribers asynchronously.
+            // waitForPromisesToResolve() ensures these async operations complete before test assertions run.
             await act(async () => waitForPromisesToResolve());
 
             expect(result1.current[0]).toBeUndefined();
@@ -852,6 +856,8 @@ describe('useOnyx', () => {
             expect(result1.current[0]).toBe('test');
 
             await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, null));
+            // Onyx.set() with null value resolves immediately, but notifies subscribers asynchronously.
+            // waitForPromisesToResolve() ensures these async operations complete before test assertions run.
             await act(async () => waitForPromisesToResolve());
 
             expect(result1.current[0]).toBeUndefined();
@@ -884,6 +890,8 @@ describe('useOnyx', () => {
             expect(result1.current[0]).toBe('test_changed');
 
             await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, null));
+            // Onyx.set() with null value resolves immediately, but notifies subscribers asynchronously.
+            // waitForPromisesToResolve() ensures these async operations complete before test assertions run.
             await act(async () => waitForPromisesToResolve());
 
             expect(result1.current[0]).toBeUndefined();
@@ -913,6 +921,8 @@ describe('useOnyx', () => {
             expect(result1.current[0]).toBe('test_changed');
 
             await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, null));
+            // Onyx.set() with null value resolves immediately, but notifies subscribers asynchronously.
+            // waitForPromisesToResolve() ensures these async operations complete before test assertions run.
             await act(async () => waitForPromisesToResolve());
 
             expect(result1.current[0]).toBe('undefined_changed');
