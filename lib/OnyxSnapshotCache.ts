@@ -1,6 +1,6 @@
 import OnyxUtils from './OnyxUtils';
-import type {OnyxKey} from './types';
-import type {UseOnyxOptions, UseOnyxSelector} from './useOnyx';
+import type {OnyxKey, OnyxValue} from './types';
+import type {UseOnyxOptions, UseOnyxResult, UseOnyxSelector} from './useOnyx';
 
 /**
  * Manages snapshot caching for useOnyx hook performance optimization.
@@ -10,7 +10,7 @@ class OnyxSnapshotCache {
     /**
      * Snapshot cache for ultimate performance - separate cache per Onyx key
      */
-    private snapshotCache: Map<string, Map<string, unknown>>;
+    private snapshotCache: Map<OnyxKey, Map<string, UseOnyxResult<OnyxValue<OnyxKey>>>>;
 
     /**
      * Maps selector functions to unique IDs for cache key generation
@@ -55,15 +55,15 @@ class OnyxSnapshotCache {
     /**
      * Get cached snapshot result for a key and cache key combination
      */
-    getCachedResult<T>(key: string, cacheKey: string): T | undefined {
+    getCachedResult<TResult extends UseOnyxResult<OnyxValue<OnyxKey>>>(key: OnyxKey, cacheKey: string): TResult | undefined {
         const keyCache = this.snapshotCache.get(key);
-        return keyCache?.get(cacheKey) as T | undefined;
+        return keyCache?.get(cacheKey) as TResult | undefined;
     }
 
     /**
      * Set cached snapshot result for a key and cache key combination
      */
-    setCachedResult<T>(key: string, cacheKey: string, result: T): void {
+    setCachedResult<TResult extends UseOnyxResult<OnyxValue<OnyxKey>>>(key: OnyxKey, cacheKey: string, result: TResult): void {
         if (!this.snapshotCache.has(key)) {
             this.snapshotCache.set(key, new Map());
         }
@@ -74,7 +74,7 @@ class OnyxSnapshotCache {
      * Selective cache invalidation to prevent data unavailability
      * Collection members invalidate upward, collections don't cascade downward
      */
-    invalidateForKey(keyToInvalidate: string): void {
+    invalidateForKey(keyToInvalidate: OnyxKey): void {
         // Always invalidate the exact key
         this.snapshotCache.delete(keyToInvalidate);
 
