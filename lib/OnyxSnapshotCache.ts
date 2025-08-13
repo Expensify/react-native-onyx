@@ -41,7 +41,18 @@ class OnyxSnapshotCache {
     }
 
     /**
-     * Fast cache key generation for useOnyx options combination
+     * Fast cache key generation for useOnyx options combination.
+     *
+     * The properties used to generate the cache key are handpicked for performance reasons and
+     * according to their purpose and effect they produce in the useOnyx hook behavior:
+     *
+     * - `selector`: Different selectors produce different results, so each selector needs its own cache entry
+     * - `initWithStoredValues`: This flag changes the initial loading behavior and affects the returned fetch status
+     * - `allowStaleData`: Controls whether stale data can be returned during pending merges, affecting result timing
+     * - `canBeMissing`: Determines logging behavior for missing data, but doesn't affect the actual data returned
+     *
+     * Other options like `canEvict`, `reuseConnection`, and `allowDynamicKey` don't affect the data transformation
+     * or timing behavior of getSnapshot, so they're excluded from the cache key for better cache hit rates.
      */
     generateCacheKey<TKey extends OnyxKey, TReturnValue>(options?: UseOnyxOptions<TKey, TReturnValue>): string {
         const selectorId = options?.selector ? this.getSelectorId(options.selector) : 'no_selector';
