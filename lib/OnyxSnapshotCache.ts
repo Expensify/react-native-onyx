@@ -71,20 +71,21 @@ class OnyxSnapshotCache {
     }
 
     /**
-     * O(1) cache invalidation - delete cache for this key and related collection keys
+     * Selective cache invalidation to prevent data unavailability
+     * Collection members invalidate upward, collections don't cascade downward
      */
     invalidateForKey(keyToInvalidate: string): void {
         // Always invalidate the exact key
         this.snapshotCache.delete(keyToInvalidate);
 
-        // For collection member keys, also invalidate the parent collection
+        // Handle collection-related keys with selective invalidation
         if (OnyxUtils.isCollectionKey(keyToInvalidate)) {
             const baseKey = OnyxUtils.getCollectionKey(keyToInvalidate);
-            // Invalidate all related collection members
-            for (const [cacheKey] of this.snapshotCache) {
-                if (cacheKey.startsWith(baseKey) || cacheKey === baseKey) {
-                    this.snapshotCache.delete(cacheKey);
-                }
+
+            // If this is a collection member key (e.g., "reports_123")
+            // Only invalidate upward to the collection base key
+            if (baseKey !== keyToInvalidate) {
+                this.snapshotCache.delete(baseKey);
             }
         }
     }
