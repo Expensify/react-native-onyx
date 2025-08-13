@@ -149,13 +149,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     const sourceValueRef = useRef<NonNullable<TReturnValue> | undefined>(undefined);
 
     // Cache the options key to avoid regenerating it every getSnapshot call
-    const cacheKeyRef = useRef<string | null>(null);
-
-    // Generate cache key and update when options change
-    const currentCacheKey = onyxSnapshotCache.generateCacheKey(options);
-    if (cacheKeyRef.current !== currentCacheKey) {
-        cacheKeyRef.current = currentCacheKey;
-    }
+    const cacheKey = useMemo(() => onyxSnapshotCache.generateCacheKey(options), [options]);
 
     useEffect(() => {
         // These conditions will ensure we can only handle dynamic collection member keys from the same collection.
@@ -226,8 +220,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     }, [key, options?.canEvict]);
 
     const getSnapshot = useCallback(() => {
-        const cacheKey = cacheKeyRef.current!;
-
         // Check if we have any cache for this Onyx key
         // Don't use cache for first connection with initWithStoredValues: false
         // Also don't use cache during active data updates (when shouldGetCachedValueRef is true)
@@ -324,7 +316,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         onyxSnapshotCache.setCachedResult<UseOnyxResult<TReturnValue>>(key, cacheKey, resultRef.current);
 
         return resultRef.current;
-    }, [options?.initWithStoredValues, options?.allowStaleData, options?.canBeMissing, key, memoizedSelector]);
+    }, [options?.initWithStoredValues, options?.allowStaleData, options?.canBeMissing, key, memoizedSelector, cacheKey]);
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
