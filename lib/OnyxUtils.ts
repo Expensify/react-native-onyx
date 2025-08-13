@@ -78,8 +78,6 @@ let lastConnectionCallbackData = new Map<number, OnyxValue<OnyxKey>>();
 
 let snapshotKey: OnyxKey | null = null;
 
-let fullyMergedSnapshotKeys: Set<string> | undefined;
-
 // Keeps track of the last subscriptionID that was used so we can keep incrementing it
 let lastSubscriptionID = 0;
 
@@ -141,9 +139,8 @@ function setSkippableCollectionMemberIDs(ids: Set<string>): void {
  * @param keys - `ONYXKEYS` constants object from Onyx.init()
  * @param initialKeyStates - initial data to set when `init()` and `clear()` are called
  * @param evictableKeys - This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal.
- * @param fullyMergedSnapshotKeys - Array of snapshot collection keys where full merge is supported and data structure can be changed after merge.
  */
-function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Partial<KeyValueMapping>, evictableKeys: OnyxKey[], fullyMergedSnapshotKeysParam?: string[]): void {
+function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Partial<KeyValueMapping>, evictableKeys: OnyxKey[]): void {
     // We need the value of the collection keys later for checking if a
     // key is a collection. We store it in a map for faster lookup.
     const collectionValues = Object.values(keys.COLLECTION ?? {}) as string[];
@@ -165,7 +162,6 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
 
     if (typeof keys.COLLECTION === 'object' && typeof keys.COLLECTION.SNAPSHOT === 'string') {
         snapshotKey = keys.COLLECTION.SNAPSHOT;
-        fullyMergedSnapshotKeys = new Set(fullyMergedSnapshotKeysParam ?? []);
     }
 }
 
@@ -1381,7 +1377,7 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
             // since there are none matched. In withOnyx() we wait for all connected keys to return a value before rendering the child
             // component. This null value will be filtered out so that the connected component can utilize defaultProps.
             if (matchingKeys.length === 0) {
-                if (mapping.key && !isCollectionKey(mapping.key)) {
+                if (mapping.key) {
                     cache.addNullishStorageKey(mapping.key);
                 }
 
@@ -1492,15 +1488,7 @@ function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge): Array<
             }
 
             const oldValue = updatedData[key] || {};
-            let collectionKey: string | undefined;
-            try {
-                collectionKey = getCollectionKey(key);
-            } catch (e) {
-                // If getCollectionKey() throws an error it means the key is not a collection key.
-                collectionKey = undefined;
-            }
-            const shouldFullyMerge = fullyMergedSnapshotKeys?.has(collectionKey || key);
-            const newValue = shouldFullyMerge ? value : lodashPick(value, Object.keys(snapshotData[key]));
+            const newValue = lodashPick(value, Object.keys(snapshotData[key]));
 
             updatedData = {...updatedData, [key]: Object.assign(oldValue, newValue)};
         });

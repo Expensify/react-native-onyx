@@ -10,6 +10,7 @@ import type {CollectionKeyBase, OnyxKey, OnyxValue} from './types';
 import usePrevious from './usePrevious';
 import decorateWithMetrics from './metrics';
 import * as Logger from './Logger';
+import useLiveRef from './useLiveRef';
 
 type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (data: OnyxValue<TKey> | undefined) => TReturnValue;
 
@@ -75,30 +76,42 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     const connectionRef = useRef<Connection | null>(null);
     const previousKey = usePrevious(key);
 
+    const currentDependenciesRef = useLiveRef(dependencies);
+    const currentSelectorRef = useLiveRef(options?.selector);
+
     // Create memoized version of selector for performance
     const memoizedSelector = useMemo(() => {
         if (!options?.selector) return null;
 
         let lastInput: OnyxValue<TKey> | undefined;
         let lastOutput: TReturnValue;
+        let lastDependencies: DependencyList = [];
         let hasComputed = false;
 
         return (input: OnyxValue<TKey> | undefined): TReturnValue => {
-            // Always recompute when input changes
-            if (!hasComputed || lastInput !== input) {
-                const newOutput = options.selector!(input);
+            const currentDependencies = currentDependenciesRef.current;
+            const currentSelector = currentSelectorRef.current;
 
-                // Deep equality mode: only update if output actually changed
-                if (!hasComputed || !deepEqual(lastOutput, newOutput)) {
-                    lastInput = input;
-                    lastOutput = newOutput;
-                    hasComputed = true;
+            // Recompute if input changed, dependencies changed, or first time
+            const dependenciesChanged = !shallowEqual(lastDependencies, currentDependencies);
+            if (!hasComputed || lastInput !== input || dependenciesChanged) {
+                // Only proceed if we have a valid selector
+                if (currentSelector) {
+                    const newOutput = currentSelector(input);
+
+                    // Deep equality mode: only update if output actually changed
+                    if (!hasComputed || !deepEqual(lastOutput, newOutput) || dependenciesChanged) {
+                        lastInput = input;
+                        lastOutput = newOutput;
+                        lastDependencies = [...currentDependencies];
+                        hasComputed = true;
+                    }
                 }
             }
 
             return lastOutput;
         };
-    }, [options?.selector]);
+    }, [currentDependenciesRef, currentSelectorRef, options?.selector]);
 
     // Stores the previous cached value as it's necessary to compare with the new value in `getSnapshot()`.
     // We initialize it to `null` to simulate that we don't have any value from cache yet.
@@ -157,10 +170,22 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         );
     }, [previousKey, key, options?.allowDynamicKey]);
 
+    // Track previous dependencies to prevent infinite loops
+    const previousDependenciesRef = useRef<DependencyList>([]);
+
     useEffect(() => {
         // This effect will only run if the `dependencies` array changes. If it changes it will force the hook
         // to trigger a `getSnapshot()` update by calling the stored `onStoreChange()` function reference, thus
         // re-running the hook and returning the latest value to the consumer.
+
+        // Deep equality check to prevent infinite loops when dependencies array reference changes
+        // but content remains the same
+        if (shallowEqual(previousDependenciesRef.current, dependencies)) {
+            return;
+        }
+
+        previousDependenciesRef.current = dependencies;
+
         if (connectionRef.current === null || isConnectingRef.current || !onStoreChangeFnRef.current) {
             return;
         }
