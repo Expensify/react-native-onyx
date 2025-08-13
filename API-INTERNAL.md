@@ -89,9 +89,7 @@ If the requested key is a collection, it will return an object with all the coll
 <dd><p>When a key change happens, search for any callbacks matching the key or collection key and trigger those callbacks</p>
 </dd>
 <dt><a href="#sendDataToConnection">sendDataToConnection()</a></dt>
-<dd><p>Sends the data obtained from the keys to the connection. It either:
-    - sets state on the withOnyxInstances
-    - triggers the callback function</p>
+<dd><p>Sends the data obtained from the keys to the connection.</p>
 </dd>
 <dt><a href="#addKeyToRecentlyAccessedIfNeeded">addKeyToRecentlyAccessedIfNeeded()</a></dt>
 <dd><p>We check to see if this key is flagged as safe for eviction and add it to the recentlyAccessedKeys list so that when we
@@ -365,9 +363,7 @@ keyChanged(key, value, subscriber => subscriber.initWithStoredValues === false)
 <a name="sendDataToConnection"></a>
 
 ## sendDataToConnection()
-Sends the data obtained from the keys to the connection. It either:
-    - sets state on the withOnyxInstances
-    - triggers the callback function
+Sends the data obtained from the keys to the connection.
 
 **Kind**: global function  
 <a name="addKeyToRecentlyAccessedIfNeeded"></a>

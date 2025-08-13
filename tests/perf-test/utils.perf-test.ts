@@ -1,9 +1,7 @@
 import {measureFunction} from 'reassure';
 import Onyx from '../../lib';
-import type {OnyxKey, WithOnyxConnectOptions} from '../../lib/types';
 import utils from '../../lib/utils';
 import createRandomReportAction, {getRandomReportActions} from '../utils/collections/reportActions';
-import generateEmptyWithOnyxInstance from '../utils/generateEmptyWithOnyxInstance';
 
 const ONYXKEYS = {
     COLLECTION: {
@@ -91,18 +89,6 @@ describe('utils', () => {
         test('one call passing function condition', async () => {
             const reportAction = createRandomReportAction(0);
             await measureFunction(() => utils.omit(reportAction, (entry) => typeof entry[1] === 'boolean'));
-        });
-    });
-
-    describe('hasWithOnyxInstance', () => {
-        test('one call', async () => {
-            const options: WithOnyxConnectOptions<OnyxKey> = {
-                displayName: '',
-                key: '',
-                statePropertyName: '',
-                withOnyxInstance: generateEmptyWithOnyxInstance(),
-            };
-            await measureFunction(() => utils.hasWithOnyxInstance(options));
         });
     });
 });
