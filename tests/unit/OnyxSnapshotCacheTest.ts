@@ -1,6 +1,6 @@
 import {OnyxSnapshotCache} from '../../lib/OnyxSnapshotCache';
 import OnyxUtils from '../../lib/OnyxUtils';
-import type {UseOnyxOptions} from '../../lib/useOnyx';
+import type {UseOnyxOptions, UseOnyxResult} from '../../lib/useOnyx';
 
 // Mock OnyxUtils for testing
 jest.mock('../../lib/OnyxUtils', () => ({
@@ -17,10 +17,7 @@ type TestData = {
     name?: string;
 };
 
-type TestResult = {
-    data: string;
-    status?: string;
-};
+type TestResult = UseOnyxResult<{data: string}>;
 
 type TestSelector = (data: unknown) => string;
 
@@ -67,7 +64,7 @@ describe('OnyxSnapshotCache', () => {
         it('should store and retrieve cached results', () => {
             const key = 'testKey';
             const cacheKey = 'testCacheKey';
-            const result: TestResult = {data: 'test', status: 'loaded'};
+            const result: TestResult = [{data: 'test'}, {status: 'loaded'}];
 
             cache.setCachedResult<TestResult>(key, cacheKey, result);
             const retrieved = cache.getCachedResult<TestResult>(key, cacheKey);
@@ -81,8 +78,8 @@ describe('OnyxSnapshotCache', () => {
         });
 
         it('should clear all caches', () => {
-            const result1: TestResult = {data: 'test1'};
-            const result2: TestResult = {data: 'test2'};
+            const result1: TestResult = [{data: 'test1'}, {status: 'loaded'}];
+            const result2: TestResult = [{data: 'test2'}, {status: 'loaded'}];
 
             cache.setCachedResult<TestResult>('key1', 'cacheKey1', result1);
             cache.setCachedResult<TestResult>('key2', 'cacheKey2', result2);
@@ -152,12 +149,12 @@ describe('OnyxSnapshotCache', () => {
     describe('cache invalidation', () => {
         beforeEach(() => {
             // Set up cache with multiple entries
-            cache.setCachedResult<TestResult>('reports_', 'cache1', {data: 'collection'});
-            cache.setCachedResult<TestResult>('reports_123', 'cache2', {data: 'member1'});
-            cache.setCachedResult<TestResult>('reports_456', 'cache3', {data: 'member2'});
-            cache.setCachedResult<TestResult>('users_', 'cache4', {data: 'users collection'});
-            cache.setCachedResult<TestResult>('users_789', 'cache5', {data: 'user member'});
-            cache.setCachedResult<TestResult>('nonCollectionKey', 'cache6', {data: 'regular key'});
+            cache.setCachedResult<TestResult>('reports_', 'cache1', [{data: 'collection'}, {status: 'loaded'}]);
+            cache.setCachedResult<TestResult>('reports_123', 'cache2', [{data: 'member1'}, {status: 'loaded'}]);
+            cache.setCachedResult<TestResult>('reports_456', 'cache3', [{data: 'member2'}, {status: 'loaded'}]);
+            cache.setCachedResult<TestResult>('users_', 'cache4', [{data: 'users collection'}, {status: 'loaded'}]);
+            cache.setCachedResult<TestResult>('users_789', 'cache5', [{data: 'user member'}, {status: 'loaded'}]);
+            cache.setCachedResult<TestResult>('nonCollectionKey', 'cache6', [{data: 'regular key'}, {status: 'loaded'}]);
         });
 
         it('should invalidate non-collection keys without affecting others', () => {
