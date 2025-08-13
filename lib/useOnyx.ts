@@ -202,7 +202,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         }
 
         // Invalidate cache when dependencies change so selector runs with new closure values
-        onyxSnapshotCache.invalidateForKey(key as string);
+        onyxSnapshotCache.invalidateForKey(key);
         shouldGetCachedValueRef.current = true;
         onStoreChangeFnRef.current();
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -227,13 +227,12 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
     const getSnapshot = useCallback(() => {
         const cacheKey = cacheKeyRef.current!;
-        const keyStr = key as string;
 
         // Check if we have any cache for this Onyx key
         // Don't use cache for first connection with initWithStoredValues: false
         // Also don't use cache during active data updates (when shouldGetCachedValueRef is true)
         if (!(isFirstConnectionRef.current && options?.initWithStoredValues === false) && !shouldGetCachedValueRef.current) {
-            const cachedResult = onyxSnapshotCache.getCachedResult<UseOnyxResult<TReturnValue>>(keyStr, cacheKey);
+            const cachedResult = onyxSnapshotCache.getCachedResult<UseOnyxResult<TReturnValue>>(key, cacheKey);
             if (cachedResult !== undefined) {
                 resultRef.current = cachedResult;
                 return cachedResult;
@@ -246,7 +245,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         if (isFirstConnectionRef.current && options?.initWithStoredValues === false) {
             const result = resultRef.current;
             // Store result in snapshot cache
-            onyxSnapshotCache.setCachedResult<UseOnyxResult<TReturnValue>>(keyStr, cacheKey, result);
+            onyxSnapshotCache.setCachedResult<UseOnyxResult<TReturnValue>>(key, cacheKey, result);
             return result;
         }
 
@@ -322,7 +321,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             }
         }
 
-        onyxSnapshotCache.setCachedResult<UseOnyxResult<TReturnValue>>(keyStr, cacheKey, resultRef.current);
+        onyxSnapshotCache.setCachedResult<UseOnyxResult<TReturnValue>>(key, cacheKey, resultRef.current);
 
         return resultRef.current;
     }, [options?.initWithStoredValues, options?.allowStaleData, options?.canBeMissing, key, memoizedSelector]);
@@ -349,7 +348,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                     sourceValueRef.current = sourceValue as NonNullable<TReturnValue>;
 
                     // Invalidate snapshot cache for this key when data changes
-                    onyxSnapshotCache.invalidateForKey(key as string);
+                    onyxSnapshotCache.invalidateForKey(key);
 
                     // Finally, we signal that the store changed, making `getSnapshot()` be called again.
                     onStoreChange();
