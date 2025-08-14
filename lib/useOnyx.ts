@@ -273,14 +273,14 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         }
 
         // Optimized equality checking:
-        // - For memoized selectors, use deep equality since reference equality is too strict when cache is involved
+        // - Memoized selectors already handle deep equality internally, so we can use fast reference equality
         // - Non-selector cases use shallow equality for object reference checks
         // - Normalize null to undefined to ensure consistent comparison (both represent "no value")
         let areValuesEqual: boolean;
         if (memoizedSelector) {
             const normalizedPrevious = previousValueRef.current ?? undefined;
             const normalizedNew = newValueRef.current ?? undefined;
-            areValuesEqual = deepEqual(normalizedPrevious, normalizedNew);
+            areValuesEqual = normalizedPrevious === normalizedNew;
         } else {
             areValuesEqual = shallowEqual(previousValueRef.current ?? undefined, newValueRef.current);
         }
