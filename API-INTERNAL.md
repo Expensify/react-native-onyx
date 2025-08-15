@@ -23,7 +23,7 @@
 <dt><a href="#setSkippableCollectionMemberIDs">setSkippableCollectionMemberIDs()</a></dt>
 <dd><p>Setter - sets the skippable collection member IDs.</p>
 </dd>
-<dt><a href="#initStoreValues">initStoreValues(keys, initialKeyStates, evictableKeys, fullyMergedSnapshotKeys)</a></dt>
+<dt><a href="#initStoreValues">initStoreValues(keys, initialKeyStates, evictableKeys)</a></dt>
 <dd><p>Sets the initial values for the Onyx store</p>
 </dd>
 <dt><a href="#maybeFlushBatchUpdates">maybeFlushBatchUpdates()</a></dt>
@@ -154,6 +154,10 @@ It will also mark deep nested objects that need to be entirely replaced during t
 Serves as core implementation for <code>Onyx.mergeCollection()</code> public function, the difference being
 that this internal function allows passing an additional <code>mergeReplaceNullPatches</code> parameter.</p>
 </dd>
+<dt><a href="#partialSetCollection">partialSetCollection(collectionKey, collection)</a></dt>
+<dd><p>Sets keys in a collection by replacing all targeted collection members with new values.
+Any existing collection members not included in the new data will not be removed.</p>
+</dd>
 <dt><a href="#clearOnyxUtilsInternals">clearOnyxUtilsInternals()</a></dt>
 <dd><p>Clear internal variables used in this file, useful in test environments.</p>
 </dd>
@@ -197,7 +201,7 @@ Setter - sets the skippable collection member IDs.
 **Kind**: global function  
 <a name="initStoreValues"></a>
 
-## initStoreValues(keys, initialKeyStates, evictableKeys, fullyMergedSnapshotKeys)
+## initStoreValues(keys, initialKeyStates, evictableKeys)
 Sets the initial values for the Onyx store
 
 **Kind**: global function  
@@ -207,7 +211,6 @@ Sets the initial values for the Onyx store
 | keys | `ONYXKEYS` constants object from Onyx.init() |
 | initialKeyStates | initial data to set when `init()` and `clear()` are called |
 | evictableKeys | This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal. |
-| fullyMergedSnapshotKeys | Array of snapshot collection keys where full merge is supported and data structure can be changed after merge. |
 
 <a name="maybeFlushBatchUpdates"></a>
 
@@ -522,6 +525,19 @@ that this internal function allows passing an additional `mergeReplaceNullPatche
 | collectionKey | e.g. `ONYXKEYS.COLLECTION.REPORT` |
 | collection | Object collection keyed by individual collection member keys and values |
 | mergeReplaceNullPatches | Record where the key is a collection member key and the value is a list of tuples that we'll use to replace the nested objects of that collection member record with something else. |
+
+<a name="partialSetCollection"></a>
+
+## partialSetCollection(collectionKey, collection)
+Sets keys in a collection by replacing all targeted collection members with new values.
+Any existing collection members not included in the new data will not be removed.
+
+**Kind**: global function  
+
+| Param | Description |
+| --- | --- |
+| collectionKey | e.g. `ONYXKEYS.COLLECTION.REPORT` |
+| collection | Object collection keyed by individual collection member keys and values |
 
 <a name="clearOnyxUtilsInternals"></a>
 
