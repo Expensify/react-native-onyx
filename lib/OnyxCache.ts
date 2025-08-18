@@ -34,6 +34,9 @@ class OnyxCache {
     /** Index mapping collection keys to their member keys for O(1) lookup */
     private collectionIndex: Record<OnyxKey, Set<OnyxKey>>;
 
+    /** Cache of complete collection data objects for O(1) retrieval */
+    private collectionData: Record<OnyxKey, Record<OnyxKey, OnyxValue<OnyxKey>>>;
+
     /**
      * Captured pending tasks for already running storage methods
      * Using a map yields better performance on operations such a delete
@@ -61,6 +64,7 @@ class OnyxCache {
         this.recentKeys = new Set();
         this.storageMap = {};
         this.collectionIndex = {};
+        this.collectionData = {};
         this.pendingPromises = new Map();
 
         // bind all public methods to prevent problems with `this`
@@ -175,6 +179,10 @@ class OnyxCache {
             // Remove from collection index if it's a collection member
             if (collectionKey && this.getCollectionMemberKeys(collectionKey)) {
                 this.collectionIndex[collectionKey].delete(key);
+                // Remove from collection data cache
+                if (this.collectionData[collectionKey]) {
+                    delete this.collectionData[collectionKey][key];
+                }
             }
             return undefined;
         }
@@ -187,6 +195,12 @@ class OnyxCache {
                 this.collectionIndex[collectionKey] = new Set();
             }
             this.collectionIndex[collectionKey].add(key);
+
+            // Update collection data cache
+            if (!this.collectionData[collectionKey]) {
+                this.collectionData[collectionKey] = {};
+            }
+            this.collectionData[collectionKey][key] = value;
         }
 
         return value;
@@ -200,11 +214,16 @@ class OnyxCache {
         const collectionKey = this.getCollectionKey(key);
         if (collectionKey && this.getCollectionMemberKeys(collectionKey)) {
             this.collectionIndex[collectionKey].delete(key);
+            // Remove from collection data cache
+            if (this.collectionData[collectionKey]) {
+                delete this.collectionData[collectionKey][key];
+            }
         }
 
-        // If this is a collection key, clear its index
+        // If this is a collection key, clear its index and data
         if (this.isCollectionKey(key)) {
             delete this.collectionIndex[key];
+            delete this.collectionData[key];
         }
 
         this.storageKeys.delete(key);
@@ -239,6 +258,10 @@ class OnyxCache {
                 // Remove from collection index if it's a collection member
                 if (collectionKey && this.getCollectionMemberKeys(collectionKey)) {
                     this.collectionIndex[collectionKey].delete(key);
+                    // Remove from collection data cache
+                    if (this.collectionData[collectionKey]) {
+                        delete this.collectionData[collectionKey][key];
+                    }
                 }
             } else {
                 this.nullishStorageKeys.delete(key);
@@ -249,6 +272,12 @@ class OnyxCache {
                         this.collectionIndex[collectionKey] = new Set();
                     }
                     this.collectionIndex[collectionKey].add(key);
+
+                    // Update collection data cache with the merged value from storageMap
+                    if (!this.collectionData[collectionKey]) {
+                        this.collectionData[collectionKey] = {};
+                    }
+                    this.collectionData[collectionKey][key] = this.storageMap[key];
                 }
             }
         });
@@ -324,6 +353,10 @@ class OnyxCache {
             const collectionKey = this.getCollectionKey(key);
             if (collectionKey && this.getCollectionMemberKeys(collectionKey)) {
                 this.collectionIndex[collectionKey].delete(key);
+                // Remove from collection data cache
+                if (this.collectionData[collectionKey]) {
+                    delete this.collectionData[collectionKey][key];
+                }
             }
             this.recentKeys.delete(key);
         }
@@ -441,6 +474,7 @@ class OnyxCache {
                 return;
             }
             this.collectionIndex[collectionKey] = new Set();
+            this.collectionData[collectionKey] = {};
         });
     }
 
@@ -467,20 +501,12 @@ class OnyxCache {
      * Get all data for a collection key
      */
     getCollectionData(collectionKey: OnyxKey): Record<OnyxKey, OnyxValue<OnyxKey>> | undefined {
-        const memberKeys = this.getCollectionMemberKeys(collectionKey);
-        if (!memberKeys || memberKeys.size === 0) {
+        const cachedCollection = this.collectionData[collectionKey];
+        if (!cachedCollection || Object.keys(cachedCollection).length === 0) {
             return undefined;
         }
 
-        const collectionData: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
-        memberKeys.forEach((memberKey) => {
-            const value = this.storageMap[memberKey];
-            if (value !== undefined) {
-                collectionData[memberKey] = value;
-            }
-        });
-
-        return collectionData;
+        return cachedCollection;
     }
 
     /**
