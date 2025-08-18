@@ -31,7 +31,6 @@ class OnyxCache {
     /** A map of cached values */
     private storageMap: Record<OnyxKey, OnyxValue<OnyxKey>>;
 
-
     /** Cache of complete collection data objects for O(1) retrieval */
     private collectionData: Record<OnyxKey, Record<OnyxKey, OnyxValue<OnyxKey>>>;
 
@@ -437,9 +436,10 @@ class OnyxCache {
 
         // Initialize collection data for existing collection keys
         collectionKeys.forEach((collectionKey) => {
-            if (!this.collectionData[collectionKey]) {
-                this.collectionData[collectionKey] = {};
+            if (this.collectionData[collectionKey]) {
+                return;
             }
+            this.collectionData[collectionKey] = {};
         });
     }
 
@@ -473,7 +473,6 @@ class OnyxCache {
 
         return cachedCollection;
     }
-
 }
 
 const instance = new OnyxCache();
