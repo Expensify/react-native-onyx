@@ -149,7 +149,16 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     const sourceValueRef = useRef<NonNullable<TReturnValue> | undefined>(undefined);
 
     // Cache the options key to avoid regenerating it every getSnapshot call
-    const cacheKey = useMemo(() => onyxSnapshotCache.generateCacheKey(options), [options]);
+    const cacheKey = useMemo(
+        () =>
+            onyxSnapshotCache.generateCacheKey({
+                selector: options?.selector,
+                initWithStoredValues: options?.initWithStoredValues,
+                allowStaleData: options?.allowStaleData,
+                canBeMissing: options?.canBeMissing,
+            }),
+        [options?.selector, options?.initWithStoredValues, options?.allowStaleData, options?.canBeMissing],
+    );
 
     useEffect(() => {
         // These conditions will ensure we can only handle dynamic collection member keys from the same collection.

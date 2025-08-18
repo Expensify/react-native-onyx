@@ -54,7 +54,7 @@ class OnyxSnapshotCache {
      * Other options like `canEvict`, `reuseConnection`, and `allowDynamicKey` don't affect the data transformation
      * or timing behavior of getSnapshot, so they're excluded from the cache key for better cache hit rates.
      */
-    generateCacheKey<TKey extends OnyxKey, TReturnValue>(options?: UseOnyxOptions<TKey, TReturnValue>): string {
+    generateCacheKey<TKey extends OnyxKey, TReturnValue>(options: Pick<UseOnyxOptions<TKey, TReturnValue>, 'selector' | 'initWithStoredValues' | 'allowStaleData' | 'canBeMissing'>): string {
         const selectorId = options?.selector ? this.getSelectorId(options.selector) : 'no_selector';
         // Create options hash without expensive JSON.stringify
         const initWithStoredValues = options?.initWithStoredValues ?? true;
