@@ -1,6 +1,7 @@
 import {measureFunction} from 'reassure';
 import {OnyxSnapshotCache} from '../../lib/OnyxSnapshotCache';
-import type {UseOnyxOptions, UseOnyxResult} from '../../lib/useOnyx';
+import type {UseOnyxOptions, UseOnyxResult, UseOnyxSelector} from '../../lib/useOnyx';
+import type {OnyxKey} from '../../lib';
 
 // Define types for test data
 type MockData = {
@@ -21,9 +22,10 @@ const ONYXKEYS = {
 };
 
 // Mock selector functions
-const simpleSelector = (data: unknown) => (data as MockData | undefined)?.value;
+const simpleSelector: UseOnyxSelector<OnyxKey, number | undefined> = (data) => (data as MockData | undefined)?.value;
 
-const complexSelector = (data: unknown) => {
+type ComplexSelectorResult = {id?: number; name?: string; computed: number; formatted: string};
+const complexSelector: UseOnyxSelector<OnyxKey, ComplexSelectorResult> = (data) => {
     const mockData = data as MockData | undefined;
     return {
         id: mockData?.id,
@@ -40,7 +42,7 @@ const selectorOptions: UseOnyxOptions<string, number | undefined> = {
     canBeMissing: true,
 };
 
-const complexSelectorOptions: UseOnyxOptions<string, {id?: number; name?: string; computed: number; formatted: string}> = {
+const complexSelectorOptions: UseOnyxOptions<string, ComplexSelectorResult> = {
     selector: complexSelector,
     initWithStoredValues: true,
     allowStaleData: false,
@@ -50,16 +52,15 @@ const complexSelectorOptions: UseOnyxOptions<string, {id?: number; name?: string
 // Mock results
 const mockResult: UseOnyxResult<MockData> = [
     {id: 1, name: 'Test', value: 42},
-    {status: 'loaded' as const, sourceValue: {id: 1, name: 'Test', value: 42}},
+    {status: 'loaded', sourceValue: {id: 1, name: 'Test', value: 42}},
 ];
 
 const mockResults = Array.from(
     {length: 1000},
-    (_, i) =>
-        [
-            {id: i, name: `Test${i}`, value: i * 10},
-            {status: 'loaded' as const, sourceValue: {id: i, name: `Test${i}`, value: i * 10}},
-        ] as UseOnyxResult<MockData>,
+    (_, i): UseOnyxResult<MockData> => [
+        {id: i, name: `Test${i}`, value: i * 10},
+        {status: 'loaded', sourceValue: {id: i, name: `Test${i}`, value: i * 10}},
+    ],
 );
 
 describe('OnyxSnapshotCache', () => {
@@ -91,7 +92,7 @@ describe('OnyxSnapshotCache', () => {
                         resetCacheBeforeEachMeasure();
                         // Pre-populate with 1000 selectors
                         for (let i = 0; i < 1000; i++) {
-                            const selector = (data: unknown) => ((data as MockData | undefined)?.field ?? '') + i;
+                            const selector: UseOnyxSelector<OnyxKey, string> = (data) => ((data as MockData | undefined)?.field ?? '') + i;
                             cache.getSelectorId(selector);
                         }
                     },
@@ -127,7 +128,7 @@ describe('OnyxSnapshotCache', () => {
             await measureFunction(
                 () => {
                     for (let i = 0; i < 1000; i++) {
-                        const selector = (data: unknown) => ((data as MockData | undefined)?.field ?? '') + i;
+                        const selector: UseOnyxSelector<OnyxKey, string> = (data) => ((data as MockData | undefined)?.field ?? '') + i;
                         const options: UseOnyxOptions<string, string> = {...selectorOptions, selector};
                         cache.generateCacheKey(options);
                     }
@@ -158,9 +159,9 @@ describe('OnyxSnapshotCache', () => {
 
         test('getting cached result with complex selector (cache hit)', async () => {
             const cacheKey = cache.generateCacheKey(complexSelectorOptions);
-            const complexResult: UseOnyxResult<{id?: number; name?: string; computed: number; formatted: string}> = [
+            const complexResult: UseOnyxResult<ComplexSelectorResult> = [
                 {id: 1, name: 'Test', computed: 84, formatted: 'Test: 42'},
-                {status: 'loaded' as const, sourceValue: {id: 1, name: 'Test', computed: 84, formatted: 'Test: 42'}},
+                {status: 'loaded', sourceValue: {id: 1, name: 'Test', computed: 84, formatted: 'Test: 42'}},
             ];
             await measureFunction(
                 () => {
