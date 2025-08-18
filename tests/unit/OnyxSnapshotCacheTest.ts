@@ -1,6 +1,7 @@
+import type {OnyxKey} from '../../lib';
 import {OnyxSnapshotCache} from '../../lib/OnyxSnapshotCache';
 import OnyxUtils from '../../lib/OnyxUtils';
-import type {UseOnyxOptions, UseOnyxResult} from '../../lib/useOnyx';
+import type {UseOnyxOptions, UseOnyxResult, UseOnyxSelector} from '../../lib/useOnyx';
 
 // Mock OnyxUtils for testing
 jest.mock('../../lib/OnyxUtils', () => ({
@@ -19,7 +20,7 @@ type TestData = {
 
 type TestResult = UseOnyxResult<{data: string}>;
 
-type TestSelector = (data: unknown) => string;
+type TestSelector = UseOnyxSelector<OnyxKey, string>;
 
 describe('OnyxSnapshotCache', () => {
     let cache: OnyxSnapshotCache;
@@ -31,26 +32,24 @@ describe('OnyxSnapshotCache', () => {
 
     describe('basic cache operations', () => {
         it('should generate unique cache keys for different options', () => {
-            const selector: TestSelector = (data: unknown) => {
+            const selector: TestSelector = (data) => {
                 const testData = data as TestData | undefined;
                 return testData?.name ?? '';
             };
-            const optionsWithSelector: UseOnyxOptions<string, string> = {
+            const optionsWithSelector: UseOnyxOptions<OnyxKey, string> = {
                 selector,
                 initWithStoredValues: true,
                 allowStaleData: false,
                 canBeMissing: true,
             };
-            const optionsWithoutSelector: UseOnyxOptions<string, string> = {
+            const optionsWithoutSelector: UseOnyxOptions<OnyxKey, string> = {
                 initWithStoredValues: false,
                 allowStaleData: true,
                 canBeMissing: false,
             };
-            const undefinedOptions: UseOnyxOptions<string, string> | undefined = undefined;
-
             const keyWithSelector = cache.generateCacheKey(optionsWithSelector);
             const keyWithoutSelector = cache.generateCacheKey(optionsWithoutSelector);
-            const keyWithUndefined = cache.generateCacheKey(undefinedOptions);
+            const keyWithUndefined = cache.generateCacheKey({});
 
             // Different option combinations should produce different cache keys
             expect(keyWithSelector).toContain('0_'); // Should contain selector ID
@@ -93,11 +92,11 @@ describe('OnyxSnapshotCache', () => {
 
     describe('selector ID management', () => {
         it('should generate unique IDs for different selectors', () => {
-            const nameSelector: TestSelector = (data: unknown) => {
+            const nameSelector: TestSelector = (data) => {
                 const testData = data as TestData | undefined;
                 return testData?.name ?? '';
             };
-            const idSelector: TestSelector = (data: unknown) => {
+            const idSelector: TestSelector = (data) => {
                 const testData = data as TestData | undefined;
                 return testData?.id ?? '';
             };
@@ -110,7 +109,7 @@ describe('OnyxSnapshotCache', () => {
         });
 
         it('should return the same ID for the same selector function', () => {
-            const selector: TestSelector = (data: unknown) => {
+            const selector: TestSelector = (data) => {
                 const testData = data as TestData | undefined;
                 return testData?.name ?? '';
             };
@@ -125,11 +124,11 @@ describe('OnyxSnapshotCache', () => {
         });
 
         it('should clear selector IDs and reset counter', () => {
-            const selector1: TestSelector = (data: unknown) => {
+            const selector1: TestSelector = (data) => {
                 const testData = data as TestData | undefined;
                 return testData?.name ?? '';
             };
-            const selector2: TestSelector = (data: unknown) => {
+            const selector2: TestSelector = (data) => {
                 const testData = data as TestData | undefined;
                 return testData?.id ?? '';
             };
