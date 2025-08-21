@@ -1,9 +1,12 @@
+/* eslint-disable no-console, @typescript-eslint/no-explicit-any */
 /**
  * Simple test to demonstrate the sourceValue race condition.
  *
  * This test proves that when multiple Onyx updates are batched together,
- * the sourceValue only reflects the final update, not all the discrete
+ * the sourceValue only reflects the first update, not all the discrete
  * updates that actually occurred.
+ *
+ * note: I don't know what's going on with sourceValue types here
  */
 
 import {act, renderHook} from '@testing-library/react-native';
@@ -98,6 +101,7 @@ describe('Simple sourceValue Race Condition Demo', () => {
 
         console.log('SourceValues received:', receivedSourceValues);
         console.log('Final data:', result.current[0]);
+        // @ts-expect-error - sourceValue exists on the metadata object but TS doesn't know the type
         console.log('Final sourceValue:', result.current[1]?.sourceValue);
 
         // ✅ PROOF OF THE RACE CONDITION:
@@ -129,10 +133,12 @@ describe('Simple sourceValue Race Condition Demo', () => {
         });
 
         // 4. But sourceValue only shows the FIRST update that triggered the batch!
+        // @ts-expect-error - sourceValue exists on the metadata object but TS doesn't know the type
         if (result.current[1]?.sourceValue) {
             // sourceValue contains data from the FIRST update, not the last!
             // This is because it gets set when the first callback fires, then gets
             // overwritten during batching but the component only renders once.
+            // @ts-expect-error - sourceValue exists on the metadata object but TS doesn't know the type
             expect(result.current[1].sourceValue).toEqual({
                 [`${ONYXKEYS.COLLECTION.TEST_ITEMS}item1`]: {
                     step: 1,
@@ -236,8 +242,11 @@ describe('Simple sourceValue Race Condition Demo', () => {
         // This demonstrates that sourceValue is only available for collection callbacks
 
         console.log('Final sourceValues:');
+        // @ts-expect-error - sourceValue exists on the metadata object but TS doesn't know the type
         console.log('- Reports hook sourceValue:', reportsResult.current[1]?.sourceValue);
+        // @ts-expect-error - sourceValue exists on the metadata object but TS doesn't know the type
         console.log('- Policies hook sourceValue:', policiesResult.current[1]?.sourceValue);
+        // @ts-expect-error - sourceValue exists on the metadata object but TS doesn't know the type
         console.log('- User hook sourceValue:', userResult.current[1]?.sourceValue);
 
         // The race condition: each hook's sourceValue might not correspond to its own data!
