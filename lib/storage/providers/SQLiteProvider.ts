@@ -9,6 +9,8 @@ import type {FastMergeReplaceNullPatch} from '../../utils';
 import utils from '../../utils';
 import type StorageProvider from './types';
 import type {StorageKeyList, StorageKeyValuePair} from './types';
+import * as GlobalSettings from '../../GlobalSettings';
+import decorateWithMetrics from '../../metrics';
 
 // By default, NitroSQLite does not accept nullish values due to current limitations in Nitro Modules.
 // This flag enables a feature in NitroSQLite that allows for nullish values to be passed to operations, such as "execute" or "executeBatch".
@@ -58,10 +60,20 @@ function objectMarkRemover(key: string, value: unknown) {
 function generateJSONReplaceSQLQueries(key: string, patches: FastMergeReplaceNullPatch[]): string[][] {
     const queries = patches.map(([pathArray, value]) => {
         const jsonPath = `$.${pathArray.join('.')}`;
-        return [jsonPath, JSON.stringify(value), key];
+        return [jsonPath, stringifyJSON(value), key];
     });
 
     return queries;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function stringifyJSON(data: any, replacer?: (key: string, value: any) => any): string {
+    return JSON.stringify(data, replacer);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function parseJSON(text: string): any {
+    return JSON.parse(text);
 }
 
 const provider: StorageProvider = {
@@ -94,7 +106,7 @@ const provider: StorageProvider = {
                 return null;
             }
 
-            return JSON.parse(result.valueJSON);
+            return parseJSON(result.valueJSON);
         });
     },
     multiGet(keys) {
@@ -102,16 +114,16 @@ const provider: StorageProvider = {
         const command = `SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
         return db.executeAsync<OnyxSQLiteKeyValuePair>(command, keys).then(({rows}) => {
             // eslint-disable-next-line no-underscore-dangle
-            const result = rows?._array.map((row) => [row.record_key, JSON.parse(row.valueJSON)]);
+            const result = rows?._array.map((row) => [row.record_key, parseJSON(row.valueJSON)]);
             return (result ?? []) as StorageKeyValuePair[];
         });
     },
     setItem(key, value) {
-        return db.executeAsync('REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);', [key, JSON.stringify(value)]).then(() => undefined);
+        return db.executeAsync('REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);', [key, stringifyJSON(value)]).then(() => undefined);
     },
     multiSet(pairs) {
         const query = 'REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, json(?));';
-        const params = pairs.map((pair) => [pair[0], JSON.stringify(pair[1] === undefined ? null : pair[1])]);
+        const params = pairs.map((pair) => [pair[0], stringifyJSON(pair[1] === undefined ? null : pair[1])]);
         if (utils.isEmptyObject(params)) {
             return Promise.resolve();
         }
@@ -138,7 +150,7 @@ const provider: StorageProvider = {
         const nonNullishPairs = pairs.filter((pair) => pair[1] !== undefined);
 
         for (const [key, value, replaceNullPatches] of nonNullishPairs) {
-            const changeWithoutMarkers = JSON.stringify(value, objectMarkRemover);
+            const changeWithoutMarkers = stringifyJSON(value, objectMarkRemover);
             patchQueryArguments.push([key, changeWithoutMarkers]);
 
             const patches = replaceNullPatches ?? [];
@@ -188,6 +200,30 @@ const provider: StorageProvider = {
         );
     },
 };
+
+GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
+    if (!enablePerformanceMetrics) {
+        return;
+    }
+
+    // Apply decorators
+    provider.getItem = decorateWithMetrics(provider.getItem, 'SQLiteProvider.getItem');
+    provider.multiGet = decorateWithMetrics(provider.multiGet, 'SQLiteProvider.multiGet');
+    provider.setItem = decorateWithMetrics(provider.setItem, 'SQLiteProvider.setItem');
+    provider.multiSet = decorateWithMetrics(provider.multiSet, 'SQLiteProvider.multiSet');
+    provider.mergeItem = decorateWithMetrics(provider.mergeItem, 'SQLiteProvider.mergeItem');
+    provider.multiMerge = decorateWithMetrics(provider.multiMerge, 'SQLiteProvider.multiMerge');
+    provider.removeItem = decorateWithMetrics(provider.removeItem, 'SQLiteProvider.removeItem');
+    provider.removeItems = decorateWithMetrics(provider.removeItems, 'SQLiteProvider.removeItems');
+    provider.clear = decorateWithMetrics(provider.clear, 'SQLiteProvider.clear');
+    provider.getAllKeys = decorateWithMetrics(provider.getAllKeys, 'SQLiteProvider.getAllKeys');
+    // @ts-expect-error Reassign
+    generateJSONReplaceSQLQueries = decorateWithMetrics(generateJSONReplaceSQLQueries, 'SQLiteProvider.generateJSONReplaceSQLQueries');
+    // @ts-expect-error Reassign
+    stringifyJSON = decorateWithMetrics(stringifyJSON, 'SQLiteProvider.stringifyJSON');
+    // @ts-expect-error Reassign
+    parseJSON = decorateWithMetrics(parseJSON, 'SQLiteProvider.parseJSON');
+});
 
 export default provider;
 export type {OnyxSQLiteKeyValuePair};

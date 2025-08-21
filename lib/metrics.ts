@@ -1,4 +1,5 @@
 import PerformanceProxy from './dependencies/PerformanceProxy';
+import * as Logger from './Logger';
 
 type PerformanceMarkDetail = {
     result?: unknown;
@@ -9,11 +10,12 @@ type PerformanceMarkDetail = {
  * Capture a measurement between the start mark and now
  */
 function measureMarkToNow(startMark: PerformanceMark, detail: PerformanceMarkDetail) {
-    PerformanceProxy.measure(startMark.name, {
+    const measurement = PerformanceProxy.measure(startMark.name, {
         start: startMark.startTime,
         end: PerformanceProxy.now(),
         detail: {...startMark.detail, ...detail},
     });
+    Logger.logInfo(`Performance - ${measurement.name}: ${measurement.duration} ms`, {isPerformanceMetric: true});
 }
 
 function isPromiseLike(value: unknown): value is Promise<unknown> {
