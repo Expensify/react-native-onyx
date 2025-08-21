@@ -5,8 +5,6 @@
  * This test proves that when multiple Onyx updates are batched together,
  * the sourceValue only reflects the first update, not all the discrete
  * updates that actually occurred.
- *
- * note: I don't know what's going on with sourceValue types here
  */
 
 import {act, renderHook} from '@testing-library/react-native';
@@ -14,12 +12,8 @@ import Onyx, {useOnyx} from '../../lib';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 const ONYXKEYS = {
-    TEST_KEY: 'test_key',
     COLLECTION: {
         TEST_ITEMS: 'test_items_',
-        REPORTS: 'reports_',
-        POLICIES: 'policies_',
-        USERS: 'users_',
     },
 };
 
@@ -32,7 +26,7 @@ beforeEach(async () => {
 });
 
 describe('Simple sourceValue Race Condition Demo', () => {
-    it('should demonstrate that only the final sourceValue is visible when updates are batched', async () => {
+    it('should demonstrate that only the first sourceValue is visible when updates are batched', async () => {
         // Track all sourceValues we receive during the test
         const receivedSourceValues: any[] = [];
         let renderCount = 0;
@@ -160,95 +154,5 @@ describe('Simple sourceValue Race Condition Demo', () => {
         console.log(`• Lost ${expectedUpdates - receivedSourceValues.length} intermediate updates`);
         console.log('• Only the FIRST update is visible in sourceValue due to batching!');
         console.log('\nThis means components cannot reliably track state transitions when updates are batched!');
-    });
-
-    it('should show how the race condition affects multiple keys differently', async () => {
-        const KEYS = {
-            REPORTS: 'reports',
-            POLICIES: 'policies',
-            USER: 'user',
-        };
-
-        // Track sourceValues for each key separately
-        const sourceValueTracker = {
-            reports: [] as any[],
-            policies: [] as any[],
-            user: [] as any[],
-        };
-
-        // Setup hooks for multiple keys
-        const {result: reportsResult} = renderHook(() => {
-            const [data, metadata] = useOnyx(KEYS.REPORTS);
-            if (metadata.sourceValue !== undefined) {
-                sourceValueTracker.reports.push(metadata.sourceValue);
-            }
-            return [data, metadata];
-        });
-
-        const {result: policiesResult} = renderHook(() => {
-            const [data, metadata] = useOnyx(KEYS.POLICIES);
-            if (metadata.sourceValue !== undefined) {
-                sourceValueTracker.policies.push(metadata.sourceValue);
-            }
-            return [data, metadata];
-        });
-
-        const {result: userResult} = renderHook(() => {
-            const [data, metadata] = useOnyx(KEYS.USER);
-            if (metadata.sourceValue !== undefined) {
-                sourceValueTracker.user.push(metadata.sourceValue);
-            }
-            return [data, metadata];
-        });
-
-        await act(async () => waitForPromisesToResolve());
-
-        // Clear trackers
-        sourceValueTracker.reports.length = 0;
-        sourceValueTracker.policies.length = 0;
-        sourceValueTracker.user.length = 0;
-
-        console.log('\n=== Multi-key race condition test ===');
-
-        // Perform updates to multiple keys that will be batched
-        await act(async () => {
-            Onyx.set(KEYS.REPORTS, {reportId: '123', data: 'report_data'});
-            Onyx.set(KEYS.POLICIES, {policyId: '456', data: 'policy_data'});
-            Onyx.set(KEYS.USER, {userId: '789', data: 'user_data'});
-
-            await waitForPromisesToResolve();
-        });
-
-        console.log('SourceValue tracker results:', sourceValueTracker);
-
-        // The race condition means we might not see sourceValues for all collections
-        // This is because different collections might not trigger each other's callbacks
-        console.log('Reports sourceValues:', sourceValueTracker.reports.length);
-        console.log('Policies sourceValues:', sourceValueTracker.policies.length);
-        console.log('User sourceValues:', sourceValueTracker.user.length);
-
-        // Each hook that received an update should have exactly one sourceValue
-        if (sourceValueTracker.reports.length > 0) {
-            expect(sourceValueTracker.reports.length).toBe(1);
-        }
-        if (sourceValueTracker.policies.length > 0) {
-            expect(sourceValueTracker.policies.length).toBe(1);
-        }
-        if (sourceValueTracker.user.length > 0) {
-            expect(sourceValueTracker.user.length).toBe(1);
-        }
-
-        // Since these are individual keys (not collections), sourceValue won't be available
-        // This demonstrates that sourceValue is only available for collection callbacks
-
-        console.log('Final sourceValues:');
-        // @ts-expect-error - sourceValue exists on the metadata object but TS doesn't know the type
-        console.log('- Reports hook sourceValue:', reportsResult.current[1]?.sourceValue);
-        // @ts-expect-error - sourceValue exists on the metadata object but TS doesn't know the type
-        console.log('- Policies hook sourceValue:', policiesResult.current[1]?.sourceValue);
-        // @ts-expect-error - sourceValue exists on the metadata object but TS doesn't know the type
-        console.log('- User hook sourceValue:', userResult.current[1]?.sourceValue);
-
-        // The race condition: each hook's sourceValue might not correspond to its own data!
     });
 });
