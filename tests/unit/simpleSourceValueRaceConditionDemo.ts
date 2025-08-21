@@ -9,11 +9,15 @@
 
 import {act, renderHook} from '@testing-library/react-native';
 import Onyx, {useOnyx} from '../../lib';
+import {clearOnyxUtilsInternals} from '../../lib/OnyxUtils';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 const ONYXKEYS = {
     COLLECTION: {
         TEST_ITEMS: 'test_items_',
+        REPORTS: 'reports_',
+        POLICIES: 'policies_',
+        TRANSACTIONS: 'transactions_',
     },
 };
 
@@ -22,7 +26,23 @@ Onyx.init({
 });
 
 beforeEach(async () => {
+    // Clear Onyx data and wait for it to complete
     await Onyx.clear();
+    
+    // Wait for any pending async operations to complete
+    await waitForPromisesToResolve();
+});
+
+afterEach(async () => {
+    // Wait for pending operations to complete
+    await waitForPromisesToResolve();
+    
+    // Add a small delay to ensure the setTimeout(0) batching mechanism fully completes
+    // This prevents flakiness where the second test gets 0 renders due to timing issues
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    // Wait again after the sleep to ensure all async operations are truly done
+    await waitForPromisesToResolve();
 });
 
 describe('Simple sourceValue Race Condition Demo', () => {
@@ -154,5 +174,144 @@ describe('Simple sourceValue Race Condition Demo', () => {
         console.log(`• Lost ${expectedUpdates - receivedSourceValues.length} intermediate updates`);
         console.log('• Only the FIRST update is visible in sourceValue due to batching!');
         console.log('\nThis means components cannot reliably track state transitions when updates are batched!');
+    });
+
+    it('should demonstrate useSidebarOrderedReports conditional logic bug when sourceValues from multiple collections are available', async () => {
+        // This test demonstrates a LOGIC BUG (not race condition) in useSidebarOrderedReports.tsx:
+        // When batching provides multiple sourceValues simultaneously, the else-if chain
+        // only processes the FIRST condition and ignores available updates from other collections
+
+        let renderCount = 0;
+        const allUpdatesReceived: string[] = [];
+
+        // Replicate the pattern from useSidebarOrderedReports.tsx lines 65-69
+        const {result} = renderHook(() => {
+            renderCount++;
+
+            // Multiple useOnyx hooks watching different collections (like useSidebarOrderedReports)
+            const [chatReports, {sourceValue: reportUpdates}] = useOnyx(ONYXKEYS.COLLECTION.REPORTS);
+            const [policies, {sourceValue: policiesUpdates}] = useOnyx(ONYXKEYS.COLLECTION.POLICIES);
+            const [transactions, {sourceValue: transactionsUpdates}] = useOnyx(ONYXKEYS.COLLECTION.TRANSACTIONS);
+
+            // Track which sourceValues we receive (for debugging)
+            if (reportUpdates !== undefined) {
+                allUpdatesReceived.push(`reports_${renderCount}`);
+            }
+            if (policiesUpdates !== undefined) {
+                allUpdatesReceived.push(`policies_${renderCount}`);
+            }
+            if (transactionsUpdates !== undefined) {
+                allUpdatesReceived.push(`transactions_${renderCount}`);
+            }
+
+            // Replicate the getUpdatedReports logic from useSidebarOrderedReports.tsx lines 94-117
+            const getUpdatedReports = () => {
+                let reportsToUpdate: string[] = [];
+
+                // This is the EXACT conditional pattern that's vulnerable to the race condition
+                if (reportUpdates) {
+                    reportsToUpdate = Object.keys(reportUpdates);
+                    return {source: 'reports', updates: reportsToUpdate};
+                }
+                if (policiesUpdates) {
+                    const updatedPolicies = Object.keys(policiesUpdates);
+                    reportsToUpdate = updatedPolicies.map((key) => `affected_by_policy_${key.replace(ONYXKEYS.COLLECTION.POLICIES, '')}`);
+                    return {source: 'policies', updates: reportsToUpdate};
+                }
+                if (transactionsUpdates) {
+                    const transactionReports = Object.values(transactionsUpdates).map((txn: any) => `report_${txn?.reportID}`);
+                    reportsToUpdate = transactionReports;
+                    return {source: 'transactions', updates: reportsToUpdate};
+                }
+
+                return {source: 'none', updates: []};
+            };
+
+            return {
+                chatReports,
+                policies,
+                transactions,
+                reportUpdates,
+                policiesUpdates,
+                transactionsUpdates,
+                getUpdatedReports: getUpdatedReports(),
+            };
+        });
+
+        await act(async () => waitForPromisesToResolve());
+
+        const initialRenderCount = renderCount;
+        allUpdatesReceived.length = 0;
+
+        console.log('\n=== useSidebarOrderedReports Conditional Logic Bug Test ===');
+        console.log('Simulating simultaneous updates that get batched together...');
+
+        // Simulate the scenario where an API response updates multiple collections simultaneously
+        await act(async () => {
+            // Update 1: New report
+            Onyx.merge(`${ONYXKEYS.COLLECTION.REPORTS}123`, {
+                reportID: '123',
+                lastMessage: 'New message',
+                participantAccountIDs: [1, 2],
+            });
+
+            // Update 2: Policy change that affects reports
+            Onyx.merge(`${ONYXKEYS.COLLECTION.POLICIES}policy456`, {
+                id: 'policy456',
+                name: 'Updated Expense Policy',
+                employeeList: {1: {}, 2: {}},
+            });
+
+            // Update 3: New transaction in a report
+            Onyx.merge(`${ONYXKEYS.COLLECTION.TRANSACTIONS}txn789`, {
+                transactionID: 'txn789',
+                reportID: '123',
+                amount: 2500,
+            });
+
+            await waitForPromisesToResolve();
+        });
+
+        const totalRenders = renderCount - initialRenderCount;
+        const updateDecision = result.current.getUpdatedReports;
+
+        console.log('=== RESULTS ===');
+        console.log(`Total renders: ${totalRenders}`);
+        console.log(`Updates received: [${allUpdatesReceived.join(', ')}]`);
+        console.log(`Decision made: ${updateDecision.source} → ${updateDecision.updates.length} reports to update`);
+
+        // Analyze what the conditional logic chose to process
+        console.log('\n🎯 CONDITIONAL LOGIC ANALYSIS:');
+
+        const hasReportUpdates = result.current.reportUpdates !== undefined;
+        const hasPolicyUpdates = result.current.policiesUpdates !== undefined;
+        const hasTransactionUpdates = result.current.transactionsUpdates !== undefined;
+
+        console.log(`• Reports sourceValue: ${hasReportUpdates ? '✅ Available' : '❌ Missing'}`);
+        console.log(`• Policies sourceValue: ${hasPolicyUpdates ? '✅ Available' : '❌ Missing'}`);
+        console.log(`• Transactions sourceValue: ${hasTransactionUpdates ? '✅ Available' : '❌ Missing'}`);
+
+        // Check if the else-if logic caused updates to be ignored
+        const collectionsWithUpdates = [hasReportUpdates, hasPolicyUpdates, hasTransactionUpdates].filter(Boolean).length;
+        const collectionsProcessed = updateDecision.source !== 'none' ? 1 : 0;
+
+        if (collectionsWithUpdates > collectionsProcessed) {
+            console.log('\n🚨 CONDITIONAL LOGIC BUG CONFIRMED:');
+            console.log(`• ${collectionsWithUpdates} collections had sourceValues available (due to batching)`);
+            console.log(`• Only ${collectionsProcessed} collection was processed: "${updateDecision.source}"`);
+            console.log(`• ${collectionsWithUpdates - collectionsProcessed} collection(s) were IGNORED by else-if logic!`);
+            console.log('\n💥 BUG IMPACT: Available updates are lost due to conditional logic design');
+            console.log('💡 SOLUTION: Replace else-if chain with parallel if statements');
+        }
+
+        // Verify the conditional logic bug occurred
+        expect(totalRenders).toBeLessThanOrEqual(2); // Updates should be batched together
+        expect(collectionsWithUpdates).toBeGreaterThan(collectionsProcessed); // Bug: Available sourceValues ignored by else-if logic
+        expect(updateDecision.source).not.toBe('none'); // At least one collection should be processed
+
+        // Verify no actual data loss (the bug affects logic, not data integrity)
+        expect(result.current.chatReports).toBeDefined();
+        expect(result.current.policies).toBeDefined();
+        expect(result.current.transactions).toBeDefined();
     });
 });
