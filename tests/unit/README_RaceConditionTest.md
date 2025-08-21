@@ -1,16 +1,17 @@
-# SourceValue Race Condition Test Documentation
-
-## Overview
+# Onyx sourceValue issues
 
 These tests demonstrate and prove multiple issues with Onyx sourceValue handling:
 1. **Race Condition**: Multiple discrete updates batched → only first `sourceValue` visible
 2. **Logic Bug**: `useSidebarOrderedReports` conditional logic ignores available `sourceValues`
-3. **Compound Issue**: Both problems occurring simultaneously for maximum impact
+3. **Stale sourceValues**: `sourceValue` preserves the keys of the latest onyx update during unrelated rerenders
+
+See the thread in [#quality](https://expensify.slack.com/archives/C05LX9D6E07/p1755792968968239?thread_ts=1755543034.080259&cid=C05LX9D6E07) for more info
 
 ## Test Files
 
 **`simpleSourceValueRaceConditionDemo.ts`** - Pure race condition test proving batching loses intermediate `sourceValues`
 **`useSidebarOrderedReportsVulnerability.ts`** - Logic bug and compound issue tests replicating production patterns
+**`staleSourceValueTest`** - Test demonstrating that sourceValue persists during unrelated renders, leading to unnecessary cache busing
 
 ## How to Run the Tests
 
@@ -18,17 +19,17 @@ These tests demonstrate and prove multiple issues with Onyx sourceValue handling
 # Run the race condition test
 npm test -- tests/unit/simpleSourceValueRaceConditionDemo.ts
 
-# Run the useSidebarOrderedReports vulnerability tests
-npm test -- tests/unit/useSidebarOrderedReportsVulnerability.ts
+# Run the useSidebarOrderedReports display bug tests
+npm test -- tests/unit/useSidebarOrderedReportsDisplayBug.ts
 
-# Or run both test files
-npm test -- tests/unit/simpleSourceValueRaceConditionDemo.ts tests/unit/useSidebarOrderedReportsVulnerability.ts
+# Run the staleSourceValueTest tests
+npm test -- tests/unit/staleSourceValueTest.ts
 
-# Run with verbose output to see detailed logging
-npm test -- tests/unit/simpleSourceValueRaceConditionDemo.ts --verbose
+# Or run all 3 at once
+npm test -- tests/unit/simpleSourceValueRaceConditionDemo.ts tests/unit/useSidebarOrderedReportsDisplayBug.ts tests/unit/staleSourceValueTest.ts
 ```
 
-## What the Test Proves
+# The race condition test and what it proves
 
 ### The Race Condition Mechanism
 
