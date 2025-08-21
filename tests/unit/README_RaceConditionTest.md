@@ -2,19 +2,29 @@
 
 ## Overview
 
-This test demonstrates and proves the race condition where multiple discrete Onyx updates get batched into a single React render, causing the `sourceValue` to only represent the first update rather than all the discrete updates that occurred.
+These tests demonstrate and prove multiple issues with Onyx sourceValue handling:
+1. **Race Condition**: Multiple discrete updates batched → only first `sourceValue` visible
+2. **Logic Bug**: `useSidebarOrderedReports` conditional logic ignores available `sourceValues`
+3. **Compound Issue**: Both problems occurring simultaneously for maximum impact
 
-## Test File
+## Test Files
 
-**`simpleSourceValueRaceConditionDemo.ts`** - Single focused test that clearly proves the race condition
+**`simpleSourceValueRaceConditionDemo.ts`** - Pure race condition test proving batching loses intermediate `sourceValues`
+**`useSidebarOrderedReportsVulnerability.ts`** - Logic bug and compound issue tests replicating production patterns
 
-## How to Run the Test
+## How to Run the Tests
 
 ```bash
-# Run the test file
+# Run the race condition test
 npm test -- tests/unit/simpleSourceValueRaceConditionDemo.ts
 
-# Or run with more verbose output to see the detailed logging
+# Run the useSidebarOrderedReports vulnerability tests
+npm test -- tests/unit/useSidebarOrderedReportsVulnerability.ts
+
+# Or run both test files
+npm test -- tests/unit/simpleSourceValueRaceConditionDemo.ts tests/unit/useSidebarOrderedReportsVulnerability.ts
+
+# Run with verbose output to see detailed logging
 npm test -- tests/unit/simpleSourceValueRaceConditionDemo.ts --verbose
 ```
 
