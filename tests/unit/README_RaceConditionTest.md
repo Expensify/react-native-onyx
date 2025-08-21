@@ -29,6 +29,13 @@ npm test -- tests/unit/simpleSourceValueRaceConditionDemo.ts --verbose
 
 2. **React Batching**: Due to `unstable_batchedUpdates` and setTimeout-based batching in Onyx, all updates get batched into a single render
 
+   **How this works internally:**
+   - When Onyx updates occur, they're queued in `batchUpdatesQueue` (in `OnyxUtils.ts`)
+   - `maybeFlushBatchUpdates()` uses `setTimeout(0)` to defer processing to the next event loop tick
+   - Inside that timeout, `unstable_batchedUpdates(() => { updatesCopy.forEach(applyUpdates) })` wraps all queued updates
+   - This forces React to treat all updates as a single batch, triggering only one render
+   - The `sourceValue` gets set by the first update, then overwritten by subsequent updates, but only the final state is visible to the component
+
 3. **Lost sourceValue Information**: Only the first `sourceValue` is visible to the component, losing information about subsequent updates
 
 ### Expected vs Actual Behavior
@@ -81,3 +88,43 @@ Final sourceValue: { test_items_item1: { step: 1, status: 'started', message: 'F
 
 This means components cannot reliably track state transitions when updates are batched!
 ```
+
+## Technical Deep Dive: The Batching Mechanism
+
+### Where `unstable_batchedUpdates` is Called
+
+The race condition is caused by Onyx's internal batching mechanism in `lib/OnyxUtils.ts`:
+
+```typescript
+// In OnyxUtils.ts, lines ~203-226
+function maybeFlushBatchUpdates(): Promise<void> {
+    if (batchUpdatesPromise) {
+        return batchUpdatesPromise;
+    }
+    batchUpdatesPromise = new Promise((resolve) => {
+        setTimeout(() => {  // ⚠️ Key: Delays execution to next tick
+            const updatesCopy = batchUpdatesQueue;
+            batchUpdatesQueue = [];
+            batchUpdatesPromise = null;
+            
+            unstable_batchedUpdates(() => {  // ⚠️ React batching starts here
+                updatesCopy.forEach((applyUpdates) => {
+                    applyUpdates(); // All updates execute together
+                });
+            });
+            resolve();
+        }, 0); // Next tick of event loop
+    });
+    return batchUpdatesPromise;
+}
+```
+
+### Why This Causes the Race Condition
+
+1. **Multiple Updates Queued**: Each `Onyx.merge()` call adds an update to `batchUpdatesQueue`
+2. **setTimeout Delay**: All updates wait for the next event loop tick
+3. **Batch Execution**: `unstable_batchedUpdates` executes all updates synchronously within React's batching context
+4. **Single Render**: React sees all state changes as one update, triggering only one render
+5. **Lost sourceValues**: Only the first `sourceValue` assignment survives the batching process
+
+This is why the test demonstrates that 3 discrete updates result in only 1 `sourceValue` being visible to components.
