@@ -6,7 +6,7 @@ This test demonstrates and proves the race condition where multiple discrete Ony
 
 ## Test File
 
-**`simpleSourceValueRaceConditionDemo.ts`** - Focused demonstration that clearly proves the race condition
+**`simpleSourceValueRaceConditionDemo.ts`** - Single focused test that clearly proves the race condition
 
 ## How to Run the Test
 
