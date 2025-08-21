@@ -132,8 +132,32 @@ describe('useOnyx', () => {
     });
 
     describe('misc', () => {
+        it('should initially return loading state while loading non-existent key, and then return `undefined` and loaded state', async () => {
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loading');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should initially return loading state while loading non-existent collection key, and then return `undefined` and loaded state', async () => {
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.COLLECTION.TEST_KEY));
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loading');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
         it('should return value and loaded state when loading cached key', async () => {
-            Onyx.set(ONYXKEYS.TEST_KEY, 'test');
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'test'));
 
             const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
 
@@ -172,7 +196,7 @@ describe('useOnyx', () => {
         });
 
         it('should return value from cache, and return updated value after a merge operation', async () => {
-            Onyx.set(ONYXKEYS.TEST_KEY, 'test1');
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'test1'));
 
             const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
 
@@ -198,8 +222,7 @@ describe('useOnyx', () => {
             expect(result2.current[0]).toBeUndefined();
             expect(result2.current[1].status).toEqual('loaded');
 
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
-            await act(async () => waitForPromisesToResolve());
+            await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, 'test2'));
 
             expect(result1.current[0]).toEqual('test2');
             expect(result1.current[1].status).toEqual('loaded');
@@ -231,8 +254,7 @@ describe('useOnyx', () => {
             expect(result3.current[0]).toBeUndefined();
             expect(result3.current[1].status).toEqual('loaded');
 
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
-            await act(async () => waitForPromisesToResolve());
+            await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, 'test2'));
 
             expect(result1.current[0]).toEqual('test2');
             expect(result1.current[1].status).toEqual('loaded');
@@ -245,7 +267,7 @@ describe('useOnyx', () => {
 
     describe('selector', () => {
         it('should return selected data from a non-collection key', async () => {
-            Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name'});
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name'}));
 
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
@@ -264,11 +286,13 @@ describe('useOnyx', () => {
         });
 
         it('should return selected data from a collection key', async () => {
-            Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, {
-                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
-                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
-                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry3`]: {id: 'entry3_id', name: 'entry3_name'},
-            } as GenericCollection);
+            await act(async () =>
+                Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, {
+                    [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
+                    [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
+                    [`${ONYXKEYS.COLLECTION.TEST_KEY}entry3`]: {id: 'entry3_id', name: 'entry3_name'},
+                } as GenericCollection),
+            );
 
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.COLLECTION.TEST_KEY, {
@@ -291,6 +315,9 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
 
             await act(async () => Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`, null));
+            // Onyx.merge() with null value resolves immediately, but notifies subscribers asynchronously.
+            // waitForPromisesToResolve() ensures these async operations complete before test assertions run.
+            await act(async () => waitForPromisesToResolve());
 
             expect(result.current[0]).toEqual({
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: 'entry1_id',
@@ -300,7 +327,7 @@ describe('useOnyx', () => {
         });
 
         it('should not change selected data if a property outside that data was changed', async () => {
-            Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name'});
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name'}));
 
             // primitive
             const {result: primitiveResult} = renderHook(() =>
@@ -341,11 +368,13 @@ describe('useOnyx', () => {
         });
 
         it('should not change selected collection data if a property outside that data was changed', async () => {
-            Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, {
-                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
-                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
-                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry3`]: {id: 'entry3_id', name: 'entry3_name'},
-            } as GenericCollection);
+            await act(async () =>
+                Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, {
+                    [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
+                    [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
+                    [`${ONYXKEYS.COLLECTION.TEST_KEY}entry3`]: {id: 'entry3_id', name: 'entry3_name'},
+                } as GenericCollection),
+            );
 
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.COLLECTION.TEST_KEY, {
@@ -365,7 +394,7 @@ describe('useOnyx', () => {
         });
 
         it('should always use the current selector reference to return new data', async () => {
-            Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name'});
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name'}));
 
             let selector = (entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name}`;
 
@@ -387,80 +416,281 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
         });
 
-        it('should return initial value if selected data is undefined', async () => {
+        it('should memoize selector output and return same reference when input unchanged', async () => {
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name', count: 1}));
+
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
                     // @ts-expect-error bypass
-                    selector: (_entry: OnyxEntry<string>) => undefined,
-                    initialValue: 'initial value',
+                    selector: (entry: OnyxEntry<{id: string; name: string; count: number}>) => ({
+                        id: entry?.id,
+                        name: entry?.name,
+                    }),
                 }),
             );
 
-            expect(result.current[0]).toEqual('initial value');
-            expect(result.current[1].status).toEqual('loaded');
-
-            Onyx.set(ONYXKEYS.TEST_KEY, 'test_id_1');
-
             await act(async () => waitForPromisesToResolve());
 
-            expect(result.current[0]).toBeUndefined();
-            expect(result.current[1].status).toEqual('loaded');
-        });
-    });
+            const firstResult = result.current[0];
 
-    describe('initialValue', () => {
-        it('should return initial value from non-cached key and then return undefined', async () => {
-            const {result} = renderHook(() =>
-                useOnyx(ONYXKEYS.TEST_KEY, {
-                    initialValue: 'initial value',
-                }),
-            );
-
-            expect(result.current[0]).toEqual('initial value');
-            expect(result.current[1].status).toEqual('loaded');
-
+            // Trigger another render without changing the data
             await act(async () => waitForPromisesToResolve());
 
-            expect(result.current[0]).toBeUndefined();
-            expect(result.current[1].status).toEqual('loaded');
+            // Should return the exact same reference due to memoization
+            expect(result.current[0]).toBe(firstResult);
         });
 
-        it('should return initial value from cached key and then return cached value', async () => {
-            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
+        it('should return new reference when selector input changes', async () => {
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name'}));
 
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
-                    initialValue: 'initial value',
-                }),
-            );
-
-            expect(result.current[0]).toEqual('initial value');
-            expect(result.current[1].status).toEqual('loaded');
-
-            await act(async () => waitForPromisesToResolve());
-
-            expect(result.current[0]).toEqual('test');
-            expect(result.current[1].status).toEqual('loaded');
-        });
-
-        it('should return initial value from cached key and then return selected data', async () => {
-            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
-
-            const {result} = renderHook(() =>
-                useOnyx(ONYXKEYS.TEST_KEY, {
-                    initialValue: 'initial value',
                     // @ts-expect-error bypass
-                    selector: (entry: OnyxEntry<string>) => `${entry}_changed`,
+                    selector: (entry: OnyxEntry<{id: string; name: string}>) => ({
+                        id: entry?.id,
+                        name: entry?.name,
+                    }),
                 }),
             );
 
-            expect(result.current[0]).toEqual('initial value');
-            expect(result.current[1].status).toEqual('loaded');
+            await act(async () => waitForPromisesToResolve());
+
+            const firstResult = result.current[0];
+
+            // Change the data
+            await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, {id: 'changed_id'}));
+
+            // Should return a new reference since data changed
+            expect(result.current[0]).not.toBe(firstResult);
+            expect(result.current[0]).toEqual({id: 'changed_id', name: 'test_name'});
+        });
+
+        it('should memoize selector output using deep equality check', async () => {
+            let selectorCallCount = 0;
+
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name'}));
+
+            const {result} = renderHook(() =>
+                useOnyx(ONYXKEYS.TEST_KEY, {
+                    // @ts-expect-error bypass
+                    selector: (entry: OnyxEntry<{id: string; name: string}>) => {
+                        selectorCallCount++;
+                        return {id: entry?.id, name: entry?.name};
+                    },
+                }),
+            );
 
             await act(async () => waitForPromisesToResolve());
 
-            expect(result.current[0]).toEqual('test_changed');
-            expect(result.current[1].status).toEqual('loaded');
+            const firstResult = result.current[0];
+            const initialCallCount = selectorCallCount;
+
+            // Add a property that will change object reference but keep selected data same
+            await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, {extraProp: 'new'}));
+
+            // Selector should be called again due to input object reference change
+            expect(selectorCallCount).toBe(initialCallCount + 1);
+            // But output should be the same reference due to deep equality check in memoized selector
+            expect(result.current[0]).toBe(firstResult);
+        });
+
+        it('should memoize primitive selector results correctly', async () => {
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, {count: 5, name: 'test'}));
+
+            const {result} = renderHook(() =>
+                useOnyx(ONYXKEYS.TEST_KEY, {
+                    // @ts-expect-error bypass
+                    selector: (entry: OnyxEntry<{count: number; name: string}>) => entry?.count || 0,
+                }),
+            );
+
+            await act(async () => waitForPromisesToResolve());
+
+            const firstResult = result.current[0];
+            expect(firstResult).toBe(5);
+
+            // Change unrelated property
+            await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, {name: 'changed'}));
+
+            // Should return the same primitive value (number 5)
+            expect(result.current[0]).toBe(firstResult);
+            expect(result.current[0]).toBe(5);
+
+            // Change the selected property
+            await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, {count: 10}));
+
+            // Should return new value
+            expect(result.current[0]).not.toBe(firstResult);
+            expect(result.current[0]).toBe(10);
+        });
+
+        it('should recompute selector when dependencies change even if input data stays the same', async () => {
+            const testCollection = {
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}1`]: {id: '1', value: 'item1'},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}2`]: {id: '2', value: 'item2'},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}3`]: {id: '3', value: 'item3'},
+            };
+
+            await act(async () => Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, testCollection as GenericCollection));
+
+            let filterIds = ['1'];
+            let selectorCallCount = 0;
+
+            const {result, rerender} = renderHook(() =>
+                useOnyx(
+                    ONYXKEYS.COLLECTION.TEST_KEY,
+                    {
+                        selector: (collection) => {
+                            selectorCallCount++;
+                            return filterIds.map((id) => (collection as OnyxCollection<GenericCollection>)?.[`${ONYXKEYS.COLLECTION.TEST_KEY}${id}`]).filter(Boolean);
+                        },
+                    },
+                    [filterIds],
+                ),
+            );
+
+            await act(async () => waitForPromisesToResolve());
+
+            // Record count after initial stabilization
+            const initialCallCount = selectorCallCount;
+            const initialResult = result.current[0];
+
+            // Should return item with id '1'
+            expect(initialResult).toEqual([{id: '1', value: 'item1'}]);
+
+            // Change dependencies without changing underlying data
+            await act(async () => {
+                filterIds = ['1', '2'];
+                rerender(ONYXKEYS.COLLECTION.TEST_KEY);
+            });
+
+            // Selector should recompute and return items with id '1' and '2'
+            expect(result.current[0]).toEqual([
+                {id: '1', value: 'item1'},
+                {id: '2', value: 'item2'},
+            ]);
+            expect(selectorCallCount).toBeGreaterThan(initialCallCount);
+
+            // Record count after first dependency change
+            const firstChangeCallCount = selectorCallCount;
+
+            // Change dependencies again
+            await act(async () => {
+                filterIds = ['2', '3'];
+                rerender(ONYXKEYS.COLLECTION.TEST_KEY);
+            });
+
+            // Selector should recompute and return items with id '2' and '3'
+            expect(result.current[0]).toEqual([
+                {id: '2', value: 'item2'},
+                {id: '3', value: 'item3'},
+            ]);
+            expect(selectorCallCount).toBeGreaterThan(firstChangeCallCount);
+        });
+
+        it('should handle complex dependency scenarios with multiple values', async () => {
+            type TestItem = {id: string; category: string; priority: number};
+            const testData = {
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}item1`]: {id: 'item1', category: 'A', priority: 1},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}item2`]: {id: 'item2', category: 'B', priority: 2},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}item3`]: {id: 'item3', category: 'A', priority: 3},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}item4`]: {id: 'item4', category: 'B', priority: 4},
+            };
+
+            await act(async () => Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, testData as GenericCollection));
+
+            let categoryFilter = 'A';
+            let sortAscending = true;
+
+            const {result, rerender} = renderHook(() =>
+                useOnyx(
+                    ONYXKEYS.COLLECTION.TEST_KEY,
+                    {
+                        selector: (collection) => {
+                            const typedCollection = collection as OnyxCollection<TestItem>;
+                            if (!typedCollection) return [];
+
+                            const filtered = Object.values(typedCollection).filter((item) => item?.category === categoryFilter);
+
+                            return filtered.sort((a, b) => (sortAscending ? (a?.priority ?? 0) - (b?.priority ?? 0) : (b?.priority ?? 0) - (a?.priority ?? 0)));
+                        },
+                    },
+                    [categoryFilter, sortAscending],
+                ),
+            );
+
+            await act(async () => waitForPromisesToResolve());
+
+            // Should return category A items sorted ascending
+            expect(result.current[0]).toEqual([
+                {id: 'item1', category: 'A', priority: 1},
+                {id: 'item3', category: 'A', priority: 3},
+            ]);
+
+            // Change sort order only
+            await act(async () => {
+                sortAscending = false;
+                rerender(ONYXKEYS.COLLECTION.TEST_KEY);
+            });
+
+            // Should return category A items sorted descending
+            expect(result.current[0]).toEqual([
+                {id: 'item3', category: 'A', priority: 3},
+                {id: 'item1', category: 'A', priority: 1},
+            ]);
+
+            // Change category filter
+            await act(async () => {
+                categoryFilter = 'B';
+                rerender(ONYXKEYS.COLLECTION.TEST_KEY);
+            });
+
+            // Should return category B items sorted descending
+            expect(result.current[0]).toEqual([
+                {id: 'item4', category: 'B', priority: 4},
+                {id: 'item2', category: 'B', priority: 2},
+            ]);
+        });
+
+        it('should not trigger unnecessary recomputations when dependencies remain the same', async () => {
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, {value: 'test'}));
+
+            const dependencies = ['constant'];
+            let selectorCallCount = 0;
+
+            const {result, rerender} = renderHook(() =>
+                useOnyx(
+                    ONYXKEYS.TEST_KEY,
+                    {
+                        selector: (data) => {
+                            selectorCallCount++;
+                            return `${dependencies.join(',')}:${(data as {value?: string})?.value}`;
+                        },
+                    },
+                    dependencies,
+                ),
+            );
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBe('constant:test');
+            expect(selectorCallCount).toBe(1);
+
+            // Force rerender without changing dependencies
+            await act(async () => {
+                rerender(ONYXKEYS.COLLECTION.TEST_KEY);
+            });
+
+            // Selector should not recompute since dependencies haven't changed
+            expect(result.current[0]).toBe('constant:test');
+            expect(selectorCallCount).toBe(1);
+
+            // Update underlying data
+            await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, {value: 'updated'}));
+
+            // Selector should recompute due to data change
+            expect(result.current[0]).toBe('constant:updated');
+            expect(selectorCallCount).toBe(2);
         });
     });
 
@@ -506,28 +736,6 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
         });
 
-        it('should return initial value and loaded state while we have pending merges for the key, and then return updated value and loaded state', async () => {
-            const {result} = renderHook(() =>
-                useOnyx(ONYXKEYS.TEST_KEY, {
-                    initialValue: 'initial value',
-                }),
-            );
-
-            expect(result.current[0]).toEqual('initial value');
-            expect(result.current[1].status).toEqual('loaded');
-
-            Onyx.set(ONYXKEYS.TEST_KEY, 'test1');
-
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test3');
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test4');
-
-            await act(async () => waitForPromisesToResolve());
-
-            expect(result.current[0]).toEqual('test4');
-            expect(result.current[1].status).toEqual('loaded');
-        });
-
         it('should return stale value and loaded state if allowStaleData is true, and then return updated value and loaded state', async () => {
             Onyx.set(ONYXKEYS.TEST_KEY, 'test1');
 
@@ -561,27 +769,6 @@ describe('useOnyx', () => {
             await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, 'test2'));
 
             expect(result.current[0]).toEqual('test2');
-            expect(result.current[1].status).toEqual('loaded');
-        });
-
-        it('should return `undefined` and loaded state if using `initialValue`, and after merge return updated value and loaded state', async () => {
-            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test1');
-
-            const {result} = renderHook(() =>
-                useOnyx(ONYXKEYS.TEST_KEY, {
-                    initWithStoredValues: false,
-                    initialValue: 'initial value',
-                }),
-            );
-
-            await act(async () => waitForPromisesToResolve());
-
-            expect(result.current[0]).toBeUndefined();
-            expect(result.current[1].status).toEqual('loaded');
-
-            await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, 'test'));
-
-            expect(result.current[0]).toEqual('test');
             expect(result.current[1].status).toEqual('loaded');
         });
 
@@ -652,11 +839,13 @@ describe('useOnyx', () => {
 
     describe('dependencies', () => {
         it('should return the updated selected value when a external value passed to the dependencies list changes', async () => {
-            Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, {
-                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
-                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
-                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry3`]: {id: 'entry3_id', name: 'entry3_name'},
-            } as GenericCollection);
+            await act(async () =>
+                Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, {
+                    [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
+                    [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
+                    [`${ONYXKEYS.COLLECTION.TEST_KEY}entry3`]: {id: 'entry3_id', name: 'entry3_name'},
+                } as GenericCollection),
+            );
 
             let externalValue = 'ex1';
 
@@ -701,11 +890,13 @@ describe('useOnyx', () => {
 
     describe('skippable collection member ids', () => {
         it('should always return undefined entry when subscribing to a collection with skippable member ids', async () => {
-            Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, {
-                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
-                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
-                [`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`]: {id: 'skippable-id_id', name: 'skippable-id_name'},
-            } as GenericCollection);
+            await act(async () =>
+                Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, {
+                    [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
+                    [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
+                    [`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`]: {id: 'skippable-id_id', name: 'skippable-id_name'},
+                } as GenericCollection),
+            );
 
             const {result} = renderHook(() => useOnyx(ONYXKEYS.COLLECTION.TEST_KEY));
 
@@ -780,6 +971,9 @@ describe('useOnyx', () => {
             expect(result1.current[0]).toBe('test');
 
             await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, null));
+            // Onyx.set() with null value resolves immediately, but notifies subscribers asynchronously.
+            // waitForPromisesToResolve() ensures these async operations complete before test assertions run.
+            await act(async () => waitForPromisesToResolve());
 
             expect(result1.current[0]).toBeUndefined();
             expect(logAlertFn).not.toBeCalled();
@@ -813,6 +1007,9 @@ describe('useOnyx', () => {
             expect(result1.current[0]).toBe('test');
 
             await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, null));
+            // Onyx.set() with null value resolves immediately, but notifies subscribers asynchronously.
+            // waitForPromisesToResolve() ensures these async operations complete before test assertions run.
+            await act(async () => waitForPromisesToResolve());
 
             expect(result1.current[0]).toBeUndefined();
             expect(logAlertFn).toHaveBeenCalledTimes(2);
@@ -844,6 +1041,9 @@ describe('useOnyx', () => {
             expect(result1.current[0]).toBe('test_changed');
 
             await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, null));
+            // Onyx.set() with null value resolves immediately, but notifies subscribers asynchronously.
+            // waitForPromisesToResolve() ensures these async operations complete before test assertions run.
+            await act(async () => waitForPromisesToResolve());
 
             expect(result1.current[0]).toBeUndefined();
             expect(logAlertFn).toHaveBeenCalledTimes(2);
@@ -872,6 +1072,9 @@ describe('useOnyx', () => {
             expect(result1.current[0]).toBe('test_changed');
 
             await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, null));
+            // Onyx.set() with null value resolves immediately, but notifies subscribers asynchronously.
+            // waitForPromisesToResolve() ensures these async operations complete before test assertions run.
+            await act(async () => waitForPromisesToResolve());
 
             expect(result1.current[0]).toBe('undefined_changed');
             expect(logAlertFn).toHaveBeenCalledTimes(2);
@@ -931,9 +1134,11 @@ describe('useOnyx', () => {
         });
 
         it('should add the connection to the blocklist when setting "canEvict" to false', async () => {
-            Onyx.mergeCollection(ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY, {
-                [`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
-            } as GenericCollection);
+            await act(async () =>
+                Onyx.mergeCollection(ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY, {
+                    [`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
+                } as GenericCollection),
+            );
 
             renderHook(() => useOnyx(`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`, {canEvict: false}));
 
@@ -944,10 +1149,12 @@ describe('useOnyx', () => {
         });
 
         it('should handle removal/adding the connection to the blocklist properly when changing the evictable key to another', async () => {
-            Onyx.mergeCollection(ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY, {
-                [`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
-                [`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
-            } as GenericCollection);
+            await act(async () =>
+                Onyx.mergeCollection(ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY, {
+                    [`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
+                    [`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
+                } as GenericCollection),
+            );
 
             const {rerender} = renderHook((key: string) => useOnyx(key, {canEvict: false}), {initialProps: `${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1` as string});
 
@@ -966,9 +1173,11 @@ describe('useOnyx', () => {
         });
 
         it('should remove the connection from the blocklist when setting "canEvict" to true', async () => {
-            Onyx.mergeCollection(ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY, {
-                [`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
-            } as GenericCollection);
+            await act(async () =>
+                Onyx.mergeCollection(ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY, {
+                    [`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
+                } as GenericCollection),
+            );
 
             const {rerender} = renderHook((canEvict: boolean) => useOnyx(`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`, {canEvict}), {initialProps: false as boolean});
 

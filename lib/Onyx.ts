@@ -1,5 +1,3 @@
-/* eslint-disable no-continue */
-import _ from 'underscore';
 import * as Logger from './Logger';
 import cache, {TASK} from './OnyxCache';
 import * as PerformanceUtils from './PerformanceUtils';
@@ -26,6 +24,7 @@ import type {
     OnyxValue,
     OnyxInput,
     OnyxMethodMap,
+    SetOptions,
 } from './types';
 import OnyxUtils from './OnyxUtils';
 import logMessages from './logMessages';
@@ -33,6 +32,7 @@ import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
 import * as GlobalSettings from './GlobalSettings';
 import decorateWithMetrics from './metrics';
+import OnyxMerge from './OnyxMerge';
 
 /** Initialize the store with actions and listening for storage events */
 function init({
@@ -44,7 +44,6 @@ function init({
     debugSetState = false,
     enablePerformanceMetrics = false,
     skippableCollectionMemberIDs = [],
-    fullyMergedSnapshotKeys = [],
 }: InitOptions): void {
     if (enablePerformanceMetrics) {
         GlobalSettings.setPerformanceMetricsEnabled(true);
@@ -71,7 +70,7 @@ function init({
         cache.setRecentKeysLimit(maxCachedKeysCount);
     }
 
-    OnyxUtils.initStoreValues(keys, initialKeyStates, evictableKeys, fullyMergedSnapshotKeys);
+    OnyxUtils.initStoreValues(keys, initialKeyStates, evictableKeys);
 
     // Initialize all of our keys with data provided then give green light to any pending connections
     Promise.all([cache.addEvictableKeysToRecentlyAccessedList(OnyxUtils.isCollectionKey, OnyxUtils.getAllKeys), OnyxUtils.initializeWithDefaultKeyStates()]).then(
@@ -81,10 +80,11 @@ function init({
 
 /**
  * Connects to an Onyx key given the options passed and listens to its changes.
+ * This method will be deprecated soon. Please use `Onyx.connectWithoutView()` instead.
  *
  * @example
  * ```ts
- * const connection = Onyx.connect({
+ * const connection = Onyx.connectWithoutView({
  *     key: ONYXKEYS.SESSION,
  *     callback: onSessionChange,
  * });
@@ -108,11 +108,39 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
 }
 
 /**
+ * Connects to an Onyx key given the options passed and listens to its changes.
+ *
+ * @example
+ * ```ts
+ * const connection = Onyx.connectWithoutView({
+ *     key: ONYXKEYS.SESSION,
+ *     callback: onSessionChange,
+ * });
+ * ```
+ *
+ * @param connectOptions The options object that will define the behavior of the connection.
+ * @param connectOptions.key The Onyx key to subscribe to.
+ * @param connectOptions.callback A function that will be called when the Onyx data we are subscribed changes.
+ * @param connectOptions.waitForCollectionCallback If set to `true`, it will return the entire collection to the callback as a single object.
+ * @param connectOptions.withOnyxInstance The `withOnyx` class instance to be internally passed. **Only used inside `withOnyx()` HOC.**
+ * @param connectOptions.statePropertyName The name of the component's prop that is connected to the Onyx key. **Only used inside `withOnyx()` HOC.**
+ * @param connectOptions.displayName The component's display name. **Only used inside `withOnyx()` HOC.**
+ * @param connectOptions.selector This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook or `withOnyx()` HOC.**
+ *        Using this setting on `useOnyx()` or `withOnyx()` can have very positive performance benefits because the component will only re-render
+ *        when the subset of data changes. Otherwise, any change of data on any property would normally
+ *        cause the component to re-render (and that can be expensive from a performance standpoint).
+ * @returns The connection object to use when calling `Onyx.disconnect()`.
+ */
+function connectWithoutView<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Connection {
+    return connectionManager.connect(connectOptions);
+}
+
+/**
  * Disconnects and removes the listener from the Onyx key.
  *
  * @example
  * ```ts
- * const connection = Onyx.connect({
+ * const connection = Onyx.connectWithoutView({
  *     key: ONYXKEYS.SESSION,
  *     callback: onSessionChange,
  * });
@@ -120,7 +148,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
  * Onyx.disconnect(connection);
  * ```
  *
- * @param connection Connection object returned by calling `Onyx.connect()`.
+ * @param connection Connection object returned by calling `Onyx.connect()` or `Onyx.connectWithoutView()`.
  */
 function disconnect(connection: Connection): void {
     connectionManager.disconnect(connection);
@@ -131,8 +159,9 @@ function disconnect(connection: Connection): void {
  *
  * @param key ONYXKEY to set
  * @param value value to store
+ * @param options optional configuration object
  */
-function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>): Promise<void> {
+function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options?: SetOptions): Promise<void> {
     // When we use Onyx.set to set a key we want to clear the current delta changes from Onyx.merge that were queued
     // before the value was set. If Onyx.merge is currently reading the old value from storage, it will then not apply the changes.
     if (OnyxUtils.hasPendingMergeForKey(key)) {
@@ -171,38 +200,31 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>): Promis
         return Promise.resolve();
     }
 
-    // If the value is null, we remove the key from storage
-    const {value: valueAfterRemoving, wasRemoved} = OnyxUtils.removeNullValues(key, value);
-
-    const logSetCall = (hasChanged = true) => {
-        // Logging properties only since values could be sensitive things we don't want to log
-        Logger.logInfo(`set called for key: ${key}${_.isObject(value) ? ` properties: ${_.keys(value).join(',')}` : ''} hasChanged: ${hasChanged}`);
-    };
-
-    // Calling "OnyxUtils.removeNullValues" removes the key from storage and cache and updates the subscriber.
+    // If the change is null, we can just delete the key.
     // Therefore, we don't need to further broadcast and update the value so we can return early.
-    if (wasRemoved) {
-        logSetCall();
+    if (value === null) {
+        OnyxUtils.remove(key);
+        OnyxUtils.logKeyRemoved(OnyxUtils.METHOD.SET, key);
         return Promise.resolve();
     }
 
-    const valueWithoutNullValues = valueAfterRemoving as OnyxValue<TKey>;
-    const hasChanged = cache.hasValueChanged(key, valueWithoutNullValues);
+    const valueWithoutNestedNullValues = utils.removeNestedNullValues(value) as OnyxValue<TKey>;
+    const hasChanged = options?.skipCacheCheck ? true : cache.hasValueChanged(key, valueWithoutNestedNullValues);
 
-    logSetCall(hasChanged);
+    OnyxUtils.logKeyChanged(OnyxUtils.METHOD.SET, key, value, hasChanged);
 
     // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
-    const updatePromise = OnyxUtils.broadcastUpdate(key, valueWithoutNullValues, hasChanged);
+    const updatePromise = OnyxUtils.broadcastUpdate(key, valueWithoutNestedNullValues, hasChanged);
 
     // If the value has not changed or the key got removed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
     if (!hasChanged) {
         return updatePromise;
     }
 
-    return Storage.setItem(key, valueWithoutNullValues)
-        .catch((error) => OnyxUtils.evictStorageAndRetry(error, set, key, valueWithoutNullValues))
+    return Storage.setItem(key, valueWithoutNestedNullValues)
+        .catch((error) => OnyxUtils.evictStorageAndRetry(error, set, key, valueWithoutNestedNullValues))
         .then(() => {
-            OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNullValues);
+            OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
             return updatePromise;
         });
 }
@@ -314,8 +336,6 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
         }
 
         try {
-            // We first only merge the changes, so we can provide these to the native implementation (SQLite uses only delta changes in "JSON_PATCH" to merge)
-            // We don't want to remove null values from the "batchedDeltaChanges", because SQLite uses them to remove keys from storage natively.
             const validChanges = mergeQueue[key].filter((change) => {
                 const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(change, existingValue);
                 if (!isCompatible) {
@@ -327,53 +347,21 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
             if (!validChanges.length) {
                 return Promise.resolve();
             }
-            const batchedDeltaChanges = OnyxUtils.applyMerge(undefined, validChanges, false);
 
-            // Case (1): When there is no existing value in storage, we want to set the value instead of merge it.
-            // Case (2): The presence of a top-level `null` in the merge queue instructs us to drop the whole existing value.
-            // In this case, we can't simply merge the batched changes with the existing value, because then the null in the merge queue would have no effect
-            const shouldSetValue = !existingValue || mergeQueue[key].includes(null);
-
-            // Clean up the write queue, so we don't apply these changes again
+            // Clean up the write queue, so we don't apply these changes again.
             delete mergeQueue[key];
             delete mergeQueuePromise[key];
 
-            const logMergeCall = (hasChanged = true) => {
-                // Logging properties only since values could be sensitive things we don't want to log
-                Logger.logInfo(`merge called for key: ${key}${_.isObject(batchedDeltaChanges) ? ` properties: ${_.keys(batchedDeltaChanges).join(',')}` : ''} hasChanged: ${hasChanged}`);
-            };
-
-            // If the batched changes equal null, we want to remove the key from storage, to reduce storage size
-            const {wasRemoved} = OnyxUtils.removeNullValues(key, batchedDeltaChanges);
-
-            // Calling "OnyxUtils.removeNullValues" removes the key from storage and cache and updates the subscriber.
+            // If the last change is null, we can just delete the key.
             // Therefore, we don't need to further broadcast and update the value so we can return early.
-            if (wasRemoved) {
-                logMergeCall();
+            if (validChanges.at(-1) === null) {
+                OnyxUtils.remove(key);
+                OnyxUtils.logKeyRemoved(OnyxUtils.METHOD.MERGE, key);
                 return Promise.resolve();
             }
 
-            // For providers that can't handle delta changes, we need to merge the batched changes with the existing value beforehand.
-            // The "preMergedValue" will be directly "set" in storage instead of being merged
-            // Therefore we merge the batched changes with the existing value to get the final merged value that will be stored.
-            // We can remove null values from the "preMergedValue", because "null" implicates that the user wants to remove a value from storage.
-            const preMergedValue = OnyxUtils.applyMerge(shouldSetValue ? undefined : existingValue, [batchedDeltaChanges], true);
-
-            // In cache, we don't want to remove the key if it's null to improve performance and speed up the next merge.
-            const hasChanged = cache.hasValueChanged(key, preMergedValue);
-
-            logMergeCall(hasChanged);
-
-            // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
-            const updatePromise = OnyxUtils.broadcastUpdate(key, preMergedValue as OnyxValue<TKey>, hasChanged);
-
-            // If the value has not changed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
-            if (!hasChanged) {
-                return updatePromise;
-            }
-
-            return Storage.mergeItem(key, batchedDeltaChanges as OnyxValue<TKey>, preMergedValue as OnyxValue<TKey>, shouldSetValue).then(() => {
-                OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, changes, preMergedValue);
+            return OnyxMerge.applyMerge(key, existingValue, validChanges).then(({mergedValue, updatePromise}) => {
+                OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, changes, mergedValue);
                 return updatePromise;
             });
         } catch (error) {
@@ -386,7 +374,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
 }
 
 /**
- * Merges a collection based on their keys
+ * Merges a collection based on their keys.
  *
  * @example
  *
@@ -399,115 +387,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
  * @param collection Object collection keyed by individual collection member keys and values
  */
 function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
-    if (!OnyxUtils.isValidNonEmptyCollectionForMerge(collection)) {
-        Logger.logInfo('mergeCollection() called with invalid or empty value. Skipping this update.');
-        return Promise.resolve();
-    }
-
-    let resultCollection: OnyxInputKeyValueMapping = collection;
-    let resultCollectionKeys = Object.keys(resultCollection);
-
-    // Confirm all the collection keys belong to the same parent
-    if (!OnyxUtils.doAllCollectionItemsBelongToSameParent(collectionKey, resultCollectionKeys)) {
-        return Promise.resolve();
-    }
-
-    const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
-    if (skippableCollectionMemberIDs.size) {
-        resultCollection = resultCollectionKeys.reduce((result: OnyxInputKeyValueMapping, key) => {
-            try {
-                const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key, collectionKey);
-                // If the collection member key is a skippable one we set its value to null.
-                // eslint-disable-next-line no-param-reassign
-                result[key] = !skippableCollectionMemberIDs.has(collectionMemberID) ? resultCollection[key] : null;
-            } catch {
-                // Something went wrong during split, so we assign the data to result anyway.
-                // eslint-disable-next-line no-param-reassign
-                result[key] = resultCollection[key];
-            }
-
-            return result;
-        }, {});
-    }
-    resultCollectionKeys = Object.keys(resultCollection);
-
-    return OnyxUtils.getAllKeys()
-        .then((persistedKeys) => {
-            // Split to keys that exist in storage and keys that don't
-            const keys = resultCollectionKeys.filter((key) => {
-                if (resultCollection[key] === null) {
-                    OnyxUtils.remove(key);
-                    return false;
-                }
-                return true;
-            });
-
-            const existingKeys = keys.filter((key) => persistedKeys.has(key));
-
-            const cachedCollectionForExistingKeys = OnyxUtils.getCachedCollection(collectionKey, existingKeys);
-
-            const existingKeyCollection = existingKeys.reduce((obj: OnyxInputKeyValueMapping, key) => {
-                const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(resultCollection[key], cachedCollectionForExistingKeys[key]);
-                if (!isCompatible) {
-                    Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'mergeCollection', existingValueType, newValueType));
-                    return obj;
-                }
-                // eslint-disable-next-line no-param-reassign
-                obj[key] = resultCollection[key];
-                return obj;
-            }, {}) as Record<OnyxKey, OnyxInput<TKey>>;
-
-            const newCollection: Record<OnyxKey, OnyxInput<TKey>> = {};
-            keys.forEach((key) => {
-                if (persistedKeys.has(key)) {
-                    return;
-                }
-                newCollection[key] = resultCollection[key];
-            });
-
-            // When (multi-)merging the values with the existing values in storage,
-            // we don't want to remove nested null values from the data that we pass to the storage layer,
-            // because the storage layer uses them to remove nested keys from storage natively.
-            const keyValuePairsForExistingCollection = OnyxUtils.prepareKeyValuePairsForStorage(existingKeyCollection, false);
-
-            // We can safely remove nested null values when using (multi-)set,
-            // because we will simply overwrite the existing values in storage.
-            const keyValuePairsForNewCollection = OnyxUtils.prepareKeyValuePairsForStorage(newCollection, true);
-
-            const promises = [];
-
-            // We need to get the previously existing values so we can compare the new ones
-            // against them, to avoid unnecessary subscriber updates.
-            const previousCollectionPromise = Promise.all(existingKeys.map((key) => OnyxUtils.get(key).then((value) => [key, value]))).then(Object.fromEntries);
-
-            // New keys will be added via multiSet while existing keys will be updated using multiMerge
-            // This is because setting a key that doesn't exist yet with multiMerge will throw errors
-            if (keyValuePairsForExistingCollection.length > 0) {
-                promises.push(Storage.multiMerge(keyValuePairsForExistingCollection));
-            }
-
-            if (keyValuePairsForNewCollection.length > 0) {
-                promises.push(Storage.multiSet(keyValuePairsForNewCollection));
-            }
-
-            // finalMergedCollection contains all the keys that were merged, without the keys of incompatible updates
-            const finalMergedCollection = {...existingKeyCollection, ...newCollection};
-
-            // Prefill cache if necessary by calling get() on any existing keys and then merge original data to cache
-            // and update all subscribers
-            const promiseUpdate = previousCollectionPromise.then((previousCollection) => {
-                cache.merge(finalMergedCollection);
-                return OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, finalMergedCollection, previousCollection);
-            });
-
-            return Promise.all(promises)
-                .catch((error) => OnyxUtils.evictStorageAndRetry(error, mergeCollection, collectionKey, resultCollection))
-                .then(() => {
-                    OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE_COLLECTION, undefined, resultCollection);
-                    return promiseUpdate;
-                });
-        })
-        .then(() => undefined);
+    return OnyxUtils.mergeCollectionWithPatches(collectionKey, collection);
 }
 
 /**
@@ -718,24 +598,35 @@ function update(data: OnyxUpdate[]): Promise<void> {
                 // Remove the collection-related key from the updateQueue so that it won't be processed individually.
                 delete updateQueue[key];
 
-                const updatedValue = OnyxUtils.applyMerge(undefined, operations, false);
+                const batchedChanges = OnyxUtils.mergeAndMarkChanges(operations);
                 if (operations[0] === null) {
                     // eslint-disable-next-line no-param-reassign
-                    queue.set[key] = updatedValue;
+                    queue.set[key] = batchedChanges.result;
                 } else {
                     // eslint-disable-next-line no-param-reassign
-                    queue.merge[key] = updatedValue;
+                    queue.merge[key] = batchedChanges.result;
+                    if (batchedChanges.replaceNullPatches.length > 0) {
+                        // eslint-disable-next-line no-param-reassign
+                        queue.mergeReplaceNullPatches[key] = batchedChanges.replaceNullPatches;
+                    }
                 }
                 return queue;
             },
             {
                 merge: {},
+                mergeReplaceNullPatches: {},
                 set: {},
             },
         );
 
         if (!utils.isEmptyObject(batchedCollectionUpdates.merge)) {
-            promises.push(() => mergeCollection(collectionKey, batchedCollectionUpdates.merge as Collection<CollectionKey, unknown, unknown>));
+            promises.push(() =>
+                OnyxUtils.mergeCollectionWithPatches(
+                    collectionKey,
+                    batchedCollectionUpdates.merge as Collection<CollectionKey, unknown, unknown>,
+                    batchedCollectionUpdates.mergeReplaceNullPatches,
+                ),
+            );
         }
         if (!utils.isEmptyObject(batchedCollectionUpdates.set)) {
             promises.push(() => multiSet(batchedCollectionUpdates.set));
@@ -743,13 +634,15 @@ function update(data: OnyxUpdate[]): Promise<void> {
     });
 
     Object.entries(updateQueue).forEach(([key, operations]) => {
-        const batchedChanges = OnyxUtils.applyMerge(undefined, operations, false);
-
         if (operations[0] === null) {
+            const batchedChanges = OnyxUtils.mergeChanges(operations).result;
             promises.push(() => set(key, batchedChanges));
-        } else {
-            promises.push(() => merge(key, batchedChanges));
+            return;
         }
+
+        operations.forEach((operation) => {
+            promises.push(() => merge(key, operation));
+        });
     });
 
     const snapshotPromises = OnyxUtils.updateSnapshots(data, merge);
@@ -835,6 +728,7 @@ function setCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey
 const Onyx = {
     METHOD: OnyxUtils.METHOD,
     connect,
+    connectWithoutView,
     disconnect,
     set,
     multiSet,
@@ -853,6 +747,8 @@ function applyDecorators() {
     // @ts-expect-error Reassign
     connect = decorateWithMetrics(connect, 'Onyx.connect');
     // @ts-expect-error Reassign
+    connectWithoutView = decorateWithMetrics(connectWithoutView, 'Onyx.connectWithoutView');
+    // @ts-expect-error Reassign
     set = decorateWithMetrics(set, 'Onyx.set');
     // @ts-expect-error Reassign
     multiSet = decorateWithMetrics(multiSet, 'Onyx.multiSet');
@@ -868,4 +764,4 @@ function applyDecorators() {
 }
 
 export default Onyx;
-export type {OnyxUpdate, Mapping, ConnectOptions};
+export type {OnyxUpdate, Mapping, ConnectOptions, SetOptions};

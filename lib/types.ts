@@ -3,6 +3,7 @@ import type {BuiltIns} from 'type-fest/source/internal';
 import type OnyxUtils from './OnyxUtils';
 import type {WithOnyxInstance, WithOnyxState} from './withOnyx/types';
 import type {OnyxMethod} from './OnyxUtils';
+import type {FastMergeReplaceNullPatch} from './utils';
 
 /**
  * Utility type that excludes `null` from the type `TValue`.
@@ -272,6 +273,9 @@ type BaseConnectOptions = {
      * with the same connect configurations.
      */
     reuseConnection?: boolean;
+
+    /** Indicates whether this subscriber is created from the useOnyx hook. */
+    isUseOnyxSubscriber?: boolean;
 };
 
 /** Represents the callback function used in `Onyx.connect()` method with a regular key. */
@@ -438,6 +442,14 @@ type OnyxUpdate = {
 }[OnyxMethod];
 
 /**
+ * Represents the options used in `Onyx.set()` method.
+ */
+type SetOptions = {
+    /** Skip the deep equality check against the cached value. Improves performance for large objects. */
+    skipCacheCheck?: boolean;
+};
+
+/**
  * Represents the options used in `Onyx.init()` method.
  */
 type InitOptions = {
@@ -480,24 +492,25 @@ type InitOptions = {
      * Additionally, any subscribers from these keys to won't receive any data from Onyx.
      */
     skippableCollectionMemberIDs?: string[];
-
-    /**
-     * Array of snapshot collection keys where full merge is supported and data structure can be changed after merge.
-     * For e.g. if oldSnapshotData is {report_1: {name 'Fitsum'}} and BE update is {report_1: {name:'Fitsum2', nickName:'Fitse'}}
-     * if it is fullyMergedSnapshotkey the `nickName` prop that didn't exist in the previous data will be merged
-     * otherwise only existing prop will be picked from the BE update and merged (in this case only name).
-     */
-    fullyMergedSnapshotKeys?: string[];
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type GenericFunction = (...args: any[]) => any;
 
 /**
+ * Represents a record where the key is a collection member key and the value is a list of
+ * tuples that we'll use to replace the nested objects of that collection member record with something else.
+ */
+type MultiMergeReplaceNullPatches = {
+    [TKey in OnyxKey]: FastMergeReplaceNullPatch[];
+};
+
+/**
  * Represents a combination of Merge and Set operations that should be executed in Onyx
  */
 type MixedOperationsQueue = {
     merge: OnyxInputKeyValueMapping;
+    mergeReplaceNullPatches: MultiMergeReplaceNullPatches;
     set: OnyxInputKeyValueMapping;
 };
 
@@ -538,6 +551,8 @@ export type {
     OnyxUpdate,
     OnyxValue,
     Selector,
+    SetOptions,
     WithOnyxConnectOptions,
+    MultiMergeReplaceNullPatches,
     MixedOperationsQueue,
 };

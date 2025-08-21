@@ -14,11 +14,25 @@ type MeasurementOutput = {
     isDeviationExceeded: boolean;
 };
 
+function getInputOrEnv(name: string): string {
+    try {
+        return core.getInput(name, {required: true});
+    } catch {
+        const envProperty = process.env[name];
+        if (!envProperty) {
+            throw new Error(`'${name}' env property not defined.`);
+        }
+
+        return envProperty;
+    }
+}
+
 async function run() {
     try {
         const regressionOutput: CompareResult = JSON.parse(fs.readFileSync('.reassure/output.json', 'utf8'));
-        const allowedDurationDeviation = Number(core.getInput('ALLOWED_DURATION_DEVIATION', {required: true}));
-        const durationDeviationPercentage = Number(core.getInput('ALLOWED_RELATIVE_DURATION_DEVIATION', {required: true}));
+        const allowedDurationDeviation = Number(getInputOrEnv('ALLOWED_DURATION_DEVIATION'));
+        const durationDeviationPercentage = Number(getInputOrEnv('ALLOWED_RELATIVE_DURATION_DEVIATION'));
+        const isValidatingStability = Boolean(getInputOrEnv('IS_VALIDATING_STABILITY'));
 
         if (regressionOutput.significant === undefined || regressionOutput.significant.length === 0) {
             console.log('No significant data available. Exiting...');
@@ -77,7 +91,11 @@ async function run() {
 
         const shouldFailWorkflow = outputs.some((output) => output.isDeviationExceeded);
         if (shouldFailWorkflow) {
-            core.setFailed(`🔴 Duration deviation exceeded the allowed ranges in one or more measurements.`);
+            if (isValidatingStability) {
+                core.setFailed(`🔴 Duration deviation exceeded the allowed ranges in one or more measurements during the stability checks.`);
+            } else {
+                core.setFailed(`🔴 Duration deviation exceeded the allowed ranges in one or more measurements.`);
+            }
         }
 
         return true;

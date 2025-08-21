@@ -17,16 +17,13 @@
 <dt><a href="#getDeferredInitTask">getDeferredInitTask()</a></dt>
 <dd><p>Getter - returns the deffered init task.</p>
 </dd>
-<dt><a href="#getEvictionBlocklist">getEvictionBlocklist()</a></dt>
-<dd><p>Getter - returns the eviction block list.</p>
-</dd>
 <dt><a href="#getSkippableCollectionMemberIDs">getSkippableCollectionMemberIDs()</a></dt>
 <dd><p>Getter - returns the skippable collection member IDs.</p>
 </dd>
 <dt><a href="#setSkippableCollectionMemberIDs">setSkippableCollectionMemberIDs()</a></dt>
 <dd><p>Setter - sets the skippable collection member IDs.</p>
 </dd>
-<dt><a href="#initStoreValues">initStoreValues(keys, initialKeyStates, evictableKeys)</a></dt>
+<dt><a href="#initStoreValues">initStoreValues(keys, initialKeyStates, evictableKeys, fullyMergedSnapshotKeys)</a></dt>
 <dd><p>Sets the initial values for the Onyx store</p>
 </dd>
 <dt><a href="#maybeFlushBatchUpdates">maybeFlushBatchUpdates()</a></dt>
@@ -71,9 +68,6 @@ is associated with a collection of keys.</p>
 <dd><p>Checks to see if a provided key is the exact configured key of our connected subscriber
 or if the provided key is a collection member key (in case our configured key is a &quot;collection key&quot;)</p>
 </dd>
-<dt><a href="#isEvictableKey">isEvictableKey()</a></dt>
-<dd><p>Checks to see if this key has been flagged as safe for removal.</p>
-</dd>
 <dt><a href="#getCollectionKey">getCollectionKey(key)</a> ⇒</dt>
 <dd><p>Extracts the collection identifier of a given collection member key.</p>
 <p>For example:</p>
@@ -87,20 +81,6 @@ or if the provided key is a collection member key (in case our configured key is
 <dt><a href="#tryGetCachedValue">tryGetCachedValue()</a></dt>
 <dd><p>Tries to get a value from the cache. If the value is not present in cache it will return the default value or undefined.
 If the requested key is a collection, it will return an object with all the collection members.</p>
-</dd>
-<dt><a href="#removeLastAccessedKey">removeLastAccessedKey()</a></dt>
-<dd><p>Remove a key from the recently accessed key list.</p>
-</dd>
-<dt><a href="#addLastAccessedKey">addLastAccessedKey()</a></dt>
-<dd><p>Add a key to the list of recently accessed keys. The least
-recently accessed key should be at the head and the most
-recently accessed key at the tail.</p>
-</dd>
-<dt><a href="#addEvictableKeysToRecentlyAccessedList">addEvictableKeysToRecentlyAccessedList()</a></dt>
-<dd><p>Take all the keys that are safe to evict and add them to
-the recently accessed list when initializing the app. This
-enables keys that have not recently been accessed to be
-removed.</p>
 </dd>
 <dt><a href="#keysChanged">keysChanged()</a></dt>
 <dd><p>When a collection of keys change, search for any callbacks matching the collection key and trigger those callbacks</p>
@@ -139,18 +119,20 @@ whatever it is we attempted to do.</p>
 <dt><a href="#broadcastUpdate">broadcastUpdate()</a></dt>
 <dd><p>Notifies subscribers and writes current value to cache</p>
 </dd>
-<dt><a href="#removeNullValues">removeNullValues()</a> ⇒</dt>
-<dd><p>Removes a key from storage if the value is null.
-Otherwise removes all nested null values in objects,
-if shouldRemoveNestedNulls is true and returns the object.</p>
-</dd>
 <dt><a href="#prepareKeyValuePairsForStorage">prepareKeyValuePairsForStorage()</a> ⇒</dt>
 <dd><p>Storage expects array like: [[&quot;@MyApp_user&quot;, value_1], [&quot;@MyApp_key&quot;, value_2]]
 This method transforms an object like {&#39;@MyApp_user&#39;: myUserValue, &#39;@MyApp_key&#39;: myKeyValue}
 to an array of key-value pairs in the above format and removes key-value pairs that are being set to null</p>
 </dd>
-<dt><a href="#applyMerge">applyMerge(changes)</a></dt>
-<dd><p>Merges an array of changes with an existing value</p>
+<dt><a href="#mergeChanges">mergeChanges(changes, existingValue)</a></dt>
+<dd><p>Merges an array of changes with an existing value or creates a single change.</p>
+</dd>
+<dt><a href="#mergeAndMarkChanges">mergeAndMarkChanges(changes, existingValue)</a></dt>
+<dd><p>Merges an array of changes with an existing value or creates a single change.
+It will also mark deep nested objects that need to be entirely replaced during the merge.</p>
+</dd>
+<dt><a href="#mergeInternal">mergeInternal(changes, existingValue)</a></dt>
+<dd><p>Merges an array of changes with an existing value or creates a single change.</p>
 </dd>
 <dt><a href="#initializeWithDefaultKeyStates">initializeWithDefaultKeyStates()</a></dt>
 <dd><p>Merge user provided default key value pairs.</p>
@@ -166,6 +148,14 @@ to an array of key-value pairs in the above format and removes key-value pairs t
 </dd>
 <dt><a href="#unsubscribeFromKey">unsubscribeFromKey(subscriptionID)</a></dt>
 <dd><p>Disconnects and removes the listener from the Onyx key.</p>
+</dd>
+<dt><a href="#mergeCollectionWithPatches">mergeCollectionWithPatches(collectionKey, collection, mergeReplaceNullPatches)</a></dt>
+<dd><p>Merges a collection based on their keys.
+Serves as core implementation for <code>Onyx.mergeCollection()</code> public function, the difference being
+that this internal function allows passing an additional <code>mergeReplaceNullPatches</code> parameter.</p>
+</dd>
+<dt><a href="#clearOnyxUtilsInternals">clearOnyxUtilsInternals()</a></dt>
+<dd><p>Clear internal variables used in this file, useful in test environments.</p>
 </dd>
 </dl>
 
@@ -193,12 +183,6 @@ Getter - returns the default key states.
 Getter - returns the deffered init task.
 
 **Kind**: global function  
-<a name="getEvictionBlocklist"></a>
-
-## getEvictionBlocklist()
-Getter - returns the eviction block list.
-
-**Kind**: global function  
 <a name="getSkippableCollectionMemberIDs"></a>
 
 ## getSkippableCollectionMemberIDs()
@@ -213,7 +197,7 @@ Setter - sets the skippable collection member IDs.
 **Kind**: global function  
 <a name="initStoreValues"></a>
 
-## initStoreValues(keys, initialKeyStates, evictableKeys)
+## initStoreValues(keys, initialKeyStates, evictableKeys, fullyMergedSnapshotKeys)
 Sets the initial values for the Onyx store
 
 **Kind**: global function  
@@ -222,7 +206,8 @@ Sets the initial values for the Onyx store
 | --- | --- |
 | keys | `ONYXKEYS` constants object from Onyx.init() |
 | initialKeyStates | initial data to set when `init()` and `clear()` are called |
-| evictableKeys | This is an array of keys (individual or collection patterns) that are eligible for automatic removal when storage limits are reached. |
+| evictableKeys | This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal. |
+| fullyMergedSnapshotKeys | Array of snapshot collection keys where full merge is supported and data structure can be changed after merge. |
 
 <a name="maybeFlushBatchUpdates"></a>
 
@@ -319,12 +304,6 @@ Checks to see if a provided key is the exact configured key of our connected sub
 or if the provided key is a collection member key (in case our configured key is a "collection key")
 
 **Kind**: global function  
-<a name="isEvictableKey"></a>
-
-## isEvictableKey()
-Checks to see if this key has been flagged as safe for removal.
-
-**Kind**: global function  
 <a name="getCollectionKey"></a>
 
 ## getCollectionKey(key) ⇒
@@ -348,29 +327,6 @@ For example:
 ## tryGetCachedValue()
 Tries to get a value from the cache. If the value is not present in cache it will return the default value or undefined.
 If the requested key is a collection, it will return an object with all the collection members.
-
-**Kind**: global function  
-<a name="removeLastAccessedKey"></a>
-
-## removeLastAccessedKey()
-Remove a key from the recently accessed key list.
-
-**Kind**: global function  
-<a name="addLastAccessedKey"></a>
-
-## addLastAccessedKey()
-Add a key to the list of recently accessed keys. The least
-recently accessed key should be at the head and the most
-recently accessed key at the tail.
-
-**Kind**: global function  
-<a name="addEvictableKeysToRecentlyAccessedList"></a>
-
-## addEvictableKeysToRecentlyAccessedList()
-Take all the keys that are safe to evict and add them to
-the recently accessed list when initializing the app. This
-enables keys that have not recently been accessed to be
-removed.
 
 **Kind**: global function  
 <a name="keysChanged"></a>
@@ -465,15 +421,6 @@ whatever it is we attempted to do.
 Notifies subscribers and writes current value to cache
 
 **Kind**: global function  
-<a name="removeNullValues"></a>
-
-## removeNullValues() ⇒
-Removes a key from storage if the value is null.
-Otherwise removes all nested null values in objects,
-if shouldRemoveNestedNulls is true and returns the object.
-
-**Kind**: global function  
-**Returns**: The value without null values and a boolean "wasRemoved", which indicates if the key got removed completely  
 <a name="prepareKeyValuePairsForStorage"></a>
 
 ## prepareKeyValuePairsForStorage() ⇒
@@ -483,16 +430,42 @@ to an array of key-value pairs in the above format and removes key-value pairs t
 
 **Kind**: global function  
 **Returns**: an array of key - value pairs <[key, value]>  
-<a name="applyMerge"></a>
+<a name="mergeChanges"></a>
 
-## applyMerge(changes)
-Merges an array of changes with an existing value
+## mergeChanges(changes, existingValue)
+Merges an array of changes with an existing value or creates a single change.
 
 **Kind**: global function  
 
 | Param | Description |
 | --- | --- |
-| changes | Array of changes that should be applied to the existing value |
+| changes | Array of changes that should be merged |
+| existingValue | The existing value that should be merged with the changes |
+
+<a name="mergeAndMarkChanges"></a>
+
+## mergeAndMarkChanges(changes, existingValue)
+Merges an array of changes with an existing value or creates a single change.
+It will also mark deep nested objects that need to be entirely replaced during the merge.
+
+**Kind**: global function  
+
+| Param | Description |
+| --- | --- |
+| changes | Array of changes that should be merged |
+| existingValue | The existing value that should be merged with the changes |
+
+<a name="mergeInternal"></a>
+
+## mergeInternal(changes, existingValue)
+Merges an array of changes with an existing value or creates a single change.
+
+**Kind**: global function  
+
+| Param | Description |
+| --- | --- |
+| changes | Array of changes that should be merged |
+| existingValue | The existing value that should be merged with the changes |
 
 <a name="initializeWithDefaultKeyStates"></a>
 
@@ -535,3 +508,24 @@ Disconnects and removes the listener from the Onyx key.
 | --- | --- |
 | subscriptionID | Subscription ID returned by calling `OnyxUtils.subscribeToKey()`. |
 
+<a name="mergeCollectionWithPatches"></a>
+
+## mergeCollectionWithPatches(collectionKey, collection, mergeReplaceNullPatches)
+Merges a collection based on their keys.
+Serves as core implementation for `Onyx.mergeCollection()` public function, the difference being
+that this internal function allows passing an additional `mergeReplaceNullPatches` parameter.
+
+**Kind**: global function  
+
+| Param | Description |
+| --- | --- |
+| collectionKey | e.g. `ONYXKEYS.COLLECTION.REPORT` |
+| collection | Object collection keyed by individual collection member keys and values |
+| mergeReplaceNullPatches | Record where the key is a collection member key and the value is a list of tuples that we'll use to replace the nested objects of that collection member record with something else. |
+
+<a name="clearOnyxUtilsInternals"></a>
+
+## clearOnyxUtilsInternals()
+Clear internal variables used in this file, useful in test environments.
+
+**Kind**: global function  

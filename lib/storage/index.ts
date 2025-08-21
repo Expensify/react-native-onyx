@@ -116,9 +116,9 @@ const storage: Storage = {
     /**
      * Merging an existing value with a new one
      */
-    mergeItem: (key, deltaChanges, preMergedValue, shouldSetValue = false) =>
+    mergeItem: (key, change, replaceNullPatches) =>
         tryOrDegradePerformance(() => {
-            const promise = provider.mergeItem(key, deltaChanges, preMergedValue, shouldSetValue);
+            const promise = provider.mergeItem(key, change, replaceNullPatches);
 
             if (shouldKeepInstancesSync) {
                 return promise.then(() => InstanceSync.mergeItem(key));
