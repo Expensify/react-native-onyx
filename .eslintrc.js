@@ -68,6 +68,8 @@ module.exports = {
                     },
                 ],
                 'rulesdir/prefer-onyx-connect-in-libs': 'off',
+                'rulesdir/no-onyx-connect': 'off',
+                'rulesdir/prefer-actions-set-data': 'off',
             },
         },
         {
