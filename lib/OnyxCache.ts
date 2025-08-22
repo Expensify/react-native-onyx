@@ -471,7 +471,8 @@ class OnyxCache {
             return undefined;
         }
 
-        return cachedCollection;
+        // Return a shallow copy to ensure React detects changes when items are added/removed
+        return {...cachedCollection};
     }
 }
 
