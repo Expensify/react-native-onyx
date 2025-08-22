@@ -101,8 +101,8 @@ describe('OnyxSnapshotCache', () => {
                 return testData?.id ?? '';
             };
 
-            const nameId = cache.getSelectorId(nameSelector);
-            const idSelectorId = cache.getSelectorId(idSelector);
+            const nameId = cache.getSelectorID(nameSelector);
+            const idSelectorId = cache.getSelectorID(idSelector);
 
             // Different selectors should get different IDs
             expect(nameId).not.toBe(idSelectorId);
@@ -114,9 +114,9 @@ describe('OnyxSnapshotCache', () => {
                 return testData?.name ?? '';
             };
 
-            const firstCall = cache.getSelectorId(selector);
-            const secondCall = cache.getSelectorId(selector);
-            const thirdCall = cache.getSelectorId(selector);
+            const firstCall = cache.getSelectorID(selector);
+            const secondCall = cache.getSelectorID(selector);
+            const thirdCall = cache.getSelectorID(selector);
 
             // Multiple calls with same selector should return identical ID
             expect(firstCall).toBe(secondCall);
@@ -137,8 +137,8 @@ describe('OnyxSnapshotCache', () => {
             cache.clearSelectorIds();
 
             // After clearing, selectors should get new IDs starting from 0
-            const id1After = cache.getSelectorId(selector1);
-            const id2After = cache.getSelectorId(selector2);
+            const id1After = cache.getSelectorID(selector1);
+            const id2After = cache.getSelectorID(selector2);
 
             expect(id1After).toBe(0); // First selector after clear should get ID 0
             expect(id2After).toBe(1); // Second selector should get ID 1

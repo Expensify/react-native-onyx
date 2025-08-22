@@ -74,7 +74,7 @@ describe('OnyxSnapshotCache', () => {
         test('getting ID for new selector', async () => {
             await measureFunction(
                 () => {
-                    cache.getSelectorId(simpleSelector);
+                    cache.getSelectorID(simpleSelector);
                 },
                 {
                     beforeEach: resetCacheBeforeEachMeasure,
@@ -85,7 +85,7 @@ describe('OnyxSnapshotCache', () => {
         test('getting ID for cached selector (1000 existing selectors)', async () => {
             await measureFunction(
                 () => {
-                    cache.getSelectorId(simpleSelector);
+                    cache.getSelectorID(simpleSelector);
                 },
                 {
                     beforeEach: () => {
@@ -93,7 +93,7 @@ describe('OnyxSnapshotCache', () => {
                         // Pre-populate with 1000 selectors
                         for (let i = 0; i < 1000; i++) {
                             const selector: UseOnyxSelector<OnyxKey, string> = (data) => ((data as MockData | undefined)?.field ?? '') + i;
-                            cache.getSelectorId(selector);
+                            cache.getSelectorID(selector);
                         }
                     },
                 },
