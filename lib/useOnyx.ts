@@ -245,6 +245,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // We return the initial result right away during the first connection if `initWithStoredValues` is set to `false`.
         if (isFirstConnectionRef.current && options?.initWithStoredValues === false) {
             const result = resultRef.current;
+
             // Store result in snapshot cache
             onyxSnapshotCache.setCachedResult<UseOnyxResult<TReturnValue>>(key, cacheKey, result);
             return result;

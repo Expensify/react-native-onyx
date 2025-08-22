@@ -15,29 +15,29 @@ class OnyxSnapshotCache {
     /**
      * Maps selector functions to unique IDs for cache key generation
      */
-    private selectorIdMap: Map<UseOnyxSelector<OnyxKey, unknown>, number>;
+    private selectorIDMap: Map<UseOnyxSelector<OnyxKey, unknown>, number>;
 
     /**
      * Counter for generating incremental selector IDs
      */
-    private selectorIdCounter: number;
+    private selectorIDCounter: number;
 
     constructor() {
         this.snapshotCache = new Map();
-        this.selectorIdMap = new Map();
-        this.selectorIdCounter = 0;
+        this.selectorIDMap = new Map();
+        this.selectorIDCounter = 0;
     }
 
     /**
      * Generate unique ID for selector functions using incrementing numbers
      */
-    getSelectorId<TKey extends OnyxKey, TReturnValue>(selector: UseOnyxSelector<TKey, TReturnValue>): number {
+    getSelectorID<TKey extends OnyxKey, TReturnValue>(selector: UseOnyxSelector<TKey, TReturnValue>): number {
         const typedSelector = selector as unknown as UseOnyxSelector<OnyxKey, unknown>;
-        if (!this.selectorIdMap.has(typedSelector)) {
-            const id = this.selectorIdCounter++;
-            this.selectorIdMap.set(typedSelector, id);
+        if (!this.selectorIDMap.has(typedSelector)) {
+            const id = this.selectorIDCounter++;
+            this.selectorIDMap.set(typedSelector, id);
         }
-        return this.selectorIdMap.get(typedSelector)!;
+        return this.selectorIDMap.get(typedSelector)!;
     }
 
     /**
@@ -55,7 +55,8 @@ class OnyxSnapshotCache {
      * or timing behavior of getSnapshot, so they're excluded from the cache key for better cache hit rates.
      */
     generateCacheKey<TKey extends OnyxKey, TReturnValue>(options: Pick<UseOnyxOptions<TKey, TReturnValue>, 'selector' | 'initWithStoredValues' | 'allowStaleData' | 'canBeMissing'>): string {
-        const selectorId = options?.selector ? this.getSelectorId(options.selector) : 'no_selector';
+        const selectorId = options?.selector ? this.getSelectorID(options.selector) : 'no_selector';
+
         // Create options hash without expensive JSON.stringify
         const initWithStoredValues = options?.initWithStoredValues ?? true;
         const allowStaleData = options?.allowStaleData ?? false;
@@ -112,8 +113,8 @@ class OnyxSnapshotCache {
      * Clear selector ID mappings (useful for testing)
      */
     clearSelectorIds(): void {
-        this.selectorIdMap.clear();
-        this.selectorIdCounter = 0;
+        this.selectorIDMap.clear();
+        this.selectorIDCounter = 0;
     }
 }
 

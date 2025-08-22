@@ -263,6 +263,7 @@ class OnyxConnectionManager {
         });
 
         this.connectionsMap.clear();
+
         // Clear snapshot cache when all connections are disconnected
         onyxSnapshotCache.clear();
     }
@@ -272,6 +273,7 @@ class OnyxConnectionManager {
      */
     refreshSessionID(): void {
         this.sessionID = Str.guid();
+
         // Clear snapshot cache when session refreshes to avoid stale cache issues
         onyxSnapshotCache.clear();
     }
