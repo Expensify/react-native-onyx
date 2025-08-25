@@ -8,7 +8,10 @@ import type {UseOnyxOptions, UseOnyxResult, UseOnyxSelector} from './useOnyx';
  */
 class OnyxSnapshotCache {
     /**
-     * Snapshot cache for ultimate performance - separate cache per Onyx key
+     * Snapshot cache is a two-level map. The top-level keys are Onyx keys. The top-level values maps.
+     * The second-level keys are a custom composite string defined by this.generateCacheKey. These represent a unique useOnyx config, which is not fully represented by the Onyx key alone.
+     * The reason we have two levels is for performance: not to make cache access faster, but to make cache invalidation faster.
+     * We can invalidate the snapshot cache for a given Onyx key with one map.delete operation on the top-level map, rather than having to loop through a large single-level map and delete any matching keys.
      */
     private snapshotCache: Map<OnyxKey, Map<string, UseOnyxResult<OnyxValue<OnyxKey>>>>;
 
