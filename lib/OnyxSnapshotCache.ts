@@ -34,7 +34,7 @@ class OnyxSnapshotCache {
     /**
      * Generate unique ID for selector functions using incrementing numbers
      */
-    private getSelectorID<TKey extends OnyxKey, TReturnValue>(selector: UseOnyxSelector<TKey, TReturnValue>): number {
+    getSelectorID<TKey extends OnyxKey, TReturnValue>(selector: UseOnyxSelector<TKey, TReturnValue>): number {
         const typedSelector = selector as unknown as UseOnyxSelector<OnyxKey, unknown>;
         if (!this.selectorIDMap.has(typedSelector)) {
             const id = this.selectorIDCounter++;
