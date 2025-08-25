@@ -15,7 +15,7 @@ class OnyxSnapshotCache {
     /**
      * Maps selector functions to unique IDs for cache key generation
      */
-    private selectorIDMap: Map<UseOnyxSelector<OnyxKey, unknown>, number>;
+    private selectorIDMap: WeakMap<UseOnyxSelector<OnyxKey, unknown>, number>;
 
     /**
      * Counter for generating incremental selector IDs
@@ -31,7 +31,7 @@ class OnyxSnapshotCache {
     /**
      * Generate unique ID for selector functions using incrementing numbers
      */
-    getSelectorID<TKey extends OnyxKey, TReturnValue>(selector: UseOnyxSelector<TKey, TReturnValue>): number {
+    private getSelectorID<TKey extends OnyxKey, TReturnValue>(selector: UseOnyxSelector<TKey, TReturnValue>): number {
         const typedSelector = selector as unknown as UseOnyxSelector<OnyxKey, unknown>;
         if (!this.selectorIDMap.has(typedSelector)) {
             const id = this.selectorIDCounter++;
@@ -113,7 +113,6 @@ class OnyxSnapshotCache {
      * Clear selector ID mappings (useful for testing)
      */
     clearSelectorIds(): void {
-        this.selectorIDMap.clear();
         this.selectorIDCounter = 0;
     }
 }
