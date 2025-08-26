@@ -58,13 +58,13 @@ class OnyxSnapshotCache {
      * or timing behavior of getSnapshot, so they're excluded from the cache key for better cache hit rates.
      */
     generateCacheKey<TKey extends OnyxKey, TReturnValue>(options: Pick<UseOnyxOptions<TKey, TReturnValue>, 'selector' | 'initWithStoredValues' | 'allowStaleData' | 'canBeMissing'>): string {
-        const selectorId = options?.selector ? this.getSelectorID(options.selector) : 'no_selector';
+        const selectorID = options?.selector ? this.getSelectorID(options.selector) : 'no_selector';
 
         // Create options hash without expensive JSON.stringify
         const initWithStoredValues = options?.initWithStoredValues ?? true;
         const allowStaleData = options?.allowStaleData ?? false;
         const canBeMissing = options?.canBeMissing ?? true;
-        return `${selectorId}_${initWithStoredValues}_${allowStaleData}_${canBeMissing}`;
+        return `${selectorID}_${initWithStoredValues}_${allowStaleData}_${canBeMissing}`;
     }
 
     /**
