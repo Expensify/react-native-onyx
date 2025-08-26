@@ -540,7 +540,7 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Partial<Ma
             if (cache.getAllKeys().size === 0) {
                 return;
             }
-            // Return empty collection object for collections that exist but have no data
+            // Set an empty collection object for collections that exist but have no data
             val = {};
         }
     }
