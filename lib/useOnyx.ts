@@ -150,7 +150,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     // Cache the options key to avoid regenerating it every getSnapshot call
     const cacheKey = useMemo(
         () =>
-            onyxSnapshotCache.generateCacheKey({
+            onyxSnapshotCache.registerConsumer({
                 selector: options?.selector,
                 initWithStoredValues: options?.initWithStoredValues,
                 allowStaleData: options?.allowStaleData,
@@ -158,6 +158,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             }),
         [options?.selector, options?.initWithStoredValues, options?.allowStaleData, options?.canBeMissing],
     );
+
+    useEffect(() => () => onyxSnapshotCache.deregisterConsumer(key, cacheKey), [key, cacheKey]);
 
     useEffect(() => {
         // These conditions will ensure we can only handle dynamic collection member keys from the same collection.

@@ -47,9 +47,9 @@ describe('OnyxSnapshotCache', () => {
                 allowStaleData: true,
                 canBeMissing: false,
             };
-            const keyWithSelector = cache.generateCacheKey(optionsWithSelector);
-            const keyWithoutSelector = cache.generateCacheKey(optionsWithoutSelector);
-            const keyWithUndefined = cache.generateCacheKey({});
+            const keyWithSelector = cache.registerConsumer(optionsWithSelector);
+            const keyWithoutSelector = cache.registerConsumer(optionsWithoutSelector);
+            const keyWithUndefined = cache.registerConsumer({});
 
             // Different option combinations should produce different cache keys
             expect(keyWithSelector).toContain('0_'); // Should contain selector ID

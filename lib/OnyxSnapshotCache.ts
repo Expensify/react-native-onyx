@@ -9,7 +9,7 @@ import type {UseOnyxOptions, UseOnyxResult, UseOnyxSelector} from './useOnyx';
 class OnyxSnapshotCache {
     /**
      * Snapshot cache is a two-level map. The top-level keys are Onyx keys. The top-level values maps.
-     * The second-level keys are a custom composite string defined by this.generateCacheKey. These represent a unique useOnyx config, which is not fully represented by the Onyx key alone.
+     * The second-level keys are a custom composite string defined by this.registerConsumer. These represent a unique useOnyx config, which is not fully represented by the Onyx key alone.
      * The reason we have two levels is for performance: not to make cache access faster, but to make cache invalidation faster.
      * We can invalidate the snapshot cache for a given Onyx key with one map.delete operation on the top-level map, rather than having to loop through a large single-level map and delete any matching keys.
      */
@@ -25,10 +25,17 @@ class OnyxSnapshotCache {
      */
     private selectorIDCounter: number;
 
+    /**
+     * Reference counting for cache keys to enable automatic cleanup.
+     * Maps cache key (string) to number of consumers using it.
+     */
+    private cacheKeyRefCounts: Map<string, number>;
+
     constructor() {
         this.snapshotCache = new Map();
         this.selectorIDMap = new Map();
         this.selectorIDCounter = 0;
+        this.cacheKeyRefCounts = new Map();
     }
 
     /**
@@ -44,7 +51,8 @@ class OnyxSnapshotCache {
     }
 
     /**
-     * Fast cache key generation for useOnyx options combination.
+     * Register a consumer for a cache key and return the cache key.
+     * Generates cache key and increments reference counter.
      *
      * The properties used to generate the cache key are handpicked for performance reasons and
      * according to their purpose and effect they produce in the useOnyx hook behavior:
@@ -57,14 +65,46 @@ class OnyxSnapshotCache {
      * Other options like `canEvict`, `reuseConnection`, and `allowDynamicKey` don't affect the data transformation
      * or timing behavior of getSnapshot, so they're excluded from the cache key for better cache hit rates.
      */
-    generateCacheKey<TKey extends OnyxKey, TReturnValue>(options: Pick<UseOnyxOptions<TKey, TReturnValue>, 'selector' | 'initWithStoredValues' | 'allowStaleData' | 'canBeMissing'>): string {
+    registerConsumer<TKey extends OnyxKey, TReturnValue>(options: Pick<UseOnyxOptions<TKey, TReturnValue>, 'selector' | 'initWithStoredValues' | 'allowStaleData' | 'canBeMissing'>): string {
         const selectorID = options?.selector ? this.getSelectorID(options.selector) : 'no_selector';
 
         // Create options hash without expensive JSON.stringify
         const initWithStoredValues = options?.initWithStoredValues ?? true;
         const allowStaleData = options?.allowStaleData ?? false;
         const canBeMissing = options?.canBeMissing ?? true;
-        return `${selectorID}_${initWithStoredValues}_${allowStaleData}_${canBeMissing}`;
+        const cacheKey = `${selectorID}_${initWithStoredValues}_${allowStaleData}_${canBeMissing}`;
+
+        // Increment reference count for this cache key
+        const currentCount = this.cacheKeyRefCounts.get(cacheKey) || 0;
+        this.cacheKeyRefCounts.set(cacheKey, currentCount + 1);
+
+        return cacheKey;
+    }
+
+    /**
+     * Deregister a consumer for a cache key.
+     * Decrements reference counter and removes cache entry if no consumers remain.
+     */
+    deregisterConsumer(key: OnyxKey, cacheKey: string): void {
+        const currentCount = this.cacheKeyRefCounts.get(cacheKey) || 0;
+
+        if (currentCount <= 1) {
+            // Last consumer - remove from reference counter and cache
+            this.cacheKeyRefCounts.delete(cacheKey);
+
+            // Remove from snapshot cache
+            const keyCache = this.snapshotCache.get(key);
+            if (keyCache) {
+                keyCache.delete(cacheKey);
+                // If this was the last cache entry for this Onyx key, remove the key entirely
+                if (keyCache.size === 0) {
+                    this.snapshotCache.delete(key);
+                }
+            }
+        } else {
+            // Still has other consumers - just decrement count
+            this.cacheKeyRefCounts.set(cacheKey, currentCount - 1);
+        }
     }
 
     /**
