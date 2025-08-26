@@ -99,10 +99,9 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                 // Only proceed if we have a valid selector
                 if (currentSelector) {
                     const newOutput = currentSelector(input);
-                    const areEqual = deepEqual(lastOutput, newOutput);
 
                     // Deep equality mode: only update if output actually changed
-                    if (!hasComputed || !areEqual || dependenciesChanged) {
+                    if (!hasComputed || !deepEqual(lastOutput, newOutput) || dependenciesChanged) {
                         lastInput = input;
                         lastOutput = newOutput;
                         lastDependencies = [...currentDependencies];
