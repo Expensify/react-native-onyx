@@ -533,26 +533,15 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Partial<Ma
 
     if (isCollectionKey(key)) {
         const collectionData = cache.getCollectionData(key);
-        const allCacheKeys = cache.getAllKeys();
-        if (collectionData !== undefined && allCacheKeys.size > 0) {
+        if (collectionData !== undefined) {
             val = collectionData;
         } else {
-            // Fallback to original logic
-            // It is possible we haven't loaded all keys yet so we do not know if the
-            // collection actually exists.
-            if (allCacheKeys.size === 0) {
+            // If we haven't loaded all keys yet, we can't determine if the collection exists
+            if (cache.getAllKeys().size === 0) {
                 return;
             }
-
-            const values: OnyxCollection<KeyValueMapping[TKey]> = {};
-            allCacheKeys.forEach((cacheKey) => {
-                if (!cacheKey.startsWith(key)) {
-                    return;
-                }
-
-                values[cacheKey] = cache.get(cacheKey);
-            });
-            val = values;
+            // Set an empty collection object for collections that exist but have no data
+            val = {};
         }
     }
 
