@@ -162,8 +162,12 @@ function disconnect(connection: Connection): void {
  * @param options optional configuration object
  */
 function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options?: SetOptions): Promise<void> {
-    return setInternal(key, value, options, false);
+    return setInternal(key, value, options);
 }
+/**
+ * @param isFromUpdate - Whether this call originates from Onyx.update()
+ * When isFromUpdate = true (called from Onyx.update()), useOnyx hook subscribers are batched to escape excessive re-renders in components
+ */
 function setInternal<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options?: SetOptions, isFromUpdate = false): Promise<void> {
     // When we use Onyx.set to set a key we want to clear the current delta changes from Onyx.merge that were queued
     // before the value was set. If Onyx.merge is currently reading the old value from storage, it will then not apply the changes.
@@ -240,8 +244,12 @@ function setInternal<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>,
  * @param data object keyed by ONYXKEYS and the values to set
  */
 function multiSet(data: OnyxMultiSetInput): Promise<void> {
-    return multiSetInternal(data, false);
+    return multiSetInternal(data);
 }
+/**
+ * @param isFromUpdate - Whether this call originates from Onyx.update()
+ * When isFromUpdate = true (called from Onyx.update()), useOnyx hook subscribers are batched to escape excessive re-renders in components
+ */
 function multiSetInternal(data: OnyxMultiSetInput, isFromUpdate = false): Promise<void> {
     let newData = data;
 
@@ -304,8 +312,12 @@ function multiSetInternal(data: OnyxMultiSetInput, isFromUpdate = false): Promis
  * Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Workspace'}
  */
 function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): Promise<void> {
-    return mergeInternal(key, changes, false);
+    return mergeInternal(key, changes);
 }
+/**
+ * @param isFromUpdate - Whether this call originates from Onyx.update()
+ * When isFromUpdate = true (called from Onyx.update()), useOnyx hook subscribers are batched to escape excessive re-renders in components
+ */
 function mergeInternal<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>, isFromUpdate = false): Promise<void> {
     const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
     if (skippableCollectionMemberIDs.size) {
@@ -396,8 +408,12 @@ function mergeInternal<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<
  * @param collection Object collection keyed by individual collection member keys and values
  */
 function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
-    return mergeCollectionInternal(collectionKey, collection, false);
+    return mergeCollectionInternal(collectionKey, collection);
 }
+/**
+ * @param isFromUpdate - Whether this call originates from Onyx.update()
+ * When isFromUpdate = true (called from Onyx.update()), useOnyx hook subscribers are batched to escape excessive re-renders in components
+ */
 function mergeCollectionInternal<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>, isFromUpdate = false): Promise<void> {
     return OnyxUtils.mergeCollectionWithPatches(collectionKey, collection, undefined, isFromUpdate);
 }
@@ -680,8 +696,12 @@ function update(data: OnyxUpdate[]): Promise<void> {
  * @param collection Object collection keyed by individual collection member keys and values
  */
 function setCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
-    return setCollectionInternal(collectionKey, collection, false);
+    return setCollectionInternal(collectionKey, collection);
 }
+/**
+ * @param isFromUpdate - Whether this call originates from Onyx.update()
+ * When isFromUpdate = true (called from Onyx.update()), useOnyx hook subscribers are batched to escape excessive re-renders in components
+ */
 function setCollectionInternal<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>, isFromUpdate = false): Promise<void> {
     let resultCollection: OnyxInputKeyValueMapping = collection;
     let resultCollectionKeys = Object.keys(resultCollection);
