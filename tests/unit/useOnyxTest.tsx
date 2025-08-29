@@ -1,5 +1,7 @@
-import {act, renderHook} from '@testing-library/react-native';
-import type {OnyxCollection, OnyxEntry} from '../../lib';
+import {act, renderHook, render} from '@testing-library/react-native';
+import React from 'react';
+import {configure as configureRNTL, resetToDefaults as resetRNTLToDefaults} from '@testing-library/react-native/build/config';
+import type {OnyxCollection, OnyxEntry, OnyxKey} from '../../lib';
 import Onyx, {useOnyx} from '../../lib';
 import OnyxCache from '../../lib/OnyxCache';
 import StorageMock from '../../lib/storage';
@@ -1150,6 +1152,73 @@ describe('useOnyx', () => {
 
             expect(result1.current[0]).toBeUndefined();
             expect(logAlertFn).not.toBeCalled();
+        });
+    });
+
+    describe('batching', () => {
+        // Temporarily disable concurrent rendering to isolate and test batching behavior independently of React's concurrent features
+        beforeAll(() => {
+            configureRNTL({
+                concurrentRoot: false,
+            });
+        });
+        afterAll(() => {
+            resetRNTLToDefaults();
+        });
+
+        function TestUseOnyxComponent({onRender, onyxKey1, onyxKey2}: {onRender: jest.Mock; onyxKey1: OnyxKey; onyxKey2: OnyxKey}) {
+            const [value1] = useOnyx(onyxKey1);
+            const [value2] = useOnyx(onyxKey2);
+
+            React.useEffect(() => {
+                onRender({value1, value2});
+            });
+
+            return null;
+        }
+
+        it('re-renders once when two subscribed keys are updated in one Onyx.update', async () => {
+            const onRender = jest.fn();
+            const testKeyValues = {
+                1: {id: 1, value: '1'},
+                2: {id: 2, value: '2'},
+            };
+            const testKey2Value = {id: 10, value: '10'};
+
+            render(
+                <TestUseOnyxComponent
+                    onRender={onRender}
+                    onyxKey1={`${ONYXKEYS.COLLECTION.TEST_KEY}1`}
+                    onyxKey2={`${ONYXKEYS.COLLECTION.TEST_KEY_2}1`}
+                />,
+            );
+
+            await act(async () => waitForPromisesToResolve());
+            onRender.mockClear();
+
+            await act(async () => {
+                Onyx.update([
+                    {
+                        onyxMethod: Onyx.METHOD.MERGE_COLLECTION,
+                        key: ONYXKEYS.COLLECTION.TEST_KEY,
+                        value: {
+                            [`${ONYXKEYS.COLLECTION.TEST_KEY}1`]: testKeyValues[1],
+                            [`${ONYXKEYS.COLLECTION.TEST_KEY}2`]: testKeyValues[2],
+                        },
+                    },
+                    {
+                        onyxMethod: Onyx.METHOD.MERGE,
+                        key: `${ONYXKEYS.COLLECTION.TEST_KEY_2}1`,
+                        value: testKey2Value,
+                    },
+                ]);
+            });
+
+            await act(async () => waitForPromisesToResolve());
+
+            // We expect only one re-render after Onyx.update updates are applied
+            expect(onRender).toHaveBeenCalledTimes(1);
+            expect(onRender).toHaveBeenLastCalledWith({value1: testKeyValues[1], value2: testKey2Value});
         });
     });
 

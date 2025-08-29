@@ -359,6 +359,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                 initWithStoredValues: options?.initWithStoredValues,
                 waitForCollectionCallback: OnyxUtils.isCollectionKey(key) as true,
                 reuseConnection: options?.reuseConnection,
+                isUseOnyxSubscriber: true,
             });
 
             checkEvictableKey();

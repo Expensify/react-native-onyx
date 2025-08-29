@@ -8,6 +8,7 @@ const applyMerge: ApplyMerge = <TKey extends OnyxKey, TValue extends OnyxInput<T
     key: TKey,
     existingValue: TValue,
     validChanges: TChange[],
+    isFromUpdate = false,
 ) => {
     const {result: mergedValue} = OnyxUtils.mergeChanges(validChanges, existingValue);
 
@@ -18,7 +19,7 @@ const applyMerge: ApplyMerge = <TKey extends OnyxKey, TValue extends OnyxInput<T
     OnyxUtils.logKeyChanged(OnyxUtils.METHOD.MERGE, key, mergedValue, hasChanged);
 
     // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
-    const updatePromise = OnyxUtils.broadcastUpdate(key, mergedValue as OnyxValue<TKey>, hasChanged);
+    const updatePromise = OnyxUtils.broadcastUpdate(key, mergedValue as OnyxValue<TKey>, hasChanged, isFromUpdate);
 
     // If the value has not changed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
     if (!hasChanged) {

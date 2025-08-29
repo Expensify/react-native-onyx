@@ -273,6 +273,9 @@ type BaseConnectOptions = {
      * with the same connect configurations.
      */
     reuseConnection?: boolean;
+
+    /** Indicates whether this subscriber is created from the useOnyx hook. */
+    isUseOnyxSubscriber?: boolean;
 };
 
 /** Represents the callback function used in `Onyx.connect()` method with a regular key. */
