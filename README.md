@@ -9,7 +9,7 @@ Awesome persistent storage solution wrapped in a Pub/Sub library.
 - Onyx allows other code to subscribe to changes in data, and then publishes change events whenever data is changed
 - Anything needing to read Onyx data needs to:
     1. Know what key the data is stored in (for web, you can find this by looking in the JS console > Application > local storage)
-    2. Subscribe to changes of the data for a particular key or set of keys. React function components use the `useOnyx()` hook (recommended), both class and function components can use `withOnyx()` HOC (deprecated, not-recommended) and non-React libs use `Onyx.connect()`.
+    2. Subscribe to changes of the data for a particular key or set of keys. React function components use the `useOnyx()` hook and non-React libs use `Onyx.connect()`.
     3. Get initialized with the current value of that key from persistent storage (Onyx does this by calling `setState()` or triggering the `callback` with the values currently on disk as part of the connection process)
 - Subscribing to Onyx keys is done using a constant defined in `ONYXKEYS`. Each Onyx key represents either a collection of items or a specific entry in storage. For example, since all reports are stored as individual keys like `report_1234`, if code needs to know about all the reports (e.g. display a list of them in the nav menu), then it would subscribe to the key `ONYXKEYS.COLLECTION.REPORT`.
 
@@ -136,7 +136,7 @@ To teardown the subscription call `Onyx.disconnect()` with the `connectionID` re
 Onyx.disconnect(connectionID);
 ```
 
-We can also access values inside React function components via the `useOnyx()` [hook](https://react.dev/reference/react/hooks) (recommended) or class and function components via the `withOnyx()` [higher order component](https://reactjs.org/docs/higher-order-components.html) (deprecated, not-recommended). When the data changes the component will re-render.
+We can also access values inside React function components via the `useOnyx()` [hook](https://react.dev/reference/react/hooks). When the data changes the component will re-render.
 
 ```javascript
 import React from 'react';
@@ -166,48 +166,6 @@ if (reportsResult.status === 'loading' || sessionResult.status === 'loading') {
 }
 
 // rest of the component's code.
-```
-
-> [!warning]
-> ## Deprecated Note
-> Please note that the `withOnyx()` Higher Order Component (HOC) is now considered deprecated. Use `useOnyx()` hook instead.
-
-```javascript
-import React from 'react';
-import {withOnyx} from 'react-native-onyx';
-
-const App = ({session}) => (
-    <View>
-        {session.token ? <Text>Logged in</Text> : <Text>Logged out</Text> }
-    </View>
-);
-
-export default withOnyx({
-    session: {
-        key: ONYXKEYS.SESSION,
-    },
-})(App);
-```
-
-Differently from `useOnyx()`, `withOnyx()` will delay the rendering of the wrapped component until all keys/entities have been fetched and passed to the component, this can be convenient for simple cases. This however, can really delay your application if many entities are connected to the same component.
-
-Additionally, if your component has many keys/entities when your component will mount but will receive many updates as data is fetched from DB and passed down to it, as every key that gets fetched will trigger a `setState` on the `withOnyx` HOC. This might cause re-renders on the initial mounting, preventing the component from mounting/rendering in reasonable time, making your app feel slow and even delaying animations.
-
-You can workaround this by passing an additional object with the `shouldDelayUpdates` property set to true. Onyx will then put all the updates in a queue until you decide when then should be applied, the component will receive a function `markReadyForHydration`. A good place to call this function is on the `onLayout` method, which gets triggered after your component has been rendered.
-
-```javascript
-const App = ({session, markReadyForHydration}) => (
-    <View onLayout={() => markReadyForHydration()}>
-        {session.token ? <Text>Logged in</Text> : <Text>Logged out</Text> }
-    </View>
-);
-
-// Second argument to funciton is `shouldDelayUpdates`
-export default withOnyx({
-    session: {
-        key: ONYXKEYS.SESSION
-    },
-}, true)(App);
 ```
 
 ### Dependent Onyx Keys and useOnyx()
@@ -245,24 +203,6 @@ export default App;
 8. Now, all mappings have values that are defined (not undefined), and the component is rendered with all necessary data.
   
 * It is VERY important to NOT use empty string default values like `report.policyID || ''`. This results in the key returned to `useOnyx` as `policies_`, which subscribes to the ENTIRE POLICY COLLECTION and is most assuredly not what you were intending. You can use a default of `0` (as long as you are reasonably sure that there is never a policyID=0). This allows Onyx to return `undefined` as the value of the policy key, which is handled by `useOnyx` appropriately.
-
-**Detailed explanation of how this is handled and rendered with `withOnyx` HOC:**
-1. The component mounts with a `reportID={1234}` prop
-2. `withOnyx` evaluates the mapping
-3. `withOnyx` connects to the key `reports_1234` because of the prop passed to the component
-3. `withOnyx` connects to the key `policies_undefined` because `report` doesn't exist in the props yet, so the `policyID` defaults to `undefined`. * (see note below)
-4. Onyx reads the data and updates the state of `withOnyx` with:
-    - `report={{reportID: 1234, policyID: 1, ... the rest of the object ...}}`
-    - `policy={undefined}` (since there is no policy with ID `undefined`)
-5. There is still an `undefined` key in the mapping, so Onyx reads the data again
-6. This time `withOnyx` connects to the key `policies_1` because the `report` object exists in the component's state and it has a `policyID: 1`
-7. Onyx reads the data and updates the state of withOnyx with:
-    - `policy={{policyID: 1, ... the rest of the object ...}`
-8. Now all mappings have values that are defined (not undefined) and the component is rendered with all necessary data
-  
-* It is VERY important to NOT use empty string default values like `report.policyID || ''`. This results in the key returned to `withOnyx` as `policies_` which subscribes to the ENTIRE POLICY COLLECTION and is most assuredly not what you were intending. You can use a default of `0` (as long as you are reasonably sure that there is never a policyID=0). This allows Onyx to return `undefined` as the value of the policy key, which is handled by `withOnyx` appropriately.
-
-DO NOT use more than one `withOnyx` component at a time. It adds overhead and prevents some optimizations like batched rendering from working to its full potential.
 
 It's also beneficial to use a [selector](https://github.com/Expensify/react-native-onyx/blob/main/API.md#connectmapping--number) with the mapping in case you need to grab a single item in a collection (like a single report action).
 
