@@ -1138,6 +1138,32 @@ function evictStorageAndRetry<TMethod extends typeof Onyx.set | typeof Onyx.mult
     // Find the first key that we can remove that has no subscribers in our blocklist
     const keyForRemoval = cache.getKeyForEviction();
     if (!keyForRemoval) {
+        const allKeys = Array.from(cache.getAllKeys());
+        const evictionBlocklist = cache.getEvictionBlocklist();
+
+        let evictableCount = 0;
+        let blockedCount = 0;
+        const evictableKeys: string[] = [];
+        allKeys.forEach((key) => {
+            if (!cache.isEvictableKey(key)) {
+                return;
+            }
+
+            evictableCount++;
+            evictableKeys.push(key);
+            if (evictionBlocklist[key]) {
+                blockedCount++;
+            }
+        });
+
+        Logger.logHmmm(
+            `Out of storage eviction failure debug:\n` +
+                `Total keys in storage: ${allKeys.length}\n` +
+                `Evictable keys found: ${evictableCount}\n` +
+                `Evictable keys blocked: ${blockedCount}\n` +
+                `Keys in eviction blocklist: ${Object.keys(evictionBlocklist).length}`,
+        );
+
         // If we have no acceptable keys to remove then we are possibly trying to save mission critical data. If this is the case,
         // then we should stop retrying as there is not much the user can do to fix this. Instead of getting them stuck in an infinite loop we
         // will allow this write to be skipped.
