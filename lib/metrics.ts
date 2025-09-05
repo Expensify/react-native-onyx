@@ -1,14 +1,21 @@
 import PerformanceProxy from './dependencies/PerformanceProxy';
+import * as Logger from './Logger';
+
+type PerformanceMarkDetail = {
+    result?: unknown;
+    error?: unknown;
+};
 
 /**
  * Capture a measurement between the start mark and now
  */
-function measureMarkToNow(startMark: PerformanceMark, detail: Record<string, unknown>) {
-    PerformanceProxy.measure(`${startMark.name} [${startMark.detail.args.toString()}]`, {
+function measureMarkToNow(startMark: PerformanceMark, detail: PerformanceMarkDetail) {
+    const measurement = PerformanceProxy.measure(startMark.name, {
         start: startMark.startTime,
         end: PerformanceProxy.now(),
         detail: {...startMark.detail, ...detail},
     });
+    Logger.logInfo(`Performance - ${measurement.name}: ${measurement.duration} ms`, {isPerformanceMetric: true});
 }
 
 function isPromiseLike(value: unknown): value is Promise<unknown> {
@@ -20,7 +27,7 @@ function isPromiseLike(value: unknown): value is Promise<unknown> {
  */
 function decorateWithMetrics<Args extends unknown[], ReturnType>(func: (...args: Args) => ReturnType, alias = func.name) {
     function decorated(...args: Args) {
-        const mark = PerformanceProxy.mark(alias, {detail: {args, alias}});
+        const mark = PerformanceProxy.mark(alias, {detail: {alias}});
 
         const originalReturnValue = func(...args);
 
@@ -43,7 +50,6 @@ function decorateWithMetrics<Args extends unknown[], ReturnType>(func: (...args:
         measureMarkToNow(mark, {result: originalReturnValue});
         return originalReturnValue;
     }
-    decorated.name = `${alias}_DECORATED`;
 
     return decorated;
 }

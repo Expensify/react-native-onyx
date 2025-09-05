@@ -3,6 +3,8 @@ import {set, keys, getMany, setMany, get, clear, del, delMany, createStore, prom
 import utils from '../../utils';
 import type StorageProvider from './types';
 import type {OnyxKey, OnyxValue} from '../../types';
+import * as GlobalSettings from '../../GlobalSettings';
+import decorateWithMetrics from '../../metrics';
 
 // We don't want to initialize the store while the JS bundle loads as idb-keyval will try to use global.indexedDB
 // which might not be available in certain environments that load the bundle (e.g. electron main process).
@@ -99,5 +101,23 @@ const provider: StorageProvider = {
             });
     },
 };
+
+GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
+    if (!enablePerformanceMetrics) {
+        return;
+    }
+
+    // Apply decorators
+    provider.getItem = decorateWithMetrics(provider.getItem, 'IDBKeyValProvider.getItem');
+    provider.multiGet = decorateWithMetrics(provider.multiGet, 'IDBKeyValProvider.multiGet');
+    provider.setItem = decorateWithMetrics(provider.setItem, 'IDBKeyValProvider.setItem');
+    provider.multiSet = decorateWithMetrics(provider.multiSet, 'IDBKeyValProvider.multiSet');
+    provider.mergeItem = decorateWithMetrics(provider.mergeItem, 'IDBKeyValProvider.mergeItem');
+    provider.multiMerge = decorateWithMetrics(provider.multiMerge, 'IDBKeyValProvider.multiMerge');
+    provider.removeItem = decorateWithMetrics(provider.removeItem, 'IDBKeyValProvider.removeItem');
+    provider.removeItems = decorateWithMetrics(provider.removeItems, 'IDBKeyValProvider.removeItems');
+    provider.clear = decorateWithMetrics(provider.clear, 'IDBKeyValProvider.clear');
+    provider.getAllKeys = decorateWithMetrics(provider.getAllKeys, 'IDBKeyValProvider.getAllKeys');
+});
 
 export default provider;
