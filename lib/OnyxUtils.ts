@@ -533,26 +533,15 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey, mapping?: Partial<Ma
 
     if (isCollectionKey(key)) {
         const collectionData = cache.getCollectionData(key);
-        const allCacheKeys = cache.getAllKeys();
-        if (collectionData !== undefined && allCacheKeys.size > 0) {
+        if (collectionData !== undefined) {
             val = collectionData;
         } else {
-            // Fallback to original logic
-            // It is possible we haven't loaded all keys yet so we do not know if the
-            // collection actually exists.
-            if (allCacheKeys.size === 0) {
+            // If we haven't loaded all keys yet, we can't determine if the collection exists
+            if (cache.getAllKeys().size === 0) {
                 return;
             }
-
-            const values: OnyxCollection<KeyValueMapping[TKey]> = {};
-            allCacheKeys.forEach((cacheKey) => {
-                if (!cacheKey.startsWith(key)) {
-                    return;
-                }
-
-                values[cacheKey] = cache.get(cacheKey);
-            });
-            val = values;
+            // Set an empty collection object for collections that exist but have no data
+            val = {};
         }
     }
 
@@ -1081,9 +1070,10 @@ function scheduleSubscriberUpdate<TKey extends OnyxKey>(
     value: OnyxValue<TKey>,
     previousValue: OnyxValue<TKey>,
     canUpdateSubscriber: (subscriber?: Mapping<OnyxKey>) => boolean = () => true,
+    isFromUpdate = false,
 ): Promise<void> {
-    const promise = Promise.resolve().then(() => keyChanged(key, value, previousValue, canUpdateSubscriber, true, false, false));
-    batchUpdates(() => keyChanged(key, value, previousValue, canUpdateSubscriber, false, true, true));
+    const promise = Promise.resolve().then(() => keyChanged(key, value, previousValue, canUpdateSubscriber, true, false, !isFromUpdate));
+    batchUpdates(() => keyChanged(key, value, previousValue, canUpdateSubscriber, false, true, isFromUpdate));
     return Promise.all([maybeFlushBatchUpdates(), promise]).then(() => undefined);
 }
 
@@ -1096,9 +1086,10 @@ function scheduleNotifyCollectionSubscribers<TKey extends OnyxKey>(
     key: TKey,
     value: OnyxCollection<KeyValueMapping[TKey]>,
     previousValue?: OnyxCollection<KeyValueMapping[TKey]>,
+    isFromUpdate = false,
 ): Promise<void> {
-    const promise = Promise.resolve().then(() => keysChanged(key, value, previousValue, true, false, false));
-    batchUpdates(() => keysChanged(key, value, previousValue, false, true, true));
+    const promise = Promise.resolve().then(() => keysChanged(key, value, previousValue, true, false, !isFromUpdate));
+    batchUpdates(() => keysChanged(key, value, previousValue, false, true, isFromUpdate));
     return Promise.all([maybeFlushBatchUpdates(), promise]).then(() => undefined);
 }
 
@@ -1160,7 +1151,7 @@ function evictStorageAndRetry<TMethod extends typeof Onyx.set | typeof Onyx.mult
 /**
  * Notifies subscribers and writes current value to cache
  */
-function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>, hasChanged?: boolean): Promise<void> {
+function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>, hasChanged?: boolean, isFromUpdate = false): Promise<void> {
     const prevValue = cache.get(key, false) as OnyxValue<TKey>;
 
     // Update subscribers if the cached value has changed, or when the subscriber specifically requires
@@ -1171,7 +1162,7 @@ function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>
         cache.addToAccessedKeys(key);
     }
 
-    return scheduleSubscriberUpdate(key, value, prevValue, (subscriber) => hasChanged || subscriber?.initWithStoredValues === false).then(() => undefined);
+    return scheduleSubscriberUpdate(key, value, prevValue, (subscriber) => hasChanged || subscriber?.initWithStoredValues === false, isFromUpdate).then(() => undefined);
 }
 
 function hasPendingMergeForKey(key: OnyxKey): boolean {
@@ -1518,6 +1509,7 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase, TMap>(
     collectionKey: TKey,
     collection: OnyxMergeCollectionInput<TKey, TMap>,
     mergeReplaceNullPatches?: MultiMergeReplaceNullPatches,
+    isFromUpdate = false,
 ): Promise<void> {
     if (!isValidNonEmptyCollectionForMerge(collection)) {
         Logger.logInfo('mergeCollection() called with invalid or empty value. Skipping this update.');
@@ -1618,7 +1610,7 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase, TMap>(
             // and update all subscribers
             const promiseUpdate = previousCollectionPromise.then((previousCollection) => {
                 cache.merge(finalMergedCollection);
-                return scheduleNotifyCollectionSubscribers(collectionKey, finalMergedCollection, previousCollection);
+                return scheduleNotifyCollectionSubscribers(collectionKey, finalMergedCollection, previousCollection, isFromUpdate);
             });
 
             return Promise.all(promises)
