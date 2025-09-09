@@ -1630,7 +1630,7 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase, TMap>(
  * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
  * @param collection Object collection keyed by individual collection member keys and values
  */
-function partialSetCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
+function partialSetCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>, isFromUpdate = false): Promise<void> {
     let resultCollection: OnyxInputKeyValueMapping = collection;
     let resultCollectionKeys = Object.keys(resultCollection);
 
@@ -1666,10 +1666,10 @@ function partialSetCollection<TKey extends CollectionKeyBase, TMap>(collectionKe
 
         keyValuePairs.forEach(([key, value]) => cache.set(key, value));
 
-        const updatePromise = scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
+        const updatePromise = scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection, isFromUpdate);
 
         return Storage.multiSet(keyValuePairs)
-            .catch((error) => evictStorageAndRetry(error, partialSetCollection, collectionKey, collection))
+            .catch((error) => evictStorageAndRetry(error, partialSetCollection, collectionKey, collection, isFromUpdate))
             .then(() => {
                 sendActionToDevTools(METHOD.SET_COLLECTION, undefined, mutableCollection);
                 return updatePromise;
