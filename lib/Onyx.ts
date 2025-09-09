@@ -658,7 +658,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
             );
         }
         if (!utils.isEmptyObject(batchedCollectionUpdates.set)) {
-            promises.push(() => OnyxUtils.partialSetCollection(collectionKey, batchedCollectionUpdates.set as Collection<CollectionKey, unknown, unknown>));
+            promises.push(() => OnyxUtils.partialSetCollection(collectionKey, batchedCollectionUpdates.set as Collection<CollectionKey, unknown, unknown>, true));
         }
     });
 
