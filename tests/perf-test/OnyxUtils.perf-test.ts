@@ -313,7 +313,7 @@ describe('OnyxUtils', () => {
             const previousReportAction = mockedReportActionsMap[`${collectionKey}0`];
             const changedReportAction = createRandomReportAction(Number(previousReportAction.reportActionID));
 
-            await measureFunction(() => OnyxUtils.keyChanged(key, changedReportAction, previousReportAction), {
+            await measureFunction(() => OnyxUtils.keyChanged(key, changedReportAction), {
                 beforeEach: async () => {
                     await Onyx.set(key, previousReportAction);
                     for (let i = 0; i < 10000; i++) {
@@ -416,28 +416,25 @@ describe('OnyxUtils', () => {
                 Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const),
             ) as GenericCollection;
 
-            await measureAsyncFunction(
-                () => Promise.all(Object.entries(changedReportActions).map(([key, value]) => OnyxUtils.scheduleSubscriberUpdate(key, value, mockedReportActionsMap[key]))),
-                {
-                    beforeEach: async () => {
-                        await Onyx.multiSet(mockedReportActionsMap);
-                        mockedReportActionsKeys.forEach((key) => {
-                            const id = OnyxUtils.subscribeToKey({key, callback: jest.fn(), initWithStoredValues: false});
-                            subscriptionMap.set(key, id);
-                        });
-                    },
-                    afterEach: async () => {
-                        mockedReportActionsKeys.forEach((key) => {
-                            const id = subscriptionMap.get(key);
-                            if (id) {
-                                OnyxUtils.unsubscribeFromKey(id);
-                            }
-                        });
-                        subscriptionMap.clear();
-                        await clearOnyxAfterEachMeasure();
-                    },
+            await measureAsyncFunction(() => Promise.all(Object.entries(changedReportActions).map(([key, value]) => OnyxUtils.scheduleSubscriberUpdate(key, value))), {
+                beforeEach: async () => {
+                    await Onyx.multiSet(mockedReportActionsMap);
+                    mockedReportActionsKeys.forEach((key) => {
+                        const id = OnyxUtils.subscribeToKey({key, callback: jest.fn(), initWithStoredValues: false});
+                        subscriptionMap.set(key, id);
+                    });
                 },
-            );
+                afterEach: async () => {
+                    mockedReportActionsKeys.forEach((key) => {
+                        const id = subscriptionMap.get(key);
+                        if (id) {
+                            OnyxUtils.unsubscribeFromKey(id);
+                        }
+                    });
+                    subscriptionMap.clear();
+                    await clearOnyxAfterEachMeasure();
+                },
+            });
         });
     });
 

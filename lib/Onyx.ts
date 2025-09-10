@@ -53,9 +53,8 @@ function init({
 
     if (shouldSyncMultipleInstances) {
         Storage.keepInstancesSync?.((key, value) => {
-            const prevValue = cache.get(key, false) as OnyxValue<typeof key>;
             cache.set(key, value);
-            OnyxUtils.keyChanged(key, value as OnyxValue<typeof key>, prevValue);
+            OnyxUtils.keyChanged(key, value as OnyxValue<typeof key>);
         });
     }
 
@@ -247,7 +246,6 @@ function multiSet(data: OnyxMultiSetInput): Promise<void> {
     const keyValuePairsToSet = OnyxUtils.prepareKeyValuePairsForStorage(newData, true);
 
     const updatePromises = keyValuePairsToSet.map(([key, value]) => {
-        const prevValue = cache.get(key, false);
         // When we use multiSet to set a key we want to clear the current delta changes from Onyx.merge that were queued
         // before the value was set. If Onyx.merge is currently reading the old value from storage, it will then not apply the changes.
         if (OnyxUtils.hasPendingMergeForKey(key)) {
@@ -256,7 +254,7 @@ function multiSet(data: OnyxMultiSetInput): Promise<void> {
 
         // Update cache and optimistically inform subscribers on the next tick
         cache.set(key, value);
-        return OnyxUtils.scheduleSubscriberUpdate(key, value, prevValue);
+        return OnyxUtils.scheduleSubscriberUpdate(key, value);
     });
 
     return Storage.multiSet(keyValuePairsToSet)
@@ -463,7 +461,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
 
             // Notify the subscribers for each key/value group so they can receive the new values
             Object.entries(keyValuesToResetIndividually).forEach(([key, value]) => {
-                updatePromises.push(OnyxUtils.scheduleSubscriberUpdate(key, value, cache.get(key, false)));
+                updatePromises.push(OnyxUtils.scheduleSubscriberUpdate(key, value));
             });
             Object.entries(keyValuesToResetAsCollection).forEach(([key, value]) => {
                 updatePromises.push(OnyxUtils.scheduleNotifyCollectionSubscribers(key, value));

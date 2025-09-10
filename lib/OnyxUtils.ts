@@ -685,7 +685,6 @@ function keysChanged<TKey extends CollectionKeyBase>(
 function keyChanged<TKey extends OnyxKey>(
     key: TKey,
     value: OnyxValue<TKey>,
-    previousValue: OnyxValue<TKey>,
     canUpdateSubscriber: (subscriber?: CallbackToStateMapping<OnyxKey>) => boolean = () => true,
     notifyConnectSubscribers = true,
 ): void {
@@ -817,11 +816,10 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
 function scheduleSubscriberUpdate<TKey extends OnyxKey>(
     key: TKey,
     value: OnyxValue<TKey>,
-    previousValue: OnyxValue<TKey>,
     canUpdateSubscriber: (subscriber?: CallbackToStateMapping<OnyxKey>) => boolean = () => true,
 ): Promise<void> {
-    const promise = Promise.resolve().then(() => keyChanged(key, value, previousValue, canUpdateSubscriber, true));
-    batchUpdates(() => keyChanged(key, value, previousValue, canUpdateSubscriber, false));
+    const promise = Promise.resolve().then(() => keyChanged(key, value, canUpdateSubscriber, true));
+    batchUpdates(() => keyChanged(key, value, canUpdateSubscriber, false));
     return Promise.all([maybeFlushBatchUpdates(), promise]).then(() => undefined);
 }
 
@@ -844,9 +842,8 @@ function scheduleNotifyCollectionSubscribers<TKey extends OnyxKey>(
  * Remove a key from Onyx and update the subscribers
  */
 function remove<TKey extends OnyxKey>(key: TKey): Promise<void> {
-    const prevValue = cache.get(key, false) as OnyxValue<TKey>;
     cache.drop(key);
-    scheduleSubscriberUpdate(key, undefined as OnyxValue<TKey>, prevValue);
+    scheduleSubscriberUpdate(key, undefined as OnyxValue<TKey>);
     return Storage.removeItem(key).then(() => undefined);
 }
 
@@ -899,8 +896,6 @@ function evictStorageAndRetry<TMethod extends typeof Onyx.set | typeof Onyx.mult
  * Notifies subscribers and writes current value to cache
  */
 function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>, hasChanged?: boolean): Promise<void> {
-    const prevValue = cache.get(key, false) as OnyxValue<TKey>;
-
     // Update subscribers if the cached value has changed, or when the subscriber specifically requires
     // all updates regardless of value changes (indicated by initWithStoredValues set to false).
     if (hasChanged) {
@@ -909,7 +904,7 @@ function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>
         cache.addToAccessedKeys(key);
     }
 
-    return scheduleSubscriberUpdate(key, value, prevValue, (subscriber) => hasChanged || subscriber?.initWithStoredValues === false).then(() => undefined);
+    return scheduleSubscriberUpdate(key, value, (subscriber) => hasChanged || subscriber?.initWithStoredValues === false).then(() => undefined);
 }
 
 function hasPendingMergeForKey(key: OnyxKey): boolean {
@@ -1018,14 +1013,14 @@ function mergeInternal<TValue extends OnyxInput<OnyxKey> | undefined, TChange ex
  */
 function initializeWithDefaultKeyStates(): Promise<void> {
     return Storage.multiGet(Object.keys(defaultKeyStates)).then((pairs) => {
-        const existingDataAsObject = Object.fromEntries(pairs);
+        const existingDataAsObject = Object.fromEntries(pairs) as Record<string, unknown>;
 
         const merged = utils.fastMerge(existingDataAsObject, defaultKeyStates, {
             shouldRemoveNestedNulls: true,
         }).result;
         cache.merge(merged ?? {});
 
-        Object.entries(merged ?? {}).forEach(([key, value]) => keyChanged(key, value, existingDataAsObject));
+        Object.entries(merged ?? {}).forEach(([key, value]) => keyChanged(key, value));
     });
 }
 
