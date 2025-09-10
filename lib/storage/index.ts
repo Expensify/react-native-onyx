@@ -36,7 +36,19 @@ function tryOrDegradePerformance<T>(fn: () => Promise<T> | T, waitForInitializat
 
         promise.then(() => {
             try {
-                resolve(fn());
+                const result = fn();
+
+                // Handle promise rejections for async operations
+                if (result instanceof Promise) {
+                    result
+                        .then((value) => resolve(value))
+                        .catch((promiseError) => {
+                            // Pass through all async errors to higher-level error handling
+                            reject(promiseError);
+                        });
+                } else {
+                    resolve(result);
+                }
             } catch (error) {
                 // Test for known critical errors that the storage provider throws, e.g. when storage is full
                 if (error instanceof Error) {
