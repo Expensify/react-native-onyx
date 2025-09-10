@@ -9,7 +9,6 @@ type ApplyMerge = <TKey extends OnyxKey, TValue extends OnyxInput<OnyxKey> | und
     key: TKey,
     existingValue: TValue,
     validChanges: TChange[],
-    isFromUpdate?: boolean,
 ) => Promise<ApplyMergeResult<TChange>>;
 
 export type {ApplyMerge, ApplyMergeResult};
