@@ -1,33 +1,15 @@
-import React from 'react';
-import {render, configure as configureRNTL, resetToDefaults as resetRNTLToDefaults} from '@testing-library/react-native';
-import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
-import type {ViewWithTextOnyxProps, ViewWithTextProps} from '../components/ViewWithText';
-import ViewWithText from '../components/ViewWithText';
-import type {ViewWithCollectionsProps} from '../components/ViewWithCollections';
-import ViewWithCollections from '../components/ViewWithCollections';
-import type OnyxCache from '../../lib/OnyxCache';
-import type MockedStorage from '../../lib/storage/__mocks__';
 import type OnyxInstance from '../../lib/Onyx';
-import type withOnyxType from '../../lib/withOnyx';
+import type OnyxCache from '../../lib/OnyxCache';
+import type {CacheTask} from '../../lib/OnyxCache';
+import type {Connection} from '../../lib/OnyxConnectionManager';
+import type MockedStorage from '../../lib/storage/__mocks__';
 import type {InitOptions} from '../../lib/types';
 import generateRange from '../utils/generateRange';
-import type {Connection} from '../../lib/OnyxConnectionManager';
-import type {CacheTask} from '../../lib/OnyxCache';
+import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 const MOCK_TASK = 'mockTask' as CacheTask;
 
 describe('Onyx', () => {
-    beforeAll(() => {
-        // Disables concurrent rendering as it breaks withOnyx() tests.
-        configureRNTL({
-            concurrentRoot: false,
-        });
-    });
-
-    afterAll(() => {
-        resetRNTLToDefaults();
-    });
-
     describe('Cache Service', () => {
         /** @type OnyxCache */
         let cache: typeof OnyxCache;
@@ -437,7 +419,6 @@ describe('Onyx', () => {
     describe('Onyx with Cache', () => {
         let Onyx: typeof OnyxInstance;
         let StorageMock: typeof MockedStorage;
-        let withOnyx: typeof withOnyxType;
 
         /** @type OnyxCache */
         let cache: typeof OnyxCache;
@@ -470,70 +451,10 @@ describe('Onyx', () => {
             // eslint-disable-next-line @typescript-eslint/no-var-requires
             const OnyxModule = require('../../lib');
             Onyx = OnyxModule.default;
-            withOnyx = OnyxModule.withOnyx;
             // eslint-disable-next-line @typescript-eslint/no-var-requires
             StorageMock = require('../../lib/storage').default;
             // eslint-disable-next-line @typescript-eslint/no-var-requires
             cache = require('../../lib/OnyxCache').default;
-        });
-
-        it('Expect a single call to getItem when multiple components use the same key', () => {
-            // Given a component connected to Onyx
-            const TestComponentWithOnyx = withOnyx<ViewWithTextProps, ViewWithTextOnyxProps>({
-                text: {
-                    key: ONYX_KEYS.TEST_KEY,
-                },
-            })(ViewWithText);
-
-            // Given some string value for that key exists in storage
-            StorageMock.getItem.mockResolvedValue('"mockValue"');
-            StorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
-            return initOnyx()
-                .then(() => {
-                    // When multiple components are rendered
-                    render(
-                        <>
-                            <TestComponentWithOnyx />
-                            <TestComponentWithOnyx />
-                            <TestComponentWithOnyx />
-                        </>,
-                    );
-                })
-                .then(waitForPromisesToResolve)
-                .then(() => {
-                    // Then Async storage `getItem` should be called only once
-                    expect(StorageMock.getItem).toHaveBeenCalledTimes(1);
-                });
-        });
-
-        it('Expect a single call to getAllKeys when multiple components use the same key', () => {
-            // Given a component connected to Onyx
-            const TestComponentWithOnyx = withOnyx<ViewWithTextProps, ViewWithTextOnyxProps>({
-                text: {
-                    key: ONYX_KEYS.TEST_KEY,
-                },
-            })(ViewWithText);
-
-            // Given some string value for that key exists in storage
-            return initOnyx()
-                .then(() => {
-                    StorageMock.getItem.mockResolvedValue('"mockValue"');
-                    StorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
-
-                    // When multiple components are rendered
-                    render(
-                        <>
-                            <TestComponentWithOnyx />
-                            <TestComponentWithOnyx />
-                            <TestComponentWithOnyx />
-                        </>,
-                    );
-                })
-                .then(waitForPromisesToResolve)
-                .then(() => {
-                    // Then Async storage `getItem` should be called only once
-                    expect(StorageMock.getAllKeys).toHaveBeenCalledTimes(1);
-                });
         });
 
         it('Should keep recently accessed items in cache', () => {
@@ -570,77 +491,6 @@ describe('Onyx', () => {
                     connections.forEach(({key}) => {
                         expect(cache.hasCacheForKey(key)).toBe(false);
                     });
-                });
-        });
-
-        it('Expect multiple calls to getItem when value cannot be retrieved from cache', () => {
-            // Given a component connected to Onyx
-            const TestComponentWithOnyx = withOnyx<ViewWithTextProps, ViewWithTextOnyxProps>({
-                text: {
-                    key: ONYX_KEYS.TEST_KEY,
-                },
-            })(ViewWithText);
-
-            // Given some string value for that key exists in storage
-            StorageMock.getItem.mockResolvedValue('"mockValue"');
-            StorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY]);
-
-            return (
-                initOnyx()
-                    .then(() => {
-                        // When a component is rendered
-                        render(<TestComponentWithOnyx />);
-                    })
-                    .then(waitForPromisesToResolve)
-                    .then(() => {
-                        // When the key was removed from cache
-                        cache.drop(ONYX_KEYS.TEST_KEY);
-                    })
-
-                    // Then When another component using the same storage key is rendered
-                    .then(() => render(<TestComponentWithOnyx />))
-                    .then(waitForPromisesToResolve)
-                    .then(() => {
-                        // Then Async storage `getItem` should be called twice
-                        expect(StorageMock.getItem).toHaveBeenCalledTimes(2);
-                    })
-            );
-        });
-
-        it('Expect multiple calls to getItem when multiple keys are used', () => {
-            // Given two component
-            const TestComponentWithOnyx = withOnyx<ViewWithCollectionsProps, {testObject: unknown}>({
-                testObject: {
-                    key: ONYX_KEYS.TEST_KEY,
-                },
-            })(ViewWithCollections);
-
-            const OtherTestComponentWithOnyx = withOnyx<ViewWithTextProps, ViewWithTextOnyxProps>({
-                text: {
-                    key: ONYX_KEYS.OTHER_TEST,
-                },
-            })(ViewWithText);
-
-            // Given some values exist in storage
-            StorageMock.setItem(ONYX_KEYS.TEST_KEY, {ID: 15, data: 'mock object with ID'});
-            StorageMock.setItem(ONYX_KEYS.OTHER_TEST, 'mock text');
-            StorageMock.getAllKeys.mockResolvedValue([ONYX_KEYS.TEST_KEY, ONYX_KEYS.OTHER_TEST]);
-            return initOnyx()
-                .then(() => {
-                    // When the components are rendered multiple times
-                    render(<TestComponentWithOnyx />);
-                    render(<OtherTestComponentWithOnyx />);
-                    render(<TestComponentWithOnyx />);
-                    render(<OtherTestComponentWithOnyx />);
-                    render(<OtherTestComponentWithOnyx />);
-                    render(<TestComponentWithOnyx />);
-                })
-                .then(waitForPromisesToResolve)
-                .then(() => {
-                    // Then Async storage `getItem` should be called exactly two times (once for each key)
-                    expect(StorageMock.getItem).toHaveBeenCalledTimes(2);
-                    expect(StorageMock.getItem).toHaveBeenNthCalledWith(1, ONYX_KEYS.TEST_KEY);
-                    expect(StorageMock.getItem).toHaveBeenNthCalledWith(2, ONYX_KEYS.OTHER_TEST);
                 });
         });
 

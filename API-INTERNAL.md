@@ -23,7 +23,7 @@
 <dt><a href="#setSkippableCollectionMemberIDs">setSkippableCollectionMemberIDs()</a></dt>
 <dd><p>Setter - sets the skippable collection member IDs.</p>
 </dd>
-<dt><a href="#initStoreValues">initStoreValues(keys, initialKeyStates, evictableKeys, fullyMergedSnapshotKeys)</a></dt>
+<dt><a href="#initStoreValues">initStoreValues(keys, initialKeyStates, evictableKeys)</a></dt>
 <dd><p>Sets the initial values for the Onyx store</p>
 </dd>
 <dt><a href="#maybeFlushBatchUpdates">maybeFlushBatchUpdates()</a></dt>
@@ -89,9 +89,7 @@ If the requested key is a collection, it will return an object with all the coll
 <dd><p>When a key change happens, search for any callbacks matching the key or collection key and trigger those callbacks</p>
 </dd>
 <dt><a href="#sendDataToConnection">sendDataToConnection()</a></dt>
-<dd><p>Sends the data obtained from the keys to the connection. It either:
-    - sets state on the withOnyxInstances
-    - triggers the callback function</p>
+<dd><p>Sends the data obtained from the keys to the connection.</p>
 </dd>
 <dt><a href="#addKeyToRecentlyAccessedIfNeeded">addKeyToRecentlyAccessedIfNeeded()</a></dt>
 <dd><p>We check to see if this key is flagged as safe for eviction and add it to the recentlyAccessedKeys list so that when we
@@ -197,7 +195,7 @@ Setter - sets the skippable collection member IDs.
 **Kind**: global function  
 <a name="initStoreValues"></a>
 
-## initStoreValues(keys, initialKeyStates, evictableKeys, fullyMergedSnapshotKeys)
+## initStoreValues(keys, initialKeyStates, evictableKeys)
 Sets the initial values for the Onyx store
 
 **Kind**: global function  
@@ -207,7 +205,6 @@ Sets the initial values for the Onyx store
 | keys | `ONYXKEYS` constants object from Onyx.init() |
 | initialKeyStates | initial data to set when `init()` and `clear()` are called |
 | evictableKeys | This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal. |
-| fullyMergedSnapshotKeys | Array of snapshot collection keys where full merge is supported and data structure can be changed after merge. |
 
 <a name="maybeFlushBatchUpdates"></a>
 
@@ -365,9 +362,7 @@ keyChanged(key, value, subscriber => subscriber.initWithStoredValues === false)
 <a name="sendDataToConnection"></a>
 
 ## sendDataToConnection()
-Sends the data obtained from the keys to the connection. It either:
-    - sets state on the withOnyxInstances
-    - triggers the callback function
+Sends the data obtained from the keys to the connection.
 
 **Kind**: global function  
 <a name="addKeyToRecentlyAccessedIfNeeded"></a>

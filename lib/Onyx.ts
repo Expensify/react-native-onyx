@@ -1,6 +1,5 @@
 import * as Logger from './Logger';
 import cache, {TASK} from './OnyxCache';
-import * as PerformanceUtils from './PerformanceUtils';
 import Storage from './storage';
 import utils from './utils';
 import DevTools from './DevTools';
@@ -11,7 +10,6 @@ import type {
     ConnectOptions,
     InitOptions,
     KeyValueMapping,
-    Mapping,
     OnyxInputKeyValueMapping,
     OnyxCollection,
     MixedOperationsQueue,
@@ -41,7 +39,6 @@ function init({
     evictableKeys = [],
     maxCachedKeysCount = 1000,
     shouldSyncMultipleInstances = !!global.localStorage,
-    debugSetState = false,
     enablePerformanceMetrics = false,
     skippableCollectionMemberIDs = [],
 }: InitOptions): void {
@@ -56,14 +53,9 @@ function init({
 
     if (shouldSyncMultipleInstances) {
         Storage.keepInstancesSync?.((key, value) => {
-            const prevValue = cache.get(key, false) as OnyxValue<typeof key>;
             cache.set(key, value);
-            OnyxUtils.keyChanged(key, value as OnyxValue<typeof key>, prevValue);
+            OnyxUtils.keyChanged(key, value as OnyxValue<typeof key>);
         });
-    }
-
-    if (debugSetState) {
-        PerformanceUtils.setShouldDebugSetState(true);
     }
 
     if (maxCachedKeysCount > 0) {
@@ -94,11 +86,8 @@ function init({
  * @param connectOptions.key The Onyx key to subscribe to.
  * @param connectOptions.callback A function that will be called when the Onyx data we are subscribed changes.
  * @param connectOptions.waitForCollectionCallback If set to `true`, it will return the entire collection to the callback as a single object.
- * @param connectOptions.withOnyxInstance The `withOnyx` class instance to be internally passed. **Only used inside `withOnyx()` HOC.**
- * @param connectOptions.statePropertyName The name of the component's prop that is connected to the Onyx key. **Only used inside `withOnyx()` HOC.**
- * @param connectOptions.displayName The component's display name. **Only used inside `withOnyx()` HOC.**
- * @param connectOptions.selector This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook or `withOnyx()` HOC.**
- *        Using this setting on `useOnyx()` or `withOnyx()` can have very positive performance benefits because the component will only re-render
+ * @param connectOptions.selector This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook.**
+ *        Using this setting on `useOnyx()` can have very positive performance benefits because the component will only re-render
  *        when the subset of data changes. Otherwise, any change of data on any property would normally
  *        cause the component to re-render (and that can be expensive from a performance standpoint).
  * @returns The connection object to use when calling `Onyx.disconnect()`.
@@ -122,11 +111,8 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
  * @param connectOptions.key The Onyx key to subscribe to.
  * @param connectOptions.callback A function that will be called when the Onyx data we are subscribed changes.
  * @param connectOptions.waitForCollectionCallback If set to `true`, it will return the entire collection to the callback as a single object.
- * @param connectOptions.withOnyxInstance The `withOnyx` class instance to be internally passed. **Only used inside `withOnyx()` HOC.**
- * @param connectOptions.statePropertyName The name of the component's prop that is connected to the Onyx key. **Only used inside `withOnyx()` HOC.**
- * @param connectOptions.displayName The component's display name. **Only used inside `withOnyx()` HOC.**
- * @param connectOptions.selector This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook or `withOnyx()` HOC.**
- *        Using this setting on `useOnyx()` or `withOnyx()` can have very positive performance benefits because the component will only re-render
+ * @param connectOptions.selector This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook.**
+ *        Using this setting on `useOnyx()` can have very positive performance benefits because the component will only re-render
  *        when the subset of data changes. Otherwise, any change of data on any property would normally
  *        cause the component to re-render (and that can be expensive from a performance standpoint).
  * @returns The connection object to use when calling `Onyx.disconnect()`.
@@ -260,7 +246,6 @@ function multiSet(data: OnyxMultiSetInput): Promise<void> {
     const keyValuePairsToSet = OnyxUtils.prepareKeyValuePairsForStorage(newData, true);
 
     const updatePromises = keyValuePairsToSet.map(([key, value]) => {
-        const prevValue = cache.get(key, false);
         // When we use multiSet to set a key we want to clear the current delta changes from Onyx.merge that were queued
         // before the value was set. If Onyx.merge is currently reading the old value from storage, it will then not apply the changes.
         if (OnyxUtils.hasPendingMergeForKey(key)) {
@@ -269,7 +254,7 @@ function multiSet(data: OnyxMultiSetInput): Promise<void> {
 
         // Update cache and optimistically inform subscribers on the next tick
         cache.set(key, value);
-        return OnyxUtils.scheduleSubscriberUpdate(key, value, prevValue);
+        return OnyxUtils.scheduleSubscriberUpdate(key, value);
     });
 
     return Storage.multiSet(keyValuePairsToSet)
@@ -476,7 +461,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
 
             // Notify the subscribers for each key/value group so they can receive the new values
             Object.entries(keyValuesToResetIndividually).forEach(([key, value]) => {
-                updatePromises.push(OnyxUtils.scheduleSubscriberUpdate(key, value, cache.get(key, false)));
+                updatePromises.push(OnyxUtils.scheduleSubscriberUpdate(key, value));
             });
             Object.entries(keyValuesToResetAsCollection).forEach(([key, value]) => {
                 updatePromises.push(OnyxUtils.scheduleNotifyCollectionSubscribers(key, value));
@@ -764,4 +749,4 @@ function applyDecorators() {
 }
 
 export default Onyx;
-export type {OnyxUpdate, Mapping, ConnectOptions, SetOptions};
+export type {OnyxUpdate, ConnectOptions, SetOptions};
