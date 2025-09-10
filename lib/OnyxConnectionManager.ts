@@ -5,6 +5,7 @@ import OnyxUtils from './OnyxUtils';
 import * as Str from './Str';
 import type {CollectionConnectCallback, DefaultConnectCallback, DefaultConnectOptions, OnyxKey, OnyxValue} from './types';
 import cache from './OnyxCache';
+import onyxSnapshotCache from './OnyxSnapshotCache';
 
 type ConnectCallback = DefaultConnectCallback<OnyxKey> | CollectionConnectCallback<OnyxKey>;
 
@@ -253,6 +254,9 @@ class OnyxConnectionManager {
         });
 
         this.connectionsMap.clear();
+
+        // Clear snapshot cache when all connections are disconnected
+        onyxSnapshotCache.clear();
     }
 
     /**
@@ -260,6 +264,9 @@ class OnyxConnectionManager {
      */
     refreshSessionID(): void {
         this.sessionID = Str.guid();
+
+        // Clear snapshot cache when session refreshes to avoid stale cache issues
+        onyxSnapshotCache.clear();
     }
 
     /**

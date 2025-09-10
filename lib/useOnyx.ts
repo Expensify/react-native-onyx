@@ -7,10 +7,11 @@ import connectionManager from './OnyxConnectionManager';
 import OnyxUtils from './OnyxUtils';
 import * as GlobalSettings from './GlobalSettings';
 import type {CollectionKeyBase, OnyxKey, OnyxValue} from './types';
-import useLiveRef from './useLiveRef';
 import usePrevious from './usePrevious';
 import decorateWithMetrics from './metrics';
 import * as Logger from './Logger';
+import onyxSnapshotCache from './OnyxSnapshotCache';
+import useLiveRef from './useLiveRef';
 
 type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (data: OnyxValue<TKey> | undefined) => TReturnValue;
 
@@ -76,8 +77,42 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     const connectionRef = useRef<Connection | null>(null);
     const previousKey = usePrevious(key);
 
-    // Used to stabilize the selector reference and avoid unnecessary calls to `getSnapshot()`.
-    const selectorRef = useLiveRef(options?.selector);
+    const currentDependenciesRef = useLiveRef(dependencies);
+    const currentSelectorRef = useLiveRef(options?.selector);
+
+    // Create memoized version of selector for performance
+    const memoizedSelector = useMemo(() => {
+        if (!options?.selector) return null;
+
+        let lastInput: OnyxValue<TKey> | undefined;
+        let lastOutput: TReturnValue;
+        let lastDependencies: DependencyList = [];
+        let hasComputed = false;
+
+        return (input: OnyxValue<TKey> | undefined): TReturnValue => {
+            const currentDependencies = currentDependenciesRef.current;
+            const currentSelector = currentSelectorRef.current;
+
+            // Recompute if input changed, dependencies changed, or first time
+            const dependenciesChanged = !shallowEqual(lastDependencies, currentDependencies);
+            if (!hasComputed || lastInput !== input || dependenciesChanged) {
+                // Only proceed if we have a valid selector
+                if (currentSelector) {
+                    const newOutput = currentSelector(input);
+
+                    // Deep equality mode: only update if output actually changed
+                    if (!hasComputed || !deepEqual(lastOutput, newOutput) || dependenciesChanged) {
+                        lastInput = input;
+                        lastOutput = newOutput;
+                        lastDependencies = [...currentDependencies];
+                        hasComputed = true;
+                    }
+                }
+            }
+
+            return lastOutput;
+        };
+    }, [currentDependenciesRef, currentSelectorRef, options?.selector]);
 
     // Stores the previous cached value as it's necessary to compare with the new value in `getSnapshot()`.
     // We initialize it to `null` to simulate that we don't have any value from cache yet.
@@ -112,6 +147,20 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     // Inside useOnyx.ts, we need to track the sourceValue separately
     const sourceValueRef = useRef<NonNullable<TReturnValue> | undefined>(undefined);
 
+    // Cache the options key to avoid regenerating it every getSnapshot call
+    const cacheKey = useMemo(
+        () =>
+            onyxSnapshotCache.registerConsumer({
+                selector: options?.selector,
+                initWithStoredValues: options?.initWithStoredValues,
+                allowStaleData: options?.allowStaleData,
+                canBeMissing: options?.canBeMissing,
+            }),
+        [options?.selector, options?.initWithStoredValues, options?.allowStaleData, options?.canBeMissing],
+    );
+
+    useEffect(() => () => onyxSnapshotCache.deregisterConsumer(key, cacheKey), [key, cacheKey]);
+
     useEffect(() => {
         // These conditions will ensure we can only handle dynamic collection member keys from the same collection.
         if (options?.allowDynamicKey || previousKey === key) {
@@ -136,14 +185,28 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         );
     }, [previousKey, key, options?.allowDynamicKey]);
 
+    // Track previous dependencies to prevent infinite loops
+    const previousDependenciesRef = useRef<DependencyList>([]);
+
     useEffect(() => {
         // This effect will only run if the `dependencies` array changes. If it changes it will force the hook
         // to trigger a `getSnapshot()` update by calling the stored `onStoreChange()` function reference, thus
         // re-running the hook and returning the latest value to the consumer.
+
+        // Deep equality check to prevent infinite loops when dependencies array reference changes
+        // but content remains the same
+        if (shallowEqual(previousDependenciesRef.current, dependencies)) {
+            return;
+        }
+
+        previousDependenciesRef.current = dependencies;
+
         if (connectionRef.current === null || isConnectingRef.current || !onStoreChangeFnRef.current) {
             return;
         }
 
+        // Invalidate cache when dependencies change so selector runs with new closure values
+        onyxSnapshotCache.invalidateForKey(key);
         shouldGetCachedValueRef.current = true;
         onStoreChangeFnRef.current();
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -166,11 +229,26 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     }, [key, options?.canEvict]);
 
     const getSnapshot = useCallback(() => {
+        // Check if we have any cache for this Onyx key
+        // Don't use cache for first connection with initWithStoredValues: false
+        // Also don't use cache during active data updates (when shouldGetCachedValueRef is true)
+        if (!(isFirstConnectionRef.current && options?.initWithStoredValues === false) && !shouldGetCachedValueRef.current) {
+            const cachedResult = onyxSnapshotCache.getCachedResult<UseOnyxResult<TReturnValue>>(key, cacheKey);
+            if (cachedResult !== undefined) {
+                resultRef.current = cachedResult;
+                return cachedResult;
+            }
+        }
+
         let isOnyxValueDefined = true;
 
         // We return the initial result right away during the first connection if `initWithStoredValues` is set to `false`.
         if (isFirstConnectionRef.current && options?.initWithStoredValues === false) {
-            return resultRef.current;
+            const result = resultRef.current;
+
+            // Store result in snapshot cache
+            onyxSnapshotCache.setCachedResult<UseOnyxResult<TReturnValue>>(key, cacheKey, result);
+            return result;
         }
 
         // We get the value from cache while the first connection to Onyx is being made,
@@ -179,7 +257,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         if (isFirstConnectionRef.current || shouldGetCachedValueRef.current) {
             // Gets the value from cache and maps it with selector. It changes `null` to `undefined` for `useOnyx` compatibility.
             const value = OnyxUtils.tryGetCachedValue(key) as OnyxValue<TKey>;
-            const selectedValue = selectorRef.current ? selectorRef.current(value) : value;
+            const selectedValue = memoizedSelector ? memoizedSelector(value) : value;
             newValueRef.current = (selectedValue ?? undefined) as TReturnValue | undefined;
 
             // This flag is `false` when the original Onyx value (without selector) is not defined yet.
@@ -204,12 +282,15 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             newFetchStatus = 'loading';
         }
 
-        // We do a deep equality check if `selector` is defined, since each `tryGetCachedValue()` call will
-        // generate a plain new primitive/object/array that was created using the `selector` function.
-        // For the other cases we will only deal with object reference checks, so just a shallow equality check is enough.
+        // Optimized equality checking:
+        // - Memoized selectors already handle deep equality internally, so we can use fast reference equality
+        // - Non-selector cases use shallow equality for object reference checks
+        // - Normalize null to undefined to ensure consistent comparison (both represent "no value")
         let areValuesEqual: boolean;
-        if (selectorRef.current) {
-            areValuesEqual = deepEqual(previousValueRef.current ?? undefined, newValueRef.current);
+        if (memoizedSelector) {
+            const normalizedPrevious = previousValueRef.current ?? undefined;
+            const normalizedNew = newValueRef.current ?? undefined;
+            areValuesEqual = normalizedPrevious === normalizedNew;
         } else {
             areValuesEqual = shallowEqual(previousValueRef.current ?? undefined, newValueRef.current);
         }
@@ -242,8 +323,10 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             }
         }
 
+        onyxSnapshotCache.setCachedResult<UseOnyxResult<TReturnValue>>(key, cacheKey, resultRef.current);
+
         return resultRef.current;
-    }, [options?.initWithStoredValues, options?.allowStaleData, options?.canBeMissing, key, selectorRef]);
+    }, [options?.initWithStoredValues, options?.allowStaleData, options?.canBeMissing, key, memoizedSelector, cacheKey]);
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
@@ -265,6 +348,9 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
                     // sourceValue is unknown type, so we need to cast it to the correct type.
                     sourceValueRef.current = sourceValue as NonNullable<TReturnValue>;
+
+                    // Invalidate snapshot cache for this key when data changes
+                    onyxSnapshotCache.invalidateForKey(key);
 
                     // Finally, we signal that the store changed, making `getSnapshot()` be called again.
                     onStoreChange();
@@ -309,4 +395,4 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
 export default useOnyx;
 
-export type {FetchStatus, ResultMetadata, UseOnyxResult, UseOnyxOptions};
+export type {FetchStatus, ResultMetadata, UseOnyxResult, UseOnyxOptions, UseOnyxSelector};

@@ -41,7 +41,6 @@ function init({
     shouldSyncMultipleInstances = !!global.localStorage,
     enablePerformanceMetrics = false,
     skippableCollectionMemberIDs = [],
-    fullyMergedSnapshotKeys = [],
 }: InitOptions): void {
     if (enablePerformanceMetrics) {
         GlobalSettings.setPerformanceMetricsEnabled(true);
@@ -64,7 +63,7 @@ function init({
         cache.setRecentKeysLimit(maxCachedKeysCount);
     }
 
-    OnyxUtils.initStoreValues(keys, initialKeyStates, evictableKeys, fullyMergedSnapshotKeys);
+    OnyxUtils.initStoreValues(keys, initialKeyStates, evictableKeys);
 
     // Initialize all of our keys with data provided then give green light to any pending connections
     Promise.all([cache.addEvictableKeysToRecentlyAccessedList(OnyxUtils.isCollectionKey, OnyxUtils.getAllKeys), OnyxUtils.initializeWithDefaultKeyStates()]).then(
