@@ -21,13 +21,9 @@ This method will be deprecated soon. Please use <code>Onyx.connectWithoutView()<
 <dt><a href="#set">set(key, value, options)</a></dt>
 <dd><p>Write a value to our store with the given key</p>
 </dd>
-<dt><a href="#setInternal">setInternal(isFromUpdate)</a></dt>
-<dd></dd>
 <dt><a href="#multiSet">multiSet(data)</a></dt>
 <dd><p>Sets multiple keys and values</p>
 </dd>
-<dt><a href="#multiSetInternal">multiSetInternal(isFromUpdate)</a></dt>
-<dd></dd>
 <dt><a href="#merge">merge()</a></dt>
 <dd><p>Merge a new value into an existing value at a key.</p>
 <p>The types of values that can be merged are <code>Object</code> and <code>Array</code>. To set another type of value use <code>Onyx.set()</code>.
@@ -36,13 +32,9 @@ Values of type <code>Object</code> get merged with the old value, whilst for <co
 applied in the order they were called. Note: <code>Onyx.set()</code> calls do not work this way so use caution when mixing
 <code>Onyx.merge()</code> and <code>Onyx.set()</code>.</p>
 </dd>
-<dt><a href="#mergeInternal">mergeInternal(isFromUpdate)</a></dt>
-<dd></dd>
 <dt><a href="#mergeCollection">mergeCollection(collectionKey, collection)</a></dt>
 <dd><p>Merges a collection based on their keys.</p>
 </dd>
-<dt><a href="#mergeCollectionInternal">mergeCollectionInternal(isFromUpdate)</a></dt>
-<dd></dd>
 <dt><a href="#clear">clear(keysToPreserve)</a></dt>
 <dd><p>Clear out all the data in the store</p>
 <p>Note that calling Onyx.clear() and then Onyx.set() on a key with a default
@@ -66,8 +58,6 @@ value will be saved to storage after the default value.</p>
 <dd><p>Sets a collection by replacing all existing collection members with new values.
 Any existing collection members not included in the new data will be removed.</p>
 </dd>
-<dt><a href="#setCollectionInternal">setCollectionInternal(isFromUpdate)</a></dt>
-<dd></dd>
 </dl>
 
 <a name="init"></a>
@@ -162,15 +152,6 @@ Write a value to our store with the given key
 | value | value to store |
 | options | optional configuration object |
 
-<a name="setInternal"></a>
-
-## setInternal(isFromUpdate)
-**Kind**: global function  
-
-| Param | Default | Description |
-| --- | --- | --- |
-| isFromUpdate | <code>false</code> | Whether this call originates from Onyx.update() When isFromUpdate = true (called from Onyx.update()), useOnyx hook subscribers are batched to escape excessive re-renders in components |
-
 <a name="multiSet"></a>
 
 ## multiSet(data)
@@ -186,15 +167,6 @@ Sets multiple keys and values
 ```js
 Onyx.multiSet({'key1': 'a', 'key2': 'b'});
 ```
-<a name="multiSetInternal"></a>
-
-## multiSetInternal(isFromUpdate)
-**Kind**: global function  
-
-| Param | Default | Description |
-| --- | --- | --- |
-| isFromUpdate | <code>false</code> | Whether this call originates from Onyx.update() When isFromUpdate = true (called from Onyx.update()), useOnyx hook subscribers are batched to escape excessive re-renders in components |
-
 <a name="merge"></a>
 
 ## merge()
@@ -215,15 +187,6 @@ Onyx.merge(ONYXKEYS.EMPLOYEE_LIST, ['Jack']); // -> ['Joe', 'Jack']
 Onyx.merge(ONYXKEYS.POLICY, {id: 1}); // -> {id: 1}
 Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Workspace'}
 ```
-<a name="mergeInternal"></a>
-
-## mergeInternal(isFromUpdate)
-**Kind**: global function  
-
-| Param | Default | Description |
-| --- | --- | --- |
-| isFromUpdate | <code>false</code> | Whether this call originates from Onyx.update() When isFromUpdate = true (called from Onyx.update()), useOnyx hook subscribers are batched to escape excessive re-renders in components |
-
 <a name="mergeCollection"></a>
 
 ## mergeCollection(collectionKey, collection)
@@ -243,15 +206,6 @@ Onyx.mergeCollection(ONYXKEYS.COLLECTION.REPORT, {
     [`${ONYXKEYS.COLLECTION.REPORT}2`]: report2,
 });
 ```
-<a name="mergeCollectionInternal"></a>
-
-## mergeCollectionInternal(isFromUpdate)
-**Kind**: global function  
-
-| Param | Default | Description |
-| --- | --- | --- |
-| isFromUpdate | <code>false</code> | Whether this call originates from Onyx.update() When isFromUpdate = true (called from Onyx.update()), useOnyx hook subscribers are batched to escape excessive re-renders in components |
-
 <a name="clear"></a>
 
 ## clear(keysToPreserve)
@@ -311,12 +265,3 @@ Onyx.setCollection(ONYXKEYS.COLLECTION.REPORT, {
     [`${ONYXKEYS.COLLECTION.REPORT}2`]: report2,
 });
 ```
-<a name="setCollectionInternal"></a>
-
-## setCollectionInternal(isFromUpdate)
-**Kind**: global function  
-
-| Param | Default | Description |
-| --- | --- | --- |
-| isFromUpdate | <code>false</code> | Whether this call originates from Onyx.update() When isFromUpdate = true (called from Onyx.update()), useOnyx hook subscribers are batched to escape excessive re-renders in components |
-
