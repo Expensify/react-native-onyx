@@ -2,7 +2,8 @@ import Onyx from '../../lib';
 import OnyxUtils from '../../lib/OnyxUtils';
 import type {GenericDeepRecord} from '../types';
 import utils from '../../lib/utils';
-import type {Collection} from '../../lib/types';
+import type {Collection, OnyxCollection} from '../../lib/types';
+import type GenericCollection from '../utils/GenericCollection';
 
 const testObject: GenericDeepRecord = {
     a: 'a',
@@ -71,6 +72,7 @@ const ONYXKEYS = {
         TEST_KEY: 'test_',
         TEST_LEVEL_KEY: 'test_level_',
         TEST_LEVEL_LAST_KEY: 'test_level_last_',
+        ROUTES: 'routes_',
     },
 };
 
@@ -120,6 +122,102 @@ describe('OnyxUtils', () => {
             expect(() => {
                 OnyxUtils.splitCollectionMemberKey(`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, ONYXKEYS.COLLECTION.TEST_LEVEL_KEY);
             }).toThrowError("Invalid 'test_level_' collection key provided, it isn't compatible with 'test_id1' key.");
+        });
+    });
+
+    describe('partialSetCollection', () => {
+        beforeEach(() => {
+            Onyx.clear();
+        });
+
+        afterEach(() => {
+            Onyx.clear();
+        });
+        it('should replace all existing collection members with new values and keep old ones intact', async () => {
+            let result: OnyxCollection<unknown>;
+            const routeA = `${ONYXKEYS.COLLECTION.ROUTES}A`;
+            const routeB = `${ONYXKEYS.COLLECTION.ROUTES}B`;
+            const routeB1 = `${ONYXKEYS.COLLECTION.ROUTES}B1`;
+            const routeC = `${ONYXKEYS.COLLECTION.ROUTES}C`;
+
+            const connection = Onyx.connect({
+                key: ONYXKEYS.COLLECTION.ROUTES,
+                initWithStoredValues: false,
+                callback: (value) => (result = value),
+                waitForCollectionCallback: true,
+            });
+
+            // Set initial collection state
+            await Onyx.setCollection(ONYXKEYS.COLLECTION.ROUTES, {
+                [routeA]: {name: 'Route A'},
+                [routeB1]: {name: 'Route B1'},
+                [routeC]: {name: 'Route C'},
+            } as GenericCollection);
+
+            // Replace with new collection data
+            await OnyxUtils.partialSetCollection(ONYXKEYS.COLLECTION.ROUTES, {
+                [routeA]: {name: 'New Route A'},
+                [routeB]: {name: 'New Route B'},
+                [routeC]: {name: 'New Route C'},
+            } as GenericCollection);
+
+            expect(result).toEqual({
+                [routeA]: {name: 'New Route A'},
+                [routeB]: {name: 'New Route B'},
+                [routeB1]: {name: 'Route B1'},
+                [routeC]: {name: 'New Route C'},
+            });
+            await Onyx.disconnect(connection);
+        });
+
+        it('should not replace anything in the collection with empty values', async () => {
+            let result: OnyxCollection<unknown>;
+            const routeA = `${ONYXKEYS.COLLECTION.ROUTES}A`;
+
+            const connection = Onyx.connect({
+                key: ONYXKEYS.COLLECTION.ROUTES,
+                initWithStoredValues: false,
+                callback: (value) => (result = value),
+                waitForCollectionCallback: true,
+            });
+
+            await Onyx.mergeCollection(ONYXKEYS.COLLECTION.ROUTES, {
+                [routeA]: {name: 'Route A'},
+            } as GenericCollection);
+
+            await OnyxUtils.partialSetCollection(ONYXKEYS.COLLECTION.ROUTES, {} as GenericCollection);
+
+            expect(result).toEqual({
+                [routeA]: {name: 'Route A'},
+            });
+            await Onyx.disconnect(connection);
+        });
+
+        it('should reject collection items with invalid keys', async () => {
+            let result: OnyxCollection<unknown>;
+            const routeA = `${ONYXKEYS.COLLECTION.ROUTES}A`;
+            const invalidRoute = 'invalid_route';
+
+            const connection = Onyx.connect({
+                key: ONYXKEYS.COLLECTION.ROUTES,
+                initWithStoredValues: false,
+                callback: (value) => (result = value),
+                waitForCollectionCallback: true,
+            });
+
+            await Onyx.mergeCollection(ONYXKEYS.COLLECTION.ROUTES, {
+                [routeA]: {name: 'Route A'},
+            } as GenericCollection);
+
+            await OnyxUtils.partialSetCollection(ONYXKEYS.COLLECTION.ROUTES, {
+                [invalidRoute]: {name: 'Invalid Route'},
+            } as GenericCollection);
+
+            expect(result).toEqual({
+                [routeA]: {name: 'Route A'},
+            });
+
+            await Onyx.disconnect(connection);
         });
     });
 
