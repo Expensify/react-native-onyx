@@ -1616,6 +1616,60 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase, TMap>(
         .then(() => undefined);
 }
 
+/**
+ * Sets keys in a collection by replacing all targeted collection members with new values.
+ * Any existing collection members not included in the new data will not be removed.
+ *
+ * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
+ * @param collection Object collection keyed by individual collection member keys and values
+ */
+function partialSetCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
+    let resultCollection: OnyxInputKeyValueMapping = collection;
+    let resultCollectionKeys = Object.keys(resultCollection);
+
+    // Confirm all the collection keys belong to the same parent
+    if (!doAllCollectionItemsBelongToSameParent(collectionKey, resultCollectionKeys)) {
+        Logger.logAlert(`setCollection called with keys that do not belong to the same parent ${collectionKey}. Skipping this update.`);
+        return Promise.resolve();
+    }
+
+    if (skippableCollectionMemberIDs.size) {
+        resultCollection = resultCollectionKeys.reduce((result: OnyxInputKeyValueMapping, key) => {
+            try {
+                const [, collectionMemberID] = splitCollectionMemberKey(key, collectionKey);
+                // If the collection member key is a skippable one we set its value to null.
+                // eslint-disable-next-line no-param-reassign
+                result[key] = !skippableCollectionMemberIDs.has(collectionMemberID) ? resultCollection[key] : null;
+            } catch {
+                // Something went wrong during split, so we assign the data to result anyway.
+                // eslint-disable-next-line no-param-reassign
+                result[key] = resultCollection[key];
+            }
+
+            return result;
+        }, {});
+    }
+    resultCollectionKeys = Object.keys(resultCollection);
+
+    return getAllKeys().then((persistedKeys) => {
+        const mutableCollection: OnyxInputKeyValueMapping = {...resultCollection};
+        const existingKeys = resultCollectionKeys.filter((key) => persistedKeys.has(key));
+        const previousCollection = getCachedCollection(collectionKey, existingKeys);
+        const keyValuePairs = prepareKeyValuePairsForStorage(mutableCollection, true);
+
+        keyValuePairs.forEach(([key, value]) => cache.set(key, value));
+
+        const updatePromise = scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
+
+        return Storage.multiSet(keyValuePairs)
+            .catch((error) => evictStorageAndRetry(error, partialSetCollection, collectionKey, collection))
+            .then(() => {
+                sendActionToDevTools(METHOD.SET_COLLECTION, undefined, mutableCollection);
+                return updatePromise;
+            });
+    });
+}
+
 function logKeyChanged(onyxMethod: Extract<OnyxMethod, 'set' | 'merge'>, key: OnyxKey, value: unknown, hasChanged: boolean) {
     Logger.logInfo(`${onyxMethod} called for key: ${key}${_.isObject(value) ? ` properties: ${_.keys(value).join(',')}` : ''} hasChanged: ${hasChanged}`);
 }
@@ -1686,6 +1740,7 @@ const OnyxUtils = {
     reduceCollectionWithSelector,
     updateSnapshots,
     mergeCollectionWithPatches,
+    partialSetCollection,
     logKeyChanged,
     logKeyRemoved,
 };
