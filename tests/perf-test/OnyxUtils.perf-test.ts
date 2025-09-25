@@ -1,4 +1,5 @@
 import {measureAsyncFunction, measureFunction} from 'reassure';
+import {randBoolean} from '@ngneat/falso';
 import createRandomReportAction, {getRandomReportActions} from '../utils/collections/reportActions';
 import type {Selector} from '../../lib';
 import Onyx from '../../lib';
@@ -269,6 +270,20 @@ describe('OnyxUtils', () => {
             await measureFunction(() => OnyxUtils.getCachedCollection(collectionKey), {
                 beforeEach: async () => {
                     await Onyx.multiSet(data);
+                },
+                afterEach: clearOnyxAfterEachMeasure,
+            });
+        });
+    });
+
+    describe('partialSetCollection', () => {
+        test('one call with 10k heavy objects', async () => {
+            const changedReportActions = Object.fromEntries(
+                Object.entries(mockedReportActionsMap).map(([k, v]) => [k, randBoolean() ? v : createRandomReportAction(Number(v.reportActionID))] as const),
+            ) as GenericCollection;
+            await measureAsyncFunction(() => OnyxUtils.partialSetCollection(collectionKey, changedReportActions), {
+                beforeEach: async () => {
+                    await Onyx.setCollection(collectionKey, mockedReportActionsMap as GenericCollection);
                 },
                 afterEach: clearOnyxAfterEachMeasure,
             });
