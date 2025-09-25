@@ -1,4 +1,4 @@
-import type {ConnectOptions, OnyxInput, OnyxKey} from './types';
+import type {OnyxInput, OnyxKey} from './types';
 
 type EmptyObject = Record<string, never>;
 type EmptyValue = EmptyObject | null | undefined;
@@ -281,13 +281,6 @@ function omit<TValue>(obj: Record<string, TValue>, condition: string | string[] 
     return filterObject(obj, condition, false);
 }
 
-/**
- * Whether the connect options has the `withOnyxInstance` property defined, that is, it's used by the `withOnyx()` HOC.
- */
-function hasWithOnyxInstance<TKey extends OnyxKey>(mapping: ConnectOptions<TKey>) {
-    return 'withOnyxInstance' in mapping && mapping.withOnyxInstance;
-}
-
 export default {
     fastMerge,
     isEmptyObject,
@@ -296,7 +289,6 @@ export default {
     checkCompatibilityWithExistingValue,
     pick,
     omit,
-    hasWithOnyxInstance,
     ONYX_INTERNALS__REPLACE_OBJECT_MARK,
 };
 export type {FastMergeResult, FastMergeReplaceNullPatch, FastMergeOptions};

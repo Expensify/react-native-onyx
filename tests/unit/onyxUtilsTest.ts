@@ -296,7 +296,6 @@ describe('OnyxUtils', () => {
             OnyxUtils.keyChanged(
                 entryKey,
                 newEntryData, // Second update with different data
-                updatedEntryData, // previous entry  data
                 () => true, // notify connect subscribers
             );
 
