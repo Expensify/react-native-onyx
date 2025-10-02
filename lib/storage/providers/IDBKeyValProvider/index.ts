@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 import type {UseStore} from 'idb-keyval';
 import {set, keys, getMany, setMany, get, clear, del, delMany, promisifyRequest} from 'idb-keyval';
 import utils from '../../../utils';
