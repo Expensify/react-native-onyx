@@ -1,12 +1,15 @@
 import type {UseStore} from 'idb-keyval';
-import {set, keys, getMany, setMany, get, clear, del, delMany, createStore, promisifyRequest} from 'idb-keyval';
-import utils from '../../utils';
-import type StorageProvider from './types';
-import type {OnyxKey, OnyxValue} from '../../types';
+import {set, keys, getMany, setMany, get, clear, del, delMany, promisifyRequest} from 'idb-keyval';
+import utils from '../../../utils';
+import type StorageProvider from '../types';
+import type {OnyxKey, OnyxValue} from '../../../types';
+import createStore from './createStore';
 
 // We don't want to initialize the store while the JS bundle loads as idb-keyval will try to use global.indexedDB
 // which might not be available in certain environments that load the bundle (e.g. electron main process).
 let idbKeyValStore: UseStore;
+const DB_NAME = 'OnyxDB';
+const STORE_NAME = 'keyvaluepairs';
 
 const provider: StorageProvider = {
     /**
@@ -17,12 +20,15 @@ const provider: StorageProvider = {
      * Initializes the storage provider
      */
     init() {
-        const newIdbKeyValStore = createStore('OnyxDB', 'keyvaluepairs');
+        const newIdbKeyValStore = createStore(DB_NAME, STORE_NAME);
 
-        if (newIdbKeyValStore == null) throw Error('IDBKeyVal store could not be created');
+        if (newIdbKeyValStore == null) {
+            throw Error('IDBKeyVal store could not be created');
+        }
 
         idbKeyValStore = newIdbKeyValStore;
     },
+
     setItem: (key, value) => {
         if (value === null) {
             provider.removeItem(key);
