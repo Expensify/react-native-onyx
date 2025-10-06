@@ -1290,6 +1290,32 @@ describe('Onyx', () => {
             });
     });
 
+    it('should merge a key after an invalid change is merged', () => {
+        let testKeyValue: unknown;
+
+        connection = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        return Onyx.set(ONYX_KEYS.TEST_KEY, {})
+            .then(() => {
+                expect(testKeyValue).toEqual({});
+                Onyx.merge(ONYX_KEYS.TEST_KEY, []);
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                expect(testKeyValue).toEqual({});
+                return Onyx.merge(ONYX_KEYS.TEST_KEY, {test1: 'test1'});
+            })
+            .then(() => {
+                expect(testKeyValue).toEqual({test1: 'test1'});
+            });
+    });
+
     it("should not set null values in Onyx.merge, when the key doesn't exist yet", () => {
         let testKeyValue: unknown;
 
