@@ -329,13 +329,13 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
                 return isCompatible;
             }) as Array<OnyxInput<TKey>>;
 
-            if (!validChanges.length) {
-                return Promise.resolve();
-            }
-
             // Clean up the write queue, so we don't apply these changes again.
             delete mergeQueue[key];
             delete mergeQueuePromise[key];
+
+            if (!validChanges.length) {
+                return Promise.resolve();
+            }
 
             // If the last change is null, we can just delete the key.
             // Therefore, we don't need to further broadcast and update the value so we can return early.
