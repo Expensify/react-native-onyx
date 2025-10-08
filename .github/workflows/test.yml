@@ -8,9 +8,11 @@ jobs:
     test:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            # v5.0.0
+            - uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
 
-            - uses: actions/cache@v3
+            # 4.3.0
+            - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
               with:
                   path: ~/.npm
                   key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
