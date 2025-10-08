@@ -1,7 +1,6 @@
 import type {Merge} from 'type-fest';
 import type {BuiltIns} from 'type-fest/source/internal';
 import type OnyxUtils from './OnyxUtils';
-import type {WithOnyxInstance, WithOnyxState} from './withOnyx/types';
 import type {OnyxMethod} from './OnyxUtils';
 import type {FastMergeReplaceNullPatch} from './utils';
 
@@ -117,71 +116,23 @@ type OnyxKey = Key | CollectionKey;
 /**
  * Represents a selector function type which operates based on the provided `TKey` and `ReturnType`.
  *
- * A `Selector` is a function that accepts a value, the withOnyx's internal state and returns a processed value.
+ * A `Selector` is a function that accepts a value and returns a processed value.
  * This type accepts two type parameters: `TKey` and `TReturnType`.
  *
  * The type `TKey` extends `OnyxKey` and it is the key used to access a value in `KeyValueMapping`.
  * `TReturnType` is the type of the returned value from the selector function.
  */
-type Selector<TKey extends OnyxKey, TOnyxProps, TReturnType> = (value: OnyxEntry<KeyValueMapping[TKey]>, state?: WithOnyxState<TOnyxProps>) => TReturnType;
+type Selector<TKey extends OnyxKey, TReturnType> = (value: OnyxEntry<KeyValueMapping[TKey]>) => TReturnType;
 
 /**
  * Represents a single Onyx entry, that can be either `TOnyxValue` or `undefined` if it doesn't exist.
- *
- * It can be used to specify data retrieved from Onyx e.g. `withOnyx` HOC mappings.
- *
- * @example
- * ```ts
- * import Onyx, {OnyxEntry, withOnyx} from 'react-native-onyx';
- *
- * type OnyxProps = {
- *     userAccount: OnyxEntry<Account>;
- * };
- *
- * type Props = OnyxProps & {
- *     prop1: string;
- * };
- *
- * function Component({prop1, userAccount}: Props) {
- *     // ...
- * }
- *
- * export default withOnyx<Props, OnyxProps>({
- *     userAccount: {
- *         key: ONYXKEYS.ACCOUNT,
- *     },
- * })(Component);
- * ```
+ * It can be used to specify data retrieved from Onyx.
  */
 type OnyxEntry<TOnyxValue> = TOnyxValue | undefined;
 
 /**
  * Represents an Onyx collection of entries, that can be either a record of `TOnyxValue`s or `undefined` if it is empty or doesn't exist.
- *
- * It can be used to specify collection data retrieved from Onyx e.g. `withOnyx` HOC mappings.
- *
- * @example
- * ```ts
- * import Onyx, {OnyxCollection, withOnyx} from 'react-native-onyx';
- *
- * type OnyxProps = {
- *     reports: OnyxCollection<Report>;
- * };
- *
- * type Props = OnyxProps & {
- *     prop1: string;
- * };
- *
- * function Component({prop1, reports}: Props) {
- *     // ...
- * }
- *
- * export default withOnyx<Props, OnyxProps>({
- *     reports: {
- *         key: ONYXKEYS.COLLECTION.REPORT,
- *     },
- * })(Component);
- * ```
+ * It can be used to specify collection data retrieved from Onyx.
  */
 type OnyxCollection<TOnyxValue> = OnyxEntry<Record<string, TOnyxValue | undefined>>;
 
@@ -273,9 +224,6 @@ type BaseConnectOptions = {
      * with the same connect configurations.
      */
     reuseConnection?: boolean;
-
-    /** Indicates whether this subscriber is created from the useOnyx hook. */
-    isUseOnyxSubscriber?: boolean;
 };
 
 /** Represents the callback function used in `Onyx.connect()` method with a regular key. */
@@ -324,31 +272,7 @@ type CollectionConnectOptions<TKey extends OnyxKey> = BaseConnectOptions & {
 // NOTE: Any changes to this type like adding or removing options must be accounted in OnyxConnectionManager's `generateConnectionID()` method!
 type ConnectOptions<TKey extends OnyxKey> = DefaultConnectOptions<TKey> | CollectionConnectOptions<TKey>;
 
-/** Represents additional `Onyx.connect()` options used inside `withOnyx()` HOC. */
-// NOTE: Any changes to this type like adding or removing options must be accounted in OnyxConnectionManager's `generateConnectionID()` method!
-type WithOnyxConnectOptions<TKey extends OnyxKey> = ConnectOptions<TKey> & {
-    /** The `withOnyx` class instance to be internally passed. */
-    withOnyxInstance: WithOnyxInstance;
-
-    /** The name of the component's prop that is connected to the Onyx key. */
-    statePropertyName: string;
-
-    /** The component's display name. */
-    displayName: string;
-
-    /**
-     * This will be used to subscribe to a subset of an Onyx key's data.
-     * Using this setting on `withOnyx` can have very positive performance benefits because the component will only re-render
-     * when the subset of data changes. Otherwise, any change of data on any property would normally
-     * cause the component to re-render (and that can be expensive from a performance standpoint).
-     */
-    selector?: Selector<TKey, unknown, unknown>;
-
-    /** Determines if this key in this subscription is safe to be evicted. */
-    canEvict?: boolean;
-};
-
-type Mapping<TKey extends OnyxKey> = WithOnyxConnectOptions<TKey> & {
+type CallbackToStateMapping<TKey extends OnyxKey> = ConnectOptions<TKey> & {
     subscriptionID: number;
 };
 
@@ -478,9 +402,6 @@ type InitOptions = {
      */
     shouldSyncMultipleInstances?: boolean;
 
-    /** Enables debugging setState() calls to connected components */
-    debugSetState?: boolean;
-
     /**
      * If enabled it will use the performance API to measure the time taken by Onyx operations.
      * @default false
@@ -531,7 +452,7 @@ export type {
     InitOptions,
     Key,
     KeyValueMapping,
-    Mapping,
+    CallbackToStateMapping,
     NonNull,
     NonUndefined,
     OnyxInputKeyValueMapping,
@@ -552,7 +473,6 @@ export type {
     OnyxValue,
     Selector,
     SetOptions,
-    WithOnyxConnectOptions,
     MultiMergeReplaceNullPatches,
     MixedOperationsQueue,
 };

@@ -5,10 +5,8 @@ import type {Connection} from '../../lib/OnyxConnectionManager';
 import connectionManager from '../../lib/OnyxConnectionManager';
 import OnyxCache from '../../lib/OnyxCache';
 import StorageMock from '../../lib/storage';
-import type {OnyxKey, WithOnyxConnectOptions} from '../../lib/types';
 import type GenericCollection from '../utils/GenericCollection';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
-import generateEmptyWithOnyxInstance from '../utils/generateEmptyWithOnyxInstance';
 
 // We need access to some internal properties of `connectionManager` during the tests but they are private,
 // so this workaround allows us to have access to them.
@@ -60,14 +58,6 @@ describe('OnyxConnectionManager', () => {
 
             const connectionID3 = generateConnectionID({key: ONYXKEYS.TEST_KEY, initWithStoredValues: false});
             expect(connectionID3.startsWith(`onyxKey=${ONYXKEYS.TEST_KEY},initWithStoredValues=false,waitForCollectionCallback=false,sessionID=${getSessionID()},uniqueID=`)).toBeTruthy();
-
-            const connectionID4 = generateConnectionID({
-                key: ONYXKEYS.TEST_KEY,
-                displayName: 'Component1',
-                statePropertyName: 'prop1',
-                withOnyxInstance: generateEmptyWithOnyxInstance(),
-            } as WithOnyxConnectOptions<OnyxKey>);
-            expect(connectionID4.startsWith(`onyxKey=${ONYXKEYS.TEST_KEY},initWithStoredValues=true,waitForCollectionCallback=false,sessionID=${getSessionID()},uniqueID=`)).toBeTruthy();
         });
 
         it('should generate an unique connection ID if the session ID is changed', async () => {
@@ -368,64 +358,6 @@ describe('OnyxConnectionManager', () => {
             expect(callback2).toHaveBeenCalledWith('test2', ONYXKEYS.TEST_KEY);
             expect(callback3).toHaveBeenCalledTimes(1);
             expect(callback3).toHaveBeenCalledWith('test2', ONYXKEYS.TEST_KEY);
-        });
-
-        describe('withOnyx', () => {
-            it('should connect to a key two times with withOnyx and create two connections instead of one', async () => {
-                await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
-
-                const connection1 = connectionManager.connect({
-                    key: ONYXKEYS.TEST_KEY,
-                    displayName: 'Component1',
-                    statePropertyName: 'prop1',
-                    withOnyxInstance: generateEmptyWithOnyxInstance(),
-                } as WithOnyxConnectOptions<OnyxKey>);
-
-                const connection2 = connectionManager.connect({
-                    key: ONYXKEYS.TEST_KEY,
-                    displayName: 'Component2',
-                    statePropertyName: 'prop2',
-                    withOnyxInstance: generateEmptyWithOnyxInstance(),
-                } as WithOnyxConnectOptions<OnyxKey>);
-
-                await act(async () => waitForPromisesToResolve());
-
-                expect(connection1.id).not.toEqual(connection2.id);
-                expect(connectionsMap.size).toEqual(2);
-                expect(connectionsMap.has(connection1.id)).toBeTruthy();
-                expect(connectionsMap.has(connection2.id)).toBeTruthy();
-
-                connectionManager.disconnect(connection1);
-                connectionManager.disconnect(connection2);
-
-                expect(connectionsMap.size).toEqual(0);
-            });
-
-            it('should connect to a key directly, connect again with withOnyx but create another connection instead of reusing the first one', async () => {
-                await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
-
-                const callback1 = jest.fn();
-                const connection1 = connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback1});
-
-                await act(async () => waitForPromisesToResolve());
-
-                const connection2 = connectionManager.connect({
-                    key: ONYXKEYS.TEST_KEY,
-                    displayName: 'Component2',
-                    statePropertyName: 'prop2',
-                    withOnyxInstance: generateEmptyWithOnyxInstance(),
-                } as WithOnyxConnectOptions<OnyxKey>);
-
-                expect(connection1.id).not.toEqual(connection2.id);
-                expect(connectionsMap.size).toEqual(2);
-                expect(connectionsMap.has(connection1.id)).toBeTruthy();
-                expect(connectionsMap.has(connection2.id)).toBeTruthy();
-
-                connectionManager.disconnect(connection1);
-                connectionManager.disconnect(connection2);
-
-                expect(connectionsMap.size).toEqual(0);
-            });
         });
     });
 

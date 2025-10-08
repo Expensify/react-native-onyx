@@ -1,6 +1,5 @@
 import * as Logger from './Logger';
 import cache, {TASK} from './OnyxCache';
-import * as PerformanceUtils from './PerformanceUtils';
 import Storage from './storage';
 import utils from './utils';
 import DevTools from './DevTools';
@@ -11,7 +10,6 @@ import type {
     ConnectOptions,
     InitOptions,
     KeyValueMapping,
-    Mapping,
     OnyxInputKeyValueMapping,
     OnyxCollection,
     MixedOperationsQueue,
@@ -41,7 +39,6 @@ function init({
     evictableKeys = [],
     maxCachedKeysCount = 1000,
     shouldSyncMultipleInstances = !!global.localStorage,
-    debugSetState = false,
     enablePerformanceMetrics = false,
     skippableCollectionMemberIDs = [],
 }: InitOptions): void {
@@ -56,14 +53,9 @@ function init({
 
     if (shouldSyncMultipleInstances) {
         Storage.keepInstancesSync?.((key, value) => {
-            const prevValue = cache.get(key, false) as OnyxValue<typeof key>;
             cache.set(key, value);
-            OnyxUtils.keyChanged(key, value as OnyxValue<typeof key>, prevValue);
+            OnyxUtils.keyChanged(key, value as OnyxValue<typeof key>);
         });
-    }
-
-    if (debugSetState) {
-        PerformanceUtils.setShouldDebugSetState(true);
     }
 
     if (maxCachedKeysCount > 0) {
@@ -94,11 +86,8 @@ function init({
  * @param connectOptions.key The Onyx key to subscribe to.
  * @param connectOptions.callback A function that will be called when the Onyx data we are subscribed changes.
  * @param connectOptions.waitForCollectionCallback If set to `true`, it will return the entire collection to the callback as a single object.
- * @param connectOptions.withOnyxInstance The `withOnyx` class instance to be internally passed. **Only used inside `withOnyx()` HOC.**
- * @param connectOptions.statePropertyName The name of the component's prop that is connected to the Onyx key. **Only used inside `withOnyx()` HOC.**
- * @param connectOptions.displayName The component's display name. **Only used inside `withOnyx()` HOC.**
- * @param connectOptions.selector This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook or `withOnyx()` HOC.**
- *        Using this setting on `useOnyx()` or `withOnyx()` can have very positive performance benefits because the component will only re-render
+ * @param connectOptions.selector This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook.**
+ *        Using this setting on `useOnyx()` can have very positive performance benefits because the component will only re-render
  *        when the subset of data changes. Otherwise, any change of data on any property would normally
  *        cause the component to re-render (and that can be expensive from a performance standpoint).
  * @returns The connection object to use when calling `Onyx.disconnect()`.
@@ -122,11 +111,8 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
  * @param connectOptions.key The Onyx key to subscribe to.
  * @param connectOptions.callback A function that will be called when the Onyx data we are subscribed changes.
  * @param connectOptions.waitForCollectionCallback If set to `true`, it will return the entire collection to the callback as a single object.
- * @param connectOptions.withOnyxInstance The `withOnyx` class instance to be internally passed. **Only used inside `withOnyx()` HOC.**
- * @param connectOptions.statePropertyName The name of the component's prop that is connected to the Onyx key. **Only used inside `withOnyx()` HOC.**
- * @param connectOptions.displayName The component's display name. **Only used inside `withOnyx()` HOC.**
- * @param connectOptions.selector This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook or `withOnyx()` HOC.**
- *        Using this setting on `useOnyx()` or `withOnyx()` can have very positive performance benefits because the component will only re-render
+ * @param connectOptions.selector This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook.**
+ *        Using this setting on `useOnyx()` can have very positive performance benefits because the component will only re-render
  *        when the subset of data changes. Otherwise, any change of data on any property would normally
  *        cause the component to re-render (and that can be expensive from a performance standpoint).
  * @returns The connection object to use when calling `Onyx.disconnect()`.
@@ -162,13 +148,6 @@ function disconnect(connection: Connection): void {
  * @param options optional configuration object
  */
 function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options?: SetOptions): Promise<void> {
-    return setInternal(key, value, options);
-}
-/**
- * @param isFromUpdate - Whether this call originates from Onyx.update()
- * When isFromUpdate = true (called from Onyx.update()), useOnyx hook subscribers are batched to escape excessive re-renders in components
- */
-function setInternal<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options?: SetOptions, isFromUpdate = false): Promise<void> {
     // When we use Onyx.set to set a key we want to clear the current delta changes from Onyx.merge that were queued
     // before the value was set. If Onyx.merge is currently reading the old value from storage, it will then not apply the changes.
     if (OnyxUtils.hasPendingMergeForKey(key)) {
@@ -221,7 +200,7 @@ function setInternal<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>,
     OnyxUtils.logKeyChanged(OnyxUtils.METHOD.SET, key, value, hasChanged);
 
     // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
-    const updatePromise = OnyxUtils.broadcastUpdate(key, valueWithoutNestedNullValues, hasChanged, isFromUpdate);
+    const updatePromise = OnyxUtils.broadcastUpdate(key, valueWithoutNestedNullValues, hasChanged);
 
     // If the value has not changed or the key got removed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
     if (!hasChanged) {
@@ -229,7 +208,7 @@ function setInternal<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>,
     }
 
     return Storage.setItem(key, valueWithoutNestedNullValues)
-        .catch((error) => OnyxUtils.evictStorageAndRetry(error, setInternal, key, valueWithoutNestedNullValues, undefined, isFromUpdate))
+        .catch((error) => OnyxUtils.evictStorageAndRetry(error, set, key, valueWithoutNestedNullValues))
         .then(() => {
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
             return updatePromise;
@@ -244,13 +223,6 @@ function setInternal<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>,
  * @param data object keyed by ONYXKEYS and the values to set
  */
 function multiSet(data: OnyxMultiSetInput): Promise<void> {
-    return multiSetInternal(data);
-}
-/**
- * @param isFromUpdate - Whether this call originates from Onyx.update()
- * When isFromUpdate = true (called from Onyx.update()), useOnyx hook subscribers are batched to escape excessive re-renders in components
- */
-function multiSetInternal(data: OnyxMultiSetInput, isFromUpdate = false): Promise<void> {
     let newData = data;
 
     const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
@@ -274,7 +246,6 @@ function multiSetInternal(data: OnyxMultiSetInput, isFromUpdate = false): Promis
     const keyValuePairsToSet = OnyxUtils.prepareKeyValuePairsForStorage(newData, true);
 
     const updatePromises = keyValuePairsToSet.map(([key, value]) => {
-        const prevValue = cache.get(key, false);
         // When we use multiSet to set a key we want to clear the current delta changes from Onyx.merge that were queued
         // before the value was set. If Onyx.merge is currently reading the old value from storage, it will then not apply the changes.
         if (OnyxUtils.hasPendingMergeForKey(key)) {
@@ -283,11 +254,11 @@ function multiSetInternal(data: OnyxMultiSetInput, isFromUpdate = false): Promis
 
         // Update cache and optimistically inform subscribers on the next tick
         cache.set(key, value);
-        return OnyxUtils.scheduleSubscriberUpdate(key, value, prevValue, undefined, isFromUpdate);
+        return OnyxUtils.scheduleSubscriberUpdate(key, value);
     });
 
     return Storage.multiSet(keyValuePairsToSet)
-        .catch((error) => OnyxUtils.evictStorageAndRetry(error, multiSetInternal, newData, isFromUpdate))
+        .catch((error) => OnyxUtils.evictStorageAndRetry(error, multiSet, newData))
         .then(() => {
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MULTI_SET, undefined, newData);
             return Promise.all(updatePromises);
@@ -312,13 +283,6 @@ function multiSetInternal(data: OnyxMultiSetInput, isFromUpdate = false): Promis
  * Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Workspace'}
  */
 function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): Promise<void> {
-    return mergeInternal(key, changes);
-}
-/**
- * @param isFromUpdate - Whether this call originates from Onyx.update()
- * When isFromUpdate = true (called from Onyx.update()), useOnyx hook subscribers are batched to escape excessive re-renders in components
- */
-function mergeInternal<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>, isFromUpdate = false): Promise<void> {
     const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
     if (skippableCollectionMemberIDs.size) {
         try {
@@ -365,13 +329,13 @@ function mergeInternal<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<
                 return isCompatible;
             }) as Array<OnyxInput<TKey>>;
 
-            if (!validChanges.length) {
-                return Promise.resolve();
-            }
-
             // Clean up the write queue, so we don't apply these changes again.
             delete mergeQueue[key];
             delete mergeQueuePromise[key];
+
+            if (!validChanges.length) {
+                return Promise.resolve();
+            }
 
             // If the last change is null, we can just delete the key.
             // Therefore, we don't need to further broadcast and update the value so we can return early.
@@ -381,7 +345,7 @@ function mergeInternal<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<
                 return Promise.resolve();
             }
 
-            return OnyxMerge.applyMerge(key, existingValue, validChanges, isFromUpdate).then(({mergedValue, updatePromise}) => {
+            return OnyxMerge.applyMerge(key, existingValue, validChanges).then(({mergedValue, updatePromise}) => {
                 OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, changes, mergedValue);
                 return updatePromise;
             });
@@ -408,14 +372,7 @@ function mergeInternal<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<
  * @param collection Object collection keyed by individual collection member keys and values
  */
 function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
-    return mergeCollectionInternal(collectionKey, collection);
-}
-/**
- * @param isFromUpdate - Whether this call originates from Onyx.update()
- * When isFromUpdate = true (called from Onyx.update()), useOnyx hook subscribers are batched to escape excessive re-renders in components
- */
-function mergeCollectionInternal<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>, isFromUpdate = false): Promise<void> {
-    return OnyxUtils.mergeCollectionWithPatches(collectionKey, collection, undefined, isFromUpdate);
+    return OnyxUtils.mergeCollectionWithPatches(collectionKey, collection);
 }
 
 /**
@@ -504,10 +461,10 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
 
             // Notify the subscribers for each key/value group so they can receive the new values
             Object.entries(keyValuesToResetIndividually).forEach(([key, value]) => {
-                updatePromises.push(OnyxUtils.scheduleSubscriberUpdate(key, value, cache.get(key, false), undefined, false));
+                updatePromises.push(OnyxUtils.scheduleSubscriberUpdate(key, value));
             });
             Object.entries(keyValuesToResetAsCollection).forEach(([key, value]) => {
-                updatePromises.push(OnyxUtils.scheduleNotifyCollectionSubscribers(key, value, undefined, false));
+                updatePromises.push(OnyxUtils.scheduleNotifyCollectionSubscribers(key, value));
             });
 
             const defaultKeyValuePairs = Object.entries(
@@ -598,7 +555,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
                     collectionKeys.forEach((collectionKey) => enqueueMergeOperation(collectionKey, mergedCollection[collectionKey]));
                 }
             },
-            [OnyxUtils.METHOD.SET_COLLECTION]: (k, v) => promises.push(() => setCollectionInternal(k, v as Collection<CollectionKey, unknown, unknown>, true)),
+            [OnyxUtils.METHOD.SET_COLLECTION]: (k, v) => promises.push(() => setCollection(k, v as Collection<CollectionKey, unknown, unknown>)),
             [OnyxUtils.METHOD.MULTI_SET]: (k, v) => Object.entries(v as Partial<OnyxInputKeyValueMapping>).forEach(([entryKey, entryValue]) => enqueueSetOperation(entryKey, entryValue)),
             [OnyxUtils.METHOD.CLEAR]: () => {
                 clearPromise = clear();
@@ -653,28 +610,27 @@ function update(data: OnyxUpdate[]): Promise<void> {
                     collectionKey,
                     batchedCollectionUpdates.merge as Collection<CollectionKey, unknown, unknown>,
                     batchedCollectionUpdates.mergeReplaceNullPatches,
-                    true,
                 ),
             );
         }
         if (!utils.isEmptyObject(batchedCollectionUpdates.set)) {
-            promises.push(() => multiSetInternal(batchedCollectionUpdates.set, true));
+            promises.push(() => OnyxUtils.partialSetCollection(collectionKey, batchedCollectionUpdates.set as Collection<CollectionKey, unknown, unknown>));
         }
     });
 
     Object.entries(updateQueue).forEach(([key, operations]) => {
         if (operations[0] === null) {
             const batchedChanges = OnyxUtils.mergeChanges(operations).result;
-            promises.push(() => setInternal(key, batchedChanges, undefined, true));
+            promises.push(() => set(key, batchedChanges));
             return;
         }
 
         operations.forEach((operation) => {
-            promises.push(() => mergeInternal(key, operation, true));
+            promises.push(() => merge(key, operation));
         });
     });
 
-    const snapshotPromises = OnyxUtils.updateSnapshots(data, (key, changes) => mergeInternal(key, changes, true));
+    const snapshotPromises = OnyxUtils.updateSnapshots(data, merge);
 
     // We need to run the snapshot updates before the other updates so the snapshot data can be updated before the loading state in the snapshot
     const finalPromises = snapshotPromises.concat(promises);
@@ -696,13 +652,6 @@ function update(data: OnyxUpdate[]): Promise<void> {
  * @param collection Object collection keyed by individual collection member keys and values
  */
 function setCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
-    return setCollectionInternal(collectionKey, collection);
-}
-/**
- * @param isFromUpdate - Whether this call originates from Onyx.update()
- * When isFromUpdate = true (called from Onyx.update()), useOnyx hook subscribers are batched to escape excessive re-renders in components
- */
-function setCollectionInternal<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>, isFromUpdate = false): Promise<void> {
     let resultCollection: OnyxInputKeyValueMapping = collection;
     let resultCollectionKeys = Object.keys(resultCollection);
 
@@ -750,10 +699,10 @@ function setCollectionInternal<TKey extends CollectionKeyBase, TMap>(collectionK
 
         keyValuePairs.forEach(([key, value]) => cache.set(key, value));
 
-        const updatePromise = OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection, isFromUpdate);
+        const updatePromise = OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
 
         return Storage.multiSet(keyValuePairs)
-            .catch((error) => OnyxUtils.evictStorageAndRetry(error, setCollectionInternal, collectionKey, collection, isFromUpdate))
+            .catch((error) => OnyxUtils.evictStorageAndRetry(error, setCollection, collectionKey, collection))
             .then(() => {
                 OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET_COLLECTION, undefined, mutableCollection);
                 return updatePromise;
@@ -820,4 +769,4 @@ GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
 });
 
 export default Onyx;
-export type {OnyxUpdate, Mapping, ConnectOptions, SetOptions};
+export type {OnyxUpdate, ConnectOptions, SetOptions};
