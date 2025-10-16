@@ -753,6 +753,13 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
     });
 }
 
+// !!!DO NOT MERGE THIS CODE, METHODS FOR READABILITY ONLY
+const nextMicrotask = () => Promise.resolve();
+const nextMacrotask = () =>
+    new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+    });
+
 /**
  * Schedules an update that will be appended to the macro task queue (so it doesn't update the subscribers immediately).
  *
@@ -764,11 +771,7 @@ function scheduleSubscriberUpdate<TKey extends OnyxKey>(
     value: OnyxValue<TKey>,
     canUpdateSubscriber: (subscriber?: CallbackToStateMapping<OnyxKey>) => boolean = () => true,
 ): Promise<void> {
-    const promise0 = new Promise<void>((resolve) => {
-        setTimeout(resolve, 0);
-    });
-    const promise = Promise.resolve().then(() => keyChanged(key, value, canUpdateSubscriber));
-    return Promise.all([promise0, promise]).then(() => undefined);
+    return Promise.all([nextMacrotask(), nextMicrotask().then(() => keyChanged(key, value, canUpdateSubscriber))]).then(() => undefined);
 }
 
 /**
@@ -781,13 +784,7 @@ function scheduleNotifyCollectionSubscribers<TKey extends OnyxKey>(
     value: OnyxCollection<KeyValueMapping[TKey]>,
     previousValue?: OnyxCollection<KeyValueMapping[TKey]>,
 ): Promise<void> {
-    const promise0 = new Promise<void>((resolve) => {
-        setTimeout(() => {
-            resolve();
-        }, 0);
-    });
-    const promise = Promise.resolve().then(() => keysChanged(key, value, previousValue));
-    return Promise.all([promise0, promise]).then(() => undefined);
+    return Promise.all([nextMacrotask(), nextMicrotask().then(() => keysChanged(key, value, previousValue))]).then(() => undefined);
 }
 
 /**
