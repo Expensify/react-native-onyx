@@ -1,4 +1,5 @@
 import Onyx from '../../lib';
+import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import OnyxUtils from '../../lib/OnyxUtils';
 import type {GenericDeepRecord} from '../types';
 import utils from '../../lib/utils';
@@ -216,6 +217,81 @@ describe('OnyxUtils', () => {
             expect(result).toEqual({
                 [routeA]: {name: 'Route A'},
             });
+
+            await Onyx.disconnect(connection);
+        });
+
+        it('should only trigger collection callback once when partialSetCollection is called with null values', async () => {
+            const mockCallback = jest.fn();
+            const routeA = `${ONYXKEYS.COLLECTION.ROUTES}A`;
+            const routeB = `${ONYXKEYS.COLLECTION.ROUTES}B`;
+            const routeC = `${ONYXKEYS.COLLECTION.ROUTES}C`;
+
+            const connection = Onyx.connect({
+                key: ONYXKEYS.COLLECTION.ROUTES,
+                waitForCollectionCallback: true,
+                callback: mockCallback,
+            });
+
+            await waitForPromisesToResolve();
+            expect(mockCallback).toHaveBeenCalledTimes(1);
+            mockCallback.mockClear();
+
+            // Call partialSetCollection with mixed null and data values
+            await OnyxUtils.partialSetCollection(ONYXKEYS.COLLECTION.ROUTES, {
+                [routeA]: null,
+                [routeB]: {name: 'Route B'},
+                [routeC]: null,
+            } as GenericCollection);
+
+            // Should only be called once, not once per key (3 times)
+            expect(mockCallback).toHaveBeenCalledTimes(1);
+
+            // Should receive filtered collection (only non-null values)
+            const receivedData = mockCallback.mock.calls[0][0];
+            expect(receivedData).toEqual({
+                [routeB]: {name: 'Route B'},
+            });
+
+            await Onyx.disconnect(connection);
+        });
+
+        it('should filter out null values from partialSetCollection callback data', async () => {
+            const mockCallback = jest.fn();
+            const routeA = `${ONYXKEYS.COLLECTION.ROUTES}A`;
+            const routeB = `${ONYXKEYS.COLLECTION.ROUTES}B`;
+            const routeC = `${ONYXKEYS.COLLECTION.ROUTES}C`;
+            const routeD = `${ONYXKEYS.COLLECTION.ROUTES}D`;
+
+            const connection = Onyx.connect({
+                key: ONYXKEYS.COLLECTION.ROUTES,
+                waitForCollectionCallback: true,
+                callback: mockCallback,
+            });
+
+            await waitForPromisesToResolve();
+            mockCallback.mockClear();
+
+            // Collection with mostly null values
+            await OnyxUtils.partialSetCollection(ONYXKEYS.COLLECTION.ROUTES, {
+                [routeA]: null,
+                [routeB]: null,
+                [routeC]: {name: 'Only Non-Null Route'},
+                [routeD]: null,
+            } as GenericCollection);
+
+            expect(mockCallback).toHaveBeenCalledTimes(1);
+
+            // Should only contain non-null values
+            const receivedData = mockCallback.mock.calls[0][0];
+            expect(receivedData).toEqual({
+                [routeC]: {name: 'Only Non-Null Route'},
+            });
+
+            // Verify null values are not present
+            expect(receivedData[routeA]).toBeUndefined();
+            expect(receivedData[routeB]).toBeUndefined();
+            expect(receivedData[routeD]).toBeUndefined();
 
             await Onyx.disconnect(connection);
         });

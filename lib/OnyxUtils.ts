@@ -1400,13 +1400,18 @@ function partialSetCollection<TKey extends CollectionKeyBase, TMap>(collectionKe
         const previousCollection = getCachedCollection(collectionKey, existingKeys);
         const keyValuePairs = prepareKeyValuePairsForStorage(mutableCollection, true);
 
+        setIsProcessingCollectionUpdate(true);
         keyValuePairs.forEach(([key, value]) => cache.set(key, value));
 
         const updatePromise = scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
 
         return Storage.multiSet(keyValuePairs)
-            .catch((error) => evictStorageAndRetry(error, partialSetCollection, collectionKey, collection))
+            .catch((error) => {
+                setIsProcessingCollectionUpdate(false);
+                return evictStorageAndRetry(error, partialSetCollection, collectionKey, collection);
+            })
             .then(() => {
+                setIsProcessingCollectionUpdate(false);
                 sendActionToDevTools(METHOD.SET_COLLECTION, undefined, mutableCollection);
                 return updatePromise;
             });
