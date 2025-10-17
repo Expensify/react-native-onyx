@@ -694,7 +694,7 @@ function setCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey
             mutableCollection[key] = null;
         });
 
-        const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(mutableCollection, true);
+        const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(mutableCollection, true, undefined, true);
         const previousCollection = OnyxUtils.getCachedCollection(collectionKey);
 
         keyValuePairs.forEach(([key, value]) => cache.set(key, value));
