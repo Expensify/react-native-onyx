@@ -73,9 +73,6 @@ let batchUpdatesQueue: Array<() => void> = [];
 // Used for comparison with a new update to avoid invoking the Onyx.connect callback with the same data.
 let lastConnectionCallbackData = new Map<number, OnyxValue<OnyxKey>>();
 
-// Flag to prevent individual keyChanged calls during collection operations to avoid duplicate callbacks
-let isProcessingCollectionUpdate = false;
-
 let snapshotKey: OnyxKey | null = null;
 
 // Keeps track of the last subscriptionID that was used so we can keep incrementing it
@@ -738,12 +735,6 @@ function keyChanged<TKey extends OnyxKey>(
             }
 
             if (isCollectionKey(subscriber.key) && subscriber.waitForCollectionCallback) {
-                // Skip individual key changes for collection callbacks during collection updates
-                // to prevent duplicate callbacks - the collection update will handle this properly
-                if (isProcessingCollectionUpdate) {
-                    continue;
-                }
-
                 let cachedCollection = cachedCollections[subscriber.key];
 
                 if (!cachedCollection) {
@@ -1422,13 +1413,6 @@ function logKeyRemoved(onyxMethod: Extract<OnyxMethod, 'set' | 'merge'>, key: On
 }
 
 /**
- * Sets the flag to indicate we're processing a collection update
- */
-function setIsProcessingCollectionUpdate(processing: boolean): void {
-    isProcessingCollectionUpdate = processing;
-}
-
-/**
  * Clear internal variables used in this file, useful in test environments.
  */
 function clearOnyxUtilsInternals() {
@@ -1493,7 +1477,6 @@ const OnyxUtils = {
     partialSetCollection,
     logKeyChanged,
     logKeyRemoved,
-    setIsProcessingCollectionUpdate,
 };
 
 GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
