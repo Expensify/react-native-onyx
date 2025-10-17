@@ -697,13 +697,17 @@ function setCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey
         const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(mutableCollection, true);
         const previousCollection = OnyxUtils.getCachedCollection(collectionKey);
 
+        OnyxUtils.setIsProcessingCollectionUpdate(true);
         keyValuePairs.forEach(([key, value]) => cache.set(key, value));
 
         const updatePromise = OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
-
         return Storage.multiSet(keyValuePairs)
-            .catch((error) => OnyxUtils.evictStorageAndRetry(error, setCollection, collectionKey, collection))
+            .catch((error) => {
+                OnyxUtils.setIsProcessingCollectionUpdate(false);
+                return OnyxUtils.evictStorageAndRetry(error, setCollection, collectionKey, collection);
+            })
             .then(() => {
+                OnyxUtils.setIsProcessingCollectionUpdate(false);
                 OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET_COLLECTION, undefined, mutableCollection);
                 return updatePromise;
             });
