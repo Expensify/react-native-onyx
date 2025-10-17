@@ -687,7 +687,7 @@ function keyChanged<TKey extends OnyxKey>(
     value: OnyxValue<TKey>,
     canUpdateSubscriber: (subscriber?: CallbackToStateMapping<OnyxKey>) => boolean = () => true,
     notifyConnectSubscribers = true,
-    isProcessingSetCollectionUpdate = false,
+    isProcessingCollectionUpdate = false,
 ): void {
     // Add or remove this key from the recentlyAccessedKeys lists
     if (value !== null) {
@@ -738,7 +738,7 @@ function keyChanged<TKey extends OnyxKey>(
             if (isCollectionKey(subscriber.key) && subscriber.waitForCollectionCallback) {
                 // Skip individual key changes for collection callbacks during collection updates
                 // to prevent duplicate callbacks - the collection update will handle this properly
-                if (isProcessingSetCollectionUpdate) {
+                if (isProcessingCollectionUpdate) {
                     continue;
                 }
                 let cachedCollection = cachedCollections[subscriber.key];
@@ -823,10 +823,10 @@ function scheduleSubscriberUpdate<TKey extends OnyxKey>(
     key: TKey,
     value: OnyxValue<TKey>,
     canUpdateSubscriber: (subscriber?: CallbackToStateMapping<OnyxKey>) => boolean = () => true,
-    isProcessingSetCollectionUpdate = false,
+    isProcessingCollectionUpdate = false,
 ): Promise<void> {
-    const promise = Promise.resolve().then(() => keyChanged(key, value, canUpdateSubscriber, true, isProcessingSetCollectionUpdate));
-    batchUpdates(() => keyChanged(key, value, canUpdateSubscriber, false, isProcessingSetCollectionUpdate));
+    const promise = Promise.resolve().then(() => keyChanged(key, value, canUpdateSubscriber, true, isProcessingCollectionUpdate));
+    batchUpdates(() => keyChanged(key, value, canUpdateSubscriber, false, isProcessingCollectionUpdate));
     return Promise.all([maybeFlushBatchUpdates(), promise]).then(() => undefined);
 }
 
@@ -848,9 +848,9 @@ function scheduleNotifyCollectionSubscribers<TKey extends OnyxKey>(
 /**
  * Remove a key from Onyx and update the subscribers
  */
-function remove<TKey extends OnyxKey>(key: TKey, isProcessingSetCollectionUpdate?: boolean): Promise<void> {
+function remove<TKey extends OnyxKey>(key: TKey, isProcessingCollectionUpdate?: boolean): Promise<void> {
     cache.drop(key);
-    scheduleSubscriberUpdate(key, undefined as OnyxValue<TKey>, undefined, isProcessingSetCollectionUpdate);
+    scheduleSubscriberUpdate(key, undefined as OnyxValue<TKey>, undefined, isProcessingCollectionUpdate);
     return Storage.removeItem(key).then(() => undefined);
 }
 
@@ -929,13 +929,13 @@ function prepareKeyValuePairsForStorage(
     data: Record<OnyxKey, OnyxInput<OnyxKey>>,
     shouldRemoveNestedNulls?: boolean,
     replaceNullPatches?: MultiMergeReplaceNullPatches,
-    isProcessingSetCollectionUpdate?: boolean,
+    isProcessingCollectionUpdate?: boolean,
 ): StorageKeyValuePair[] {
     const pairs: StorageKeyValuePair[] = [];
 
     Object.entries(data).forEach(([key, value]) => {
         if (value === null) {
-            remove(key, isProcessingSetCollectionUpdate);
+            remove(key, isProcessingCollectionUpdate);
             return;
         }
 
