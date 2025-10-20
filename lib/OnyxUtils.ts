@@ -1245,6 +1245,7 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase, TMap>(
     collectionKey: TKey,
     collection: OnyxMergeCollectionInput<TKey, TMap>,
     mergeReplaceNullPatches?: MultiMergeReplaceNullPatches,
+    isProcessingCollectionUpdate = false,
 ): Promise<void> {
     if (!isValidNonEmptyCollectionForMerge(collection)) {
         Logger.logInfo('mergeCollection() called with invalid or empty value. Skipping this update.');
@@ -1282,7 +1283,7 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase, TMap>(
             // Split to keys that exist in storage and keys that don't
             const keys = resultCollectionKeys.filter((key) => {
                 if (resultCollection[key] === null) {
-                    remove(key);
+                    remove(key, isProcessingCollectionUpdate);
                     return false;
                 }
                 return true;

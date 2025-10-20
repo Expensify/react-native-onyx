@@ -372,7 +372,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
  * @param collection Object collection keyed by individual collection member keys and values
  */
 function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
-    return OnyxUtils.mergeCollectionWithPatches(collectionKey, collection);
+    return OnyxUtils.mergeCollectionWithPatches(collectionKey, collection, undefined, true);
 }
 
 /**
@@ -610,6 +610,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
                     collectionKey,
                     batchedCollectionUpdates.merge as Collection<CollectionKey, unknown, unknown>,
                     batchedCollectionUpdates.mergeReplaceNullPatches,
+                    true,
                 ),
             );
         }
