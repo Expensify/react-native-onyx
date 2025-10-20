@@ -2283,7 +2283,7 @@ describe('Onyx', () => {
                 });
         });
 
-        it('should not trigger individual callbacks for each key when update is called with mergeCollection', async () => {
+        it('should trigger individual callbacks for each key when update is called with mergeCollection', async () => {
             const collectionCallback = jest.fn();
             const individualCallback1 = jest.fn();
             const individualCallback2 = jest.fn();
