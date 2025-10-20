@@ -530,7 +530,8 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey): OnyxValue<OnyxKey> 
     if (isCollectionKey(key)) {
         const collectionData = cache.getCollectionData(key);
         if (collectionData !== undefined) {
-            val = collectionData;
+            // Return a shallow copy to ensure React detects changes when items are added/removed
+            val = {...collectionData};
         } else {
             // If we haven't loaded all keys yet, we can't determine if the collection exists
             if (cache.getAllKeys().size === 0) {
