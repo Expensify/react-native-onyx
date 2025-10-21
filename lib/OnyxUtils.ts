@@ -687,6 +687,7 @@ function keyChanged<TKey extends OnyxKey>(
     value: OnyxValue<TKey>,
     canUpdateSubscriber: (subscriber?: CallbackToStateMapping<OnyxKey>) => boolean = () => true,
     notifyConnectSubscribers = true,
+    isProcessingCollectionUpdate = false,
 ): void {
     // Add or remove this key from the recentlyAccessedKeys lists
     if (value !== null) {
@@ -735,6 +736,11 @@ function keyChanged<TKey extends OnyxKey>(
             }
 
             if (isCollectionKey(subscriber.key) && subscriber.waitForCollectionCallback) {
+                // Skip individual key changes for collection callbacks during collection updates
+                // to prevent duplicate callbacks - the collection update will handle this properly
+                if (isProcessingCollectionUpdate) {
+                    continue;
+                }
                 let cachedCollection = cachedCollections[subscriber.key];
 
                 if (!cachedCollection) {
@@ -817,9 +823,10 @@ function scheduleSubscriberUpdate<TKey extends OnyxKey>(
     key: TKey,
     value: OnyxValue<TKey>,
     canUpdateSubscriber: (subscriber?: CallbackToStateMapping<OnyxKey>) => boolean = () => true,
+    isProcessingCollectionUpdate = false,
 ): Promise<void> {
-    const promise = Promise.resolve().then(() => keyChanged(key, value, canUpdateSubscriber, true));
-    batchUpdates(() => keyChanged(key, value, canUpdateSubscriber, false));
+    const promise = Promise.resolve().then(() => keyChanged(key, value, canUpdateSubscriber, true, isProcessingCollectionUpdate));
+    batchUpdates(() => keyChanged(key, value, canUpdateSubscriber, false, isProcessingCollectionUpdate));
     return Promise.all([maybeFlushBatchUpdates(), promise]).then(() => undefined);
 }
 
@@ -841,9 +848,9 @@ function scheduleNotifyCollectionSubscribers<TKey extends OnyxKey>(
 /**
  * Remove a key from Onyx and update the subscribers
  */
-function remove<TKey extends OnyxKey>(key: TKey): Promise<void> {
+function remove<TKey extends OnyxKey>(key: TKey, isProcessingCollectionUpdate?: boolean): Promise<void> {
     cache.drop(key);
-    scheduleSubscriberUpdate(key, undefined as OnyxValue<TKey>);
+    scheduleSubscriberUpdate(key, undefined as OnyxValue<TKey>, undefined, isProcessingCollectionUpdate);
     return Storage.removeItem(key).then(() => undefined);
 }
 
@@ -922,12 +929,13 @@ function prepareKeyValuePairsForStorage(
     data: Record<OnyxKey, OnyxInput<OnyxKey>>,
     shouldRemoveNestedNulls?: boolean,
     replaceNullPatches?: MultiMergeReplaceNullPatches,
+    isProcessingCollectionUpdate?: boolean,
 ): StorageKeyValuePair[] {
     const pairs: StorageKeyValuePair[] = [];
 
     Object.entries(data).forEach(([key, value]) => {
         if (value === null) {
-            remove(key);
+            remove(key, isProcessingCollectionUpdate);
             return;
         }
 
@@ -1237,6 +1245,7 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase, TMap>(
     collectionKey: TKey,
     collection: OnyxMergeCollectionInput<TKey, TMap>,
     mergeReplaceNullPatches?: MultiMergeReplaceNullPatches,
+    isProcessingCollectionUpdate = false,
 ): Promise<void> {
     if (!isValidNonEmptyCollectionForMerge(collection)) {
         Logger.logInfo('mergeCollection() called with invalid or empty value. Skipping this update.');
@@ -1274,7 +1283,7 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase, TMap>(
             // Split to keys that exist in storage and keys that don't
             const keys = resultCollectionKeys.filter((key) => {
                 if (resultCollection[key] === null) {
-                    remove(key);
+                    remove(key, isProcessingCollectionUpdate);
                     return false;
                 }
                 return true;
@@ -1389,7 +1398,7 @@ function partialSetCollection<TKey extends CollectionKeyBase, TMap>(collectionKe
         const mutableCollection: OnyxInputKeyValueMapping = {...resultCollection};
         const existingKeys = resultCollectionKeys.filter((key) => persistedKeys.has(key));
         const previousCollection = getCachedCollection(collectionKey, existingKeys);
-        const keyValuePairs = prepareKeyValuePairsForStorage(mutableCollection, true);
+        const keyValuePairs = prepareKeyValuePairsForStorage(mutableCollection, true, undefined, true);
 
         keyValuePairs.forEach(([key, value]) => cache.set(key, value));
 

@@ -723,6 +723,87 @@ describe('Onyx', () => {
             });
     });
 
+    it('should only trigger collection callback once when mergeCollection is called', async () => {
+        const mockCallback = jest.fn();
+        const key1 = `${ONYX_KEYS.COLLECTION.TEST_KEY}1`;
+        const key2 = `${ONYX_KEYS.COLLECTION.TEST_KEY}2`;
+        const key3 = `${ONYX_KEYS.COLLECTION.TEST_KEY}3`;
+
+        connection = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            waitForCollectionCallback: true,
+            callback: mockCallback,
+        });
+
+        await waitForPromisesToResolve();
+        expect(mockCallback).toHaveBeenCalledTimes(1);
+        mockCallback.mockClear();
+
+        // Call mergeCollection with multiple items
+        await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+            [key1]: {id: '1', name: 'Item 1'},
+            [key2]: {id: '2', name: 'Item 2'},
+            [key3]: {id: '3', name: 'Item 3'},
+        } as GenericCollection);
+
+        // Should only be called once
+        expect(mockCallback).toHaveBeenCalledTimes(1);
+
+        // Should receive the entire merged collection
+        const receivedData = mockCallback.mock.calls[0][0];
+        expect(receivedData).toEqual(
+            expect.objectContaining({
+                [key1]: {id: '1', name: 'Item 1'},
+                [key2]: {id: '2', name: 'Item 2'},
+                [key3]: {id: '3', name: 'Item 3'},
+            }),
+        );
+    });
+
+    it('should only trigger collection callback once when mergeCollection is called with null values', async () => {
+        const mockCallback = jest.fn();
+        const key1 = `${ONYX_KEYS.COLLECTION.TEST_KEY}1`;
+        const key2 = `${ONYX_KEYS.COLLECTION.TEST_KEY}2`;
+        const key3 = `${ONYX_KEYS.COLLECTION.TEST_KEY}3`;
+
+        // Set up initial data
+        await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+            [key1]: {id: '1', name: 'Item 1'},
+            [key2]: {id: '2', name: 'Item 2'},
+            [key3]: {id: '3', name: 'Item 3'},
+        } as GenericCollection);
+
+        connection = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            waitForCollectionCallback: true,
+            callback: mockCallback,
+        });
+
+        await waitForPromisesToResolve();
+        expect(mockCallback).toHaveBeenCalledTimes(1);
+        mockCallback.mockClear();
+
+        // Call mergeCollection with mixed null and data values
+        await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+            [key1]: null,
+            [key2]: {id: '2', name: 'Updated Item 2'},
+            [key3]: null,
+        } as GenericCollection);
+
+        // Should only be called once
+        expect(mockCallback).toHaveBeenCalledTimes(1);
+
+        // Should receive filtered collection
+        const receivedData = mockCallback.mock.calls[0][0];
+        expect(receivedData).toEqual({
+            [key2]: {id: '2', name: 'Updated Item 2'},
+        });
+
+        // Verify removed items are not present
+        expect(receivedData[key1]).toBeUndefined();
+        expect(receivedData[key3]).toBeUndefined();
+    });
+
     it('should use update data object to set/merge keys', () => {
         let testKeyValue: unknown;
         connection = Onyx.connect({
@@ -2201,6 +2282,57 @@ describe('Onyx', () => {
                     expect(testKeyValue).toBe('merged value');
                 });
         });
+
+        it('should trigger individual callbacks for each key when update is called with mergeCollection', async () => {
+            const collectionCallback = jest.fn();
+            const individualCallback1 = jest.fn();
+            const individualCallback2 = jest.fn();
+            const key1 = `${ONYX_KEYS.COLLECTION.TEST_KEY}1`;
+            const key2 = `${ONYX_KEYS.COLLECTION.TEST_KEY}2`;
+
+            connection = Onyx.connect({
+                key: ONYX_KEYS.COLLECTION.TEST_KEY,
+                waitForCollectionCallback: true,
+                callback: collectionCallback,
+            });
+
+            const connection1 = Onyx.connect({
+                key: key1,
+                callback: individualCallback1,
+            });
+
+            const connection2 = Onyx.connect({
+                key: key2,
+                callback: individualCallback2,
+            });
+
+            await waitForPromisesToResolve();
+            collectionCallback.mockClear();
+            individualCallback1.mockClear();
+            individualCallback2.mockClear();
+
+            // Perform update with mergeCollection
+            await Onyx.update([
+                {
+                    onyxMethod: 'mergecollection',
+                    key: ONYX_KEYS.COLLECTION.TEST_KEY,
+                    value: {
+                        [key1]: {id: '1', name: 'Updated Item 1'},
+                        [key2]: {id: '2', name: 'Updated Item 2'},
+                    },
+                },
+            ]);
+
+            // Collection callback should be called
+            expect(collectionCallback).toHaveBeenCalled();
+
+            // Individual callbacks should still work
+            expect(individualCallback1).toHaveBeenCalledWith({id: '1', name: 'Updated Item 1'}, key1);
+            expect(individualCallback2).toHaveBeenCalledWith({id: '2', name: 'Updated Item 2'}, key2);
+
+            Onyx.disconnect(connection1);
+            Onyx.disconnect(connection2);
+        });
     });
 
     describe('merge', () => {
@@ -2536,6 +2668,39 @@ describe('Onyx', () => {
 
             expect(result).toEqual({
                 [routeA]: {name: 'Route A'},
+            });
+        });
+
+        it('should only trigger collection callback once when setCollection is called with null values', async () => {
+            const mockCallback = jest.fn();
+            const routeA = `${ONYX_KEYS.COLLECTION.ROUTES}A`;
+            const routeB = `${ONYX_KEYS.COLLECTION.ROUTES}B`;
+            const routeC = `${ONYX_KEYS.COLLECTION.ROUTES}C`;
+
+            connection = Onyx.connect({
+                key: ONYX_KEYS.COLLECTION.ROUTES,
+                waitForCollectionCallback: true,
+                callback: mockCallback,
+            });
+
+            await waitForPromisesToResolve();
+            expect(mockCallback).toHaveBeenCalledTimes(1);
+            mockCallback.mockClear();
+
+            // Call setCollection with mixed null and data values
+            await Onyx.setCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                [routeA]: null,
+                [routeB]: {name: 'Route B'},
+                [routeC]: null,
+            } as GenericCollection);
+
+            // Should only be called once
+            expect(mockCallback).toHaveBeenCalledTimes(1);
+
+            // Should receive filtered collection (only non-null values)
+            const receivedData = mockCallback.mock.calls[0][0];
+            expect(receivedData).toEqual({
+                [routeB]: {name: 'Route B'},
             });
         });
     });
