@@ -283,7 +283,6 @@ describe('OnyxUtils', () => {
                 ONYXKEYS.COLLECTION.TEST_KEY,
                 {[entryKey]: updatedEntryData}, // new collection
                 initialCollection, // previous collection
-                true, // notify connect subscribers
             );
 
             // Should be called again because data changed
