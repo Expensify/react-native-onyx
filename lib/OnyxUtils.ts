@@ -755,9 +755,13 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
 
 // !!!DO NOT MERGE THIS CODE, METHODS FOR READABILITY ONLY
 const nextMicrotask = () => Promise.resolve();
+let nextMacrotaskPromise: Promise<void> | null = null;
 const nextMacrotask = () =>
     new Promise<void>((resolve) => {
-        setTimeout(resolve, 0);
+        setTimeout(() => {
+            nextMacrotaskPromise = null;
+            resolve();
+        }, 0);
     });
 
 /**
@@ -771,7 +775,10 @@ function scheduleSubscriberUpdate<TKey extends OnyxKey>(
     value: OnyxValue<TKey>,
     canUpdateSubscriber: (subscriber?: CallbackToStateMapping<OnyxKey>) => boolean = () => true,
 ): Promise<void> {
-    return Promise.all([nextMacrotask(), nextMicrotask().then(() => keyChanged(key, value, canUpdateSubscriber))]).then(() => undefined);
+    if (!nextMacrotaskPromise) {
+        nextMacrotaskPromise = nextMacrotask();
+    }
+    return Promise.all([nextMacrotaskPromise, nextMicrotask().then(() => keyChanged(key, value, canUpdateSubscriber))]).then(() => undefined);
 }
 
 /**
@@ -784,7 +791,10 @@ function scheduleNotifyCollectionSubscribers<TKey extends OnyxKey>(
     value: OnyxCollection<KeyValueMapping[TKey]>,
     previousValue?: OnyxCollection<KeyValueMapping[TKey]>,
 ): Promise<void> {
-    return Promise.all([nextMacrotask(), nextMicrotask().then(() => keysChanged(key, value, previousValue))]).then(() => undefined);
+    if (!nextMacrotaskPromise) {
+        nextMacrotaskPromise = nextMacrotask();
+    }
+    return Promise.all([nextMacrotaskPromise, nextMicrotask().then(() => keysChanged(key, value, previousValue))]).then(() => undefined);
 }
 
 /**
