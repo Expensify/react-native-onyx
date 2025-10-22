@@ -441,7 +441,19 @@ To use the extension, simply install it from your favorite web browser store:
 - [Microsoft Edge](https://microsoftedge.microsoft.com/addons/detail/redux-devtools/nnkgneoiohoecpdiaponcejilbhhikei)
 - [Mozilla Firefox](https://addons.mozilla.org/en-US/firefox/addon/reduxdevtools/)
 
-After installing the extension, Onyx will automatically connect to it and start logging any updates made to the local storage.
+### Enabling DevTools
+
+To enable the Redux DevTools integration and start logging any updates made to the local storage, pass `enableDevTools: true` to `Onyx.init()`: 
+
+```javascript
+import Onyx from 'react-native-onyx';
+import Config from './config';
+
+Onyx.init({
+    keys: ONYXKEYS,
+    enableDevTools: Config.ENABLE_ONYX_DEVTOOLS,
+});
+```
 
 ### Usage
 

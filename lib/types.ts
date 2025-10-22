@@ -409,6 +409,13 @@ type InitOptions = {
     enablePerformanceMetrics?: boolean;
 
     /**
+     * If enabled, it will connect to Redux DevTools Extension for debugging.
+     * This allows you to see all Onyx state changes in the Redux DevTools.
+     * @default false
+     */
+    enableDevTools?: boolean;
+
+    /**
      * Array of collection member IDs which updates will be ignored when using Onyx methods.
      * Additionally, any subscribers from these keys to won't receive any data from Onyx.
      */
