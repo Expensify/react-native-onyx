@@ -13,6 +13,14 @@ function initDevTools(enabled: boolean): void {
 }
 
 /**
+ * Gets the current DevTools instance (for testing purposes only)
+ * @private
+ */
+function getDevToolsInstance(): IDevTools {
+    return devToolsInstance;
+}
+
+/**
  * Export a default object that delegates to the current devToolsInstance
  * This allows the instance to be swapped out while keeping the same import signature
  */
@@ -29,5 +37,6 @@ const DevTools: IDevTools = {
 };
 
 export default DevTools;
-export {initDevTools};
+export {initDevTools, getDevToolsInstance};
 export type {DevtoolsConnection, IDevTools};
+export type {default as RealDevTools} from './DevTools/RealDevTools';
