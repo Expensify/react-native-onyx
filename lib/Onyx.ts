@@ -40,7 +40,7 @@ function init({
     maxCachedKeysCount = 1000,
     shouldSyncMultipleInstances = !!global.localStorage,
     enablePerformanceMetrics = false,
-    enableDevTools = false,
+    enableDevTools = true,
     skippableCollectionMemberIDs = [],
 }: InitOptions): void {
     if (enablePerformanceMetrics) {
