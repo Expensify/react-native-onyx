@@ -411,7 +411,7 @@ type InitOptions = {
     /**
      * If enabled, it will connect to Redux DevTools Extension for debugging.
      * This allows you to see all Onyx state changes in the Redux DevTools.
-     * @default false
+     * @default true
      */
     enableDevTools?: boolean;
 
