@@ -2,7 +2,7 @@ import * as Logger from './Logger';
 import cache, {TASK} from './OnyxCache';
 import Storage from './storage';
 import utils from './utils';
-import DevTools from './DevTools';
+import DevTools, {initDevTools} from './DevTools';
 import type {
     Collection,
     CollectionKey,
@@ -40,12 +40,15 @@ function init({
     maxCachedKeysCount = 1000,
     shouldSyncMultipleInstances = !!global.localStorage,
     enablePerformanceMetrics = false,
+    enableDevTools = true,
     skippableCollectionMemberIDs = [],
 }: InitOptions): void {
     if (enablePerformanceMetrics) {
         GlobalSettings.setPerformanceMetricsEnabled(true);
         applyDecorators();
     }
+
+    initDevTools(enableDevTools);
 
     Storage.init();
 
