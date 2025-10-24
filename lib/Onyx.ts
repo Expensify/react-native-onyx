@@ -1,3 +1,4 @@
+import {deepEqual} from 'fast-equals';
 import * as Logger from './Logger';
 import cache, {TASK} from './OnyxCache';
 import Storage from './storage';
@@ -701,9 +702,23 @@ function setCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey
         const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(mutableCollection, true, undefined, true);
         const previousCollection = OnyxUtils.getCachedCollection(collectionKey);
 
-        keyValuePairs.forEach(([key, value]) => cache.set(key, value));
+        // Preserve references for unchanged items in setCollection
+        const preservedCollection: OnyxInputKeyValueMapping = {};
+        keyValuePairs.forEach(([key, value]) => {
+            const cachedValue = cache.get(key, false);
 
-        const updatePromise = OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
+            // Use deep equality check to preserve references for unchanged items
+            if (cachedValue !== undefined && deepEqual(value, cachedValue)) {
+                // Keep the existing reference
+                preservedCollection[key] = cachedValue;
+            } else {
+                // Update cache only for changed items
+                cache.set(key, value);
+                preservedCollection[key] = value;
+            }
+        });
+
+        const updatePromise = OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, preservedCollection, previousCollection);
 
         return Storage.multiSet(keyValuePairs)
             .catch((error) => OnyxUtils.evictStorageAndRetry(error, setCollection, collectionKey, collection))

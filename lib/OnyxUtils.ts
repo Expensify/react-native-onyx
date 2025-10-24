@@ -1343,10 +1343,35 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase, TMap>(
             const finalMergedCollection = {...existingKeyCollection, ...newCollection};
 
             // Prefill cache if necessary by calling get() on any existing keys and then merge original data to cache
-            // and update all subscribers
+            // and update all subscribers with reference preservation for unchanged items
             const promiseUpdate = previousCollectionPromise.then((previousCollection) => {
+                const preservedCollection: Record<string, OnyxValue<OnyxKey>> = {};
+
+                // Capture the original cached values before merging
+                const originalCachedValues: Record<string, OnyxValue<OnyxKey>> = {};
+                Object.keys(finalMergedCollection).forEach((key) => {
+                    originalCachedValues[key] = cache.get(key, false);
+                });
+
+                // Then merge all the data into cache as normal
                 cache.merge(finalMergedCollection);
-                return scheduleNotifyCollectionSubscribers(collectionKey, finalMergedCollection, previousCollection);
+
+                // Finally, preserve references for items that didn't actually change
+                Object.keys(finalMergedCollection).forEach((key) => {
+                    const newMergedValue = cache.get(key, false);
+                    const originalValue = originalCachedValues[key];
+
+                    // Use deep equality check to preserve references for unchanged items
+                    if (originalValue !== undefined && deepEqual(newMergedValue, originalValue)) {
+                        // Keep the existing reference and update cache
+                        preservedCollection[key] = originalValue;
+                        cache.set(key, originalValue);
+                    } else {
+                        preservedCollection[key] = newMergedValue;
+                    }
+                });
+
+                return scheduleNotifyCollectionSubscribers(collectionKey, preservedCollection, previousCollection);
             });
 
             return Promise.all(promises)
@@ -1400,9 +1425,23 @@ function partialSetCollection<TKey extends CollectionKeyBase, TMap>(collectionKe
         const previousCollection = getCachedCollection(collectionKey, existingKeys);
         const keyValuePairs = prepareKeyValuePairsForStorage(mutableCollection, true, undefined, true);
 
-        keyValuePairs.forEach(([key, value]) => cache.set(key, value));
+        // Preserve references for unchanged items in partialSetCollection
+        const preservedCollection: OnyxInputKeyValueMapping = {};
+        keyValuePairs.forEach(([key, value]) => {
+            const cachedValue = cache.get(key, false);
 
-        const updatePromise = scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
+            // Use deep equality check to preserve references for unchanged items
+            if (cachedValue !== undefined && deepEqual(value, cachedValue)) {
+                // Keep the existing reference
+                preservedCollection[key] = cachedValue;
+            } else {
+                // Update cache only for changed items
+                cache.set(key, value);
+                preservedCollection[key] = value;
+            }
+        });
+
+        const updatePromise = scheduleNotifyCollectionSubscribers(collectionKey, preservedCollection, previousCollection);
 
         return Storage.multiSet(keyValuePairs)
             .catch((error) => evictStorageAndRetry(error, partialSetCollection, collectionKey, collection))
