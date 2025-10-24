@@ -1357,11 +1357,10 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase, TMap>(
                         // Keep the existing reference
                         preservedCollection[key] = cachedValue;
                     } else {
-                        // Update cache only for changed items
-                        cache.set(key, newValue);
                         preservedCollection[key] = newValue;
                     }
                 });
+                cache.merge(preservedCollection);
 
                 return scheduleNotifyCollectionSubscribers(collectionKey, preservedCollection, previousCollection);
             });
