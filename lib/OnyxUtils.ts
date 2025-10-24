@@ -1347,20 +1347,29 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase, TMap>(
             const promiseUpdate = previousCollectionPromise.then((previousCollection) => {
                 const preservedCollection: Record<string, OnyxValue<OnyxKey>> = {};
 
-                // Only update cache for items that actually changed to preserve references
+                // Capture the original cached values before merging
+                const originalCachedValues: Record<string, OnyxValue<OnyxKey>> = {};
                 Object.keys(finalMergedCollection).forEach((key) => {
-                    const newValue = finalMergedCollection[key];
-                    const cachedValue = cache.get(key, false);
+                    originalCachedValues[key] = cache.get(key, false);
+                });
+
+                // Then merge all the data into cache as normal
+                cache.merge(finalMergedCollection);
+
+                // Finally, preserve references for items that didn't actually change
+                Object.keys(finalMergedCollection).forEach((key) => {
+                    const newMergedValue = cache.get(key, false);
+                    const originalValue = originalCachedValues[key];
 
                     // Use deep equality check to preserve references for unchanged items
-                    if (cachedValue !== undefined && deepEqual(newValue, cachedValue)) {
-                        // Keep the existing reference
-                        preservedCollection[key] = cachedValue;
+                    if (originalValue !== undefined && deepEqual(newMergedValue, originalValue)) {
+                        // Keep the existing reference and update cache
+                        preservedCollection[key] = originalValue;
+                        cache.set(key, originalValue);
                     } else {
-                        preservedCollection[key] = newValue;
+                        preservedCollection[key] = newMergedValue;
                     }
                 });
-                cache.merge(preservedCollection);
 
                 return scheduleNotifyCollectionSubscribers(collectionKey, preservedCollection, previousCollection);
             });
