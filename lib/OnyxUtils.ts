@@ -879,27 +879,27 @@ function retryOperation<TMethod extends typeof Onyx.set | typeof Onyx.multiSet |
     const storageErrors = ['quotaexceedederror', 'database or disk is full', 'disk I/O error', 'out of memory'];
     const isStorageCapacityError = storageErrors.includes(error?.name?.toLowerCase()) || storageErrors.some((message) => errorMessage?.includes(message));
 
-    if (isStorageCapacityError) {
-        // Find the first key that we can remove that has no subscribers in our blocklist
-        const keyForRemoval = cache.getKeyForEviction();
-        if (!keyForRemoval) {
-            // If we have no acceptable keys to remove then we are possibly trying to save mission critical data. If this is the case,
-            // then we should stop retrying as there is not much the user can do to fix this. Instead of getting them stuck in an infinite loop we
-            // will allow this write to be skipped.
-            Logger.logAlert('Out of storage. But found no acceptable keys to remove.');
-            return reportStorageQuota();
-        }
-
-        // Remove the least recently viewed key that is not currently being accessed and retry.
-        Logger.logInfo(`Out of storage. Evicting least recently accessed key (${keyForRemoval}) and retrying.`);
-        reportStorageQuota();
-
+    if (!isStorageCapacityError) {
         // @ts-expect-error No overload matches this call.
-        return remove(keyForRemoval).then(() => onyxMethod(...args));
+        return onyxMethod(...args);
     }
 
+    // Find the first key that we can remove that has no subscribers in our blocklist
+    const keyForRemoval = cache.getKeyForEviction();
+    if (!keyForRemoval) {
+        // If we have no acceptable keys to remove then we are possibly trying to save mission critical data. If this is the case,
+        // then we should stop retrying as there is not much the user can do to fix this. Instead of getting them stuck in an infinite loop we
+        // will allow this write to be skipped.
+        Logger.logAlert('Out of storage. But found no acceptable keys to remove.');
+        return reportStorageQuota();
+    }
+
+    // Remove the least recently viewed key that is not currently being accessed and retry.
+    Logger.logInfo(`Out of storage. Evicting least recently accessed key (${keyForRemoval}) and retrying.`);
+    reportStorageQuota();
+
     // @ts-expect-error No overload matches this call.
-    return onyxMethod(...args);
+    return remove(keyForRemoval).then(() => onyxMethod(...args));
 }
 
 /**
