@@ -544,6 +544,60 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey): OnyxValue<OnyxKey> 
     return val;
 }
 
+/**
+ * Utility function to preserve object references for unchanged items in collection operations.
+ * Compares new values with cached values using deep equality and preserves references when data is identical.
+ * @returns The preserved collection with unchanged references maintained
+ */
+function preserveCollectionReferences(keyValuePairs: StorageKeyValuePair[]): OnyxInputKeyValueMapping {
+    const preservedCollection: OnyxInputKeyValueMapping = {};
+
+    keyValuePairs.forEach(([key, value]) => {
+        const cachedValue = cache.get(key, false);
+
+        // If no cached value exists, we need to add the new value (skip expensive deep equality check)
+        // Use deep equality check to preserve references for unchanged items
+        if (cachedValue !== undefined && deepEqual(value, cachedValue)) {
+            // Keep the existing reference
+            preservedCollection[key] = cachedValue;
+        } else {
+            // Update cache only for changed items
+            cache.set(key, value);
+            preservedCollection[key] = value;
+        }
+    });
+
+    return preservedCollection;
+}
+
+/**
+ * Utility function for merge operations that preserves references after cache merge has been performed.
+ * Compares merged values with original cached values and preserves references when data is unchanged.
+ * @returns The preserved collection with unchanged references maintained
+ */
+function preserveCollectionReferencesAfterMerge(
+    collection: Record<string, OnyxValue<OnyxKey>>,
+    originalCachedValues: Record<string, OnyxValue<OnyxKey>>,
+): Record<string, OnyxValue<OnyxKey>> {
+    const preservedCollection: Record<string, OnyxValue<OnyxKey>> = {};
+
+    Object.keys(collection).forEach((key) => {
+        const newMergedValue = cache.get(key, false);
+        const originalValue = originalCachedValues[key];
+
+        // Use deep equality check to preserve references for unchanged items
+        if (originalValue !== undefined && deepEqual(newMergedValue, originalValue)) {
+            // Keep the existing reference and update cache
+            preservedCollection[key] = originalValue;
+            cache.set(key, originalValue);
+        } else {
+            preservedCollection[key] = newMergedValue;
+        }
+    });
+
+    return preservedCollection;
+}
+
 function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collectionMemberKeys?: string[]): NonNullable<OnyxCollection<KeyValueMapping[TKey]>> {
     // Use optimized collection data retrieval when cache is populated
     const collectionData = cache.getCollectionData(collectionKey);
@@ -1345,8 +1399,6 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase, TMap>(
             // Prefill cache if necessary by calling get() on any existing keys and then merge original data to cache
             // and update all subscribers with reference preservation for unchanged items
             const promiseUpdate = previousCollectionPromise.then((previousCollection) => {
-                const preservedCollection: Record<string, OnyxValue<OnyxKey>> = {};
-
                 // Capture the original cached values before merging
                 const originalCachedValues: Record<string, OnyxValue<OnyxKey>> = {};
                 Object.keys(finalMergedCollection).forEach((key) => {
@@ -1357,19 +1409,7 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase, TMap>(
                 cache.merge(finalMergedCollection);
 
                 // Finally, preserve references for items that didn't actually change
-                Object.keys(finalMergedCollection).forEach((key) => {
-                    const newMergedValue = cache.get(key, false);
-                    const originalValue = originalCachedValues[key];
-
-                    // Use deep equality check to preserve references for unchanged items
-                    if (originalValue !== undefined && deepEqual(newMergedValue, originalValue)) {
-                        // Keep the existing reference and update cache
-                        preservedCollection[key] = originalValue;
-                        cache.set(key, originalValue);
-                    } else {
-                        preservedCollection[key] = newMergedValue;
-                    }
-                });
+                const preservedCollection = preserveCollectionReferencesAfterMerge(finalMergedCollection, originalCachedValues);
 
                 return scheduleNotifyCollectionSubscribers(collectionKey, preservedCollection, previousCollection);
             });
@@ -1426,20 +1466,7 @@ function partialSetCollection<TKey extends CollectionKeyBase, TMap>(collectionKe
         const keyValuePairs = prepareKeyValuePairsForStorage(mutableCollection, true, undefined, true);
 
         // Preserve references for unchanged items in partialSetCollection
-        const preservedCollection: OnyxInputKeyValueMapping = {};
-        keyValuePairs.forEach(([key, value]) => {
-            const cachedValue = cache.get(key, false);
-
-            // Use deep equality check to preserve references for unchanged items
-            if (cachedValue !== undefined && deepEqual(value, cachedValue)) {
-                // Keep the existing reference
-                preservedCollection[key] = cachedValue;
-            } else {
-                // Update cache only for changed items
-                cache.set(key, value);
-                preservedCollection[key] = value;
-            }
-        });
+        const preservedCollection = preserveCollectionReferences(keyValuePairs);
 
         const updatePromise = scheduleNotifyCollectionSubscribers(collectionKey, preservedCollection, previousCollection);
 
@@ -1523,6 +1550,8 @@ const OnyxUtils = {
     updateSnapshots,
     mergeCollectionWithPatches,
     partialSetCollection,
+    preserveCollectionReferences,
+    preserveCollectionReferencesAfterMerge,
     logKeyChanged,
     logKeyRemoved,
 };
