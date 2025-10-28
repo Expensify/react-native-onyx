@@ -109,10 +109,11 @@ subscriber callbacks receive the data in a different format than they normally e
 <dt><a href="#remove">remove()</a></dt>
 <dd><p>Remove a key from Onyx and update the subscribers</p>
 </dd>
-<dt><a href="#evictStorageAndRetry">evictStorageAndRetry()</a></dt>
-<dd><p>If we fail to set or merge we must handle this by
-evicting some data from Onyx and then retrying to do
-whatever it is we attempted to do.</p>
+<dt><a href="#retryOperation">retryOperation()</a></dt>
+<dd><p>Handles storage operation failures based on the error type:
+- Storage capacity errors: evicts data and retries the operation
+- Invalid data errors: logs an alert and throws an error
+- Other errors: retries the operation</p>
 </dd>
 <dt><a href="#broadcastUpdate">broadcastUpdate()</a></dt>
 <dd><p>Notifies subscribers and writes current value to cache</p>
@@ -405,13 +406,14 @@ subscriber callbacks receive the data in a different format than they normally e
 ## remove()
 Remove a key from Onyx and update the subscribers
 
-**Kind**: global function  
-<a name="evictStorageAndRetry"></a>
+**Kind**: global function
+<a name="retryOperation"></a>
 
-## evictStorageAndRetry()
-If we fail to set or merge we must handle this by
-evicting some data from Onyx and then retrying to do
-whatever it is we attempted to do.
+## retryOperation()
+Handles storage operation failures based on the error type:
+- Storage capacity errors: evicts data and retries the operation
+- Invalid data errors: logs an alert and throws an error
+- Other errors: retries the operation
 
 **Kind**: global function  
 <a name="broadcastUpdate"></a>

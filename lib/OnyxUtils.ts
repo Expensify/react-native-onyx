@@ -858,11 +858,12 @@ function reportStorageQuota(): Promise<void> {
 }
 
 /**
- * If we fail to set or merge we must handle this by
- * evicting some data from Onyx and then retrying to do
- * whatever it is we attempted to do.
+ * Handles storage operation failures based on the error type:
+ * - Storage capacity errors: evicts data and retries the operation
+ * - Invalid data errors: logs an alert and throws an error
+ * - Other errors: retries the operation
  */
-function evictStorageAndRetry<TMethod extends typeof Onyx.set | typeof Onyx.multiSet | typeof Onyx.mergeCollection | typeof Onyx.setCollection>(
+function retryOperation<TMethod extends typeof Onyx.set | typeof Onyx.multiSet | typeof Onyx.mergeCollection | typeof Onyx.setCollection>(
     error: Error,
     onyxMethod: TMethod,
     ...args: Parameters<TMethod>
@@ -874,22 +875,31 @@ function evictStorageAndRetry<TMethod extends typeof Onyx.set | typeof Onyx.mult
         throw error;
     }
 
-    // Find the first key that we can remove that has no subscribers in our blocklist
-    const keyForRemoval = cache.getKeyForEviction();
-    if (!keyForRemoval) {
-        // If we have no acceptable keys to remove then we are possibly trying to save mission critical data. If this is the case,
-        // then we should stop retrying as there is not much the user can do to fix this. Instead of getting them stuck in an infinite loop we
-        // will allow this write to be skipped.
-        Logger.logAlert('Out of storage. But found no acceptable keys to remove.');
-        return reportStorageQuota();
+    const errorMessage = error?.message?.toLowerCase?.();
+    const storageErrors = ['quotaexceedederror', 'database or disk is full', 'disk I/O error', 'out of memory'];
+    const isStorageCapacityError = storageErrors.includes(error?.name?.toLowerCase()) || storageErrors.some((message) => errorMessage?.includes(message));
+
+    if (isStorageCapacityError) {
+        // Find the first key that we can remove that has no subscribers in our blocklist
+        const keyForRemoval = cache.getKeyForEviction();
+        if (!keyForRemoval) {
+            // If we have no acceptable keys to remove then we are possibly trying to save mission critical data. If this is the case,
+            // then we should stop retrying as there is not much the user can do to fix this. Instead of getting them stuck in an infinite loop we
+            // will allow this write to be skipped.
+            Logger.logAlert('Out of storage. But found no acceptable keys to remove.');
+            return reportStorageQuota();
+        }
+
+        // Remove the least recently viewed key that is not currently being accessed and retry.
+        Logger.logInfo(`Out of storage. Evicting least recently accessed key (${keyForRemoval}) and retrying.`);
+        reportStorageQuota();
+
+        // @ts-expect-error No overload matches this call.
+        return remove(keyForRemoval).then(() => onyxMethod(...args));
     }
 
-    // Remove the least recently viewed key that is not currently being accessed and retry.
-    Logger.logInfo(`Out of storage. Evicting least recently accessed key (${keyForRemoval}) and retrying.`);
-    reportStorageQuota();
-
     // @ts-expect-error No overload matches this call.
-    return remove(keyForRemoval).then(() => onyxMethod(...args));
+    return onyxMethod(...args);
 }
 
 /**
@@ -1341,7 +1351,7 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase, TMap>(
             });
 
             return Promise.all(promises)
-                .catch((error) => evictStorageAndRetry(error, mergeCollectionWithPatches, collectionKey, resultCollection))
+                .catch((error) => retryOperation(error, mergeCollectionWithPatches, collectionKey, resultCollection))
                 .then(() => {
                     sendActionToDevTools(METHOD.MERGE_COLLECTION, undefined, resultCollection);
                     return promiseUpdate;
@@ -1396,7 +1406,7 @@ function partialSetCollection<TKey extends CollectionKeyBase, TMap>(collectionKe
         const updatePromise = scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
 
         return Storage.multiSet(keyValuePairs)
-            .catch((error) => evictStorageAndRetry(error, partialSetCollection, collectionKey, collection))
+            .catch((error) => retryOperation(error, partialSetCollection, collectionKey, collection))
             .then(() => {
                 sendActionToDevTools(METHOD.SET_COLLECTION, undefined, mutableCollection);
                 return updatePromise;
@@ -1452,7 +1462,7 @@ const OnyxUtils = {
     scheduleNotifyCollectionSubscribers,
     remove,
     reportStorageQuota,
-    evictStorageAndRetry,
+    retryOperation,
     broadcastUpdate,
     hasPendingMergeForKey,
     prepareKeyValuePairsForStorage,
@@ -1512,7 +1522,7 @@ GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
     // @ts-expect-error Reassign
     reportStorageQuota = decorateWithMetrics(reportStorageQuota, 'OnyxUtils.reportStorageQuota');
     // @ts-expect-error Complex type signature
-    evictStorageAndRetry = decorateWithMetrics(evictStorageAndRetry, 'OnyxUtils.evictStorageAndRetry');
+    retryOperation = decorateWithMetrics(retryOperation, 'OnyxUtils.retryOperation');
     // @ts-expect-error Reassign
     broadcastUpdate = decorateWithMetrics(broadcastUpdate, 'OnyxUtils.broadcastUpdate');
     // @ts-expect-error Reassign

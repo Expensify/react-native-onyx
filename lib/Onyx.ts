@@ -208,7 +208,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options
     }
 
     return Storage.setItem(key, valueWithoutNestedNullValues)
-        .catch((error) => OnyxUtils.evictStorageAndRetry(error, set, key, valueWithoutNestedNullValues))
+        .catch((error) => OnyxUtils.retryOperation(error, set, key, valueWithoutNestedNullValues))
         .then(() => {
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
             return updatePromise;
@@ -258,7 +258,7 @@ function multiSet(data: OnyxMultiSetInput): Promise<void> {
     });
 
     return Storage.multiSet(keyValuePairsToSet)
-        .catch((error) => OnyxUtils.evictStorageAndRetry(error, multiSet, newData))
+        .catch((error) => OnyxUtils.retryOperation(error, multiSet, newData))
         .then(() => {
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MULTI_SET, undefined, newData);
             return Promise.all(updatePromises);
@@ -702,7 +702,7 @@ function setCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey
         const updatePromise = OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
 
         return Storage.multiSet(keyValuePairs)
-            .catch((error) => OnyxUtils.evictStorageAndRetry(error, setCollection, collectionKey, collection))
+            .catch((error) => OnyxUtils.retryOperation(error, setCollection, collectionKey, collection))
             .then(() => {
                 OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET_COLLECTION, undefined, mutableCollection);
                 return updatePromise;
