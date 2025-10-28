@@ -49,6 +49,10 @@ const METHOD = {
     CLEAR: 'clear',
 } as const;
 
+const IDB_STORAGE_ERRORS = ['quotaexceedederror'] as const;
+const SQL_STORAGE_ERRORS = ['database or disk is full', 'disk I/O error', 'out of memory'] as const;
+const STORAGE_ERRORS = [...IDB_STORAGE_ERRORS, ...SQL_STORAGE_ERRORS];
+
 type OnyxMethod = ValueOf<typeof METHOD>;
 
 // Key/value store of Onyx key and arrays of values to merge
@@ -876,8 +880,7 @@ function retryOperation<TMethod extends typeof Onyx.set | typeof Onyx.multiSet |
     }
 
     const errorMessage = error?.message?.toLowerCase?.();
-    const storageErrors = ['quotaexceedederror', 'database or disk is full', 'disk I/O error', 'out of memory'];
-    const isStorageCapacityError = storageErrors.includes(error?.name?.toLowerCase()) || storageErrors.some((message) => errorMessage?.includes(message));
+    const isStorageCapacityError = STORAGE_ERRORS.some((storageError) => storageError === error?.name?.toLowerCase() || errorMessage?.includes(storageError));
 
     if (!isStorageCapacityError) {
         // @ts-expect-error No overload matches this call.
