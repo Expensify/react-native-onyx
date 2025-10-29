@@ -63,6 +63,8 @@ const SQL_STORAGE_ERRORS = [
 
 const STORAGE_ERRORS = [...IDB_STORAGE_ERRORS, ...SQL_STORAGE_ERRORS];
 
+const MAX_RETRY_ATTEMPTS = 5;
+
 type OnyxMethod = ValueOf<typeof METHOD>;
 
 // Key/value store of Onyx key and arrays of values to merge
@@ -880,9 +882,13 @@ function reportStorageQuota(): Promise<void> {
 function retryOperation<TMethod extends typeof Onyx.set | typeof Onyx.multiSet | typeof Onyx.mergeCollection | typeof Onyx.setCollection>(
     error: Error,
     onyxMethod: TMethod,
-    ...args: Parameters<TMethod>
+    args: Parameters<TMethod>,
+    retryAttempt: number | undefined,
 ): Promise<void> {
-    Logger.logInfo(`Failed to save to storage. Error: ${error}. onyxMethod: ${onyxMethod.name}`);
+    const currentRetryAttempt = retryAttempt ?? 0;
+    const nextRetryAttempt = currentRetryAttempt + 1;
+
+    Logger.logInfo(`Failed to save to storage. Error: ${error}. onyxMethod: ${onyxMethod.name}. retryAttempt: ${currentRetryAttempt}/${MAX_RETRY_ATTEMPTS}`);
 
     if (error && Str.startsWith(error.message, "Failed to execute 'put' on 'IDBObjectStore'")) {
         Logger.logAlert('Attempted to set invalid data set in Onyx. Please ensure all data is serializable.');
@@ -894,7 +900,7 @@ function retryOperation<TMethod extends typeof Onyx.set | typeof Onyx.multiSet |
 
     if (!isStorageCapacityError) {
         // @ts-expect-error No overload matches this call.
-        return onyxMethod(...args);
+        return nextRetryAttempt > MAX_RETRY_ATTEMPTS ? undefined : onyxMethod(...args, nextRetryAttempt);
     }
 
     // Find the first key that we can remove that has no subscribers in our blocklist
@@ -912,7 +918,7 @@ function retryOperation<TMethod extends typeof Onyx.set | typeof Onyx.multiSet |
     reportStorageQuota();
 
     // @ts-expect-error No overload matches this call.
-    return remove(keyForRemoval).then(() => onyxMethod(...args));
+    return remove(keyForRemoval).then(() => (nextRetryAttempt > MAX_RETRY_ATTEMPTS ? undefined : onyxMethod(...args, nextRetryAttempt)));
 }
 
 /**
@@ -1255,11 +1261,13 @@ function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge): Array<
  * @param collection Object collection keyed by individual collection member keys and values
  * @param mergeReplaceNullPatches Record where the key is a collection member key and the value is a list of
  * tuples that we'll use to replace the nested objects of that collection member record with something else.
+ * @param retryAttempt retry attempt
  */
 function mergeCollectionWithPatches<TKey extends CollectionKeyBase, TMap>(
     collectionKey: TKey,
     collection: OnyxMergeCollectionInput<TKey, TMap>,
     mergeReplaceNullPatches?: MultiMergeReplaceNullPatches,
+    retryAttempt?: number,
 ): Promise<void> {
     if (!isValidNonEmptyCollectionForMerge(collection)) {
         Logger.logInfo('mergeCollection() called with invalid or empty value. Skipping this update.');
@@ -1364,7 +1372,7 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase, TMap>(
             });
 
             return Promise.all(promises)
-                .catch((error) => retryOperation(error, mergeCollectionWithPatches, collectionKey, resultCollection))
+                .catch((error) => retryOperation(error, mergeCollectionWithPatches, [collectionKey, resultCollection, undefined], retryAttempt))
                 .then(() => {
                     sendActionToDevTools(METHOD.MERGE_COLLECTION, undefined, resultCollection);
                     return promiseUpdate;
@@ -1379,8 +1387,9 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase, TMap>(
  *
  * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
  * @param collection Object collection keyed by individual collection member keys and values
+ * @param retryAttempt retry attempt
  */
-function partialSetCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
+function partialSetCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>, retryAttempt?: number): Promise<void> {
     let resultCollection: OnyxInputKeyValueMapping = collection;
     let resultCollectionKeys = Object.keys(resultCollection);
 
@@ -1419,7 +1428,7 @@ function partialSetCollection<TKey extends CollectionKeyBase, TMap>(collectionKe
         const updatePromise = scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
 
         return Storage.multiSet(keyValuePairs)
-            .catch((error) => retryOperation(error, partialSetCollection, collectionKey, collection))
+            .catch((error) => retryOperation(error, partialSetCollection, [collectionKey, collection], retryAttempt))
             .then(() => {
                 sendActionToDevTools(METHOD.SET_COLLECTION, undefined, mutableCollection);
                 return updatePromise;

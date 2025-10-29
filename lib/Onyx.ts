@@ -146,8 +146,9 @@ function disconnect(connection: Connection): void {
  * @param key ONYXKEY to set
  * @param value value to store
  * @param options optional configuration object
+ * @param retryAttempt retry attempt
  */
-function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options?: SetOptions): Promise<void> {
+function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options?: SetOptions, retryAttempt?: number): Promise<void> {
     // When we use Onyx.set to set a key we want to clear the current delta changes from Onyx.merge that were queued
     // before the value was set. If Onyx.merge is currently reading the old value from storage, it will then not apply the changes.
     if (OnyxUtils.hasPendingMergeForKey(key)) {
@@ -208,7 +209,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options
     }
 
     return Storage.setItem(key, valueWithoutNestedNullValues)
-        .catch((error) => OnyxUtils.retryOperation(error, set, key, valueWithoutNestedNullValues))
+        .catch((error) => OnyxUtils.retryOperation(error, set, [key, valueWithoutNestedNullValues, undefined], retryAttempt))
         .then(() => {
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
             return updatePromise;
@@ -221,8 +222,9 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options
  * @example Onyx.multiSet({'key1': 'a', 'key2': 'b'});
  *
  * @param data object keyed by ONYXKEYS and the values to set
+ * @param retryAttempt retry attempt
  */
-function multiSet(data: OnyxMultiSetInput): Promise<void> {
+function multiSet(data: OnyxMultiSetInput, retryAttempt?: number): Promise<void> {
     let newData = data;
 
     const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
@@ -258,7 +260,7 @@ function multiSet(data: OnyxMultiSetInput): Promise<void> {
     });
 
     return Storage.multiSet(keyValuePairsToSet)
-        .catch((error) => OnyxUtils.retryOperation(error, multiSet, newData))
+        .catch((error) => OnyxUtils.retryOperation(error, multiSet, [newData], retryAttempt))
         .then(() => {
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MULTI_SET, undefined, newData);
             return Promise.all(updatePromises);
@@ -650,8 +652,9 @@ function update(data: OnyxUpdate[]): Promise<void> {
  *
  * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
  * @param collection Object collection keyed by individual collection member keys and values
+ * @param retryAttempt retry attempt
  */
-function setCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
+function setCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>, retryAttempt?: number): Promise<void> {
     let resultCollection: OnyxInputKeyValueMapping = collection;
     let resultCollectionKeys = Object.keys(resultCollection);
 
@@ -702,7 +705,7 @@ function setCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey
         const updatePromise = OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
 
         return Storage.multiSet(keyValuePairs)
-            .catch((error) => OnyxUtils.retryOperation(error, setCollection, collectionKey, collection))
+            .catch((error) => OnyxUtils.retryOperation(error, setCollection, [collectionKey, collection], retryAttempt))
             .then(() => {
                 OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET_COLLECTION, undefined, mutableCollection);
                 return updatePromise;

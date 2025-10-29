@@ -507,7 +507,7 @@ describe('OnyxUtils', () => {
             const error = new Error();
             const onyxMethod = jest.fn() as typeof Onyx.set;
 
-            await measureAsyncFunction(() => OnyxUtils.retryOperation(error, onyxMethod, '', null), {
+            await measureAsyncFunction(() => OnyxUtils.retryOperation(error, onyxMethod, ['', null], 1), {
                 beforeEach: async () => {
                     mockedReportActionsKeys.forEach((key) => OnyxCache.addLastAccessedKey(key, false));
                     OnyxCache.addLastAccessedKey(`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}1`, false);
