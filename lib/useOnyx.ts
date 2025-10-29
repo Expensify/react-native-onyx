@@ -229,6 +229,24 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     }, [key, options?.canEvict]);
 
     const getSnapshot = useCallback(() => {
+        // Fast path: if subscribing to a skippable collection member id, return undefined as loaded immediately
+        if (isFirstConnectionRef.current) {
+            try {
+                const [, memberId] = OnyxUtils.splitCollectionMemberKey(key);
+                if (OnyxUtils.getSkippableCollectionMemberIDs().has(memberId)) {
+                    // Finalize initial state as loaded undefined and stop further first-connection flows
+                    if (resultRef.current[1].status !== 'loaded' || resultRef.current[0] !== undefined) {
+                        resultRef.current = [undefined, {status: 'loaded'}];
+                        onyxSnapshotCache.setCachedResult<UseOnyxResult<TReturnValue>>(key, cacheKey, resultRef.current);
+                    }
+                    isFirstConnectionRef.current = false;
+                    shouldGetCachedValueRef.current = false;
+                    return resultRef.current;
+                }
+            } catch (e) {
+                // Not a collection member, continue as usual
+            }
+        }
         // Check if we have any cache for this Onyx key
         // Don't use cache for first connection with initWithStoredValues: false
         // Also don't use cache during active data updates (when shouldGetCachedValueRef is true)
