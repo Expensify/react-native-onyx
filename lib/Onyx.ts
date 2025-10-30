@@ -23,6 +23,8 @@ import type {
     OnyxInput,
     OnyxMethodMap,
     SetOptions,
+    SetParams,
+    SetCollectionParams,
 } from './types';
 import OnyxUtils from './OnyxUtils';
 import logMessages from './logMessages';
@@ -144,14 +146,14 @@ function disconnect(connection: Connection): void {
 }
 
 /**
- * Write a value to our store with the given key
+ * Write a value to our store with the given key, retry if the operation fails.
  *
  * @param key ONYXKEY to set
  * @param value value to store
  * @param options optional configuration object
  * @param retryAttempt retry attempt
  */
-function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options?: SetOptions, retryAttempt?: number): Promise<void> {
+function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKey>, retryAttempt?: number): Promise<void> {
     // When we use Onyx.set to set a key we want to clear the current delta changes from Onyx.merge that were queued
     // before the value was set. If Onyx.merge is currently reading the old value from storage, it will then not apply the changes.
     if (OnyxUtils.hasPendingMergeForKey(key)) {
@@ -212,7 +214,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options
     }
 
     return Storage.setItem(key, valueWithoutNestedNullValues)
-        .catch((error) => OnyxUtils.retryOperation(error, set, [key, valueWithoutNestedNullValues, undefined], retryAttempt))
+        .catch((error) => OnyxUtils.retryOperation(error, setWithRetry, {key, value: valueWithoutNestedNullValues}, retryAttempt))
         .then(() => {
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
             return updatePromise;
@@ -220,14 +222,23 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options
 }
 
 /**
- * Sets multiple keys and values
+ * Write a value to our store with the given key
  *
- * @example Onyx.multiSet({'key1': 'a', 'key2': 'b'});
+ * @param key ONYXKEY to set
+ * @param value value to store
+ * @param options optional configuration object
+ */
+function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options?: SetOptions): Promise<void> {
+    return setWithRetry({key, value, options});
+}
+
+/**
+ * Sets multiple keys and values, retries if the operation fails
  *
  * @param data object keyed by ONYXKEYS and the values to set
  * @param retryAttempt retry attempt
  */
-function multiSet(data: OnyxMultiSetInput, retryAttempt?: number): Promise<void> {
+function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Promise<void> {
     let newData = data;
 
     const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
@@ -263,12 +274,23 @@ function multiSet(data: OnyxMultiSetInput, retryAttempt?: number): Promise<void>
     });
 
     return Storage.multiSet(keyValuePairsToSet)
-        .catch((error) => OnyxUtils.retryOperation(error, multiSet, [newData], retryAttempt))
+        .catch((error) => OnyxUtils.retryOperation(error, multiSetWithRetry, newData, retryAttempt))
         .then(() => {
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MULTI_SET, undefined, newData);
             return Promise.all(updatePromises);
         })
         .then(() => undefined);
+}
+
+/**
+ * Sets multiple keys and values
+ *
+ * @example Onyx.multiSet({'key1': 'a', 'key2': 'b'});
+ *
+ * @param data object keyed by ONYXKEYS and the values to set
+ */
+function multiSet(data: OnyxMultiSetInput): Promise<void> {
+    return multiSetWithRetry(data);
 }
 
 /**
@@ -647,18 +669,13 @@ function update(data: OnyxUpdate[]): Promise<void> {
 /**
  * Sets a collection by replacing all existing collection members with new values.
  * Any existing collection members not included in the new data will be removed.
- *
- * @example
- * Onyx.setCollection(ONYXKEYS.COLLECTION.REPORT, {
- *     [`${ONYXKEYS.COLLECTION.REPORT}1`]: report1,
- *     [`${ONYXKEYS.COLLECTION.REPORT}2`]: report2,
- * });
+ * Retries in case of failures.
  *
  * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
  * @param collection Object collection keyed by individual collection member keys and values
  * @param retryAttempt retry attempt
  */
-function setCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>, retryAttempt?: number): Promise<void> {
+function setCollectionWithRetry<TKey extends CollectionKeyBase, TMap>({collectionKey, collection}: SetCollectionParams<TKey, TMap>, retryAttempt?: number): Promise<void> {
     let resultCollection: OnyxInputKeyValueMapping = collection;
     let resultCollectionKeys = Object.keys(resultCollection);
 
@@ -709,12 +726,29 @@ function setCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey
         const updatePromise = OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
 
         return Storage.multiSet(keyValuePairs)
-            .catch((error) => OnyxUtils.retryOperation(error, setCollection, [collectionKey, collection], retryAttempt))
+            .catch((error) => OnyxUtils.retryOperation(error, setCollectionWithRetry, {collectionKey, collection}, retryAttempt))
             .then(() => {
                 OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET_COLLECTION, undefined, mutableCollection);
                 return updatePromise;
             });
     });
+}
+
+/**
+ * Sets a collection by replacing all existing collection members with new values.
+ * Any existing collection members not included in the new data will be removed.
+ *
+ * @example
+ * Onyx.setCollection(ONYXKEYS.COLLECTION.REPORT, {
+ *     [`${ONYXKEYS.COLLECTION.REPORT}1`]: report1,
+ *     [`${ONYXKEYS.COLLECTION.REPORT}2`]: report2,
+ * });
+ *
+ * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
+ * @param collection Object collection keyed by individual collection member keys and values
+ */
+function setCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
+    return setCollectionWithRetry({collectionKey, collection});
 }
 
 const Onyx = {
@@ -755,5 +789,7 @@ function applyDecorators() {
     /* eslint-enable rulesdir/prefer-actions-set-data */
 }
 
+type OnyxRetryOperation = typeof setWithRetry | typeof multiSetWithRetry | typeof setCollectionWithRetry;
+
 export default Onyx;
-export type {OnyxUpdate, ConnectOptions, SetOptions};
+export type {OnyxUpdate, ConnectOptions, SetOptions, OnyxRetryOperation};

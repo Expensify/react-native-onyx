@@ -6,6 +6,7 @@ import _ from 'underscore';
 import DevTools from './DevTools';
 import * as Logger from './Logger';
 import type Onyx from './Onyx';
+import type {OnyxRetryOperation} from './Onyx';
 import cache, {TASK} from './OnyxCache';
 import * as Str from './Str';
 import unstable_batchedUpdates from './batch';
@@ -886,12 +887,7 @@ function reportStorageQuota(): Promise<void> {
  * - Invalid data errors: logs an alert and throws an error
  * - Other errors: retries the operation
  */
-function retryOperation<TMethod extends typeof Onyx.set | typeof Onyx.multiSet | typeof Onyx.mergeCollection | typeof Onyx.setCollection>(
-    error: Error,
-    onyxMethod: TMethod,
-    args: Parameters<TMethod>,
-    retryAttempt: number | undefined,
-): Promise<void> {
+function retryOperation<TMethod extends OnyxRetryOperation>(error: Error, onyxMethod: TMethod, defaultParams: Parameters<TMethod>[0], retryAttempt: number | undefined): Promise<void> {
     const currentRetryAttempt = retryAttempt ?? 0;
     const nextRetryAttempt = currentRetryAttempt + 1;
 
@@ -907,7 +903,7 @@ function retryOperation<TMethod extends typeof Onyx.set | typeof Onyx.multiSet |
 
     if (!isStorageCapacityError) {
         // @ts-expect-error No overload matches this call.
-        return nextRetryAttempt > MAX_RETRY_ATTEMPTS ? undefined : onyxMethod(...args, nextRetryAttempt);
+        return nextRetryAttempt > MAX_RETRY_ATTEMPTS ? Promise.resolve() : onyxMethod(defaultParams, nextRetryAttempt);
     }
 
     // Find the first key that we can remove that has no subscribers in our blocklist
@@ -925,7 +921,7 @@ function retryOperation<TMethod extends typeof Onyx.set | typeof Onyx.multiSet |
     reportStorageQuota();
 
     // @ts-expect-error No overload matches this call.
-    return remove(keyForRemoval).then(() => (nextRetryAttempt > MAX_RETRY_ATTEMPTS ? undefined : onyxMethod(...args, nextRetryAttempt)));
+    return remove(keyForRemoval).then(() => (nextRetryAttempt > MAX_RETRY_ATTEMPTS ? Promise.resolve() : onyxMethod(defaultParams, nextRetryAttempt)));
 }
 
 /**

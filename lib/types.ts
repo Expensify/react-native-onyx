@@ -373,6 +373,17 @@ type SetOptions = {
     skipCacheCheck?: boolean;
 };
 
+type SetParams<TKey extends OnyxKey> = {
+    key: TKey;
+    value: OnyxSetInput<TKey>;
+    options?: SetOptions;
+};
+
+type SetCollectionParams<TKey extends CollectionKeyBase, TMap> = {
+    collectionKey: TKey;
+    collection: OnyxMergeCollectionInput<TKey, TMap>;
+};
+
 /**
  * Represents the options used in `Onyx.init()` method.
  */
@@ -480,6 +491,8 @@ export type {
     OnyxValue,
     Selector,
     SetOptions,
+    SetParams,
+    SetCollectionParams,
     MultiMergeReplaceNullPatches,
     MixedOperationsQueue,
 };
