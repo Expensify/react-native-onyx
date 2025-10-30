@@ -391,6 +391,13 @@ type MergeCollectionWithPatchesParams<TKey extends CollectionKeyBase, TMap> = {
     isProcessingCollectionUpdate?: boolean;
 };
 
+type OnyxRetryOperation =
+    | typeof OnyxUtils.setWithRetry
+    | typeof OnyxUtils.multiSetWithRetry
+    | typeof OnyxUtils.setCollectionWithRetry
+    | typeof OnyxUtils.mergeCollectionWithPatches
+    | typeof OnyxUtils.partialSetCollection;
+
 /**
  * Represents the options used in `Onyx.init()` method.
  */
@@ -503,4 +510,5 @@ export type {
     MergeCollectionWithPatchesParams,
     MultiMergeReplaceNullPatches,
     MixedOperationsQueue,
+    OnyxRetryOperation,
 };

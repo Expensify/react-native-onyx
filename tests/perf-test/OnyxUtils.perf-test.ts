@@ -7,9 +7,9 @@ import StorageMock from '../../lib/storage';
 import OnyxCache from '../../lib/OnyxCache';
 import OnyxUtils, {clearOnyxUtilsInternals} from '../../lib/OnyxUtils';
 import type GenericCollection from '../utils/GenericCollection';
-import type {OnyxRetryOperation, OnyxUpdate} from '../../lib/Onyx';
+import type {OnyxUpdate} from '../../lib/Onyx';
 import createDeferredTask from '../../lib/createDeferredTask';
-import type {OnyxInputKeyValueMapping} from '../../lib/types';
+import type {OnyxInputKeyValueMapping, OnyxRetryOperation} from '../../lib/types';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',

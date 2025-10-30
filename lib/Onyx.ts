@@ -23,8 +23,6 @@ import type {
     OnyxInput,
     OnyxMethodMap,
     SetOptions,
-    SetParams,
-    SetCollectionParams,
 } from './types';
 import OnyxUtils from './OnyxUtils';
 import logMessages from './logMessages';
@@ -33,13 +31,6 @@ import connectionManager from './OnyxConnectionManager';
 import * as GlobalSettings from './GlobalSettings';
 import decorateWithMetrics from './metrics';
 import OnyxMerge from './OnyxMerge';
-
-type OnyxRetryOperation =
-    | typeof setWithRetry
-    | typeof multiSetWithRetry
-    | typeof setCollectionWithRetry
-    | typeof OnyxUtils.mergeCollectionWithPatches
-    | typeof OnyxUtils.partialSetCollection;
 
 /** Initialize the store with actions and listening for storage events */
 function init({
@@ -153,83 +144,6 @@ function disconnect(connection: Connection): void {
 }
 
 /**
- * Write a value to our store with the given key, retry if the operation fails.
- *
- * @param params - set parameters
- * @param params.key ONYXKEY to set
- * @param params.value value to store
- * @param params.options optional configuration object
- * @param retryAttempt retry attempt
- */
-function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKey>, retryAttempt?: number): Promise<void> {
-    // When we use Onyx.set to set a key we want to clear the current delta changes from Onyx.merge that were queued
-    // before the value was set. If Onyx.merge is currently reading the old value from storage, it will then not apply the changes.
-    if (OnyxUtils.hasPendingMergeForKey(key)) {
-        delete OnyxUtils.getMergeQueue()[key];
-    }
-
-    const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
-    if (skippableCollectionMemberIDs.size) {
-        try {
-            const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key);
-            if (skippableCollectionMemberIDs.has(collectionMemberID)) {
-                // The key is a skippable one, so we set the new value to null.
-                // eslint-disable-next-line no-param-reassign
-                value = null;
-            }
-        } catch (e) {
-            // The key is not a collection one or something went wrong during split, so we proceed with the function's logic.
-        }
-    }
-
-    // Onyx.set will ignore `undefined` values as inputs, therefore we can return early.
-    if (value === undefined) {
-        return Promise.resolve();
-    }
-
-    const existingValue = cache.get(key, false);
-    // If the existing value as well as the new value are null, we can return early.
-    if (existingValue === undefined && value === null) {
-        return Promise.resolve();
-    }
-
-    // Check if the value is compatible with the existing value in the storage
-    const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(value, existingValue);
-    if (!isCompatible) {
-        Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'set', existingValueType, newValueType));
-        return Promise.resolve();
-    }
-
-    // If the change is null, we can just delete the key.
-    // Therefore, we don't need to further broadcast and update the value so we can return early.
-    if (value === null) {
-        OnyxUtils.remove(key);
-        OnyxUtils.logKeyRemoved(OnyxUtils.METHOD.SET, key);
-        return Promise.resolve();
-    }
-
-    const valueWithoutNestedNullValues = utils.removeNestedNullValues(value) as OnyxValue<TKey>;
-    const hasChanged = options?.skipCacheCheck ? true : cache.hasValueChanged(key, valueWithoutNestedNullValues);
-
-    OnyxUtils.logKeyChanged(OnyxUtils.METHOD.SET, key, value, hasChanged);
-
-    // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
-    const updatePromise = OnyxUtils.broadcastUpdate(key, valueWithoutNestedNullValues, hasChanged);
-
-    // If the value has not changed or the key got removed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
-    if (!hasChanged) {
-        return updatePromise;
-    }
-
-    return Storage.setItem(key, valueWithoutNestedNullValues)
-        .catch((error) => OnyxUtils.retryOperation(error, setWithRetry, {key, value: valueWithoutNestedNullValues}, retryAttempt))
-        .then(() => {
-            OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
-            return updatePromise;
-        });
-}
-
-/**
  * Write a value to our store with the given key
  *
  * @param key ONYXKEY to set
@@ -237,57 +151,7 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
  * @param options optional configuration object
  */
 function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options?: SetOptions): Promise<void> {
-    return setWithRetry({key, value, options});
-}
-
-/**
- * Sets multiple keys and values, retries if the operation fails
- *
- * @param data object keyed by ONYXKEYS and the values to set
- * @param retryAttempt retry attempt
- */
-function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Promise<void> {
-    let newData = data;
-
-    const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
-    if (skippableCollectionMemberIDs.size) {
-        newData = Object.keys(newData).reduce((result: OnyxMultiSetInput, key) => {
-            try {
-                const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key);
-                // If the collection member key is a skippable one we set its value to null.
-                // eslint-disable-next-line no-param-reassign
-                result[key] = !skippableCollectionMemberIDs.has(collectionMemberID) ? newData[key] : null;
-            } catch {
-                // The key is not a collection one or something went wrong during split, so we assign the data to result anyway.
-                // eslint-disable-next-line no-param-reassign
-                result[key] = newData[key];
-            }
-
-            return result;
-        }, {});
-    }
-
-    const keyValuePairsToSet = OnyxUtils.prepareKeyValuePairsForStorage(newData, true);
-
-    const updatePromises = keyValuePairsToSet.map(([key, value]) => {
-        // When we use multiSet to set a key we want to clear the current delta changes from Onyx.merge that were queued
-        // before the value was set. If Onyx.merge is currently reading the old value from storage, it will then not apply the changes.
-        if (OnyxUtils.hasPendingMergeForKey(key)) {
-            delete OnyxUtils.getMergeQueue()[key];
-        }
-
-        // Update cache and optimistically inform subscribers on the next tick
-        cache.set(key, value);
-        return OnyxUtils.scheduleSubscriberUpdate(key, value);
-    });
-
-    return Storage.multiSet(keyValuePairsToSet)
-        .catch((error) => OnyxUtils.retryOperation(error, multiSetWithRetry, newData, retryAttempt))
-        .then(() => {
-            OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MULTI_SET, undefined, newData);
-            return Promise.all(updatePromises);
-        })
-        .then(() => undefined);
+    return OnyxUtils.setWithRetry({key, value, options});
 }
 
 /**
@@ -298,7 +162,7 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
  * @param data object keyed by ONYXKEYS and the values to set
  */
 function multiSet(data: OnyxMultiSetInput): Promise<void> {
-    return multiSetWithRetry(data);
+    return OnyxUtils.multiSetWithRetry(data);
 }
 
 /**
@@ -677,75 +541,6 @@ function update(data: OnyxUpdate[]): Promise<void> {
 /**
  * Sets a collection by replacing all existing collection members with new values.
  * Any existing collection members not included in the new data will be removed.
- * Retries in case of failures.
- *
- * @param params - collection parameters
- * @param params.collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
- * @param params.collection Object collection keyed by individual collection member keys and values
- * @param retryAttempt retry attempt
- */
-function setCollectionWithRetry<TKey extends CollectionKeyBase, TMap>({collectionKey, collection}: SetCollectionParams<TKey, TMap>, retryAttempt?: number): Promise<void> {
-    let resultCollection: OnyxInputKeyValueMapping = collection;
-    let resultCollectionKeys = Object.keys(resultCollection);
-
-    // Confirm all the collection keys belong to the same parent
-    if (!OnyxUtils.doAllCollectionItemsBelongToSameParent(collectionKey, resultCollectionKeys)) {
-        Logger.logAlert(`setCollection called with keys that do not belong to the same parent ${collectionKey}. Skipping this update.`);
-        return Promise.resolve();
-    }
-
-    const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
-    if (skippableCollectionMemberIDs.size) {
-        resultCollection = resultCollectionKeys.reduce((result: OnyxInputKeyValueMapping, key) => {
-            try {
-                const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key, collectionKey);
-                // If the collection member key is a skippable one we set its value to null.
-                // eslint-disable-next-line no-param-reassign
-                result[key] = !skippableCollectionMemberIDs.has(collectionMemberID) ? resultCollection[key] : null;
-            } catch {
-                // Something went wrong during split, so we assign the data to result anyway.
-                // eslint-disable-next-line no-param-reassign
-                result[key] = resultCollection[key];
-            }
-
-            return result;
-        }, {});
-    }
-    resultCollectionKeys = Object.keys(resultCollection);
-
-    return OnyxUtils.getAllKeys().then((persistedKeys) => {
-        const mutableCollection: OnyxInputKeyValueMapping = {...resultCollection};
-
-        persistedKeys.forEach((key) => {
-            if (!key.startsWith(collectionKey)) {
-                return;
-            }
-            if (resultCollectionKeys.includes(key)) {
-                return;
-            }
-
-            mutableCollection[key] = null;
-        });
-
-        const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(mutableCollection, true, undefined, true);
-        const previousCollection = OnyxUtils.getCachedCollection(collectionKey);
-
-        keyValuePairs.forEach(([key, value]) => cache.set(key, value));
-
-        const updatePromise = OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
-
-        return Storage.multiSet(keyValuePairs)
-            .catch((error) => OnyxUtils.retryOperation(error, setCollectionWithRetry, {collectionKey, collection}, retryAttempt))
-            .then(() => {
-                OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET_COLLECTION, undefined, mutableCollection);
-                return updatePromise;
-            });
-    });
-}
-
-/**
- * Sets a collection by replacing all existing collection members with new values.
- * Any existing collection members not included in the new data will be removed.
  *
  * @example
  * Onyx.setCollection(ONYXKEYS.COLLECTION.REPORT, {
@@ -757,7 +552,7 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase, TMap>({collectio
  * @param collection Object collection keyed by individual collection member keys and values
  */
 function setCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
-    return setCollectionWithRetry({collectionKey, collection});
+    return OnyxUtils.setCollectionWithRetry({collectionKey, collection});
 }
 
 const Onyx = {
@@ -799,4 +594,4 @@ function applyDecorators() {
 }
 
 export default Onyx;
-export type {OnyxUpdate, ConnectOptions, SetOptions, OnyxRetryOperation};
+export type {OnyxUpdate, ConnectOptions, SetOptions};
