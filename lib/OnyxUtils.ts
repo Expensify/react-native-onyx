@@ -58,13 +58,13 @@ const IDB_STORAGE_ERRORS = [
 ] as const;
 
 // SQLite errors that indicate storage capacity issues where eviction can help
-const SQL_STORAGE_ERRORS = [
+const SQLITE_STORAGE_ERRORS = [
     'database or disk is full', // Device storage is full
     'disk I/O error', // File system I/O failure, often due to insufficient space or corrupted storage
     'out of memory', // Insufficient RAM or storage space to complete the operation
 ] as const;
 
-const STORAGE_ERRORS = [...IDB_STORAGE_ERRORS, ...SQL_STORAGE_ERRORS];
+const STORAGE_ERRORS = [...IDB_STORAGE_ERRORS, ...SQLITE_STORAGE_ERRORS];
 
 const MAX_RETRY_ATTEMPTS = 5;
 
