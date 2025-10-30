@@ -384,6 +384,13 @@ type SetCollectionParams<TKey extends CollectionKeyBase, TMap> = {
     collection: OnyxMergeCollectionInput<TKey, TMap>;
 };
 
+type MergeCollectionWithPatchesParams<TKey extends CollectionKeyBase, TMap> = {
+    collectionKey: TKey;
+    collection: OnyxMergeCollectionInput<TKey, TMap>;
+    mergeReplaceNullPatches?: MultiMergeReplaceNullPatches;
+    isProcessingCollectionUpdate?: boolean;
+};
+
 /**
  * Represents the options used in `Onyx.init()` method.
  */
@@ -493,6 +500,7 @@ export type {
     SetOptions,
     SetParams,
     SetCollectionParams,
+    MergeCollectionWithPatchesParams,
     MultiMergeReplaceNullPatches,
     MixedOperationsQueue,
 };

@@ -30,6 +30,7 @@ import type {
     OnyxUpdate,
     OnyxValue,
     Selector,
+    MergeCollectionWithPatchesParams,
 } from './types';
 import type {FastMergeOptions, FastMergeResult} from './utils';
 import utils from './utils';
@@ -1259,19 +1260,18 @@ function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge): Array<
 /**
  * Merges a collection based on their keys.
  * Serves as core implementation for `Onyx.mergeCollection()` public function, the difference being
- * that this internal function allows passing an additional `mergeReplaceNullPatches` parameter.
+ * that this internal function allows passing an additional `mergeReplaceNullPatches` parameter and retries on failure.
  *
- * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
- * @param collection Object collection keyed by individual collection member keys and values
- * @param mergeReplaceNullPatches Record where the key is a collection member key and the value is a list of
+ * @param params - mergeCollection parameters
+ * @param params.collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
+ * @param params.collection Object collection keyed by individual collection member keys and values
+ * @param params.mergeReplaceNullPatches Record where the key is a collection member key and the value is a list of
  * tuples that we'll use to replace the nested objects of that collection member record with something else.
+ * @param params.isProcessingCollectionUpdate whether this is part of a collection update operation.
  * @param retryAttempt retry attempt
  */
 function mergeCollectionWithPatches<TKey extends CollectionKeyBase, TMap>(
-    collectionKey: TKey,
-    collection: OnyxMergeCollectionInput<TKey, TMap>,
-    mergeReplaceNullPatches?: MultiMergeReplaceNullPatches,
-    isProcessingCollectionUpdate?: boolean,
+    {collectionKey, collection, mergeReplaceNullPatches, isProcessingCollectionUpdate = false}: MergeCollectionWithPatchesParams<TKey, TMap>,
     retryAttempt?: number,
 ): Promise<void> {
     if (!isValidNonEmptyCollectionForMerge(collection)) {
@@ -1377,7 +1377,7 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase, TMap>(
             });
 
             return Promise.all(promises)
-                .catch((error) => retryOperation(error, mergeCollectionWithPatches, [collectionKey, resultCollection, undefined, false], retryAttempt))
+                .catch((error) => retryOperation(error, mergeCollectionWithPatches, {collectionKey, collection: resultCollection}, retryAttempt))
                 .then(() => {
                     sendActionToDevTools(METHOD.MERGE_COLLECTION, undefined, resultCollection);
                     return promiseUpdate;

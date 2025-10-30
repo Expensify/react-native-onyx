@@ -148,9 +148,10 @@ function disconnect(connection: Connection): void {
 /**
  * Write a value to our store with the given key, retry if the operation fails.
  *
- * @param key ONYXKEY to set
- * @param value value to store
- * @param options optional configuration object
+ * @param params - set parameters
+ * @param params.key ONYXKEY to set
+ * @param params.value value to store
+ * @param params.options optional configuration object
  * @param retryAttempt retry attempt
  */
 function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKey>, retryAttempt?: number): Promise<void> {
@@ -399,7 +400,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
  * @param collection Object collection keyed by individual collection member keys and values
  */
 function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
-    return OnyxUtils.mergeCollectionWithPatches(collectionKey, collection, undefined, true);
+    return OnyxUtils.mergeCollectionWithPatches({collectionKey, collection, isProcessingCollectionUpdate: true});
 }
 
 /**
@@ -633,12 +634,12 @@ function update(data: OnyxUpdate[]): Promise<void> {
 
         if (!utils.isEmptyObject(batchedCollectionUpdates.merge)) {
             promises.push(() =>
-                OnyxUtils.mergeCollectionWithPatches(
+                OnyxUtils.mergeCollectionWithPatches({
                     collectionKey,
-                    batchedCollectionUpdates.merge as Collection<CollectionKey, unknown, unknown>,
-                    batchedCollectionUpdates.mergeReplaceNullPatches,
-                    true,
-                ),
+                    collection: batchedCollectionUpdates.merge as Collection<CollectionKey, unknown, unknown>,
+                    mergeReplaceNullPatches: batchedCollectionUpdates.mergeReplaceNullPatches,
+                    isProcessingCollectionUpdate: true,
+                }),
             );
         }
         if (!utils.isEmptyObject(batchedCollectionUpdates.set)) {
@@ -671,8 +672,9 @@ function update(data: OnyxUpdate[]): Promise<void> {
  * Any existing collection members not included in the new data will be removed.
  * Retries in case of failures.
  *
- * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
- * @param collection Object collection keyed by individual collection member keys and values
+ * @param params - collection parameters
+ * @param params.collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
+ * @param params.collection Object collection keyed by individual collection member keys and values
  * @param retryAttempt retry attempt
  */
 function setCollectionWithRetry<TKey extends CollectionKeyBase, TMap>({collectionKey, collection}: SetCollectionParams<TKey, TMap>, retryAttempt?: number): Promise<void> {
@@ -789,7 +791,7 @@ function applyDecorators() {
     /* eslint-enable rulesdir/prefer-actions-set-data */
 }
 
-type OnyxRetryOperation = typeof setWithRetry | typeof multiSetWithRetry | typeof setCollectionWithRetry;
+type OnyxRetryOperation = typeof setWithRetry | typeof multiSetWithRetry | typeof setCollectionWithRetry | typeof OnyxUtils.mergeCollectionWithPatches;
 
 export default Onyx;
 export type {OnyxUpdate, ConnectOptions, SetOptions, OnyxRetryOperation};
