@@ -1311,7 +1311,7 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase, TMap>(
             // Split to keys that exist in storage and keys that don't
             const keys = resultCollectionKeys.filter((key) => {
                 if (resultCollection[key] === null) {
-                    remove(key, !!isProcessingCollectionUpdate);
+                    remove(key, isProcessingCollectionUpdate);
                     return false;
                 }
                 return true;
