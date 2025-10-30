@@ -326,44 +326,49 @@ type OnyxMergeCollectionInput<TKey extends OnyxKey, TMap = object> = Collection<
 
 type OnyxMethodMap = typeof OnyxUtils.METHOD;
 
-// Maps onyx methods to their corresponding value types
-type OnyxMethodValueMap = {
-    [OnyxUtils.METHOD.SET]: {
-        key: OnyxKey;
-        value: OnyxSetInput<OnyxKey>;
-    };
-    [OnyxUtils.METHOD.MULTI_SET]: {
-        key: OnyxKey;
-        value: OnyxMultiSetInput;
-    };
-    [OnyxUtils.METHOD.MERGE]: {
-        key: OnyxKey;
-        value: OnyxMergeInput<OnyxKey>;
-    };
-    [OnyxUtils.METHOD.CLEAR]: {
-        key: OnyxKey;
-        value?: undefined;
-    };
-    [OnyxUtils.METHOD.MERGE_COLLECTION]: {
-        key: CollectionKeyBase;
-        value: OnyxMergeCollectionInput<CollectionKeyBase>;
-    };
-    [OnyxUtils.METHOD.SET_COLLECTION]: {
-        key: CollectionKeyBase;
-        value: OnyxMergeCollectionInput<CollectionKeyBase>;
-    };
-};
-
 /**
  * OnyxUpdate type includes all onyx methods used in OnyxMethodValueMap.
  * If a new method is added to OnyxUtils.METHOD constant, it must be added to OnyxMethodValueMap type.
  * Otherwise it will show static type errors.
  */
-type OnyxUpdate = {
-    [Method in OnyxMethod]: {
-        onyxMethod: Method;
-    } & OnyxMethodValueMap[Method];
-}[OnyxMethod];
+type OnyxUpdate =
+    // ⚠️ DO NOT CHANGE THIS TYPE, UNLESS YOU KNOW WHAT YOU ARE DOING. ⚠️
+    | {
+          [TKey in OnyxKey]:
+              | {
+                    onyxMethod: typeof OnyxUtils.METHOD.SET;
+                    key: TKey;
+                    value: OnyxSetInput<TKey>;
+                }
+              | {
+                    onyxMethod: typeof OnyxUtils.METHOD.MULTI_SET;
+                    key: TKey;
+                    value: OnyxMultiSetInput;
+                }
+              | {
+                    onyxMethod: typeof OnyxUtils.METHOD.MERGE;
+                    key: TKey;
+                    value: OnyxMergeInput<TKey>;
+                }
+              | {
+                    onyxMethod: typeof OnyxUtils.METHOD.CLEAR;
+                    key: TKey;
+                    value?: undefined;
+                };
+      }[OnyxKey]
+    | {
+          [TKey in CollectionKeyBase]:
+              | {
+                    onyxMethod: typeof OnyxUtils.METHOD.MERGE_COLLECTION;
+                    key: TKey;
+                    value: OnyxMergeCollectionInput<TKey>;
+                }
+              | {
+                    onyxMethod: typeof OnyxUtils.METHOD.SET_COLLECTION;
+                    key: TKey;
+                    value: OnyxMergeCollectionInput<TKey>;
+                };
+      }[CollectionKeyBase];
 
 /**
  * Represents the options used in `Onyx.set()` method.
