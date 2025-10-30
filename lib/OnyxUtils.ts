@@ -66,7 +66,8 @@ const SQLITE_STORAGE_ERRORS = [
 
 const STORAGE_ERRORS = [...IDB_STORAGE_ERRORS, ...SQLITE_STORAGE_ERRORS];
 
-const MAX_RETRY_ATTEMPTS = 5;
+// Max number of retries for failed storage operations
+const MAX_STORAGE_OPERATION_RETRY_ATTEMPTS = 5;
 
 type OnyxMethod = ValueOf<typeof METHOD>;
 
@@ -893,7 +894,7 @@ function retryOperation<TMethod extends OnyxRetryOperation>(error: Error, onyxMe
     const currentRetryAttempt = retryAttempt ?? 0;
     const nextRetryAttempt = currentRetryAttempt + 1;
 
-    Logger.logInfo(`Failed to save to storage. Error: ${error}. onyxMethod: ${onyxMethod.name}. retryAttempt: ${currentRetryAttempt}/${MAX_RETRY_ATTEMPTS}`);
+    Logger.logInfo(`Failed to save to storage. Error: ${error}. onyxMethod: ${onyxMethod.name}. retryAttempt: ${currentRetryAttempt}/${MAX_STORAGE_OPERATION_RETRY_ATTEMPTS}`);
 
     if (error && Str.startsWith(error.message, "Failed to execute 'put' on 'IDBObjectStore'")) {
         Logger.logAlert('Attempted to set invalid data set in Onyx. Please ensure all data is serializable.');
@@ -901,11 +902,11 @@ function retryOperation<TMethod extends OnyxRetryOperation>(error: Error, onyxMe
     }
 
     const errorMessage = error?.message?.toLowerCase?.();
-    const isStorageCapacityError = STORAGE_ERRORS.some((storageError) => storageError === error?.name?.toLowerCase() || errorMessage?.includes(storageError));
+    const isStorageCapacityError = STORAGE_ERRORS.some((storageError) => storageError === error?.name?.toLowerCase?.() || errorMessage?.includes(storageError));
 
     if (!isStorageCapacityError) {
         // @ts-expect-error No overload matches this call.
-        return nextRetryAttempt > MAX_RETRY_ATTEMPTS ? Promise.resolve() : onyxMethod(defaultParams, nextRetryAttempt);
+        return nextRetryAttempt > MAX_STORAGE_OPERATION_RETRY_ATTEMPTS ? Promise.resolve() : onyxMethod(defaultParams, nextRetryAttempt);
     }
 
     // Find the first key that we can remove that has no subscribers in our blocklist
@@ -923,7 +924,7 @@ function retryOperation<TMethod extends OnyxRetryOperation>(error: Error, onyxMe
     reportStorageQuota();
 
     // @ts-expect-error No overload matches this call.
-    return remove(keyForRemoval).then(() => (nextRetryAttempt > MAX_RETRY_ATTEMPTS ? Promise.resolve() : onyxMethod(defaultParams, nextRetryAttempt)));
+    return remove(keyForRemoval).then(() => (nextRetryAttempt > MAX_STORAGE_OPERATION_RETRY_ATTEMPTS ? Promise.resolve() : onyxMethod(defaultParams, nextRetryAttempt)));
 }
 
 /**
