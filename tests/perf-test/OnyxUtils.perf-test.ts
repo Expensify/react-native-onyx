@@ -7,7 +7,7 @@ import StorageMock from '../../lib/storage';
 import OnyxCache from '../../lib/OnyxCache';
 import OnyxUtils, {clearOnyxUtilsInternals} from '../../lib/OnyxUtils';
 import type GenericCollection from '../utils/GenericCollection';
-import type {OnyxUpdate} from '../../lib/Onyx';
+import type {OnyxRetryOperation, OnyxUpdate} from '../../lib/Onyx';
 import createDeferredTask from '../../lib/createDeferredTask';
 import type {OnyxInputKeyValueMapping} from '../../lib/types';
 
@@ -281,7 +281,7 @@ describe('OnyxUtils', () => {
             const changedReportActions = Object.fromEntries(
                 Object.entries(mockedReportActionsMap).map(([k, v]) => [k, randBoolean() ? v : createRandomReportAction(Number(v.reportActionID))] as const),
             ) as GenericCollection;
-            await measureAsyncFunction(() => OnyxUtils.partialSetCollection(collectionKey, changedReportActions), {
+            await measureAsyncFunction(() => OnyxUtils.partialSetCollection({collectionKey, collection: changedReportActions}), {
                 beforeEach: async () => {
                     await Onyx.setCollection(collectionKey, mockedReportActionsMap as GenericCollection);
                 },
@@ -505,9 +505,9 @@ describe('OnyxUtils', () => {
     describe('retryOperation', () => {
         test('one call', async () => {
             const error = new Error();
-            const onyxMethod = jest.fn() as typeof Onyx.set;
+            const onyxMethod = jest.fn() as OnyxRetryOperation;
 
-            await measureAsyncFunction(() => OnyxUtils.retryOperation(error, onyxMethod, ['', null], 1), {
+            await measureAsyncFunction(() => OnyxUtils.retryOperation(error, onyxMethod, {key: '', value: null}, 1), {
                 beforeEach: async () => {
                     mockedReportActionsKeys.forEach((key) => OnyxCache.addLastAccessedKey(key, false));
                     OnyxCache.addLastAccessedKey(`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}1`, false);

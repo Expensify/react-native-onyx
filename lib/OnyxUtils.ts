@@ -31,6 +31,7 @@ import type {
     OnyxValue,
     Selector,
     MergeCollectionWithPatchesParams,
+    SetCollectionParams,
 } from './types';
 import type {FastMergeOptions, FastMergeResult} from './utils';
 import utils from './utils';
@@ -1389,12 +1390,14 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase, TMap>(
 /**
  * Sets keys in a collection by replacing all targeted collection members with new values.
  * Any existing collection members not included in the new data will not be removed.
+ * Retries on failure.
  *
- * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
- * @param collection Object collection keyed by individual collection member keys and values
+ * @param params - collection parameters
+ * @param params.collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
+ * @param params.collection Object collection keyed by individual collection member keys and values
  * @param retryAttempt retry attempt
  */
-function partialSetCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>, retryAttempt?: number): Promise<void> {
+function partialSetCollection<TKey extends CollectionKeyBase, TMap>({collectionKey, collection}: SetCollectionParams<TKey, TMap>, retryAttempt?: number): Promise<void> {
     let resultCollection: OnyxInputKeyValueMapping = collection;
     let resultCollectionKeys = Object.keys(resultCollection);
 
@@ -1433,7 +1436,7 @@ function partialSetCollection<TKey extends CollectionKeyBase, TMap>(collectionKe
         const updatePromise = scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
 
         return Storage.multiSet(keyValuePairs)
-            .catch((error) => retryOperation(error, partialSetCollection, [collectionKey, collection], retryAttempt))
+            .catch((error) => retryOperation(error, partialSetCollection, {collectionKey, collection}, retryAttempt))
             .then(() => {
                 sendActionToDevTools(METHOD.SET_COLLECTION, undefined, mutableCollection);
                 return updatePromise;

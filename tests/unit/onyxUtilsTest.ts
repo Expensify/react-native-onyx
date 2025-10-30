@@ -155,11 +155,14 @@ describe('OnyxUtils', () => {
             } as GenericCollection);
 
             // Replace with new collection data
-            await OnyxUtils.partialSetCollection(ONYXKEYS.COLLECTION.ROUTES, {
-                [routeA]: {name: 'New Route A'},
-                [routeB]: {name: 'New Route B'},
-                [routeC]: {name: 'New Route C'},
-            } as GenericCollection);
+            await OnyxUtils.partialSetCollection({
+                collectionKey: ONYXKEYS.COLLECTION.ROUTES,
+                collection: {
+                    [routeA]: {name: 'New Route A'},
+                    [routeB]: {name: 'New Route B'},
+                    [routeC]: {name: 'New Route C'},
+                } as GenericCollection,
+            });
 
             expect(result).toEqual({
                 [routeA]: {name: 'New Route A'},
@@ -185,7 +188,7 @@ describe('OnyxUtils', () => {
                 [routeA]: {name: 'Route A'},
             } as GenericCollection);
 
-            await OnyxUtils.partialSetCollection(ONYXKEYS.COLLECTION.ROUTES, {} as GenericCollection);
+            await OnyxUtils.partialSetCollection({collectionKey: ONYXKEYS.COLLECTION.ROUTES, collection: {} as GenericCollection});
 
             expect(result).toEqual({
                 [routeA]: {name: 'Route A'},
@@ -209,9 +212,12 @@ describe('OnyxUtils', () => {
                 [routeA]: {name: 'Route A'},
             } as GenericCollection);
 
-            await OnyxUtils.partialSetCollection(ONYXKEYS.COLLECTION.ROUTES, {
-                [invalidRoute]: {name: 'Invalid Route'},
-            } as GenericCollection);
+            await OnyxUtils.partialSetCollection({
+                collectionKey: ONYXKEYS.COLLECTION.ROUTES,
+                collection: {
+                    [invalidRoute]: {name: 'Invalid Route'},
+                } as GenericCollection,
+            });
 
             expect(result).toEqual({
                 [routeA]: {name: 'Route A'},

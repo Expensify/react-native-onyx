@@ -34,6 +34,13 @@ import * as GlobalSettings from './GlobalSettings';
 import decorateWithMetrics from './metrics';
 import OnyxMerge from './OnyxMerge';
 
+type OnyxRetryOperation =
+    | typeof setWithRetry
+    | typeof multiSetWithRetry
+    | typeof setCollectionWithRetry
+    | typeof OnyxUtils.mergeCollectionWithPatches
+    | typeof OnyxUtils.partialSetCollection;
+
 /** Initialize the store with actions and listening for storage events */
 function init({
     keys = {},
@@ -643,7 +650,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
             );
         }
         if (!utils.isEmptyObject(batchedCollectionUpdates.set)) {
-            promises.push(() => OnyxUtils.partialSetCollection(collectionKey, batchedCollectionUpdates.set as Collection<CollectionKey, unknown, unknown>));
+            promises.push(() => OnyxUtils.partialSetCollection({collectionKey, collection: batchedCollectionUpdates.set as Collection<CollectionKey, unknown, unknown>}));
         }
     });
 
@@ -790,8 +797,6 @@ function applyDecorators() {
     clear = decorateWithMetrics(clear, 'Onyx.clear');
     /* eslint-enable rulesdir/prefer-actions-set-data */
 }
-
-type OnyxRetryOperation = typeof setWithRetry | typeof multiSetWithRetry | typeof setCollectionWithRetry | typeof OnyxUtils.mergeCollectionWithPatches;
 
 export default Onyx;
 export type {OnyxUpdate, ConnectOptions, SetOptions, OnyxRetryOperation};
