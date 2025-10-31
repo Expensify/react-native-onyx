@@ -2,3 +2,4 @@
 dist
 node_modules
 *.config.js
+tests/types/**/*.ts
