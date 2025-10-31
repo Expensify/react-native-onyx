@@ -904,7 +904,8 @@ function retryOperation<TMethod extends OnyxRetryOperation>(error: Error, onyxMe
     }
 
     const errorMessage = error?.message?.toLowerCase?.();
-    const isStorageCapacityError = STORAGE_ERRORS.some((storageError) => storageError === error?.name?.toLowerCase?.() || errorMessage?.includes(storageError));
+    const errorName = error?.name?.toLowerCase?.();
+    const isStorageCapacityError = STORAGE_ERRORS.some((storageError) => errorName?.includes(storageError) || errorMessage?.includes(storageError));
 
     if (!isStorageCapacityError) {
         // @ts-expect-error No overload matches this call.
@@ -1326,7 +1327,7 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
     // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
     const updatePromise = OnyxUtils.broadcastUpdate(key, valueWithoutNestedNullValues, hasChanged);
 
-    // If the value has not changed or the key got removed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
+    // If the value has not changed and this isn't a retry attempt, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
     if (!hasChanged && !retryAttempt) {
         return updatePromise;
     }
