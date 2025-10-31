@@ -29,6 +29,7 @@ import type {
     OnyxUpdate,
     OnyxValue,
     Selector,
+    Collection,
 } from './types';
 import type {FastMergeOptions, FastMergeResult} from './utils';
 import utils from './utils';
@@ -1035,7 +1036,7 @@ function initializeWithDefaultKeyStates(): Promise<void> {
 /**
  * Validate the collection is not empty and has a correct type before applying mergeCollection()
  */
-function isValidNonEmptyCollectionForMerge<TKey extends CollectionKeyBase>(collection: OnyxMergeCollectionInput<TKey>): boolean {
+function isValidNonEmptyCollectionForMerge<TKey extends CollectionKeyBase>(collection: Collection<TKey, unknown>): boolean {
     return typeof collection === 'object' && !Array.isArray(collection) && !utils.isEmptyObject(collection);
 }
 
@@ -1350,7 +1351,7 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
             });
 
             return Promise.all(promises)
-                .catch((error) => evictStorageAndRetry(error, mergeCollectionWithPatches, collectionKey, resultCollection))
+                .catch((error) => evictStorageAndRetry(error, mergeCollectionWithPatches, collectionKey, resultCollection as OnyxMergeCollectionInput<TKey>))
                 .then(() => {
                     sendActionToDevTools(METHOD.MERGE_COLLECTION, undefined, resultCollection);
                     return promiseUpdate;

@@ -558,7 +558,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
                     collectionKeys.forEach((collectionKey) => enqueueMergeOperation(collectionKey, mergedCollection[collectionKey]));
                 }
             },
-            [OnyxUtils.METHOD.SET_COLLECTION]: (k, v) => promises.push(() => setCollection(k, v as Collection<CollectionKey, unknown>)),
+            [OnyxUtils.METHOD.SET_COLLECTION]: (k, v) => promises.push(() => setCollection(k, v as OnyxMergeCollectionInput<OnyxKey>)),
             [OnyxUtils.METHOD.MULTI_SET]: (k, v) => Object.entries(v as Partial<OnyxInputKeyValueMapping>).forEach(([entryKey, entryValue]) => enqueueSetOperation(entryKey, entryValue)),
             [OnyxUtils.METHOD.CLEAR]: () => {
                 clearPromise = clear();
@@ -611,14 +611,14 @@ function update(data: OnyxUpdate[]): Promise<void> {
             promises.push(() =>
                 OnyxUtils.mergeCollectionWithPatches(
                     collectionKey,
-                    batchedCollectionUpdates.merge as Collection<CollectionKey, unknown>,
+                    batchedCollectionUpdates.merge as OnyxMergeCollectionInput<OnyxKey>,
                     batchedCollectionUpdates.mergeReplaceNullPatches,
                     true,
                 ),
             );
         }
         if (!utils.isEmptyObject(batchedCollectionUpdates.set)) {
-            promises.push(() => OnyxUtils.partialSetCollection(collectionKey, batchedCollectionUpdates.set as Collection<CollectionKey, unknown>));
+            promises.push(() => OnyxUtils.partialSetCollection(collectionKey, batchedCollectionUpdates.set as OnyxMergeCollectionInput<OnyxKey>));
         }
     });
 
