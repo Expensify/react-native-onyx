@@ -1,5 +1,5 @@
-import type {Collection} from '../../lib/types';
+import type {OnyxKey, OnyxMergeCollectionInput} from '../../lib/types';
 
-type GenericCollection = Collection<string, unknown>;
+type GenericCollection = OnyxMergeCollectionInput<OnyxKey>;
 
 export default GenericCollection;
