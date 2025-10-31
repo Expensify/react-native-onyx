@@ -1,28 +1,5 @@
-import Onyx from '../../dist/Onyx';
-import type {Collection, KeyValueMapping, NullishDeep, OnyxInput, OnyxUpdate} from '../../dist/types';
-
-const ONYX_KEYS = {
-    TEST_KEY: 'test',
-    COLLECTION: {
-        TEST_KEY: 'test_',
-    },
-} as const;
-
-type OnyxValues = {
-    [ONYX_KEYS.TEST_KEY]: string;
-};
-
-type OnyxCollectionValues = {
-    [ONYX_KEYS.COLLECTION.TEST_KEY]: {str: string};
-};
-
-declare module '../../dist/types' {
-    interface CustomTypeOptions {
-        keys: keyof OnyxValues;
-        collectionKeys: keyof OnyxCollectionValues;
-        values: OnyxValues & OnyxCollectionValues;
-    }
-}
+import type {OnyxUpdate} from '../../dist/types';
+import ONYX_KEYS from './augmentation';
 
 const onyxUpdate: OnyxUpdate = {
     onyxMethod: 'set',
@@ -80,15 +57,3 @@ const onyxUpdateCollectionError3: OnyxUpdate = {
         },
     },
 };
-
-Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
-    // @ts-expect-error COLLECTION.TEST_KEY is invalid key, it is missing the suffix
-    test_: {
-        str: 'test3',
-    },
-    test_2: {
-        str: 'test4',
-    },
-    // @ts-expect-error COLLECTION.TEST_KEY is object, not a number
-    test_3: 2,
-});
