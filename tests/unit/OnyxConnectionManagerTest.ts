@@ -117,10 +117,10 @@ describe('OnyxConnectionManager', () => {
         it('should connect two times to the same key but with different options, and fire the callbacks differently', async () => {
             const obj1 = {id: 'entry1_id', name: 'entry1_name'};
             const obj2 = {id: 'entry2_id', name: 'entry2_name'};
-            const collection: GenericCollection = {
+            const collection = {
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: obj1,
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: obj2,
-            };
+            } as GenericCollection;
             await StorageMock.multiSet([
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`, obj1],
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`, obj2],

@@ -29,6 +29,7 @@ import type {
     OnyxUpdate,
     OnyxValue,
     Selector,
+    Collection,
 } from './types';
 import type {FastMergeOptions, FastMergeResult} from './utils';
 import utils from './utils';
@@ -1035,7 +1036,7 @@ function initializeWithDefaultKeyStates(): Promise<void> {
 /**
  * Validate the collection is not empty and has a correct type before applying mergeCollection()
  */
-function isValidNonEmptyCollectionForMerge<TKey extends CollectionKeyBase, TMap>(collection: OnyxMergeCollectionInput<TKey, TMap>): boolean {
+function isValidNonEmptyCollectionForMerge<TKey extends CollectionKeyBase>(collection: Collection<TKey, unknown>): boolean {
     return typeof collection === 'object' && !Array.isArray(collection) && !utils.isEmptyObject(collection);
 }
 
@@ -1241,9 +1242,9 @@ function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge): Array<
  * @param mergeReplaceNullPatches Record where the key is a collection member key and the value is a list of
  * tuples that we'll use to replace the nested objects of that collection member record with something else.
  */
-function mergeCollectionWithPatches<TKey extends CollectionKeyBase, TMap>(
+function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
     collectionKey: TKey,
-    collection: OnyxMergeCollectionInput<TKey, TMap>,
+    collection: OnyxMergeCollectionInput<TKey>,
     mergeReplaceNullPatches?: MultiMergeReplaceNullPatches,
     isProcessingCollectionUpdate = false,
 ): Promise<void> {
@@ -1350,7 +1351,7 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase, TMap>(
             });
 
             return Promise.all(promises)
-                .catch((error) => evictStorageAndRetry(error, mergeCollectionWithPatches, collectionKey, resultCollection))
+                .catch((error) => evictStorageAndRetry(error, mergeCollectionWithPatches, collectionKey, resultCollection as OnyxMergeCollectionInput<TKey>))
                 .then(() => {
                     sendActionToDevTools(METHOD.MERGE_COLLECTION, undefined, resultCollection);
                     return promiseUpdate;
@@ -1366,7 +1367,7 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase, TMap>(
  * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
  * @param collection Object collection keyed by individual collection member keys and values
  */
-function partialSetCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
+function partialSetCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey>): Promise<void> {
     let resultCollection: OnyxInputKeyValueMapping = collection;
     let resultCollectionKeys = Object.keys(resultCollection);
 

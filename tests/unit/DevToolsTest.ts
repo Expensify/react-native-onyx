@@ -25,10 +25,10 @@ const initialKeyStates = {
     [ONYX_KEYS.OBJECT_KEY]: {id: 42},
 };
 
-const exampleCollection: GenericCollection = {
+const exampleCollection = {
     [`${ONYX_KEYS.COLLECTION.NUM_KEY}1`]: 1,
     [`${ONYX_KEYS.COLLECTION.NUM_KEY}2`]: 2,
-};
+} as GenericCollection;
 
 const exampleObject = {name: 'Pedro'};
 

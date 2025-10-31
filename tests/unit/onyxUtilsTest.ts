@@ -210,8 +210,9 @@ describe('OnyxUtils', () => {
             } as GenericCollection);
 
             await OnyxUtils.partialSetCollection(ONYXKEYS.COLLECTION.ROUTES, {
+                // @ts-expect-error invalidRoute is not a valid key
                 [invalidRoute]: {name: 'Invalid Route'},
-            } as GenericCollection);
+            });
 
             expect(result).toEqual({
                 [routeA]: {name: 'Route A'},
