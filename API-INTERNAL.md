@@ -110,10 +110,12 @@ subscriber callbacks receive the data in a different format than they normally e
 <dd><p>Remove a key from Onyx and update the subscribers</p>
 </dd>
 <dt><a href="#retryOperation">retryOperation()</a></dt>
-<dd><p>Handles storage operation failures based on the error type:
-- Storage capacity errors: evicts data and retries the operation
-- Invalid data errors: logs an alert and throws an error
-- Other errors: retries the operation</p>
+<dd><p>Handles storage operation failures based on the error type:</p>
+<ul>
+<li>Storage capacity errors: evicts data and retries the operation</li>
+<li>Invalid data errors: logs an alert and throws an error</li>
+<li>Other errors: retries the operation</li>
+</ul>
 </dd>
 <dt><a href="#broadcastUpdate">broadcastUpdate()</a></dt>
 <dd><p>Notifies subscribers and writes current value to cache</p>
@@ -148,14 +150,31 @@ It will also mark deep nested objects that need to be entirely replaced during t
 <dt><a href="#unsubscribeFromKey">unsubscribeFromKey(subscriptionID)</a></dt>
 <dd><p>Disconnects and removes the listener from the Onyx key.</p>
 </dd>
-<dt><a href="#mergeCollectionWithPatches">mergeCollectionWithPatches(collectionKey, collection, mergeReplaceNullPatches)</a></dt>
+<dt><a href="#setWithRetry">setWithRetry(params, retryAttempt)</a></dt>
+<dd><p>Writes a value to our store with the given key.
+Serves as core implementation for <code>Onyx.set()</code> public function, the difference being
+that this internal function allows passing an additional <code>retryAttempt</code> parameter to retry on failure.</p>
+</dd>
+<dt><a href="#multiSetWithRetry">multiSetWithRetry(data, retryAttempt)</a></dt>
+<dd><p>Sets multiple keys and values.
+Serves as core implementation for <code>Onyx.multiSet()</code> public function, the difference being
+that this internal function allows passing an additional <code>retryAttempt</code> parameter to retry on failure.</p>
+</dd>
+<dt><a href="#setCollectionWithRetry">setCollectionWithRetry(params, retryAttempt)</a></dt>
+<dd><p>Sets a collection by replacing all existing collection members with new values.
+Any existing collection members not included in the new data will be removed.
+Serves as core implementation for <code>Onyx.setCollection()</code> public function, the difference being
+that this internal function allows passing an additional <code>retryAttempt</code> parameter to retry on failure.</p>
+</dd>
+<dt><a href="#mergeCollectionWithPatches">mergeCollectionWithPatches(params, retryAttempt)</a></dt>
 <dd><p>Merges a collection based on their keys.
 Serves as core implementation for <code>Onyx.mergeCollection()</code> public function, the difference being
-that this internal function allows passing an additional <code>mergeReplaceNullPatches</code> parameter.</p>
+that this internal function allows passing an additional <code>mergeReplaceNullPatches</code> parameter and retries on failure.</p>
 </dd>
-<dt><a href="#partialSetCollection">partialSetCollection(collectionKey, collection)</a></dt>
+<dt><a href="#partialSetCollection">partialSetCollection(params, retryAttempt)</a></dt>
 <dd><p>Sets keys in a collection by replacing all targeted collection members with new values.
-Any existing collection members not included in the new data will not be removed.</p>
+Any existing collection members not included in the new data will not be removed.
+Retries on failure.</p>
 </dd>
 <dt><a href="#clearOnyxUtilsInternals">clearOnyxUtilsInternals()</a></dt>
 <dd><p>Clear internal variables used in this file, useful in test environments.</p>
@@ -406,7 +425,7 @@ subscriber callbacks receive the data in a different format than they normally e
 ## remove()
 Remove a key from Onyx and update the subscribers
 
-**Kind**: global function
+**Kind**: global function  
 <a name="retryOperation"></a>
 
 ## retryOperation()
@@ -509,33 +528,87 @@ Disconnects and removes the listener from the Onyx key.
 | --- | --- |
 | subscriptionID | Subscription ID returned by calling `OnyxUtils.subscribeToKey()`. |
 
-<a name="mergeCollectionWithPatches"></a>
+<a name="setWithRetry"></a>
 
-## mergeCollectionWithPatches(collectionKey, collection, mergeReplaceNullPatches)
-Merges a collection based on their keys.
-Serves as core implementation for `Onyx.mergeCollection()` public function, the difference being
-that this internal function allows passing an additional `mergeReplaceNullPatches` parameter.
+## setWithRetry(params, retryAttempt)
+Writes a value to our store with the given key.
+Serves as core implementation for `Onyx.set()` public function, the difference being
+that this internal function allows passing an additional `retryAttempt` parameter to retry on failure.
 
 **Kind**: global function  
 
 | Param | Description |
 | --- | --- |
-| collectionKey | e.g. `ONYXKEYS.COLLECTION.REPORT` |
-| collection | Object collection keyed by individual collection member keys and values |
-| mergeReplaceNullPatches | Record where the key is a collection member key and the value is a list of tuples that we'll use to replace the nested objects of that collection member record with something else. |
+| params | set parameters |
+| params.key | ONYXKEY to set |
+| params.value | value to store |
+| params.options | optional configuration object |
+| retryAttempt | retry attempt |
+
+<a name="multiSetWithRetry"></a>
+
+## multiSetWithRetry(data, retryAttempt)
+Sets multiple keys and values.
+Serves as core implementation for `Onyx.multiSet()` public function, the difference being
+that this internal function allows passing an additional `retryAttempt` parameter to retry on failure.
+
+**Kind**: global function  
+
+| Param | Description |
+| --- | --- |
+| data | object keyed by ONYXKEYS and the values to set |
+| retryAttempt | retry attempt |
+
+<a name="setCollectionWithRetry"></a>
+
+## setCollectionWithRetry(params, retryAttempt)
+Sets a collection by replacing all existing collection members with new values.
+Any existing collection members not included in the new data will be removed.
+Serves as core implementation for `Onyx.setCollection()` public function, the difference being
+that this internal function allows passing an additional `retryAttempt` parameter to retry on failure.
+
+**Kind**: global function  
+
+| Param | Description |
+| --- | --- |
+| params | collection parameters |
+| params.collectionKey | e.g. `ONYXKEYS.COLLECTION.REPORT` |
+| params.collection | Object collection keyed by individual collection member keys and values |
+| retryAttempt | retry attempt |
+
+<a name="mergeCollectionWithPatches"></a>
+
+## mergeCollectionWithPatches(params, retryAttempt)
+Merges a collection based on their keys.
+Serves as core implementation for `Onyx.mergeCollection()` public function, the difference being
+that this internal function allows passing an additional `mergeReplaceNullPatches` parameter and retries on failure.
+
+**Kind**: global function  
+
+| Param | Description |
+| --- | --- |
+| params | mergeCollection parameters |
+| params.collectionKey | e.g. `ONYXKEYS.COLLECTION.REPORT` |
+| params.collection | Object collection keyed by individual collection member keys and values |
+| params.mergeReplaceNullPatches | Record where the key is a collection member key and the value is a list of tuples that we'll use to replace the nested objects of that collection member record with something else. |
+| params.isProcessingCollectionUpdate | whether this is part of a collection update operation. |
+| retryAttempt | retry attempt |
 
 <a name="partialSetCollection"></a>
 
-## partialSetCollection(collectionKey, collection)
+## partialSetCollection(params, retryAttempt)
 Sets keys in a collection by replacing all targeted collection members with new values.
 Any existing collection members not included in the new data will not be removed.
+Retries on failure.
 
 **Kind**: global function  
 
 | Param | Description |
 | --- | --- |
-| collectionKey | e.g. `ONYXKEYS.COLLECTION.REPORT` |
-| collection | Object collection keyed by individual collection member keys and values |
+| params | collection parameters |
+| params.collectionKey | e.g. `ONYXKEYS.COLLECTION.REPORT` |
+| params.collection | Object collection keyed by individual collection member keys and values |
+| retryAttempt | retry attempt |
 
 <a name="clearOnyxUtilsInternals"></a>
 
