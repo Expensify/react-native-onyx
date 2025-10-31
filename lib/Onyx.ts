@@ -374,7 +374,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
  * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
  * @param collection Object collection keyed by individual collection member keys and values
  */
-function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
+function mergeCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey>): Promise<void> {
     return OnyxUtils.mergeCollectionWithPatches(collectionKey, collection, undefined, true);
 }
 
@@ -545,7 +545,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
             [OnyxUtils.METHOD.SET]: enqueueSetOperation,
             [OnyxUtils.METHOD.MERGE]: enqueueMergeOperation,
             [OnyxUtils.METHOD.MERGE_COLLECTION]: () => {
-                const collection = value as Collection<CollectionKey, unknown, unknown>;
+                const collection = value as Collection<CollectionKey, unknown>;
                 if (!OnyxUtils.isValidNonEmptyCollectionForMerge(collection)) {
                     Logger.logInfo('mergeCollection enqueued within update() with invalid or empty value. Skipping this operation.');
                     return;
@@ -558,7 +558,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
                     collectionKeys.forEach((collectionKey) => enqueueMergeOperation(collectionKey, mergedCollection[collectionKey]));
                 }
             },
-            [OnyxUtils.METHOD.SET_COLLECTION]: (k, v) => promises.push(() => setCollection(k, v as Collection<CollectionKey, unknown, unknown>)),
+            [OnyxUtils.METHOD.SET_COLLECTION]: (k, v) => promises.push(() => setCollection(k, v as Collection<CollectionKey, unknown>)),
             [OnyxUtils.METHOD.MULTI_SET]: (k, v) => Object.entries(v as Partial<OnyxInputKeyValueMapping>).forEach(([entryKey, entryValue]) => enqueueSetOperation(entryKey, entryValue)),
             [OnyxUtils.METHOD.CLEAR]: () => {
                 clearPromise = clear();
@@ -611,14 +611,14 @@ function update(data: OnyxUpdate[]): Promise<void> {
             promises.push(() =>
                 OnyxUtils.mergeCollectionWithPatches(
                     collectionKey,
-                    batchedCollectionUpdates.merge as Collection<CollectionKey, unknown, unknown>,
+                    batchedCollectionUpdates.merge as Collection<CollectionKey, unknown>,
                     batchedCollectionUpdates.mergeReplaceNullPatches,
                     true,
                 ),
             );
         }
         if (!utils.isEmptyObject(batchedCollectionUpdates.set)) {
-            promises.push(() => OnyxUtils.partialSetCollection(collectionKey, batchedCollectionUpdates.set as Collection<CollectionKey, unknown, unknown>));
+            promises.push(() => OnyxUtils.partialSetCollection(collectionKey, batchedCollectionUpdates.set as Collection<CollectionKey, unknown>));
         }
     });
 
@@ -655,7 +655,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
  * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
  * @param collection Object collection keyed by individual collection member keys and values
  */
-function setCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
+function setCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey>): Promise<void> {
     let resultCollection: OnyxInputKeyValueMapping = collection;
     let resultCollectionKeys = Object.keys(resultCollection);
 

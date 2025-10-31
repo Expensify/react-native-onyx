@@ -1,5 +1,4 @@
 import type {Merge} from 'type-fest';
-import type {BuiltIns} from 'type-fest/source/internal';
 import type OnyxUtils from './OnyxUtils';
 import type {OnyxMethod} from './OnyxUtils';
 import type {FastMergeReplaceNullPatch} from './utils';
@@ -157,6 +156,10 @@ type OnyxValue<TKey extends OnyxKey> = string extends TKey ? unknown : TKey exte
 /** Utility type to extract `TOnyxValue` from `OnyxCollection<TOnyxValue>` */
 type ExtractOnyxCollectionValue<TOnyxCollection> = TOnyxCollection extends NonNullable<OnyxCollection<infer U>> ? U : never;
 
+type Primitive = null | undefined | string | number | boolean | symbol | bigint;
+
+type BuiltIns = Primitive | void | Date | RegExp;
+
 type NonTransformableTypes =
     | BuiltIns
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -205,13 +208,7 @@ type NullishObjectDeep<ObjectType extends object> = {
  * Also, the `TMap` type is inferred automatically in `mergeCollection()` method and represents
  * the object of collection keys/values specified in the second parameter of the method.
  */
-type Collection<TKey extends CollectionKeyBase, TValue, TMap = never> = {
-    [MapK in keyof TMap]: MapK extends `${TKey}${string}`
-        ? MapK extends `${TKey}`
-            ? never // forbids empty id
-            : TValue
-        : never;
-};
+type Collection<TKey extends CollectionKeyBase, TValue> = Record<`${TKey}${string}`, TValue> & {[P in TKey]?: never};
 
 /** Represents the base options used in `Onyx.connect()` method. */
 // NOTE: Any changes to this type like adding or removing options must be accounted in OnyxConnectionManager's `generateConnectionID()` method!
@@ -322,7 +319,7 @@ type OnyxMergeInput<TKey extends OnyxKey> = OnyxInput<TKey>;
 /**
  * This represents the value that can be passed to `Onyx.merge` and to `Onyx.update` with the method "MERGE"
  */
-type OnyxMergeCollectionInput<TKey extends OnyxKey, TMap = object> = Collection<TKey, NonNullable<OnyxInput<TKey>>, TMap>;
+type OnyxMergeCollectionInput<TKey extends OnyxKey> = Collection<TKey, NonNullable<OnyxInput<TKey>>>;
 
 type OnyxMethodMap = typeof OnyxUtils.METHOD;
 
