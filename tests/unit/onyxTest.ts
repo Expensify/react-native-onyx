@@ -2562,6 +2562,59 @@ describe('Onyx', () => {
                     });
                 });
         });
+
+        it('should preserve object references for unchanged items when merging collections', async () => {
+            const item1 = {id: 1, name: 'Item 1'};
+            const item2 = {id: 2, name: 'Item 2'};
+
+            // Set initial data using separate multiSet calls like existing tests
+            await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: item1});
+            await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: item2});
+
+            // Get references to the cached objects
+            const cachedItem1 = cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`);
+            const cachedItem2 = cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}2`);
+
+            // Merge collection with same data for item1 and changed data for item2
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {id: 1, name: 'Item 1'}, // Same data
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {id: 2, name: 'Item 2 Updated'}, // Changed data
+            } as GenericCollection);
+
+            // Check that unchanged item keeps its reference
+            const newCachedItem1 = cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`);
+            const newCachedItem2 = cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}2`);
+
+            expect(newCachedItem1).toBe(cachedItem1); // Same reference
+            expect(newCachedItem2).not.toBe(cachedItem2); // Different reference
+            expect(newCachedItem2).toEqual({id: 2, name: 'Item 2 Updated'}); // Correct data
+        });
+
+        it('should preserve all references when no data changes', async () => {
+            const item1 = {id: 1, name: 'Item 1', nested: {value: 'test'}};
+            const item2 = {id: 2, name: 'Item 2', nested: {value: 'test2'}};
+
+            // Set initial data using separate calls
+            await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: item1});
+            await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: item2});
+
+            // Get references to the cached objects
+            const cachedItem1 = cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`);
+            const cachedItem2 = cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}2`);
+
+            // Merge collection with identical data
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {id: 1, name: 'Item 1', nested: {value: 'test'}},
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {id: 2, name: 'Item 2', nested: {value: 'test2'}},
+            } as GenericCollection);
+
+            // Both items should keep their references since data is identical
+            const newCachedItem1 = cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`);
+            const newCachedItem2 = cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}2`);
+
+            expect(newCachedItem1).toBe(cachedItem1); // Same reference
+            expect(newCachedItem2).toBe(cachedItem2); // Same reference
+        });
     });
 
     describe('set', () => {
@@ -2702,6 +2755,35 @@ describe('Onyx', () => {
             expect(receivedData).toEqual({
                 [routeB]: {name: 'Route B'},
             });
+        });
+
+        it('should preserve object references for unchanged items when setting collections', async () => {
+            const item1 = {id: 1, name: 'Item 1'};
+            const item2 = {id: 2, name: 'Item 2'};
+
+            // Set initial data
+            await Onyx.setCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: item1,
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: item2,
+            } as GenericCollection);
+
+            // Get references to the cached objects
+            const cachedItem1 = cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`);
+            const cachedItem2 = cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}2`);
+
+            // Set collection with same data for item1 and changed data for item2
+            await Onyx.setCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {id: 1, name: 'Item 1'}, // Same data
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {id: 2, name: 'Item 2 Updated'}, // Changed data
+            } as GenericCollection);
+
+            // Check that unchanged item keeps its reference
+            const newCachedItem1 = cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`);
+            const newCachedItem2 = cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}2`);
+
+            expect(newCachedItem1).toBe(cachedItem1); // Same reference
+            expect(newCachedItem2).not.toBe(cachedItem2); // Different reference
+            expect(newCachedItem2).toEqual({id: 2, name: 'Item 2 Updated'}); // Correct data
         });
     });
 
