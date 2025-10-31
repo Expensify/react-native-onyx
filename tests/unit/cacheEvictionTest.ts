@@ -45,7 +45,7 @@ test('Cache eviction', () => {
             const setItemMock = jest.fn(originalSetItem).mockImplementationOnce(
                 () =>
                     new Promise((_resolve, reject) => {
-                        reject();
+                        reject(new Error('out of memory'));
                     }),
             );
             StorageMock.setItem = setItemMock;
