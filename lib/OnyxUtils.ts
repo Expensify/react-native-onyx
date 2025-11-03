@@ -961,9 +961,14 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, on
     const errorName = error?.name?.toLowerCase?.();
     const isStorageCapacityError = STORAGE_ERRORS.some((storageError) => errorName?.includes(storageError) || errorMessage?.includes(storageError));
 
+    if (nextRetryAttempt > MAX_STORAGE_OPERATION_RETRY_ATTEMPTS) {
+        Logger.logAlert(`Storage operation failed after 5 retries. Error: ${error}. onyxMethod: ${onyxMethod.name}.`);
+        return Promise.resolve();
+    }
+
     if (!isStorageCapacityError) {
         // @ts-expect-error No overload matches this call.
-        return nextRetryAttempt > MAX_STORAGE_OPERATION_RETRY_ATTEMPTS ? Promise.resolve() : onyxMethod(defaultParams, nextRetryAttempt);
+        return onyxMethod(defaultParams, nextRetryAttempt);
     }
 
     // Find the first key that we can remove that has no subscribers in our blocklist
@@ -981,7 +986,7 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, on
     reportStorageQuota();
 
     // @ts-expect-error No overload matches this call.
-    return remove(keyForRemoval).then(() => (nextRetryAttempt > MAX_STORAGE_OPERATION_RETRY_ATTEMPTS ? Promise.resolve() : onyxMethod(defaultParams, nextRetryAttempt)));
+    return remove(keyForRemoval).then(() => onyxMethod(defaultParams, nextRetryAttempt));
 }
 
 /**
