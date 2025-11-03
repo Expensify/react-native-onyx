@@ -4,8 +4,6 @@ import Storage from './storage';
 import utils from './utils';
 import DevTools, {initDevTools} from './DevTools';
 import type {
-    Collection,
-    CollectionKey,
     CollectionKeyBase,
     ConnectOptions,
     InitOptions,
@@ -15,6 +13,7 @@ import type {
     MixedOperationsQueue,
     OnyxKey,
     OnyxMergeCollectionInput,
+    OnyxSetCollectionInput,
     OnyxMergeInput,
     OnyxMultiSetInput,
     OnyxSetInput,
@@ -545,7 +544,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
             [OnyxUtils.METHOD.SET]: enqueueSetOperation,
             [OnyxUtils.METHOD.MERGE]: enqueueMergeOperation,
             [OnyxUtils.METHOD.MERGE_COLLECTION]: () => {
-                const collection = value as Collection<CollectionKey, unknown>;
+                const collection = value as OnyxMergeCollectionInput<OnyxKey>;
                 if (!OnyxUtils.isValidNonEmptyCollectionForMerge(collection)) {
                     Logger.logInfo('mergeCollection enqueued within update() with invalid or empty value. Skipping this operation.');
                     return;
@@ -655,7 +654,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
  * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
  * @param collection Object collection keyed by individual collection member keys and values
  */
-function setCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey>): Promise<void> {
+function setCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collection: OnyxSetCollectionInput<TKey>): Promise<void> {
     let resultCollection: OnyxInputKeyValueMapping = collection;
     let resultCollectionKeys = Object.keys(resultCollection);
 

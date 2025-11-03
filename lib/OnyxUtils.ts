@@ -29,7 +29,7 @@ import type {
     OnyxUpdate,
     OnyxValue,
     Selector,
-    Collection,
+    OnyxSetCollectionInput,
 } from './types';
 import type {FastMergeOptions, FastMergeResult} from './utils';
 import utils from './utils';
@@ -1036,7 +1036,7 @@ function initializeWithDefaultKeyStates(): Promise<void> {
 /**
  * Validate the collection is not empty and has a correct type before applying mergeCollection()
  */
-function isValidNonEmptyCollectionForMerge<TKey extends CollectionKeyBase>(collection: Collection<TKey, unknown>): boolean {
+function isValidNonEmptyCollectionForMerge<TKey extends CollectionKeyBase>(collection: OnyxMergeCollectionInput<TKey>): boolean {
     return typeof collection === 'object' && !Array.isArray(collection) && !utils.isEmptyObject(collection);
 }
 
@@ -1367,7 +1367,7 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
  * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
  * @param collection Object collection keyed by individual collection member keys and values
  */
-function partialSetCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey>): Promise<void> {
+function partialSetCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collection: OnyxSetCollectionInput<TKey>): Promise<void> {
     let resultCollection: OnyxInputKeyValueMapping = collection;
     let resultCollectionKeys = Object.keys(resultCollection);
 

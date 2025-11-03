@@ -321,6 +321,11 @@ type OnyxMergeInput<TKey extends OnyxKey> = OnyxInput<TKey>;
  */
 type OnyxMergeCollectionInput<TKey extends OnyxKey> = Collection<TKey, NonNullable<OnyxInput<TKey>>>;
 
+/**
+ * This represents the value that can be passed to `Onyx.setCollection` and to `Onyx.update` with the method "SET_COLLECTION"
+ */
+type OnyxSetCollectionInput<TKey extends OnyxKey> = Collection<TKey, OnyxInput<TKey>>;
+
 type OnyxMethodMap = typeof OnyxUtils.METHOD;
 
 /**
@@ -363,7 +368,7 @@ type OnyxUpdate =
               | {
                     onyxMethod: typeof OnyxUtils.METHOD.SET_COLLECTION;
                     key: TKey;
-                    value: OnyxMergeCollectionInput<TKey>;
+                    value: OnyxSetCollectionInput<TKey>;
                 };
       }[CollectionKeyBase];
 
@@ -476,6 +481,7 @@ export type {
     OnyxMultiSetInput,
     OnyxMergeInput,
     OnyxMergeCollectionInput,
+    OnyxSetCollectionInput,
     OnyxMethod,
     OnyxMethodMap,
     OnyxUpdate,

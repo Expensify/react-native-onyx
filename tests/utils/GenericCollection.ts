@@ -1,5 +1,4 @@
-import type {OnyxKey, OnyxMergeCollectionInput} from '../../lib/types';
-
-type GenericCollection = OnyxMergeCollectionInput<OnyxKey>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type GenericCollection = Record<string, any>;
 
 export default GenericCollection;
