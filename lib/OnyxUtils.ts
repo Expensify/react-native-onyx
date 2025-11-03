@@ -33,7 +33,7 @@ import type {
     SetCollectionParams,
     SetParams,
     OnyxMultiSetInput,
-    OnyxRetryOperation,
+    RetriableOnyxOperation,
 } from './types';
 import type {FastMergeOptions, FastMergeResult} from './utils';
 import utils from './utils';
@@ -892,7 +892,7 @@ function reportStorageQuota(): Promise<void> {
  * - Invalid data errors: logs an alert and throws an error
  * - Other errors: retries the operation
  */
-function retryOperation<TMethod extends OnyxRetryOperation>(error: Error, onyxMethod: TMethod, defaultParams: Parameters<TMethod>[0], retryAttempt: number | undefined): Promise<void> {
+function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, onyxMethod: TMethod, defaultParams: Parameters<TMethod>[0], retryAttempt: number | undefined): Promise<void> {
     const currentRetryAttempt = retryAttempt ?? 0;
     const nextRetryAttempt = currentRetryAttempt + 1;
 

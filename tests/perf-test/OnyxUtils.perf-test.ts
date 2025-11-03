@@ -9,7 +9,7 @@ import OnyxUtils, {clearOnyxUtilsInternals} from '../../lib/OnyxUtils';
 import type GenericCollection from '../utils/GenericCollection';
 import type {OnyxUpdate} from '../../lib/Onyx';
 import createDeferredTask from '../../lib/createDeferredTask';
-import type {OnyxInputKeyValueMapping, OnyxRetryOperation} from '../../lib/types';
+import type {OnyxInputKeyValueMapping, RetriableOnyxOperation} from '../../lib/types';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -505,7 +505,7 @@ describe('OnyxUtils', () => {
     describe('retryOperation', () => {
         test('one call', async () => {
             const error = new Error();
-            const onyxMethod = jest.fn() as OnyxRetryOperation;
+            const onyxMethod = jest.fn() as RetriableOnyxOperation;
 
             await measureAsyncFunction(() => OnyxUtils.retryOperation(error, onyxMethod, {key: '', value: null}, 1), {
                 beforeEach: async () => {

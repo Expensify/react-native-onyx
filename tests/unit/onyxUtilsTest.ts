@@ -83,7 +83,7 @@ Onyx.init({
 
 beforeEach(() => Onyx.clear());
 
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => jest.clearAllMocks());
 
 describe('OnyxUtils', () => {
     describe('splitCollectionMemberKey', () => {
@@ -420,10 +420,12 @@ describe('OnyxUtils', () => {
     });
 
     describe('retryOperation', () => {
-        it('should retry only one time if the operation is firstly failed and then passed', async () => {
-            const retryOperationSpy = jest.spyOn(OnyxUtils, 'retryOperation');
-            const genericError = new Error('Generic storage error');
+        const retryOperationSpy = jest.spyOn(OnyxUtils, 'retryOperation');
+        const genericError = new Error('Generic storage error');
+        const invalidDataError = new Error("Failed to execute 'put' on 'IDBObjectStore': invalid data");
+        const memoryError = new Error('out of memory');
 
+        it('should retry only one time if the operation is firstly failed and then passed', async () => {
             StorageMock.setItem = jest.fn(StorageMock.setItem).mockRejectedValueOnce(genericError).mockImplementation(StorageMock.setItem);
 
             await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
@@ -433,9 +435,6 @@ describe('OnyxUtils', () => {
         });
 
         it('should stop retrying after MAX_STORAGE_OPERATION_RETRY_ATTEMPTS retries for failing operation', async () => {
-            const retryOperationSpy = jest.spyOn(OnyxUtils, 'retryOperation');
-            const genericError = new Error('Generic storage error');
-
             StorageMock.setItem = jest.fn().mockRejectedValue(genericError);
 
             await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
@@ -445,17 +444,13 @@ describe('OnyxUtils', () => {
         });
 
         it("should throw error for if operation failed with \"Failed to execute 'put' on 'IDBObjectStore': invalid data\" error", async () => {
-            const idbError = new Error("Failed to execute 'put' on 'IDBObjectStore': invalid data");
-            StorageMock.setItem = jest.fn().mockRejectedValueOnce(idbError);
+            StorageMock.setItem = jest.fn().mockRejectedValueOnce(invalidDataError);
 
-            await expect(Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'})).rejects.toThrow(idbError);
+            await expect(Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'})).rejects.toThrow(invalidDataError);
         });
 
         it('should not retry in case of storage capacity error and no keys to evict', async () => {
-            const retryOperationSpy = jest.spyOn(OnyxUtils, 'retryOperation');
-            const quotaError = new Error('out of memory');
-
-            StorageMock.setItem = jest.fn().mockRejectedValue(quotaError);
+            StorageMock.setItem = jest.fn().mockRejectedValue(memoryError);
 
             await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
