@@ -1333,7 +1333,7 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
     }
 
     return Storage.setItem(key, valueWithoutNestedNullValues)
-        .catch((error) => OnyxUtils.retryOperation(error, setWithRetry, {key, value: valueWithoutNestedNullValues}, retryAttempt))
+        .catch((error) => OnyxUtils.retryOperation(error, setWithRetry, {key, value: valueWithoutNestedNullValues, options}, retryAttempt))
         .then(() => {
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
             return updatePromise;
@@ -1580,7 +1580,9 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase, TMap>(
             });
 
             return Promise.all(promises)
-                .catch((error) => retryOperation(error, mergeCollectionWithPatches, {collectionKey, collection: resultCollection}, retryAttempt))
+                .catch((error) =>
+                    retryOperation(error, mergeCollectionWithPatches, {collectionKey, collection: resultCollection, mergeReplaceNullPatches, isProcessingCollectionUpdate}, retryAttempt),
+                )
                 .then(() => {
                     sendActionToDevTools(METHOD.MERGE_COLLECTION, undefined, resultCollection);
                     return promiseUpdate;
