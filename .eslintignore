@@ -2,3 +2,5 @@
 dist
 node_modules
 *.config.js
+# tests/types catalog is not type checked with the rest of the project, so we need to ignore it in eslint
+tests/types/**/*.ts

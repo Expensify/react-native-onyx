@@ -16,6 +16,7 @@ import type {
     OnyxMultiSetInput,
     OnyxMergeInput,
     OnyxMergeCollectionInput,
+    OnyxSetCollectionInput,
 } from './types';
 import type {FetchStatus, ResultMetadata, UseOnyxResult, UseOnyxOptions} from './useOnyx';
 import type {Connection} from './OnyxConnectionManager';
@@ -40,6 +41,7 @@ export type {
     OnyxMultiSetInput,
     OnyxMergeInput,
     OnyxMergeCollectionInput,
+    OnyxSetCollectionInput,
     OnyxUpdate,
     OnyxValue,
     ResultMetadata,
