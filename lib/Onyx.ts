@@ -2,7 +2,7 @@ import * as Logger from './Logger';
 import cache, {TASK} from './OnyxCache';
 import Storage from './storage';
 import utils from './utils';
-import DevTools from './DevTools';
+import DevTools, {initDevTools} from './DevTools';
 import type {
     Collection,
     CollectionKey,
@@ -40,12 +40,15 @@ function init({
     maxCachedKeysCount = 1000,
     shouldSyncMultipleInstances = !!global.localStorage,
     enablePerformanceMetrics = false,
+    enableDevTools = true,
     skippableCollectionMemberIDs = [],
 }: InitOptions): void {
     if (enablePerformanceMetrics) {
         GlobalSettings.setPerformanceMetricsEnabled(true);
         applyPerformanceMetricsDecorators();
     }
+
+    initDevTools(enableDevTools);
 
     Storage.init();
 
@@ -372,7 +375,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
  * @param collection Object collection keyed by individual collection member keys and values
  */
 function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
-    return OnyxUtils.mergeCollectionWithPatches(collectionKey, collection);
+    return OnyxUtils.mergeCollectionWithPatches(collectionKey, collection, undefined, true);
 }
 
 /**
@@ -610,6 +613,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
                     collectionKey,
                     batchedCollectionUpdates.merge as Collection<CollectionKey, unknown, unknown>,
                     batchedCollectionUpdates.mergeReplaceNullPatches,
+                    true,
                 ),
             );
         }
@@ -694,7 +698,7 @@ function setCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey
             mutableCollection[key] = null;
         });
 
-        const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(mutableCollection, true);
+        const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(mutableCollection, true, undefined, true);
         const previousCollection = OnyxUtils.getCachedCollection(collectionKey);
 
         keyValuePairs.forEach(([key, value]) => cache.set(key, value));
