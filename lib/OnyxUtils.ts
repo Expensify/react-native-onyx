@@ -40,6 +40,8 @@ import decorateWithMetrics from './metrics';
 import type {StorageKeyValuePair} from './storage/providers/types';
 import logMessages from './logMessages';
 
+// test comment
+
 // Method constants
 const METHOD = {
     SET: 'set',
