@@ -1,5 +1,5 @@
 import type {OnyxUpdate} from '../../dist/types';
-import ONYX_KEYS from './augmentation';
+import ONYX_KEYS from './setup';
 
 const onyxUpdate: OnyxUpdate = {
     onyxMethod: 'set',

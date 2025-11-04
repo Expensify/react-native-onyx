@@ -1,5 +1,5 @@
 import Onyx from '../../dist/Onyx';
-import ONYX_KEYS from './augmentation';
+import ONYX_KEYS from './setup';
 
 Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
     test_1: {
