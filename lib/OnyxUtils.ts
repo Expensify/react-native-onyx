@@ -1358,6 +1358,7 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
     }
 
     const existingValue = cache.get(key, false);
+
     // If the existing value as well as the new value are null, we can return early.
     if (existingValue === undefined && value === null) {
         return Promise.resolve();
