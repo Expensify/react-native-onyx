@@ -380,6 +380,31 @@ type SetOptions = {
     skipCacheCheck?: boolean;
 };
 
+type SetParams<TKey extends OnyxKey> = {
+    key: TKey;
+    value: OnyxSetInput<TKey>;
+    options?: SetOptions;
+};
+
+type SetCollectionParams<TKey extends CollectionKeyBase> = {
+    collectionKey: TKey;
+    collection: OnyxSetCollectionInput<TKey>;
+};
+
+type MergeCollectionWithPatchesParams<TKey extends CollectionKeyBase> = {
+    collectionKey: TKey;
+    collection: OnyxMergeCollectionInput<TKey>;
+    mergeReplaceNullPatches?: MultiMergeReplaceNullPatches;
+    isProcessingCollectionUpdate?: boolean;
+};
+
+type RetriableOnyxOperation =
+    | typeof OnyxUtils.setWithRetry
+    | typeof OnyxUtils.multiSetWithRetry
+    | typeof OnyxUtils.setCollectionWithRetry
+    | typeof OnyxUtils.mergeCollectionWithPatches
+    | typeof OnyxUtils.partialSetCollection;
+
 /**
  * Represents the options used in `Onyx.init()` method.
  */
@@ -488,6 +513,10 @@ export type {
     OnyxValue,
     Selector,
     SetOptions,
+    SetParams,
+    SetCollectionParams,
+    MergeCollectionWithPatchesParams,
     MultiMergeReplaceNullPatches,
     MixedOperationsQueue,
+    RetriableOnyxOperation,
 };
