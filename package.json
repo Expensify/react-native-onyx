@@ -1,6 +1,6 @@
 {
   "name": "react-native-onyx",
-  "version": "3.0.10",
+  "version": "3.0.11",
   "author": "Expensify, Inc.",
   "homepage": "https://expensify.com",
   "description": "State management for React Native",
@@ -32,6 +32,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "jest",
+    "test:types": "npm run build && tsc --noEmit --project tsconfig.test.json",
     "perf-test": "npx reassure",
     "build": "tsc -p tsconfig.build.json",
     "build:watch": "nodemon --watch lib --ext js,json,ts,tsx --exec \"npm run build && npm pack\"",

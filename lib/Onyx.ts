@@ -4,8 +4,6 @@ import Storage from './storage';
 import utils from './utils';
 import DevTools, {initDevTools} from './DevTools';
 import type {
-    Collection,
-    CollectionKey,
     CollectionKeyBase,
     ConnectOptions,
     InitOptions,
@@ -15,6 +13,7 @@ import type {
     MixedOperationsQueue,
     OnyxKey,
     OnyxMergeCollectionInput,
+    OnyxSetCollectionInput,
     OnyxMergeInput,
     OnyxMultiSetInput,
     OnyxSetInput,
@@ -270,7 +269,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
  * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
  * @param collection Object collection keyed by individual collection member keys and values
  */
-function mergeCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
+function mergeCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey>): Promise<void> {
     return OnyxUtils.mergeCollectionWithPatches({collectionKey, collection, isProcessingCollectionUpdate: true});
 }
 
@@ -441,7 +440,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
             [OnyxUtils.METHOD.SET]: enqueueSetOperation,
             [OnyxUtils.METHOD.MERGE]: enqueueMergeOperation,
             [OnyxUtils.METHOD.MERGE_COLLECTION]: () => {
-                const collection = value as Collection<CollectionKey, unknown, unknown>;
+                const collection = value as OnyxMergeCollectionInput<OnyxKey>;
                 if (!OnyxUtils.isValidNonEmptyCollectionForMerge(collection)) {
                     Logger.logInfo('mergeCollection enqueued within update() with invalid or empty value. Skipping this operation.');
                     return;
@@ -454,7 +453,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
                     collectionKeys.forEach((collectionKey) => enqueueMergeOperation(collectionKey, mergedCollection[collectionKey]));
                 }
             },
-            [OnyxUtils.METHOD.SET_COLLECTION]: (k, v) => promises.push(() => setCollection(k, v as Collection<CollectionKey, unknown, unknown>)),
+            [OnyxUtils.METHOD.SET_COLLECTION]: (k, v) => promises.push(() => setCollection(k, v as OnyxSetCollectionInput<OnyxKey>)),
             [OnyxUtils.METHOD.MULTI_SET]: (k, v) => Object.entries(v as Partial<OnyxInputKeyValueMapping>).forEach(([entryKey, entryValue]) => enqueueSetOperation(entryKey, entryValue)),
             [OnyxUtils.METHOD.CLEAR]: () => {
                 clearPromise = clear();
@@ -507,14 +506,14 @@ function update(data: OnyxUpdate[]): Promise<void> {
             promises.push(() =>
                 OnyxUtils.mergeCollectionWithPatches({
                     collectionKey,
-                    collection: batchedCollectionUpdates.merge as Collection<CollectionKey, unknown, unknown>,
+                    collection: batchedCollectionUpdates.merge as OnyxMergeCollectionInput<OnyxKey>,
                     mergeReplaceNullPatches: batchedCollectionUpdates.mergeReplaceNullPatches,
                     isProcessingCollectionUpdate: true,
                 }),
             );
         }
         if (!utils.isEmptyObject(batchedCollectionUpdates.set)) {
-            promises.push(() => OnyxUtils.partialSetCollection({collectionKey, collection: batchedCollectionUpdates.set as Collection<CollectionKey, unknown, unknown>}));
+            promises.push(() => OnyxUtils.partialSetCollection({collectionKey, collection: batchedCollectionUpdates.set as OnyxSetCollectionInput<OnyxKey>}));
         }
     });
 
@@ -551,7 +550,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
  * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
  * @param collection Object collection keyed by individual collection member keys and values
  */
-function setCollection<TKey extends CollectionKeyBase, TMap>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey, TMap>): Promise<void> {
+function setCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collection: OnyxSetCollectionInput<TKey>): Promise<void> {
     return OnyxUtils.setCollectionWithRetry({collectionKey, collection});
 }
 

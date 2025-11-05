@@ -29,6 +29,7 @@ import type {
     OnyxUpdate,
     OnyxValue,
     Selector,
+    OnyxSetCollectionInput,
     MergeCollectionWithPatchesParams,
     SetCollectionParams,
     SetParams,
@@ -1125,7 +1126,7 @@ function initializeWithDefaultKeyStates(): Promise<void> {
 /**
  * Validate the collection is not empty and has a correct type before applying mergeCollection()
  */
-function isValidNonEmptyCollectionForMerge<TKey extends CollectionKeyBase, TMap>(collection: OnyxMergeCollectionInput<TKey, TMap>): boolean {
+function isValidNonEmptyCollectionForMerge<TKey extends CollectionKeyBase>(collection: OnyxMergeCollectionInput<TKey>): boolean {
     return typeof collection === 'object' && !Array.isArray(collection) && !utils.isEmptyObject(collection);
 }
 
@@ -1533,8 +1534,8 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase, TMap>({collectio
  * @param params.isProcessingCollectionUpdate whether this is part of a collection update operation.
  * @param retryAttempt retry attempt
  */
-function mergeCollectionWithPatches<TKey extends CollectionKeyBase, TMap>(
-    {collectionKey, collection, mergeReplaceNullPatches, isProcessingCollectionUpdate = false}: MergeCollectionWithPatchesParams<TKey, TMap>,
+function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
+    {collectionKey, collection, mergeReplaceNullPatches, isProcessingCollectionUpdate = false}: MergeCollectionWithPatchesParams<TKey>,
     retryAttempt?: number,
 ): Promise<void> {
     if (!isValidNonEmptyCollectionForMerge(collection)) {
