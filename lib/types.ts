@@ -386,14 +386,14 @@ type SetParams<TKey extends OnyxKey> = {
     options?: SetOptions;
 };
 
-type SetCollectionParams<TKey extends CollectionKeyBase, TMap> = {
+type SetCollectionParams<TKey extends CollectionKeyBase> = {
     collectionKey: TKey;
-    collection: OnyxMergeCollectionInput<TKey, TMap>;
+    collection: OnyxSetCollectionInput<TKey>;
 };
 
-type MergeCollectionWithPatchesParams<TKey extends CollectionKeyBase, TMap> = {
+type MergeCollectionWithPatchesParams<TKey extends CollectionKeyBase> = {
     collectionKey: TKey;
-    collection: OnyxMergeCollectionInput<TKey, TMap>;
+    collection: OnyxMergeCollectionInput<TKey>;
     mergeReplaceNullPatches?: MultiMergeReplaceNullPatches;
     isProcessingCollectionUpdate?: boolean;
 };

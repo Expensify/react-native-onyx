@@ -29,7 +29,6 @@ import type {
     OnyxUpdate,
     OnyxValue,
     Selector,
-    OnyxSetCollectionInput,
     MergeCollectionWithPatchesParams,
     SetCollectionParams,
     SetParams,
@@ -1462,7 +1461,7 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
  * @param params.collection Object collection keyed by individual collection member keys and values
  * @param retryAttempt retry attempt
  */
-function setCollectionWithRetry<TKey extends CollectionKeyBase, TMap>({collectionKey, collection}: SetCollectionParams<TKey, TMap>, retryAttempt?: number): Promise<void> {
+function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, collection}: SetCollectionParams<TKey>, retryAttempt?: number): Promise<void> {
     let resultCollection: OnyxInputKeyValueMapping = collection;
     let resultCollectionKeys = Object.keys(resultCollection);
 
@@ -1653,7 +1652,12 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
 
             return Promise.all(promises)
                 .catch((error) =>
-                    retryOperation(error, mergeCollectionWithPatches, {collectionKey, collection: resultCollection, mergeReplaceNullPatches, isProcessingCollectionUpdate}, retryAttempt),
+                    retryOperation(
+                        error,
+                        mergeCollectionWithPatches,
+                        {collectionKey, collection: resultCollection as OnyxMergeCollectionInput<TKey>, mergeReplaceNullPatches, isProcessingCollectionUpdate},
+                        retryAttempt,
+                    ),
                 )
                 .then(() => {
                     sendActionToDevTools(METHOD.MERGE_COLLECTION, undefined, resultCollection);
@@ -1673,7 +1677,7 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
  * @param params.collection Object collection keyed by individual collection member keys and values
  * @param retryAttempt retry attempt
  */
-function partialSetCollection<TKey extends CollectionKeyBase, TMap>({collectionKey, collection}: SetCollectionParams<TKey, TMap>, retryAttempt?: number): Promise<void> {
+function partialSetCollection<TKey extends CollectionKeyBase>({collectionKey, collection}: SetCollectionParams<TKey>, retryAttempt?: number): Promise<void> {
     let resultCollection: OnyxInputKeyValueMapping = collection;
     let resultCollectionKeys = Object.keys(resultCollection);
 
