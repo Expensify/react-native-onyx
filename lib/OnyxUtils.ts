@@ -1453,10 +1453,7 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
         const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(mutableCollection, true, undefined, true);
         const previousCollection = OnyxUtils.getCachedCollection(collectionKey);
 
-        // Preserve references for unchanged items in setCollection
-        const preservedCollection = OnyxUtils.preserveCollectionReferences(keyValuePairs);
-
-        const updatePromise = OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, preservedCollection, previousCollection);
+        const updatePromise = OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
 
         return Storage.multiSet(keyValuePairs)
             .catch((error) => OnyxUtils.retryOperation(error, setCollectionWithRetry, {collectionKey, collection}, retryAttempt))
