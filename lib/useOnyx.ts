@@ -11,7 +11,6 @@ import usePrevious from './usePrevious';
 import decorateWithMetrics from './metrics';
 import * as Logger from './Logger';
 import onyxSnapshotCache from './OnyxSnapshotCache';
-import useLiveRef from './useLiveRef';
 
 type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (data: OnyxValue<TKey> | undefined) => TReturnValue;
 
@@ -77,8 +76,13 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     const connectionRef = useRef<Connection | null>(null);
     const previousKey = usePrevious(key);
 
-    const currentDependenciesRef = useLiveRef(dependencies);
-    const currentSelectorRef = useLiveRef(options?.selector);
+    const currentDependenciesRef = useRef<DependencyList>(dependencies);
+    const currentSelectorRef = useRef<UseOnyxSelector<TKey, TReturnValue> | undefined>(options?.selector);
+
+    useEffect(() => {
+        currentDependenciesRef.current = dependencies;
+        currentSelectorRef.current = options?.selector;
+    }, [dependencies, options?.selector]);
 
     // Create memoized version of selector for performance
     const memoizedSelector = useMemo(() => {
