@@ -77,12 +77,10 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     const previousKey = usePrevious(key);
 
     const currentDependenciesRef = useRef<DependencyList>(dependencies);
-    const currentSelectorRef = useRef<UseOnyxSelector<TKey, TReturnValue> | undefined>(options?.selector);
 
     useEffect(() => {
         currentDependenciesRef.current = dependencies;
-        currentSelectorRef.current = options?.selector;
-    }, [dependencies, options?.selector]);
+    }, [dependencies]);
 
     // Create memoized version of selector for performance
     const memoizedSelector = useMemo(() => {
@@ -95,14 +93,13 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
         return (input: OnyxValue<TKey> | undefined): TReturnValue => {
             const currentDependencies = currentDependenciesRef.current;
-            const currentSelector = currentSelectorRef.current;
 
             // Recompute if input changed, dependencies changed, or first time
             const dependenciesChanged = !shallowEqual(lastDependencies, currentDependencies);
             if (!hasComputed || lastInput !== input || dependenciesChanged) {
                 // Only proceed if we have a valid selector
-                if (currentSelector) {
-                    const newOutput = currentSelector(input);
+                if (options?.selector) {
+                    const newOutput = options.selector(input);
 
                     // Deep equality mode: only update if output actually changed
                     if (!hasComputed || !deepEqual(lastOutput, newOutput) || dependenciesChanged) {
@@ -116,7 +113,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
             return lastOutput;
         };
-    }, [currentDependenciesRef, currentSelectorRef, options?.selector]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- we only need options?.selector, not the entire options object
+    }, [currentDependenciesRef, options?.selector]);
 
     // Stores the previous cached value as it's necessary to compare with the new value in `getSnapshot()`.
     // We initialize it to `null` to simulate that we don't have any value from cache yet.
