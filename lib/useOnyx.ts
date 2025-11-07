@@ -76,36 +76,25 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     const connectionRef = useRef<Connection | null>(null);
     const previousKey = usePrevious(key);
 
-    const currentDependenciesRef = useRef<DependencyList>(dependencies);
-
-    useEffect(() => {
-        currentDependenciesRef.current = dependencies;
-    }, [dependencies]);
-
     // Create memoized version of selector for performance
     const memoizedSelector = useMemo(() => {
         if (!options?.selector) return null;
 
         let lastInput: OnyxValue<TKey> | undefined;
         let lastOutput: TReturnValue;
-        let lastDependencies: DependencyList = [];
         let hasComputed = false;
 
         return (input: OnyxValue<TKey> | undefined): TReturnValue => {
-            const currentDependencies = currentDependenciesRef.current;
-
-            // Recompute if input changed, dependencies changed, or first time
-            const dependenciesChanged = !shallowEqual(lastDependencies, currentDependencies);
-            if (!hasComputed || lastInput !== input || dependenciesChanged) {
+            // Recompute if input changed or first time
+            if (!hasComputed || lastInput !== input) {
                 // Only proceed if we have a valid selector
                 if (options?.selector) {
                     const newOutput = options.selector(input);
 
                     // Deep equality mode: only update if output actually changed
-                    if (!hasComputed || !deepEqual(lastOutput, newOutput) || dependenciesChanged) {
+                    if (!hasComputed || !deepEqual(lastOutput, newOutput)) {
                         lastInput = input;
                         lastOutput = newOutput;
-                        lastDependencies = [...currentDependencies];
                         hasComputed = true;
                     }
                 }
@@ -114,7 +103,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             return lastOutput;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps -- we only need options?.selector, not the entire options object
-    }, [currentDependenciesRef, options?.selector]);
+    }, [dependencies, options?.selector]);
 
     // Stores the previous cached value as it's necessary to compare with the new value in `getSnapshot()`.
     // We initialize it to `null` to simulate that we don't have any value from cache yet.
