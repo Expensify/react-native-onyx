@@ -92,7 +92,7 @@
     "react-native-device-info": "^10.3.0",
     "react-native-nitro-modules": "^0.27.2",
     "react-native-nitro-sqlite": "^9.2.0",
-    "react-native-performance": "^2.0.0",
+    "react-native-performance": "^5.1.0",
     "react-test-renderer": "18.2.0",
     "reassure": "1.4.0",
     "ts-node": "^10.9.2",
@@ -107,7 +107,7 @@
     "react-native-device-info": "^10.3.0",
     "react-native-nitro-modules": ">=0.27.2",
     "react-native-nitro-sqlite": "^9.2.0",
-    "react-native-performance": "^5.1.0"
+    "react-native-performance": ">=5.1.0"
   },
   "peerDependenciesMeta": {
     "idb-keyval": {
