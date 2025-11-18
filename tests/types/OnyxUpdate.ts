@@ -1,20 +1,20 @@
 import type {OnyxUpdate} from '../../dist/types';
 import ONYX_KEYS from './setup';
 
-const onyxUpdate: OnyxUpdate = {
+const onyxUpdate: OnyxUpdate<'test'> = {
     onyxMethod: 'set',
     key: ONYX_KEYS.TEST_KEY,
     value: 'string',
 };
 
-const onyxUpdateError: OnyxUpdate = {
+const onyxUpdateError: OnyxUpdate<'test'> = {
     onyxMethod: 'set',
     key: ONYX_KEYS.TEST_KEY,
     // @ts-expect-error TEST_KEY is a string, not a number
     value: 2,
 };
 
-const onyxUpdateCollection: OnyxUpdate = {
+const onyxUpdateCollection: OnyxUpdate<'test_'> = {
     onyxMethod: 'mergecollection',
     key: ONYX_KEYS.COLLECTION.TEST_KEY,
     value: {
@@ -28,7 +28,7 @@ const onyxUpdateCollection: OnyxUpdate = {
 };
 
 // @ts-expect-error COLLECTION.TEST_KEY is an object, not a number
-const onyxUpdateCollectionError: OnyxUpdate = {
+const onyxUpdateCollectionError: OnyxUpdate<'test_'> = {
     onyxMethod: 'mergecollection',
     key: ONYX_KEYS.COLLECTION.TEST_KEY,
     value: {
@@ -36,7 +36,7 @@ const onyxUpdateCollectionError: OnyxUpdate = {
     },
 };
 
-const onyxUpdateCollectionError2: OnyxUpdate = {
+const onyxUpdateCollectionError2: OnyxUpdate<'test_'> = {
     onyxMethod: 'mergecollection',
     key: ONYX_KEYS.COLLECTION.TEST_KEY,
     value: {
@@ -48,7 +48,7 @@ const onyxUpdateCollectionError2: OnyxUpdate = {
 };
 
 // @ts-expect-error COLLECTION.TEST_KEY is invalid key, it is missing the suffix
-const onyxUpdateCollectionError3: OnyxUpdate = {
+const onyxUpdateCollectionError3: OnyxUpdate<'test_'> = {
     onyxMethod: 'mergecollection',
     key: ONYX_KEYS.COLLECTION.TEST_KEY,
     value: {

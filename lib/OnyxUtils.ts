@@ -1209,7 +1209,7 @@ function unsubscribeFromKey(subscriptionID: number): void {
     delete callbackToStateMapping[subscriptionID];
 }
 
-function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge): Array<() => Promise<void>> {
+function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, mergeFn: typeof Onyx.merge): Array<() => Promise<void>> {
     const snapshotCollectionKey = getSnapshotKey();
     if (!snapshotCollectionKey) return [];
 
