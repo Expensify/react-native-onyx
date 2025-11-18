@@ -328,27 +328,29 @@ type OnyxSetCollectionInput<TKey extends OnyxKey> = Collection<TKey, OnyxInput<T
 
 type OnyxMethodMap = typeof OnyxUtils.METHOD;
 
+type ExpandOnyxKeys<TKey extends OnyxKey> = TKey extends CollectionKeyBase ? `${TKey}${string}` : TKey;
+
 type OnyxUpdateBase<TKey extends OnyxKey> = {
     // ⚠️ DO NOT CHANGE THIS TYPE, UNLESS YOU KNOW WHAT YOU ARE DOING. ⚠️
     [K in TKey]:
         | {
               onyxMethod: typeof OnyxUtils.METHOD.SET;
-              key: K;
+              key: ExpandOnyxKeys<K>;
               value: OnyxSetInput<K>;
           }
         | {
               onyxMethod: typeof OnyxUtils.METHOD.MULTI_SET;
-              key: K;
+              key: ExpandOnyxKeys<K>;
               value: OnyxMultiSetInput;
           }
         | {
               onyxMethod: typeof OnyxUtils.METHOD.MERGE;
-              key: K;
+              key: ExpandOnyxKeys<K>;
               value: OnyxMergeInput<K>;
           }
         | {
               onyxMethod: typeof OnyxUtils.METHOD.CLEAR;
-              key: K;
+              key: ExpandOnyxKeys<K>;
               value?: undefined;
           };
 }[TKey];
