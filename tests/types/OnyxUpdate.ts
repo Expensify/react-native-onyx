@@ -8,6 +8,14 @@ const onyxUpdate: OnyxUpdate<'test'> = {
     value: 'string',
 };
 
+const onyxUpdateCollectionMember: OnyxUpdate<typeof ONYX_KEYS.COLLECTION.TEST_KEY> = {
+    onyxMethod: 'set',
+    key: `${ONYX_KEYS.COLLECTION.TEST_KEY}1`,
+    value: {
+        str: 'test1',
+    },
+};
+
 const onyxUpdateError: OnyxUpdate<'test'> = {
     onyxMethod: 'set',
     key: ONYX_KEYS.TEST_KEY,
