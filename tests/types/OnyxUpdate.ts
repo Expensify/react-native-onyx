@@ -1,3 +1,4 @@
+import Onyx from '../../dist/Onyx';
 import type {OnyxUpdate} from '../../dist/types';
 import ONYX_KEYS from './setup';
 
@@ -57,3 +58,76 @@ const onyxUpdateCollectionError3: OnyxUpdate<'test_'> = {
         },
     },
 };
+
+Onyx.update([
+    {
+        onyxMethod: 'mergecollection',
+        key: ONYX_KEYS.COLLECTION.TEST_KEY,
+        value: {
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {
+                str: 'test1',
+            },
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {
+                str: 'test2',
+            },
+        },
+    },
+    {
+        onyxMethod: 'setcollection',
+        key: ONYX_KEYS.COLLECTION.TEST_KEY,
+        value: {
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {
+                str: 'test1',
+            },
+        },
+    },
+    {
+        onyxMethod: 'set',
+        key: ONYX_KEYS.TEST_KEY,
+        value: 'string',
+    },
+]);
+
+Onyx.update([
+    {
+        onyxMethod: 'clear',
+        key: ONYX_KEYS.TEST_KEY,
+    },
+]);
+
+Onyx.update([
+    {
+        onyxMethod: 'merge',
+        key: ONYX_KEYS.COLLECTION.TEST_KEY,
+        value: {
+            str: 'test1',
+        },
+    },
+    {
+        onyxMethod: 'set',
+        key: ONYX_KEYS.TEST_KEY,
+        value: 'string',
+    },
+]);
+
+Onyx.update([
+    {
+        onyxMethod: 'set',
+        key: ONYX_KEYS.TEST_KEY,
+        // @ts-expect-error TEST_KEY is a string, not a boolean
+        value: true,
+    },
+]);
+
+Onyx.update([
+    // @ts-expect-error COLLECTION.TEST_KEY is invalid key, it is missing the suffix
+    {
+        onyxMethod: 'mergecollection',
+        key: ONYX_KEYS.COLLECTION.TEST_KEY,
+        value: {
+            [ONYX_KEYS.COLLECTION.TEST_KEY]: {
+                str: 'test1',
+            },
+        },
+    },
+]);
