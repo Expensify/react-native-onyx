@@ -91,7 +91,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         return (input: OnyxValue<TKey> | undefined): TReturnValue => {
             const currentDependencies = currentDependenciesRef.current;
 
-            // Recompute if input changed, depedencies changes, or first time
+            // Recompute if input changed, dependencies changed, or first time
             const dependenciesChanged = !shallowEqual(lastDependencies, currentDependencies);
             if (!hasComputed || lastInput !== input || dependenciesChanged) {
                 // Only proceed if we have a valid selector
