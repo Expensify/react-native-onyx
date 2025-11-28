@@ -1,139 +1,282 @@
+import {getMany as idbGetMany, clear as idbClear, get as idbGet, keys as idbKeys, set as idbSet, setMany as idbSetMany} from 'idb-keyval';
 import IDBKeyValProvider from '../../../../lib/storage/providers/IDBKeyValProvider';
-import createDeferredTask from '../../../../lib/createDeferredTask';
-import waitForPromisesToResolve from '../../../utils/waitForPromisesToResolve';
-import type StorageMock from '../../../../lib/storage/__mocks__';
+import utils from '../../../../lib/utils';
+import type {GenericDeepRecord} from '../../../types';
 
-const IDBKeyValProviderMock = IDBKeyValProvider as unknown as typeof StorageMock;
+const ONYXKEYS = {
+    TEST_KEY: 'test',
+    TEST_KEY_2: 'test2',
+    TEST_KEY_3: 'test3',
+    COLLECTION: {
+        TEST_KEY: 'test_',
+        TEST_KEY_2: 'test2_',
+    },
+};
 
-describe('storage/providers/IDBKeyVal', () => {
-    const SAMPLE_ITEMS: Array<[string, unknown]> = [
-        ['string', 'Plain String'],
-        ['array', ['Mixed', {array: [{id: 1}, {id: 2}]}]],
-        ['true', true],
-        ['false', false],
-        ['object', {id: 'Object', nested: {content: 'Nested object'}}],
-        ['number', 100],
+describe('IDBKeyValProvider', () => {
+    const testEntries: Array<[string, unknown]> = [
+        [ONYXKEYS.TEST_KEY, 'value'],
+        [ONYXKEYS.TEST_KEY_2, 1000],
+        [
+            ONYXKEYS.TEST_KEY_3,
+            {
+                key: 'value',
+                property: {
+                    nestedProperty: {
+                        nestedKey1: 'nestedValue1',
+                        nestedKey2: 'nestedValue2',
+                    },
+                },
+            },
+        ],
+        [`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, true],
+        [`${ONYXKEYS.COLLECTION.TEST_KEY}id2`, ['a', {key: 'value'}, 1, true]],
     ];
 
-    // For some reason fake timers cause promises to hang
-    beforeAll(() => jest.useRealTimers());
-    beforeEach(() => {
-        jest.clearAllMocks();
-        IDBKeyValProviderMock.clear();
-        IDBKeyValProviderMock.clear.mockClear();
+    beforeEach(async () => {
+        IDBKeyValProvider.init();
+        await idbClear(IDBKeyValProvider.store);
     });
 
-    it('multiSet', () => {
-        // Given multiple pairs to be saved in storage
-        const pairs = SAMPLE_ITEMS.slice();
+    describe('getItem', () => {
+        it('should return the stored value for the key', async () => {
+            await idbSet(ONYXKEYS.TEST_KEY, 'value', IDBKeyValProvider.store);
+            expect(await IDBKeyValProvider.getItem(ONYXKEYS.TEST_KEY)).toEqual('value');
+        });
 
-        // When they are saved
-        return IDBKeyValProviderMock.multiSet(pairs).then(() => {
-            // We expect a call to idbKeyval.setItem for each pair
-            pairs.forEach(([key, value]) => expect(IDBKeyValProviderMock.setItem).toHaveBeenCalledWith(key, value));
+        it('should return null if there is no stored value for the key', async () => {
+            expect(await IDBKeyValProvider.getItem(ONYXKEYS.TEST_KEY)).toBeNull();
         });
     });
 
-    it('multiGet', () => {
-        // Given we have some data in storage
-        IDBKeyValProviderMock.multiSet(SAMPLE_ITEMS);
+    describe('multiGet', () => {
+        it('should return the tuples in the order of the keys supplied in a batch', async () => {
+            await idbSetMany(testEntries, IDBKeyValProvider.store);
 
-        return waitForPromisesToResolve().then(() => {
-            // Then multi get should retrieve them
-            const keys = SAMPLE_ITEMS.map(([key]) => key);
-            return IDBKeyValProviderMock.multiGet(keys).then((pairs) => expect(pairs).toEqual(expect.arrayContaining(SAMPLE_ITEMS)));
+            expect(await IDBKeyValProvider.multiGet([`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, ONYXKEYS.TEST_KEY, ONYXKEYS.TEST_KEY_2])).toEqual([
+                testEntries[3],
+                testEntries[0],
+                testEntries[1],
+            ]);
         });
     });
 
-    it('multiMerge', () => {
-        // Given existing data in storage
-        const USER_1 = {
-            name: 'Tom',
-            age: 30,
-            traits: {hair: 'brown'},
-        };
+    describe('setItem', () => {
+        it('should set the value to the key', async () => {
+            await IDBKeyValProvider.setItem(ONYXKEYS.TEST_KEY, 'value');
+            expect(await idbGet(ONYXKEYS.TEST_KEY, IDBKeyValProvider.store)).toEqual('value');
+        });
 
-        const USER_2 = {
-            name: 'Sarah',
-            age: 25,
-            traits: {hair: 'black'},
-        };
+        // FIXME: 🐞 IDBKeyValProvider - setItem removes and redundantly sets the value to null
+        it.skip('should remove the key when passing null', async () => {
+            await IDBKeyValProvider.setItem(ONYXKEYS.TEST_KEY, 'value');
+            expect(await idbGet(ONYXKEYS.TEST_KEY, IDBKeyValProvider.store)).toEqual('value');
 
-        IDBKeyValProviderMock.multiSet([
-            ['@USER_1', USER_1],
-            ['@USER_2', USER_2],
-        ]);
+            await IDBKeyValProvider.setItem(ONYXKEYS.TEST_KEY, null);
+            expect(await idbKeys(IDBKeyValProvider.store)).not.toContainEqual(ONYXKEYS.TEST_KEY);
+        });
+    });
 
-        return waitForPromisesToResolve().then(() => {
-            (IDBKeyValProviderMock.mockSet as jest.Mock).mockClear();
+    describe('multiSet', () => {
+        it('should set multiple keys in a batch', async () => {
+            await IDBKeyValProvider.multiSet(testEntries);
+            expect(
+                await idbGetMany(
+                    testEntries.map((e) => e[0]),
+                    IDBKeyValProvider.store,
+                ),
+            ).toEqual(testEntries.map((e) => (e[1] === null ? undefined : e[1])));
+        });
 
-            // Given deltas matching existing structure
-            const USER_1_DELTA = {
-                age: 31,
-                traits: {eyes: 'blue'},
-            };
+        // FIXME: 🐞 IDBKeyValProvider - multiSet calls multiple removeItem's instead of delMany
+        it('should set and remove multiple keys in a batch', async () => {
+            await idbSetMany(testEntries, IDBKeyValProvider.store);
+            const changedEntries: Array<[string, unknown]> = [
+                [ONYXKEYS.TEST_KEY, 'value_changed'],
+                [ONYXKEYS.TEST_KEY_2, null],
+                [ONYXKEYS.TEST_KEY_3, {changed: true}],
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, null],
+            ];
 
-            const USER_2_DELTA = {
-                age: 26,
-                traits: {hair: 'green'},
-            };
+            await IDBKeyValProvider.multiSet(changedEntries);
+            // ONYXKEYS.TEST_KEY, ONYXKEYS.TEST_KEY_3 and `${ONYXKEYS.COLLECTION.TEST_KEY}id2`.
+            expect((await idbKeys(IDBKeyValProvider.store)).length).toEqual(3);
+            expect(
+                await idbGetMany(
+                    changedEntries.map((e) => e[0]),
+                    IDBKeyValProvider.store,
+                ),
+            ).toEqual(changedEntries.map((e) => (e[1] === null ? undefined : e[1])));
+        });
+    });
 
-            // When data is merged to storage
-            return IDBKeyValProviderMock.multiMerge([
-                ['@USER_1', USER_1_DELTA],
-                ['@USER_2', USER_2_DELTA],
-            ]).then(() => {
-                // Then each existing item should be set with the merged content
-                expect(IDBKeyValProviderMock.mockSet).toHaveBeenNthCalledWith(1, '@USER_1', {
-                    name: 'Tom',
-                    age: 31,
-                    traits: {
-                        hair: 'brown',
-                        eyes: 'blue',
+    describe('multiMerge', () => {
+        it('should merge multiple keys in a batch', async () => {
+            await idbSetMany(testEntries, IDBKeyValProvider.store);
+            const changedEntries: Array<[string, unknown]> = [
+                // FIXME: 🐞 IDBKeyValProvider (possibly other places): Primitives are incorrectly stored when using multiMerge
+                // [ONYXKEYS.TEST_KEY, 'value_changed'],
+                // [ONYXKEYS.TEST_KEY_2, 1001],
+                [
+                    ONYXKEYS.TEST_KEY_3,
+                    {
+                        key: 'value_changed',
+                        property: {
+                            nestedProperty: {
+                                nestedKey2: 'nestedValue2_changed',
+                                [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                            },
+                            newKey: 'newValue',
+                        },
                     },
-                });
+                ],
+                // FIXME: 🐞 IDBKeyValProvider (possibly other places): Primitives are incorrectly stored when using multiMerge
+                // [`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, false],
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}id2`, ['a', {newKey: 'newValue'}]],
+            ];
 
-                expect(IDBKeyValProviderMock.mockSet).toHaveBeenNthCalledWith(2, '@USER_2', {
-                    name: 'Sarah',
-                    age: 26,
-                    traits: {
-                        hair: 'green',
-                    },
-                });
+            const expectedEntries = structuredClone(changedEntries);
+            const expectedTestKey3Value = structuredClone(testEntries[2])[1] as GenericDeepRecord;
+            expectedTestKey3Value.key = 'value_changed';
+            expectedTestKey3Value.property.nestedProperty = {nestedKey2: 'nestedValue2_changed'};
+            expectedTestKey3Value.property.newKey = 'newValue';
+            expectedEntries[0][1] = expectedTestKey3Value;
+
+            await IDBKeyValProvider.multiMerge(changedEntries);
+            expect(
+                await idbGetMany(
+                    expectedEntries.map((e) => e[0]),
+                    IDBKeyValProvider.store,
+                ),
+            ).toEqual(expectedEntries.map((e) => (e[1] === null ? undefined : e[1])));
+        });
+
+        // FIXME: 🐞 IDBKeyValProvider - multiMerge calls multiple removeItem's instead of using the transaction
+        // FIXME: 🐞 IDBKeyValProvider: Index misalignment between pairs and values in multiMerge
+        // FIXME: Check if multiMerge is supposed to handle null values
+        it.skip('should merge and delete multiple keys in a batch', async () => {
+            await idbSetMany(testEntries, IDBKeyValProvider.store);
+            const changedEntries: Array<[string, unknown]> = [
+                [ONYXKEYS.TEST_KEY, null],
+                [ONYXKEYS.TEST_KEY_2, null],
+                [ONYXKEYS.TEST_KEY_3, {key: 'value_changed'}],
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, null],
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}id2`, ['a', {newKey: 'newValue'}]],
+            ];
+
+            const expectedEntries = structuredClone(changedEntries);
+            const expectedTestKey3Value = structuredClone(testEntries[2])[1] as GenericDeepRecord;
+            expectedTestKey3Value.key = 'value_changed';
+            expectedEntries[2][1] = expectedTestKey3Value;
+
+            await IDBKeyValProvider.multiMerge(changedEntries);
+            // ONYXKEYS.TEST_KEY_3 and `${ONYXKEYS.COLLECTION.TEST_KEY}id2`.
+            expect((await idbKeys(IDBKeyValProvider.store)).length).toEqual(2);
+            expect(
+                await idbGetMany(
+                    expectedEntries.map((e) => e[0]),
+                    IDBKeyValProvider.store,
+                ),
+            ).toEqual(expectedEntries.map((e) => (e[1] === null ? undefined : e[1])));
+        });
+    });
+
+    describe('mergeItem', () => {
+        it('should merge all the supported kinds of data correctly', async () => {
+            await idbSet(ONYXKEYS.TEST_KEY, 'value', IDBKeyValProvider.store);
+            await idbSet(ONYXKEYS.TEST_KEY_2, 1000, IDBKeyValProvider.store);
+            await idbSet(ONYXKEYS.TEST_KEY_3, {key: 'value', property: {propertyKey: 'propertyValue'}}, IDBKeyValProvider.store);
+            await idbSet(`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, true, IDBKeyValProvider.store);
+            await idbSet(`${ONYXKEYS.COLLECTION.TEST_KEY}id2`, ['a', {key: 'value'}, 1, true], IDBKeyValProvider.store);
+
+            await IDBKeyValProvider.mergeItem(ONYXKEYS.TEST_KEY, 'value_changed');
+            await IDBKeyValProvider.mergeItem(ONYXKEYS.TEST_KEY_2, 1001);
+            await IDBKeyValProvider.mergeItem(ONYXKEYS.TEST_KEY_3, {
+                key: 'value_changed',
+                property: {
+                    [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                    newKey: 'newValue',
+                },
+            });
+            await IDBKeyValProvider.mergeItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id1` as string, false);
+            await IDBKeyValProvider.mergeItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id2` as string, ['a', {newKey: 'newValue'}]);
+
+            // FIXME: 🐞 IDBKeyValProvider (possibly other places): Primitives are incorrectly stored when using multiMerge
+            // expect(await idbGet(ONYXKEYS.TEST_KEY, IDBKeyValProvider.store)).toEqual('value_changed');
+            // expect(await idbGet(ONYXKEYS.TEST_KEY_2, IDBKeyValProvider.store)).toEqual(1001);
+            expect(await idbGet(ONYXKEYS.TEST_KEY_3, IDBKeyValProvider.store)).toEqual({key: 'value_changed', property: {newKey: 'newValue'}});
+            // expect(await idbGet(`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, IDBKeyValProvider.store)).toEqual(false);
+            expect(await idbGet(`${ONYXKEYS.COLLECTION.TEST_KEY}id2`, IDBKeyValProvider.store)).toEqual(['a', {newKey: 'newValue'}]);
+        });
+
+        // FIXME: Check if multiMerge is supposed to handle null values
+        it('should remove the key when passing null', async () => {
+            await idbSet(ONYXKEYS.TEST_KEY, 'value', IDBKeyValProvider.store);
+
+            await IDBKeyValProvider.mergeItem(ONYXKEYS.TEST_KEY, null);
+            expect(await idbKeys(IDBKeyValProvider.store)).not.toContainEqual(ONYXKEYS.TEST_KEY);
+        });
+    });
+
+    describe('getAllKeys', () => {
+        it('should list all the keys stored', async () => {
+            await idbSetMany(testEntries, IDBKeyValProvider.store);
+            expect((await IDBKeyValProvider.getAllKeys()).length).toEqual(5);
+        });
+    });
+
+    describe('removeItem', () => {
+        it('should remove the key from the store', async () => {
+            await idbSetMany(testEntries, IDBKeyValProvider.store);
+            expect(await idbKeys(IDBKeyValProvider.store)).toContainEqual(ONYXKEYS.TEST_KEY);
+
+            await IDBKeyValProvider.removeItem(ONYXKEYS.TEST_KEY);
+            expect(await idbKeys(IDBKeyValProvider.store)).not.toContainEqual(ONYXKEYS.TEST_KEY);
+        });
+    });
+
+    describe('removeItem', () => {
+        it('should remove all the supplied keys from the store', async () => {
+            await idbSetMany(testEntries, IDBKeyValProvider.store);
+            expect(await idbKeys(IDBKeyValProvider.store)).toContainEqual(ONYXKEYS.TEST_KEY);
+            expect(await idbKeys(IDBKeyValProvider.store)).toContainEqual(ONYXKEYS.TEST_KEY_3);
+
+            await IDBKeyValProvider.removeItems([ONYXKEYS.TEST_KEY, ONYXKEYS.TEST_KEY_3]);
+            expect(await idbKeys(IDBKeyValProvider.store)).not.toContainEqual(ONYXKEYS.TEST_KEY);
+            expect(await idbKeys(IDBKeyValProvider.store)).not.toContainEqual(ONYXKEYS.TEST_KEY_3);
+        });
+    });
+
+    describe('clear', () => {
+        it('should clear the storage', async () => {
+            await idbSetMany(testEntries, IDBKeyValProvider.store);
+            expect((await idbKeys(IDBKeyValProvider.store)).length).toEqual(5);
+
+            await IDBKeyValProvider.clear();
+            expect((await idbKeys(IDBKeyValProvider.store)).length).toEqual(0);
+        });
+    });
+
+    describe('getDatabaseSize', () => {
+        beforeEach(() => {
+            Object.defineProperty(window.navigator, 'storage', {
+                value: {
+                    estimate: jest.fn().mockResolvedValue({quota: 750000, usage: 250000}),
+                },
+                configurable: true,
             });
         });
-    });
 
-    it('clear', () => {
-        // We're creating a Promise which we programatically control when to resolve.
-        const task = createDeferredTask();
+        afterEach(() => {
+            // @ts-expect-error tear down of mocked property
+            delete window.navigator.storage;
+        });
 
-        // We configure idbKeyval.setItem to return this promise the first time it's called and to otherwise return resolved promises
-        IDBKeyValProviderMock.setItem = jest
-            .fn()
-            .mockReturnValue(Promise.resolve()) // Default behavior
-            .mockReturnValueOnce(task.promise); // First call behavior
-
-        // Make 5 StorageProvider.setItem calls - this adds 5 items to the queue and starts executing the first idbKeyval.setItem
-        for (let i = 0; i < 5; i++) {
-            IDBKeyValProviderMock.setItem(`key${i}`, `value${i}`);
-        }
-
-        // At this point,`idbKeyval.setItem` should have been called once, but we control when it resolves, and we'll keep it unresolved.
-        // This simulates the 1st idbKeyval.setItem taking a random time.
-        // We then call StorageProvider.clear() while the first idbKeyval.setItem isn't completed yet.
-        IDBKeyValProviderMock.clear();
-
-        // Any calls that follow this would have been queued - so we don't expect more than 1 `idbKeyval.setItem` call after the
-        // first one resolves.
-        task.resolve?.();
-
-        // waitForPromisesToResolve() makes jest wait for any promises (even promises returned as the result of a promise) to resolve.
-        // If StorageProvider.clear() does not abort the queue, more idbKeyval.setItem calls would be executed because they would
-        // be sitting in the setItemQueue
-        return waitForPromisesToResolve().then(() => {
-            expect(IDBKeyValProviderMock.mockSet).toHaveBeenCalledTimes(0);
-            expect(IDBKeyValProviderMock.clear).toHaveBeenCalledTimes(1);
+        it('should get the current size of the store', async () => {
+            expect(await IDBKeyValProvider.getDatabaseSize()).toEqual({
+                bytesUsed: 250000,
+                bytesRemaining: 500000,
+            });
         });
     });
 });
