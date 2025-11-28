@@ -1,15 +1,5 @@
 import type {UseStore} from 'idb-keyval';
-import {
-    set as idbSet,
-    keys as idbKeys,
-    getMany as idbGetMany,
-    setMany as idbSetMany,
-    get as idbGet,
-    clear as idbClear,
-    del as idbDel,
-    delMany as idbDelMany,
-    promisifyRequest as idbPromisifyRequest,
-} from 'idb-keyval';
+import IDB from 'idb-keyval';
 import utils from '../../../utils';
 import type StorageProvider from '../types';
 import type {OnyxKey, OnyxValue} from '../../../types';
@@ -47,14 +37,14 @@ const provider: StorageProvider<UseStore | undefined> = {
             provider.removeItem(key);
         }
 
-        return idbSet(key, value, provider.store);
+        return IDB.set(key, value, provider.store);
     },
     multiGet(keysParam) {
         if (!provider.store) {
             throw new Error('Store not initialized!');
         }
 
-        return idbGetMany(keysParam, provider.store).then((values) => values.map((value, index) => [keysParam[index], value]));
+        return IDB.getMany(keysParam, provider.store).then((values) => values.map((value, index) => [keysParam[index], value]));
     },
     multiMerge(pairs) {
         if (!provider.store) {
@@ -65,7 +55,7 @@ const provider: StorageProvider<UseStore | undefined> = {
             .store('readwrite', (store) => {
                 // Note: we are using the manual store transaction here, to fit the read and update
                 // of the items in one transaction to achieve best performance.
-                const getValues = Promise.all(pairs.map(([key]) => idbPromisifyRequest<OnyxValue<OnyxKey>>(store.get(key))));
+                const getValues = Promise.all(pairs.map(([key]) => IDB.promisifyRequest<OnyxValue<OnyxKey>>(store.get(key))));
 
                 return getValues.then((values) => {
                     const pairsWithoutNull = pairs.filter(([key, value]) => {
@@ -84,7 +74,7 @@ const provider: StorageProvider<UseStore | undefined> = {
                             objectRemovalMode: 'replace',
                         }).result;
 
-                        return idbPromisifyRequest(store.put(newValue, key));
+                        return IDB.promisifyRequest(store.put(newValue, key));
                     });
                     return Promise.all(upsertMany);
                 });
@@ -109,21 +99,21 @@ const provider: StorageProvider<UseStore | undefined> = {
             return true;
         }) as Array<[IDBValidKey, unknown]>;
 
-        return idbSetMany(pairsWithoutNull, provider.store);
+        return IDB.setMany(pairsWithoutNull, provider.store);
     },
     clear() {
         if (!provider.store) {
             throw new Error('Store not initialized!');
         }
 
-        return idbClear(provider.store);
+        return IDB.clear(provider.store);
     },
     getAllKeys() {
         if (!provider.store) {
             throw new Error('Store not initialized!');
         }
 
-        return idbKeys(provider.store);
+        return IDB.keys(provider.store);
     },
     getItem(key) {
         if (!provider.store) {
@@ -131,7 +121,7 @@ const provider: StorageProvider<UseStore | undefined> = {
         }
 
         return (
-            idbGet(key, provider.store)
+            IDB.get(key, provider.store)
                 // idb-keyval returns undefined for missing items, but this needs to return null so that idb-keyval does the same thing as SQLiteStorage.
                 .then((val) => (val === undefined ? null : val))
         );
@@ -141,14 +131,14 @@ const provider: StorageProvider<UseStore | undefined> = {
             throw new Error('Store not initialized!');
         }
 
-        return idbDel(key, provider.store);
+        return IDB.del(key, provider.store);
     },
     removeItems(keysParam) {
         if (!provider.store) {
             throw new Error('Store not initialized!');
         }
 
-        return idbDelMany(keysParam, provider.store);
+        return IDB.delMany(keysParam, provider.store);
     },
     getDatabaseSize() {
         if (!provider.store) {

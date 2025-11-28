@@ -1,4 +1,4 @@
-import {getMany as idbGetMany, clear as idbClear, get as idbGet, keys as idbKeys, set as idbSet, setMany as idbSetMany} from 'idb-keyval';
+import IDB from 'idb-keyval';
 import IDBKeyValProvider from '../../../../lib/storage/providers/IDBKeyValProvider';
 import utils from '../../../../lib/utils';
 import type {GenericDeepRecord} from '../../../types';
@@ -35,12 +35,12 @@ describe('IDBKeyValProvider', () => {
 
     beforeEach(async () => {
         IDBKeyValProvider.init();
-        await idbClear(IDBKeyValProvider.store);
+        await IDB.clear(IDBKeyValProvider.store);
     });
 
     describe('getItem', () => {
         it('should return the stored value for the key', async () => {
-            await idbSet(ONYXKEYS.TEST_KEY, 'value', IDBKeyValProvider.store);
+            await IDB.set(ONYXKEYS.TEST_KEY, 'value', IDBKeyValProvider.store);
             expect(await IDBKeyValProvider.getItem(ONYXKEYS.TEST_KEY)).toEqual('value');
         });
 
@@ -51,7 +51,7 @@ describe('IDBKeyValProvider', () => {
 
     describe('multiGet', () => {
         it('should return the tuples in the order of the keys supplied in a batch', async () => {
-            await idbSetMany(testEntries, IDBKeyValProvider.store);
+            await IDB.setMany(testEntries, IDBKeyValProvider.store);
 
             expect(await IDBKeyValProvider.multiGet([`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, ONYXKEYS.TEST_KEY, ONYXKEYS.TEST_KEY_2])).toEqual([
                 testEntries[3],
@@ -64,16 +64,16 @@ describe('IDBKeyValProvider', () => {
     describe('setItem', () => {
         it('should set the value to the key', async () => {
             await IDBKeyValProvider.setItem(ONYXKEYS.TEST_KEY, 'value');
-            expect(await idbGet(ONYXKEYS.TEST_KEY, IDBKeyValProvider.store)).toEqual('value');
+            expect(await IDB.get(ONYXKEYS.TEST_KEY, IDBKeyValProvider.store)).toEqual('value');
         });
 
         // FIXME: 🐞 IDBKeyValProvider - setItem removes and redundantly sets the value to null
         it.skip('should remove the key when passing null', async () => {
             await IDBKeyValProvider.setItem(ONYXKEYS.TEST_KEY, 'value');
-            expect(await idbGet(ONYXKEYS.TEST_KEY, IDBKeyValProvider.store)).toEqual('value');
+            expect(await IDB.get(ONYXKEYS.TEST_KEY, IDBKeyValProvider.store)).toEqual('value');
 
             await IDBKeyValProvider.setItem(ONYXKEYS.TEST_KEY, null);
-            expect(await idbKeys(IDBKeyValProvider.store)).not.toContainEqual(ONYXKEYS.TEST_KEY);
+            expect(await IDB.keys(IDBKeyValProvider.store)).not.toContainEqual(ONYXKEYS.TEST_KEY);
         });
     });
 
@@ -81,7 +81,7 @@ describe('IDBKeyValProvider', () => {
         it('should set multiple keys in a batch', async () => {
             await IDBKeyValProvider.multiSet(testEntries);
             expect(
-                await idbGetMany(
+                await IDB.getMany(
                     testEntries.map((e) => e[0]),
                     IDBKeyValProvider.store,
                 ),
@@ -90,7 +90,7 @@ describe('IDBKeyValProvider', () => {
 
         // FIXME: 🐞 IDBKeyValProvider - multiSet calls multiple removeItem's instead of delMany
         it('should set and remove multiple keys in a batch', async () => {
-            await idbSetMany(testEntries, IDBKeyValProvider.store);
+            await IDB.setMany(testEntries, IDBKeyValProvider.store);
             const changedEntries: Array<[string, unknown]> = [
                 [ONYXKEYS.TEST_KEY, 'value_changed'],
                 [ONYXKEYS.TEST_KEY_2, null],
@@ -100,9 +100,9 @@ describe('IDBKeyValProvider', () => {
 
             await IDBKeyValProvider.multiSet(changedEntries);
             // ONYXKEYS.TEST_KEY, ONYXKEYS.TEST_KEY_3 and `${ONYXKEYS.COLLECTION.TEST_KEY}id2`.
-            expect((await idbKeys(IDBKeyValProvider.store)).length).toEqual(3);
+            expect((await IDB.keys(IDBKeyValProvider.store)).length).toEqual(3);
             expect(
-                await idbGetMany(
+                await IDB.getMany(
                     changedEntries.map((e) => e[0]),
                     IDBKeyValProvider.store,
                 ),
@@ -112,7 +112,7 @@ describe('IDBKeyValProvider', () => {
 
     describe('multiMerge', () => {
         it('should merge multiple keys in a batch', async () => {
-            await idbSetMany(testEntries, IDBKeyValProvider.store);
+            await IDB.setMany(testEntries, IDBKeyValProvider.store);
             const changedEntries: Array<[string, unknown]> = [
                 // FIXME: 🐞 IDBKeyValProvider (possibly other places): Primitives are incorrectly stored when using multiMerge
                 // [ONYXKEYS.TEST_KEY, 'value_changed'],
@@ -144,7 +144,7 @@ describe('IDBKeyValProvider', () => {
 
             await IDBKeyValProvider.multiMerge(changedEntries);
             expect(
-                await idbGetMany(
+                await IDB.getMany(
                     expectedEntries.map((e) => e[0]),
                     IDBKeyValProvider.store,
                 ),
@@ -155,7 +155,7 @@ describe('IDBKeyValProvider', () => {
         // FIXME: 🐞 IDBKeyValProvider: Index misalignment between pairs and values in multiMerge
         // FIXME: Check if multiMerge is supposed to handle null values
         it.skip('should merge and delete multiple keys in a batch', async () => {
-            await idbSetMany(testEntries, IDBKeyValProvider.store);
+            await IDB.setMany(testEntries, IDBKeyValProvider.store);
             const changedEntries: Array<[string, unknown]> = [
                 [ONYXKEYS.TEST_KEY, null],
                 [ONYXKEYS.TEST_KEY_2, null],
@@ -171,9 +171,9 @@ describe('IDBKeyValProvider', () => {
 
             await IDBKeyValProvider.multiMerge(changedEntries);
             // ONYXKEYS.TEST_KEY_3 and `${ONYXKEYS.COLLECTION.TEST_KEY}id2`.
-            expect((await idbKeys(IDBKeyValProvider.store)).length).toEqual(2);
+            expect((await IDB.keys(IDBKeyValProvider.store)).length).toEqual(2);
             expect(
-                await idbGetMany(
+                await IDB.getMany(
                     expectedEntries.map((e) => e[0]),
                     IDBKeyValProvider.store,
                 ),
@@ -183,11 +183,11 @@ describe('IDBKeyValProvider', () => {
 
     describe('mergeItem', () => {
         it('should merge all the supported kinds of data correctly', async () => {
-            await idbSet(ONYXKEYS.TEST_KEY, 'value', IDBKeyValProvider.store);
-            await idbSet(ONYXKEYS.TEST_KEY_2, 1000, IDBKeyValProvider.store);
-            await idbSet(ONYXKEYS.TEST_KEY_3, {key: 'value', property: {propertyKey: 'propertyValue'}}, IDBKeyValProvider.store);
-            await idbSet(`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, true, IDBKeyValProvider.store);
-            await idbSet(`${ONYXKEYS.COLLECTION.TEST_KEY}id2`, ['a', {key: 'value'}, 1, true], IDBKeyValProvider.store);
+            await IDB.set(ONYXKEYS.TEST_KEY, 'value', IDBKeyValProvider.store);
+            await IDB.set(ONYXKEYS.TEST_KEY_2, 1000, IDBKeyValProvider.store);
+            await IDB.set(ONYXKEYS.TEST_KEY_3, {key: 'value', property: {propertyKey: 'propertyValue'}}, IDBKeyValProvider.store);
+            await IDB.set(`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, true, IDBKeyValProvider.store);
+            await IDB.set(`${ONYXKEYS.COLLECTION.TEST_KEY}id2`, ['a', {key: 'value'}, 1, true], IDBKeyValProvider.store);
 
             await IDBKeyValProvider.mergeItem(ONYXKEYS.TEST_KEY, 'value_changed');
             await IDBKeyValProvider.mergeItem(ONYXKEYS.TEST_KEY_2, 1001);
@@ -202,58 +202,58 @@ describe('IDBKeyValProvider', () => {
             await IDBKeyValProvider.mergeItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id2` as string, ['a', {newKey: 'newValue'}]);
 
             // FIXME: 🐞 IDBKeyValProvider (possibly other places): Primitives are incorrectly stored when using multiMerge
-            // expect(await idbGet(ONYXKEYS.TEST_KEY, IDBKeyValProvider.store)).toEqual('value_changed');
-            // expect(await idbGet(ONYXKEYS.TEST_KEY_2, IDBKeyValProvider.store)).toEqual(1001);
-            expect(await idbGet(ONYXKEYS.TEST_KEY_3, IDBKeyValProvider.store)).toEqual({key: 'value_changed', property: {newKey: 'newValue'}});
-            // expect(await idbGet(`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, IDBKeyValProvider.store)).toEqual(false);
-            expect(await idbGet(`${ONYXKEYS.COLLECTION.TEST_KEY}id2`, IDBKeyValProvider.store)).toEqual(['a', {newKey: 'newValue'}]);
+            // expect(await IDB.get(ONYXKEYS.TEST_KEY, IDBKeyValProvider.store)).toEqual('value_changed');
+            // expect(await IDB.get(ONYXKEYS.TEST_KEY_2, IDBKeyValProvider.store)).toEqual(1001);
+            expect(await IDB.get(ONYXKEYS.TEST_KEY_3, IDBKeyValProvider.store)).toEqual({key: 'value_changed', property: {newKey: 'newValue'}});
+            // expect(await IDB.get(`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, IDBKeyValProvider.store)).toEqual(false);
+            expect(await IDB.get(`${ONYXKEYS.COLLECTION.TEST_KEY}id2`, IDBKeyValProvider.store)).toEqual(['a', {newKey: 'newValue'}]);
         });
 
         // FIXME: Check if multiMerge is supposed to handle null values
         it('should remove the key when passing null', async () => {
-            await idbSet(ONYXKEYS.TEST_KEY, 'value', IDBKeyValProvider.store);
+            await IDB.set(ONYXKEYS.TEST_KEY, 'value', IDBKeyValProvider.store);
 
             await IDBKeyValProvider.mergeItem(ONYXKEYS.TEST_KEY, null);
-            expect(await idbKeys(IDBKeyValProvider.store)).not.toContainEqual(ONYXKEYS.TEST_KEY);
+            expect(await IDB.keys(IDBKeyValProvider.store)).not.toContainEqual(ONYXKEYS.TEST_KEY);
         });
     });
 
     describe('getAllKeys', () => {
         it('should list all the keys stored', async () => {
-            await idbSetMany(testEntries, IDBKeyValProvider.store);
+            await IDB.setMany(testEntries, IDBKeyValProvider.store);
             expect((await IDBKeyValProvider.getAllKeys()).length).toEqual(5);
         });
     });
 
     describe('removeItem', () => {
         it('should remove the key from the store', async () => {
-            await idbSetMany(testEntries, IDBKeyValProvider.store);
-            expect(await idbKeys(IDBKeyValProvider.store)).toContainEqual(ONYXKEYS.TEST_KEY);
+            await IDB.setMany(testEntries, IDBKeyValProvider.store);
+            expect(await IDB.keys(IDBKeyValProvider.store)).toContainEqual(ONYXKEYS.TEST_KEY);
 
             await IDBKeyValProvider.removeItem(ONYXKEYS.TEST_KEY);
-            expect(await idbKeys(IDBKeyValProvider.store)).not.toContainEqual(ONYXKEYS.TEST_KEY);
+            expect(await IDB.keys(IDBKeyValProvider.store)).not.toContainEqual(ONYXKEYS.TEST_KEY);
         });
     });
 
     describe('removeItem', () => {
         it('should remove all the supplied keys from the store', async () => {
-            await idbSetMany(testEntries, IDBKeyValProvider.store);
-            expect(await idbKeys(IDBKeyValProvider.store)).toContainEqual(ONYXKEYS.TEST_KEY);
-            expect(await idbKeys(IDBKeyValProvider.store)).toContainEqual(ONYXKEYS.TEST_KEY_3);
+            await IDB.setMany(testEntries, IDBKeyValProvider.store);
+            expect(await IDB.keys(IDBKeyValProvider.store)).toContainEqual(ONYXKEYS.TEST_KEY);
+            expect(await IDB.keys(IDBKeyValProvider.store)).toContainEqual(ONYXKEYS.TEST_KEY_3);
 
             await IDBKeyValProvider.removeItems([ONYXKEYS.TEST_KEY, ONYXKEYS.TEST_KEY_3]);
-            expect(await idbKeys(IDBKeyValProvider.store)).not.toContainEqual(ONYXKEYS.TEST_KEY);
-            expect(await idbKeys(IDBKeyValProvider.store)).not.toContainEqual(ONYXKEYS.TEST_KEY_3);
+            expect(await IDB.keys(IDBKeyValProvider.store)).not.toContainEqual(ONYXKEYS.TEST_KEY);
+            expect(await IDB.keys(IDBKeyValProvider.store)).not.toContainEqual(ONYXKEYS.TEST_KEY_3);
         });
     });
 
     describe('clear', () => {
         it('should clear the storage', async () => {
-            await idbSetMany(testEntries, IDBKeyValProvider.store);
-            expect((await idbKeys(IDBKeyValProvider.store)).length).toEqual(5);
+            await IDB.setMany(testEntries, IDBKeyValProvider.store);
+            expect((await IDB.keys(IDBKeyValProvider.store)).length).toEqual(5);
 
             await IDBKeyValProvider.clear();
-            expect((await idbKeys(IDBKeyValProvider.store)).length).toEqual(0);
+            expect((await IDB.keys(IDBKeyValProvider.store)).length).toEqual(0);
         });
     });
 

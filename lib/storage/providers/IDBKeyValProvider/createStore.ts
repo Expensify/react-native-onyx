@@ -1,4 +1,4 @@
-import {promisifyRequest} from 'idb-keyval';
+import IDB from 'idb-keyval';
 import type {UseStore} from 'idb-keyval';
 import {logInfo} from '../../../Logger';
 
@@ -12,7 +12,7 @@ function createStore(dbName: string, storeName: string): UseStore {
         if (dbp) return dbp;
         const request = indexedDB.open(dbName);
         request.onupgradeneeded = () => request.result.createObjectStore(storeName);
-        dbp = promisifyRequest(request);
+        dbp = IDB.promisifyRequest(request);
 
         dbp.then(
             (db) => {
@@ -49,7 +49,7 @@ function createStore(dbName: string, storeName: string): UseStore {
             updatedDatabase.createObjectStore(storeName);
         };
 
-        dbp = promisifyRequest(request);
+        dbp = IDB.promisifyRequest(request);
         return dbp;
     };
 
