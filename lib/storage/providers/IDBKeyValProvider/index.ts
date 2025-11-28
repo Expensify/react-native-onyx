@@ -1,17 +1,27 @@
 import type {UseStore} from 'idb-keyval';
-import {set, keys, getMany, setMany, get, clear, del, delMany, promisifyRequest} from 'idb-keyval';
+import {
+    set as idbSet,
+    keys as idbKeys,
+    getMany as idbGetMany,
+    setMany as idbSetMany,
+    get as idbGet,
+    clear as idbClear,
+    del as idbDel,
+    delMany as idbDelMany,
+    promisifyRequest as idbPromisifyRequest,
+} from 'idb-keyval';
 import utils from '../../../utils';
 import type StorageProvider from '../types';
 import type {OnyxKey, OnyxValue} from '../../../types';
 import createStore from './createStore';
 
-// We don't want to initialize the store while the JS bundle loads as idb-keyval will try to use global.indexedDB
-// which might not be available in certain environments that load the bundle (e.g. electron main process).
-let idbKeyValStore: UseStore;
 const DB_NAME = 'OnyxDB';
 const STORE_NAME = 'keyvaluepairs';
 
-const provider: StorageProvider = {
+const provider: StorageProvider<UseStore | undefined> = {
+    // We don't want to initialize the store while the JS bundle loads as idb-keyval will try to use global.indexedDB
+    // which might not be available in certain environments that load the bundle (e.g. electron main process).
+    store: undefined,
     /**
      * The name of the provider that can be printed to the logs
      */
@@ -25,51 +35,71 @@ const provider: StorageProvider = {
         if (newIdbKeyValStore == null) {
             throw Error('IDBKeyVal store could not be created');
         }
-
-        idbKeyValStore = newIdbKeyValStore;
+        provider.store = newIdbKeyValStore;
     },
 
-    setItem: (key, value) => {
+    setItem(key, value) {
+        if (!provider.store) {
+            throw new Error('Store not initialized!');
+        }
+
         if (value === null) {
             provider.removeItem(key);
         }
 
-        return set(key, value, idbKeyValStore);
+        return idbSet(key, value, provider.store);
     },
-    multiGet: (keysParam) => getMany(keysParam, idbKeyValStore).then((values) => values.map((value, index) => [keysParam[index], value])),
-    multiMerge: (pairs) =>
-        idbKeyValStore('readwrite', (store) => {
-            // Note: we are using the manual store transaction here, to fit the read and update
-            // of the items in one transaction to achieve best performance.
-            const getValues = Promise.all(pairs.map(([key]) => promisifyRequest<OnyxValue<OnyxKey>>(store.get(key))));
+    multiGet(keysParam) {
+        if (!provider.store) {
+            throw new Error('Store not initialized!');
+        }
 
-            return getValues.then((values) => {
-                const pairsWithoutNull = pairs.filter(([key, value]) => {
-                    if (value === null) {
-                        provider.removeItem(key);
-                        return false;
-                    }
+        return idbGetMany(keysParam, provider.store).then((values) => values.map((value, index) => [keysParam[index], value]));
+    },
+    multiMerge(pairs) {
+        if (!provider.store) {
+            throw new Error('Store not initialized!');
+        }
 
-                    return true;
+        return provider
+            .store('readwrite', (store) => {
+                // Note: we are using the manual store transaction here, to fit the read and update
+                // of the items in one transaction to achieve best performance.
+                const getValues = Promise.all(pairs.map(([key]) => idbPromisifyRequest<OnyxValue<OnyxKey>>(store.get(key))));
+
+                return getValues.then((values) => {
+                    const pairsWithoutNull = pairs.filter(([key, value]) => {
+                        if (value === null) {
+                            provider.removeItem(key);
+                            return false;
+                        }
+
+                        return true;
+                    });
+
+                    const upsertMany = pairsWithoutNull.map(([key, value], index) => {
+                        const prev = values[index];
+                        const newValue = utils.fastMerge(prev as Record<string, unknown>, value as Record<string, unknown>, {
+                            shouldRemoveNestedNulls: true,
+                            objectRemovalMode: 'replace',
+                        }).result;
+
+                        return idbPromisifyRequest(store.put(newValue, key));
+                    });
+                    return Promise.all(upsertMany);
                 });
-
-                const upsertMany = pairsWithoutNull.map(([key, value], index) => {
-                    const prev = values[index];
-                    const newValue = utils.fastMerge(prev as Record<string, unknown>, value as Record<string, unknown>, {
-                        shouldRemoveNestedNulls: true,
-                        objectRemovalMode: 'replace',
-                    }).result;
-
-                    return promisifyRequest(store.put(newValue, key));
-                });
-                return Promise.all(upsertMany);
-            });
-        }).then(() => undefined),
+            })
+            .then(() => undefined);
+    },
     mergeItem(key, change) {
         // Since Onyx already merged the existing value with the changes, we can just set the value directly.
         return provider.multiMerge([[key, change]]);
     },
-    multiSet: (pairs) => {
+    multiSet(pairs) {
+        if (!provider.store) {
+            throw new Error('Store not initialized!');
+        }
+
         const pairsWithoutNull = pairs.filter(([key, value]) => {
             if (value === null) {
                 provider.removeItem(key);
@@ -79,17 +109,52 @@ const provider: StorageProvider = {
             return true;
         }) as Array<[IDBValidKey, unknown]>;
 
-        return setMany(pairsWithoutNull, idbKeyValStore);
+        return idbSetMany(pairsWithoutNull, provider.store);
     },
-    clear: () => clear(idbKeyValStore),
-    getAllKeys: () => keys(idbKeyValStore),
-    getItem: (key) =>
-        get(key, idbKeyValStore)
-            // idb-keyval returns undefined for missing items, but this needs to return null so that idb-keyval does the same thing as SQLiteStorage.
-            .then((val) => (val === undefined ? null : val)),
-    removeItem: (key) => del(key, idbKeyValStore),
-    removeItems: (keysParam) => delMany(keysParam, idbKeyValStore),
+    clear() {
+        if (!provider.store) {
+            throw new Error('Store not initialized!');
+        }
+
+        return idbClear(provider.store);
+    },
+    getAllKeys() {
+        if (!provider.store) {
+            throw new Error('Store not initialized!');
+        }
+
+        return idbKeys(provider.store);
+    },
+    getItem(key) {
+        if (!provider.store) {
+            throw new Error('Store not initialized!');
+        }
+
+        return (
+            idbGet(key, provider.store)
+                // idb-keyval returns undefined for missing items, but this needs to return null so that idb-keyval does the same thing as SQLiteStorage.
+                .then((val) => (val === undefined ? null : val))
+        );
+    },
+    removeItem(key) {
+        if (!provider.store) {
+            throw new Error('Store not initialized!');
+        }
+
+        return idbDel(key, provider.store);
+    },
+    removeItems(keysParam) {
+        if (!provider.store) {
+            throw new Error('Store not initialized!');
+        }
+
+        return idbDelMany(keysParam, provider.store);
+    },
     getDatabaseSize() {
+        if (!provider.store) {
+            throw new Error('Store is not initialized!');
+        }
+
         if (!window.navigator || !window.navigator.storage) {
             throw new Error('StorageManager browser API unavailable');
         }

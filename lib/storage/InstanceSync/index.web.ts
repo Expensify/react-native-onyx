@@ -32,7 +32,7 @@ const InstanceSync = {
     /**
      * @param {Function} onStorageKeyChanged Storage synchronization mechanism keeping all opened tabs in sync
      */
-    init: (onStorageKeyChanged: OnStorageKeyChanged, store: StorageProvider) => {
+    init: (onStorageKeyChanged: OnStorageKeyChanged, store: StorageProvider<unknown>) => {
         storage = store;
 
         // This listener will only be triggered by events coming from other tabs

@@ -1,7 +1,9 @@
 import type {OnyxValue} from '../../types';
 import type StorageProvider from './types';
 
-const provider: StorageProvider = {
+const provider: StorageProvider<unknown> = {
+    store: undefined,
+
     /**
      * The name of the provider that can be printed to the logs
      */
