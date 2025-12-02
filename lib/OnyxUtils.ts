@@ -615,7 +615,7 @@ function preserveCollectionReferences(keyValuePairs: StorageKeyValuePair[], prev
     });
 
     if (previousCollection) {
-        markRemovedItemsAsNull(preservedCollection, previousCollection);
+        return markRemovedItemsAsNull(preservedCollection, previousCollection);
     }
 
     return preservedCollection;
@@ -651,7 +651,7 @@ function preserveCollectionReferencesAfterMerge(
     });
 
     if (previousCollection) {
-        markRemovedItemsAsNull(preservedCollection, previousCollection);
+        return markRemovedItemsAsNull(preservedCollection, previousCollection);
     }
 
     return preservedCollection;
