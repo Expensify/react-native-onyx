@@ -52,10 +52,10 @@ function fastMerge<TValue>(target: TValue, source: TValue, options?: FastMergeOp
         };
     }
 
-    // We have to ignore arrays and nullish values here,
+    // We have to ignore arrays, primitives and nullish values here,
     // otherwise "mergeObject" will throw an error,
     // because it expects an object as "source"
-    if (Array.isArray(source) || source === null || source === undefined) {
+    if (!isMergeableObject(source)) {
         return {result: source, replaceNullPatches: metadata.replaceNullPatches};
     }
 

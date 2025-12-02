@@ -112,9 +112,8 @@ describe('IDBKeyValProvider', () => {
         it('should merge multiple keys in a batch', async () => {
             await IDB.setMany(testEntries, IDBKeyValProvider.store);
             const changedEntries: Array<[string, unknown]> = [
-                // FIXME: 🐞 IDBKeyValProvider (possibly other places): Primitives are incorrectly stored when using multiMerge
-                // [ONYXKEYS.TEST_KEY, 'value_changed'],
-                // [ONYXKEYS.TEST_KEY_2, 1001],
+                [ONYXKEYS.TEST_KEY, 'value_changed'],
+                [ONYXKEYS.TEST_KEY_2, 1001],
                 [
                     ONYXKEYS.TEST_KEY_3,
                     {
@@ -128,8 +127,7 @@ describe('IDBKeyValProvider', () => {
                         },
                     },
                 ],
-                // FIXME: 🐞 IDBKeyValProvider (possibly other places): Primitives are incorrectly stored when using multiMerge
-                // [`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, false],
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, false],
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}id2`, ['a', {newKey: 'newValue'}]],
             ];
 
@@ -138,7 +136,7 @@ describe('IDBKeyValProvider', () => {
             expectedTestKey3Value.key = 'value_changed';
             expectedTestKey3Value.property.nestedProperty = {nestedKey2: 'nestedValue2_changed'};
             expectedTestKey3Value.property.newKey = 'newValue';
-            expectedEntries[0][1] = expectedTestKey3Value;
+            expectedEntries[2][1] = expectedTestKey3Value;
 
             await IDBKeyValProvider.multiMerge(changedEntries);
             expect(
@@ -196,15 +194,13 @@ describe('IDBKeyValProvider', () => {
             await IDBKeyValProvider.mergeItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id1` as string, false);
             await IDBKeyValProvider.mergeItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id2` as string, ['a', {newKey: 'newValue'}]);
 
-            // FIXME: 🐞 IDBKeyValProvider (possibly other places): Primitives are incorrectly stored when using multiMerge
-            // expect(await IDB.get(ONYXKEYS.TEST_KEY, IDBKeyValProvider.store)).toEqual('value_changed');
-            // expect(await IDB.get(ONYXKEYS.TEST_KEY_2, IDBKeyValProvider.store)).toEqual(1001);
+            expect(await IDB.get(ONYXKEYS.TEST_KEY, IDBKeyValProvider.store)).toEqual('value_changed');
+            expect(await IDB.get(ONYXKEYS.TEST_KEY_2, IDBKeyValProvider.store)).toEqual(1001);
             expect(await IDB.get(ONYXKEYS.TEST_KEY_3, IDBKeyValProvider.store)).toEqual({key: 'value_changed', property: {newKey: 'newValue'}});
-            // expect(await IDB.get(`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, IDBKeyValProvider.store)).toEqual(false);
+            expect(await IDB.get(`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, IDBKeyValProvider.store)).toEqual(false);
             expect(await IDB.get(`${ONYXKEYS.COLLECTION.TEST_KEY}id2`, IDBKeyValProvider.store)).toEqual(['a', {newKey: 'newValue'}]);
         });
 
-        // FIXME: Check if multiMerge is supposed to handle null values
         it('should remove the key when passing null', async () => {
             await IDB.set(ONYXKEYS.TEST_KEY, 'value', IDBKeyValProvider.store);
 

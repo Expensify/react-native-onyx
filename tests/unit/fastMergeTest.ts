@@ -53,93 +53,87 @@ const testMergeChanges: DeepObject[] = [
 ];
 
 describe('fastMerge', () => {
-    it('should merge an object with another object and remove nested null values', () => {
-        const result = utils.fastMerge(testObject, testObjectWithNullishValues, {shouldRemoveNestedNulls: true});
+    describe('primitives', () => {
+        it('should replace strings', () => {
+            const result = utils.fastMerge('old', 'new');
+            expect(result.result).toEqual('new');
+        });
 
-        expect(result.result).toEqual({
-            a: 'a',
-            b: {
-                c: {
-                    h: 'h',
+        it('should replace numbers', () => {
+            const result = utils.fastMerge(1000, 1001);
+            expect(result.result).toEqual(1001);
+        });
+
+        it('should replace booleans', () => {
+            const result = utils.fastMerge(true, false);
+            expect(result.result).toEqual(false);
+        });
+    });
+
+    describe('arrays', () => {
+        it('should replace arrays', () => {
+            const result = utils.fastMerge(['a', 1, true], ['b', false]);
+            expect(result.result).toEqual(['b', false]);
+        });
+    });
+
+    describe('objects', () => {
+        it('should merge an object with another object and remove nested null values', () => {
+            const result = utils.fastMerge(testObject, testObjectWithNullishValues, {shouldRemoveNestedNulls: true});
+
+            expect(result.result).toEqual({
+                a: 'a',
+                b: {
+                    c: {
+                        h: 'h',
+                    },
+                    d: {
+                        f: 'f',
+                    },
+                    g: 'g',
                 },
-                d: {
-                    f: 'f',
+            });
+        });
+
+        it('should merge an object with another object and not remove nested null values', () => {
+            const result = utils.fastMerge(testObject, testObjectWithNullishValues);
+
+            expect(result.result).toEqual({
+                a: 'a',
+                b: {
+                    c: {
+                        h: 'h',
+                    },
+                    d: {
+                        e: null,
+                        f: 'f',
+                    },
+                    g: 'g',
                 },
-                g: 'g',
-            },
-        });
-    });
-
-    it('should merge an object with another object and not remove nested null values', () => {
-        const result = utils.fastMerge(testObject, testObjectWithNullishValues);
-
-        expect(result.result).toEqual({
-            a: 'a',
-            b: {
-                c: {
-                    h: 'h',
-                },
-                d: {
-                    e: null,
-                    f: 'f',
-                },
-                g: 'g',
-            },
-        });
-    });
-
-    it('should merge an object with an empty object and remove deeply nested null values', () => {
-        const result = utils.fastMerge({}, testObjectWithNullishValues, {
-            shouldRemoveNestedNulls: true,
+            });
         });
 
-        expect(result.result).toEqual(testObjectWithNullValuesRemoved);
-    });
+        it('should merge an object with an empty object and remove deeply nested null values', () => {
+            const result = utils.fastMerge({}, testObjectWithNullishValues, {
+                shouldRemoveNestedNulls: true,
+            });
 
-    it('should remove null values by merging two identical objects with fastMerge', () => {
-        const result = utils.removeNestedNullValues(testObjectWithNullishValues);
-
-        expect(result).toEqual(testObjectWithNullValuesRemoved);
-    });
-
-    it('should replace an object with an array', () => {
-        const result = utils.fastMerge(testObject, [1, 2, 3], {
-            shouldRemoveNestedNulls: true,
+            expect(result.result).toEqual(testObjectWithNullValuesRemoved);
         });
 
-        expect(result.result).toEqual([1, 2, 3]);
-    });
+        it('should remove null values by merging two identical objects with fastMerge', () => {
+            const result = utils.removeNestedNullValues(testObjectWithNullishValues);
 
-    it('should replace an array with an object', () => {
-        const result = utils.fastMerge([1, 2, 3], testObject, {
-            shouldRemoveNestedNulls: true,
+            expect(result).toEqual(testObjectWithNullValuesRemoved);
         });
 
-        expect(result.result).toEqual(testObject);
-    });
+        it('should add the "ONYX_INTERNALS__REPLACE_OBJECT_MARK" flag to the merged object when the change is set to null and "objectRemovalMode" is set to "mark"', () => {
+            const result = utils.fastMerge(testMergeChanges[1], testMergeChanges[0], {
+                shouldRemoveNestedNulls: true,
+                objectRemovalMode: 'mark',
+            });
 
-    it('should add the "ONYX_INTERNALS__REPLACE_OBJECT_MARK" flag to the merged object when the change is set to null and "objectRemovalMode" is set to "mark"', () => {
-        const result = utils.fastMerge(testMergeChanges[1], testMergeChanges[0], {
-            shouldRemoveNestedNulls: true,
-            objectRemovalMode: 'mark',
-        });
-
-        expect(result.result).toEqual({
-            b: {
-                d: {
-                    h: 'h',
-                    [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
-                },
-                h: 'h',
-            },
-        });
-        expect(result.replaceNullPatches).toEqual([[['b', 'd'], {h: 'h'}]]);
-    });
-
-    it('should completely replace the target object with its source when the source has the "ONYX_INTERNALS__REPLACE_OBJECT_MARK" flag and "objectRemovalMode" is set to "replace"', () => {
-        const result = utils.fastMerge(
-            testObject,
-            {
+            expect(result.result).toEqual({
                 b: {
                     d: {
                         h: 'h',
@@ -147,23 +141,59 @@ describe('fastMerge', () => {
                     },
                     h: 'h',
                 },
-            },
-            {
-                shouldRemoveNestedNulls: true,
-                objectRemovalMode: 'replace',
-            },
-        );
+            });
+            expect(result.replaceNullPatches).toEqual([[['b', 'd'], {h: 'h'}]]);
+        });
 
-        expect(result.result).toEqual({
-            a: 'a',
-            b: {
-                c: 'c',
-                d: {
-                    h: 'h',
+        it('should completely replace the target object with its source when the source has the "ONYX_INTERNALS__REPLACE_OBJECT_MARK" flag and "objectRemovalMode" is set to "replace"', () => {
+            const result = utils.fastMerge(
+                testObject,
+                {
+                    b: {
+                        d: {
+                            h: 'h',
+                            [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                        },
+                        h: 'h',
+                    },
                 },
-                h: 'h',
-                g: 'g',
-            },
+                {
+                    shouldRemoveNestedNulls: true,
+                    objectRemovalMode: 'replace',
+                },
+            );
+
+            expect(result.result).toEqual({
+                a: 'a',
+                b: {
+                    c: 'c',
+                    d: {
+                        h: 'h',
+                    },
+                    h: 'h',
+                    g: 'g',
+                },
+            });
+        });
+
+        test.each([
+            ['a string', 'value'],
+            ['a number', 1000],
+            ['a boolean', true],
+            ['an array', []],
+        ])('should replace an object with %s', (_label, expected) => {
+            const result = utils.fastMerge<unknown>(testObject, expected);
+            expect(result.result).toEqual(expected);
+        });
+
+        test.each([
+            ['a string', 'value'],
+            ['a number', 1000],
+            ['a boolean', true],
+            ['an array', []],
+        ])('should %s with an object', (_label, data) => {
+            const result = utils.fastMerge<unknown>(data, testObject);
+            expect(result.result).toEqual(testObject);
         });
     });
 });
