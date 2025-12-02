@@ -90,16 +90,17 @@ const provider: StorageProvider<UseStore | undefined> = {
             throw new Error('Store not initialized!');
         }
 
-        const pairsWithoutNull = pairs.filter(([key, value]) => {
-            if (value === null) {
-                provider.removeItem(key);
-                return false;
-            }
+        return provider.store('readwrite', (store) => {
+            pairs.forEach(([key, value]) => {
+                if (value === null) {
+                    store.delete(key);
+                } else {
+                    store.put(value, key);
+                }
+            });
 
-            return true;
-        }) as Array<[IDBValidKey, unknown]>;
-
-        return IDB.setMany(pairsWithoutNull, provider.store);
+            return IDB.promisifyRequest(store.transaction);
+        });
     },
     clear() {
         if (!provider.store) {

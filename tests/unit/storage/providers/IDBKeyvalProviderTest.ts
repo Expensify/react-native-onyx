@@ -87,7 +87,6 @@ describe('IDBKeyValProvider', () => {
             ).toEqual(testEntries.map((e) => (e[1] === null ? undefined : e[1])));
         });
 
-        // FIXME: 🐞 IDBKeyValProvider - multiSet calls multiple removeItem's instead of delMany
         it('should set and remove multiple keys in a batch', async () => {
             await IDB.setMany(testEntries, IDBKeyValProvider.store);
             const changedEntries: Array<[string, unknown]> = [
