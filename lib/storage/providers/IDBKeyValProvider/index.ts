@@ -34,7 +34,7 @@ const provider: StorageProvider<UseStore | undefined> = {
         }
 
         if (value === null) {
-            provider.removeItem(key);
+            return provider.removeItem(key);
         }
 
         return IDB.set(key, value, provider.store);
