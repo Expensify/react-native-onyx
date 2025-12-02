@@ -51,35 +51,28 @@ const provider: StorageProvider<UseStore | undefined> = {
             throw new Error('Store not initialized!');
         }
 
-        return provider
-            .store('readwrite', (store) => {
-                // Note: we are using the manual store transaction here, to fit the read and update
-                // of the items in one transaction to achieve best performance.
-                const getValues = Promise.all(pairs.map(([key]) => IDB.promisifyRequest<OnyxValue<OnyxKey>>(store.get(key))));
+        return provider.store('readwrite', (store) => {
+            // Note: we are using the manual store transaction here, to fit the read and update
+            // of the items in one transaction to achieve best performance.
+            const getValues = Promise.all(pairs.map(([key]) => IDB.promisifyRequest<OnyxValue<OnyxKey>>(store.get(key))));
 
-                return getValues.then((values) => {
-                    const pairsWithoutNull = pairs.filter(([key, value]) => {
-                        if (value === null) {
-                            provider.removeItem(key);
-                            return false;
-                        }
-
-                        return true;
-                    });
-
-                    const upsertMany = pairsWithoutNull.map(([key, value], index) => {
-                        const prev = values[index];
-                        const newValue = utils.fastMerge(prev as Record<string, unknown>, value as Record<string, unknown>, {
+            return getValues.then((values) => {
+                pairs.forEach(([key, value], index) => {
+                    if (value === null) {
+                        store.delete(key);
+                    } else {
+                        const newValue = utils.fastMerge(values[index] as Record<string, unknown>, value as Record<string, unknown>, {
                             shouldRemoveNestedNulls: true,
                             objectRemovalMode: 'replace',
                         }).result;
 
-                        return IDB.promisifyRequest(store.put(newValue, key));
-                    });
-                    return Promise.all(upsertMany);
+                        store.put(newValue, key);
+                    }
                 });
-            })
-            .then(() => undefined);
+
+                return IDB.promisifyRequest(store.transaction);
+            });
+        });
     },
     mergeItem(key, change) {
         // Since Onyx already merged the existing value with the changes, we can just set the value directly.

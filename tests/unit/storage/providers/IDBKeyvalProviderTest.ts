@@ -149,10 +149,7 @@ describe('IDBKeyValProvider', () => {
             ).toEqual(expectedEntries.map((e) => (e[1] === null ? undefined : e[1])));
         });
 
-        // FIXME: 🐞 IDBKeyValProvider - multiMerge calls multiple removeItem's instead of using the transaction
-        // FIXME: 🐞 IDBKeyValProvider: Index misalignment between pairs and values in multiMerge
-        // FIXME: Check if multiMerge is supposed to handle null values
-        it.skip('should merge and delete multiple keys in a batch', async () => {
+        it('should merge and delete multiple keys in a batch', async () => {
             await IDB.setMany(testEntries, IDBKeyValProvider.store);
             const changedEntries: Array<[string, unknown]> = [
                 [ONYXKEYS.TEST_KEY, null],
