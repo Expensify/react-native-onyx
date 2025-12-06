@@ -293,7 +293,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             const normalizedNew = newValueRef.current ?? undefined;
             areValuesEqual = normalizedPrevious === normalizedNew;
         } else {
-            areValuesEqual = shallowEqual(previousValueRef.current, newValueRef.current);
+            areValuesEqual = shallowEqual(previousValueRef.current ?? undefined, newValueRef.current);
         }
 
         // We update the cached value and the result in the following conditions:
@@ -302,7 +302,10 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // - The previously cached value is `null` (not set from cache yet) and we have cache for this key
         //   OR we have a pending `Onyx.clear()` task (if `Onyx.clear()` is running cache might not be available anymore
         //   so we update the cached value/result right away in order to prevent infinite loading state issues).
-        const shouldUpdateResult = !areValuesEqual || (previousValueRef.current === null && (hasCacheForKey || OnyxCache.hasPendingTask(TASK.CLEAR)));
+        const shouldUpdateResult =
+            !areValuesEqual ||
+            (previousValueRef.current === null && (hasCacheForKey || OnyxCache.hasPendingTask(TASK.CLEAR))) ||
+            (previousValueRef.current === null && !isFirstConnectionRef.current);
         if (shouldUpdateResult) {
             previousValueRef.current = newValueRef.current;
 
