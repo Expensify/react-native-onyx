@@ -293,7 +293,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             const normalizedNew = newValueRef.current ?? undefined;
             areValuesEqual = normalizedPrevious === normalizedNew;
         } else {
-            areValuesEqual = shallowEqual(previousValueRef.current ?? undefined, newValueRef.current);
+            areValuesEqual = shallowEqual(previousValueRef.current, newValueRef.current);
         }
 
         // We update the cached value and the result in the following conditions:
