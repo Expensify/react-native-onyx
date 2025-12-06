@@ -50,8 +50,9 @@ jobs:
       - name: Run Reassure delta tests
         run: npx reassure --branch --verbose
 
+      # v4.6.2
       - name: Upload Reassure results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
         with:
           name: results
           path: .reassure/

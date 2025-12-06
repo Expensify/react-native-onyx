@@ -62,9 +62,9 @@ const provider: StorageProvider = {
 
                     return promisifyRequest(store.put(newValue, key));
                 });
-                return Promise.all(upsertMany).then(() => undefined);
+                return Promise.all(upsertMany);
             });
-        }),
+        }).then(() => undefined),
     mergeItem(key, change) {
         // Since Onyx already merged the existing value with the changes, we can just set the value directly.
         return provider.multiMerge([[key, change]]);

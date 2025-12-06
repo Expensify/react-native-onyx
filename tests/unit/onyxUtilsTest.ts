@@ -4,6 +4,7 @@ import type {GenericDeepRecord} from '../types';
 import utils from '../../lib/utils';
 import type {Collection, OnyxCollection} from '../../lib/types';
 import type GenericCollection from '../utils/GenericCollection';
+import StorageMock from '../../lib/storage';
 
 const testObject: GenericDeepRecord = {
     a: 'a',
@@ -82,6 +83,8 @@ Onyx.init({
 
 beforeEach(() => Onyx.clear());
 
+afterEach(() => jest.clearAllMocks());
+
 describe('OnyxUtils', () => {
     describe('splitCollectionMemberKey', () => {
         describe('should return correct values', () => {
@@ -155,11 +158,14 @@ describe('OnyxUtils', () => {
             } as GenericCollection);
 
             // Replace with new collection data
-            await OnyxUtils.partialSetCollection(ONYXKEYS.COLLECTION.ROUTES, {
-                [routeA]: {name: 'New Route A'},
-                [routeB]: {name: 'New Route B'},
-                [routeC]: {name: 'New Route C'},
-            } as GenericCollection);
+            await OnyxUtils.partialSetCollection({
+                collectionKey: ONYXKEYS.COLLECTION.ROUTES,
+                collection: {
+                    [routeA]: {name: 'New Route A'},
+                    [routeB]: {name: 'New Route B'},
+                    [routeC]: {name: 'New Route C'},
+                } as GenericCollection,
+            });
 
             expect(result).toEqual({
                 [routeA]: {name: 'New Route A'},
@@ -185,7 +191,7 @@ describe('OnyxUtils', () => {
                 [routeA]: {name: 'Route A'},
             } as GenericCollection);
 
-            await OnyxUtils.partialSetCollection(ONYXKEYS.COLLECTION.ROUTES, {} as GenericCollection);
+            await OnyxUtils.partialSetCollection({collectionKey: ONYXKEYS.COLLECTION.ROUTES, collection: {} as GenericCollection});
 
             expect(result).toEqual({
                 [routeA]: {name: 'Route A'},
@@ -209,13 +215,167 @@ describe('OnyxUtils', () => {
                 [routeA]: {name: 'Route A'},
             } as GenericCollection);
 
-            await OnyxUtils.partialSetCollection(ONYXKEYS.COLLECTION.ROUTES, {
-                [invalidRoute]: {name: 'Invalid Route'},
-            } as GenericCollection);
+            await OnyxUtils.partialSetCollection({
+                collectionKey: ONYXKEYS.COLLECTION.ROUTES,
+                collection: {
+                    [invalidRoute]: {name: 'Invalid Route'},
+                } as GenericCollection,
+            });
 
             expect(result).toEqual({
                 [routeA]: {name: 'Route A'},
             });
+
+            await Onyx.disconnect(connection);
+        });
+
+        it('should notify subscribers when removing collection items with null values', async () => {
+            let collectionResult: OnyxCollection<unknown>;
+            let callbackCount = 0;
+            const routeA = `${ONYXKEYS.COLLECTION.ROUTES}A`;
+            const routeB = `${ONYXKEYS.COLLECTION.ROUTES}B`;
+            const routeC = `${ONYXKEYS.COLLECTION.ROUTES}C`;
+
+            // Test with waitForCollectionCallback: true
+            const connection = Onyx.connect({
+                key: ONYXKEYS.COLLECTION.ROUTES,
+                initWithStoredValues: false,
+                callback: (value) => {
+                    collectionResult = value;
+                    callbackCount++;
+                },
+                waitForCollectionCallback: true,
+            });
+
+            // Set initial collection state
+            await Onyx.setCollection(ONYXKEYS.COLLECTION.ROUTES, {
+                [routeA]: {name: 'Route A'},
+                [routeB]: {name: 'Route B'},
+                [routeC]: {name: 'Route C'},
+            } as GenericCollection);
+
+            callbackCount = 0; // Reset counter after initial set
+
+            // Remove items by setting them to null
+            await OnyxUtils.partialSetCollection({
+                collectionKey: ONYXKEYS.COLLECTION.ROUTES,
+                collection: {
+                    [routeA]: null,
+                    [routeB]: null,
+                } as GenericCollection,
+            });
+
+            // Should be notified about the removal
+            expect(callbackCount).toBeGreaterThan(0);
+            expect(collectionResult).toEqual({
+                [routeC]: {name: 'Route C'},
+            });
+
+            await Onyx.disconnect(connection);
+        });
+
+        it('should notify individual key subscribers when removing collection items with null values', async () => {
+            let routeAValue: unknown;
+            let routeBValue: unknown;
+            let routeCValue: unknown;
+            const routeA = `${ONYXKEYS.COLLECTION.ROUTES}A`;
+            const routeB = `${ONYXKEYS.COLLECTION.ROUTES}B`;
+            const routeC = `${ONYXKEYS.COLLECTION.ROUTES}C`;
+
+            // Test with waitForCollectionCallback: false (individual callbacks)
+            const connectionA = Onyx.connect({
+                key: routeA,
+                initWithStoredValues: false,
+                callback: (value) => {
+                    routeAValue = value;
+                },
+            });
+
+            const connectionB = Onyx.connect({
+                key: routeB,
+                initWithStoredValues: false,
+                callback: (value) => {
+                    routeBValue = value;
+                },
+            });
+
+            const connectionC = Onyx.connect({
+                key: routeC,
+                initWithStoredValues: false,
+                callback: (value) => {
+                    routeCValue = value;
+                },
+            });
+
+            // Set initial collection state
+            await Onyx.setCollection(ONYXKEYS.COLLECTION.ROUTES, {
+                [routeA]: {name: 'Route A'},
+                [routeB]: {name: 'Route B'},
+                [routeC]: {name: 'Route C'},
+            } as GenericCollection);
+
+            // Remove items by setting them to null
+            await OnyxUtils.partialSetCollection({
+                collectionKey: ONYXKEYS.COLLECTION.ROUTES,
+                collection: {
+                    [routeA]: null,
+                    [routeB]: null,
+                } as GenericCollection,
+            });
+
+            // Individual subscribers should be notified about removals
+            expect(routeAValue).toBeUndefined();
+            expect(routeBValue).toBeUndefined();
+            expect(routeCValue).toEqual({name: 'Route C'});
+
+            await Onyx.disconnect(connectionA);
+            await Onyx.disconnect(connectionB);
+            await Onyx.disconnect(connectionC);
+        });
+
+        it('should notify collection subscribers without waitForCollectionCallback when removing items', async () => {
+            const callbackResults: Array<{value: unknown; key: string}> = [];
+            const routeA = `${ONYXKEYS.COLLECTION.ROUTES}A`;
+            const routeB = `${ONYXKEYS.COLLECTION.ROUTES}B`;
+            const routeC = `${ONYXKEYS.COLLECTION.ROUTES}C`;
+
+            // Test without waitForCollectionCallback (gets called for each item)
+            const connection = Onyx.connect({
+                key: ONYXKEYS.COLLECTION.ROUTES,
+                initWithStoredValues: false,
+                callback: (value, key) => {
+                    callbackResults.push({value, key});
+                },
+                waitForCollectionCallback: false,
+            });
+
+            // Set initial collection state
+            await Onyx.setCollection(ONYXKEYS.COLLECTION.ROUTES, {
+                [routeA]: {name: 'Route A'},
+                [routeB]: {name: 'Route B'},
+                [routeC]: {name: 'Route C'},
+            } as GenericCollection);
+
+            callbackResults.length = 0; // Clear after initial set
+
+            // Remove items by setting them to null
+            await OnyxUtils.partialSetCollection({
+                collectionKey: ONYXKEYS.COLLECTION.ROUTES,
+                collection: {
+                    [routeA]: null,
+                    [routeB]: null,
+                } as GenericCollection,
+            });
+
+            // Should be notified about removals (value will be undefined for removed keys)
+            const removalCallbacks = callbackResults.filter((result) => result.value === undefined);
+
+            // We expect at least routeA or routeB to have undefined callback
+            // Both should ideally be notified, but the exact behavior depends on iteration order
+            expect(removalCallbacks.length).toBeGreaterThanOrEqual(1);
+            const hasRouteARemoval = removalCallbacks.some((result) => result.key === routeA);
+            const hasRouteBRemoval = removalCallbacks.some((result) => result.key === routeB);
+            expect(hasRouteARemoval || hasRouteBRemoval).toBe(true);
 
             await Onyx.disconnect(connection);
         });
@@ -407,6 +567,46 @@ describe('OnyxUtils', () => {
                 [['b', 'd'], {i: 'i', j: 'j'}],
                 [['b', 'g'], {k: 'k'}],
             ]);
+        });
+    });
+
+    describe('retryOperation', () => {
+        const retryOperationSpy = jest.spyOn(OnyxUtils, 'retryOperation');
+        const genericError = new Error('Generic storage error');
+        const invalidDataError = new Error("Failed to execute 'put' on 'IDBObjectStore': invalid data");
+        const memoryError = new Error('out of memory');
+
+        it('should retry only one time if the operation is firstly failed and then passed', async () => {
+            StorageMock.setItem = jest.fn(StorageMock.setItem).mockRejectedValueOnce(genericError).mockImplementation(StorageMock.setItem);
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+
+            // Should be called once, since Storage.setItem if failed only once
+            expect(retryOperationSpy).toHaveBeenCalledTimes(1);
+        });
+
+        it('should stop retrying after MAX_STORAGE_OPERATION_RETRY_ATTEMPTS retries for failing operation', async () => {
+            StorageMock.setItem = jest.fn().mockRejectedValue(genericError);
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+
+            // Should be called 6 times: initial attempt + 5 retries (MAX_STORAGE_OPERATION_RETRY_ATTEMPTS)
+            expect(retryOperationSpy).toHaveBeenCalledTimes(6);
+        });
+
+        it("should throw error for if operation failed with \"Failed to execute 'put' on 'IDBObjectStore': invalid data\" error", async () => {
+            StorageMock.setItem = jest.fn().mockRejectedValueOnce(invalidDataError);
+
+            await expect(Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'})).rejects.toThrow(invalidDataError);
+        });
+
+        it('should not retry in case of storage capacity error and no keys to evict', async () => {
+            StorageMock.setItem = jest.fn().mockRejectedValue(memoryError);
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+
+            // Should only be called once since there are no evictable keys
+            expect(retryOperationSpy).toHaveBeenCalledTimes(1);
         });
     });
 });

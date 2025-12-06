@@ -4,7 +4,7 @@ module.exports = {
     transform: {
         '\\.[jt]sx?$': 'babel-jest',
     },
-    testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/tests/unit/mocks/', '<rootDir>/tests/e2e/'],
+    testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/tests/unit/mocks/', '<rootDir>/tests/e2e/', '<rootDir>/tests/types/'],
     testMatch: ['**/tests/unit/**/*.[jt]s?(x)', '**/?(*.)+(spec|test).[jt]s?(x)'],
     globals: {
         __DEV__: true,
