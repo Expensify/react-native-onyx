@@ -396,7 +396,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
  * @param data An array of objects with update expressions
  * @returns resolves when all operations are complete
  */
-function update(data: OnyxUpdate[]): Promise<void> {
+function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<void> {
     // First, validate the Onyx object is in the format we expect
     data.forEach(({onyxMethod, key, value}) => {
         if (!Object.values(OnyxUtils.METHOD).includes(onyxMethod)) {
@@ -453,7 +453,7 @@ function update(data: OnyxUpdate[]): Promise<void> {
                     collectionKeys.forEach((collectionKey) => enqueueMergeOperation(collectionKey, mergedCollection[collectionKey]));
                 }
             },
-            [OnyxUtils.METHOD.SET_COLLECTION]: (k, v) => promises.push(() => setCollection(k, v as OnyxSetCollectionInput<OnyxKey>)),
+            [OnyxUtils.METHOD.SET_COLLECTION]: (k, v) => promises.push(() => setCollection(k as TKey, v as OnyxSetCollectionInput<TKey>)),
             [OnyxUtils.METHOD.MULTI_SET]: (k, v) => Object.entries(v as Partial<OnyxInputKeyValueMapping>).forEach(([entryKey, entryValue]) => enqueueSetOperation(entryKey, entryValue)),
             [OnyxUtils.METHOD.CLEAR]: () => {
                 clearPromise = clear();

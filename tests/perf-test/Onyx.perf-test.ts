@@ -1,5 +1,5 @@
 import {measureAsyncFunction} from 'reassure';
-import type {OnyxUpdate} from '../../lib';
+import type {OnyxKey, OnyxUpdate} from '../../lib';
 import Onyx from '../../lib';
 import createRandomReportAction, {getRandomReportActions} from '../utils/collections/reportActions';
 import type GenericCollection from '../utils/GenericCollection';
@@ -115,13 +115,13 @@ describe('Onyx', () => {
 
             const sets = Object.entries(changedReportActions)
                 .filter(([, v]) => Number(v.reportActionID) % 2 === 0)
-                .map(([k, v]): OnyxUpdate => ({key: k, onyxMethod: Onyx.METHOD.SET, value: v}));
+                .map(([k, v]): OnyxUpdate<OnyxKey> => ({key: k, onyxMethod: Onyx.METHOD.SET, value: v}));
 
             const merges = Object.entries(changedReportActions)
                 .filter(([, v]) => Number(v.reportActionID) % 2 !== 0)
-                .map(([k, v]): OnyxUpdate => ({key: k, onyxMethod: Onyx.METHOD.MERGE, value: v}));
+                .map(([k, v]): OnyxUpdate<OnyxKey> => ({key: k, onyxMethod: Onyx.METHOD.MERGE, value: v}));
 
-            const updates = alternateLists(sets, merges) as OnyxUpdate[];
+            const updates = alternateLists(sets, merges) as Array<OnyxUpdate<OnyxKey>>;
 
             await measureAsyncFunction(() => Onyx.update(updates), {
                 beforeEach: async () => {

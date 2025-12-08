@@ -5,7 +5,7 @@ import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import OnyxUtils from '../../lib/OnyxUtils';
 import type OnyxCache from '../../lib/OnyxCache';
 import StorageMock from '../../lib/storage';
-import type {OnyxCollection, OnyxUpdate} from '../../lib/types';
+import type {OnyxCollection, OnyxKey, OnyxUpdate} from '../../lib/types';
 import type {GenericDeepRecord} from '../types';
 import type GenericCollection from '../utils/GenericCollection';
 import type {Connection} from '../../lib/OnyxConnectionManager';
@@ -997,7 +997,7 @@ describe('Onyx', () => {
                             },
                         },
                     },
-                ] as unknown as OnyxUpdate[]),
+                ] as unknown as Array<OnyxUpdate<OnyxKey>>),
             )
             .then(() => {
                 expect(valuesReceived).toEqual({
@@ -1029,7 +1029,7 @@ describe('Onyx', () => {
                         },
                     ],
                 },
-            ] as unknown as OnyxUpdate[]);
+            ] as unknown as Array<OnyxUpdate<OnyxKey>>);
         } catch (error) {
             if (error instanceof Error) {
                 expect(error.message).toEqual('Invalid value provided in Onyx multiSet. Onyx multiSet value must be of type object.');
@@ -1825,7 +1825,7 @@ describe('Onyx', () => {
                 },
             });
 
-            const queuedUpdates: OnyxUpdate[] = [
+            const queuedUpdates: Array<OnyxUpdate<OnyxKey>> = [
                 {
                     key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
                     onyxMethod: 'merge',
@@ -1872,7 +1872,7 @@ describe('Onyx', () => {
                 await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1});
 
                 const entry1ExpectedResult = lodashCloneDeep(entry1);
-                const queuedUpdates: OnyxUpdate[] = [];
+                const queuedUpdates: Array<OnyxUpdate<OnyxKey>> = [];
 
                 queuedUpdates.push({
                     key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
@@ -1919,7 +1919,7 @@ describe('Onyx', () => {
                 await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1});
 
                 const entry1ExpectedResult = lodashCloneDeep(entry1);
-                const queuedUpdates: OnyxUpdate[] = [];
+                const queuedUpdates: Array<OnyxUpdate<OnyxKey>> = [];
 
                 queuedUpdates.push({
                     key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
@@ -1991,7 +1991,7 @@ describe('Onyx', () => {
                 await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1});
 
                 const entry1ExpectedResult = lodashCloneDeep(entry1);
-                const queuedUpdates: OnyxUpdate[] = [];
+                const queuedUpdates: Array<OnyxUpdate<OnyxKey>> = [];
 
                 queuedUpdates.push({
                     key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
@@ -2048,7 +2048,7 @@ describe('Onyx', () => {
                 });
 
                 let entry1ExpectedResult = lodashCloneDeep(entry1) as GenericDeepRecord | undefined;
-                const queuedUpdates: OnyxUpdate[] = [];
+                const queuedUpdates: Array<OnyxUpdate<OnyxKey>> = [];
 
                 queuedUpdates.push({
                     key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
@@ -2121,7 +2121,7 @@ describe('Onyx', () => {
 
                     const entry1ExpectedResult = lodashCloneDeep(entry1);
                     const entry2ExpectedResult = lodashCloneDeep(entry2);
-                    const queuedUpdates: OnyxUpdate[] = [];
+                    const queuedUpdates: Array<OnyxUpdate<OnyxKey>> = [];
 
                     queuedUpdates.push(
                         {
@@ -2663,7 +2663,6 @@ describe('Onyx', () => {
             } as GenericCollection);
 
             await Onyx.setCollection(ONYX_KEYS.COLLECTION.ROUTES, {
-                // @ts-expect-error invalidRoute is not a valid key
                 [invalidRoute]: {name: 'Invalid Route'},
             });
 
