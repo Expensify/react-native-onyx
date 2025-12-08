@@ -2663,7 +2663,6 @@ describe('Onyx', () => {
             } as GenericCollection);
 
             await Onyx.setCollection(ONYX_KEYS.COLLECTION.ROUTES, {
-                // @ts-expect-error invalidRoute is not a valid key
                 [invalidRoute]: {name: 'Invalid Route'},
             });
 

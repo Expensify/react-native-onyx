@@ -1,5 +1,5 @@
 import Onyx from '../../dist/Onyx';
-import type {OnyxUpdate} from '../../dist/types';
+import type {OnyxMergeCollectionInput, OnyxUpdate} from '../../dist/types';
 import ONYX_KEYS from './setup';
 
 const onyxUpdate: OnyxUpdate<'test'> = {
@@ -56,12 +56,12 @@ const onyxUpdateCollectionError2: OnyxUpdate<'test_'> = {
     },
 };
 
-// @ts-expect-error COLLECTION.TEST_KEY is invalid key, it is missing the suffix
 const onyxUpdateCollectionError3: OnyxUpdate<'test_'> = {
     onyxMethod: 'mergecollection',
     key: ONYX_KEYS.COLLECTION.TEST_KEY,
     value: {
-        [ONYX_KEYS.COLLECTION.TEST_KEY]: {
+        // @ts-expect-error nonExistingKey is not a valid key
+        ['nonExistingKey']: {
             str: 'test2',
         },
     },
@@ -128,12 +128,12 @@ Onyx.update([
 ]);
 
 Onyx.update([
-    // @ts-expect-error COLLECTION.TEST_KEY is invalid key, it is missing the suffix
     {
         onyxMethod: 'mergecollection',
         key: ONYX_KEYS.COLLECTION.TEST_KEY,
         value: {
-            [ONYX_KEYS.COLLECTION.TEST_KEY]: {
+            // @ts-expect-error nonExistingKey is not a valid key
+            ['nonExistingKey']: {
                 str: 'test1',
             },
         },

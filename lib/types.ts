@@ -208,7 +208,7 @@ type NullishObjectDeep<ObjectType extends object> = {
  * Also, the `TMap` type is inferred automatically in `mergeCollection()` method and represents
  * the object of collection keys/values specified in the second parameter of the method.
  */
-type Collection<TKey extends CollectionKeyBase, TValue> = Record<`${TKey}${string}`, TValue> & {[P in TKey]?: never};
+type Collection<TKey extends CollectionKeyBase, TValue> = Record<`${TKey}${string}`, TValue>;
 
 /** Represents the base options used in `Onyx.connect()` method. */
 // NOTE: Any changes to this type like adding or removing options must be accounted in OnyxConnectionManager's `generateConnectionID()` method!
@@ -335,7 +335,7 @@ type ExpandOnyxKeys<TKey extends OnyxKey> = TKey extends CollectionKeyBase ? NoI
  * If a new method is added to OnyxUtils.METHOD constant, it must be added to OnyxMethodValueMap type.
  * Otherwise it will show static type errors.
  */
-type OnyxUpdate<TKey extends OnyxKey> = {
+type OnyxUpdate<TKey extends OnyxKey = OnyxKey> = {
     // ⚠️ DO NOT CHANGE THIS TYPE, UNLESS YOU KNOW WHAT YOU ARE DOING. ⚠️
     [K in TKey]:
         | {onyxMethod: typeof OnyxUtils.METHOD.SET; key: ExpandOnyxKeys<K>; value: OnyxSetInput<K>}
