@@ -191,7 +191,7 @@ describe('fastMerge', () => {
             ['a number', 1000],
             ['a boolean', true],
             ['an array', []],
-        ])('should %s with an object', (_label, data) => {
+        ])('should replace %s with an object', (_label, data) => {
             const result = utils.fastMerge<unknown>(data, testObject);
             expect(result.result).toEqual(testObject);
         });
