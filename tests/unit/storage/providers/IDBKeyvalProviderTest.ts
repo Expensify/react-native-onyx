@@ -1,4 +1,4 @@
-import IDB from 'idb-keyval';
+import * as IDB from 'idb-keyval';
 import IDBKeyValProvider from '../../../../lib/storage/providers/IDBKeyValProvider';
 import utils from '../../../../lib/utils';
 import type {GenericDeepRecord} from '../../../types';

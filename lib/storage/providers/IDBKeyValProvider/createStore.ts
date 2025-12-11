@@ -1,4 +1,4 @@
-import IDB from 'idb-keyval';
+import * as IDB from 'idb-keyval';
 import type {UseStore} from 'idb-keyval';
 import {logInfo} from '../../../Logger';
 

@@ -1,5 +1,5 @@
 import type {UseStore} from 'idb-keyval';
-import IDB from 'idb-keyval';
+import * as IDB from 'idb-keyval';
 import utils from '../../../utils';
 import type StorageProvider from '../types';
 import type {OnyxKey, OnyxValue} from '../../../types';
