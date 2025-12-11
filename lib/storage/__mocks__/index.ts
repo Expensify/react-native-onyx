@@ -1,4 +1,4 @@
-import MemoryOnlyProvider, {mockStore, mockSet, setMockStore} from '../providers/MemoryOnlyProvider';
+import MemoryOnlyProvider, {mockStore, setMockStore} from '../providers/MemoryOnlyProvider';
 
 const init = jest.fn(MemoryOnlyProvider.init);
 
@@ -18,7 +18,7 @@ const StorageMock = {
     getAllKeys: jest.fn(MemoryOnlyProvider.getAllKeys),
     getDatabaseSize: jest.fn(MemoryOnlyProvider.getDatabaseSize),
     keepInstancesSync: jest.fn(),
-    mockSet,
+
     getMockStore: jest.fn(() => mockStore),
     setMockStore: jest.fn((data) => setMockStore(data)),
 };

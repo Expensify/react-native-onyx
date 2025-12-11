@@ -42,7 +42,6 @@ type PageCountResult = {
 };
 
 const DB_NAME = 'OnyxDB';
-let db: NitroSQLiteConnection;
 
 /**
  * Prevents the stringifying of the object markers.
@@ -64,7 +63,9 @@ function generateJSONReplaceSQLQueries(key: string, patches: FastMergeReplaceNul
     return queries;
 }
 
-const provider: StorageProvider = {
+const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
+    store: undefined,
+
     /**
      * The name of the provider that can be printed to the logs
      */
@@ -73,18 +74,22 @@ const provider: StorageProvider = {
      * Initializes the storage provider
      */
     init() {
-        db = open({name: DB_NAME});
+        provider.store = open({name: DB_NAME});
 
-        db.execute('CREATE TABLE IF NOT EXISTS keyvaluepairs (record_key TEXT NOT NULL PRIMARY KEY , valueJSON JSON NOT NULL) WITHOUT ROWID;');
+        provider.store.execute('CREATE TABLE IF NOT EXISTS keyvaluepairs (record_key TEXT NOT NULL PRIMARY KEY , valueJSON JSON NOT NULL) WITHOUT ROWID;');
 
         // All of the 3 pragmas below were suggested by SQLite team.
         // You can find more info about them here: https://www.sqlite.org/pragma.html
-        db.execute('PRAGMA CACHE_SIZE=-20000;');
-        db.execute('PRAGMA synchronous=NORMAL;');
-        db.execute('PRAGMA journal_mode=WAL;');
+        provider.store.execute('PRAGMA CACHE_SIZE=-20000;');
+        provider.store.execute('PRAGMA synchronous=NORMAL;');
+        provider.store.execute('PRAGMA journal_mode=WAL;');
     },
     getItem(key) {
-        return db.executeAsync<OnyxSQLiteKeyValuePair>('SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key = ?;', [key]).then(({rows}) => {
+        if (!provider.store) {
+            throw new Error('Store is not initialized!');
+        }
+
+        return provider.store.executeAsync<OnyxSQLiteKeyValuePair>('SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key = ?;', [key]).then(({rows}) => {
             if (!rows || rows?.length === 0) {
                 return null;
             }
@@ -98,26 +103,42 @@ const provider: StorageProvider = {
         });
     },
     multiGet(keys) {
+        if (!provider.store) {
+            throw new Error('Store is not initialized!');
+        }
+
         const placeholders = keys.map(() => '?').join(',');
         const command = `SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
-        return db.executeAsync<OnyxSQLiteKeyValuePair>(command, keys).then(({rows}) => {
+        return provider.store.executeAsync<OnyxSQLiteKeyValuePair>(command, keys).then(({rows}) => {
             // eslint-disable-next-line no-underscore-dangle
             const result = rows?._array.map((row) => [row.record_key, JSON.parse(row.valueJSON)]);
             return (result ?? []) as StorageKeyValuePair[];
         });
     },
     setItem(key, value) {
-        return db.executeAsync('REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);', [key, JSON.stringify(value)]).then(() => undefined);
+        if (!provider.store) {
+            throw new Error('Store is not initialized!');
+        }
+
+        return provider.store.executeAsync('REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);', [key, JSON.stringify(value)]).then(() => undefined);
     },
     multiSet(pairs) {
+        if (!provider.store) {
+            throw new Error('Store is not initialized!');
+        }
+
         const query = 'REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, json(?));';
         const params = pairs.map((pair) => [pair[0], JSON.stringify(pair[1] === undefined ? null : pair[1])]);
         if (utils.isEmptyObject(params)) {
             return Promise.resolve();
         }
-        return db.executeBatchAsync([{query, params}]).then(() => undefined);
+        return provider.store.executeBatchAsync([{query, params}]).then(() => undefined);
     },
     multiMerge(pairs) {
+        if (!provider.store) {
+            throw new Error('Store is not initialized!');
+        }
+
         const commands: BatchQueryCommand[] = [];
 
         // Query to merge the change into the DB value.
@@ -156,27 +177,52 @@ const provider: StorageProvider = {
             commands.push({query: replaceQuery, params: replaceQueryArguments});
         }
 
-        return db.executeBatchAsync(commands).then(() => undefined);
+        return provider.store.executeBatchAsync(commands).then(() => undefined);
     },
     mergeItem(key, change, replaceNullPatches) {
         // Since Onyx already merged the existing value with the changes, we can just set the value directly.
-        return this.multiMerge([[key, change, replaceNullPatches]]);
+        return provider.multiMerge([[key, change, replaceNullPatches]]);
     },
-    getAllKeys: () =>
-        db.executeAsync('SELECT record_key FROM keyvaluepairs;').then(({rows}) => {
+    getAllKeys() {
+        if (!provider.store) {
+            throw new Error('Store is not initialized!');
+        }
+
+        return provider.store.executeAsync('SELECT record_key FROM keyvaluepairs;').then(({rows}) => {
             // eslint-disable-next-line no-underscore-dangle
             const result = rows?._array.map((row) => row.record_key);
             return (result ?? []) as StorageKeyList;
-        }),
-    removeItem: (key) => db.executeAsync('DELETE FROM keyvaluepairs WHERE record_key = ?;', [key]).then(() => undefined),
-    removeItems: (keys) => {
+        });
+    },
+    removeItem(key) {
+        if (!provider.store) {
+            throw new Error('Store is not initialized!');
+        }
+
+        return provider.store.executeAsync('DELETE FROM keyvaluepairs WHERE record_key = ?;', [key]).then(() => undefined);
+    },
+    removeItems(keys) {
+        if (!provider.store) {
+            throw new Error('Store is not initialized!');
+        }
+
         const placeholders = keys.map(() => '?').join(',');
         const query = `DELETE FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
-        return db.executeAsync(query, keys).then(() => undefined);
+        return provider.store.executeAsync(query, keys).then(() => undefined);
     },
-    clear: () => db.executeAsync('DELETE FROM keyvaluepairs;', []).then(() => undefined),
+    clear() {
+        if (!provider.store) {
+            throw new Error('Store is not initialized!');
+        }
+
+        return provider.store.executeAsync('DELETE FROM keyvaluepairs;', []).then(() => undefined);
+    },
     getDatabaseSize() {
-        return Promise.all([db.executeAsync<PageSizeResult>('PRAGMA page_size;'), db.executeAsync<PageCountResult>('PRAGMA page_count;'), getFreeDiskStorage()]).then(
+        if (!provider.store) {
+            throw new Error('Store is not initialized!');
+        }
+
+        return Promise.all([provider.store.executeAsync<PageSizeResult>('PRAGMA page_size;'), provider.store.executeAsync<PageCountResult>('PRAGMA page_count;'), getFreeDiskStorage()]).then(
             ([pageSizeResult, pageCountResult, bytesRemaining]) => {
                 const pageSize = pageSizeResult.rows?.item(0)?.page_size ?? 0;
                 const pageCount = pageCountResult.rows?.item(0)?.page_count ?? 0;
