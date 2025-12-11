@@ -899,7 +899,7 @@ describe('Onyx', () => {
                                 ID: 345,
                                 value: 'three',
                             },
-                        },
+                        } as GenericCollection,
                     },
                 ]);
             })
@@ -1268,7 +1268,7 @@ describe('Onyx', () => {
             Onyx.update([
                 {onyxMethod: Onyx.METHOD.SET, key: ONYX_KEYS.TEST_KEY, value: 'taco'},
                 {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.OTHER_TEST, value: 'pizza'},
-                {onyxMethod: Onyx.METHOD.MERGE_COLLECTION, key: ONYX_KEYS.COLLECTION.TEST_UPDATE, value: {[itemKey]: {a: 'a'}}},
+                {onyxMethod: Onyx.METHOD.MERGE_COLLECTION, key: ONYX_KEYS.COLLECTION.TEST_UPDATE, value: {[itemKey]: {a: 'a'}} as GenericCollection},
             ]).then(() => {
                 expect(collectionCallback).toHaveBeenCalledTimes(2);
                 expect(collectionCallback).toHaveBeenNthCalledWith(1, undefined, undefined, undefined);
@@ -1630,7 +1630,7 @@ describe('Onyx', () => {
                                 0: 'Bed',
                             },
                         },
-                    },
+                    } as GenericCollection,
                 },
                 {
                     onyxMethod: Onyx.METHOD.MERGE,
@@ -1729,7 +1729,7 @@ describe('Onyx', () => {
                     value: {
                         [cat]: {age: 5, size: 'S'},
                         [dog]: {size: 'M'},
-                    },
+                    } as GenericCollection,
                 },
                 {onyxMethod: Onyx.METHOD.SET, key: cat, value: {age: 3}},
                 {onyxMethod: Onyx.METHOD.MERGE, key: cat, value: {sound: 'meow'}},
@@ -2214,7 +2214,7 @@ describe('Onyx', () => {
                             value: {
                                 [routeA]: {name: 'New Route A'},
                                 [routeB]: {name: 'New Route B'},
-                            },
+                            } as GenericCollection,
                         },
                     ]);
                 })
@@ -2265,7 +2265,7 @@ describe('Onyx', () => {
                             key: ONYX_KEYS.COLLECTION.ROUTES,
                             value: {
                                 [routeA]: {name: 'Final Route A'},
-                            },
+                            } as GenericCollection,
                         },
                         {
                             onyxMethod: Onyx.METHOD.MERGE,
@@ -2319,7 +2319,7 @@ describe('Onyx', () => {
                     value: {
                         [key1]: {id: '1', name: 'Updated Item 1'},
                         [key2]: {id: '2', name: 'Updated Item 2'},
-                    },
+                    } as GenericCollection,
                 },
             ]);
 
@@ -2663,8 +2663,9 @@ describe('Onyx', () => {
             } as GenericCollection);
 
             await Onyx.setCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                // @ts-expect-error invalidRoute is not a valid key
                 [invalidRoute]: {name: 'Invalid Route'},
-            } as GenericCollection);
+            });
 
             expect(result).toEqual({
                 [routeA]: {name: 'Route A'},

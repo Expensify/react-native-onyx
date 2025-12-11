@@ -1,6 +1,6 @@
 {
   "name": "react-native-onyx",
-  "version": "3.0.8",
+  "version": "3.0.17",
   "author": "Expensify, Inc.",
   "homepage": "https://expensify.com",
   "description": "State management for React Native",
@@ -32,6 +32,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "jest",
+    "test:types": "npm run build && tsc --noEmit --project tsconfig.test.json",
     "perf-test": "npx reassure",
     "build": "tsc -p tsconfig.build.json",
     "build:watch": "nodemon --watch lib --ext js,json,ts,tsx --exec \"npm run build && npm pack\"",
@@ -89,9 +90,9 @@
     "react-dom": "18.2.0",
     "react-native": "0.76.3",
     "react-native-device-info": "^10.3.0",
-    "react-native-nitro-modules": "^0.26.2",
-    "react-native-nitro-sqlite": "^9.1.10",
-    "react-native-performance": "^2.0.0",
+    "react-native-nitro-modules": "^0.27.2",
+    "react-native-nitro-sqlite": "^9.2.0",
+    "react-native-performance": "^5.1.0",
     "react-test-renderer": "18.2.0",
     "reassure": "1.4.0",
     "ts-node": "^10.9.2",
@@ -104,9 +105,9 @@
     "react-dom": ">=18.1.0",
     "react-native": ">=0.75.0",
     "react-native-device-info": "^10.3.0",
-    "react-native-nitro-modules": ">=0.26.2",
-    "react-native-nitro-sqlite": "^9.1.10",
-    "react-native-performance": "^5.1.0"
+    "react-native-nitro-modules": ">=0.27.2",
+    "react-native-nitro-sqlite": "^9.2.0",
+    "react-native-performance": ">=5.1.0"
   },
   "peerDependenciesMeta": {
     "idb-keyval": {

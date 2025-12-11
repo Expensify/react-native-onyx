@@ -76,11 +76,13 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     const previousKey = usePrevious(key);
 
     const currentDependenciesRef = useLiveRef(dependencies);
-    const currentSelectorRef = useLiveRef(options?.selector);
+    const selector = options?.selector;
 
     // Create memoized version of selector for performance
     const memoizedSelector = useMemo(() => {
-        if (!options?.selector) return null;
+        if (!selector) {
+            return null;
+        }
 
         let lastInput: OnyxValue<TKey> | undefined;
         let lastOutput: TReturnValue;
@@ -89,14 +91,13 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
         return (input: OnyxValue<TKey> | undefined): TReturnValue => {
             const currentDependencies = currentDependenciesRef.current;
-            const currentSelector = currentSelectorRef.current;
 
             // Recompute if input changed, dependencies changed, or first time
             const dependenciesChanged = !shallowEqual(lastDependencies, currentDependencies);
             if (!hasComputed || lastInput !== input || dependenciesChanged) {
                 // Only proceed if we have a valid selector
-                if (currentSelector) {
-                    const newOutput = currentSelector(input);
+                if (selector) {
+                    const newOutput = selector(input);
 
                     // Deep equality mode: only update if output actually changed
                     if (!hasComputed || !deepEqual(lastOutput, newOutput) || dependenciesChanged) {
@@ -110,7 +111,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
             return lastOutput;
         };
-    }, [currentDependenciesRef, currentSelectorRef, options?.selector]);
+    }, [currentDependenciesRef, selector]);
 
     // Stores the previous cached value as it's necessary to compare with the new value in `getSnapshot()`.
     // We initialize it to `null` to simulate that we don't have any value from cache yet.

@@ -4,6 +4,7 @@ import type {GenericDeepRecord} from '../types';
 import utils from '../../lib/utils';
 import type {Collection, OnyxCollection} from '../../lib/types';
 import type GenericCollection from '../utils/GenericCollection';
+import StorageMock from '../../lib/storage';
 
 const testObject: GenericDeepRecord = {
     a: 'a',
@@ -82,6 +83,8 @@ Onyx.init({
 
 beforeEach(() => Onyx.clear());
 
+afterEach(() => jest.clearAllMocks());
+
 describe('OnyxUtils', () => {
     describe('splitCollectionMemberKey', () => {
         describe('should return correct values', () => {
@@ -155,11 +158,14 @@ describe('OnyxUtils', () => {
             } as GenericCollection);
 
             // Replace with new collection data
-            await OnyxUtils.partialSetCollection(ONYXKEYS.COLLECTION.ROUTES, {
-                [routeA]: {name: 'New Route A'},
-                [routeB]: {name: 'New Route B'},
-                [routeC]: {name: 'New Route C'},
-            } as GenericCollection);
+            await OnyxUtils.partialSetCollection({
+                collectionKey: ONYXKEYS.COLLECTION.ROUTES,
+                collection: {
+                    [routeA]: {name: 'New Route A'},
+                    [routeB]: {name: 'New Route B'},
+                    [routeC]: {name: 'New Route C'},
+                } as GenericCollection,
+            });
 
             expect(result).toEqual({
                 [routeA]: {name: 'New Route A'},
@@ -185,7 +191,7 @@ describe('OnyxUtils', () => {
                 [routeA]: {name: 'Route A'},
             } as GenericCollection);
 
-            await OnyxUtils.partialSetCollection(ONYXKEYS.COLLECTION.ROUTES, {} as GenericCollection);
+            await OnyxUtils.partialSetCollection({collectionKey: ONYXKEYS.COLLECTION.ROUTES, collection: {} as GenericCollection});
 
             expect(result).toEqual({
                 [routeA]: {name: 'Route A'},
@@ -209,9 +215,12 @@ describe('OnyxUtils', () => {
                 [routeA]: {name: 'Route A'},
             } as GenericCollection);
 
-            await OnyxUtils.partialSetCollection(ONYXKEYS.COLLECTION.ROUTES, {
-                [invalidRoute]: {name: 'Invalid Route'},
-            } as GenericCollection);
+            await OnyxUtils.partialSetCollection({
+                collectionKey: ONYXKEYS.COLLECTION.ROUTES,
+                collection: {
+                    [invalidRoute]: {name: 'Invalid Route'},
+                } as GenericCollection,
+            });
 
             expect(result).toEqual({
                 [routeA]: {name: 'Route A'},
@@ -407,6 +416,46 @@ describe('OnyxUtils', () => {
                 [['b', 'd'], {i: 'i', j: 'j'}],
                 [['b', 'g'], {k: 'k'}],
             ]);
+        });
+    });
+
+    describe('retryOperation', () => {
+        const retryOperationSpy = jest.spyOn(OnyxUtils, 'retryOperation');
+        const genericError = new Error('Generic storage error');
+        const invalidDataError = new Error("Failed to execute 'put' on 'IDBObjectStore': invalid data");
+        const memoryError = new Error('out of memory');
+
+        it('should retry only one time if the operation is firstly failed and then passed', async () => {
+            StorageMock.setItem = jest.fn(StorageMock.setItem).mockRejectedValueOnce(genericError).mockImplementation(StorageMock.setItem);
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+
+            // Should be called once, since Storage.setItem if failed only once
+            expect(retryOperationSpy).toHaveBeenCalledTimes(1);
+        });
+
+        it('should stop retrying after MAX_STORAGE_OPERATION_RETRY_ATTEMPTS retries for failing operation', async () => {
+            StorageMock.setItem = jest.fn().mockRejectedValue(genericError);
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+
+            // Should be called 6 times: initial attempt + 5 retries (MAX_STORAGE_OPERATION_RETRY_ATTEMPTS)
+            expect(retryOperationSpy).toHaveBeenCalledTimes(6);
+        });
+
+        it("should throw error for if operation failed with \"Failed to execute 'put' on 'IDBObjectStore': invalid data\" error", async () => {
+            StorageMock.setItem = jest.fn().mockRejectedValueOnce(invalidDataError);
+
+            await expect(Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'})).rejects.toThrow(invalidDataError);
+        });
+
+        it('should not retry in case of storage capacity error and no keys to evict', async () => {
+            StorageMock.setItem = jest.fn().mockRejectedValue(memoryError);
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+
+            // Should only be called once since there are no evictable keys
+            expect(retryOperationSpy).toHaveBeenCalledTimes(1);
         });
     });
 });
