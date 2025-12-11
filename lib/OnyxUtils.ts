@@ -479,6 +479,22 @@ function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collect
 }
 
 /**
+ * Checks if a given key is a collection member key (not just a collection key).
+ * @param key - The key to check
+ * @returns true if the key is a collection member, false otherwise
+ */
+function isCollectionMember(key: OnyxKey): boolean {
+    try {
+        const collectionKey = getCollectionKey(key);
+        // If the key is longer than the collection key, it's a collection member
+        return key.length > collectionKey.length;
+    } catch (e) {
+        // If getCollectionKey throws, the key is not a collection member
+        return false;
+    }
+}
+
+/**
  * Splits a collection member key into the collection key part and the ID part.
  * @param key - The collection member key to split.
  * @param collectionKey - The collection key of the `key` param that can be passed in advance to optimize the function.
@@ -1694,6 +1710,7 @@ const OnyxUtils = {
     getCollectionKeys,
     isCollectionKey,
     isCollectionMemberKey,
+    isCollectionMember,
     splitCollectionMemberKey,
     isKeyMatch,
     tryGetCachedValue,

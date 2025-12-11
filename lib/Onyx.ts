@@ -56,7 +56,13 @@ function init({
     if (shouldSyncMultipleInstances) {
         Storage.keepInstancesSync?.((key, value) => {
             cache.set(key, value);
-            OnyxUtils.keyChanged(key, value as OnyxValue<typeof key>);
+
+            // Check if this is a collection member key to prevent duplicate callbacks
+            // When a collection is updated, individual members sync separately to other tabs
+            // Setting isProcessingCollectionUpdate=true prevents triggering collection callbacks for each individual update
+            const isKeyCollectionMember = OnyxUtils.isCollectionMember(key);
+
+            OnyxUtils.keyChanged(key, value as OnyxValue<typeof key>, undefined, true, isKeyCollectionMember);
         });
     }
 
