@@ -345,6 +345,36 @@ describe('OnyxUtils', () => {
         });
     });
 
+    describe('isCollectionMember', () => {
+        it('should return true for collection member keys', () => {
+            expect(OnyxUtils.isCollectionMember('test_123')).toBe(true);
+            expect(OnyxUtils.isCollectionMember('test_level_456')).toBe(true);
+            expect(OnyxUtils.isCollectionMember('test_level_last_789')).toBe(true);
+            expect(OnyxUtils.isCollectionMember('test_-1_something')).toBe(true);
+            expect(OnyxUtils.isCollectionMember('routes_abc')).toBe(true);
+        });
+
+        it('should return false for collection keys themselves', () => {
+            expect(OnyxUtils.isCollectionMember('test_')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('test_level_')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('test_level_last_')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('routes_')).toBe(false);
+        });
+
+        it('should return false for non-collection keys', () => {
+            expect(OnyxUtils.isCollectionMember('test')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('someRegularKey')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('notACollection')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('')).toBe(false);
+        });
+
+        it('should return false for invalid keys', () => {
+            expect(OnyxUtils.isCollectionMember('invalid_key_123')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('notregistered_')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('notregistered_123')).toBe(false);
+        });
+    });
+
     describe('mergeChanges', () => {
         it("should return the last change if it's an array", () => {
             const {result} = OnyxUtils.mergeChanges([...testMergeChanges, [0, 1, 2]], testObject);
