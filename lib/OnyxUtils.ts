@@ -658,9 +658,8 @@ function preserveCollectionReferencesAfterMerge(
 
         // Use deep equality check to preserve references for unchanged items
         if (originalValue !== undefined && deepEqual(newMergedValue, originalValue)) {
-            // Keep the existing reference and update cache
+            // Keep the existing reference for subscribers
             preservedCollection[key] = originalValue;
-            cache.set(key, originalValue);
         } else {
             preservedCollection[key] = newMergedValue;
         }
@@ -1707,7 +1706,6 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
 
                 // Finally, preserve references for items that didn't actually change and include removed items as null
                 const preservedCollection = preserveCollectionReferencesAfterMerge(finalMergedCollection, originalCachedValues, previousCollection);
-
                 return scheduleNotifyCollectionSubscribers(collectionKey, preservedCollection, previousCollection);
             });
 
