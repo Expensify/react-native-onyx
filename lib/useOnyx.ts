@@ -313,11 +313,9 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // - The previously cached value is different from the new value.
         // - The previously cached value is `null` (not set from cache yet) and we have cache for this key
         //   OR we have a pending `Onyx.clear()` task (if `Onyx.clear()` is running cache might not be available anymore
+        //   OR the subscriber is triggered (the value is gotten from the storage)
         //   so we update the cached value/result right away in order to prevent infinite loading state issues).
-        const shouldUpdateResult =
-            !areValuesEqual ||
-            (previousValueRef.current === null && (hasCacheForKey || OnyxCache.hasPendingTask(TASK.CLEAR))) ||
-            (previousValueRef.current === null && !isFirstConnectionRef.current);
+        const shouldUpdateResult = !areValuesEqual || (previousValueRef.current === null && (hasCacheForKey || OnyxCache.hasPendingTask(TASK.CLEAR) || !isFirstConnectionRef.current));
         if (shouldUpdateResult) {
             previousValueRef.current = newValueRef.current;
 
