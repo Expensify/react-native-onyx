@@ -479,6 +479,22 @@ function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collect
 }
 
 /**
+ * Checks if a given key is a collection member key (not just a collection key).
+ * @param key - The key to check
+ * @returns true if the key is a collection member, false otherwise
+ */
+function isCollectionMember(key: OnyxKey): boolean {
+    try {
+        const collectionKey = getCollectionKey(key);
+        // If the key is longer than the collection key, it's a collection member
+        return key.length > collectionKey.length;
+    } catch (e) {
+        // If getCollectionKey throws, the key is not a collection member
+        return false;
+    }
+}
+
+/**
  * Splits a collection member key into the collection key part and the ID part.
  * @param key - The collection member key to split.
  * @param collectionKey - The collection key of the `key` param that can be passed in advance to optimize the function.
@@ -564,97 +580,6 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey): OnyxValue<OnyxKey> 
     }
 
     return val;
-}
-
-/**
- * Marks items that existed in previousCollection but not in preservedCollection as null.
- * This ensures subscribers are properly notified about item removals.
- * @param preservedCollection - The collection to mark removed items in (mutated in place)
- * @param previousCollection - The previous collection state to compare against
- */
-function markRemovedItemsAsNull(preservedCollection: OnyxInputKeyValueMapping, previousCollection: OnyxCollection<KeyValueMapping[OnyxKey]>) {
-    if (!previousCollection) {
-        return preservedCollection;
-    }
-
-    const mutablePreservedCollection = {...preservedCollection};
-    Object.keys(previousCollection).forEach((key) => {
-        if (key in preservedCollection) {
-            return;
-        }
-
-        mutablePreservedCollection[key] = null;
-    });
-
-    return mutablePreservedCollection;
-}
-
-/**
- * Utility function to preserve object references for unchanged items in collection operations.
- * Compares new values with cached values using deep equality and preserves references when data is identical.
- * @param keyValuePairs - Array of key-value pairs to process
- * @param previousCollection - Optional previous collection state. If provided, removed items will be included as null
- * @returns The preserved collection with unchanged references maintained and removed items marked as null
- */
-function preserveCollectionReferences(keyValuePairs: StorageKeyValuePair[], previousCollection?: OnyxCollection<KeyValueMapping[OnyxKey]>): OnyxInputKeyValueMapping {
-    const preservedCollection: OnyxInputKeyValueMapping = {};
-
-    keyValuePairs.forEach(([key, value]) => {
-        const cachedValue = cache.get(key, false);
-
-        // If no cached value exists, we need to add the new value (skip expensive deep equality check)
-        // Use deep equality check to preserve references for unchanged items
-        if (cachedValue !== undefined && deepEqual(value, cachedValue)) {
-            // Keep the existing reference
-            preservedCollection[key] = cachedValue;
-        } else {
-            // Update cache only for changed items
-            cache.set(key, value);
-            preservedCollection[key] = value;
-        }
-    });
-
-    if (previousCollection) {
-        return markRemovedItemsAsNull(preservedCollection, previousCollection);
-    }
-
-    return preservedCollection;
-}
-
-/**
- * Utility function for merge operations that preserves references after cache merge has been performed.
- * Compares merged values with original cached values and preserves references when data is unchanged.
- * @param collection - Collection of merged data
- * @param originalCachedValues - Original cached values before merge
- * @param previousCollection - Optional previous collection state. If provided, removed items will be included as null
- * @returns The preserved collection with unchanged references maintained and removed items marked as null
- */
-function preserveCollectionReferencesAfterMerge(
-    collection: Record<string, OnyxValue<OnyxKey>>,
-    originalCachedValues: Record<string, OnyxValue<OnyxKey>>,
-    previousCollection?: Record<string, OnyxValue<OnyxKey>>,
-): Record<string, OnyxValue<OnyxKey>> {
-    const preservedCollection: Record<string, OnyxValue<OnyxKey>> = {};
-
-    Object.keys(collection).forEach((key) => {
-        const newMergedValue = cache.get(key, false);
-        const originalValue = originalCachedValues[key];
-
-        // Use deep equality check to preserve references for unchanged items
-        if (originalValue !== undefined && deepEqual(newMergedValue, originalValue)) {
-            // Keep the existing reference and update cache
-            preservedCollection[key] = originalValue;
-            cache.set(key, originalValue);
-        } else {
-            preservedCollection[key] = newMergedValue;
-        }
-    });
-
-    if (previousCollection) {
-        return markRemovedItemsAsNull(preservedCollection, previousCollection);
-    }
-
-    return preservedCollection;
 }
 
 function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collectionMemberKeys?: string[]): NonNullable<OnyxCollection<KeyValueMapping[TKey]>> {
@@ -1300,7 +1225,7 @@ function unsubscribeFromKey(subscriptionID: number): void {
     delete callbackToStateMapping[subscriptionID];
 }
 
-function updateSnapshots(data: OnyxUpdate[], mergeFn: typeof Onyx.merge): Array<() => Promise<void>> {
+function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, mergeFn: typeof Onyx.merge): Array<() => Promise<void>> {
     const snapshotCollectionKey = getSnapshotKey();
     if (!snapshotCollectionKey) return [];
 
@@ -1544,10 +1469,9 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
         const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(mutableCollection, true, undefined, true);
         const previousCollection = OnyxUtils.getCachedCollection(collectionKey);
 
-        // Preserve references for unchanged items and include removed items as null in setCollection
-        const preservedCollection = preserveCollectionReferences(keyValuePairs, previousCollection);
+        keyValuePairs.forEach(([key, value]) => cache.set(key, value));
 
-        const updatePromise = OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, preservedCollection, previousCollection);
+        const updatePromise = OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
 
         return Storage.multiSet(keyValuePairs)
             .catch((error) => OnyxUtils.retryOperation(error, setCollectionWithRetry, {collectionKey, collection}, retryAttempt))
@@ -1608,9 +1532,6 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
 
     return getAllKeys()
         .then((persistedKeys) => {
-            // Capture keys that will be removed (before calling remove())
-            const keysToRemove = resultCollectionKeys.filter((key) => resultCollection[key] === null && persistedKeys.has(key));
-
             // Split to keys that exist in storage and keys that don't
             const keys = resultCollectionKeys.filter((key) => {
                 if (resultCollection[key] === null) {
@@ -1622,8 +1543,6 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
 
             const existingKeys = keys.filter((key) => persistedKeys.has(key));
 
-            // Get previous values for both existing keys and keys that will be removed
-            const allAffectedKeys = [...existingKeys, ...keysToRemove];
             const cachedCollectionForExistingKeys = getCachedCollection(collectionKey, existingKeys);
 
             const existingKeyCollection = existingKeys.reduce((obj: OnyxInputKeyValueMapping, key) => {
@@ -1660,8 +1579,7 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
 
             // We need to get the previously existing values so we can compare the new ones
             // against them, to avoid unnecessary subscriber updates.
-            // Include keys that will be removed so subscribers are notified about removals
-            const previousCollectionPromise = Promise.all(allAffectedKeys.map((key) => get(key).then((value) => [key, value]))).then(Object.fromEntries);
+            const previousCollectionPromise = Promise.all(existingKeys.map((key) => get(key).then((value) => [key, value]))).then(Object.fromEntries);
 
             // New keys will be added via multiSet while existing keys will be updated using multiMerge
             // This is because setting a key that doesn't exist yet with multiMerge will throw errors
@@ -1679,20 +1597,8 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
             // Prefill cache if necessary by calling get() on any existing keys and then merge original data to cache
             // and update all subscribers
             const promiseUpdate = previousCollectionPromise.then((previousCollection) => {
-                // Capture the original cached values before merging
-                const originalCachedValues: Record<string, OnyxValue<OnyxKey>> = {};
-                Object.keys(finalMergedCollection).forEach((key) => {
-                    originalCachedValues[key] = cache.get(key, false);
-                });
-
-                // Then merge all the data into cache as normal
-
                 cache.merge(finalMergedCollection);
-
-                // Finally, preserve references for items that didn't actually change and include removed items as null
-                const preservedCollection = preserveCollectionReferencesAfterMerge(finalMergedCollection, originalCachedValues, previousCollection);
-
-                return scheduleNotifyCollectionSubscribers(collectionKey, preservedCollection, previousCollection);
+                return scheduleNotifyCollectionSubscribers(collectionKey, finalMergedCollection, previousCollection);
             });
 
             return Promise.all(promises)
@@ -1756,10 +1662,9 @@ function partialSetCollection<TKey extends CollectionKeyBase>({collectionKey, co
         const previousCollection = getCachedCollection(collectionKey, existingKeys);
         const keyValuePairs = prepareKeyValuePairsForStorage(mutableCollection, true, undefined, true);
 
-        // Preserve references for unchanged items and include removed items as null in partialSetCollection
-        const preservedCollection = preserveCollectionReferences(keyValuePairs, previousCollection);
+        keyValuePairs.forEach(([key, value]) => cache.set(key, value));
 
-        const updatePromise = scheduleNotifyCollectionSubscribers(collectionKey, preservedCollection, previousCollection);
+        const updatePromise = scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
 
         return Storage.multiSet(keyValuePairs)
             .catch((error) => retryOperation(error, partialSetCollection, {collectionKey, collection}, retryAttempt))
@@ -1805,6 +1710,7 @@ const OnyxUtils = {
     getCollectionKeys,
     isCollectionKey,
     isCollectionMemberKey,
+    isCollectionMember,
     splitCollectionMemberKey,
     isKeyMatch,
     tryGetCachedValue,

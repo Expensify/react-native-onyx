@@ -122,6 +122,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     // Stores the newest cached value in order to compare with the previous one and optimize `getSnapshot()` execution.
     const newValueRef = useRef<TReturnValue | undefined | null>(null);
 
+    const lastConnectedKeyRef = useRef<TKey>(key);
+
     // Stores the previously result returned by the hook, containing the data from cache and the fetch status.
     // We initialize it to `undefined` and `loading` fetch status to simulate the initial result when the hook is loading from the cache.
     // However, if `initWithStoredValues` is `false` we set the fetch status to `loaded` since we want to signal that data is ready.
@@ -161,6 +163,16 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     );
 
     useEffect(() => () => onyxSnapshotCache.deregisterConsumer(key, cacheKey), [key, cacheKey]);
+
+    useEffect(() => {
+        if (lastConnectedKeyRef.current === key) {
+            return;
+        }
+        lastConnectedKeyRef.current = key;
+        shouldGetCachedValueRef.current = true;
+        previousValueRef.current = null;
+        resultRef.current = [undefined, {status: options?.initWithStoredValues === false ? 'loaded' : 'loading'}];
+    }, [key, options?.initWithStoredValues]);
 
     useEffect(() => {
         // These conditions will ensure we can only handle dynamic collection member keys from the same collection.
@@ -310,11 +322,11 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             previousValueRef.current = newValueRef.current;
 
             // If the new value is `null` we default it to `undefined` to ensure the consumer gets a consistent result from the hook.
-            const newStatus = newFetchStatus ?? 'loaded';
+            newFetchStatus = newFetchStatus ?? 'loaded';
             resultRef.current = [
                 previousValueRef.current ?? undefined,
                 {
-                    status: newStatus,
+                    status: newFetchStatus,
                     sourceValue: sourceValueRef.current,
                 },
             ];
@@ -322,12 +334,14 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             // If `canBeMissing` is set to `false` and the Onyx value of that key is not defined,
             // we log an alert so it can be acknowledged by the consumer. Additionally, we won't log alerts
             // if there's a `Onyx.clear()` task in progress.
-            if (options?.canBeMissing === false && newStatus === 'loaded' && !isOnyxValueDefined && !OnyxCache.hasPendingTask(TASK.CLEAR)) {
+            if (options?.canBeMissing === false && newFetchStatus === 'loaded' && !isOnyxValueDefined && !OnyxCache.hasPendingTask(TASK.CLEAR)) {
                 Logger.logAlert(`useOnyx returned no data for key with canBeMissing set to false for key ${key}`, {showAlert: true});
             }
         }
 
-        onyxSnapshotCache.setCachedResult<UseOnyxResult<TReturnValue>>(key, cacheKey, resultRef.current);
+        if (newFetchStatus !== 'loading') {
+            onyxSnapshotCache.setCachedResult<UseOnyxResult<TReturnValue>>(key, cacheKey, resultRef.current);
+        }
 
         return resultRef.current;
     }, [options?.initWithStoredValues, options?.allowStaleData, options?.canBeMissing, key, memoizedSelector, cacheKey]);

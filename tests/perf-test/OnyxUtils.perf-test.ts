@@ -9,7 +9,7 @@ import OnyxUtils, {clearOnyxUtilsInternals} from '../../lib/OnyxUtils';
 import type GenericCollection from '../utils/GenericCollection';
 import type {OnyxUpdate} from '../../lib/Onyx';
 import createDeferredTask from '../../lib/createDeferredTask';
-import type {OnyxInputKeyValueMapping, RetriableOnyxOperation} from '../../lib/types';
+import type {OnyxInputKeyValueMapping, OnyxKey, RetriableOnyxOperation} from '../../lib/types';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -806,7 +806,7 @@ describe('OnyxUtils', () => {
 
     describe('updateSnapshots', () => {
         test('one call with 100 updates', async () => {
-            const updates: OnyxUpdate[] = [];
+            const updates: Array<OnyxUpdate<OnyxKey>> = [];
             for (let i = 0; i < 100; i++) {
                 updates.push({
                     onyxMethod: OnyxUtils.METHOD.MERGE,

@@ -228,157 +228,6 @@ describe('OnyxUtils', () => {
 
             await Onyx.disconnect(connection);
         });
-
-        it('should notify subscribers when removing collection items with null values', async () => {
-            let collectionResult: OnyxCollection<unknown>;
-            let callbackCount = 0;
-            const routeA = `${ONYXKEYS.COLLECTION.ROUTES}A`;
-            const routeB = `${ONYXKEYS.COLLECTION.ROUTES}B`;
-            const routeC = `${ONYXKEYS.COLLECTION.ROUTES}C`;
-
-            // Test with waitForCollectionCallback: true
-            const connection = Onyx.connect({
-                key: ONYXKEYS.COLLECTION.ROUTES,
-                initWithStoredValues: false,
-                callback: (value) => {
-                    collectionResult = value;
-                    callbackCount++;
-                },
-                waitForCollectionCallback: true,
-            });
-
-            // Set initial collection state
-            await Onyx.setCollection(ONYXKEYS.COLLECTION.ROUTES, {
-                [routeA]: {name: 'Route A'},
-                [routeB]: {name: 'Route B'},
-                [routeC]: {name: 'Route C'},
-            } as GenericCollection);
-
-            callbackCount = 0; // Reset counter after initial set
-
-            // Remove items by setting them to null
-            await OnyxUtils.partialSetCollection({
-                collectionKey: ONYXKEYS.COLLECTION.ROUTES,
-                collection: {
-                    [routeA]: null,
-                    [routeB]: null,
-                } as GenericCollection,
-            });
-
-            // Should be notified about the removal
-            expect(callbackCount).toBeGreaterThan(0);
-            expect(collectionResult).toEqual({
-                [routeC]: {name: 'Route C'},
-            });
-
-            await Onyx.disconnect(connection);
-        });
-
-        it('should notify individual key subscribers when removing collection items with null values', async () => {
-            let routeAValue: unknown;
-            let routeBValue: unknown;
-            let routeCValue: unknown;
-            const routeA = `${ONYXKEYS.COLLECTION.ROUTES}A`;
-            const routeB = `${ONYXKEYS.COLLECTION.ROUTES}B`;
-            const routeC = `${ONYXKEYS.COLLECTION.ROUTES}C`;
-
-            // Test with waitForCollectionCallback: false (individual callbacks)
-            const connectionA = Onyx.connect({
-                key: routeA,
-                initWithStoredValues: false,
-                callback: (value) => {
-                    routeAValue = value;
-                },
-            });
-
-            const connectionB = Onyx.connect({
-                key: routeB,
-                initWithStoredValues: false,
-                callback: (value) => {
-                    routeBValue = value;
-                },
-            });
-
-            const connectionC = Onyx.connect({
-                key: routeC,
-                initWithStoredValues: false,
-                callback: (value) => {
-                    routeCValue = value;
-                },
-            });
-
-            // Set initial collection state
-            await Onyx.setCollection(ONYXKEYS.COLLECTION.ROUTES, {
-                [routeA]: {name: 'Route A'},
-                [routeB]: {name: 'Route B'},
-                [routeC]: {name: 'Route C'},
-            } as GenericCollection);
-
-            // Remove items by setting them to null
-            await OnyxUtils.partialSetCollection({
-                collectionKey: ONYXKEYS.COLLECTION.ROUTES,
-                collection: {
-                    [routeA]: null,
-                    [routeB]: null,
-                } as GenericCollection,
-            });
-
-            // Individual subscribers should be notified about removals
-            expect(routeAValue).toBeUndefined();
-            expect(routeBValue).toBeUndefined();
-            expect(routeCValue).toEqual({name: 'Route C'});
-
-            await Onyx.disconnect(connectionA);
-            await Onyx.disconnect(connectionB);
-            await Onyx.disconnect(connectionC);
-        });
-
-        it('should notify collection subscribers without waitForCollectionCallback when removing items', async () => {
-            const callbackResults: Array<{value: unknown; key: string}> = [];
-            const routeA = `${ONYXKEYS.COLLECTION.ROUTES}A`;
-            const routeB = `${ONYXKEYS.COLLECTION.ROUTES}B`;
-            const routeC = `${ONYXKEYS.COLLECTION.ROUTES}C`;
-
-            // Test without waitForCollectionCallback (gets called for each item)
-            const connection = Onyx.connect({
-                key: ONYXKEYS.COLLECTION.ROUTES,
-                initWithStoredValues: false,
-                callback: (value, key) => {
-                    callbackResults.push({value, key});
-                },
-                waitForCollectionCallback: false,
-            });
-
-            // Set initial collection state
-            await Onyx.setCollection(ONYXKEYS.COLLECTION.ROUTES, {
-                [routeA]: {name: 'Route A'},
-                [routeB]: {name: 'Route B'},
-                [routeC]: {name: 'Route C'},
-            } as GenericCollection);
-
-            callbackResults.length = 0; // Clear after initial set
-
-            // Remove items by setting them to null
-            await OnyxUtils.partialSetCollection({
-                collectionKey: ONYXKEYS.COLLECTION.ROUTES,
-                collection: {
-                    [routeA]: null,
-                    [routeB]: null,
-                } as GenericCollection,
-            });
-
-            // Should be notified about removals (value will be undefined for removed keys)
-            const removalCallbacks = callbackResults.filter((result) => result.value === undefined);
-
-            // We expect at least routeA or routeB to have undefined callback
-            // Both should ideally be notified, but the exact behavior depends on iteration order
-            expect(removalCallbacks.length).toBeGreaterThanOrEqual(1);
-            const hasRouteARemoval = removalCallbacks.some((result) => result.key === routeA);
-            const hasRouteBRemoval = removalCallbacks.some((result) => result.key === routeB);
-            expect(hasRouteARemoval || hasRouteBRemoval).toBe(true);
-
-            await Onyx.disconnect(connection);
-        });
     });
 
     describe('keysChanged', () => {
@@ -493,6 +342,36 @@ describe('OnyxUtils', () => {
             expect(() => {
                 OnyxUtils.getCollectionKey('');
             }).toThrowError("Invalid '' key provided, only collection keys are allowed.");
+        });
+    });
+
+    describe('isCollectionMember', () => {
+        it('should return true for collection member keys', () => {
+            expect(OnyxUtils.isCollectionMember('test_123')).toBe(true);
+            expect(OnyxUtils.isCollectionMember('test_level_456')).toBe(true);
+            expect(OnyxUtils.isCollectionMember('test_level_last_789')).toBe(true);
+            expect(OnyxUtils.isCollectionMember('test_-1_something')).toBe(true);
+            expect(OnyxUtils.isCollectionMember('routes_abc')).toBe(true);
+        });
+
+        it('should return false for collection keys themselves', () => {
+            expect(OnyxUtils.isCollectionMember('test_')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('test_level_')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('test_level_last_')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('routes_')).toBe(false);
+        });
+
+        it('should return false for non-collection keys', () => {
+            expect(OnyxUtils.isCollectionMember('test')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('someRegularKey')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('notACollection')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('')).toBe(false);
+        });
+
+        it('should return false for invalid keys', () => {
+            expect(OnyxUtils.isCollectionMember('invalid_key_123')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('notregistered_')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('notregistered_123')).toBe(false);
         });
     });
 
