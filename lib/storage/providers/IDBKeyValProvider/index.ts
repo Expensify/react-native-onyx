@@ -57,7 +57,7 @@ const provider: StorageProvider<UseStore | undefined> = {
             const getValues = Promise.all(pairs.map(([key]) => IDB.promisifyRequest<OnyxValue<OnyxKey>>(store.get(key))));
 
             return getValues.then((values) => {
-                pairs.forEach(([key, value], index) => {
+                for (const [index, [key, value]] of pairs.entries()) {
                     if (value === null) {
                         store.delete(key);
                     } else {
@@ -68,7 +68,7 @@ const provider: StorageProvider<UseStore | undefined> = {
 
                         store.put(newValue, key);
                     }
-                });
+                }
 
                 return IDB.promisifyRequest(store.transaction);
             });
