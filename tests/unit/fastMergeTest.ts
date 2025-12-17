@@ -127,6 +127,20 @@ describe('fastMerge', () => {
             expect(result).toEqual(testObjectWithNullValuesRemoved);
         });
 
+        it('should replace Date objects', () => {
+            const oldDate = new Date('2024-01-01');
+            const newDate = new Date('2025-01-01');
+            const result = utils.fastMerge(oldDate, newDate);
+            expect(result.result).toEqual(newDate);
+        });
+
+        it('should replace RegExp objects', () => {
+            const oldRegex = /old/gi;
+            const newRegex = /new/i;
+            const result = utils.fastMerge(oldRegex, newRegex);
+            expect(result.result).toEqual(newRegex);
+        });
+
         it('should add the "ONYX_INTERNALS__REPLACE_OBJECT_MARK" flag to the merged object when the change is set to null and "objectRemovalMode" is set to "mark"', () => {
             const result = utils.fastMerge(testMergeChanges[1], testMergeChanges[0], {
                 shouldRemoveNestedNulls: true,
