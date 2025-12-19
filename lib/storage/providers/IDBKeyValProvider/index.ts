@@ -84,13 +84,13 @@ const provider: StorageProvider<UseStore | undefined> = {
         }
 
         return provider.store('readwrite', (store) => {
-            pairs.forEach(([key, value]) => {
+            for (const [key, value] of pairs) {
                 if (value === null) {
                     store.delete(key);
                 } else {
                     store.put(value, key);
                 }
-            });
+            }
 
             return IDB.promisifyRequest(store.transaction);
         });

@@ -123,7 +123,9 @@ const provider: StorageProvider<Store> = {
      */
     clear() {
         // Remove all keys without changing the root object reference.
-        Object.keys(provider.store).forEach((k) => delete provider.store[k]);
+        for (const key of Object.keys(provider.store)) {
+            delete provider.store[key];
+        }
         return Promise.resolve();
     },
 
@@ -145,7 +147,9 @@ const provider: StorageProvider<Store> = {
 
 const setMockStore = (data: Store) => {
     // Replace keys without changing the root object reference.
-    Object.keys(storeInternal).forEach((k) => delete storeInternal[k]);
+    for (const key of Object.keys(storeInternal)) {
+        delete storeInternal[key];
+    }
     Object.assign(storeInternal, data);
 };
 
