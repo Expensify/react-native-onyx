@@ -122,8 +122,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     // Stores the newest cached value in order to compare with the previous one and optimize `getSnapshot()` execution.
     const newValueRef = useRef<TReturnValue | undefined | null>(null);
 
-    const lastConnectedKeyRef = useRef<TKey>(key);
-
     // Stores the previously result returned by the hook, containing the data from cache and the fetch status.
     // We initialize it to `undefined` and `loading` fetch status to simulate the initial result when the hook is loading from the cache.
     // However, if `initWithStoredValues` is `false` we set the fetch status to `loaded` since we want to signal that data is ready.
@@ -163,16 +161,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     );
 
     useEffect(() => () => onyxSnapshotCache.deregisterConsumer(key, cacheKey), [key, cacheKey]);
-
-    useEffect(() => {
-        if (lastConnectedKeyRef.current === key) {
-            return;
-        }
-        lastConnectedKeyRef.current = key;
-        shouldGetCachedValueRef.current = true;
-        previousValueRef.current = null;
-        resultRef.current = [undefined, {status: options?.initWithStoredValues === false ? 'loaded' : 'loading'}];
-    }, [key, options?.initWithStoredValues]);
 
     useEffect(() => {
         // These conditions will ensure we can only handle dynamic collection member keys from the same collection.
