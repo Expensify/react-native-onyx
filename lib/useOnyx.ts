@@ -264,10 +264,10 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             return result;
         }
 
-        // We get the value from cache while the first connection to Onyx is being made,
+        // We get the value from cache while the first connection to Onyx is being made or the key has changed,
         // so we can return any cached value right away. After the connection is made, we only
         // update `newValueRef` when `Onyx.connect()` callback is fired.
-        if (isFirstConnectionRef.current || shouldGetCachedValueRef.current) {
+        if (isFirstConnectionRef.current || shouldGetCachedValueRef.current || key !== previousKey) {
             // Gets the value from cache and maps it with selector. It changes `null` to `undefined` for `useOnyx` compatibility.
             const value = OnyxUtils.tryGetCachedValue(key) as OnyxValue<TKey>;
             const selectedValue = memoizedSelector ? memoizedSelector(value) : value;
