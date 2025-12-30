@@ -248,6 +248,22 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         if (!(isFirstConnectionRef.current && options?.initWithStoredValues === false) && !shouldGetCachedValueRef.current) {
             const cachedResult = onyxSnapshotCache.getCachedResult<UseOnyxResult<TReturnValue>>(key, cacheKey);
             if (cachedResult !== undefined) {
+                // Collections are rebuilt as new objects each time via getCollectionData, so we need to compare values
+                // and preserve reference stability to prevent unnecessary rerenders
+                const isCollection = OnyxUtils.isCollectionKey(key);
+                if (isCollection) {
+                    const oldResultRef = resultRef.current;
+                    const cachedValue = cachedResult[0];
+                    const oldValue = oldResultRef[0];
+
+                    // If values are equal but references differ, keep the old reference to prevent unnecessary rerenders
+                    // This ensures reference stability even when cache gets invalidated and recreated
+                    // useSyncExternalStore compares return values, so we need to return the same reference when values are equal
+                    if (deepEqual(cachedValue, oldValue) && cachedResult !== oldResultRef) {
+                        return oldResultRef;
+                    }
+                }
+
                 resultRef.current = cachedResult;
                 return cachedResult;
             }
@@ -296,11 +312,17 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         }
 
         // Optimized equality checking:
-        // - Memoized selectors already handle deep equality internally, so we can use fast reference equality
-        // - Non-selector cases use shallow equality for object reference checks
+        // - Collections always use deepEqual since they're rebuilt as new objects each time
+        //   (even with selectors, collection outputs will have different references)
+        // - Memoized selectors with non-collections handle deep equality internally, so we can use fast reference equality
+        // - Other non-selector cases use shallow equality for object reference checks
         // - Normalize null to undefined to ensure consistent comparison (both represent "no value")
+        const isCollection = OnyxUtils.isCollectionKey(key);
         let areValuesEqual: boolean;
-        if (memoizedSelector) {
+        if (isCollection) {
+            // Collections always need deepEqual, even with selectors, because selector outputs are new object references
+            areValuesEqual = deepEqual(previousValueRef.current ?? undefined, newValueRef.current);
+        } else if (memoizedSelector) {
             const normalizedPrevious = previousValueRef.current ?? undefined;
             const normalizedNew = newValueRef.current ?? undefined;
             areValuesEqual = normalizedPrevious === normalizedNew;
