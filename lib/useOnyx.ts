@@ -264,7 +264,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             return result;
         }
 
-        // We get the value from cache while the first connection to Onyx is being made or the key has changed,
+        // We get the value from cache while the first connection to Onyx is being made or if the key has changed,
         // so we can return any cached value right away. After the connection is made, we only
         // update `newValueRef` when `Onyx.connect()` callback is fired.
         if (isFirstConnectionRef.current || shouldGetCachedValueRef.current || key !== previousKey) {
