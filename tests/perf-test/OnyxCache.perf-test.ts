@@ -220,4 +220,59 @@ describe('OnyxCache', () => {
             });
         });
     });
+
+    describe('getCollectionData', () => {
+        test('one call getting collection with stable reference (10k members)', async () => {
+            await measureFunction(() => cache.getCollectionData(collectionKey), {
+                beforeEach: async () => {
+                    resetCacheBeforeEachMeasure();
+                    cache.setCollectionKeys(new Set([collectionKey]));
+                    // Set all collection members
+                    Object.entries(mockedReportActionsMap).forEach(([k, v]) => cache.set(k, v));
+                    // First call to create stable reference
+                    cache.getCollectionData(collectionKey);
+                },
+            });
+        });
+
+        test('one call getting collection with dirty collection (10k members)', async () => {
+            await measureFunction(() => cache.getCollectionData(collectionKey), {
+                beforeEach: async () => {
+                    resetCacheBeforeEachMeasure();
+                    cache.setCollectionKeys(new Set([collectionKey]));
+                    // Set all collection members
+                    Object.entries(mockedReportActionsMap).forEach(([k, v]) => cache.set(k, v));
+                    // Mark collection as dirty by updating a member
+                    cache.set(mockedReportActionsKeys[0], createRandomReportAction(Number(mockedReportActionsMap[mockedReportActionsKeys[0]].reportActionID)));
+                },
+            });
+        });
+
+        test('one call getting collection among 1000 different collections', async () => {
+            const targetCollectionKey = `collection_100_`;
+
+            await measureFunction(() => cache.getCollectionData(targetCollectionKey), {
+                beforeEach: async () => {
+                    resetCacheBeforeEachMeasure();
+
+                    // Create 500 collection keys
+                    const collectionKeys = Array.from({length: 1000}, (_, i) => `collection_${i}_`);
+                    cache.setCollectionKeys(new Set(collectionKeys));
+
+                    // Populate each collection with mockedReportActionsMap data
+                    const partOfMockedReportActionsKeys = mockedReportActionsKeys.slice(0, 20);
+                    collectionKeys.forEach((colKey) => {
+                        partOfMockedReportActionsKeys.forEach((originalKey) => {
+                            const memberId = originalKey.replace(collectionKey, '');
+                            const memberKey = `${colKey}${memberId}`;
+                            cache.set(memberKey, mockedReportActionsMap[originalKey]);
+                        });
+                    });
+
+                    // First call to create stable reference
+                    cache.getCollectionData(targetCollectionKey);
+                },
+            });
+        });
+    });
 });

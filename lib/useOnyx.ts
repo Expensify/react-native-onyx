@@ -236,12 +236,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         if (!(isFirstConnectionRef.current && options?.initWithStoredValues === false) && !shouldGetCachedValueRef.current) {
             const cachedResult = onyxSnapshotCache.getCachedResult<UseOnyxResult<TReturnValue>>(key, cacheKey);
             if (cachedResult !== undefined) {
-                // Collections: preserve reference stability - if data is deeply equal, return same reference
-                const isCollection = OnyxUtils.isCollectionKey(key);
-                if (isCollection && resultRef.current && cachedResult !== resultRef.current && deepEqual(cachedResult, resultRef.current)) {
-                    return resultRef.current;
-                }
-
                 resultRef.current = cachedResult;
                 return cachedResult;
             }

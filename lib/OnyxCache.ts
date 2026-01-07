@@ -34,6 +34,12 @@ class OnyxCache {
     /** Cache of complete collection data objects for O(1) retrieval */
     private collectionData: Record<OnyxKey, Record<OnyxKey, OnyxValue<OnyxKey>>>;
 
+    /** Track which collections have changed since last getCollectionData() call */
+    private dirtyCollections: Set<OnyxKey>;
+
+    /** The stable reference returned last time for each collection */
+    private stableCollectionReference: Record<OnyxKey, Record<OnyxKey, OnyxValue<OnyxKey>> | undefined>;
+
     /**
      * Captured pending tasks for already running storage methods
      * Using a map yields better performance on operations such a delete
@@ -55,6 +61,14 @@ class OnyxCache {
     /** Set of collection keys for fast lookup */
     private collectionKeys = new Set<OnyxKey>();
 
+    /**
+     * Mark a collection as dirty when its data changes
+     * This ensures getCollectionData() creates a new reference
+     */
+    private markCollectionDirty(collectionKey: OnyxKey): void {
+        this.dirtyCollections.add(collectionKey);
+    }
+
     constructor() {
         this.storageKeys = new Set();
         this.nullishStorageKeys = new Set();
@@ -62,6 +76,8 @@ class OnyxCache {
         this.storageMap = {};
         this.collectionData = {};
         this.pendingPromises = new Map();
+        this.dirtyCollections = new Set();
+        this.stableCollectionReference = {};
 
         // bind all public methods to prevent problems with `this`
         bindAll(
@@ -174,6 +190,7 @@ class OnyxCache {
             // Remove from collection data cache if it's a collection member
             if (collectionKey && this.collectionData[collectionKey]) {
                 delete this.collectionData[collectionKey][key];
+                this.markCollectionDirty(collectionKey);
             }
             return undefined;
         }
@@ -186,6 +203,7 @@ class OnyxCache {
                 this.collectionData[collectionKey] = {};
             }
             this.collectionData[collectionKey][key] = value;
+            this.markCollectionDirty(collectionKey);
         }
 
         return value;
@@ -199,11 +217,14 @@ class OnyxCache {
         const collectionKey = this.getCollectionKey(key);
         if (collectionKey && this.collectionData[collectionKey]) {
             delete this.collectionData[collectionKey][key];
+            this.markCollectionDirty(collectionKey);
         }
 
         // If this is a collection key, clear its data
         if (this.isCollectionKey(key)) {
             delete this.collectionData[key];
+            this.dirtyCollections.delete(key);
+            delete this.stableCollectionReference[key];
         }
 
         this.storageKeys.delete(key);
@@ -238,6 +259,7 @@ class OnyxCache {
                 // Remove from collection data cache if it's a collection member
                 if (collectionKey && this.collectionData[collectionKey]) {
                     delete this.collectionData[collectionKey][key];
+                    this.markCollectionDirty(collectionKey);
                 }
             } else {
                 this.nullishStorageKeys.delete(key);
@@ -248,6 +270,7 @@ class OnyxCache {
                         this.collectionData[collectionKey] = {};
                     }
                     this.collectionData[collectionKey][key] = this.storageMap[key];
+                    this.markCollectionDirty(collectionKey);
                 }
             }
         });
@@ -323,6 +346,7 @@ class OnyxCache {
             const collectionKey = this.getCollectionKey(key);
             if (collectionKey && this.collectionData[collectionKey]) {
                 delete this.collectionData[collectionKey][key];
+                this.markCollectionDirty(collectionKey);
             }
             this.recentKeys.delete(key);
         }
@@ -440,6 +464,8 @@ class OnyxCache {
                 return;
             }
             this.collectionData[collectionKey] = {};
+            // New empty collection - mark as dirty so first getCollectionData creates reference
+            this.markCollectionDirty(collectionKey);
         });
     }
 
@@ -464,15 +490,26 @@ class OnyxCache {
 
     /**
      * Get all data for a collection key
+     * Returns stable references when data hasn't changed to prevent unnecessary rerenders
      */
     getCollectionData(collectionKey: OnyxKey): Record<OnyxKey, OnyxValue<OnyxKey>> | undefined {
+        if (!this.dirtyCollections.has(collectionKey) && this.stableCollectionReference[collectionKey]) {
+            return this.stableCollectionReference[collectionKey];
+        }
+
         const cachedCollection = this.collectionData[collectionKey];
         if (!cachedCollection || Object.keys(cachedCollection).length === 0) {
+            this.dirtyCollections.delete(collectionKey);
+            delete this.stableCollectionReference[collectionKey];
             return undefined;
         }
 
-        // Return a shallow copy to ensure React detects changes when items are added/removed
-        return {...cachedCollection};
+        // Collection changed, create new reference
+        const newReference = {...cachedCollection};
+        this.stableCollectionReference[collectionKey] = newReference;
+        this.dirtyCollections.delete(collectionKey);
+
+        return newReference;
     }
 }
 
