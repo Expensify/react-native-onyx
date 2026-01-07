@@ -7,7 +7,7 @@ import type StorageProvider from './providers/types';
 import * as GlobalSettings from '../GlobalSettings';
 import decorateWithMetrics from '../metrics';
 
-let provider = PlatformStorage;
+let provider = PlatformStorage as StorageProvider<unknown>;
 let shouldKeepInstancesSync = false;
 let finishInitalization: (value?: unknown) => void;
 const initPromise = new Promise((resolve) => {
@@ -15,8 +15,8 @@ const initPromise = new Promise((resolve) => {
 });
 
 type Storage = {
-    getStorageProvider: () => StorageProvider;
-} & Omit<StorageProvider, 'name'>;
+    getStorageProvider: () => StorageProvider<unknown>;
+} & Omit<StorageProvider<unknown>, 'name' | 'store'>;
 
 /**
  * Degrade performance by removing the storage provider and only using cache

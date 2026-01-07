@@ -177,7 +177,7 @@ applied in the order they were called. Note: `Onyx.set()` calls do not work this
 **Example**  
 ```js
 Onyx.merge(ONYXKEYS.EMPLOYEE_LIST, ['Joe']); // -> ['Joe']
-Onyx.merge(ONYXKEYS.EMPLOYEE_LIST, ['Jack']); // -> ['Joe', 'Jack']
+Onyx.merge(ONYXKEYS.EMPLOYEE_LIST, ['Jack']); // -> ['Jack']
 Onyx.merge(ONYXKEYS.POLICY, {id: 1}); // -> {id: 1}
 Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Workspace'}
 ```

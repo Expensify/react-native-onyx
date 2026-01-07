@@ -78,11 +78,13 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     const previousKey = usePrevious(key);
 
     const currentDependenciesRef = useLiveRef(dependencies);
-    const currentSelectorRef = useLiveRef(options?.selector);
+    const selector = options?.selector;
 
     // Create memoized version of selector for performance
     const memoizedSelector = useMemo(() => {
-        if (!options?.selector) return null;
+        if (!selector) {
+            return null;
+        }
 
         let lastInput: OnyxValue<TKey> | undefined;
         let lastOutput: TReturnValue;
@@ -91,14 +93,13 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
         return (input: OnyxValue<TKey> | undefined): TReturnValue => {
             const currentDependencies = currentDependenciesRef.current;
-            const currentSelector = currentSelectorRef.current;
 
             // Recompute if input changed, dependencies changed, or first time
             const dependenciesChanged = !shallowEqual(lastDependencies, currentDependencies);
             if (!hasComputed || lastInput !== input || dependenciesChanged) {
                 // Only proceed if we have a valid selector
-                if (currentSelector) {
-                    const newOutput = currentSelector(input);
+                if (selector) {
+                    const newOutput = selector(input);
 
                     // Deep equality mode: only update if output actually changed
                     if (!hasComputed || !deepEqual(lastOutput, newOutput) || dependenciesChanged) {
@@ -112,7 +113,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
             return lastOutput;
         };
-    }, [currentDependenciesRef, currentSelectorRef, options?.selector]);
+    }, [currentDependenciesRef, selector]);
 
     // Stores the previous cached value as it's necessary to compare with the new value in `getSnapshot()`.
     // We initialize it to `null` to simulate that we don't have any value from cache yet.
@@ -300,17 +301,18 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // - The previously cached value is different from the new value.
         // - The previously cached value is `null` (not set from cache yet) and we have cache for this key
         //   OR we have a pending `Onyx.clear()` task (if `Onyx.clear()` is running cache might not be available anymore
+        //   OR the subscriber is triggered (the value is gotten from the storage)
         //   so we update the cached value/result right away in order to prevent infinite loading state issues).
-        const shouldUpdateResult = !areValuesEqual || (previousValueRef.current === null && (hasCacheForKey || OnyxCache.hasPendingTask(TASK.CLEAR)));
+        const shouldUpdateResult = !areValuesEqual || (previousValueRef.current === null && (hasCacheForKey || OnyxCache.hasPendingTask(TASK.CLEAR) || !isFirstConnectionRef.current));
         if (shouldUpdateResult) {
             previousValueRef.current = newValueRef.current;
 
             // If the new value is `null` we default it to `undefined` to ensure the consumer gets a consistent result from the hook.
-            const newStatus = newFetchStatus ?? 'loaded';
+            newFetchStatus = newFetchStatus ?? 'loaded';
             resultRef.current = [
                 previousValueRef.current ?? undefined,
                 {
-                    status: newStatus,
+                    status: newFetchStatus,
                     sourceValue: sourceValueRef.current,
                 },
             ];
@@ -318,12 +320,14 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             // If `canBeMissing` is set to `false` and the Onyx value of that key is not defined,
             // we log an alert so it can be acknowledged by the consumer. Additionally, we won't log alerts
             // if there's a `Onyx.clear()` task in progress.
-            if (options?.canBeMissing === false && newStatus === 'loaded' && !isOnyxValueDefined && !OnyxCache.hasPendingTask(TASK.CLEAR)) {
+            if (options?.canBeMissing === false && newFetchStatus === 'loaded' && !isOnyxValueDefined && !OnyxCache.hasPendingTask(TASK.CLEAR)) {
                 Logger.logAlert(`useOnyx returned no data for key with canBeMissing set to false for key ${key}`, {showAlert: true});
             }
         }
 
-        onyxSnapshotCache.setCachedResult<UseOnyxResult<TReturnValue>>(key, cacheKey, resultRef.current);
+        if (newFetchStatus !== 'loading') {
+            onyxSnapshotCache.setCachedResult<UseOnyxResult<TReturnValue>>(key, cacheKey, resultRef.current);
+        }
 
         return resultRef.current;
     }, [options?.initWithStoredValues, options?.allowStaleData, options?.canBeMissing, key, memoizedSelector, cacheKey]);
