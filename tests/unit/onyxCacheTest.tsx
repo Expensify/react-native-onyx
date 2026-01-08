@@ -414,6 +414,312 @@ describe('Onyx', () => {
                 });
             });
         });
+
+        describe.only('getCollectionData', () => {
+            const COLLECTION_KEY = 'test_collection_';
+            const MEMBER_KEY_1 = `${COLLECTION_KEY}member1`;
+            const MEMBER_KEY_2 = `${COLLECTION_KEY}member2`;
+            const MEMBER_KEY_3 = `${COLLECTION_KEY}member3`;
+
+            beforeEach(() => {
+                cache.setCollectionKeys(new Set([COLLECTION_KEY]));
+            });
+
+            it('Should return undefined when collection does not exist', () => {
+                // When getCollectionData is called for non-existent collection
+                const result = cache.getCollectionData('non_existent_collection_');
+
+                // Then it should return undefined
+                expect(result).toBeUndefined();
+            });
+
+            it('Should return undefined when collection is empty', () => {
+                // Given a collection key is set but has no members
+                cache.setCollectionKeys(new Set([COLLECTION_KEY]));
+
+                // When getCollectionData is called
+                const result = cache.getCollectionData(COLLECTION_KEY);
+
+                // Then it should return undefined
+                expect(result).toBeUndefined();
+            });
+
+            it('Should return new reference when collection is dirty', () => {
+                // Given a collection with some members
+                cache.set(MEMBER_KEY_1, {id: 1, value: 'test1'});
+                cache.set(MEMBER_KEY_2, {id: 2, value: 'test2'});
+
+                // When getCollectionData is called (collection is dirty after set)
+                const result1 = cache.getCollectionData(COLLECTION_KEY);
+
+                // Then it should return a new reference with all members
+                expect(result1).toBeDefined();
+                expect(result1).toEqual({
+                    [MEMBER_KEY_1]: {id: 1, value: 'test1'},
+                    [MEMBER_KEY_2]: {id: 2, value: 'test2'},
+                });
+            });
+
+            it('Should return stable reference when collection is not dirty', () => {
+                // Given a collection with some members
+                cache.set(MEMBER_KEY_1, {id: 1, value: 'test1'});
+                cache.set(MEMBER_KEY_2, {id: 2, value: 'test2'});
+
+                // When getCollectionData is called first time (marks as clean)
+                const result1 = cache.getCollectionData(COLLECTION_KEY);
+
+                // When getCollectionData is called again (not dirty)
+                const result2 = cache.getCollectionData(COLLECTION_KEY);
+
+                // Then it should return the same reference
+                expect(result1).toBe(result2);
+                expect(result1).toEqual({
+                    [MEMBER_KEY_1]: {id: 1, value: 'test1'},
+                    [MEMBER_KEY_2]: {id: 2, value: 'test2'},
+                });
+            });
+
+            it('Should return new reference after collection member is added', () => {
+                // Given a collection with some members
+                cache.set(MEMBER_KEY_1, {id: 1, value: 'test1'});
+                cache.set(MEMBER_KEY_2, {id: 2, value: 'test2'});
+
+                // When getCollectionData is called first time
+                const result1 = cache.getCollectionData(COLLECTION_KEY);
+
+                // When a new member is added
+                cache.set(MEMBER_KEY_3, {id: 3, value: 'test3'});
+
+                // When getCollectionData is called again
+                const result2 = cache.getCollectionData(COLLECTION_KEY);
+
+                // Then it should return a new reference with the new member
+                expect(result1).not.toBe(result2);
+                expect(result2).toEqual({
+                    [MEMBER_KEY_1]: {id: 1, value: 'test1'},
+                    [MEMBER_KEY_2]: {id: 2, value: 'test2'},
+                    [MEMBER_KEY_3]: {id: 3, value: 'test3'},
+                });
+            });
+
+            it('Should return new reference after collection member is updated', () => {
+                // Given a collection with some members
+                cache.set(MEMBER_KEY_1, {id: 1, value: 'test1'});
+                cache.set(MEMBER_KEY_2, {id: 2, value: 'test2'});
+
+                // When getCollectionData is called first time
+                const result1 = cache.getCollectionData(COLLECTION_KEY);
+
+                // When a member is updated
+                cache.set(MEMBER_KEY_1, {id: 1, value: 'updated'});
+
+                // When getCollectionData is called again
+                const result2 = cache.getCollectionData(COLLECTION_KEY);
+
+                // Then it should return a new reference with updated member
+                expect(result1).not.toBe(result2);
+                expect(result2).toEqual({
+                    [MEMBER_KEY_1]: {id: 1, value: 'updated'},
+                    [MEMBER_KEY_2]: {id: 2, value: 'test2'},
+                });
+            });
+
+            it('Should return new reference after collection member is deleted', () => {
+                // Given a collection with some members
+                cache.set(MEMBER_KEY_1, {id: 1, value: 'test1'});
+                cache.set(MEMBER_KEY_2, {id: 2, value: 'test2'});
+                cache.set(MEMBER_KEY_3, {id: 3, value: 'test3'});
+
+                // When getCollectionData is called first time
+                const result1 = cache.getCollectionData(COLLECTION_KEY);
+
+                // When a member is deleted
+                cache.set(MEMBER_KEY_2, null);
+
+                // When getCollectionData is called again
+                const result2 = cache.getCollectionData(COLLECTION_KEY);
+
+                // Then it should return a new reference without the deleted member
+                expect(result1).not.toBe(result2);
+                expect(result2).toEqual({
+                    [MEMBER_KEY_1]: {id: 1, value: 'test1'},
+                    [MEMBER_KEY_3]: {id: 3, value: 'test3'},
+                });
+            });
+
+            it('Should return undefined after all collection members are deleted', () => {
+                // Given a collection with some members
+                cache.set(MEMBER_KEY_1, {id: 1, value: 'test1'});
+                cache.set(MEMBER_KEY_2, {id: 2, value: 'test2'});
+
+                // When getCollectionData is called first time
+                const result1 = cache.getCollectionData(COLLECTION_KEY);
+                expect(result1).toBeDefined();
+
+                // When all members are deleted
+                cache.set(MEMBER_KEY_1, null);
+                cache.set(MEMBER_KEY_2, null);
+
+                // When getCollectionData is called again
+                const result2 = cache.getCollectionData(COLLECTION_KEY);
+
+                // Then it should return undefined
+                expect(result2).toBeUndefined();
+            });
+
+            it('Should return undefined after collection is dropped', () => {
+                // Given a collection with some members
+                cache.set(MEMBER_KEY_1, {id: 1, value: 'test1'});
+                cache.set(MEMBER_KEY_2, {id: 2, value: 'test2'});
+
+                // When getCollectionData is called first time
+                const result1 = cache.getCollectionData(COLLECTION_KEY);
+                expect(result1).toBeDefined();
+
+                // When collection is dropped
+                cache.drop(COLLECTION_KEY);
+
+                // When getCollectionData is called again
+                const result2 = cache.getCollectionData(COLLECTION_KEY);
+
+                // Then it should return undefined
+                expect(result2).toBeUndefined();
+            });
+
+            it('Should return correct data structure with all collection members', () => {
+                // Given a collection with multiple members
+                cache.set(MEMBER_KEY_1, {id: 1, value: 'test1'});
+                cache.set(MEMBER_KEY_2, {id: 2, value: 'test2'});
+                cache.set(MEMBER_KEY_3, {id: 3, value: 'test3'});
+
+                // When getCollectionData is called
+                const result = cache.getCollectionData(COLLECTION_KEY);
+
+                // Then it should return an object with all members
+                expect(result).toBeDefined();
+                expect(Object.keys(result!)).toHaveLength(3);
+                expect(result![MEMBER_KEY_1]).toEqual({id: 1, value: 'test1'});
+                expect(result![MEMBER_KEY_2]).toEqual({id: 2, value: 'test2'});
+                expect(result![MEMBER_KEY_3]).toEqual({id: 3, value: 'test3'});
+            });
+
+            it('Should maintain stable reference across multiple calls when no changes occur', () => {
+                // Given a collection with some members
+                cache.set(MEMBER_KEY_1, {id: 1, value: 'test1'});
+                cache.set(MEMBER_KEY_2, {id: 2, value: 'test2'});
+
+                // When getCollectionData is called multiple times without changes
+                const result1 = cache.getCollectionData(COLLECTION_KEY);
+                const result2 = cache.getCollectionData(COLLECTION_KEY);
+                const result3 = cache.getCollectionData(COLLECTION_KEY);
+
+                // Then all results should be the same reference
+                expect(result1).toBe(result2);
+                expect(result2).toBe(result3);
+            });
+
+            it('Should handle merge operations correctly', () => {
+                // Given a collection with some members
+                cache.set(MEMBER_KEY_1, {id: 1, value: 'test1'});
+                cache.set(MEMBER_KEY_2, {id: 2, value: 'test2'});
+
+                // When getCollectionData is called first time
+                const result1 = cache.getCollectionData(COLLECTION_KEY);
+
+                // When merge is called with new member
+                cache.merge({
+                    [MEMBER_KEY_3]: {id: 3, value: 'test3'},
+                });
+
+                // When getCollectionData is called again
+                const result2 = cache.getCollectionData(COLLECTION_KEY);
+
+                // Then it should return a new reference with merged data
+                expect(result1).not.toBe(result2);
+                expect(result2).toEqual({
+                    [MEMBER_KEY_1]: {id: 1, value: 'test1'},
+                    [MEMBER_KEY_2]: {id: 2, value: 'test2'},
+                    [MEMBER_KEY_3]: {id: 3, value: 'test3'},
+                });
+            });
+
+            it('Should return new reference after collection member is dropped', () => {
+                // Given a collection with some members
+                cache.set(MEMBER_KEY_1, {id: 1, value: 'test1'});
+                cache.set(MEMBER_KEY_2, {id: 2, value: 'test2'});
+                cache.set(MEMBER_KEY_3, {id: 3, value: 'test3'});
+
+                // When getCollectionData is called first time
+                const result1 = cache.getCollectionData(COLLECTION_KEY);
+
+                // When a member is dropped
+                cache.drop(MEMBER_KEY_2);
+
+                // When getCollectionData is called again
+                const result2 = cache.getCollectionData(COLLECTION_KEY);
+
+                // Then it should return a new reference without the dropped member
+                expect(result1).not.toBe(result2);
+                expect(result2).toEqual({
+                    [MEMBER_KEY_1]: {id: 1, value: 'test1'},
+                    [MEMBER_KEY_3]: {id: 3, value: 'test3'},
+                });
+            });
+
+            it.only('Should return new reference after collection member is evicted via removeLeastRecentlyUsedKeys', () => {
+                // Given a collection with some members
+                cache.set(MEMBER_KEY_1, {id: 1, value: 'test1'});
+                cache.set(MEMBER_KEY_2, {id: 2, value: 'test2'});
+                cache.set(MEMBER_KEY_3, {id: 3, value: 'test3'});
+                // Set eviction allow list to allow all keys to be evicted when removeLeastRecentlyUsedKeys is called
+                cache.setEvictionAllowList([MEMBER_KEY_1, MEMBER_KEY_2, MEMBER_KEY_3]);
+
+                // When getCollectionData is called first time
+                const result1 = cache.getCollectionData(COLLECTION_KEY);
+                expect(result1).toBeDefined();
+                expect(Object.keys(result1!)).toHaveLength(3);
+
+                // When removeLeastRecentlyUsedKeys is called to evict collection members
+                // Add keys in order - first added will be least recent
+                cache.addToAccessedKeys(MEMBER_KEY_1);
+                cache.addToAccessedKeys(MEMBER_KEY_2);
+                cache.addToAccessedKeys(MEMBER_KEY_3);
+                // MEMBER_KEY_3 is most recent, so MEMBER_KEY_1 and MEMBER_KEY_2 should be evicted
+                cache.removeLeastRecentlyUsedKeys();
+
+                // When getCollectionData is called again
+                const result2 = cache.getCollectionData(COLLECTION_KEY);
+                // Then it should return a new reference (collection is dirty after member eviction)
+                expect(result1).not.toBe(result2);
+                // Only the most recent member should remain
+                expect(Object.keys(result2!)).toHaveLength(1);
+                expect(result2![MEMBER_KEY_3]).toEqual({id: 3, value: 'test3'});
+            });
+
+            it('Should mark collection as dirty when setCollectionKeys is called with new collection', () => {
+                // Given an existing collection with members
+                cache.set(MEMBER_KEY_1, {id: 1, value: 'test1'});
+                cache.set(MEMBER_KEY_2, {id: 2, value: 'test2'});
+
+                // When getCollectionData is called first time
+                const result1 = cache.getCollectionData(COLLECTION_KEY);
+                expect(result1).toBeDefined();
+
+                // When a new collection key is added via setCollectionKeys
+                const NEW_COLLECTION_KEY = 'new_collection_';
+                cache.setCollectionKeys(new Set([COLLECTION_KEY, NEW_COLLECTION_KEY]));
+
+                // When getCollectionData is called for the new collection (should be dirty)
+                const newCollectionResult = cache.getCollectionData(NEW_COLLECTION_KEY);
+
+                // Then it should return undefined (empty collection)
+                expect(newCollectionResult).toBeUndefined();
+
+                // And the original collection should still work
+                const result2 = cache.getCollectionData(COLLECTION_KEY);
+                expect(result2).toBe(result1); // Same reference, not dirty
+            });
+        });
     });
 
     describe('Onyx with Cache', () => {
