@@ -88,22 +88,27 @@ export default [
         },
     },
     {
-        files: ['tests/**/*.{js,jsx,ts,tsx}'],
+        files: ['tests/**/*.{js,jsx,ts,tsx}', 'jestSetup.js'],
+        languageOptions: {
+            globals: {
+                jest: 'readonly',
+                describe: 'readonly',
+                it: 'readonly',
+                test: 'readonly',
+                expect: 'readonly',
+                beforeEach: 'readonly',
+                afterEach: 'readonly',
+                beforeAll: 'readonly',
+                afterAll: 'readonly',
+                fail: 'readonly',
+            },
+        },
         rules: {
             '@lwc/lwc/no-async-await': 'off',
             'no-await-in-loop': 'off',
             'no-restricted-syntax': ['error', 'ForInStatement', 'LabeledStatement', 'WithStatement'],
-        },
-    },
-    {
-        files: ['jestSetup.cjs'],
-        languageOptions: {
-            globals: {
-                jest: 'readonly',
-            },
-        },
-        rules: {
             'import/extensions': 'off',
+            '@typescript-eslint/no-require-imports': 'off',
         },
     },
 ];
