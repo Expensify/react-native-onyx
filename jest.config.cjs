@@ -12,10 +12,10 @@ module.exports = {
     },
     testEnvironment: './jest-test-environment.ts',
     setupFiles: ['fake-indexeddb/auto'],
-    setupFilesAfterEnv: ['./jestSetup.js'],
+    setupFilesAfterEnv: ['./jestSetup.cjs'],
     testTimeout: 60000,
     transformIgnorePatterns: ['node_modules/(?!((@)?react-native|@ngneat/falso|uuid)/)'],
-    testSequencer: './jest-sequencer.js',
+    testSequencer: './jest-sequencer.cjs',
     moduleNameMapper: {
         // Redirect all imports of OnyxMerge to its web version during unit tests.
         '^(.*)/OnyxMerge$': '<rootDir>/lib/OnyxMerge/index.ts',
