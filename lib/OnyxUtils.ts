@@ -818,16 +818,15 @@ function prepareSubscriberUpdate<TKey extends OnyxKey>(key: TKey, callback: () =
         collectionKey = undefined;
     }
 
-    callback();
-
     // If subscription is in progress, schedule a macrotask to prevent race condition with data from subscribeToKey deferred logic.
     if (pendingSubscriptionKeys.has(key) || (collectionKey && pendingSubscriptionKeys.has(collectionKey))) {
-        return new Promise((resolve) => {
-            setTimeout(() => resolve());
+        const macrotaskPromise = new Promise<void>((resolve) => {
+            setTimeout(() => resolve(), 0);
         });
+        return Promise.all([macrotaskPromise, Promise.resolve().then(callback)]).then();
     }
 
-    return Promise.resolve();
+    return Promise.resolve().then(callback);
 }
 
 /**
