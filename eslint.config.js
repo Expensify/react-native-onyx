@@ -44,6 +44,14 @@ export default [
                 project: './tsconfig.json',
             },
         },
+        settings: {
+            'import/resolver': {
+                typescript: {
+                    alwaysTryTypes: true,
+                    project: './tsconfig.json',
+                },
+            },
+        },
         rules: {
             ...tsPlugin.configs.recommended.rules,
             ...tsPlugin.configs.stylistic.rules,
@@ -51,7 +59,7 @@ export default [
             'react/jsx-props-no-spreading': 'off',
             'react/require-default-props': 'off',
             'react/jsx-filename-extension': ['error', {extensions: ['.tsx', '.jsx']}],
-            'import/no-unresolved': 'off',
+            'import/no-unresolved': 'error',
             'import/consistent-type-specifier-style': ['error', 'prefer-top-level'],
             'no-use-before-define': 'off',
             '@typescript-eslint/no-use-before-define': 'off',
@@ -66,7 +74,16 @@ export default [
             'rulesdir/prefer-import-module-contents': 'off',
             'es/no-optional-chaining': 'off',
             'es/no-nullish-coalescing-operators': 'off',
-            'import/extensions': 'off',
+            'import/extensions': [
+                'error',
+                'ignorePackages',
+                {
+                    js: 'never',
+                    jsx: 'never',
+                    ts: 'never',
+                    tsx: 'never',
+                },
+            ],
             'rulesdir/prefer-onyx-connect-in-libs': 'off',
         },
     },
