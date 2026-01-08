@@ -76,6 +76,9 @@ type OnyxMethod = ValueOf<typeof METHOD>;
 let mergeQueue: Record<OnyxKey, Array<OnyxValue<OnyxKey>>> = {};
 let mergeQueuePromise: Record<OnyxKey, Promise<void>> = {};
 
+// Used to schedule subscriber update to the macro task queue
+let nextMacrotaskPromise: Promise<void> | null = null;
+
 // Holds a mapping of all the React components that want their state subscribed to a store key
 let callbackToStateMapping: Record<string, CallbackToStateMapping<OnyxKey>> = {};
 
@@ -84,9 +87,6 @@ let onyxCollectionKeySet = new Set<OnyxKey>();
 
 // Holds a mapping of the connected key to the subscriptionID for faster lookups
 let onyxKeyToSubscriptionIDs = new Map();
-
-// Keys with subscriptions currently being established
-const pendingSubscriptionKeys = new Set<OnyxKey>();
 
 // Optional user-provided key value states set when Onyx initializes or clears
 let defaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
@@ -804,29 +804,21 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
     });
 }
 
-/** Helps to schedule subscriber update. Schedule the macrotask if the key subscription is in progress to avoid race condition.
+/**
+ * Delays promise resolution until the next macrotask to prevent race condition if the key subscription is in progress.
  *
- * @param key Onyx key
  * @param callback The keyChanged/keysChanged callback
  * */
-function prepareSubscriberUpdate<TKey extends OnyxKey>(key: TKey, callback: () => void): Promise<void> {
-    let collectionKey: string | undefined;
-    try {
-        collectionKey = getCollectionKey(key);
-    } catch (e) {
-        // If getCollectionKey() throws an error it means the key is not a collection key.
-        collectionKey = undefined;
-    }
-
-    // If subscription is in progress, schedule a macrotask to prevent race condition with data from subscribeToKey deferred logic.
-    if (pendingSubscriptionKeys.has(key) || (collectionKey && pendingSubscriptionKeys.has(collectionKey))) {
-        const macrotaskPromise = new Promise<void>((resolve) => {
-            setTimeout(() => resolve(), 0);
+function prepareSubscriberUpdate(callback: () => void): Promise<void> {
+    if (!nextMacrotaskPromise) {
+        nextMacrotaskPromise = new Promise<void>((resolve) => {
+            setTimeout(() => {
+                nextMacrotaskPromise = null;
+                resolve();
+            }, 0);
         });
-        return Promise.all([macrotaskPromise, Promise.resolve().then(callback)]).then();
     }
-
-    return Promise.resolve().then(callback);
+    return Promise.all([nextMacrotaskPromise, Promise.resolve().then(callback)]).then();
 }
 
 /**
@@ -841,7 +833,7 @@ function scheduleSubscriberUpdate<TKey extends OnyxKey>(
     canUpdateSubscriber: (subscriber?: CallbackToStateMapping<OnyxKey>) => boolean = () => true,
     isProcessingCollectionUpdate = false,
 ): Promise<void> {
-    return prepareSubscriberUpdate(key, () => keyChanged(key, value, canUpdateSubscriber, isProcessingCollectionUpdate));
+    return prepareSubscriberUpdate(() => keyChanged(key, value, canUpdateSubscriber, isProcessingCollectionUpdate));
 }
 
 /**
@@ -854,7 +846,7 @@ function scheduleNotifyCollectionSubscribers<TKey extends OnyxKey>(
     value: OnyxCollection<KeyValueMapping[TKey]>,
     previousValue?: OnyxCollection<KeyValueMapping[TKey]>,
 ): Promise<void> {
-    return prepareSubscriberUpdate(key, () => keysChanged(key, value, previousValue));
+    return prepareSubscriberUpdate(() => keysChanged(key, value, previousValue));
 }
 
 /**
@@ -1103,10 +1095,7 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
     // We create a mapping from key to lists of subscriptionIDs to access the specific list of subscriptionIDs.
     storeKeyBySubscriptions(mapping.key, callbackToStateMapping[subscriptionID].subscriptionID);
 
-    pendingSubscriptionKeys.add(mapping.key);
-
     if (mapping.initWithStoredValues === false) {
-        pendingSubscriptionKeys.delete(mapping.key);
         return subscriptionID;
     }
 
@@ -1152,7 +1141,8 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
 
                 // Here we cannot use batching because the nullish value is expected to be set immediately for default props
                 // or they will be undefined.
-                return sendDataToConnection(mapping, null, undefined);
+                sendDataToConnection(mapping, null, undefined);
+                return;
             }
 
             // When using a callback subscriber we will either trigger the provided callback for each key we find or combine all values
@@ -1161,25 +1151,25 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
             if (typeof mapping.callback === 'function') {
                 if (isCollectionKey(mapping.key)) {
                     if (mapping.waitForCollectionCallback) {
-                        return getCollectionDataAndSendAsObject(matchingKeys, mapping);
+                        getCollectionDataAndSendAsObject(matchingKeys, mapping);
+                        return;
                     }
 
                     // We did not opt into using waitForCollectionCallback mode so the callback is called for every matching key.
-                    return multiGet(matchingKeys).then((values) => {
+                    multiGet(matchingKeys).then((values) => {
                         values.forEach((val, key) => {
                             sendDataToConnection(mapping, val as OnyxValue<TKey>, key as TKey);
                         });
                     });
+                    return;
                 }
 
                 // If we are not subscribed to a collection key then there's only a single key to send an update for.
-                return get(mapping.key).then((val) => sendDataToConnection(mapping, val as OnyxValue<TKey>, mapping.key));
+                get(mapping.key).then((val) => sendDataToConnection(mapping, val as OnyxValue<TKey>, mapping.key));
+                return;
             }
 
             console.error('Warning: Onyx.connect() was found without a callback');
-        })
-        .then(() => {
-            pendingSubscriptionKeys.delete(mapping.key);
         });
 
     // The subscriptionID is returned back to the caller so that it can be used to clean up the connection when it's no longer needed
