@@ -161,7 +161,7 @@ describe('Set data while storage is clearing', () => {
                     expect(collectionCallback).toHaveBeenCalledTimes(3);
 
                     // And it should be called with the expected parameters each time
-                    expect(collectionCallback).toHaveBeenNthCalledWith(1, undefined, undefined, undefined);
+                    expect(collectionCallback).toHaveBeenNthCalledWith(1, undefined, ONYX_KEYS.COLLECTION.TEST, undefined);
                     expect(collectionCallback).toHaveBeenNthCalledWith(
                         2,
                         {

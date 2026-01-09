@@ -847,7 +847,7 @@ function addKeyToRecentlyAccessedIfNeeded<TKey extends OnyxKey>(key: TKey): void
 function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: CollectionKeyBase[], mapping: CallbackToStateMapping<TKey>): void {
     multiGet(matchingKeys).then((dataMap) => {
         const data = Object.fromEntries(dataMap.entries()) as OnyxValue<TKey>;
-        sendDataToConnection(mapping, data, undefined);
+        sendDataToConnection(mapping, data, mapping.key);
     });
 }
 
@@ -1173,9 +1173,11 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
                     cache.addNullishStorageKey(mapping.key);
                 }
 
+                const matchedKey = isCollectionKey(mapping.key) && mapping.waitForCollectionCallback ? mapping.key : undefined;
+
                 // Here we cannot use batching because the nullish value is expected to be set immediately for default props
                 // or they will be undefined.
-                sendDataToConnection(mapping, null, undefined);
+                sendDataToConnection(mapping, null, matchedKey);
                 return;
             }
 
