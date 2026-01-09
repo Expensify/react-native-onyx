@@ -1173,8 +1173,7 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
                     cache.addNullishStorageKey(mapping.key);
                 }
 
-                const shouldSendCollectionKey = isCollectionKey(mapping.key) && mapping.waitForCollectionCallback;
-                const matchedKey = shouldSendCollectionKey ? mapping.key : undefined;
+                const matchedKey = isCollectionKey(mapping.key) && mapping.waitForCollectionCallback ? mapping.key : undefined;
 
                 // Here we cannot use batching because the nullish value is expected to be set immediately for default props
                 // or they will be undefined.
