@@ -19,8 +19,8 @@ const provider: StorageProvider<unknown> = {
     /**
      * Get the value of a given key or return `null` if it's not available in memory
      */
-    getItem(key) {
-        return Promise.resolve(null as OnyxValue<typeof key>);
+    getItem(_key) {
+        return Promise.resolve(null as OnyxValue<typeof _key>);
     },
 
     /**

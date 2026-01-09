@@ -20,9 +20,9 @@ function raiseStorageSyncEvent(onyxKey: OnyxKey) {
 }
 
 function raiseStorageSyncManyKeysEvent(onyxKeys: StorageKeyList) {
-    onyxKeys.forEach((onyxKey) => {
+    for (const onyxKey of onyxKeys) {
         raiseStorageSyncEvent(onyxKey);
-    });
+    }
 }
 
 let storage = NoopProvider;

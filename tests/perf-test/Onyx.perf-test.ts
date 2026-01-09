@@ -44,12 +44,7 @@ describe('Onyx', () => {
     describe('set', () => {
         test('10k calls with heavy objects', async () => {
             await measureAsyncFunction(
-                () =>
-                    Promise.all(
-                        Object.values(mockedReportActionsMap).map((reportAction) => {
-                            return Onyx.set(`${collectionKey}${reportAction.reportActionID}`, reportAction);
-                        }),
-                    ),
+                () => Promise.all(Object.values(mockedReportActionsMap).map((reportAction) => Onyx.set(`${collectionKey}${reportAction.reportActionID}`, reportAction))),
                 {afterEach: clearOnyxAfterEachMeasure},
             );
         });
@@ -65,12 +60,7 @@ describe('Onyx', () => {
         test('10k calls with heavy objects', async () => {
             const changedReportActions = Object.fromEntries(Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const));
             await measureAsyncFunction(
-                () =>
-                    Promise.all(
-                        Object.values(changedReportActions).map((changedReportAction) => {
-                            return Onyx.merge(`${collectionKey}${changedReportAction.reportActionID}`, changedReportAction);
-                        }),
-                    ),
+                () => Promise.all(Object.values(changedReportActions).map((changedReportAction) => Onyx.merge(`${collectionKey}${changedReportAction.reportActionID}`, changedReportAction))),
                 {
                     beforeEach: async () => {
                         await Onyx.multiSet(mockedReportActionsMap);

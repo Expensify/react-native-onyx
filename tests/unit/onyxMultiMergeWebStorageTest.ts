@@ -24,7 +24,6 @@ describe('Onyx.mergeCollection() and WebStorage', () => {
     let Onyx: typeof OnyxInstance;
 
     beforeAll(() => {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
         Onyx = require('../../lib').default;
         jest.useRealTimers();
 
