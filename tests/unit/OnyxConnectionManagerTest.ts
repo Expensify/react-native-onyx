@@ -1,4 +1,3 @@
-// eslint-disable-next-line max-classes-per-file
 import {act} from '@testing-library/react-native';
 import Onyx from '../../lib';
 import type {Connection} from '../../lib/OnyxConnectionManager';
