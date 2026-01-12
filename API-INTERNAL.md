@@ -26,12 +26,6 @@
 <dt><a href="#initStoreValues">initStoreValues(keys, initialKeyStates, evictableKeys)</a></dt>
 <dd><p>Sets the initial values for the Onyx store</p>
 </dd>
-<dt><a href="#maybeFlushBatchUpdates">maybeFlushBatchUpdates()</a></dt>
-<dd><p>We are batching together onyx updates. This helps with use cases where we schedule onyx updates after each other.
-This happens for example in the Onyx.update function, where we process API responses that might contain a lot of
-update operations. Instead of calling the subscribers for each update operation, we batch them together which will
-cause react to schedule the updates at once instead of after each other. This is mainly a performance optimization.</p>
-</dd>
 <dt><a href="#reduceCollectionWithSelector">reduceCollectionWithSelector()</a></dt>
 <dd><p>Takes a collection of items (eg. {testKey_1:{a:&#39;a&#39;}, testKey_2:{b:&#39;b&#39;}})
 and runs it through a reducer function to return a subset of the data according to a selector.
@@ -60,6 +54,9 @@ to the values for those keys (correctly typed) such as <code>[OnyxCollection&lt;
 <dt><a href="#isCollectionKey">isCollectionKey()</a></dt>
 <dd><p>Checks to see if the subscriber&#39;s supplied key
 is associated with a collection of keys.</p>
+</dd>
+<dt><a href="#isCollectionMember">isCollectionMember(key)</a> ⇒</dt>
+<dd><p>Checks if a given key is a collection member key (not just a collection key).</p>
 </dd>
 <dt><a href="#splitCollectionMemberKey">splitCollectionMemberKey(key, collectionKey)</a> ⇒</dt>
 <dd><p>Splits a collection member key into the collection key part and the ID part.</p>
@@ -98,11 +95,14 @@ run out of storage the least recently accessed key can be removed.</p>
 <dt><a href="#getCollectionDataAndSendAsObject">getCollectionDataAndSendAsObject()</a></dt>
 <dd><p>Gets the data for a given an array of matching keys, combines them into an object, and sends the result back to the subscriber.</p>
 </dd>
+<dt><a href="#prepareSubscriberUpdate">prepareSubscriberUpdate(callback)</a></dt>
+<dd><p>Delays promise resolution until the next macrotask to prevent race condition if the key subscription is in progress.</p>
+</dd>
 <dt><a href="#scheduleSubscriberUpdate">scheduleSubscriberUpdate()</a></dt>
 <dd><p>Schedules an update that will be appended to the macro task queue (so it doesn&#39;t update the subscribers immediately).</p>
 </dd>
 <dt><a href="#scheduleNotifyCollectionSubscribers">scheduleNotifyCollectionSubscribers()</a></dt>
-<dd><p>This method is similar to notifySubscribersOnNextTick but it is built for working specifically with collections
+<dd><p>This method is similar to scheduleSubscriberUpdate but it is built for working specifically with collections
 so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
 subscriber callbacks receive the data in a different format than they normally expect and it breaks code.</p>
 </dd>
@@ -230,15 +230,6 @@ Sets the initial values for the Onyx store
 | initialKeyStates | initial data to set when `init()` and `clear()` are called |
 | evictableKeys | This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal. |
 
-<a name="maybeFlushBatchUpdates"></a>
-
-## maybeFlushBatchUpdates()
-We are batching together onyx updates. This helps with use cases where we schedule onyx updates after each other.
-This happens for example in the Onyx.update function, where we process API responses that might contain a lot of
-update operations. Instead of calling the subscribers for each update operation, we batch them together which will
-cause react to schedule the updates at once instead of after each other. This is mainly a performance optimization.
-
-**Kind**: global function  
 <a name="reduceCollectionWithSelector"></a>
 
 ## reduceCollectionWithSelector()
@@ -304,6 +295,18 @@ Checks to see if the subscriber's supplied key
 is associated with a collection of keys.
 
 **Kind**: global function  
+<a name="isCollectionMember"></a>
+
+## isCollectionMember(key) ⇒
+Checks if a given key is a collection member key (not just a collection key).
+
+**Kind**: global function  
+**Returns**: true if the key is a collection member, false otherwise  
+
+| Param | Description |
+| --- | --- |
+| key | The key to check |
+
 <a name="splitCollectionMemberKey"></a>
 
 ## splitCollectionMemberKey(key, collectionKey) ⇒
@@ -402,6 +405,17 @@ run out of storage the least recently accessed key can be removed.
 Gets the data for a given an array of matching keys, combines them into an object, and sends the result back to the subscriber.
 
 **Kind**: global function  
+<a name="prepareSubscriberUpdate"></a>
+
+## prepareSubscriberUpdate(callback)
+Delays promise resolution until the next macrotask to prevent race condition if the key subscription is in progress.
+
+**Kind**: global function  
+
+| Param | Description |
+| --- | --- |
+| callback | The keyChanged/keysChanged callback |
+
 <a name="scheduleSubscriberUpdate"></a>
 
 ## scheduleSubscriberUpdate()
@@ -415,7 +429,7 @@ scheduleSubscriberUpdate(key, value, subscriber => subscriber.initWithStoredValu
 <a name="scheduleNotifyCollectionSubscribers"></a>
 
 ## scheduleNotifyCollectionSubscribers()
-This method is similar to notifySubscribersOnNextTick but it is built for working specifically with collections
+This method is similar to scheduleSubscriberUpdate but it is built for working specifically with collections
 so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
 subscriber callbacks receive the data in a different format than they normally expect and it breaks code.
 
