@@ -88,7 +88,6 @@ type TypeOptions = Merge<
  * }
  * ```
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
 interface CustomTypeOptions {}
 
 /**
@@ -435,9 +434,7 @@ type GenericFunction = (...args: any[]) => any;
  * Represents a record where the key is a collection member key and the value is a list of
  * tuples that we'll use to replace the nested objects of that collection member record with something else.
  */
-type MultiMergeReplaceNullPatches = {
-    [TKey in OnyxKey]: FastMergeReplaceNullPatch[];
-};
+type MultiMergeReplaceNullPatches = Record<OnyxKey, FastMergeReplaceNullPatch[]>;
 
 /**
  * Represents a combination of Merge and Set operations that should be executed in Onyx

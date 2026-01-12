@@ -6,7 +6,6 @@ import type {StorageKeyValuePair} from './types';
 
 type Store = Record<OnyxKey, OnyxValue<OnyxKey>>;
 
-// eslint-disable-next-line import/no-mutable-exports
 const storeInternal: Store = {};
 
 const setInternal = (key: OnyxKey, value: OnyxValue<OnyxKey>) => {
@@ -86,7 +85,7 @@ const provider: StorageProvider<Store> = {
      * This function also removes all nested null values from an object.
      */
     multiMerge(pairs) {
-        _.forEach(pairs, ([key, value]) => {
+        for (const [key, value] of pairs) {
             const existingValue = provider.store[key] as Record<string, unknown>;
 
             const newValue = utils.fastMerge(existingValue, value as Record<string, unknown>, {
@@ -95,7 +94,7 @@ const provider: StorageProvider<Store> = {
             }).result;
 
             set(key, newValue);
-        });
+        }
 
         return Promise.resolve();
     },

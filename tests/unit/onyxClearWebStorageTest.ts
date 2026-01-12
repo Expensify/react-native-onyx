@@ -26,7 +26,7 @@ describe('Set data while storage is clearing', () => {
     // Always use a "fresh" cache instance
     beforeEach(() => {
         onyxValue = null;
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
+
         cache = require('../../lib/OnyxCache').default;
         Onyx.init({
             keys: ONYX_KEYS,
@@ -161,7 +161,7 @@ describe('Set data while storage is clearing', () => {
                     expect(collectionCallback).toHaveBeenCalledTimes(3);
 
                     // And it should be called with the expected parameters each time
-                    expect(collectionCallback).toHaveBeenNthCalledWith(1, undefined, undefined, undefined);
+                    expect(collectionCallback).toHaveBeenNthCalledWith(1, undefined, ONYX_KEYS.COLLECTION.TEST, undefined);
                     expect(collectionCallback).toHaveBeenNthCalledWith(
                         2,
                         {
