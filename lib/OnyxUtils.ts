@@ -1,4 +1,3 @@
-/* eslint-disable no-continue */
 import {deepEqual} from 'fast-equals';
 import type {ValueOf} from 'type-fest';
 import lodashPick from 'lodash/pick';
@@ -234,9 +233,9 @@ function maybeFlushBatchUpdates(): Promise<void> {
             batchUpdatesQueue = [];
             batchUpdatesPromise = null;
             unstable_batchedUpdates(() => {
-                updatesCopy.forEach((applyUpdates) => {
+                for (const applyUpdates of updatesCopy) {
                     applyUpdates();
-                });
+                }
             });
 
             resolve();
@@ -332,11 +331,11 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
      *
      * These missingKeys will be later used to multiGet the data from the storage.
      */
-    keys.forEach((key) => {
+    for (const key of keys) {
         const cacheValue = cache.get(key) as OnyxValue<TKey>;
         if (cacheValue) {
             dataMap.set(key, cacheValue);
-            return;
+            continue;
         }
 
         const pendingKey = `${TASK.GET}:${key}` as const;
@@ -346,15 +345,15 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
         } else {
             missingKeys.push(key);
         }
-    });
+    }
 
     return (
         Promise.all(pendingTasks)
             // Wait for all the pending tasks to resolve and then add the data to the data map.
             .then((values) => {
-                values.forEach((value, index) => {
+                for (const [index, value] of values.entries()) {
                     dataMap.set(pendingKeys[index], value);
-                });
+                }
 
                 return Promise.resolve();
             })
@@ -374,13 +373,13 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
 
                 // temp object is used to merge the missing data into the cache
                 const temp: OnyxCollection<KeyValueMapping[TKey]> = {};
-                values.forEach(([key, value]) => {
+                for (const [key, value] of values) {
                     if (skippableCollectionMemberIDs.size) {
                         try {
                             const [, collectionMemberID] = splitCollectionMemberKey(key);
                             if (skippableCollectionMemberIDs.has(collectionMemberID)) {
                                 // The key is a skippable one, so we skip this iteration.
-                                return;
+                                continue;
                             }
                         } catch (e) {
                             // The key is not a collection one or something went wrong during split, so we proceed with the function's logic.
@@ -389,7 +388,7 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
 
                     dataMap.set(key, value as OnyxValue<TKey>);
                     temp[key] = value as OnyxValue<TKey>;
-                });
+                }
                 cache.merge(temp);
                 return dataMap;
             })
@@ -590,13 +589,13 @@ function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey
         // If we have specific member keys, filter the collection
         if (collectionMemberKeys) {
             const filteredCollection: OnyxCollection<KeyValueMapping[TKey]> = {};
-            collectionMemberKeys.forEach((key) => {
+            for (const key of collectionMemberKeys) {
                 if (collectionData[key] !== undefined) {
                     filteredCollection[key] = collectionData[key];
                 } else if (cache.hasNullishStorageKey(key)) {
                     filteredCollection[key] = cache.get(key);
                 }
-            });
+            }
             return filteredCollection;
         }
 
@@ -608,22 +607,22 @@ function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey
     const collection: OnyxCollection<KeyValueMapping[TKey]> = {};
 
     // forEach exists on both Set and Array
-    allKeys.forEach((key) => {
+    for (const key of allKeys) {
         // If we don't have collectionMemberKeys array then we have to check whether a key is a collection member key.
         // Because in that case the keys will be coming from `cache.getAllKeys()` and we need to filter out the keys that
         // are not part of the collection.
         if (!collectionMemberKeys && !isCollectionMemberKey(collectionKey, key)) {
-            return;
+            continue;
         }
 
         const cachedValue = cache.get(key);
 
         if (cachedValue === undefined && !cache.hasNullishStorageKey(key)) {
-            return;
+            continue;
         }
 
         collection[key] = cache.get(key);
-    });
+    }
 
     return collection;
 }
@@ -847,7 +846,7 @@ function addKeyToRecentlyAccessedIfNeeded<TKey extends OnyxKey>(key: TKey): void
 function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: CollectionKeyBase[], mapping: CallbackToStateMapping<TKey>): void {
     multiGet(matchingKeys).then((dataMap) => {
         const data = Object.fromEntries(dataMap.entries()) as OnyxValue<TKey>;
-        sendDataToConnection(mapping, data, undefined);
+        sendDataToConnection(mapping, data, mapping.key);
     });
 }
 
@@ -985,10 +984,10 @@ function prepareKeyValuePairsForStorage(
 ): StorageKeyValuePair[] {
     const pairs: StorageKeyValuePair[] = [];
 
-    Object.entries(data).forEach(([key, value]) => {
+    for (const [key, value] of Object.entries(data)) {
         if (value === null) {
             remove(key, isProcessingCollectionUpdate);
-            return;
+            continue;
         }
 
         const valueWithoutNestedNullValues = shouldRemoveNestedNulls ?? true ? utils.removeNestedNullValues(value) : value;
@@ -996,7 +995,7 @@ function prepareKeyValuePairsForStorage(
         if (valueWithoutNestedNullValues !== undefined) {
             pairs.push([key, valueWithoutNestedNullValues, replaceNullPatches?.[key]]);
         }
-    });
+    }
 
     return pairs;
 }
@@ -1080,7 +1079,7 @@ function initializeWithDefaultKeyStates(): Promise<void> {
         }).result;
         cache.merge(merged ?? {});
 
-        Object.entries(merged ?? {}).forEach(([key, value]) => keyChanged(key, value));
+        for (const [key, value] of Object.entries(merged ?? {})) keyChanged(key, value);
     });
 }
 
@@ -1096,9 +1095,9 @@ function isValidNonEmptyCollectionForMerge<TKey extends CollectionKeyBase>(colle
  */
 function doAllCollectionItemsBelongToSameParent<TKey extends CollectionKeyBase>(collectionKey: TKey, collectionKeys: string[]): boolean {
     let hasCollectionKeyCheckFailed = false;
-    collectionKeys.forEach((dataKey) => {
+    for (const dataKey of collectionKeys) {
         if (isKeyMatch(collectionKey, dataKey)) {
-            return;
+            continue;
         }
 
         if (process.env.NODE_ENV === 'development') {
@@ -1107,7 +1106,7 @@ function doAllCollectionItemsBelongToSameParent<TKey extends CollectionKeyBase>(
 
         hasCollectionKeyCheckFailed = true;
         Logger.logAlert(`Provided collection doesn't have all its data belonging to the same parent. CollectionKey: ${collectionKey}, DataKey: ${dataKey}`);
-    });
+    }
 
     return !hasCollectionKeyCheckFailed;
 }
@@ -1158,12 +1157,12 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
                 }
             } else {
                 // Collection case - need to iterate through all keys to find matches (O(n))
-                keys.forEach((key) => {
+                for (const key of keys) {
                     if (!isKeyMatch(mapping.key, key)) {
-                        return;
+                        continue;
                     }
                     matchingKeys.push(key);
-                });
+                }
             }
             // If the key being connected to does not exist we initialize the value with null. For subscribers that connected
             // directly via connect() they will simply get a null value sent to them without any information about which key matched
@@ -1173,9 +1172,11 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
                     cache.addNullishStorageKey(mapping.key);
                 }
 
+                const matchedKey = isCollectionKey(mapping.key) && mapping.waitForCollectionCallback ? mapping.key : undefined;
+
                 // Here we cannot use batching because the nullish value is expected to be set immediately for default props
                 // or they will be undefined.
-                sendDataToConnection(mapping, null, undefined);
+                sendDataToConnection(mapping, null, matchedKey);
                 return;
             }
 
@@ -1191,9 +1192,9 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
 
                     // We did not opt into using waitForCollectionCallback mode so the callback is called for every matching key.
                     multiGet(matchingKeys).then((values) => {
-                        values.forEach((val, key) => {
+                        for (const [key, val] of values.entries()) {
                             sendDataToConnection(mapping, val as OnyxValue<TKey>, key as TKey);
-                        });
+                        }
                     });
                     return;
                 }
@@ -1233,52 +1234,52 @@ function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, me
 
     const snapshotCollection = getCachedCollection(snapshotCollectionKey);
 
-    Object.entries(snapshotCollection).forEach(([snapshotEntryKey, snapshotEntryValue]) => {
+    for (const [snapshotEntryKey, snapshotEntryValue] of Object.entries(snapshotCollection)) {
         // Snapshots may not be present in cache. We don't know how to update them so we skip.
         if (!snapshotEntryValue) {
-            return;
+            continue;
         }
 
         let updatedData: Record<string, unknown> = {};
 
-        data.forEach(({key, value}) => {
+        for (const {key, value} of data) {
             // snapshots are normal keys so we want to skip update if they are written to Onyx
             if (isCollectionMemberKey(snapshotCollectionKey, key)) {
-                return;
+                continue;
             }
 
             if (typeof snapshotEntryValue !== 'object' || !('data' in snapshotEntryValue)) {
-                return;
+                continue;
             }
 
             const snapshotData = snapshotEntryValue.data;
             if (!snapshotData || !snapshotData[key]) {
-                return;
+                continue;
             }
 
             if (Array.isArray(value) || Array.isArray(snapshotData[key])) {
                 updatedData[key] = value || [];
-                return;
+                continue;
             }
 
             if (value === null) {
                 updatedData[key] = value;
-                return;
+                continue;
             }
 
             const oldValue = updatedData[key] || {};
             const newValue = lodashPick(value, Object.keys(snapshotData[key]));
 
             updatedData = {...updatedData, [key]: Object.assign(oldValue, newValue)};
-        });
+        }
 
         // Skip the update if there's no data to be merged
         if (utils.isEmptyObject(updatedData)) {
-            return;
+            continue;
         }
 
         promises.push(() => mergeFn(snapshotEntryKey, {data: updatedData}));
-    });
+    }
 
     return promises;
 }
@@ -1455,21 +1456,21 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
     return OnyxUtils.getAllKeys().then((persistedKeys) => {
         const mutableCollection: OnyxInputKeyValueMapping = {...resultCollection};
 
-        persistedKeys.forEach((key) => {
+        for (const key of persistedKeys) {
             if (!key.startsWith(collectionKey)) {
-                return;
+                continue;
             }
             if (resultCollectionKeys.includes(key)) {
-                return;
+                continue;
             }
 
             mutableCollection[key] = null;
-        });
+        }
 
         const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(mutableCollection, true, undefined, true);
         const previousCollection = OnyxUtils.getCachedCollection(collectionKey);
 
-        keyValuePairs.forEach(([key, value]) => cache.set(key, value));
+        for (const [key, value] of keyValuePairs) cache.set(key, value);
 
         const updatePromise = OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
 
@@ -1559,12 +1560,12 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
             }, {}) as Record<OnyxKey, OnyxInput<TKey>>;
 
             const newCollection: Record<OnyxKey, OnyxInput<TKey>> = {};
-            keys.forEach((key) => {
+            for (const key of keys) {
                 if (persistedKeys.has(key)) {
-                    return;
+                    continue;
                 }
                 newCollection[key] = resultCollection[key];
-            });
+            }
 
             // When (multi-)merging the values with the existing values in storage,
             // we don't want to remove nested null values from the data that we pass to the storage layer,
@@ -1662,7 +1663,7 @@ function partialSetCollection<TKey extends CollectionKeyBase>({collectionKey, co
         const previousCollection = getCachedCollection(collectionKey, existingKeys);
         const keyValuePairs = prepareKeyValuePairsForStorage(mutableCollection, true, undefined, true);
 
-        keyValuePairs.forEach(([key, value]) => cache.set(key, value));
+        for (const [key, value] of keyValuePairs) cache.set(key, value);
 
         const updatePromise = scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
 

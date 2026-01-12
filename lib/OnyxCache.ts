@@ -226,7 +226,7 @@ class OnyxCache {
             }).result,
         };
 
-        Object.entries(data).forEach(([key, value]) => {
+        for (const [key, value] of Object.entries(data)) {
             this.addKey(key);
             this.addToAccessedKeys(key);
 
@@ -250,7 +250,7 @@ class OnyxCache {
                     this.collectionData[collectionKey][key] = this.storageMap[key];
                 }
             }
-        });
+        }
     }
 
     /**
@@ -404,15 +404,15 @@ class OnyxCache {
      */
     addEvictableKeysToRecentlyAccessedList(isCollectionKeyFn: (key: OnyxKey) => boolean, getAllKeysFn: () => Promise<Set<OnyxKey>>): Promise<void> {
         return getAllKeysFn().then((keys: Set<OnyxKey>) => {
-            this.evictionAllowList.forEach((evictableKey) => {
-                keys.forEach((key: OnyxKey) => {
+            for (const evictableKey of this.evictionAllowList) {
+                for (const key of keys) {
                     if (!this.isKeyMatch(evictableKey, key)) {
-                        return;
+                        continue;
                     }
 
                     this.addLastAccessedKey(key, isCollectionKeyFn(key));
-                });
-            });
+                }
+            }
         });
     }
 
@@ -435,12 +435,12 @@ class OnyxCache {
         this.collectionKeys = collectionKeys;
 
         // Initialize collection data for existing collection keys
-        collectionKeys.forEach((collectionKey) => {
+        for (const collectionKey of collectionKeys) {
             if (this.collectionData[collectionKey]) {
-                return;
+                continue;
             }
             this.collectionData[collectionKey] = {};
-        });
+        }
     }
 
     /**

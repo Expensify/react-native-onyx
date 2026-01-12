@@ -1,23 +1,24 @@
 import _ from 'underscore';
+import type {OnyxKey, OnyxValue} from '../../types';
 import utils from '../../utils';
 import type StorageProvider from './types';
 import type {StorageKeyValuePair} from './types';
-import type {OnyxKey, OnyxValue} from '../../types';
 
 type Store = Record<OnyxKey, OnyxValue<OnyxKey>>;
 
-// eslint-disable-next-line import/no-mutable-exports
-let store: Store = {};
+const storeInternal: Store = {};
 
 const setInternal = (key: OnyxKey, value: OnyxValue<OnyxKey>) => {
-    store[key] = value;
+    storeInternal[key] = value;
     return Promise.resolve(value);
 };
 
 const isJestRunning = typeof jest !== 'undefined';
 const set = isJestRunning ? jest.fn(setInternal) : setInternal;
 
-const provider: StorageProvider = {
+const provider: StorageProvider<Store> = {
+    store: storeInternal,
+
     /**
      * The name of the provider that can be printed to the logs
      */
@@ -34,7 +35,7 @@ const provider: StorageProvider = {
      * Get the value of a given key or return `null` if it's not available in memory
      */
     getItem(key) {
-        const value = store[key] as OnyxValue<typeof key>;
+        const value = provider.store[key] as OnyxValue<typeof key>;
 
         return Promise.resolve(value === undefined ? (null as OnyxValue<typeof key>) : value);
     },
@@ -47,7 +48,7 @@ const provider: StorageProvider = {
             keys,
             (key) =>
                 new Promise((resolve) => {
-                    this.getItem(key).then((value) => resolve([key, value]));
+                    provider.getItem(key).then((value) => resolve([key, value]));
                 }),
         ) as Array<Promise<StorageKeyValuePair>>;
         return Promise.all(getPromises);
@@ -66,7 +67,7 @@ const provider: StorageProvider = {
      * Stores multiple key-value pairs in a batch
      */
     multiSet(pairs) {
-        const setPromises = _.map(pairs, ([key, value]) => this.setItem(key, value));
+        const setPromises = _.map(pairs, ([key, value]) => provider.setItem(key, value));
 
         return Promise.all(setPromises).then(() => undefined);
     },
@@ -76,7 +77,7 @@ const provider: StorageProvider = {
      */
     mergeItem(key, change) {
         // Since Onyx already merged the existing value with the changes, we can just set the value directly.
-        return this.multiMerge([[key, change]]);
+        return provider.multiMerge([[key, change]]);
     },
 
     /**
@@ -84,8 +85,8 @@ const provider: StorageProvider = {
      * This function also removes all nested null values from an object.
      */
     multiMerge(pairs) {
-        _.forEach(pairs, ([key, value]) => {
-            const existingValue = store[key] as Record<string, unknown>;
+        for (const [key, value] of pairs) {
+            const existingValue = provider.store[key] as Record<string, unknown>;
 
             const newValue = utils.fastMerge(existingValue, value as Record<string, unknown>, {
                 shouldRemoveNestedNulls: true,
@@ -93,7 +94,7 @@ const provider: StorageProvider = {
             }).result;
 
             set(key, newValue);
-        });
+        }
 
         return Promise.resolve();
     },
@@ -102,7 +103,7 @@ const provider: StorageProvider = {
      * Remove given key and it's value from memory
      */
     removeItem(key) {
-        delete store[key];
+        delete provider.store[key];
         return Promise.resolve();
     },
 
@@ -111,7 +112,7 @@ const provider: StorageProvider = {
      */
     removeItems(keys) {
         _.each(keys, (key) => {
-            delete store[key];
+            delete provider.store[key];
         });
         return Promise.resolve();
     },
@@ -120,7 +121,10 @@ const provider: StorageProvider = {
      * Clear everything from memory
      */
     clear() {
-        store = {};
+        // Remove all keys without changing the root object reference.
+        for (const key of Object.keys(provider.store)) {
+            delete provider.store[key];
+        }
         return Promise.resolve();
     },
 
@@ -128,7 +132,7 @@ const provider: StorageProvider = {
      * Returns all keys available in memory
      */
     getAllKeys() {
-        return Promise.resolve(_.keys(store));
+        return Promise.resolve(_.keys(provider.store));
     },
 
     /**
@@ -141,8 +145,12 @@ const provider: StorageProvider = {
 };
 
 const setMockStore = (data: Store) => {
-    store = data;
+    // Replace keys without changing the root object reference.
+    for (const key of Object.keys(storeInternal)) {
+        delete storeInternal[key];
+    }
+    Object.assign(storeInternal, data);
 };
 
 export default provider;
-export {store as mockStore, set as mockSet, setMockStore};
+export {set as mockSet, storeInternal as mockStore, setMockStore};

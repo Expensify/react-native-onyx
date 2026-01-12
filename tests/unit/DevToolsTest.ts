@@ -1,6 +1,4 @@
 /* eslint-disable dot-notation */
-/* eslint-disable @lwc/lwc/no-async-await */
-/* eslint-disable no-underscore-dangle */
 import Onyx from '../../lib';
 import {getDevToolsInstance} from '../../lib/DevTools';
 import type {DevtoolsConnection, RealDevTools as RealDevToolsType} from '../../lib/DevTools';
