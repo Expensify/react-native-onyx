@@ -1657,6 +1657,7 @@ function clearOnyxUtilsInternals() {
     mergeQueue = {};
     mergeQueuePromise = {};
     callbackToStateMapping = {};
+    nextMacrotaskPromise = null;
     onyxKeyToSubscriptionIDs = new Map();
     lastConnectionCallbackData = new Map();
 }
