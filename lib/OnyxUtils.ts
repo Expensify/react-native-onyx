@@ -76,7 +76,7 @@ let mergeQueue: Record<OnyxKey, Array<OnyxValue<OnyxKey>>> = {};
 let mergeQueuePromise: Record<OnyxKey, Promise<void>> = {};
 
 // Used to schedule subscriber update to the macro task queue
-let nextMacrotaskPromise: Promise<void> | null = null;
+// let nextMacrotaskPromise: Promise<void> | null = null;
 
 // Holds a mapping of all the React components that want their state subscribed to a store key
 let callbackToStateMapping: Record<string, CallbackToStateMapping<OnyxKey>> = {};
@@ -808,17 +808,28 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
  *
  * @param callback The keyChanged/keysChanged callback
  * */
-function prepareSubscriberUpdate(callback: () => void): Promise<void> {
-    if (!nextMacrotaskPromise) {
-        nextMacrotaskPromise = new Promise<void>((resolve) => {
-            setTimeout(() => {
-                nextMacrotaskPromise = null;
-                resolve();
-            }, 0);
-        });
-    }
-    return Promise.all([nextMacrotaskPromise, Promise.resolve().then(callback)]).then();
-}
+// function prepareSubscriberUpdate(callback: () => void): Promise<void> {
+//     if (!nextMacrotaskPromise) {
+//         nextMacrotaskPromise = new Promise<void>((resolve) => {
+//             setTimeout(() => {
+//                 nextMacrotaskPromise = null;
+//                 resolve();
+//             }, 0);
+//         });
+//     }
+//     return Promise.all([nextMacrotaskPromise, Promise.resolve().then(callback)]).then();
+// }
+
+// !!!DO NOT MERGE THIS CODE, METHODS FOR TESTING ONLY
+const nextMicrotask = () => Promise.resolve();
+let nextMacrotaskPromise: Promise<void> | null = null;
+const nextMacrotask = () =>
+    new Promise<void>((resolve) => {
+        setTimeout(() => {
+            nextMacrotaskPromise = null;
+            resolve();
+        }, 0);
+    });
 
 /**
  * Schedules an update that will be appended to the macro task queue (so it doesn't update the subscribers immediately).
@@ -832,7 +843,10 @@ function scheduleSubscriberUpdate<TKey extends OnyxKey>(
     canUpdateSubscriber: (subscriber?: CallbackToStateMapping<OnyxKey>) => boolean = () => true,
     isProcessingCollectionUpdate = false,
 ): Promise<void> {
-    return prepareSubscriberUpdate(() => keyChanged(key, value, canUpdateSubscriber, isProcessingCollectionUpdate));
+    if (!nextMacrotaskPromise) {
+        nextMacrotaskPromise = nextMacrotask();
+    }
+    return Promise.all([nextMacrotaskPromise, nextMicrotask().then(() => keyChanged(key, value, canUpdateSubscriber, isProcessingCollectionUpdate))]).then(() => undefined);
 }
 
 /**
@@ -845,7 +859,10 @@ function scheduleNotifyCollectionSubscribers<TKey extends OnyxKey>(
     value: OnyxCollection<KeyValueMapping[TKey]>,
     previousValue?: OnyxCollection<KeyValueMapping[TKey]>,
 ): Promise<void> {
-    return prepareSubscriberUpdate(() => keysChanged(key, value, previousValue));
+    if (!nextMacrotaskPromise) {
+        nextMacrotaskPromise = nextMacrotask();
+    }
+    return Promise.all([nextMacrotaskPromise, nextMicrotask().then(() => keysChanged(key, value, previousValue))]).then(() => undefined);
 }
 
 /**
