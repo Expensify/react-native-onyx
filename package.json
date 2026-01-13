@@ -65,6 +65,7 @@
     "@types/lodash": "^4.14.202",
     "@types/node": "^20.11.5",
     "@types/react": "^18.2.14",
+    "@types/react-dom": "^18.2.18",
     "@types/react-native": "^0.70.0",
     "@types/underscore": "^1.11.15",
     "@typescript-eslint/eslint-plugin": "^8.51.0",
@@ -88,6 +89,7 @@
     "prettier": "^2.8.8",
     "prop-types": "^15.7.2",
     "react": "18.2.0",
+    "react-dom": "18.2.0",
     "react-native": "0.76.3",
     "react-native-device-info": "^10.3.0",
     "react-native-nitro-modules": "^0.27.2",
@@ -102,6 +104,7 @@
   "peerDependencies": {
     "idb-keyval": "^6.2.1",
     "react": ">=18.1.0",
+    "react-dom": ">=18.1.0",
     "react-native": ">=0.75.0",
     "react-native-device-info": "^10.3.0",
     "react-native-nitro-modules": ">=0.27.2",
