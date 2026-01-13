@@ -7,7 +7,6 @@ import * as Logger from './Logger';
 import type Onyx from './Onyx';
 import cache, {TASK} from './OnyxCache';
 import * as Str from './Str';
-import unstable_batchedUpdates from './batch';
 import Storage from './storage';
 import type {
     CollectionKey,
@@ -232,11 +231,9 @@ function maybeFlushBatchUpdates(): Promise<void> {
             const updatesCopy = batchUpdatesQueue;
             batchUpdatesQueue = [];
             batchUpdatesPromise = null;
-            unstable_batchedUpdates(() => {
-                for (const applyUpdates of updatesCopy) {
-                    applyUpdates();
-                }
-            });
+            for (const applyUpdates of updatesCopy) {
+                applyUpdates();
+            }
 
             resolve();
         }, 0);
