@@ -860,7 +860,9 @@ function scheduleSubscriberUpdate<TKey extends OnyxKey>(
     isProcessingCollectionUpdate = false,
 ): Promise<void> {
     const promise = Promise.resolve().then(() => keyChanged(key, value, canUpdateSubscriber, true, isProcessingCollectionUpdate));
-    // batchUpdates(() => keyChanged(key, value, canUpdateSubscriber, false, isProcessingCollectionUpdate));
+    batchUpdates(() => {
+        /* empty */
+    });
     return Promise.all([maybeFlushBatchUpdates(), promise]).then(() => undefined);
 }
 
@@ -875,7 +877,9 @@ function scheduleNotifyCollectionSubscribers<TKey extends OnyxKey>(
     previousValue?: OnyxCollection<KeyValueMapping[TKey]>,
 ): Promise<void> {
     const promise = Promise.resolve().then(() => keysChanged(key, value, previousValue, true));
-    // batchUpdates(() => keysChanged(key, value, previousValue, false));
+    batchUpdates(() => {
+        /* empty */
+    });
     return Promise.all([maybeFlushBatchUpdates(), promise]).then(() => undefined);
 }
 
