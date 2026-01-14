@@ -867,21 +867,21 @@ function scheduleSubscriberUpdate<TKey extends OnyxKey>(
             cache.removeLastAccessedKey(key);
         }
 
-        let stateMappingKeys = onyxKeyToSubscriptionIDs.get(key) ?? [];
-        let collectionKey: string | undefined;
-        try {
-            collectionKey = getCollectionKey(key);
-        } catch (e) {
-            collectionKey = undefined;
-        }
-
-        if (collectionKey) {
-            stateMappingKeys = [...stateMappingKeys, ...(onyxKeyToSubscriptionIDs.get(collectionKey) ?? [])];
-            if (stateMappingKeys.length === 0) {
-                // eslint-disable-next-line no-useless-return
-                return;
-            }
-        }
+        // let stateMappingKeys = onyxKeyToSubscriptionIDs.get(key) ?? [];
+        // let collectionKey: string | undefined;
+        // try {
+        //     collectionKey = getCollectionKey(key);
+        // } catch (e) {
+        //     collectionKey = undefined;
+        // }
+        //
+        // if (collectionKey) {
+        //     stateMappingKeys = [...stateMappingKeys, ...(onyxKeyToSubscriptionIDs.get(collectionKey) ?? [])];
+        //     if (stateMappingKeys.length === 0) {
+        //         // eslint-disable-next-line no-useless-return
+        //         return;
+        //     }
+        // }
     });
     return Promise.all([maybeFlushBatchUpdates(), promise]).then(() => undefined);
 }
