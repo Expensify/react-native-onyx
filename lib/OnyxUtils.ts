@@ -7,7 +7,6 @@ import * as Logger from './Logger';
 import type Onyx from './Onyx';
 import cache, {TASK} from './OnyxCache';
 import * as Str from './Str';
-import unstable_batchedUpdates from './batch';
 import Storage from './storage';
 import type {
     CollectionKey,
@@ -76,6 +75,9 @@ type OnyxMethod = ValueOf<typeof METHOD>;
 let mergeQueue: Record<OnyxKey, Array<OnyxValue<OnyxKey>>> = {};
 let mergeQueuePromise: Record<OnyxKey, Promise<void>> = {};
 
+// Used to schedule subscriber update to the macro task queue
+let nextMacrotaskPromise: Promise<void> | null = null;
+
 // Holds a mapping of all the React components that want their state subscribed to a store key
 let callbackToStateMapping: Record<string, CallbackToStateMapping<OnyxKey>> = {};
 
@@ -87,9 +89,6 @@ let onyxKeyToSubscriptionIDs = new Map();
 
 // Optional user-provided key value states set when Onyx initializes or clears
 let defaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
-
-let batchUpdatesPromise: Promise<void> | null = null;
-let batchUpdatesQueue: Array<() => void> = [];
 
 // Used for comparison with a new update to avoid invoking the Onyx.connect callback with the same data.
 let lastConnectionCallbackData = new Map<number, OnyxValue<OnyxKey>>();
@@ -210,43 +209,6 @@ function sendActionToDevTools(
     mergedValue: OnyxEntry<KeyValueMapping[OnyxKey]> = undefined,
 ): void {
     DevTools.registerAction(utils.formatActionName(method, key), value, key ? {[key]: mergedValue || value} : (value as OnyxCollection<KeyValueMapping[OnyxKey]>));
-}
-
-/**
- * We are batching together onyx updates. This helps with use cases where we schedule onyx updates after each other.
- * This happens for example in the Onyx.update function, where we process API responses that might contain a lot of
- * update operations. Instead of calling the subscribers for each update operation, we batch them together which will
- * cause react to schedule the updates at once instead of after each other. This is mainly a performance optimization.
- */
-function maybeFlushBatchUpdates(): Promise<void> {
-    if (batchUpdatesPromise) {
-        return batchUpdatesPromise;
-    }
-
-    batchUpdatesPromise = new Promise((resolve) => {
-        /* We use (setTimeout, 0) here which should be called once native module calls are flushed (usually at the end of the frame)
-         * We may investigate if (setTimeout, 1) (which in React Native is equal to requestAnimationFrame) works even better
-         * then the batch will be flushed on next frame.
-         */
-        setTimeout(() => {
-            const updatesCopy = batchUpdatesQueue;
-            batchUpdatesQueue = [];
-            batchUpdatesPromise = null;
-            unstable_batchedUpdates(() => {
-                for (const applyUpdates of updatesCopy) {
-                    applyUpdates();
-                }
-            });
-
-            resolve();
-        }, 0);
-    });
-    return batchUpdatesPromise;
-}
-
-function batchUpdates(updates: () => void): Promise<void> {
-    batchUpdatesQueue.push(updates);
-    return maybeFlushBatchUpdates();
 }
 
 /**
@@ -634,7 +596,6 @@ function keysChanged<TKey extends CollectionKeyBase>(
     collectionKey: TKey,
     partialCollection: OnyxCollection<KeyValueMapping[TKey]>,
     partialPreviousCollection: OnyxCollection<KeyValueMapping[TKey]> | undefined,
-    notifyConnectSubscribers = true,
 ): void {
     // We prepare the "cached collection" which is the entire collection + the new partial data that
     // was merged in via mergeCollection().
@@ -670,10 +631,6 @@ function keysChanged<TKey extends CollectionKeyBase>(
 
         // Regular Onyx.connect() subscriber found.
         if (typeof subscriber.callback === 'function') {
-            if (!notifyConnectSubscribers) {
-                continue;
-            }
-
             // If they are subscribed to the collection key and using waitForCollectionCallback then we'll
             // send the whole cached collection.
             if (isSubscribedToCollectionKey) {
@@ -723,7 +680,6 @@ function keyChanged<TKey extends OnyxKey>(
     key: TKey,
     value: OnyxValue<TKey>,
     canUpdateSubscriber: (subscriber?: CallbackToStateMapping<OnyxKey>) => boolean = () => true,
-    notifyConnectSubscribers = true,
     isProcessingCollectionUpdate = false,
 ): void {
     // Add or remove this key from the recentlyAccessedKeys lists
@@ -765,9 +721,6 @@ function keyChanged<TKey extends OnyxKey>(
 
         // Subscriber is a regular call to connect() and provided a callback
         if (typeof subscriber.callback === 'function') {
-            if (!notifyConnectSubscribers) {
-                continue;
-            }
             if (lastConnectionCallbackData.has(subscriber.subscriptionID) && lastConnectionCallbackData.get(subscriber.subscriptionID) === value) {
                 continue;
             }
@@ -851,6 +804,23 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
 }
 
 /**
+ * Delays promise resolution until the next macrotask to prevent race condition if the key subscription is in progress.
+ *
+ * @param callback The keyChanged/keysChanged callback
+ * */
+function prepareSubscriberUpdate(callback: () => void): Promise<void> {
+    if (!nextMacrotaskPromise) {
+        nextMacrotaskPromise = new Promise<void>((resolve) => {
+            setTimeout(() => {
+                nextMacrotaskPromise = null;
+                resolve();
+            }, 0);
+        });
+    }
+    return Promise.all([nextMacrotaskPromise, Promise.resolve().then(callback)]).then();
+}
+
+/**
  * Schedules an update that will be appended to the macro task queue (so it doesn't update the subscribers immediately).
  *
  * @example
@@ -862,13 +832,11 @@ function scheduleSubscriberUpdate<TKey extends OnyxKey>(
     canUpdateSubscriber: (subscriber?: CallbackToStateMapping<OnyxKey>) => boolean = () => true,
     isProcessingCollectionUpdate = false,
 ): Promise<void> {
-    const promise = Promise.resolve().then(() => keyChanged(key, value, canUpdateSubscriber, true, isProcessingCollectionUpdate));
-    batchUpdates(() => keyChanged(key, value, canUpdateSubscriber, false, isProcessingCollectionUpdate));
-    return Promise.all([maybeFlushBatchUpdates(), promise]).then(() => undefined);
+    return prepareSubscriberUpdate(() => keyChanged(key, value, canUpdateSubscriber, isProcessingCollectionUpdate));
 }
 
 /**
- * This method is similar to notifySubscribersOnNextTick but it is built for working specifically with collections
+ * This method is similar to scheduleSubscriberUpdate but it is built for working specifically with collections
  * so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
  * subscriber callbacks receive the data in a different format than they normally expect and it breaks code.
  */
@@ -877,9 +845,7 @@ function scheduleNotifyCollectionSubscribers<TKey extends OnyxKey>(
     value: OnyxCollection<KeyValueMapping[TKey]>,
     previousValue?: OnyxCollection<KeyValueMapping[TKey]>,
 ): Promise<void> {
-    const promise = Promise.resolve().then(() => keysChanged(key, value, previousValue, true));
-    batchUpdates(() => keysChanged(key, value, previousValue, false));
-    return Promise.all([maybeFlushBatchUpdates(), promise]).then(() => undefined);
+    return prepareSubscriberUpdate(() => keysChanged(key, value, previousValue));
 }
 
 /**
@@ -1692,7 +1658,6 @@ function clearOnyxUtilsInternals() {
     mergeQueuePromise = {};
     callbackToStateMapping = {};
     onyxKeyToSubscriptionIDs = new Map();
-    batchUpdatesQueue = [];
     lastConnectionCallbackData = new Map();
 }
 
@@ -1704,8 +1669,6 @@ const OnyxUtils = {
     getDeferredInitTask,
     initStoreValues,
     sendActionToDevTools,
-    maybeFlushBatchUpdates,
-    batchUpdates,
     get,
     getAllKeys,
     getCollectionKeys,
@@ -1763,10 +1726,6 @@ GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
 
     // @ts-expect-error Reassign
     initStoreValues = decorateWithMetrics(initStoreValues, 'OnyxUtils.initStoreValues');
-    // @ts-expect-error Reassign
-    maybeFlushBatchUpdates = decorateWithMetrics(maybeFlushBatchUpdates, 'OnyxUtils.maybeFlushBatchUpdates');
-    // @ts-expect-error Reassign
-    batchUpdates = decorateWithMetrics(batchUpdates, 'OnyxUtils.batchUpdates');
     // @ts-expect-error Complex type signature
     get = decorateWithMetrics(get, 'OnyxUtils.get');
     // @ts-expect-error Reassign
