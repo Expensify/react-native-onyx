@@ -875,7 +875,7 @@ function scheduleNotifyCollectionSubscribers<TKey extends OnyxKey>(
     previousValue?: OnyxCollection<KeyValueMapping[TKey]>,
 ): Promise<void> {
     const promise = Promise.resolve().then(() => keysChanged(key, value, previousValue, true));
-    batchUpdates(() => keysChanged(key, value, previousValue, false));
+    // batchUpdates(() => keysChanged(key, value, previousValue, false));
     return Promise.all([maybeFlushBatchUpdates(), promise]).then(() => undefined);
 }
 
