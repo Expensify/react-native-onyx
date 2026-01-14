@@ -860,34 +860,6 @@ function scheduleSubscriberUpdate<TKey extends OnyxKey>(
     isProcessingCollectionUpdate = false,
 ): Promise<void> {
     const promise = Promise.resolve().then(() => keyChanged(key, value, canUpdateSubscriber, true, isProcessingCollectionUpdate));
-    batchUpdates(() => {
-        if (value !== null) {
-            cache.addLastAccessedKey(key, isCollectionKey(key));
-        } else {
-            cache.removeLastAccessedKey(key);
-        }
-
-        // Any additional computations
-        for (let i = 0; i < 1000; i++) {
-            // do nothing
-        }
-
-        // let stateMappingKeys = onyxKeyToSubscriptionIDs.get(key) ?? [];
-        // let collectionKey: string | undefined;
-        // try {
-        //     collectionKey = getCollectionKey(key);
-        // } catch (e) {
-        //     collectionKey = undefined;
-        // }
-        //
-        // if (collectionKey) {
-        //     stateMappingKeys = [...stateMappingKeys, ...(onyxKeyToSubscriptionIDs.get(collectionKey) ?? [])];
-        //     if (stateMappingKeys.length === 0) {
-        //         // eslint-disable-next-line no-useless-return
-        //         return;
-        //     }
-        // }
-    });
     return Promise.all([maybeFlushBatchUpdates(), promise]).then(() => undefined);
 }
 

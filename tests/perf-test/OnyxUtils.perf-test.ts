@@ -312,29 +312,29 @@ describe('OnyxUtils', () => {
     });
 
     describe('keyChanged', () => {
+        const subscriptionIDs = new Set<number>();
+        const key = `${collectionKey}0`;
+        const previousReportAction = mockedReportActionsMap[`${collectionKey}0`];
+
+        beforeEach(async () => {
+            await Onyx.set(key, previousReportAction);
+            for (let i = 0; i < 10000; i++) {
+                const id = OnyxUtils.subscribeToKey({key, callback: jest.fn(), initWithStoredValues: false});
+                subscriptionIDs.add(id);
+            }
+        });
+
+        afterEach(async () => {
+            for (const id of subscriptionIDs) {
+                OnyxUtils.unsubscribeFromKey(id);
+            }
+            subscriptionIDs.clear();
+            await clearOnyxAfterEachMeasure();
+        });
+
         test('one call with one heavy object to update 10k subscribers', async () => {
-            const subscriptionIDs = new Set<number>();
-
-            const key = `${collectionKey}0`;
-            const previousReportAction = mockedReportActionsMap[`${collectionKey}0`];
             const changedReportAction = createRandomReportAction(Number(previousReportAction.reportActionID));
-
-            await measureFunction(() => OnyxUtils.keyChanged(key, changedReportAction), {
-                beforeEach: async () => {
-                    await Onyx.set(key, previousReportAction);
-                    for (let i = 0; i < 10000; i++) {
-                        const id = OnyxUtils.subscribeToKey({key, callback: jest.fn(), initWithStoredValues: false});
-                        subscriptionIDs.add(id);
-                    }
-                },
-                afterEach: async () => {
-                    for (const id of subscriptionIDs) {
-                        OnyxUtils.unsubscribeFromKey(id);
-                    }
-                    subscriptionIDs.clear();
-                    await clearOnyxAfterEachMeasure();
-                },
-            });
+            await measureFunction(() => OnyxUtils.keyChanged(key, changedReportAction));
         });
     });
 
