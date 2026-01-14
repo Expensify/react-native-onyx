@@ -7,7 +7,6 @@ import * as Logger from './Logger';
 import type Onyx from './Onyx';
 import cache, {TASK} from './OnyxCache';
 import * as Str from './Str';
-import unstable_batchedUpdates from './batch';
 import Storage from './storage';
 import type {
     CollectionKey,
@@ -89,6 +88,7 @@ let onyxKeyToSubscriptionIDs = new Map();
 let defaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
 
 let batchUpdatesPromise: Promise<void> | null = null;
+let batchUpdatesTimeoutID: number | null = null;
 let batchUpdatesQueue: Array<() => void> = [];
 
 // Used for comparison with a new update to avoid invoking the Onyx.connect callback with the same data.
@@ -228,15 +228,15 @@ function maybeFlushBatchUpdates(): Promise<void> {
          * We may investigate if (setTimeout, 1) (which in React Native is equal to requestAnimationFrame) works even better
          * then the batch will be flushed on next frame.
          */
-        setTimeout(() => {
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-expect-error
+        batchUpdatesTimeoutID = setTimeout(() => {
             const updatesCopy = batchUpdatesQueue;
             batchUpdatesQueue = [];
             batchUpdatesPromise = null;
-            unstable_batchedUpdates(() => {
-                for (const applyUpdates of updatesCopy) {
-                    applyUpdates();
-                }
-            });
+            for (const applyUpdates of updatesCopy) {
+                applyUpdates();
+            }
 
             resolve();
         }, 0);
@@ -863,7 +863,7 @@ function scheduleSubscriberUpdate<TKey extends OnyxKey>(
     isProcessingCollectionUpdate = false,
 ): Promise<void> {
     const promise = Promise.resolve().then(() => keyChanged(key, value, canUpdateSubscriber, true, isProcessingCollectionUpdate));
-    batchUpdates(() => keyChanged(key, value, canUpdateSubscriber, false, isProcessingCollectionUpdate));
+    // batchUpdates(() => keyChanged(key, value, canUpdateSubscriber, false, isProcessingCollectionUpdate));
     return Promise.all([maybeFlushBatchUpdates(), promise]).then(() => undefined);
 }
 
@@ -878,7 +878,7 @@ function scheduleNotifyCollectionSubscribers<TKey extends OnyxKey>(
     previousValue?: OnyxCollection<KeyValueMapping[TKey]>,
 ): Promise<void> {
     const promise = Promise.resolve().then(() => keysChanged(key, value, previousValue, true));
-    batchUpdates(() => keysChanged(key, value, previousValue, false));
+    // batchUpdates(() => keysChanged(key, value, previousValue, false));
     return Promise.all([maybeFlushBatchUpdates(), promise]).then(() => undefined);
 }
 
@@ -1693,7 +1693,12 @@ function clearOnyxUtilsInternals() {
     callbackToStateMapping = {};
     onyxKeyToSubscriptionIDs = new Map();
     batchUpdatesQueue = [];
+    batchUpdatesPromise = null;
     lastConnectionCallbackData = new Map();
+    if (batchUpdatesTimeoutID) {
+        clearTimeout(batchUpdatesTimeoutID);
+        batchUpdatesTimeoutID = null;
+    }
 }
 
 const OnyxUtils = {
