@@ -867,6 +867,11 @@ function scheduleSubscriberUpdate<TKey extends OnyxKey>(
             cache.removeLastAccessedKey(key);
         }
 
+        // Any additional computations
+        for (let i = 0; i < 10000; i++) {
+            // do nothing
+        }
+
         // let stateMappingKeys = onyxKeyToSubscriptionIDs.get(key) ?? [];
         // let collectionKey: string | undefined;
         // try {
