@@ -236,7 +236,7 @@ describe('useOnyx', () => {
             expect(result2.current[1].status).toEqual('loaded');
         });
 
-        it('should return updated state when connecting to the same key after an Onyx.clear() call', async () => {
+        it('should return updated state when connecting to the same regular key after an Onyx.clear() call', async () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
 
             const {result: result1} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
@@ -261,6 +261,43 @@ describe('useOnyx', () => {
             expect(result3.current[1].status).toEqual('loaded');
 
             Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result1.current[0]).toEqual('test2');
+            expect(result1.current[1].status).toEqual('loaded');
+            expect(result2.current[0]).toEqual('test2');
+            expect(result2.current[1].status).toEqual('loaded');
+            expect(result3.current[0]).toEqual('test2');
+            expect(result3.current[1].status).toEqual('loaded');
+        });
+
+        it('should return updated state when connecting to the same colection member key after an Onyx.clear() call', async () => {
+            // @ts-expect-error bypass
+            await StorageMock.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`, 'test');
+
+            const {result: result1} = renderHook(() => useOnyx(`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`));
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result1.current[0]).toEqual('test');
+            expect(result1.current[1].status).toEqual('loaded');
+
+            await act(async () => Onyx.clear());
+
+            const {result: result2} = renderHook(() => useOnyx(`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`));
+            const {result: result3} = renderHook(() => useOnyx(`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`));
+
+            await act(async () => waitForPromisesToResolve());
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result1.current[0]).toBeUndefined();
+            expect(result1.current[1].status).toEqual('loaded');
+            expect(result2.current[0]).toBeUndefined();
+            expect(result2.current[1].status).toEqual('loaded');
+            expect(result3.current[0]).toBeUndefined();
+            expect(result3.current[1].status).toEqual('loaded');
+
+            Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`, 'test2');
             await act(async () => waitForPromisesToResolve());
 
             expect(result1.current[0]).toEqual('test2');
