@@ -10,7 +10,7 @@ jobs:
   # Note: We run baseline and delta performance checks in the same runner to reduce hardware variance across machines
   perf-tests:
     if: ${{ github.actor != 'OSBotify' }}
-    runs-on: ubuntu-24.04-v4
+    runs-on: ubuntu-latest
     steps:
       # v4
       - name: Checkout
