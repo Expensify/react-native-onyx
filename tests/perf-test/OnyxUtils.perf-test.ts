@@ -110,13 +110,6 @@ describe('OnyxUtils', () => {
         });
     });
 
-    describe('batchUpdates / maybeFlushBatchUpdates', () => {
-        test('one call with 1k updates', async () => {
-            const updates: Array<() => void> = Array.from({length: 1000}, () => jest.fn);
-            await measureAsyncFunction(() => Promise.all(updates.map((update) => OnyxUtils.batchUpdates(update))));
-        });
-    });
-
     describe('get', () => {
         test('10k calls with heavy objects', async () => {
             await measureAsyncFunction(() => Promise.all(mockedReportActionsKeys.map((key) => OnyxUtils.get(key))), {

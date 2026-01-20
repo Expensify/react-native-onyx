@@ -62,7 +62,7 @@ function init({
             // Setting isProcessingCollectionUpdate=true prevents triggering collection callbacks for each individual update
             const isKeyCollectionMember = OnyxUtils.isCollectionMember(key);
 
-            OnyxUtils.keyChanged(key, value as OnyxValue<typeof key>, undefined, true, isKeyCollectionMember);
+            OnyxUtils.keyChanged(key, value as OnyxValue<typeof key>, undefined, isKeyCollectionMember);
         });
     }
 
