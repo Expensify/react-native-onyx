@@ -288,7 +288,6 @@ describe('useOnyx', () => {
             const {result: result3} = renderHook(() => useOnyx(`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`));
 
             await act(async () => waitForPromisesToResolve());
-            await act(async () => waitForPromisesToResolve());
 
             expect(result1.current[0]).toBeUndefined();
             expect(result1.current[1].status).toEqual('loaded');
