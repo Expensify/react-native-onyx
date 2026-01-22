@@ -956,7 +956,7 @@ function prepareKeyValuePairsForStorage(
             continue;
         }
 
-        const valueWithoutNestedNullValues = shouldRemoveNestedNulls ?? true ? utils.removeNestedNullValues(value) : value;
+        const valueWithoutNestedNullValues = (shouldRemoveNestedNulls ?? true) ? utils.removeNestedNullValues(value) : value;
 
         if (valueWithoutNestedNullValues !== undefined) {
             pairs.push([key, valueWithoutNestedNullValues, replaceNullPatches?.[key]]);
@@ -1234,7 +1234,19 @@ function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, me
             }
 
             const oldValue = updatedData[key] || {};
-            const newValue = lodashPick(value, Object.keys(snapshotData[key]));
+
+            const snapshotExistingKeys = Object.keys(snapshotData[key] || {});
+            const allowedNewKeys = ['pendingAction', 'pendingFields'];
+            const keysToCopy = new Set(snapshotExistingKeys.concat(allowedNewKeys));
+            const newValue: Record<string, unknown> = {};
+            if (typeof value === 'object' && value !== null) {
+                const valueRecord = value as Record<string, unknown>;
+                for (const allowedKey of keysToCopy) {
+                    if (Object.prototype.hasOwnProperty.call(valueRecord, allowedKey)) {
+                        newValue[allowedKey] = valueRecord[allowedKey];
+                    }
+                }
+            }
 
             updatedData = {...updatedData, [key]: Object.assign(oldValue, newValue)};
         }
