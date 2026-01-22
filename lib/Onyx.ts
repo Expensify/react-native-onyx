@@ -308,11 +308,14 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
             cache.clearNullishStorageKeys();
 
             const keysToBeClearedFromStorage: OnyxKey[] = [];
+            const keyValuesToResetIndividually: KeyValueMapping = {};
+            // We need to store old and new values for collection keys to properly notify subscribers when clearing Onyx
+            // because the notification process needs the old values in cache but at that point they will be already removed from it.
             const keyValuesToResetAsCollection: Record<
                 OnyxKey,
                 {oldValues: Record<string, KeyValueMapping[OnyxKey] | undefined>; newValues: Record<string, KeyValueMapping[OnyxKey] | undefined>}
             > = {};
-            const keyValuesToResetIndividually: KeyValueMapping = {};
+            
             const allKeys = new Set([...cachedKeys, ...initialKeys]);
 
             // The only keys that should not be cleared are:
