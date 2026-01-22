@@ -315,7 +315,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                 OnyxKey,
                 {oldValues: Record<string, KeyValueMapping[OnyxKey] | undefined>; newValues: Record<string, KeyValueMapping[OnyxKey] | undefined>}
             > = {};
-            
+
             const allKeys = new Set([...cachedKeys, ...initialKeys]);
 
             // The only keys that should not be cleared are:
