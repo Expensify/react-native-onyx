@@ -452,7 +452,7 @@ describe('OnyxUtils', () => {
                 Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const),
             ) as GenericCollection;
 
-            await measureAsyncFunction(() => OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, changedReportActions, mockedReportActionsMap), {
+            await measureFunction(() => OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, changedReportActions, mockedReportActionsMap), {
                 beforeEach: async () => {
                     await Onyx.multiSet(mockedReportActionsMap);
                     for (const key of mockedReportActionsKeys) {
@@ -517,7 +517,7 @@ describe('OnyxUtils', () => {
             const reportAction = mockedReportActionsMap[`${collectionKey}0`];
             const changedReportAction = createRandomReportAction(Number(reportAction.reportActionID));
 
-            await measureAsyncFunction(() => OnyxUtils.broadcastUpdate(key, changedReportAction, true), {
+            await measureFunction(() => OnyxUtils.broadcastUpdate(key, changedReportAction, true), {
                 beforeEach: async () => {
                     await Onyx.set(key, reportAction);
                 },

@@ -75,9 +75,6 @@ type OnyxMethod = ValueOf<typeof METHOD>;
 let mergeQueue: Record<OnyxKey, Array<OnyxValue<OnyxKey>>> = {};
 let mergeQueuePromise: Record<OnyxKey, Promise<void>> = {};
 
-// Used to schedule subscriber update to the macro task queue
-let nextMacrotaskPromise: Promise<void> | null = null;
-
 // Holds a mapping of all the React components that want their state subscribed to a store key
 let callbackToStateMapping: Record<string, CallbackToStateMapping<OnyxKey>> = {};
 
@@ -804,23 +801,6 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
 }
 
 /**
- * Delays promise resolution until the next macrotask to prevent race condition if the key subscription is in progress.
- *
- * @param callback The keyChanged/keysChanged callback
- * */
-function prepareSubscriberUpdate(callback: () => void): Promise<void> {
-    if (!nextMacrotaskPromise) {
-        nextMacrotaskPromise = new Promise<void>((resolve) => {
-            setTimeout(() => {
-                nextMacrotaskPromise = null;
-                resolve();
-            }, 0);
-        });
-    }
-    return Promise.all([nextMacrotaskPromise, Promise.resolve().then(callback)]).then();
-}
-
-/**
  * Schedules an update that will be appended to the macro task queue (so it doesn't update the subscribers immediately).
  *
  * @example
@@ -831,8 +811,8 @@ function scheduleSubscriberUpdate<TKey extends OnyxKey>(
     value: OnyxValue<TKey>,
     canUpdateSubscriber: (subscriber?: CallbackToStateMapping<OnyxKey>) => boolean = () => true,
     isProcessingCollectionUpdate = false,
-): Promise<void> {
-    return prepareSubscriberUpdate(() => keyChanged(key, value, canUpdateSubscriber, isProcessingCollectionUpdate));
+): void {
+    keyChanged(key, value, canUpdateSubscriber, isProcessingCollectionUpdate);
 }
 
 /**
@@ -840,12 +820,8 @@ function scheduleSubscriberUpdate<TKey extends OnyxKey>(
  * so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
  * subscriber callbacks receive the data in a different format than they normally expect and it breaks code.
  */
-function scheduleNotifyCollectionSubscribers<TKey extends OnyxKey>(
-    key: TKey,
-    value: OnyxCollection<KeyValueMapping[TKey]>,
-    previousValue?: OnyxCollection<KeyValueMapping[TKey]>,
-): Promise<void> {
-    return prepareSubscriberUpdate(() => keysChanged(key, value, previousValue));
+function scheduleNotifyCollectionSubscribers<TKey extends OnyxKey>(key: TKey, value: OnyxCollection<KeyValueMapping[TKey]>, previousValue?: OnyxCollection<KeyValueMapping[TKey]>): void {
+    keysChanged(key, value, previousValue);
 }
 
 /**
@@ -919,7 +895,7 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, on
 /**
  * Notifies subscribers and writes current value to cache
  */
-function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>, hasChanged?: boolean): Promise<void> {
+function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>, hasChanged?: boolean): void {
     // Update subscribers if the cached value has changed, or when the subscriber specifically requires
     // all updates regardless of value changes (indicated by initWithStoredValues set to false).
     if (hasChanged) {
@@ -928,7 +904,7 @@ function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>
         cache.addToAccessedKeys(key);
     }
 
-    return scheduleSubscriberUpdate(key, value, (subscriber) => hasChanged || subscriber?.initWithStoredValues === false).then(() => undefined);
+    scheduleSubscriberUpdate(key, value, (subscriber) => hasChanged || subscriber?.initWithStoredValues === false);
 }
 
 function hasPendingMergeForKey(key: OnyxKey): boolean {
@@ -1314,18 +1290,17 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
     OnyxUtils.logKeyChanged(OnyxUtils.METHOD.SET, key, value, hasChanged);
 
     // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
-    const updatePromise = OnyxUtils.broadcastUpdate(key, valueWithoutNestedNullValues, hasChanged);
+    OnyxUtils.broadcastUpdate(key, valueWithoutNestedNullValues, hasChanged);
 
     // If the value has not changed and this isn't a retry attempt, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
     if (!hasChanged && !retryAttempt) {
-        return updatePromise;
+        return Promise.resolve();
     }
 
     return Storage.setItem(key, valueWithoutNestedNullValues)
         .catch((error) => OnyxUtils.retryOperation(error, setWithRetry, {key, value: valueWithoutNestedNullValues, options}, retryAttempt))
         .then(() => {
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
-            return updatePromise;
         });
 }
 
