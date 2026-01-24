@@ -9,7 +9,7 @@ import OnyxUtils, {clearOnyxUtilsInternals} from '../../lib/OnyxUtils';
 import type GenericCollection from '../utils/GenericCollection';
 import type {OnyxUpdate} from '../../lib/Onyx';
 import createDeferredTask from '../../lib/createDeferredTask';
-import type {OnyxInputKeyValueMapping, OnyxKey, RetriableOnyxOperation} from '../../lib/types';
+import type {OnyxEntry, OnyxInputKeyValueMapping, OnyxKey, RetriableOnyxOperation} from '../../lib/types';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -31,11 +31,11 @@ const evictableKeys = [ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY];
 
 const initialKeyStates = {};
 
-// @ts-expect-error bypass
-const generateTestSelector = (): Selector<string, unknown, unknown> => (value: Record<string, unknown>) => ({
-    reportActionID: value.reportActionID,
-    originalMessage: value.originalMessage,
-});
+const generateTestSelector = () =>
+    ((value: OnyxEntry<Record<string, unknown>>) => ({
+        reportActionID: value?.reportActionID,
+        originalMessage: value?.originalMessage,
+    })) as Selector<OnyxKey, {reportActionID?: string; originalMessage?: string}>;
 
 const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
 const mockedReportActionsMap = getRandomReportActions(collectionKey);
