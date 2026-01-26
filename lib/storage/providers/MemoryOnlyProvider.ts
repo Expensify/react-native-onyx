@@ -3,6 +3,8 @@ import type {OnyxKey, OnyxValue} from '../../types';
 import utils from '../../utils';
 import type StorageProvider from './types';
 import type {StorageKeyValuePair} from './types';
+import * as GlobalSettings from '../../GlobalSettings';
+import decorateWithMetrics from '../../metrics';
 
 type Store = Record<OnyxKey, OnyxValue<OnyxKey>>;
 
@@ -151,6 +153,24 @@ const setMockStore = (data: Store) => {
     }
     Object.assign(storeInternal, data);
 };
+
+GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
+    if (!enablePerformanceMetrics) {
+        return;
+    }
+
+    // Apply decorators
+    provider.getItem = decorateWithMetrics(provider.getItem, 'MemoryOnlyProvider.getItem');
+    provider.multiGet = decorateWithMetrics(provider.multiGet, 'MemoryOnlyProvider.multiGet');
+    provider.setItem = decorateWithMetrics(provider.setItem, 'MemoryOnlyProvider.setItem');
+    provider.multiSet = decorateWithMetrics(provider.multiSet, 'MemoryOnlyProvider.multiSet');
+    provider.mergeItem = decorateWithMetrics(provider.mergeItem, 'MemoryOnlyProvider.mergeItem');
+    provider.multiMerge = decorateWithMetrics(provider.multiMerge, 'MemoryOnlyProvider.multiMerge');
+    provider.removeItem = decorateWithMetrics(provider.removeItem, 'MemoryOnlyProvider.removeItem');
+    provider.removeItems = decorateWithMetrics(provider.removeItems, 'MemoryOnlyProvider.removeItems');
+    provider.clear = decorateWithMetrics(provider.clear, 'MemoryOnlyProvider.clear');
+    provider.getAllKeys = decorateWithMetrics(provider.getAllKeys, 'MemoryOnlyProvider.getAllKeys');
+});
 
 export default provider;
 export {set as mockSet, storeInternal as mockStore, setMockStore};

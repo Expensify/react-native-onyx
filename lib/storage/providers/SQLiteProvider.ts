@@ -9,6 +9,8 @@ import type {FastMergeReplaceNullPatch} from '../../utils';
 import utils from '../../utils';
 import type StorageProvider from './types';
 import type {StorageKeyList, StorageKeyValuePair} from './types';
+import * as GlobalSettings from '../../GlobalSettings';
+import decorateWithMetrics from '../../metrics';
 
 // By default, NitroSQLite does not accept nullish values due to current limitations in Nitro Modules.
 // This flag enables a feature in NitroSQLite that allows for nullish values to be passed to operations, such as "execute" or "executeBatch".
@@ -234,6 +236,24 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
         );
     },
 };
+
+GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
+    if (!enablePerformanceMetrics) {
+        return;
+    }
+
+    // Apply decorators
+    provider.getItem = decorateWithMetrics(provider.getItem, 'SQLiteProvider.getItem');
+    provider.multiGet = decorateWithMetrics(provider.multiGet, 'SQLiteProvider.multiGet');
+    provider.setItem = decorateWithMetrics(provider.setItem, 'SQLiteProvider.setItem');
+    provider.multiSet = decorateWithMetrics(provider.multiSet, 'SQLiteProvider.multiSet');
+    provider.mergeItem = decorateWithMetrics(provider.mergeItem, 'SQLiteProvider.mergeItem');
+    provider.multiMerge = decorateWithMetrics(provider.multiMerge, 'SQLiteProvider.multiMerge');
+    provider.removeItem = decorateWithMetrics(provider.removeItem, 'SQLiteProvider.removeItem');
+    provider.removeItems = decorateWithMetrics(provider.removeItems, 'SQLiteProvider.removeItems');
+    provider.clear = decorateWithMetrics(provider.clear, 'SQLiteProvider.clear');
+    provider.getAllKeys = decorateWithMetrics(provider.getAllKeys, 'SQLiteProvider.getAllKeys');
+});
 
 export default provider;
 export type {OnyxSQLiteKeyValuePair};

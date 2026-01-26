@@ -43,7 +43,7 @@ function init({
 }: InitOptions): void {
     if (enablePerformanceMetrics) {
         GlobalSettings.setPerformanceMetricsEnabled(true);
-        applyDecorators();
+        applyPerformanceMetricsDecorators();
     }
 
     initDevTools(enableDevTools);
@@ -583,25 +583,41 @@ const Onyx = {
     registerLogger: Logger.registerLogger,
 };
 
-function applyDecorators() {
+function applyPerformanceMetricsDecorators() {
     // We are reassigning the functions directly so that internal function calls are also decorated
     // @ts-expect-error Reassign
-    connect = decorateWithMetrics(connect, 'Onyx.connect');
-    // @ts-expect-error Reassign
-    connectWithoutView = decorateWithMetrics(connectWithoutView, 'Onyx.connectWithoutView');
-    // @ts-expect-error Reassign
     set = decorateWithMetrics(set, 'Onyx.set');
+    Onyx.set = set;
     // @ts-expect-error Reassign
     multiSet = decorateWithMetrics(multiSet, 'Onyx.multiSet');
+    Onyx.multiSet = multiSet;
     // @ts-expect-error Reassign
     merge = decorateWithMetrics(merge, 'Onyx.merge');
+    Onyx.merge = merge;
     // @ts-expect-error Reassign
     mergeCollection = decorateWithMetrics(mergeCollection, 'Onyx.mergeCollection');
+    Onyx.mergeCollection = mergeCollection;
+    // @ts-expect-error Reassign
+    setCollection = decorateWithMetrics(setCollection, 'Onyx.setCollection');
+    Onyx.setCollection = setCollection;
     // @ts-expect-error Reassign
     update = decorateWithMetrics(update, 'Onyx.update');
+    Onyx.update = update;
     // @ts-expect-error Reassign
     clear = decorateWithMetrics(clear, 'Onyx.clear');
+    Onyx.clear = clear;
+    // @ts-expect-error Reassign
+    init = decorateWithMetrics(init, 'Onyx.init');
+    Onyx.init = init;
 }
+
+GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
+    if (!enablePerformanceMetrics) {
+        return;
+    }
+
+    applyPerformanceMetricsDecorators();
+});
 
 export default Onyx;
 export type {OnyxUpdate, ConnectOptions, SetOptions};

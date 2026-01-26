@@ -1722,48 +1722,47 @@ GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
     if (!enablePerformanceMetrics) {
         return;
     }
-    // We are reassigning the functions directly so that internal function calls are also decorated
 
+    // We are reassigning the functions directly so that internal function calls are also decorated
     // @ts-expect-error Reassign
     initStoreValues = decorateWithMetrics(initStoreValues, 'OnyxUtils.initStoreValues');
+    OnyxUtils.initStoreValues = initStoreValues;
     // @ts-expect-error Complex type signature
     get = decorateWithMetrics(get, 'OnyxUtils.get');
+    OnyxUtils.get = get;
     // @ts-expect-error Reassign
     getAllKeys = decorateWithMetrics(getAllKeys, 'OnyxUtils.getAllKeys');
+    OnyxUtils.getAllKeys = getAllKeys;
+    // @@ts-expect-error Reassign
+    // tryGetCachedValue = decorateWithMetrics(tryGetCachedValue, 'OnyxUtils.tryGetCachedValue');
+    // OnyxUtils.tryGetCachedValue = tryGetCachedValue;
     // @ts-expect-error Reassign
-    getCollectionKeys = decorateWithMetrics(getCollectionKeys, 'OnyxUtils.getCollectionKeys');
+    getCachedCollection = decorateWithMetrics(getCachedCollection, 'OnyxUtils.getCachedCollection');
+    OnyxUtils.getCachedCollection = getCachedCollection;
     // @ts-expect-error Reassign
     keysChanged = decorateWithMetrics(keysChanged, 'OnyxUtils.keysChanged');
+    OnyxUtils.keysChanged = keysChanged;
     // @ts-expect-error Reassign
     keyChanged = decorateWithMetrics(keyChanged, 'OnyxUtils.keyChanged');
+    OnyxUtils.keyChanged = keyChanged;
     // @ts-expect-error Reassign
     sendDataToConnection = decorateWithMetrics(sendDataToConnection, 'OnyxUtils.sendDataToConnection');
-    // @ts-expect-error Reassign
-    scheduleSubscriberUpdate = decorateWithMetrics(scheduleSubscriberUpdate, 'OnyxUtils.scheduleSubscriberUpdate');
-    // @ts-expect-error Reassign
-    scheduleNotifyCollectionSubscribers = decorateWithMetrics(scheduleNotifyCollectionSubscribers, 'OnyxUtils.scheduleNotifyCollectionSubscribers');
+    OnyxUtils.sendDataToConnection = sendDataToConnection;
     // @ts-expect-error Reassign
     remove = decorateWithMetrics(remove, 'OnyxUtils.remove');
+    OnyxUtils.remove = remove;
     // @ts-expect-error Reassign
-    reportStorageQuota = decorateWithMetrics(reportStorageQuota, 'OnyxUtils.reportStorageQuota');
-    // @ts-expect-error Complex type signature
-    retryOperation = decorateWithMetrics(retryOperation, 'OnyxUtils.retryOperation');
-    // @ts-expect-error Reassign
-    broadcastUpdate = decorateWithMetrics(broadcastUpdate, 'OnyxUtils.broadcastUpdate');
+    prepareKeyValuePairsForStorage = decorateWithMetrics(prepareKeyValuePairsForStorage, 'OnyxUtils.prepareKeyValuePairsForStorage');
+    OnyxUtils.prepareKeyValuePairsForStorage = prepareKeyValuePairsForStorage;
     // @ts-expect-error Reassign
     initializeWithDefaultKeyStates = decorateWithMetrics(initializeWithDefaultKeyStates, 'OnyxUtils.initializeWithDefaultKeyStates');
-    // @ts-expect-error Complex type signature
-    multiGet = decorateWithMetrics(multiGet, 'OnyxUtils.multiGet');
+    OnyxUtils.initializeWithDefaultKeyStates = initializeWithDefaultKeyStates;
     // @ts-expect-error Reassign
-    tupleGet = decorateWithMetrics(tupleGet, 'OnyxUtils.tupleGet');
+    multiGet = decorateWithMetrics(multiGet, 'OnyxUtils.multiGet');
+    OnyxUtils.multiGet = multiGet;
     // @ts-expect-error Reassign
     subscribeToKey = decorateWithMetrics(subscribeToKey, 'OnyxUtils.subscribeToKey');
-    // @ts-expect-error Reassign
-    setWithRetry = decorateWithMetrics(setWithRetry, 'OnyxUtils.setWithRetry');
-    // @ts-expect-error Reassign
-    multiSetWithRetry = decorateWithMetrics(multiSetWithRetry, 'OnyxUtils.multiSetWithRetry');
-    // @ts-expect-error Reassign
-    setCollectionWithRetry = decorateWithMetrics(setCollectionWithRetry, 'OnyxUtils.setCollectionWithRetry');
+    OnyxUtils.subscribeToKey = subscribeToKey;
 });
 
 export type {OnyxMethod};

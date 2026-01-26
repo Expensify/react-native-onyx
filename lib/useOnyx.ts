@@ -5,10 +5,8 @@ import OnyxCache, {TASK} from './OnyxCache';
 import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
 import OnyxUtils from './OnyxUtils';
-import * as GlobalSettings from './GlobalSettings';
 import type {CollectionKeyBase, OnyxKey, OnyxValue} from './types';
 import usePrevious from './usePrevious';
-import decorateWithMetrics from './metrics';
 import * as Logger from './Logger';
 import onyxSnapshotCache from './OnyxSnapshotCache';
 import useLiveRef from './useLiveRef';
@@ -380,19 +378,11 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         [key, options?.initWithStoredValues, options?.reuseConnection, checkEvictableKey],
     );
 
-    const getSnapshotDecorated = useMemo(() => {
-        if (!GlobalSettings.isPerformanceMetricsEnabled()) {
-            return getSnapshot;
-        }
-
-        return decorateWithMetrics(getSnapshot, 'useOnyx.getSnapshot');
-    }, [getSnapshot]);
-
     useEffect(() => {
         checkEvictableKey();
     }, [checkEvictableKey]);
 
-    const result = useSyncExternalStore<UseOnyxResult<TReturnValue>>(subscribe, getSnapshotDecorated);
+    const result = useSyncExternalStore<UseOnyxResult<TReturnValue>>(subscribe, getSnapshot);
 
     return result;
 }
