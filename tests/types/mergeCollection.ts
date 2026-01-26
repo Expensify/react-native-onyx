@@ -14,13 +14,16 @@ Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
 });
 
 Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
-    // @ts-expect-error COLLECTION.TEST_KEY is invalid key, it is missing the suffix
-    test_: {
-        str: 'test3',
-    },
     test_2: {
         str: 'test4',
     },
     // @ts-expect-error COLLECTION.TEST_KEY is object, not a number
     test_3: 2,
+});
+
+Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+    // @ts-expect-error invalidKey is not a valid key
+    invalidKey: {
+        str: 'test3',
+    },
 });

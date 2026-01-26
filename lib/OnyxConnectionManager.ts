@@ -142,14 +142,17 @@ class OnyxConnectionManager {
      */
     private fireCallbacks(connectionID: string): void {
         const connection = this.connectionsMap.get(connectionID);
+        if (!connection) {
+            return;
+        }
 
-        connection?.callbacks.forEach((callback) => {
+        for (const callback of connection.callbacks.values()) {
             if (connection.waitForCollectionCallback) {
                 (callback as CollectionConnectCallback<OnyxKey>)(connection.cachedCallbackValue as Record<string, unknown>, connection.cachedCallbackKey as OnyxKey, connection.sourceValue);
             } else {
                 (callback as DefaultConnectCallback<OnyxKey>)(connection.cachedCallbackValue, connection.cachedCallbackKey as OnyxKey);
             }
-        });
+        }
     }
 
     /**
@@ -246,12 +249,12 @@ class OnyxConnectionManager {
      * Disconnect all subscribers from Onyx.
      */
     disconnectAll(): void {
-        this.connectionsMap.forEach((connectionMetadata, connectionID) => {
+        for (const [connectionID, connectionMetadata] of this.connectionsMap.entries()) {
             OnyxUtils.unsubscribeFromKey(connectionMetadata.subscriptionID);
-            connectionMetadata.callbacks.forEach((_, callbackID) => {
+            for (const callbackID of connectionMetadata.callbacks.keys()) {
                 this.removeFromEvictionBlockList({id: connectionID, callbackID});
-            });
-        });
+            }
+        }
 
         this.connectionsMap.clear();
 

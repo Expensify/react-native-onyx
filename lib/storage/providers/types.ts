@@ -11,15 +11,19 @@ type DatabaseSize = {
 
 type OnStorageKeyChanged = <TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>) => void;
 
-type StorageProvider = {
+type StorageProvider<TStore> = {
+    store: TStore;
+
     /**
      * The name of the provider that can be printed to the logs
      */
     name: string;
+
     /**
      * Initializes the storage provider
      */
     init: () => void;
+
     /**
      * Gets the value of a given key or return `null` if it's not available in storage
      */

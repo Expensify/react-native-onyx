@@ -52,10 +52,10 @@ function fastMerge<TValue>(target: TValue, source: TValue, options?: FastMergeOp
         };
     }
 
-    // We have to ignore arrays and nullish values here,
+    // We have to ignore arrays, primitives and nullish values here,
     // otherwise "mergeObject" will throw an error,
     // because it expects an object as "source"
-    if (Array.isArray(source) || source === null || source === undefined) {
+    if (!isMergeableObject(source)) {
         return {result: source, replaceNullPatches: metadata.replaceNullPatches};
     }
 
@@ -94,7 +94,7 @@ function mergeObject<TObject extends Record<string, unknown>>(
     // If "shouldRemoveNestedNulls" is true, we want to remove null values from the merged object
     // and therefore we need to omit keys where either the source or target value is null.
     if (targetObject) {
-        Object.keys(targetObject).forEach((key) => {
+        for (const key of Object.keys(targetObject)) {
             const targetProperty = targetObject?.[key];
             const sourceProperty = source?.[key];
 
@@ -103,15 +103,15 @@ function mergeObject<TObject extends Record<string, unknown>>(
             const shouldOmitNullishProperty = options.shouldRemoveNestedNulls && (targetProperty === null || sourceProperty === null);
 
             if (targetProperty === undefined || shouldOmitNullishProperty) {
-                return;
+                continue;
             }
 
             destination[key] = targetProperty;
-        });
+        }
     }
 
     // After copying over all keys from the target object, we want to merge the source object into the destination object.
-    Object.keys(source).forEach((key) => {
+    for (const key of Object.keys(source)) {
         let targetProperty = targetObject?.[key];
         const sourceProperty = source?.[key] as Record<string, unknown>;
 
@@ -120,13 +120,13 @@ function mergeObject<TObject extends Record<string, unknown>>(
         const shouldOmitNullishProperty = options.shouldRemoveNestedNulls && sourceProperty === null;
 
         if (sourceProperty === undefined || shouldOmitNullishProperty) {
-            return;
+            continue;
         }
 
         // If the source value is not a mergable object, we need to set the key directly.
         if (!isMergeableObject(sourceProperty)) {
             destination[key] = sourceProperty;
-            return;
+            continue;
         }
 
         // If "shouldMarkRemovedObjects" is enabled and the previous merge change (targetProperty) is null,
@@ -147,11 +147,11 @@ function mergeObject<TObject extends Record<string, unknown>>(
             const sourcePropertyWithoutMark = {...sourceProperty};
             delete sourcePropertyWithoutMark.ONYX_INTERNALS__REPLACE_OBJECT_MARK;
             destination[key] = sourcePropertyWithoutMark;
-            return;
+            continue;
         }
 
         destination[key] = fastMerge(targetProperty, sourceProperty, options, metadata, [...basePath, key]).result;
-    });
+    }
 
     return destination as TObject;
 }
@@ -187,7 +187,6 @@ function removeNestedNullValues<TValue extends OnyxInput<OnyxKey> | null>(value:
         const propertyValue = value[key];
 
         if (propertyValue === null || propertyValue === undefined) {
-            // eslint-disable-next-line no-continue
             continue;
         }
 

@@ -292,7 +292,6 @@ describe('OnyxUtils', () => {
                 ONYXKEYS.COLLECTION.TEST_KEY,
                 {[entryKey]: updatedEntryData}, // new collection
                 initialCollection, // previous collection
-                true, // notify connect subscribers
             );
 
             // Should be called again because data changed
@@ -342,6 +341,36 @@ describe('OnyxUtils', () => {
             expect(() => {
                 OnyxUtils.getCollectionKey('');
             }).toThrowError("Invalid '' key provided, only collection keys are allowed.");
+        });
+    });
+
+    describe('isCollectionMember', () => {
+        it('should return true for collection member keys', () => {
+            expect(OnyxUtils.isCollectionMember('test_123')).toBe(true);
+            expect(OnyxUtils.isCollectionMember('test_level_456')).toBe(true);
+            expect(OnyxUtils.isCollectionMember('test_level_last_789')).toBe(true);
+            expect(OnyxUtils.isCollectionMember('test_-1_something')).toBe(true);
+            expect(OnyxUtils.isCollectionMember('routes_abc')).toBe(true);
+        });
+
+        it('should return false for collection keys themselves', () => {
+            expect(OnyxUtils.isCollectionMember('test_')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('test_level_')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('test_level_last_')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('routes_')).toBe(false);
+        });
+
+        it('should return false for non-collection keys', () => {
+            expect(OnyxUtils.isCollectionMember('test')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('someRegularKey')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('notACollection')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('')).toBe(false);
+        });
+
+        it('should return false for invalid keys', () => {
+            expect(OnyxUtils.isCollectionMember('invalid_key_123')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('notregistered_')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('notregistered_123')).toBe(false);
         });
     });
 

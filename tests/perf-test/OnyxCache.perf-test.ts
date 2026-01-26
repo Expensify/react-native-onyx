@@ -29,7 +29,7 @@ let cache: typeof OnyxCache;
 const resetCacheBeforeEachMeasure = () => {
     // Always use a "fresh" instance
     jest.resetModules();
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+
     cache = require('../../lib/OnyxCache').default;
 };
 
@@ -107,7 +107,7 @@ describe('OnyxCache', () => {
             await measureFunction(() => cache.get(mockedReportActionsKeys[0]), {
                 beforeEach: async () => {
                     resetCacheBeforeEachMeasure();
-                    Object.entries(mockedReportActionsMap).forEach(([k, v]) => cache.set(k, v));
+                    for (const [k, v] of Object.entries(mockedReportActionsMap)) cache.set(k, v);
                 },
             });
         });
@@ -127,7 +127,7 @@ describe('OnyxCache', () => {
             await measureFunction(() => cache.drop(mockedReportActionsKeys[1000]), {
                 beforeEach: async () => {
                     resetCacheBeforeEachMeasure();
-                    Object.entries(mockedReportActionsMap).forEach(([k, v]) => cache.set(k, v));
+                    for (const [k, v] of Object.entries(mockedReportActionsMap)) cache.set(k, v);
                 },
             });
         });
@@ -142,7 +142,7 @@ describe('OnyxCache', () => {
             await measureFunction(() => cache.merge(changedReportActions), {
                 beforeEach: async () => {
                     resetCacheBeforeEachMeasure();
-                    Object.entries(mockedReportActionsMap).forEach(([k, v]) => cache.set(k, v));
+                    for (const [k, v] of Object.entries(mockedReportActionsMap)) cache.set(k, v);
                 },
             });
         });
@@ -192,7 +192,7 @@ describe('OnyxCache', () => {
                 beforeEach: async () => {
                     resetCacheBeforeEachMeasure();
                     cache.setRecentKeysLimit(mockedReportActionsKeys.length - 1000);
-                    mockedReportActionsKeys.forEach((k) => cache.addToAccessedKeys(k));
+                    for (const k of mockedReportActionsKeys) cache.addToAccessedKeys(k);
                 },
             });
         });

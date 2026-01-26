@@ -18,7 +18,7 @@ function addGlobalSettingsChangeListener(listener: (settings: GlobalSettings) =>
 }
 
 function notifyListeners() {
-    listeners.forEach((listener) => listener(globalSettings));
+    for (const listener of listeners) listener(globalSettings);
 }
 
 function setPerformanceMetricsEnabled(enabled: boolean) {

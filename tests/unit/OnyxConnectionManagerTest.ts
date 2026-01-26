@@ -1,4 +1,3 @@
-// eslint-disable-next-line max-classes-per-file
 import {act} from '@testing-library/react-native';
 import Onyx from '../../lib';
 import type {Connection} from '../../lib/OnyxConnectionManager';
@@ -144,7 +143,7 @@ describe('OnyxConnectionManager', () => {
             expect(callback1).toHaveBeenNthCalledWith(2, obj2, `${ONYXKEYS.COLLECTION.TEST_KEY}entry2`);
 
             expect(callback2).toHaveBeenCalledTimes(1);
-            expect(callback2).toHaveBeenCalledWith(collection, undefined, undefined);
+            expect(callback2).toHaveBeenCalledWith(collection, ONYXKEYS.COLLECTION.TEST_KEY, undefined);
 
             connectionManager.disconnect(connection1);
             connectionManager.disconnect(connection2);
@@ -483,7 +482,7 @@ describe('OnyxConnectionManager', () => {
 
             // Initial callback with undefined values
             expect(callback).toHaveBeenCalledTimes(1);
-            expect(callback).toHaveBeenCalledWith(undefined, undefined, undefined);
+            expect(callback).toHaveBeenCalledWith(undefined, ONYXKEYS.COLLECTION.TEST_KEY, undefined);
 
             // Reset mock to test the next update
             callback.mockReset();
