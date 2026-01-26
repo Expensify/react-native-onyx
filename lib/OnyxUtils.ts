@@ -736,6 +736,7 @@ function keyChanged<TKey extends OnyxKey>(
                 }
 
                 cachedCollection[key] = value;
+                lastConnectionCallbackData.set(subscriber.subscriptionID, cachedCollection);
                 subscriber.callback(cachedCollection, subscriber.key, {[key]: value});
                 continue;
             }
@@ -767,7 +768,7 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: CallbackToStateMapp
     lastConnectionCallbackData.get(mapping.subscriptionID);
 
     // If the value has not changed we do not need to trigger the callback
-    if (lastConnectionCallbackData.has(mapping.subscriptionID) && valueToPass === lastValue) {
+    if (lastConnectionCallbackData.has(mapping.subscriptionID) && lastValue) {
         return;
     }
 
