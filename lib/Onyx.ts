@@ -586,12 +586,6 @@ const Onyx = {
 function applyPerformanceMetricsDecorators() {
     // We are reassigning the functions directly so that internal function calls are also decorated
     // @ts-expect-error Reassign
-    connect = decorateWithMetrics(connect, 'Onyx.connect');
-    Onyx.connect = connect;
-    // @ts-expect-error Reassign
-    connectWithoutView = decorateWithMetrics(connectWithoutView, 'Onyx.connectWithoutView');
-    Onyx.connectWithoutView = connectWithoutView;
-    // @ts-expect-error Reassign
     set = decorateWithMetrics(set, 'Onyx.set');
     Onyx.set = set;
     // @ts-expect-error Reassign
