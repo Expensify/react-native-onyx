@@ -402,7 +402,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
 }
 
 /**
- * Insert API responses and lifecycle data into Onyx
+ * Insert API responses and lifecycle data into Onyx.
  *
  * @param data An array of objects with update expressions
  * @returns resolves when all operations are complete
