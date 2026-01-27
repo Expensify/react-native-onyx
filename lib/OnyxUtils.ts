@@ -1387,7 +1387,10 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
         return OnyxUtils.scheduleSubscriberUpdate(key, value);
     });
 
-    return Storage.multiSet(keyValuePairsToSet)
+    // Filter out the RAM-only key value pairs, as they should not be saved to storage
+    const keyValuePairsToStore = keyValuePairsToSet.filter(keyValuePair => !cache.isRamOnlyKey(keyValuePair[0]))
+    
+    return Storage.multiSet(keyValuePairsToStore)
         .catch((error) => OnyxUtils.retryOperation(error, multiSetWithRetry, newData, retryAttempt))
         .then(() => {
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MULTI_SET, undefined, newData);
