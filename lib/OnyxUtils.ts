@@ -1447,6 +1447,12 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
 
         const updatePromise = OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
 
+        // RAM-only keys are not supposed to be saved to storage
+        if(cache.isRamOnlyKey(collectionKey)) {
+            OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET_COLLECTION, undefined, mutableCollection);
+            return updatePromise;
+        }
+
         return Storage.multiSet(keyValuePairs)
             .catch((error) => OnyxUtils.retryOperation(error, setCollectionWithRetry, {collectionKey, collection}, retryAttempt))
             .then(() => {
@@ -1561,7 +1567,8 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
                 promises.push(Storage.multiMerge(keyValuePairsForExistingCollection));
             }
 
-            if (keyValuePairsForNewCollection.length > 0) {
+            // We can skip this step for RAM-only keys as they should never be saved to storage
+            if (!cache.isRamOnlyKey(collectionKey) && keyValuePairsForNewCollection.length > 0) {
                 promises.push(Storage.multiSet(keyValuePairsForNewCollection));
             }
 
@@ -1639,6 +1646,11 @@ function partialSetCollection<TKey extends CollectionKeyBase>({collectionKey, co
         for (const [key, value] of keyValuePairs) cache.set(key, value);
 
         const updatePromise = scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
+
+        if(cache.isRamOnlyKey(collectionKey)) {
+            sendActionToDevTools(METHOD.SET_COLLECTION, undefined, mutableCollection);
+            return updatePromise;
+        }
 
         return Storage.multiSet(keyValuePairs)
             .catch((error) => retryOperation(error, partialSetCollection, {collectionKey, collection}, retryAttempt))
