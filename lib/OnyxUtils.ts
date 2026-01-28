@@ -84,9 +84,6 @@ let callbackToStateMapping: Record<string, CallbackToStateMapping<OnyxKey>> = {}
 // Keeps a copy of the values of the onyx collection keys as a map for faster lookups
 let onyxCollectionKeySet = new Set<OnyxKey>();
 
-// Keeps a copy of the values of the onyx RAM-only keys as a map for faster lookups
-let onyxRamOnlyKeySet = new Set<OnyxKey>();
-
 // Holds a mapping of the connected key to the subscriptionID for faster lookups
 let onyxKeyToSubscriptionIDs = new Map();
 
@@ -169,12 +166,6 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
         return acc;
     }, new Set<OnyxKey>());
 
-    const ramOnlyValues = Object.values(keys.RAM_ONLY ?? {}) as string[];
-    onyxRamOnlyKeySet = ramOnlyValues.reduce((acc, val) => {
-        acc.add(val);
-        return acc;
-    }, new Set<OnyxKey>());
-
     // Set our default key states to use when initializing and clearing Onyx data
     defaultKeyStates = initialKeyStates;
 
@@ -185,9 +176,6 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
 
     // Set collection keys in cache for optimized storage
     cache.setCollectionKeys(onyxCollectionKeySet);
-
-    // Set RAM-only keys in cache for optimized storage
-    cache.setRamOnlyKeys(onyxRamOnlyKeySet);
 
     if (typeof keys.COLLECTION === 'object' && typeof keys.COLLECTION.SNAPSHOT === 'string') {
         snapshotKey = keys.COLLECTION.SNAPSHOT;

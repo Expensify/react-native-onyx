@@ -41,6 +41,7 @@ function init({
     enablePerformanceMetrics = false,
     enableDevTools = true,
     skippableCollectionMemberIDs = [],
+    ramOnlyKeys = [],
 }: InitOptions): void {
     if (enablePerformanceMetrics) {
         GlobalSettings.setPerformanceMetricsEnabled(true);
@@ -52,6 +53,8 @@ function init({
     Storage.init();
 
     OnyxUtils.setSkippableCollectionMemberIDs(new Set(skippableCollectionMemberIDs));
+
+    cache.setRamOnlyKeys(new Set<OnyxKey>(ramOnlyKeys))
 
     if (shouldSyncMultipleInstances) {
         Storage.keepInstancesSync?.((key, value) => {
