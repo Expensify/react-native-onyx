@@ -376,7 +376,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
 
             const defaultKeyValuePairs = Object.entries(
                 Object.keys(defaultKeyStates)
-                    .filter((key) => !keysToPreserve.includes(key))
+                    .filter((key) => !keysToPreserve.includes(key) && !cache.isRamOnlyKey(key))
                     .reduce((obj: KeyValueMapping, key) => {
                         // eslint-disable-next-line no-param-reassign
                         obj[key] = defaultKeyStates[key];
@@ -387,10 +387,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
             // Remove only the items that we want cleared from storage, and reset others to default
             for (const key of keysToBeClearedFromStorage) cache.drop(key);
 
-            // Remove RAM-only keys value pairs as they are never saved to storage
-            const nonRamOnlyDefaultKeyValuePairs = keysToBeClearedFromStorage.filter(key => !cache.isRamOnlyKey(key))
-
-            return Storage.removeItems(nonRamOnlyDefaultKeyValuePairs)
+            return Storage.removeItems(keysToBeClearedFromStorage)
                 .then(() => connectionManager.refreshSessionID())
                 .then(() => Storage.multiSet(defaultKeyValuePairs))
                 .then(() => {
