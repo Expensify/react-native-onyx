@@ -1563,7 +1563,8 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
 
             // New keys will be added via multiSet while existing keys will be updated using multiMerge
             // This is because setting a key that doesn't exist yet with multiMerge will throw errors
-            if (keyValuePairsForExistingCollection.length > 0) {
+            // We can skip this step for RAM-only keys as they should never be saved to storage
+            if (!cache.isRamOnlyKey(collectionKey) && keyValuePairsForExistingCollection.length > 0) {
                 promises.push(Storage.multiMerge(keyValuePairsForExistingCollection));
             }
 
