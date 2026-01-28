@@ -425,6 +425,12 @@ type InitOptions = {
      * Additionally, any subscribers from these keys to won't receive any data from Onyx.
      */
     skippableCollectionMemberIDs?: string[];
+
+    /**
+     * This is an array of keys that when provided to Onyx are flagged as RAM-only keys, that are not supposed to be saved to disk. 
+     * This functionality replaces initWithStoredValues parameter from the useOnyx hook.
+     */
+    ramOnlyKeys?: OnyxKey[];
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -40,6 +40,7 @@ function init({
     enablePerformanceMetrics = false,
     enableDevTools = true,
     skippableCollectionMemberIDs = [],
+    ramOnlyKeys = [],
 }: InitOptions): void {
     if (enablePerformanceMetrics) {
         GlobalSettings.setPerformanceMetricsEnabled(true);
@@ -51,6 +52,8 @@ function init({
     Storage.init();
 
     OnyxUtils.setSkippableCollectionMemberIDs(new Set(skippableCollectionMemberIDs));
+
+    cache.setRamOnlyKeys(new Set<OnyxKey>(ramOnlyKeys))
 
     if (shouldSyncMultipleInstances) {
         Storage.keepInstancesSync?.((key, value) => {
@@ -378,7 +381,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
 
             const defaultKeyValuePairs = Object.entries(
                 Object.keys(defaultKeyStates)
-                    .filter((key) => !keysToPreserve.includes(key))
+                    .filter((key) => !keysToPreserve.includes(key) && !cache.isRamOnlyKey(key))
                     .reduce((obj: KeyValueMapping, key) => {
                         // eslint-disable-next-line no-param-reassign
                         obj[key] = defaultKeyStates[key];
@@ -388,6 +391,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
 
             // Remove only the items that we want cleared from storage, and reset others to default
             for (const key of keysToBeClearedFromStorage) cache.drop(key);
+
             return Storage.removeItems(keysToBeClearedFromStorage)
                 .then(() => connectionManager.refreshSessionID())
                 .then(() => Storage.multiSet(defaultKeyValuePairs))

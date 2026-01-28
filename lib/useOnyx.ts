@@ -23,6 +23,7 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
 
     /**
      * If set to `false`, then no data will be prefilled into the component.
+     * @deprecated This param is going to be removed soon. Use RAM-only keys instead.
      */
     initWithStoredValues?: boolean;
 

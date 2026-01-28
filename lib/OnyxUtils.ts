@@ -1321,6 +1321,21 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
         return updatePromise;
     }
 
+    let collectionKey;
+    try {
+        collectionKey = OnyxUtils.splitCollectionMemberKey(key)[0];
+    } catch {
+        // The key is not a collection key
+    }
+
+    const isMemberOfRamOnlyCollection = collectionKey && cache.isRamOnlyKey(collectionKey)
+
+    // If a key is a RAM-only key or a member of RAM-only collection, we skip the step that modifies the storage
+    if(cache.isRamOnlyKey(key) || isMemberOfRamOnlyCollection) {
+        OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
+        return updatePromise
+    } 
+
     return Storage.setItem(key, valueWithoutNestedNullValues)
         .catch((error) => OnyxUtils.retryOperation(error, setWithRetry, {key, value: valueWithoutNestedNullValues, options}, retryAttempt))
         .then(() => {
@@ -1371,7 +1386,10 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
         return OnyxUtils.scheduleSubscriberUpdate(key, value);
     });
 
-    return Storage.multiSet(keyValuePairsToSet)
+    // Filter out the RAM-only key value pairs, as they should not be saved to storage
+    const keyValuePairsToStore = keyValuePairsToSet.filter(keyValuePair => !cache.isRamOnlyKey(keyValuePair[0]))
+    
+    return Storage.multiSet(keyValuePairsToStore)
         .catch((error) => OnyxUtils.retryOperation(error, multiSetWithRetry, newData, retryAttempt))
         .then(() => {
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MULTI_SET, undefined, newData);
@@ -1439,6 +1457,12 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
         for (const [key, value] of keyValuePairs) cache.set(key, value);
 
         const updatePromise = OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
+
+        // RAM-only keys are not supposed to be saved to storage
+        if(cache.isRamOnlyKey(collectionKey)) {
+            OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET_COLLECTION, undefined, mutableCollection);
+            return updatePromise;
+        }
 
         return Storage.multiSet(keyValuePairs)
             .catch((error) => OnyxUtils.retryOperation(error, setCollectionWithRetry, {collectionKey, collection}, retryAttempt))
@@ -1550,11 +1574,13 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
 
             // New keys will be added via multiSet while existing keys will be updated using multiMerge
             // This is because setting a key that doesn't exist yet with multiMerge will throw errors
-            if (keyValuePairsForExistingCollection.length > 0) {
+            // We can skip this step for RAM-only keys as they should never be saved to storage
+            if (!cache.isRamOnlyKey(collectionKey) && keyValuePairsForExistingCollection.length > 0) {
                 promises.push(Storage.multiMerge(keyValuePairsForExistingCollection));
             }
 
-            if (keyValuePairsForNewCollection.length > 0) {
+            // We can skip this step for RAM-only keys as they should never be saved to storage
+            if (!cache.isRamOnlyKey(collectionKey) && keyValuePairsForNewCollection.length > 0) {
                 promises.push(Storage.multiSet(keyValuePairsForNewCollection));
             }
 
@@ -1632,6 +1658,11 @@ function partialSetCollection<TKey extends CollectionKeyBase>({collectionKey, co
         for (const [key, value] of keyValuePairs) cache.set(key, value);
 
         const updatePromise = scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
+
+        if(cache.isRamOnlyKey(collectionKey)) {
+            sendActionToDevTools(METHOD.SET_COLLECTION, undefined, mutableCollection);
+            return updatePromise;
+        }
 
         return Storage.multiSet(keyValuePairs)
             .catch((error) => retryOperation(error, partialSetCollection, {collectionKey, collection}, retryAttempt))
