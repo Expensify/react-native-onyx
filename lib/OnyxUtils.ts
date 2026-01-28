@@ -1321,7 +1321,17 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
         return updatePromise;
     }
 
-    if(cache.isRamOnlyKey(key)) {
+    let collectionKey;
+    try {
+        collectionKey = OnyxUtils.splitCollectionMemberKey(key)[0];
+    } catch {
+        // The key is not a collection key
+    }
+
+    const isMemberOfRamOnlyCollection = collectionKey && cache.isRamOnlyKey(collectionKey)
+
+    // If a key is a RAM-only key or a member of RAM-only collection, we skip the step that modifies the storage
+    if(cache.isRamOnlyKey(key) || isMemberOfRamOnlyCollection) {
         OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
         return updatePromise
     } 
