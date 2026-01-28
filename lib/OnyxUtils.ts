@@ -1322,6 +1322,7 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
     }
 
     if(cache.isRamOnlyKey(key)) {
+        OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
         return updatePromise
     } 
 
