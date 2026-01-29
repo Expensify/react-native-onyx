@@ -107,13 +107,53 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             throw new Error('Store is not initialized!');
         }
 
-        const placeholders = keys.map(() => '?').join(',');
-        const command = `SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
-        return provider.store.executeAsync<OnyxSQLiteKeyValuePair>(command, keys).then(({rows}) => {
-            // eslint-disable-next-line no-underscore-dangle
-            const result = rows?._array.map((row) => [row.record_key, JSON.parse(row.valueJSON)]);
-            return (result ?? []) as StorageKeyValuePair[];
-        });
+        if (keys.length <= 500) {
+            const placeholders = keys.map(() => '?').join(',');
+            const command = `SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
+            return provider.store.executeAsync<OnyxSQLiteKeyValuePair>(command, keys).then(({rows}) => {
+                // eslint-disable-next-line no-underscore-dangle
+                const result = rows?._array.map<StorageKeyValuePair>((row) => [row.record_key, JSON.parse(row.valueJSON)]);
+                return result ?? [];
+            });
+        }
+
+        // FIXME: Not working because of "-" apparently.
+        // const tableName = `temp_multiMerge_${Str.guid()}`;
+        const tableName = `temp_multiMerge_${Date.now()}_${Math.random().toString(36).slice(2, 8)}}`;
+
+        return provider.store
+            .executeAsync(`CREATE TEMP TABLE ${tableName} (record_key TEXT PRIMARY KEY);`)
+            .then(() => {
+                if (!provider.store) {
+                    throw new Error('Store is not initialized!');
+                }
+
+                const insertQuery = `INSERT INTO ${tableName} (record_key) VALUES (?);`;
+                const insertParams = keys.map((key) => [key]);
+                return provider.store.executeBatchAsync([{query: insertQuery, params: insertParams}]);
+            })
+            .then(() => {
+                if (!provider.store) {
+                    throw new Error('Store is not initialized!');
+                }
+
+                return provider.store.executeAsync<OnyxSQLiteKeyValuePair>(
+                    `SELECT k.record_key, k.valueJSON
+                 FROM keyvaluepairs AS k
+                 INNER JOIN ${tableName} AS t ON k.record_key = t.record_key;`,
+                );
+            })
+            .then(({rows}) => {
+                // eslint-disable-next-line no-underscore-dangle
+                const result = rows?._array.map<StorageKeyValuePair>((row) => [row.record_key, JSON.parse(row.valueJSON)]);
+
+                return result ?? [];
+            })
+            .catch((error) => {
+                console.error('[SQLiteProvider] Error in multiGet:', error);
+                provider.store?.executeAsync(`DROP TABLE IF EXISTS ${tableName};`);
+                throw error;
+            });
     },
     setItem(key, value) {
         if (!provider.store) {
@@ -127,7 +167,7 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             throw new Error('Store is not initialized!');
         }
 
-        const query = 'REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, json(?));';
+        const query = 'REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);';
         const params = pairs.map((pair) => [pair[0], JSON.stringify(pair[1] === undefined ? null : pair[1])]);
         if (utils.isEmptyObject(params)) {
             return Promise.resolve();
@@ -143,15 +183,15 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
 
         // Query to merge the change into the DB value.
         const patchQuery = `INSERT INTO keyvaluepairs (record_key, valueJSON)
-            VALUES (:key, JSON(:value))
+            VALUES (:key, :value)
             ON CONFLICT DO UPDATE
-            SET valueJSON = JSON_PATCH(valueJSON, JSON(:value));
+            SET valueJSON = JSON_PATCH(valueJSON, :value);
         `;
         const patchQueryArguments: string[][] = [];
 
         // Query to fully replace the nested objects of the DB value.
         const replaceQuery = `UPDATE keyvaluepairs
-            SET valueJSON = JSON_REPLACE(valueJSON, ?, JSON(?))
+            SET valueJSON = JSON_REPLACE(valueJSON, ?, ?)
             WHERE record_key = ?;
         `;
         const replaceQueryArguments: string[][] = [];
