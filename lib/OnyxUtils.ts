@@ -1386,8 +1386,20 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
         return OnyxUtils.scheduleSubscriberUpdate(key, value);
     });
 
-    // Filter out the RAM-only key value pairs, as they should not be saved to storage
-    const keyValuePairsToStore = keyValuePairsToSet.filter(keyValuePair => !cache.isRamOnlyKey(keyValuePair[0]))
+    const keyValuePairsToStore = keyValuePairsToSet.filter(keyValuePair => {
+        let collectionKey;
+        try {
+            const [key] = keyValuePair
+            collectionKey = OnyxUtils.splitCollectionMemberKey(key)[0];
+        } catch {
+            // The key is not a collection key
+        }
+
+        const isMemberOfRamOnlyCollection = collectionKey && cache.isRamOnlyKey(collectionKey)
+
+        // Filter out the RAM-only key value pairs, as they should not be saved to storage
+        return !cache.isRamOnlyKey(keyValuePair[0]) && !isMemberOfRamOnlyCollection
+    })
     
     return Storage.multiSet(keyValuePairsToStore)
         .catch((error) => OnyxUtils.retryOperation(error, multiSetWithRetry, newData, retryAttempt))
