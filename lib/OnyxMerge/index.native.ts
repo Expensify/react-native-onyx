@@ -30,7 +30,7 @@ const applyMerge: ApplyMerge = <TKey extends OnyxKey, TValue extends OnyxInput<T
 
     // If the value has not changed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
     // If the key is marked as RAM-only, it should not be saved nor updated in the storage.
-    if (!hasChanged || cache.isRamOnlyKey(key)) {
+    if (!hasChanged || OnyxUtils.isRamOnlyKey(key) || OnyxUtils.isRamOnlyCollectionMember(key)) {
         return Promise.resolve({mergedValue, updatePromise});
     }
 

@@ -376,7 +376,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
 
             const defaultKeyValuePairs = Object.entries(
                 Object.keys(defaultKeyStates)
-                    .filter((key) => !keysToPreserve.includes(key) && !cache.isRamOnlyKey(key))
+                    .filter((key) => !keysToPreserve.includes(key) && !OnyxUtils.isRamOnlyKey(key) && !OnyxUtils.isRamOnlyCollectionMember(key))
                     .reduce((obj: KeyValueMapping, key) => {
                         // eslint-disable-next-line no-param-reassign
                         obj[key] = defaultKeyStates[key];

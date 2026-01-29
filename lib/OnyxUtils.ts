@@ -456,6 +456,31 @@ function isCollectionMember(key: OnyxKey): boolean {
 }
 
 /**
+ * Checks if a given key is a RAM-only key 
+ * @param key - The key to check
+ * @returns true if key is a RAM-only key
+ */
+function isRamOnlyKey(key: OnyxKey): boolean {
+    return cache.isRamOnlyKey(key)
+}
+
+/**
+ * Checks if a given key is a member of a RAM-only collection
+ * @param key - The key to check
+ * @returns true if key is a member of RAM-only collection
+ */
+function isRamOnlyCollectionMember(key: OnyxKey): boolean {
+    try {
+        const collectionKey = getCollectionKey(key)
+        // If collectionKey exists for a given key, check if it's a RAM-only key
+        return isRamOnlyKey(collectionKey)
+    } catch {
+        // If getCollectionKey throws, the key is not a collection member
+        return false
+    }
+}
+
+/**
  * Splits a collection member key into the collection key part and the ID part.
  * @param key - The collection member key to split.
  * @param collectionKey - The collection key of the `key` param that can be passed in advance to optimize the function.
@@ -1321,17 +1346,8 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
         return updatePromise;
     }
 
-    let collectionKey;
-    try {
-        collectionKey = OnyxUtils.splitCollectionMemberKey(key)[0];
-    } catch {
-        // The key is not a collection key
-    }
-
-    const isMemberOfRamOnlyCollection = collectionKey && cache.isRamOnlyKey(collectionKey)
-
     // If a key is a RAM-only key or a member of RAM-only collection, we skip the step that modifies the storage
-    if(cache.isRamOnlyKey(key) || isMemberOfRamOnlyCollection) {
+    if(isRamOnlyKey(key) || isRamOnlyCollectionMember(key)) {
         OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
         return updatePromise
     } 
@@ -1387,18 +1403,9 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
     });
 
     const keyValuePairsToStore = keyValuePairsToSet.filter(keyValuePair => {
-        let collectionKey;
-        try {
-            const [key] = keyValuePair
-            collectionKey = OnyxUtils.splitCollectionMemberKey(key)[0];
-        } catch {
-            // The key is not a collection key
-        }
-
-        const isMemberOfRamOnlyCollection = collectionKey && cache.isRamOnlyKey(collectionKey)
-
+        const [key] = keyValuePair
         // Filter out the RAM-only key value pairs, as they should not be saved to storage
-        return !cache.isRamOnlyKey(keyValuePair[0]) && !isMemberOfRamOnlyCollection
+        return !isRamOnlyKey(keyValuePair[0]) && !isRamOnlyCollectionMember(key)
     })
     
     return Storage.multiSet(keyValuePairsToStore)
@@ -1471,7 +1478,7 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
         const updatePromise = OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
 
         // RAM-only keys are not supposed to be saved to storage
-        if(cache.isRamOnlyKey(collectionKey)) {
+        if(isRamOnlyKey(collectionKey)) {
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET_COLLECTION, undefined, mutableCollection);
             return updatePromise;
         }
@@ -1587,12 +1594,12 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
             // New keys will be added via multiSet while existing keys will be updated using multiMerge
             // This is because setting a key that doesn't exist yet with multiMerge will throw errors
             // We can skip this step for RAM-only keys as they should never be saved to storage
-            if (!cache.isRamOnlyKey(collectionKey) && keyValuePairsForExistingCollection.length > 0) {
+            if (!isRamOnlyKey(collectionKey) && keyValuePairsForExistingCollection.length > 0) {
                 promises.push(Storage.multiMerge(keyValuePairsForExistingCollection));
             }
 
             // We can skip this step for RAM-only keys as they should never be saved to storage
-            if (!cache.isRamOnlyKey(collectionKey) && keyValuePairsForNewCollection.length > 0) {
+            if (!isRamOnlyKey(collectionKey) && keyValuePairsForNewCollection.length > 0) {
                 promises.push(Storage.multiSet(keyValuePairsForNewCollection));
             }
 
@@ -1671,7 +1678,7 @@ function partialSetCollection<TKey extends CollectionKeyBase>({collectionKey, co
 
         const updatePromise = scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
 
-        if(cache.isRamOnlyKey(collectionKey)) {
+        if(isRamOnlyKey(collectionKey)) {
             sendActionToDevTools(METHOD.SET_COLLECTION, undefined, mutableCollection);
             return updatePromise;
         }
@@ -1759,6 +1766,8 @@ const OnyxUtils = {
     setWithRetry,
     multiSetWithRetry,
     setCollectionWithRetry,
+    isRamOnlyKey,
+    isRamOnlyCollectionMember
 };
 
 GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
