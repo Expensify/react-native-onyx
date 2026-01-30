@@ -427,7 +427,7 @@ type InitOptions = {
     skippableCollectionMemberIDs?: string[];
 
     /**
-     * This is an array of keys that when provided to Onyx are flagged as RAM-only keys, that are not supposed to be saved to disk. 
+     * This is an array of keys that when provided to Onyx are flagged as RAM-only keys, that are not supposed to be saved to disk.
      * This functionality replaces initWithStoredValues parameter from the useOnyx hook.
      */
     ramOnlyKeys?: OnyxKey[];

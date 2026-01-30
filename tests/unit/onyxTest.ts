@@ -24,9 +24,9 @@ const ONYX_KEYS = {
         ANIMALS: 'animals_',
         SNAPSHOT: 'snapshot_',
         ROUTES: 'routes_',
-        RAM_ONLY_COLLECTION: 'ramOnlyCollection_'
+        RAM_ONLY_COLLECTION: 'ramOnlyCollection_',
     },
-    RAM_ONLY_TEST_KEY: 'ramOnlyKey'
+    RAM_ONLY_TEST_KEY: 'ramOnlyKey',
 };
 
 Onyx.init({
@@ -35,10 +35,7 @@ Onyx.init({
         [ONYX_KEYS.OTHER_TEST]: 42,
         [ONYX_KEYS.KEY_WITH_UNDERSCORE]: 'default',
     },
-    ramOnlyKeys: [
-        ONYX_KEYS.RAM_ONLY_TEST_KEY,
-        ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION
-    ],
+    ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION],
     skippableCollectionMemberIDs: ['skippable-id'],
 });
 
@@ -2189,22 +2186,22 @@ describe('Onyx', () => {
                 });
 
                 it('should not save a RAM-only collection to storage', async () => {
-                    const key1 = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`
-                    const key2 = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`
+                    const key1 = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
+                    const key2 = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`;
 
                     await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, {
                         [key1]: 'value 1',
                         [key2]: 'value 2',
-                    })
+                    });
 
                     await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, {
                         [key1]: 'updated value 1',
                         [key2]: 'updated value 2',
-                    })
+                    });
 
-                    expect(await StorageMock.getItem(key1)).toBeNull()
-                    expect(await StorageMock.getItem(key2)).toBeNull()
-                })
+                    expect(await StorageMock.getItem(key1)).toBeNull();
+                    expect(await StorageMock.getItem(key2)).toBeNull();
+                });
             });
         });
 
@@ -2358,10 +2355,10 @@ describe('Onyx', () => {
         });
 
         it('should not save a RAM-only collection to storage', async () => {
-            const entry1 = 'test 1'
+            const entry1 = 'test 1';
 
-            const entry2 = 'test 2'
-            
+            const entry2 = 'test 2';
+
             await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`]: entry1});
             await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`]: entry2});
 
@@ -2371,12 +2368,12 @@ describe('Onyx', () => {
                 {
                     key: `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`,
                     onyxMethod: 'merge',
-                    value: null
+                    value: null,
                 },
                 {
                     key: `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`,
                     onyxMethod: 'merge',
-                    value: null
+                    value: null,
                 },
             );
 
@@ -2384,21 +2381,21 @@ describe('Onyx', () => {
                 {
                     key: `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`,
                     onyxMethod: 'merge',
-                    value: 'updated test 1'
+                    value: 'updated test 1',
                 },
                 {
                     key: `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`,
                     onyxMethod: 'merge',
-                    value: 'updated test 2'
+                    value: 'updated test 2',
                 },
             );
 
             await Onyx.update(queuedUpdates);
 
-            expect(true).toBeTruthy()
+            expect(true).toBeTruthy();
 
-            expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`)).toBeNull()
-            expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`)).toBeNull()
+            expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`)).toBeNull();
+            expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`)).toBeNull();
         });
     });
 
@@ -2657,35 +2654,35 @@ describe('Onyx', () => {
         });
 
         it('should not save a RAM-only key to storage', async () => {
-            await Onyx.set(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'test')
+            await Onyx.set(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'test');
 
-            expect(await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeNull()
-        })
+            expect(await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeNull();
+        });
 
         it('should not save a member of a RAM-only collection to storage', async () => {
-            const collectionMemberKey = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`
-            await Onyx.set(collectionMemberKey, 'test')
+            const collectionMemberKey = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
+            await Onyx.set(collectionMemberKey, 'test');
 
-            expect(await StorageMock.getItem(collectionMemberKey)).toBeNull()
-        })
+            expect(await StorageMock.getItem(collectionMemberKey)).toBeNull();
+        });
     });
 
     describe('multiSet', () => {
         it('should only save non RAM-only keys to storage', async () => {
-            const otherTestValue = 'non ram only value'
-            const collectionMemberKey = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`
+            const otherTestValue = 'non ram only value';
+            const collectionMemberKey = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`;
 
             await Onyx.multiSet({
                 [ONYX_KEYS.OTHER_TEST]: otherTestValue,
                 [ONYX_KEYS.RAM_ONLY_TEST_KEY]: 'test value',
                 [collectionMemberKey]: 'test value',
-            })
+            });
 
-            expect(await StorageMock.getItem(ONYX_KEYS.OTHER_TEST)).toEqual(otherTestValue)
-            expect(await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeNull()
-            expect(await StorageMock.getItem(collectionMemberKey)).toBeNull()
-        }) 
-    })
+            expect(await StorageMock.getItem(ONYX_KEYS.OTHER_TEST)).toEqual(otherTestValue);
+            expect(await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeNull();
+            expect(await StorageMock.getItem(collectionMemberKey)).toBeNull();
+        });
+    });
 
     describe('setCollection', () => {
         it('should replace all existing collection members with new values and remove old ones', async () => {
@@ -2802,17 +2799,17 @@ describe('Onyx', () => {
         });
 
         it('should not save a RAM-only collection to storage', async () => {
-            const key1 = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`
-            const key2 = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`
+            const key1 = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
+            const key2 = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`;
 
             await Onyx.setCollection(ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, {
                 [key1]: 'test1',
                 [key2]: 'test2',
-            })
+            });
 
-            expect(await StorageMock.getItem(key1)).toBeNull()
-            expect(await StorageMock.getItem(key2)).toBeNull()
-        })
+            expect(await StorageMock.getItem(key1)).toBeNull();
+            expect(await StorageMock.getItem(key2)).toBeNull();
+        });
     });
 
     describe('skippable collection member ids', () => {

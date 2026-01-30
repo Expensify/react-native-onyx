@@ -98,7 +98,7 @@ class OnyxCache {
             'getCollectionKey',
             'getCollectionData',
             'setRamOnlyKeys',
-            'isRamOnlyKey'
+            'isRamOnlyKey',
         );
     }
 

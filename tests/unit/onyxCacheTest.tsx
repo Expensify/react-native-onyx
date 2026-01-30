@@ -667,19 +667,19 @@ describe('Onyx', () => {
                 ...ONYX_KEYS,
                 COLLECTION: {
                     ...ONYX_KEYS.COLLECTION,
-                    RAM_ONLY_COLLECTION: 'ramOnlyCollection'
+                    RAM_ONLY_COLLECTION: 'ramOnlyCollection',
                 },
-                RAM_ONLY_KEY: 'ramOnlyKey'
-            }
+                RAM_ONLY_KEY: 'ramOnlyKey',
+            };
 
             return initOnyx({
                 keys: testKeys,
-                ramOnlyKeys: [testKeys.COLLECTION.RAM_ONLY_COLLECTION, testKeys.RAM_ONLY_KEY]
+                ramOnlyKeys: [testKeys.COLLECTION.RAM_ONLY_COLLECTION, testKeys.RAM_ONLY_KEY],
             }).then(() => {
-                expect(cache.isRamOnlyKey(testKeys.RAM_ONLY_KEY)).toBeTruthy()
-                expect(cache.isRamOnlyKey(testKeys.COLLECTION.RAM_ONLY_COLLECTION)).toBeTruthy()
-                expect(cache.isRamOnlyKey(testKeys.TEST_KEY)).toBeFalsy()
-            })
-        })
+                expect(cache.isRamOnlyKey(testKeys.RAM_ONLY_KEY)).toBeTruthy();
+                expect(cache.isRamOnlyKey(testKeys.COLLECTION.RAM_ONLY_COLLECTION)).toBeTruthy();
+                expect(cache.isRamOnlyKey(testKeys.TEST_KEY)).toBeFalsy();
+            });
+        });
     });
 });

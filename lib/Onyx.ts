@@ -54,7 +54,7 @@ function init({
 
     OnyxUtils.setSkippableCollectionMemberIDs(new Set(skippableCollectionMemberIDs));
 
-    cache.setRamOnlyKeys(new Set<OnyxKey>(ramOnlyKeys))
+    cache.setRamOnlyKeys(new Set<OnyxKey>(ramOnlyKeys));
 
     if (shouldSyncMultipleInstances) {
         Storage.keepInstancesSync?.((key, value) => {

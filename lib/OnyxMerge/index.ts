@@ -20,8 +20,8 @@ const applyMerge: ApplyMerge = <TKey extends OnyxKey, TValue extends OnyxInput<T
     // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
     const updatePromise = OnyxUtils.broadcastUpdate(key, mergedValue as OnyxValue<TKey>, hasChanged);
 
-    const shouldSkipStorageOperations = !hasChanged || OnyxUtils.isRamOnlyKey(key) || OnyxUtils.isRamOnlyCollectionMember(key)
-    
+    const shouldSkipStorageOperations = !hasChanged || OnyxUtils.isRamOnlyKey(key) || OnyxUtils.isRamOnlyCollectionMember(key);
+
     // If the value has not changed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
     // If the key is marked as RAM-only, it should not be saved nor updated in the storage.
     if (shouldSkipStorageOperations) {
