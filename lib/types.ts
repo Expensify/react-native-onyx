@@ -425,6 +425,12 @@ type InitOptions = {
      * Additionally, any subscribers from these keys to won't receive any data from Onyx.
      */
     skippableCollectionMemberIDs?: string[];
+
+    /**
+     * Keys that should always be merged into snapshot entries even if they were not previously present.
+     * This allows clients to opt-in to extra snapshot data without hardcoding app-specific keys in Onyx.
+     */
+    snapshotMergeKeys?: string[];
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

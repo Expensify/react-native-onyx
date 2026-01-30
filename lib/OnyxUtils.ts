@@ -1,6 +1,5 @@
 import {deepEqual} from 'fast-equals';
 import type {ValueOf} from 'type-fest';
-import lodashPick from 'lodash/pick';
 import _ from 'underscore';
 import DevTools from './DevTools';
 import * as Logger from './Logger';
@@ -956,7 +955,7 @@ function prepareKeyValuePairsForStorage(
             continue;
         }
 
-        const valueWithoutNestedNullValues = (shouldRemoveNestedNulls ?? true) ? utils.removeNestedNullValues(value) : value;
+        const valueWithoutNestedNullValues = shouldRemoveNestedNulls ?? true ? utils.removeNestedNullValues(value) : value;
 
         if (valueWithoutNestedNullValues !== undefined) {
             pairs.push([key, valueWithoutNestedNullValues, replaceNullPatches?.[key]]);
@@ -1236,7 +1235,7 @@ function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, me
             const oldValue = updatedData[key] || {};
 
             const snapshotExistingKeys = Object.keys(snapshotData[key] || {});
-            const allowedNewKeys = ['pendingAction', 'pendingFields'];
+            const allowedNewKeys = GlobalSettings.getSnapshotMergeKeys();
             const keysToCopy = new Set(snapshotExistingKeys.concat(allowedNewKeys));
             const newValue: Record<string, unknown> = {};
             if (typeof value === 'object' && value !== null) {

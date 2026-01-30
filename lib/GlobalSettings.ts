@@ -4,6 +4,7 @@
 
 const globalSettings = {
     enablePerformanceMetrics: false,
+    snapshotMergeKeys: [] as string[],
 };
 
 type GlobalSettings = typeof globalSettings;
@@ -29,4 +30,13 @@ function isPerformanceMetricsEnabled() {
     return globalSettings.enablePerformanceMetrics;
 }
 
-export {setPerformanceMetricsEnabled, isPerformanceMetricsEnabled, addGlobalSettingsChangeListener};
+function setSnapshotMergeKeys(keys: string[]) {
+    globalSettings.snapshotMergeKeys = keys;
+    notifyListeners();
+}
+
+function getSnapshotMergeKeys() {
+    return globalSettings.snapshotMergeKeys;
+}
+
+export {setPerformanceMetricsEnabled, isPerformanceMetricsEnabled, setSnapshotMergeKeys, getSnapshotMergeKeys, addGlobalSettingsChangeListener};
