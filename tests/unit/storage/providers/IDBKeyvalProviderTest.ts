@@ -67,7 +67,7 @@ describe('IDBKeyValProvider', () => {
             expect(await IDB.get(ONYXKEYS.TEST_KEY, IDBKeyValProvider.store)).toEqual('value');
         });
 
-        it.skip('should remove the key when passing null', async () => {
+        it('should remove the key when passing null', async () => {
             await IDBKeyValProvider.setItem(ONYXKEYS.TEST_KEY, 'value');
             expect(await IDB.get(ONYXKEYS.TEST_KEY, IDBKeyValProvider.store)).toEqual('value');
 
