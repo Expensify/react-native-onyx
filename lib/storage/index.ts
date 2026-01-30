@@ -204,10 +204,12 @@ const storage: Storage = {
     },
 };
 
+let hasDecoratedWithMetrics = false;
 GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
-    if (!enablePerformanceMetrics) {
+    if (!enablePerformanceMetrics || hasDecoratedWithMetrics) {
         return;
     }
+    hasDecoratedWithMetrics = true;
 
     // Apply decorators
     storage.getItem = decorateWithMetrics(storage.getItem, 'Storage.getItem');
