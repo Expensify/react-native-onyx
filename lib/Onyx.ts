@@ -386,7 +386,6 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
 
             // Remove only the items that we want cleared from storage, and reset others to default
             for (const key of keysToBeClearedFromStorage) cache.drop(key);
-
             return Storage.removeItems(keysToBeClearedFromStorage)
                 .then(() => connectionManager.refreshSessionID())
                 .then(() => Storage.multiSet(defaultKeyValuePairs))
