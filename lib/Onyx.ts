@@ -312,100 +312,100 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
         const initialKeys = Object.keys(defaultKeyStates);
 
         const promise = OnyxUtils.getAllKeys()
-        .then((cachedKeys) => {
-            cache.clearNullishStorageKeys();
+            .then((cachedKeys) => {
+                cache.clearNullishStorageKeys();
 
-            const keysToBeClearedFromStorage: OnyxKey[] = [];
-            const keyValuesToResetIndividually: KeyValueMapping = {};
-            // We need to store old and new values for collection keys to properly notify subscribers when clearing Onyx
-            // because the notification process needs the old values in cache but at that point they will be already removed from it.
-            const keyValuesToResetAsCollection: Record<
-                OnyxKey,
-                {oldValues: Record<string, KeyValueMapping[OnyxKey] | undefined>; newValues: Record<string, KeyValueMapping[OnyxKey] | undefined>}
-            > = {};
+                const keysToBeClearedFromStorage: OnyxKey[] = [];
+                const keyValuesToResetIndividually: KeyValueMapping = {};
+                // We need to store old and new values for collection keys to properly notify subscribers when clearing Onyx
+                // because the notification process needs the old values in cache but at that point they will be already removed from it.
+                const keyValuesToResetAsCollection: Record<
+                    OnyxKey,
+                    {oldValues: Record<string, KeyValueMapping[OnyxKey] | undefined>; newValues: Record<string, KeyValueMapping[OnyxKey] | undefined>}
+                > = {};
 
-            const allKeys = new Set([...cachedKeys, ...initialKeys]);
+                const allKeys = new Set([...cachedKeys, ...initialKeys]);
 
-            // The only keys that should not be cleared are:
-            // 1. Anything specifically passed in keysToPreserve (because some keys like language preferences, offline
-            //      status, or activeClients need to remain in Onyx even when signed out)
-            // 2. Any keys with a default state (because they need to remain in Onyx as their default, and setting them
-            //      to null would cause unknown behavior)
-            //   2.1 However, if a default key was explicitly set to null, we need to reset it to the default value
-            for (const key of allKeys) {
-                const isKeyToPreserve = keysToPreserve.includes(key);
-                const isDefaultKey = key in defaultKeyStates;
+                // The only keys that should not be cleared are:
+                // 1. Anything specifically passed in keysToPreserve (because some keys like language preferences, offline
+                //      status, or activeClients need to remain in Onyx even when signed out)
+                // 2. Any keys with a default state (because they need to remain in Onyx as their default, and setting them
+                //      to null would cause unknown behavior)
+                //   2.1 However, if a default key was explicitly set to null, we need to reset it to the default value
+                for (const key of allKeys) {
+                    const isKeyToPreserve = keysToPreserve.includes(key);
+                    const isDefaultKey = key in defaultKeyStates;
 
-                // If the key is being removed or reset to default:
-                // 1. Update it in the cache
-                // 2. Figure out whether it is a collection key or not,
-                //      since collection key subscribers need to be updated differently
-                if (!isKeyToPreserve) {
-                    const oldValue = cache.get(key);
-                    const newValue = defaultKeyStates[key] ?? null;
-                    if (newValue !== oldValue) {
-                        cache.set(key, newValue);
+                    // If the key is being removed or reset to default:
+                    // 1. Update it in the cache
+                    // 2. Figure out whether it is a collection key or not,
+                    //      since collection key subscribers need to be updated differently
+                    if (!isKeyToPreserve) {
+                        const oldValue = cache.get(key);
+                        const newValue = defaultKeyStates[key] ?? null;
+                        if (newValue !== oldValue) {
+                            cache.set(key, newValue);
 
-                        let collectionKey: string | undefined;
-                        try {
-                            collectionKey = OnyxUtils.getCollectionKey(key);
-                        } catch (e) {
-                            // If getCollectionKey() throws an error it means the key is not a collection key.
-                            collectionKey = undefined;
-                        }
-
-                        if (collectionKey) {
-                            if (!keyValuesToResetAsCollection[collectionKey]) {
-                                keyValuesToResetAsCollection[collectionKey] = {oldValues: {}, newValues: {}};
+                            let collectionKey: string | undefined;
+                            try {
+                                collectionKey = OnyxUtils.getCollectionKey(key);
+                            } catch (e) {
+                                // If getCollectionKey() throws an error it means the key is not a collection key.
+                                collectionKey = undefined;
                             }
-                            keyValuesToResetAsCollection[collectionKey].oldValues[key] = oldValue;
-                            keyValuesToResetAsCollection[collectionKey].newValues[key] = newValue ?? undefined;
-                        } else {
-                            keyValuesToResetIndividually[key] = newValue ?? undefined;
+
+                            if (collectionKey) {
+                                if (!keyValuesToResetAsCollection[collectionKey]) {
+                                    keyValuesToResetAsCollection[collectionKey] = {oldValues: {}, newValues: {}};
+                                }
+                                keyValuesToResetAsCollection[collectionKey].oldValues[key] = oldValue;
+                                keyValuesToResetAsCollection[collectionKey].newValues[key] = newValue ?? undefined;
+                            } else {
+                                keyValuesToResetIndividually[key] = newValue ?? undefined;
+                            }
                         }
                     }
+
+                    if (isKeyToPreserve || isDefaultKey) {
+                        continue;
+                    }
+
+                    // If it isn't preserved and doesn't have a default, we'll remove it
+                    keysToBeClearedFromStorage.push(key);
                 }
 
-                if (isKeyToPreserve || isDefaultKey) {
-                    continue;
+                const updatePromises: Array<Promise<void>> = [];
+
+                // Notify the subscribers for each key/value group so they can receive the new values
+                for (const [key, value] of Object.entries(keyValuesToResetIndividually)) {
+                    updatePromises.push(OnyxUtils.scheduleSubscriberUpdate(key, value));
+                }
+                for (const [key, value] of Object.entries(keyValuesToResetAsCollection)) {
+                    updatePromises.push(OnyxUtils.scheduleNotifyCollectionSubscribers(key, value.newValues, value.oldValues));
                 }
 
-                // If it isn't preserved and doesn't have a default, we'll remove it
-                keysToBeClearedFromStorage.push(key);
-            }
+                // Exclude RAM-only keys to prevent them from being saved to storage
+                const defaultKeyValuePairs = Object.entries(
+                    Object.keys(defaultKeyStates)
+                        .filter((key) => !keysToPreserve.includes(key) && !OnyxUtils.isRamOnlyKey(key))
+                        .reduce((obj: KeyValueMapping, key) => {
+                            // eslint-disable-next-line no-param-reassign
+                            obj[key] = defaultKeyStates[key];
+                            return obj;
+                        }, {}),
+                );
 
-            const updatePromises: Array<Promise<void>> = [];
-
-            // Notify the subscribers for each key/value group so they can receive the new values
-            for (const [key, value] of Object.entries(keyValuesToResetIndividually)) {
-                updatePromises.push(OnyxUtils.scheduleSubscriberUpdate(key, value));
-            }
-            for (const [key, value] of Object.entries(keyValuesToResetAsCollection)) {
-                updatePromises.push(OnyxUtils.scheduleNotifyCollectionSubscribers(key, value.newValues, value.oldValues));
-            }
-
-            // Exclude RAM-only keys to prevent them from being saved to storage
-            const defaultKeyValuePairs = Object.entries(
-                Object.keys(defaultKeyStates)
-                    .filter((key) => !keysToPreserve.includes(key) && !OnyxUtils.isRamOnlyKey(key))
-                    .reduce((obj: KeyValueMapping, key) => {
-                        // eslint-disable-next-line no-param-reassign
-                        obj[key] = defaultKeyStates[key];
-                        return obj;
-                    }, {}),
-            );
-
-            // Remove only the items that we want cleared from storage, and reset others to default
-            for (const key of keysToBeClearedFromStorage) cache.drop(key);
-            return Storage.removeItems(keysToBeClearedFromStorage)
-                .then(() => connectionManager.refreshSessionID())
-                .then(() => Storage.multiSet(defaultKeyValuePairs))
-                .then(() => {
-                    DevTools.clearState(keysToPreserve);
-                    return Promise.all(updatePromises);
-                });
-        })
-        .then(() => undefined);
+                // Remove only the items that we want cleared from storage, and reset others to default
+                for (const key of keysToBeClearedFromStorage) cache.drop(key);
+                return Storage.removeItems(keysToBeClearedFromStorage)
+                    .then(() => connectionManager.refreshSessionID())
+                    .then(() => Storage.multiSet(defaultKeyValuePairs))
+                    .then(() => {
+                        DevTools.clearState(keysToPreserve);
+                        return Promise.all(updatePromises);
+                    });
+            })
+            .then(() => undefined);
 
         return cache.captureTask(TASK.CLEAR, promise) as Promise<void>;
     });
