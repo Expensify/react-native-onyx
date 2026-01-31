@@ -30,6 +30,8 @@ import * as GlobalSettings from './GlobalSettings';
 import decorateWithMetrics from './metrics';
 import OnyxMerge from './OnyxMerge';
 
+/** Test change */
+
 /** Initialize the store with actions and listening for storage events */
 function init({
     keys = {},
@@ -61,7 +63,7 @@ function init({
             // Setting isProcessingCollectionUpdate=true prevents triggering collection callbacks for each individual update
             const isKeyCollectionMember = OnyxUtils.isCollectionMember(key);
 
-            OnyxUtils.keyChanged(key, value as OnyxValue<typeof key>, undefined, isKeyCollectionMember);
+            OnyxUtils.keyChanged(key, value as OnyxValue<typeof key>, undefined, true, isKeyCollectionMember);
         });
     }
 
