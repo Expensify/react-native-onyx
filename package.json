@@ -20,6 +20,7 @@
     "url": "https://github.com/Expensify/react-native-onyx/issues"
   },
   "files": [
+    "lib/**/*",
     "dist/**/*",
     "API.md",
     "README.md",
@@ -27,6 +28,7 @@
   ],
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "react-native": "lib/index.ts",
   "scripts": {
     "prepare": "npm run build",
     "lint": "eslint .",
