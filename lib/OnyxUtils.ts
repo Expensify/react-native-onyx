@@ -1234,6 +1234,10 @@ function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, me
 
             const oldValue = updatedData[key] || {};
 
+            // Snapshot entries are stored as a "shape" of the last known data per key, so by default we only
+            // merge fields that already exist in the snapshot to avoid unintentionally bloating snapshot data.
+            // Some clients need specific fields (like pending status) even when they are missing in the snapshot,
+            // so we allow an explicit, opt-in list of keys to always include during snapshot merges.
             const snapshotExistingKeys = Object.keys(snapshotData[key] || {});
             const allowedNewKeys = GlobalSettings.getSnapshotMergeKeys();
             const keysToCopy = new Set(snapshotExistingKeys.concat(allowedNewKeys));
