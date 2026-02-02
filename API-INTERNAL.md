@@ -59,10 +59,7 @@ is associated with a collection of keys.</p>
 <dd><p>Checks if a given key is a collection member key (not just a collection key).</p>
 </dd>
 <dt><a href="#isRamOnlyKey">isRamOnlyKey(key)</a> ⇒</dt>
-<dd><p>Checks if a given key is a RAM-only key.</p>
-</dd>
-<dt><a href="#isRamOnlyCollectionMember">isRamOnlyCollectionMember(key)</a> ⇒</dt>
-<dd><p>Checks if a given key is a member of a RAM-only collection.</p>
+<dd><p>Checks if a given key is a RAM-only key or a RAM-only collection member.</p>
 </dd>
 <dt><a href="#splitCollectionMemberKey">splitCollectionMemberKey(key, collectionKey)</a> ⇒</dt>
 <dd><p>Splits a collection member key into the collection key part and the ID part.</p>

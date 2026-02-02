@@ -456,28 +456,20 @@ function isCollectionMember(key: OnyxKey): boolean {
 }
 
 /**
- * Checks if a given key is a RAM-only key
+ * Checks if a given key is a RAM-only key or a RAM-only collection member
  * @param key - The key to check
- * @returns true if key is a RAM-only key
+ * @returns true if key is a RAM-only key or a RAM-only collection member
  */
 function isRamOnlyKey(key: OnyxKey): boolean {
-    return cache.isRamOnlyKey(key);
-}
-
-/**
- * Checks if a given key is a member of a RAM-only collection
- * @param key - The key to check
- * @returns true if key is a member of RAM-only collection
- */
-function isRamOnlyCollectionMember(key: OnyxKey): boolean {
     try {
         const collectionKey = getCollectionKey(key);
         // If collectionKey exists for a given key, check if it's a RAM-only key
-        return isRamOnlyKey(collectionKey);
+        return cache.isRamOnlyKey(collectionKey);
     } catch {
         // If getCollectionKey throws, the key is not a collection member
-        return false;
     }
+
+    return cache.isRamOnlyKey(key);
 }
 
 /**
@@ -1347,7 +1339,7 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
     }
 
     // If a key is a RAM-only key or a member of RAM-only collection, we skip the step that modifies the storage
-    if (isRamOnlyKey(key) || isRamOnlyCollectionMember(key)) {
+    if (isRamOnlyKey(key)) {
         OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
         return updatePromise;
     }
@@ -1405,7 +1397,7 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
     const keyValuePairsToStore = keyValuePairsToSet.filter((keyValuePair) => {
         const [key] = keyValuePair;
         // Filter out the RAM-only key value pairs, as they should not be saved to storage
-        return !isRamOnlyKey(key) && !isRamOnlyCollectionMember(key);
+        return !isRamOnlyKey(key);
     });
 
     return Storage.multiSet(keyValuePairsToStore)
@@ -1767,7 +1759,6 @@ const OnyxUtils = {
     multiSetWithRetry,
     setCollectionWithRetry,
     isRamOnlyKey,
-    isRamOnlyCollectionMember,
 };
 
 GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {

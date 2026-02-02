@@ -472,11 +472,10 @@ Onyx.init({
     ramOnlyKeys: [
         ONYXKEYS.RAM_ONLY_KEY_1,
         ONYXKEYS.RAM_ONLY_KEY_2,
+        ONYXKEYS.COLLECTION.RAM_ONLY_KEY_2,
     ],
 });
 ```
-
-You can achieve a similar effect using `initWithStoredValues: false` in `useOnyx`, but that feature is deprecated and will be removed in one of the future releases. 
 
 ### Usage
 

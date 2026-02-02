@@ -2199,6 +2199,8 @@ describe('Onyx', () => {
                         [key2]: 'updated value 2',
                     });
 
+                    expect(await cache.get(key1)).toEqual('updated value 1');
+                    expect(await cache.get(key2)).toEqual('updated value 2');
                     expect(await StorageMock.getItem(key1)).toBeNull();
                     expect(await StorageMock.getItem(key2)).toBeNull();
                 });
@@ -2385,6 +2387,8 @@ describe('Onyx', () => {
 
             await Onyx.update(queuedUpdates);
 
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`)).toEqual('updated test 1');
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`)).toEqual('updated test 2');
             expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`)).toBeNull();
             expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`)).toBeNull();
         });
@@ -2647,6 +2651,7 @@ describe('Onyx', () => {
         it('should not save a RAM-only key to storage', async () => {
             await Onyx.set(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'test');
 
+            expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toEqual('test');
             expect(await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeNull();
         });
 
@@ -2654,6 +2659,7 @@ describe('Onyx', () => {
             const collectionMemberKey = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
             await Onyx.set(collectionMemberKey, 'test');
 
+            expect(cache.get(collectionMemberKey)).toEqual('test');
             expect(await StorageMock.getItem(collectionMemberKey)).toBeNull();
         });
     });
@@ -2665,12 +2671,14 @@ describe('Onyx', () => {
 
             await Onyx.multiSet({
                 [ONYX_KEYS.OTHER_TEST]: otherTestValue,
-                [ONYX_KEYS.RAM_ONLY_TEST_KEY]: 'test value',
-                [collectionMemberKey]: 'test value',
+                [ONYX_KEYS.RAM_ONLY_TEST_KEY]: 'test value 1',
+                [collectionMemberKey]: 'test value 2',
             });
 
             expect(await StorageMock.getItem(ONYX_KEYS.OTHER_TEST)).toEqual(otherTestValue);
+            expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toEqual('test value 1');
             expect(await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeNull();
+            expect(cache.get(collectionMemberKey)).toEqual('test value 2');
             expect(await StorageMock.getItem(collectionMemberKey)).toBeNull();
         });
     });
@@ -2798,6 +2806,8 @@ describe('Onyx', () => {
                 [key2]: 'test2',
             });
 
+            expect(cache.get(key1)).toEqual('test1');
+            expect(cache.get(key2)).toEqual('test2');
             expect(await StorageMock.getItem(key1)).toBeNull();
             expect(await StorageMock.getItem(key2)).toBeNull();
         });
