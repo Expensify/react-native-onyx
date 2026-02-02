@@ -52,7 +52,7 @@ function init({
     Storage.init();
 
     OnyxUtils.setSkippableCollectionMemberIDs(new Set(skippableCollectionMemberIDs));
-    GlobalSettings.setSnapshotMergeKeys([...new Set(snapshotMergeKeys)]);
+    OnyxUtils.setSnapshotMergeKeys(new Set(snapshotMergeKeys));
 
     if (shouldSyncMultipleInstances) {
         Storage.keepInstancesSync?.((key, value) => {
