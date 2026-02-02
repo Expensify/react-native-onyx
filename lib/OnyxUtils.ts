@@ -1405,7 +1405,7 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
     const keyValuePairsToStore = keyValuePairsToSet.filter((keyValuePair) => {
         const [key] = keyValuePair;
         // Filter out the RAM-only key value pairs, as they should not be saved to storage
-        return !isRamOnlyKey(keyValuePair[0]) && !isRamOnlyCollectionMember(key);
+        return !isRamOnlyKey(key) && !isRamOnlyCollectionMember(key);
     });
 
     return Storage.multiSet(keyValuePairsToStore)

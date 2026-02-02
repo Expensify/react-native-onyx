@@ -2355,13 +2355,6 @@ describe('Onyx', () => {
         });
 
         it('should not save a RAM-only collection to storage', async () => {
-            const entry1 = 'test 1';
-
-            const entry2 = 'test 2';
-
-            await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`]: entry1});
-            await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`]: entry2});
-
             const queuedUpdates: Array<OnyxUpdate<OnyxKey>> = [];
 
             queuedUpdates.push(
@@ -2391,8 +2384,6 @@ describe('Onyx', () => {
             );
 
             await Onyx.update(queuedUpdates);
-
-            expect(true).toBeTruthy();
 
             expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`)).toBeNull();
             expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`)).toBeNull();
