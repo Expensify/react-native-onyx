@@ -1744,12 +1744,10 @@ const OnyxUtils = {
     setCollectionWithRetry,
 };
 
-let hasDecoratedWithMetrics = false;
 GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
-    if (!enablePerformanceMetrics || hasDecoratedWithMetrics) {
+    if (!enablePerformanceMetrics) {
         return;
     }
-    hasDecoratedWithMetrics = true;
     // We are reassigning the functions directly so that internal function calls are also decorated
 
     // @ts-expect-error Reassign
