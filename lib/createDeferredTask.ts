@@ -1,6 +1,7 @@
 type DeferredTask = {
     promise: Promise<void>;
     resolve?: () => void;
+    isResolved: boolean;
 };
 
 /**
@@ -10,9 +11,13 @@ type DeferredTask = {
  */
 export default function createDeferredTask(): DeferredTask {
     const deferred = {} as DeferredTask;
+    deferred.isResolved = false;
 
     deferred.promise = new Promise((res) => {
-        deferred.resolve = res;
+        deferred.resolve = () => {
+            deferred.isResolved = true;
+            res();
+        };
     });
 
     return deferred;
