@@ -542,12 +542,7 @@ function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<vo
         }
     }
 
-    const snapshotPromises = OnyxUtils.updateSnapshots(data, merge);
-
-    // We need to run the snapshot updates before the other updates so the snapshot data can be updated before the loading state in the snapshot
-    const finalPromises = snapshotPromises.concat(promises);
-
-    return clearPromise.then(() => Promise.all(finalPromises.map((p) => p()))).then(() => undefined);
+    return clearPromise.then(() => Promise.all(promises.map((p) => p()))).then(() => undefined);
 }
 
 /**

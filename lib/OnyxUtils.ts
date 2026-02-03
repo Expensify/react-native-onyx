@@ -1,10 +1,8 @@
 import {deepEqual} from 'fast-equals';
 import type {ValueOf} from 'type-fest';
-import lodashPick from 'lodash/pick';
 import _ from 'underscore';
 import DevTools from './DevTools';
 import * as Logger from './Logger';
-import type Onyx from './Onyx';
 import cache, {TASK} from './OnyxCache';
 import * as Str from './Str';
 import Storage from './storage';
@@ -24,7 +22,6 @@ import type {
     OnyxInputKeyValueMapping,
     OnyxKey,
     OnyxMergeCollectionInput,
-    OnyxUpdate,
     OnyxValue,
     Selector,
     MergeCollectionWithPatchesParams,
@@ -1192,64 +1189,6 @@ function unsubscribeFromKey(subscriptionID: number): void {
     delete callbackToStateMapping[subscriptionID];
 }
 
-function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, mergeFn: typeof Onyx.merge): Array<() => Promise<void>> {
-    const snapshotCollectionKey = getSnapshotKey();
-    if (!snapshotCollectionKey) return [];
-
-    const promises: Array<() => Promise<void>> = [];
-
-    const snapshotCollection = getCachedCollection(snapshotCollectionKey);
-
-    for (const [snapshotEntryKey, snapshotEntryValue] of Object.entries(snapshotCollection)) {
-        // Snapshots may not be present in cache. We don't know how to update them so we skip.
-        if (!snapshotEntryValue) {
-            continue;
-        }
-
-        let updatedData: Record<string, unknown> = {};
-
-        for (const {key, value} of data) {
-            // snapshots are normal keys so we want to skip update if they are written to Onyx
-            if (isCollectionMemberKey(snapshotCollectionKey, key)) {
-                continue;
-            }
-
-            if (typeof snapshotEntryValue !== 'object' || !('data' in snapshotEntryValue)) {
-                continue;
-            }
-
-            const snapshotData = snapshotEntryValue.data;
-            if (!snapshotData || !snapshotData[key]) {
-                continue;
-            }
-
-            if (Array.isArray(value) || Array.isArray(snapshotData[key])) {
-                updatedData[key] = value || [];
-                continue;
-            }
-
-            if (value === null) {
-                updatedData[key] = value;
-                continue;
-            }
-
-            const oldValue = updatedData[key] || {};
-            const newValue = lodashPick(value, Object.keys(snapshotData[key]));
-
-            updatedData = {...updatedData, [key]: Object.assign(oldValue, newValue)};
-        }
-
-        // Skip the update if there's no data to be merged
-        if (utils.isEmptyObject(updatedData)) {
-            continue;
-        }
-
-        promises.push(() => mergeFn(snapshotEntryKey, {data: updatedData}));
-    }
-
-    return promises;
-}
-
 /**
  * Writes a value to our store with the given key.
  * Serves as core implementation for `Onyx.set()` public function, the difference being
@@ -1708,7 +1647,6 @@ const OnyxUtils = {
     deleteKeyBySubscriptions,
     addKeyToRecentlyAccessedIfNeeded,
     reduceCollectionWithSelector,
-    updateSnapshots,
     mergeCollectionWithPatches,
     partialSetCollection,
     logKeyChanged,

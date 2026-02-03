@@ -7,9 +7,8 @@ import StorageMock from '../../lib/storage';
 import OnyxCache from '../../lib/OnyxCache';
 import OnyxUtils, {clearOnyxUtilsInternals} from '../../lib/OnyxUtils';
 import type GenericCollection from '../utils/GenericCollection';
-import type {OnyxUpdate} from '../../lib/Onyx';
 import createDeferredTask from '../../lib/createDeferredTask';
-import type {OnyxEntry, OnyxInputKeyValueMapping, OnyxKey, RetriableOnyxOperation} from '../../lib/types';
+import type {OnyxEntry, OnyxKey, RetriableOnyxOperation} from '../../lib/types';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -792,39 +791,6 @@ describe('OnyxUtils', () => {
         test('one call with 10k heavy objects', async () => {
             const selector = generateTestSelector();
             await measureFunction(() => OnyxUtils.reduceCollectionWithSelector(mockedReportActionsMap, selector));
-        });
-    });
-
-    describe('updateSnapshots', () => {
-        test('one call with 100 updates', async () => {
-            const updates: Array<OnyxUpdate<OnyxKey>> = [];
-            for (let i = 0; i < 100; i++) {
-                updates.push({
-                    onyxMethod: OnyxUtils.METHOD.MERGE,
-                    key: `${collectionKey}${i}`,
-                    value: createRandomReportAction(i),
-                });
-            }
-
-            await measureAsyncFunction(() => Promise.all(OnyxUtils.updateSnapshots(updates, Onyx.merge).map((p) => p())), {
-                beforeEach: async () => {
-                    const searchData: Partial<OnyxInputKeyValueMapping> = {};
-                    const data: Partial<OnyxInputKeyValueMapping> = {
-                        ...mockedReportActionsMap,
-                        [`${ONYXKEYS.COLLECTION.SNAPSHOT}hash0`]: {
-                            data: searchData,
-                            search: {},
-                        },
-                    };
-
-                    for (let i = 0; i < 100; i++) {
-                        searchData[`${collectionKey}${i}`] = mockedReportActionsMap[`${collectionKey}${i}`];
-                    }
-
-                    await Onyx.multiSet(data);
-                },
-                afterEach: clearOnyxAfterEachMeasure,
-            });
         });
     });
 });
