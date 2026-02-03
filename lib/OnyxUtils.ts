@@ -871,6 +871,11 @@ function scheduleNotifyCollectionSubscribers<TKey extends OnyxKey>(
 function remove<TKey extends OnyxKey>(key: TKey, isProcessingCollectionUpdate?: boolean): Promise<void> {
     cache.drop(key);
     scheduleSubscriberUpdate(key, undefined as OnyxValue<TKey>, undefined, isProcessingCollectionUpdate);
+
+    if (isRamOnlyKey(key)) {
+        return Promise.resolve();
+    }
+
     return Storage.removeItem(key).then(() => undefined);
 }
 
