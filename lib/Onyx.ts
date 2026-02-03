@@ -160,11 +160,7 @@ function disconnect(connection: Connection): void {
  * @param options optional configuration object
  */
 function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options?: SetOptions): Promise<void> {
-    if (OnyxUtils.getDeferredInitTask().isResolved) {
-        return OnyxUtils.setWithRetry({key, value, options});
-    }
-
-    return OnyxUtils.getDeferredInitTask().promise.then(() => OnyxUtils.setWithRetry({key, value, options}));
+    return OnyxUtils.afterInit(() => OnyxUtils.setWithRetry({key, value, options}));
 }
 
 /**
@@ -175,11 +171,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options
  * @param data object keyed by ONYXKEYS and the values to set
  */
 function multiSet(data: OnyxMultiSetInput): Promise<void> {
-    if (OnyxUtils.getDeferredInitTask().isResolved) {
-        return OnyxUtils.multiSetWithRetry(data);
-    }
-
-    return OnyxUtils.getDeferredInitTask().promise.then(() => OnyxUtils.multiSetWithRetry(data));
+    return OnyxUtils.afterInit(() => OnyxUtils.multiSetWithRetry(data));
 }
 
 /**
@@ -275,11 +267,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
         return mergeQueuePromise[key];
     };
 
-    if (OnyxUtils.getDeferredInitTask().isResolved) {
-        return mergeOperation();
-    }
-
-    return OnyxUtils.getDeferredInitTask().promise.then(mergeOperation);
+    return OnyxUtils.afterInit(mergeOperation);
 }
 
 /**
@@ -296,11 +284,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
  * @param collection Object collection keyed by individual collection member keys and values
  */
 function mergeCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey>): Promise<void> {
-    if (OnyxUtils.getDeferredInitTask().isResolved) {
-        return OnyxUtils.mergeCollectionWithPatches({collectionKey, collection, isProcessingCollectionUpdate: true});
-    }
-
-    return OnyxUtils.getDeferredInitTask().promise.then(() => OnyxUtils.mergeCollectionWithPatches({collectionKey, collection, isProcessingCollectionUpdate: true}));
+    return OnyxUtils.afterInit(() => OnyxUtils.mergeCollectionWithPatches({collectionKey, collection, isProcessingCollectionUpdate: true}));
 }
 
 /**
@@ -428,11 +412,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
         return cache.captureTask(TASK.CLEAR, promise) as Promise<void>;
     };
 
-    if (OnyxUtils.getDeferredInitTask().isResolved) {
-        return clearOperation();
-    }
-
-    return OnyxUtils.getDeferredInitTask().promise.then(clearOperation);
+    return OnyxUtils.afterInit(clearOperation);
 }
 
 /**
@@ -585,11 +565,7 @@ function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<vo
         return clearPromise.then(() => Promise.all(finalPromises.map((p) => p()))).then(() => undefined);
     };
 
-    if (OnyxUtils.getDeferredInitTask().isResolved) {
-        return updateOperation();
-    }
-
-    return OnyxUtils.getDeferredInitTask().promise.then(updateOperation);
+    return OnyxUtils.afterInit(updateOperation);
 }
 
 /**
@@ -606,11 +582,7 @@ function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<vo
  * @param collection Object collection keyed by individual collection member keys and values
  */
 function setCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collection: OnyxSetCollectionInput<TKey>): Promise<void> {
-    if (OnyxUtils.getDeferredInitTask().isResolved) {
-        return OnyxUtils.setCollectionWithRetry({collectionKey, collection});
-    }
-
-    return OnyxUtils.getDeferredInitTask().promise.then(() => OnyxUtils.setCollectionWithRetry({collectionKey, collection}));
+    return OnyxUtils.afterInit(() => OnyxUtils.setCollectionWithRetry({collectionKey, collection}));
 }
 
 const Onyx = {
