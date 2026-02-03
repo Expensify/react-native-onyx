@@ -90,8 +90,6 @@ let defaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
 // Used for comparison with a new update to avoid invoking the Onyx.connect callback with the same data.
 let lastConnectionCallbackData = new Map<number, OnyxValue<OnyxKey>>();
 
-let snapshotKey: OnyxKey | null = null;
-
 // Keeps track of the last subscriptionID that was used so we can keep incrementing it
 let lastSubscriptionID = 0;
 
@@ -100,10 +98,6 @@ const deferredInitTask = createDeferredTask();
 
 // Holds a set of collection member IDs which updates will be ignored when using Onyx methods.
 let skippableCollectionMemberIDs = new Set<string>();
-
-function getSnapshotKey(): OnyxKey | null {
-    return snapshotKey;
-}
 
 /**
  * Getter - returns the merge queue.
@@ -173,10 +167,6 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
 
     // Set collection keys in cache for optimized storage
     cache.setCollectionKeys(onyxCollectionKeySet);
-
-    if (typeof keys.COLLECTION === 'object' && typeof keys.COLLECTION.SNAPSHOT === 'string') {
-        snapshotKey = keys.COLLECTION.SNAPSHOT;
-    }
 }
 
 /**
@@ -1634,7 +1624,6 @@ const OnyxUtils = {
     mergeChanges,
     mergeAndMarkChanges,
     initializeWithDefaultKeyStates,
-    getSnapshotKey,
     multiGet,
     tupleGet,
     isValidNonEmptyCollectionForMerge,

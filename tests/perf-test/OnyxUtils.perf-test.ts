@@ -580,12 +580,6 @@ describe('OnyxUtils', () => {
         });
     });
 
-    describe('getSnapshotKey', () => {
-        test('one call', async () => {
-            await measureFunction(() => OnyxUtils.getSnapshotKey());
-        });
-    });
-
     describe('multiGet', () => {
         test('one call getting 10k heavy objects from storage', async () => {
             await measureAsyncFunction(() => OnyxUtils.multiGet(mockedReportActionsKeys), {
