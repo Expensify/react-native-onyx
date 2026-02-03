@@ -2621,6 +2621,21 @@ describe('Onyx', () => {
                     });
                 });
         });
+
+        it('should not save a RAM-only key to storage when using merge', async () => {
+            await Onyx.merge(ONYX_KEYS.RAM_ONLY_TEST_KEY, {someProperty: 'value'});
+
+            expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toEqual({someProperty: 'value'});
+            expect(await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeNull();
+        });
+
+        it('should not save a RAM-only collection member to storage when using merge', async () => {
+            const collectionMemberKey = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
+            await Onyx.merge(collectionMemberKey, {data: 'test'});
+
+            expect(cache.get(collectionMemberKey)).toEqual({data: 'test'});
+            expect(await StorageMock.getItem(collectionMemberKey)).toBeNull();
+        });
     });
 
     describe('set', () => {
@@ -2939,6 +2954,20 @@ describe('Onyx', () => {
             expect(mockMergeQueue[testKey]).toBeUndefined();
 
             jest.restoreAllMocks();
+        });
+    });
+
+    describe('clear', () => {
+        it('should handle RAM-only keys with defaults correctly during clear', async () => {
+            // Set a value for RAM-only key
+            await Onyx.set(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'some value');
+
+            await Onyx.clear();
+
+            // Verify it's not in storage
+            expect(await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeNull();
+            // Verify cache state based on whether there's a default
+            expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeUndefined();
         });
     });
 });
