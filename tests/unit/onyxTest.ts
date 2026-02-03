@@ -27,6 +27,7 @@ const ONYX_KEYS = {
         RAM_ONLY_COLLECTION: 'ramOnlyCollection_',
     },
     RAM_ONLY_TEST_KEY: 'ramOnlyKey',
+    RAM_ONLY_WITH_INITIAL_VALUE: 'ramOnlyWithInitialValue',
 };
 
 Onyx.init({
@@ -34,8 +35,9 @@ Onyx.init({
     initialKeyStates: {
         [ONYX_KEYS.OTHER_TEST]: 42,
         [ONYX_KEYS.KEY_WITH_UNDERSCORE]: 'default',
+        [ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE]: 'default',
     },
-    ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION],
+    ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
     skippableCollectionMemberIDs: ['skippable-id'],
 });
 
@@ -2961,13 +2963,16 @@ describe('Onyx', () => {
         it('should handle RAM-only keys with defaults correctly during clear', async () => {
             // Set a value for RAM-only key
             await Onyx.set(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'some value');
+            await Onyx.set(ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE, 'some other value');
 
             await Onyx.clear();
 
             // Verify it's not in storage
             expect(await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeNull();
+            expect(await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE)).toBeNull();
             // Verify cache state based on whether there's a default
             expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeUndefined();
+            expect(cache.get(ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE)).toEqual('default');
         });
     });
 });
