@@ -456,9 +456,21 @@ function isCollectionMember(key: OnyxKey): boolean {
 }
 
 /**
- * Checks if a given key is a RAM-only key or a RAM-only collection member
+ * Checks if a given key is a RAM-only key, RAM-only collection key, or a RAM-only collection member
+ *
+ * For example:
+ *
+ * For the following Onyx setup
+ *
+ * ramOnlyKeys: ["ramOnlyKey", "ramOnlyCollection_"]
+ *
+ * - `isRamOnlyKey("ramOnlyKey")` would return true
+ * - `isRamOnlyKey("ramOnlyCollection_")` would return true
+ * - `isRamOnlyKey("ramOnlyCollection_1")` would return true
+ * - `isRamOnlyKey("someOtherKey")` would return false
+ *
  * @param key - The key to check
- * @returns true if key is a RAM-only key or a RAM-only collection member
+ * @returns true if key is a RAM-only key, RAM-only collection key, or a RAM-only collection member
  */
 function isRamOnlyKey(key: OnyxKey): boolean {
     try {
