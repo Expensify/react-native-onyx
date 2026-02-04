@@ -191,7 +191,7 @@ function multiSet(data: OnyxMultiSetInput): Promise<void> {
  * Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Workspace'}
  */
 function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): Promise<void> {
-    const mergeOperation = () => {
+    return OnyxUtils.afterInit(() => {
         const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
         if (skippableCollectionMemberIDs.size) {
             try {
@@ -265,9 +265,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
         });
 
         return mergeQueuePromise[key];
-    };
-
-    return OnyxUtils.afterInit(mergeOperation);
+    });
 }
 
 /**
@@ -309,7 +307,7 @@ function mergeCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, co
  * @param keysToPreserve is a list of ONYXKEYS that should not be cleared with the rest of the data
  */
 function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
-    const clearOperation = () => {
+    return OnyxUtils.afterInit(() => {
         const defaultKeyStates = OnyxUtils.getDefaultKeyStates();
         const initialKeys = Object.keys(defaultKeyStates);
 
@@ -410,9 +408,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
             .then(() => undefined);
 
         return cache.captureTask(TASK.CLEAR, promise) as Promise<void>;
-    };
-
-    return OnyxUtils.afterInit(clearOperation);
+    });
 }
 
 /**
@@ -422,7 +418,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
  * @returns resolves when all operations are complete
  */
 function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<void> {
-    const updateOperation = () => {
+    return OnyxUtils.afterInit(() => {
         // First, validate the Onyx object is in the format we expect
         for (const {onyxMethod, key, value} of data) {
             if (!Object.values(OnyxUtils.METHOD).includes(onyxMethod)) {
@@ -563,9 +559,7 @@ function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<vo
         const finalPromises = snapshotPromises.concat(promises);
 
         return clearPromise.then(() => Promise.all(finalPromises.map((p) => p()))).then(() => undefined);
-    };
-
-    return OnyxUtils.afterInit(updateOperation);
+    });
 }
 
 /**
