@@ -1257,8 +1257,7 @@ function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, me
             const snapshotExistingKeys = Object.keys(snapshotData[key] || {});
             const allowedNewKeys = getSnapshotMergeKeys();
             const keysToCopy = new Set([...snapshotExistingKeys, ...allowedNewKeys]);
-            const newValue =
-                typeof value === 'object' && value !== null ? utils.pick(value as Record<string, unknown>, [...keysToCopy]) : {};
+            const newValue = typeof value === 'object' && value !== null ? utils.pick(value as Record<string, unknown>, [...keysToCopy]) : {};
 
             updatedData = {...updatedData, [key]: Object.assign(oldValue, newValue)};
         }
