@@ -41,6 +41,7 @@ function init({
     enableDevTools = true,
     skippableCollectionMemberIDs = [],
     ramOnlyKeys = [],
+    snapshotMergeKeys = [],
 }: InitOptions): void {
     if (enablePerformanceMetrics) {
         GlobalSettings.setPerformanceMetricsEnabled(true);
@@ -52,6 +53,7 @@ function init({
     Storage.init();
 
     OnyxUtils.setSkippableCollectionMemberIDs(new Set(skippableCollectionMemberIDs));
+    OnyxUtils.setSnapshotMergeKeys(new Set(snapshotMergeKeys));
 
     cache.setRamOnlyKeys(new Set<OnyxKey>(ramOnlyKeys));
 

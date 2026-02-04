@@ -39,6 +39,7 @@ Onyx.init({
     },
     ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
     skippableCollectionMemberIDs: ['skippable-id'],
+    snapshotMergeKeys: ['pendingAction', 'pendingFields'],
 });
 
 describe('Onyx', () => {
@@ -1579,6 +1580,37 @@ describe('Onyx', () => {
         expect(callback).toBeCalledTimes(2);
         expect(callback).toHaveBeenNthCalledWith(1, {data: {[cat]: initialValue}}, snapshot1);
         expect(callback).toHaveBeenNthCalledWith(2, {data: {[cat]: finalValue}}, snapshot1);
+    });
+
+    it('should merge allowlisted keys into Snapshot even if they were missing', async () => {
+        const cat = `${ONYX_KEYS.COLLECTION.ANIMALS}cat`;
+        const snapshot1 = `${ONYX_KEYS.COLLECTION.SNAPSHOT}1`;
+
+        const initialValue = {name: 'Fluffy'};
+        const finalValue = {
+            name: 'Kitty',
+            pendingAction: 'delete',
+            pendingFields: {preview: 'delete'},
+            other: 'ignored',
+        };
+
+        await Onyx.set(cat, initialValue);
+        await Onyx.set(snapshot1, {data: {[cat]: initialValue}});
+
+        const callback = jest.fn();
+
+        Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.SNAPSHOT,
+            callback,
+        });
+
+        await waitForPromisesToResolve();
+
+        await Onyx.update([{key: cat, value: finalValue, onyxMethod: Onyx.METHOD.MERGE}]);
+
+        expect(callback).toBeCalledTimes(2);
+        expect(callback).toHaveBeenNthCalledWith(1, {data: {[cat]: initialValue}}, snapshot1);
+        expect(callback).toHaveBeenNthCalledWith(2, {data: {[cat]: {name: 'Kitty', pendingAction: 'delete', pendingFields: {preview: 'delete'}}}}, snapshot1);
     });
 
     describe('update', () => {
