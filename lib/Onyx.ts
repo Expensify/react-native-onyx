@@ -9,7 +9,6 @@ import type {
     InitOptions,
     KeyValueMapping,
     OnyxInputKeyValueMapping,
-    OnyxCollection,
     MixedOperationsQueue,
     OnyxKey,
     OnyxMergeCollectionInput,
@@ -322,8 +321,13 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
             cache.clearNullishStorageKeys();
 
             const keysToBeClearedFromStorage: OnyxKey[] = [];
-            const keyValuesToResetAsCollection: Record<OnyxKey, OnyxCollection<KeyValueMapping[OnyxKey]>> = {};
             const keyValuesToResetIndividually: KeyValueMapping = {};
+            // We need to store old and new values for collection keys to properly notify subscribers when clearing Onyx
+            // because the notification process needs the old values in cache but at that point they will be already removed from it.
+            const keyValuesToResetAsCollection: Record<
+                OnyxKey,
+                {oldValues: Record<string, KeyValueMapping[OnyxKey] | undefined>; newValues: Record<string, KeyValueMapping[OnyxKey] | undefined>}
+            > = {};
 
             const allKeys = new Set([...cachedKeys, ...initialKeys]);
 
@@ -357,9 +361,10 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
 
                         if (collectionKey) {
                             if (!keyValuesToResetAsCollection[collectionKey]) {
-                                keyValuesToResetAsCollection[collectionKey] = {};
+                                keyValuesToResetAsCollection[collectionKey] = {oldValues: {}, newValues: {}};
                             }
-                            keyValuesToResetAsCollection[collectionKey]![key] = newValue ?? undefined;
+                            keyValuesToResetAsCollection[collectionKey].oldValues[key] = oldValue;
+                            keyValuesToResetAsCollection[collectionKey].newValues[key] = newValue ?? undefined;
                         } else {
                             keyValuesToResetIndividually[key] = newValue ?? undefined;
                         }
@@ -381,7 +386,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                 updatePromises.push(OnyxUtils.scheduleSubscriberUpdate(key, value));
             }
             for (const [key, value] of Object.entries(keyValuesToResetAsCollection)) {
-                updatePromises.push(OnyxUtils.scheduleNotifyCollectionSubscribers(key, value));
+                updatePromises.push(OnyxUtils.scheduleNotifyCollectionSubscribers(key, value.newValues, value.oldValues));
             }
 
             const defaultKeyValuePairs = Object.entries(

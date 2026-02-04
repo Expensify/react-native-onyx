@@ -5,6 +5,7 @@ import {measureRenders} from 'reassure';
 import type {FetchStatus, OnyxEntry, OnyxKey, OnyxValue, ResultMetadata, UseOnyxOptions} from '../../lib';
 import Onyx, {useOnyx} from '../../lib';
 import StorageMock from '../../lib/storage';
+import type {UseOnyxSelector} from '../../lib/useOnyx';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -142,8 +143,7 @@ describe('useOnyx', () => {
                 <UseOnyxWrapper
                     onyxKey={key}
                     onyxOptions={{
-                        // @ts-expect-error bypass
-                        selector: (entry: OnyxEntry<{id: string; name: string}>) => `${entry?.name}_changed`,
+                        selector: ((entry: OnyxEntry<{id: string; name: string}>) => `${entry?.name}_changed`) as UseOnyxSelector<OnyxKey, string>,
                     }}
                 />,
                 {
@@ -173,8 +173,7 @@ describe('useOnyx', () => {
                 <UseOnyxWrapper
                     onyxKey={key}
                     onyxOptions={{
-                        // @ts-expect-error bypass
-                        selector: (entry: OnyxEntry<{id: string; name: string}>) => `${entry?.name}_changed`,
+                        selector: ((entry: OnyxEntry<{id: string; name: string}>) => `${entry?.name}_changed`) as UseOnyxSelector<OnyxKey, string>,
                     }}
                 />,
                 {
