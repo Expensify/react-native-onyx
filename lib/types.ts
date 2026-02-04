@@ -425,6 +425,15 @@ type InitOptions = {
      * Additionally, any subscribers from these keys to won't receive any data from Onyx.
      */
     skippableCollectionMemberIDs?: string[];
+
+    /**
+     * A list of field names that should always be merged into snapshot entries even if those fields are
+     * missing in the snapshot. Snapshots are saved "views" of a key's data used to populate read-only
+     * or cached lists, and by default Onyx only merges fields that already exist in that saved view.
+     * Use this to opt-in to additional fields that must appear in snapshots (for example, pending flags)
+     * without hardcoding app-specific logic inside Onyx.
+     */
+    snapshotMergeKeys?: string[];
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
