@@ -145,11 +145,11 @@ function getDeferredInitTask(): DeferredTask {
  * @param action The action to execute after initialization
  * @returns The result of the action
  */
-function afterInit<T>(action: () => T): T {
+function afterInit<T>(action: () => Promise<T>): Promise<T> {
     if (deferredInitTask.isResolved) {
         return action();
     }
-    return deferredInitTask.promise.then(action) as T;
+    return deferredInitTask.promise.then(action);
 }
 
 /**
