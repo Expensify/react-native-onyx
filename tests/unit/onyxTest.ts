@@ -1,5 +1,6 @@
 import lodashClone from 'lodash/clone';
 import lodashCloneDeep from 'lodash/cloneDeep';
+import {act} from '@testing-library/react-native';
 import Onyx from '../../lib';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import OnyxUtils from '../../lib/OnyxUtils';
@@ -9,6 +10,7 @@ import type {OnyxCollection, OnyxKey, OnyxUpdate} from '../../lib/types';
 import type {GenericDeepRecord} from '../types';
 import type GenericCollection from '../utils/GenericCollection';
 import type {Connection} from '../../lib/OnyxConnectionManager';
+import createDeferredTask from '../../lib/createDeferredTask';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
@@ -30,22 +32,23 @@ const ONYX_KEYS = {
     RAM_ONLY_WITH_INITIAL_VALUE: 'ramOnlyWithInitialValue',
 };
 
-Onyx.init({
-    keys: ONYX_KEYS,
-    initialKeyStates: {
-        [ONYX_KEYS.OTHER_TEST]: 42,
-        [ONYX_KEYS.KEY_WITH_UNDERSCORE]: 'default',
-        [ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE]: 'default',
-    },
-    ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
-    skippableCollectionMemberIDs: ['skippable-id'],
-    snapshotMergeKeys: ['pendingAction', 'pendingFields'],
-});
-
 describe('Onyx', () => {
+    beforeAll(() => {
+        Onyx.init({
+            keys: ONYX_KEYS,
+            initialKeyStates: {
+                [ONYX_KEYS.OTHER_TEST]: 42,
+                [ONYX_KEYS.KEY_WITH_UNDERSCORE]: 'default',
+                [ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE]: 'default',
+            },
+            ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
+            skippableCollectionMemberIDs: ['skippable-id'],
+            snapshotMergeKeys: ['pendingAction', 'pendingFields'],
+        });
+    });
+
     let connection: Connection | undefined;
 
-    /** @type OnyxCache */
     let cache: typeof OnyxCache;
 
     beforeEach(() => {
@@ -3005,6 +3008,111 @@ describe('Onyx', () => {
             // Verify cache state based on whether there's a default
             expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeUndefined();
             expect(cache.get(ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE)).toEqual('default');
+        });
+    });
+});
+
+// Separate describe block for Onyx.init to control initialization during each test.
+describe('Onyx.init', () => {
+    let cache: typeof OnyxCache;
+
+    beforeEach(() => {
+        // Resets the deferred init task before each test.
+        Object.assign(OnyxUtils.getDeferredInitTask(), createDeferredTask());
+        cache = require('../../lib/OnyxCache').default;
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
+        return Onyx.clear();
+    });
+
+    describe('should only execute Onyx methods after initialization', () => {
+        it('set', async () => {
+            Onyx.set(ONYX_KEYS.TEST_KEY, 'test');
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(ONYX_KEYS.TEST_KEY)).toBeUndefined();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(ONYX_KEYS.TEST_KEY)).toEqual('test');
+        });
+
+        it('multiSet', async () => {
+            Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: 'test_1'});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toBeUndefined();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toEqual('test_1');
+        });
+
+        it('merge', async () => {
+            Onyx.merge(ONYX_KEYS.TEST_KEY, 'test');
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(ONYX_KEYS.TEST_KEY)).toBeUndefined();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(ONYX_KEYS.TEST_KEY)).toEqual('test');
+        });
+
+        it('mergeCollection', async () => {
+            Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {[`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: 'test_1'});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toBeUndefined();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toEqual('test_1');
+        });
+
+        it('clear', async () => {
+            // Spies on a function that is exclusively called during Onyx.clear().
+            const spyClearNullishStorageKeys = jest.spyOn(cache, 'clearNullishStorageKeys');
+
+            Onyx.clear();
+            await act(async () => waitForPromisesToResolve());
+
+            expect(spyClearNullishStorageKeys).not.toHaveBeenCalled();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(spyClearNullishStorageKeys).toHaveBeenCalled();
+        });
+
+        it('update', async () => {
+            Onyx.update([{onyxMethod: 'set', key: ONYX_KEYS.TEST_KEY, value: 'test'}]);
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(ONYX_KEYS.TEST_KEY)).toBeUndefined();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(ONYX_KEYS.TEST_KEY)).toEqual('test');
+        });
+
+        it('setCollection', async () => {
+            Onyx.setCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {[`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: 'test_1'});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toBeUndefined();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toEqual('test_1');
         });
     });
 });
