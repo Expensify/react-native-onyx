@@ -57,16 +57,6 @@ function init({
 
     cache.setRamOnlyKeys(new Set<OnyxKey>(ramOnlyKeys));
 
-    // Clean up any pre-existing RAM-only keys from storage
-    if (ramOnlyKeys.length > 0) {
-        Storage.getAllKeys().then((storedKeys) => {
-            const keysToRemove = Array.from(storedKeys).filter((key) => OnyxUtils.isRamOnlyKey(key));
-            if (keysToRemove.length > 0) {
-                Storage.removeItems(keysToRemove);
-            }
-        });
-    }
-
     if (shouldSyncMultipleInstances) {
         Storage.keepInstancesSync?.((key, value) => {
             cache.set(key, value);
