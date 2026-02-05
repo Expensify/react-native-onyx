@@ -419,21 +419,6 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
  */
 function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<void> {
     return OnyxUtils.afterInit(() => {
-        // First, validate the Onyx object is in the format we expect
-        for (const {onyxMethod, key, value} of data) {
-            if (!Object.values(OnyxUtils.METHOD).includes(onyxMethod)) {
-                throw new Error(`Invalid onyxMethod ${onyxMethod} in Onyx update.`);
-            }
-            if (onyxMethod === OnyxUtils.METHOD.MULTI_SET) {
-                // For multiset, we just expect the value to be an object
-                if (typeof value !== 'object' || Array.isArray(value) || typeof value === 'function') {
-                    throw new Error('Invalid value provided in Onyx multiSet. Onyx multiSet value must be of type object.');
-                }
-            } else if (onyxMethod !== OnyxUtils.METHOD.CLEAR && typeof key !== 'string') {
-                throw new Error(`Invalid ${typeof key} key provided in Onyx update. Onyx key must be of type string.`);
-            }
-        }
-
         // The queue of operations within a single `update` call in the format of <item key - list of operations updating the item>.
         // This allows us to batch the operations per item and merge them into one operation in the order they were requested.
         const updateQueue: Record<OnyxKey, Array<OnyxValue<OnyxKey>>> = {};
@@ -457,14 +442,24 @@ function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<vo
         const promises: Array<() => Promise<void>> = [];
         let clearPromise: Promise<void> = Promise.resolve();
 
+        const onyxMethods = Object.values(OnyxUtils.METHOD);
         for (const {onyxMethod, key, value} of data) {
+            if (!onyxMethods.includes(onyxMethod)) {
+                Logger.logInfo(`Invalid onyxMethod ${onyxMethod} in Onyx update. Skipping this operation.`);
+                continue;
+            }
+            if (onyxMethod !== OnyxUtils.METHOD.CLEAR && onyxMethod !== OnyxUtils.METHOD.MULTI_SET && typeof key !== 'string') {
+                Logger.logInfo(`Invalid ${typeof key} key provided in Onyx update. Key must be of type string. Skipping this operation.`);
+                continue;
+            }
+
             const handlers: Record<OnyxMethodMap[keyof OnyxMethodMap], (k: typeof key, v: typeof value) => void> = {
                 [OnyxUtils.METHOD.SET]: enqueueSetOperation,
                 [OnyxUtils.METHOD.MERGE]: enqueueMergeOperation,
                 [OnyxUtils.METHOD.MERGE_COLLECTION]: () => {
                     const collection = value as OnyxMergeCollectionInput<OnyxKey>;
                     if (!OnyxUtils.isValidNonEmptyCollectionForMerge(collection)) {
-                        Logger.logInfo('mergeCollection enqueued within update() with invalid or empty value. Skipping this operation.');
+                        Logger.logInfo('Invalid or empty value provided in Onyx mergeCollection. Skipping this operation.');
                         return;
                     }
 
@@ -477,6 +472,11 @@ function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<vo
                 },
                 [OnyxUtils.METHOD.SET_COLLECTION]: (k, v) => promises.push(() => setCollection(k as TKey, v as OnyxSetCollectionInput<TKey>)),
                 [OnyxUtils.METHOD.MULTI_SET]: (k, v) => {
+                    if (typeof value !== 'object' || Array.isArray(value) || typeof value === 'function') {
+                        Logger.logInfo(`Invalid value provided in Onyx multiSet. Value must be of type object. Skipping this operation.`);
+                        return;
+                    }
+
                     for (const [entryKey, entryValue] of Object.entries(v as Partial<OnyxInputKeyValueMapping>)) enqueueSetOperation(entryKey, entryValue);
                 },
                 [OnyxUtils.METHOD.CLEAR]: () => {
