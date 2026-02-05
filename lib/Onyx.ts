@@ -40,6 +40,7 @@ function init({
     enablePerformanceMetrics = false,
     enableDevTools = true,
     skippableCollectionMemberIDs = [],
+    snapshotMergeKeys = [],
 }: InitOptions): void {
     if (enablePerformanceMetrics) {
         GlobalSettings.setPerformanceMetricsEnabled(true);
@@ -51,6 +52,7 @@ function init({
     Storage.init();
 
     OnyxUtils.setSkippableCollectionMemberIDs(new Set(skippableCollectionMemberIDs));
+    OnyxUtils.setSnapshotMergeKeys(new Set(snapshotMergeKeys));
 
     if (shouldSyncMultipleInstances) {
         Storage.keepInstancesSync?.((key, value) => {

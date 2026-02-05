@@ -1,6 +1,5 @@
 import {deepEqual} from 'fast-equals';
 import type {ValueOf} from 'type-fest';
-import lodashPick from 'lodash/pick';
 import _ from 'underscore';
 import DevTools from './DevTools';
 import * as Logger from './Logger';
@@ -103,6 +102,8 @@ const deferredInitTask = createDeferredTask();
 
 // Holds a set of collection member IDs which updates will be ignored when using Onyx methods.
 let skippableCollectionMemberIDs = new Set<string>();
+// Holds a set of keys that should always be merged into snapshot entries.
+let snapshotMergeKeys = new Set<string>();
 
 function getSnapshotKey(): OnyxKey | null {
     return snapshotKey;
@@ -144,10 +145,24 @@ function getSkippableCollectionMemberIDs(): Set<string> {
 }
 
 /**
+ * Getter - returns the snapshot merge keys allowlist.
+ */
+function getSnapshotMergeKeys(): Set<string> {
+    return snapshotMergeKeys;
+}
+
+/**
  * Setter - sets the skippable collection member IDs.
  */
 function setSkippableCollectionMemberIDs(ids: Set<string>): void {
     skippableCollectionMemberIDs = ids;
+}
+
+/**
+ * Setter - sets the snapshot merge keys allowlist.
+ */
+function setSnapshotMergeKeys(keys: Set<string>): void {
+    snapshotMergeKeys = keys;
 }
 
 /**
@@ -1234,7 +1249,15 @@ function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, me
             }
 
             const oldValue = updatedData[key] || {};
-            const newValue = lodashPick(value, Object.keys(snapshotData[key]));
+
+            // Snapshot entries are stored as a "shape" of the last known data per key, so by default we only
+            // merge fields that already exist in the snapshot to avoid unintentionally bloating snapshot data.
+            // Some clients need specific fields (like pending status) even when they are missing in the snapshot,
+            // so we allow an explicit, opt-in list of keys to always include during snapshot merges.
+            const snapshotExistingKeys = Object.keys(snapshotData[key] || {});
+            const allowedNewKeys = getSnapshotMergeKeys();
+            const keysToCopy = new Set([...snapshotExistingKeys, ...allowedNewKeys]);
+            const newValue = typeof value === 'object' && value !== null ? utils.pick(value as Record<string, unknown>, [...keysToCopy]) : {};
 
             updatedData = {...updatedData, [key]: Object.assign(oldValue, newValue)};
         }
@@ -1704,6 +1727,8 @@ const OnyxUtils = {
     unsubscribeFromKey,
     getSkippableCollectionMemberIDs,
     setSkippableCollectionMemberIDs,
+    getSnapshotMergeKeys,
+    setSnapshotMergeKeys,
     storeKeyBySubscriptions,
     deleteKeyBySubscriptions,
     addKeyToRecentlyAccessedIfNeeded,
