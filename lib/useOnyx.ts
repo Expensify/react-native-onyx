@@ -13,6 +13,10 @@ import * as Logger from './Logger';
 import onyxSnapshotCache from './OnyxSnapshotCache';
 import useLiveRef from './useLiveRef';
 
+function noopUnsubscribe(): void {
+    // No-op: do nothing when unsubscribing from a non-subscribed state
+}
+
 type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (data: OnyxValue<TKey> | undefined) => TReturnValue;
 
 type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
@@ -58,6 +62,14 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
      * @see `useOnyx` cannot return `null` and so selector will replace `null` with `undefined` to maintain compatibility.
      */
     selector?: UseOnyxSelector<TKey, TReturnValue>;
+
+    /**
+     * Controls whether the hook subscribes to Onyx updates.
+     * When set to `false`, the hook will not listen for updates and won't trigger re-renders.
+     * When it changes from `false` to `true`, the hook will re-subscribe and fetch the latest data.
+     * Defaults to `true` if not specified.
+     */
+    subscribed?: boolean;
 };
 
 type FetchStatus = 'loading' | 'loaded';
@@ -80,6 +92,13 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     const currentDependenciesRef = useLiveRef(dependencies);
     const selector = options?.selector;
 
+    // // Compute subscribed state once (defaults to true for backward compatibility)
+    const isSubscribed = options?.subscribed !== false;
+    const previousSubscribedRef = useRef(isSubscribed);
+    
+    // // Track if we're transitioning from false to true to force fresh data read
+    const isResubscribing = !previousSubscribedRef.current && isSubscribed;
+    previousSubscribedRef.current = isSubscribed;
     // Create memoized version of selector for performance
     const memoizedSelector = useMemo(() => {
         if (!selector) {
@@ -230,6 +249,18 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     }, [key, options?.canEvict]);
 
     const getSnapshot = useCallback(() => {
+        // When not subscribed, return the last known value to prevent re-renders
+        // This ensures that when subscribed becomes false, we don't trigger unnecessary re-renders
+        if (!isSubscribed) {
+            return resultRef.current;
+        }
+
+        // When resubscribing (transitioning from false to true), force reading fresh data
+        // This prevents returning stale data and causing an extra re-render
+        if (isResubscribing) {
+            shouldGetCachedValueRef.current = true;
+        }
+
         // Check if we have any cache for this Onyx key
         // Don't use cache for first connection with initWithStoredValues: false
         // Also don't use cache during active data updates (when shouldGetCachedValueRef is true)
@@ -331,15 +362,27 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
         return resultRef.current;
     }, [options?.initWithStoredValues, options?.allowStaleData, options?.canBeMissing, key, memoizedSelector, cacheKey, previousKey]);
-
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
+            // If subscribed is false, return a no-op unsubscribe function
+            // This prevents the hook from subscribing to Onyx updates
+            if (!isSubscribed) {
+                return noopUnsubscribe;
+            }
+
             isConnectingRef.current = true;
             onStoreChangeFnRef.current = onStoreChange;
 
             connectionRef.current = connectionManager.connect<CollectionKeyBase>({
                 key,
                 callback: (value, callbackKey, sourceValue) => {
+                    // Only process callbacks if we're still subscribed
+                    // This check protects against race conditions where subscribed changes
+                    // but a callback is already queued
+                    if (!isSubscribed) {
+                        return;
+                    }
+
                     isConnectingRef.current = false;
                     onStoreChangeFnRef.current = onStoreChange;
 
