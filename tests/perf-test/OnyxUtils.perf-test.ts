@@ -147,6 +147,20 @@ describe('OnyxUtils', () => {
         });
     });
 
+    describe('isRamOnlyKey', () => {
+        test('one call for RAM-only key', async () => {
+            await measureFunction(() => OnyxUtils.isRamOnlyKey(ONYXKEYS.RAM_ONLY_TEST_KEY));
+        });
+
+        test('one call for RAM-only collection key', async () => {
+            await measureFunction(() => OnyxUtils.isRamOnlyKey(ONYXKEYS.COLLECTION.RAM_ONLY_TEST_COLLECTION));
+        });
+
+        test('one call for RAM-only collection member key', async () => {
+            await measureFunction(() => OnyxUtils.isRamOnlyKey(`${ONYXKEYS.COLLECTION.RAM_ONLY_TEST_COLLECTION}1`));
+        });
+    });
+
     describe('isCollectionMemberKey', () => {
         test('one call with correct key', async () => {
             await measureFunction(() => OnyxUtils.isCollectionMemberKey(collectionKey, `${collectionKey}entry1`));

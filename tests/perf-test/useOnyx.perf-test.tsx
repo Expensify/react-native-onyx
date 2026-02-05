@@ -11,6 +11,7 @@ const ONYXKEYS = {
     TEST_KEY: 'test',
     TEST_KEY_2: 'test2',
     TEST_KEY_3: 'test3',
+    RAM_ONLY_TEST_KEY: 'ramOnlyTestKey',
 };
 
 const dataMatcher = (onyxKey: OnyxKey, expected: unknown) => `data: ${onyxKey}_${JSON.stringify(expected)}`;
@@ -57,6 +58,7 @@ describe('useOnyx', () => {
         Onyx.init({
             keys: ONYXKEYS,
             maxCachedKeysCount: 100000,
+            ramOnlyKeys: [ONYXKEYS.RAM_ONLY_TEST_KEY],
         });
     });
 
