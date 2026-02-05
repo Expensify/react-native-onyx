@@ -14,6 +14,7 @@ import type {OnyxEntry, OnyxInputKeyValueMapping, OnyxKey, RetriableOnyxOperatio
 const ONYXKEYS = {
     TEST_KEY: 'test',
     TEST_KEY_2: 'test2',
+    RAM_ONLY_TEST_KEY: 'ramOnlyTestKey',
     COLLECTION: {
         TEST_KEY: 'test_',
         TEST_NESTED_KEY: 'test_nested_',
@@ -24,6 +25,7 @@ const ONYXKEYS = {
         TEST_KEY_5: 'test5_',
         EVICTABLE_TEST_KEY: 'evictable_test_',
         SNAPSHOT: 'snapshot_',
+        RAM_ONLY_TEST_COLLECTION: 'ramOnlyTestCollection_',
     },
 };
 
@@ -54,6 +56,7 @@ describe('OnyxUtils', () => {
             evictableKeys,
             initialKeyStates,
             skippableCollectionMemberIDs: ['skippable-id'],
+            ramOnlyKeys: [ONYXKEYS.RAM_ONLY_TEST_KEY, ONYXKEYS.COLLECTION.RAM_ONLY_TEST_COLLECTION],
         });
     });
 
