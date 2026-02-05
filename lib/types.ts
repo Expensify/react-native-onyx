@@ -334,7 +334,7 @@ type ExpandOnyxKeys<TKey extends OnyxKey> = TKey extends CollectionKeyBase ? NoI
  * If a new method is added to OnyxUtils.METHOD constant, it must be added to OnyxMethodValueMap type.
  * Otherwise it will show static type errors.
  */
-type OnyxUpdate<TKey extends OnyxKey = OnyxKey> = {
+type OnyxUpdate<TKey extends OnyxKey> = {
     // ⚠️ DO NOT CHANGE THIS TYPE, UNLESS YOU KNOW WHAT YOU ARE DOING. ⚠️
     [K in TKey]:
         | {onyxMethod: typeof OnyxUtils.METHOD.SET; key: ExpandOnyxKeys<K>; value: OnyxSetInput<K>}
