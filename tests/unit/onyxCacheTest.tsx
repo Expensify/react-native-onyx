@@ -661,5 +661,25 @@ describe('Onyx', () => {
                     expect(cache.hasCacheForKey(triggerKey)).toBe(true);
                 });
         });
+
+        it('should save RAM-only keys', () => {
+            const testKeys = {
+                ...ONYX_KEYS,
+                COLLECTION: {
+                    ...ONYX_KEYS.COLLECTION,
+                    RAM_ONLY_COLLECTION: 'ramOnlyCollection',
+                },
+                RAM_ONLY_KEY: 'ramOnlyKey',
+            };
+
+            return initOnyx({
+                keys: testKeys,
+                ramOnlyKeys: [testKeys.COLLECTION.RAM_ONLY_COLLECTION, testKeys.RAM_ONLY_KEY],
+            }).then(() => {
+                expect(cache.isRamOnlyKey(testKeys.RAM_ONLY_KEY)).toBeTruthy();
+                expect(cache.isRamOnlyKey(testKeys.COLLECTION.RAM_ONLY_COLLECTION)).toBeTruthy();
+                expect(cache.isRamOnlyKey(testKeys.TEST_KEY)).toBeFalsy();
+            });
+        });
     });
 });

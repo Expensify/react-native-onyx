@@ -74,11 +74,14 @@ const ONYXKEYS = {
         TEST_LEVEL_KEY: 'test_level_',
         TEST_LEVEL_LAST_KEY: 'test_level_last_',
         ROUTES: 'routes_',
+        RAM_ONLY_COLLECTION: 'ramOnlyCollection_',
     },
+    RAM_ONLY_KEY: 'ramOnlyKey',
 };
 
 Onyx.init({
     keys: ONYXKEYS,
+    ramOnlyKeys: [ONYXKEYS.RAM_ONLY_KEY, ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION],
 });
 
 beforeEach(() => Onyx.clear());
@@ -485,6 +488,32 @@ describe('OnyxUtils', () => {
 
             // Should only be called once since there are no evictable keys
             expect(retryOperationSpy).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('isRamOnlyKey', () => {
+        it('should return true for RAM-only key', () => {
+            expect(OnyxUtils.isRamOnlyKey(ONYXKEYS.RAM_ONLY_KEY)).toBeTruthy();
+        });
+
+        it('should return true for RAM-only collection', () => {
+            expect(OnyxUtils.isRamOnlyKey(ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION)).toBeTruthy();
+        });
+
+        it('should return true for RAM-only collection member', () => {
+            expect(OnyxUtils.isRamOnlyKey(`${ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION}1`)).toBeTruthy();
+        });
+
+        it('should return false for a normal key', () => {
+            expect(OnyxUtils.isRamOnlyKey(ONYXKEYS.TEST_KEY)).toBeFalsy();
+        });
+
+        it('should return false for normal collection', () => {
+            expect(OnyxUtils.isRamOnlyKey(ONYXKEYS.COLLECTION.TEST_KEY)).toBeFalsy();
+        });
+
+        it('should return false for normal collection member', () => {
+            expect(OnyxUtils.isRamOnlyKey(`${ONYXKEYS.COLLECTION.TEST_KEY}1`)).toBeFalsy();
         });
     });
 });
