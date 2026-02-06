@@ -107,6 +107,7 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             throw new Error('Store is not initialized!');
         }
 
+        // For a small number of keys, it's more efficient to just use a single query with multiple placeholders.
         if (keys.length <= 500) {
             const placeholders = keys.map(() => '?').join(',');
             const command = `SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
@@ -117,10 +118,10 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             });
         }
 
+        // For a large number of keys, it becomes more performant if we insert the keys into a temporary table and perform a join.
         // FIXME: Not working because of "-" apparently.
         // const tableName = `temp_multiGet_${Str.guid()}`;
         const tableName = `temp_multiGet_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
         return provider.store
             .executeAsync(`CREATE TEMP TABLE ${tableName} (record_key TEXT PRIMARY KEY);`)
             .then(() => {
@@ -139,8 +140,8 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
 
                 return provider.store.executeAsync<OnyxSQLiteKeyValuePair>(
                     `SELECT k.record_key, k.valueJSON
-                 FROM keyvaluepairs AS k
-                 INNER JOIN ${tableName} AS t ON k.record_key = t.record_key;`,
+                    FROM keyvaluepairs AS k
+                    INNER JOIN ${tableName} AS t ON k.record_key = t.record_key;`,
                 );
             })
             .then(({rows}) => {
@@ -150,7 +151,6 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
                 return result ?? [];
             })
             .catch((error) => {
-                console.error('[SQLiteProvider] Error in multiGet:', error);
                 provider.store?.executeAsync(`DROP TABLE IF EXISTS ${tableName};`);
                 throw error;
             });
