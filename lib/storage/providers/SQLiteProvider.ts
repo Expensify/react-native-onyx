@@ -118,8 +118,8 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
         }
 
         // FIXME: Not working because of "-" apparently.
-        // const tableName = `temp_multiMerge_${Str.guid()}`;
-        const tableName = `temp_multiMerge_${Date.now()}_${Math.random().toString(36).slice(2, 8)}}`;
+        // const tableName = `temp_multiGet_${Str.guid()}`;
+        const tableName = `temp_multiGet_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
         return provider.store
             .executeAsync(`CREATE TEMP TABLE ${tableName} (record_key TEXT PRIMARY KEY);`)
