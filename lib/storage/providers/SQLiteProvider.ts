@@ -150,9 +150,9 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
 
                 return result ?? [];
             })
-            .catch((error) => {
+            .finally(() => {
+                // Drops the temporary table to free up resources.
                 provider.store?.executeAsync(`DROP TABLE IF EXISTS ${tableName};`);
-                throw error;
             });
     },
     setItem(key, value) {
