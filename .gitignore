@@ -21,3 +21,6 @@ yalc.lock
 
 # Perf tests
 .reassure
+
+# Benchmark baseline files
+.bench-baseline.json
