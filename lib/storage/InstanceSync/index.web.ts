@@ -1,59 +1,85 @@
 /**
- * The InstancesSync object provides data-changed events like the ones that exist
- * when using LocalStorage APIs in the browser. These events are great because multiple tabs can listen for when
- * data changes and then stay up-to-date with everything happening in Onyx.
+ * The InstancesSync object provides data-changed events across browser tabs.
+ *
+ * This implementation uses BroadcastChannel for cross-tab communication,
+ * replacing the previous localStorage-based approach. BroadcastChannel is
+ * more reliable, supports structured data, and doesn't pollute localStorage.
+ *
+ * Note: When using the SQLiteProvider (web), cross-tab sync is also handled
+ * at the worker/provider level via BroadcastChannel. This InstanceSync layer
+ * serves as a fallback for IDBKeyValProvider and as the storage-layer
+ * integration point that the storage/index.ts module calls.
  */
 import type {OnyxKey} from '../../types';
 import NoopProvider from '../providers/NoopProvider';
 import type {StorageKeyList, OnStorageKeyChanged} from '../providers/types';
 import type StorageProvider from '../providers/types';
 
-const SYNC_ONYX = 'SYNC_ONYX';
+const CHANNEL_NAME = 'onyx-instance-sync';
+
+let channel: BroadcastChannel | null = null;
+let storage: StorageProvider<unknown> = NoopProvider;
 
 /**
- * Raise an event through `localStorage` to let other tabs know a value changed
- * @param {String} onyxKey
+ * Broadcast a single key change to other tabs.
  */
 function raiseStorageSyncEvent(onyxKey: OnyxKey) {
-    global.localStorage.setItem(SYNC_ONYX, onyxKey);
-    global.localStorage.removeItem(SYNC_ONYX);
+    channel?.postMessage({type: 'keyChanged', key: onyxKey});
 }
 
+/**
+ * Broadcast multiple key changes to other tabs in a single message.
+ */
 function raiseStorageSyncManyKeysEvent(onyxKeys: StorageKeyList) {
-    for (const onyxKey of onyxKeys) {
-        raiseStorageSyncEvent(onyxKey);
-    }
+    if (onyxKeys.length === 0) return;
+    channel?.postMessage({type: 'keysChanged', keys: onyxKeys});
 }
-
-let storage = NoopProvider;
 
 const InstanceSync = {
     shouldBeUsed: true,
+
     /**
-     * @param {Function} onStorageKeyChanged Storage synchronization mechanism keeping all opened tabs in sync
+     * Initialize the BroadcastChannel listener for cross-tab synchronization.
+     * @param onStorageKeyChanged - Callback invoked when another tab changes a key
+     * @param store - The storage provider to read updated values from
      */
     init: (onStorageKeyChanged: OnStorageKeyChanged, store: StorageProvider<unknown>) => {
         storage = store;
 
-        // This listener will only be triggered by events coming from other tabs
-        global.addEventListener('storage', (event) => {
-            // Ignore events that don't originate from the SYNC_ONYX logic
-            if (event.key !== SYNC_ONYX || !event.newValue) {
-                return;
+        // Close any existing channel before creating a new one
+        if (channel) {
+            channel.close();
+        }
+
+        channel = new BroadcastChannel(CHANNEL_NAME);
+
+        channel.onmessage = (event: MessageEvent) => {
+            const data = event.data;
+            if (!data) return;
+
+            if (data.type === 'keyChanged' && data.key) {
+                storage.getItem(data.key).then((value) => onStorageKeyChanged(data.key, value));
+            } else if (data.type === 'keysChanged' && Array.isArray(data.keys)) {
+                for (const key of data.keys) {
+                    storage.getItem(key).then((value) => onStorageKeyChanged(key, value));
+                }
+            } else if (data.type === 'clear' && Array.isArray(data.keys)) {
+                // When a clear happens, notify about all the keys that were cleared
+                for (const key of data.keys) {
+                    storage.getItem(key).then((value) => onStorageKeyChanged(key, value));
+                }
             }
-
-            const onyxKey = event.newValue;
-
-            storage.getItem(onyxKey).then((value) => onStorageKeyChanged(onyxKey, value));
-        });
+        };
     },
+
     setItem: raiseStorageSyncEvent,
     removeItem: raiseStorageSyncEvent,
     removeItems: raiseStorageSyncManyKeysEvent,
     multiMerge: raiseStorageSyncManyKeysEvent,
     multiSet: raiseStorageSyncManyKeysEvent,
     mergeItem: raiseStorageSyncEvent,
-    clear: (clearImplementation: () => void) => {
+
+    clear: (clearImplementation: () => Promise<void>) => {
         let allKeys: StorageKeyList;
 
         // The keys must be retrieved before storage is cleared or else the list of keys would be empty
@@ -64,9 +90,8 @@ const InstanceSync = {
             })
             .then(() => clearImplementation())
             .then(() => {
-                // Now that storage is cleared, the storage sync event can happen which is a more atomic action
-                // for other browser tabs
-                raiseStorageSyncManyKeysEvent(allKeys);
+                // Now that storage is cleared, broadcast the clear event with all affected keys
+                channel?.postMessage({type: 'clear', keys: allKeys});
             });
     },
 };

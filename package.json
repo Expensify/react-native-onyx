@@ -46,6 +46,7 @@
     "gh-actions-build": "./.github/scripts/buildActions.sh"
   },
   "dependencies": {
+    "@sqlite.org/sqlite-wasm": "^3.51.2-build6",
     "ascii-table": "0.0.9",
     "fast-equals": "^4.0.3",
     "lodash.bindall": "^4.4.0",
