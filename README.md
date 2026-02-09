@@ -510,3 +510,72 @@ you to edit the Onyx source directly in the Onyx repo, and have those changes ho
 Now you can make changes directly to the `react-native-onyx` source code and your React Native project should-hot reload with those changes in realtime.
 
 _Note:_ If you want to unlink `react-native-onyx`, simply run `npm install` from your React Native project directory again. That will reinstall `react-native-onyx` from npm.
+
+# Benchmarks
+
+The `benchmarks/` directory contains a browser-based benchmark suite that measures the performance of core Onyx operations using real IndexedDB in a headless Chromium browser. This gives accurate measurements that reflect production web behavior, unlike Jest-based tests which use mocked storage.
+
+## What's benchmarked
+
+Every perf-sensitive Onyx method is covered:
+
+| Method | File |
+|---|---|
+| `set()`, `multiSet()`, `setCollection()` | `benchmarks/set.bench.ts` |
+| `merge()`, `mergeCollection()`, `update()` | `benchmarks/merge.bench.ts` |
+| `connect()`, `disconnect()`, subscriber notifications | `benchmarks/connect.bench.ts` |
+| `init()` | `benchmarks/init.bench.ts` |
+| `clear()` | `benchmarks/clear.bench.ts` |
+
+Each benchmark runs across four data tiers to show how operations scale:
+
+| Tier | Reports | Report Actions | Transactions |
+|---|---|---|---|
+| **small** | 50 | 500 | 50 |
+| **modest** | 250 | 2,500 | 250 |
+| **heavy** | 1,000 | 10,000 | 1,000 |
+| **extreme** | 5,000 | 50,000 | 5,000 |
+
+## Running benchmarks
+
+```bash
+# Run all benchmarks
+npm run bench
+
+# Run a specific benchmark file
+npx vitest bench --config vitest.bench.config.ts benchmarks/set
+```
+
+## Comparing branches
+
+To measure the performance impact of a change, use the comparison workflow:
+
+```bash
+# Compare current branch against main (automated)
+npm run bench:compare
+
+# Compare against a different base branch
+npm run bench:compare -- some-branch
+
+# Compare only specific benchmarks
+npm run bench:compare -- main -- benchmarks/set
+```
+
+This checks out the base branch, runs benchmarks to capture a baseline, switches back, and runs again with `--compare` to show the diff:
+
+```
+· Onyx.merge() - partial update 250 reports  21.46 hz  [0.95x] ⇓
+  Onyx.merge() - partial update 250 reports  22.58 hz  (baseline)
+```
+
+You can also save and compare manually:
+
+```bash
+# Save current results as baseline
+npm run bench:save
+
+# ...make changes...
+
+# Compare against saved baseline
+npx vitest bench --config vitest.bench.config.ts --compare .bench-baseline.json
+```
