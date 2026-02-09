@@ -21,7 +21,7 @@ import type {
 import type {FetchStatus, ResultMetadata, UseOnyxResult, UseOnyxOptions} from './useOnyx';
 import type {Connection} from './OnyxConnectionManager';
 import useOnyx from './useOnyx';
-import type {OnyxSQLiteKeyValuePair} from './storage/providers/SQLiteProvider';
+import type {OnyxSQLiteKeyValuePair} from './storage/providers/SQLiteProvider/index.native';
 
 export default Onyx;
 export {useOnyx};

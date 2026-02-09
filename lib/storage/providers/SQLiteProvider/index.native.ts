@@ -5,10 +5,11 @@
 import type {BatchQueryCommand, NitroSQLiteConnection} from 'react-native-nitro-sqlite';
 import {enableSimpleNullHandling, open} from 'react-native-nitro-sqlite';
 import {getFreeDiskStorage} from 'react-native-device-info';
-import type {FastMergeReplaceNullPatch} from '../../utils';
-import utils from '../../utils';
-import type StorageProvider from './types';
-import type {StorageKeyList, StorageKeyValuePair} from './types';
+import type {FastMergeReplaceNullPatch} from '../../../utils';
+import utils from '../../../utils';
+import type StorageProvider from '../types';
+import type {StorageKeyList, StorageKeyValuePair} from '../types';
+import * as Queries from '../SQLiteQueries';
 
 // By default, NitroSQLite does not accept nullish values due to current limitations in Nitro Modules.
 // This flag enables a feature in NitroSQLite that allows for nullish values to be passed to operations, such as "execute" or "executeBatch".
@@ -76,20 +77,20 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
     init() {
         provider.store = open({name: DB_NAME});
 
-        provider.store.execute('CREATE TABLE IF NOT EXISTS keyvaluepairs (record_key TEXT NOT NULL PRIMARY KEY , valueJSON JSON NOT NULL) WITHOUT ROWID;');
+        provider.store.execute(Queries.CREATE_TABLE);
 
         // All of the 3 pragmas below were suggested by SQLite team.
         // You can find more info about them here: https://www.sqlite.org/pragma.html
-        provider.store.execute('PRAGMA CACHE_SIZE=-20000;');
-        provider.store.execute('PRAGMA synchronous=NORMAL;');
-        provider.store.execute('PRAGMA journal_mode=WAL;');
+        provider.store.execute(Queries.PRAGMA_CACHE_SIZE);
+        provider.store.execute(Queries.PRAGMA_SYNCHRONOUS);
+        provider.store.execute(Queries.PRAGMA_JOURNAL_MODE);
     },
     getItem(key) {
         if (!provider.store) {
             throw new Error('Store is not initialized!');
         }
 
-        return provider.store.executeAsync<OnyxSQLiteKeyValuePair>('SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key = ?;', [key]).then(({rows}) => {
+        return provider.store.executeAsync<OnyxSQLiteKeyValuePair>(Queries.GET_ITEM, [key]).then(({rows}) => {
             if (!rows || rows?.length === 0) {
                 return null;
             }
@@ -107,8 +108,7 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             throw new Error('Store is not initialized!');
         }
 
-        const placeholders = keys.map(() => '?').join(',');
-        const command = `SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
+        const command = Queries.buildMultiGetQuery(keys.length);
         return provider.store.executeAsync<OnyxSQLiteKeyValuePair>(command, keys).then(({rows}) => {
             // eslint-disable-next-line no-underscore-dangle
             const result = rows?._array.map((row) => [row.record_key, JSON.parse(row.valueJSON)]);
@@ -120,19 +120,18 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             throw new Error('Store is not initialized!');
         }
 
-        return provider.store.executeAsync('REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);', [key, JSON.stringify(value)]).then(() => undefined);
+        return provider.store.executeAsync(Queries.SET_ITEM, [key, JSON.stringify(value)]).then(() => undefined);
     },
     multiSet(pairs) {
         if (!provider.store) {
             throw new Error('Store is not initialized!');
         }
 
-        const query = 'REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, json(?));';
         const params = pairs.map((pair) => [pair[0], JSON.stringify(pair[1] === undefined ? null : pair[1])]);
         if (utils.isEmptyObject(params)) {
             return Promise.resolve();
         }
-        return provider.store.executeBatchAsync([{query, params}]).then(() => undefined);
+        return provider.store.executeBatchAsync([{query: Queries.MULTI_SET_ITEM, params}]).then(() => undefined);
     },
     multiMerge(pairs) {
         if (!provider.store) {
@@ -141,19 +140,7 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
 
         const commands: BatchQueryCommand[] = [];
 
-        // Query to merge the change into the DB value.
-        const patchQuery = `INSERT INTO keyvaluepairs (record_key, valueJSON)
-            VALUES (:key, JSON(:value))
-            ON CONFLICT DO UPDATE
-            SET valueJSON = JSON_PATCH(valueJSON, JSON(:value));
-        `;
         const patchQueryArguments: string[][] = [];
-
-        // Query to fully replace the nested objects of the DB value.
-        const replaceQuery = `UPDATE keyvaluepairs
-            SET valueJSON = JSON_REPLACE(valueJSON, ?, JSON(?))
-            WHERE record_key = ?;
-        `;
         const replaceQueryArguments: string[][] = [];
 
         const nonNullishPairs = pairs.filter((pair) => pair[1] !== undefined);
@@ -172,9 +159,9 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             }
         }
 
-        commands.push({query: patchQuery, params: patchQueryArguments});
+        commands.push({query: Queries.MERGE_ITEM_PATCH, params: patchQueryArguments});
         if (replaceQueryArguments.length > 0) {
-            commands.push({query: replaceQuery, params: replaceQueryArguments});
+            commands.push({query: Queries.MERGE_ITEM_REPLACE, params: replaceQueryArguments});
         }
 
         return provider.store.executeBatchAsync(commands).then(() => undefined);
@@ -188,7 +175,7 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             throw new Error('Store is not initialized!');
         }
 
-        return provider.store.executeAsync('SELECT record_key FROM keyvaluepairs;').then(({rows}) => {
+        return provider.store.executeAsync(Queries.GET_ALL_KEYS).then(({rows}) => {
             // eslint-disable-next-line no-underscore-dangle
             const result = rows?._array.map((row) => row.record_key);
             return (result ?? []) as StorageKeyList;
@@ -199,15 +186,14 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             throw new Error('Store is not initialized!');
         }
 
-        return provider.store.executeAsync('DELETE FROM keyvaluepairs WHERE record_key = ?;', [key]).then(() => undefined);
+        return provider.store.executeAsync(Queries.REMOVE_ITEM, [key]).then(() => undefined);
     },
     removeItems(keys) {
         if (!provider.store) {
             throw new Error('Store is not initialized!');
         }
 
-        const placeholders = keys.map(() => '?').join(',');
-        const query = `DELETE FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
+        const query = Queries.buildRemoveItemsQuery(keys.length);
         return provider.store.executeAsync(query, keys).then(() => undefined);
     },
     clear() {
@@ -215,14 +201,14 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             throw new Error('Store is not initialized!');
         }
 
-        return provider.store.executeAsync('DELETE FROM keyvaluepairs;', []).then(() => undefined);
+        return provider.store.executeAsync(Queries.CLEAR, []).then(() => undefined);
     },
     getDatabaseSize() {
         if (!provider.store) {
             throw new Error('Store is not initialized!');
         }
 
-        return Promise.all([provider.store.executeAsync<PageSizeResult>('PRAGMA page_size;'), provider.store.executeAsync<PageCountResult>('PRAGMA page_count;'), getFreeDiskStorage()]).then(
+        return Promise.all([provider.store.executeAsync<PageSizeResult>(Queries.PRAGMA_PAGE_SIZE), provider.store.executeAsync<PageCountResult>(Queries.PRAGMA_PAGE_COUNT), getFreeDiskStorage()]).then(
             ([pageSizeResult, pageCountResult, bytesRemaining]) => {
                 const pageSize = pageSizeResult.rows?.item(0)?.page_size ?? 0;
                 const pageCount = pageCountResult.rows?.item(0)?.page_count ?? 0;
