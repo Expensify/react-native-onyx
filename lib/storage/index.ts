@@ -6,6 +6,7 @@ import MemoryOnlyProvider from './providers/MemoryOnlyProvider';
 import type StorageProvider from './providers/types';
 import * as GlobalSettings from '../GlobalSettings';
 import decorateWithMetrics from '../metrics';
+import DirtyMap from './DirtyMap';
 
 let provider = PlatformStorage as StorageProvider<unknown>;
 let shouldKeepInstancesSync = false;
@@ -57,6 +58,13 @@ function tryOrDegradePerformance<T>(fn: () => Promise<T> | T, waitForInitializat
     });
 }
 
+/**
+ * The DirtyMap coalesces rapid successive writes to the same key.
+ * Instead of persisting every intermediate value, only the latest value per key
+ * is flushed to the storage provider in a batched multiSet call.
+ */
+const dirtyMap = new DirtyMap((pairs) => provider.multiSet(pairs));
+
 const storage: Storage = {
     /**
      * Returns the storage provider currently in use
@@ -76,77 +84,128 @@ const storage: Storage = {
     },
 
     /**
-     * Get the value of a given key or return `null` if it's not available
+     * Get the value of a given key or return `null` if it's not available.
+     * Checks the dirty map first for any pending unflushed writes.
      */
-    getItem: (key) => tryOrDegradePerformance(() => provider.getItem(key)),
+    getItem: (key) =>
+        tryOrDegradePerformance(() => {
+            // Read-through: check the dirty map before hitting the provider
+            if (dirtyMap.has(key)) {
+                return Promise.resolve(dirtyMap.get(key));
+            }
+            return provider.getItem(key);
+        }),
 
     /**
-     * Get multiple key-value pairs for the give array of keys in a batch
+     * Get multiple key-value pairs for the give array of keys in a batch.
+     * Overlays dirty map values on top of provider results.
      */
-    multiGet: (keys) => tryOrDegradePerformance(() => provider.multiGet(keys)),
+    multiGet: (keys) =>
+        tryOrDegradePerformance(() => {
+            // Split keys into dirty (already in memory) and clean (need provider read)
+            const dirtyKeys: string[] = [];
+            const cleanKeys: string[] = [];
+
+            for (const key of keys) {
+                if (dirtyMap.has(key)) {
+                    dirtyKeys.push(key);
+                } else {
+                    cleanKeys.push(key);
+                }
+            }
+
+            // If all keys are dirty, skip the provider call entirely
+            if (cleanKeys.length === 0) {
+                return Promise.resolve(dirtyKeys.map((key) => [key, dirtyMap.get(key)]));
+            }
+
+            return provider.multiGet(cleanKeys).then((providerResults) => {
+                // Merge dirty values with provider results
+                const dirtyResults = dirtyKeys.map((key) => [key, dirtyMap.get(key)] as [string, unknown]);
+                return [...providerResults, ...dirtyResults];
+            });
+        }),
 
     /**
-     * Sets the value for a given key. The only requirement is that the value should be serializable to JSON string
+     * Sets the value for a given key. The value is staged in the dirty map
+     * and flushed to storage asynchronously in a coalesced batch.
      */
     setItem: (key, value) =>
         tryOrDegradePerformance(() => {
-            const promise = provider.setItem(key, value);
+            dirtyMap.set(key, value);
 
             if (shouldKeepInstancesSync) {
-                return promise.then(() => InstanceSync.setItem(key));
+                InstanceSync.setItem(key);
             }
 
-            return promise;
+            return Promise.resolve();
         }),
 
     /**
-     * Stores multiple key-value pairs in a batch
+     * Stores multiple key-value pairs. All values are staged in the dirty map
+     * and flushed to storage asynchronously in a coalesced batch.
      */
     multiSet: (pairs) =>
         tryOrDegradePerformance(() => {
-            const promise = provider.multiSet(pairs);
+            dirtyMap.setMany(pairs);
 
             if (shouldKeepInstancesSync) {
-                return promise.then(() => InstanceSync.multiSet(pairs.map((pair) => pair[0])));
+                InstanceSync.multiSet(pairs.map((pair) => pair[0]));
             }
 
-            return promise;
+            return Promise.resolve();
         }),
 
     /**
-     * Merging an existing value with a new one
+     * Merging an existing value with a new one.
+     * Merge operations bypass the dirty map and go directly to the provider,
+     * since merges require knowledge of the existing value in storage and
+     * on native leverage SQLite's JSON_PATCH for efficient partial updates.
      */
     mergeItem: (key, change, replaceNullPatches) =>
         tryOrDegradePerformance(() => {
-            const promise = provider.mergeItem(key, change, replaceNullPatches);
+            // Flush any pending dirty writes for this key before merging,
+            // so the provider's merge operates on the latest persisted value.
+            const flushPromise = dirtyMap.has(key) ? dirtyMap.flushNow() : Promise.resolve();
 
-            if (shouldKeepInstancesSync) {
-                return promise.then(() => InstanceSync.mergeItem(key));
-            }
+            return flushPromise.then(() => {
+                const promise = provider.mergeItem(key, change, replaceNullPatches);
 
-            return promise;
+                if (shouldKeepInstancesSync) {
+                    return promise.then(() => InstanceSync.mergeItem(key));
+                }
+
+                return promise;
+            });
         }),
 
     /**
-     * Multiple merging of existing and new values in a batch
-     * This function also removes all nested null values from an object.
+     * Multiple merging of existing and new values in a batch.
+     * Like mergeItem, this bypasses coalescing and goes directly to the provider.
      */
     multiMerge: (pairs) =>
         tryOrDegradePerformance(() => {
-            const promise = provider.multiMerge(pairs);
+            // Flush any pending dirty writes before merging
+            const flushPromise = dirtyMap.size > 0 ? dirtyMap.flushNow() : Promise.resolve();
 
-            if (shouldKeepInstancesSync) {
-                return promise.then(() => InstanceSync.multiMerge(pairs.map((pair) => pair[0])));
-            }
+            return flushPromise.then(() => {
+                const promise = provider.multiMerge(pairs);
 
-            return promise;
+                if (shouldKeepInstancesSync) {
+                    return promise.then(() => InstanceSync.multiMerge(pairs.map((pair) => pair[0])));
+                }
+
+                return promise;
+            });
         }),
 
     /**
-     * Removes given key and its value
+     * Removes given key and its value.
+     * Also removes the key from the dirty map if it has a pending write.
      */
     removeItem: (key) =>
         tryOrDegradePerformance(() => {
+            dirtyMap.remove(key);
             const promise = provider.removeItem(key);
 
             if (shouldKeepInstancesSync) {
@@ -157,10 +216,12 @@ const storage: Storage = {
         }),
 
     /**
-     * Remove given keys and their values
+     * Remove given keys and their values.
+     * Also removes the keys from the dirty map if they have pending writes.
      */
     removeItems: (keys) =>
         tryOrDegradePerformance(() => {
+            dirtyMap.removeMany(keys);
             const promise = provider.removeItems(keys);
 
             if (shouldKeepInstancesSync) {
@@ -171,10 +232,12 @@ const storage: Storage = {
         }),
 
     /**
-     * Clears everything
+     * Clears everything. Flushes and clears the dirty map first.
      */
     clear: () =>
         tryOrDegradePerformance(() => {
+            dirtyMap.clear();
+
             if (shouldKeepInstancesSync) {
                 return InstanceSync.clear(() => provider.clear());
             }
