@@ -59,11 +59,19 @@ function tryOrDegradePerformance<T>(fn: () => Promise<T> | T, waitForInitializat
 }
 
 /**
- * The DirtyMap coalesces rapid successive writes to the same key.
- * Instead of persisting every intermediate value, only the latest value per key
- * is flushed to the storage provider in a batched multiSet call.
+ * The DirtyMap is a patch-staging layer between Onyx's cache and the storage
+ * provider. It tracks two types of pending entries:
+ * - SET entries (full values) flushed via provider.multiSet()
+ * - MERGE entries (accumulated patches) flushed via provider.multiMerge(),
+ *   preserving JSON_PATCH efficiency on SQLite
+ *
+ * All writes (set, merge) return immediately after staging in the DirtyMap.
+ * Persistence happens asynchronously in coalesced batches.
  */
-const dirtyMap = new DirtyMap((pairs) => provider.multiSet(pairs));
+const dirtyMap = new DirtyMap({
+    multiSet: (pairs) => provider.multiSet(pairs),
+    multiMerge: (pairs) => provider.multiMerge(pairs),
+});
 
 const storage: Storage = {
     /**
@@ -85,11 +93,12 @@ const storage: Storage = {
 
     /**
      * Get the value of a given key or return `null` if it's not available.
-     * Checks the dirty map first for any pending unflushed writes.
+     * Checks the dirty map for pending SET entries first. MERGE entries
+     * (patches) are not served since they don't contain complete values.
      */
     getItem: (key) =>
         tryOrDegradePerformance(() => {
-            // Read-through: check the dirty map before hitting the provider
+            // Read-through: check the dirty map for SET entries
             if (dirtyMap.has(key)) {
                 return Promise.resolve(dirtyMap.get(key));
             }
@@ -98,11 +107,11 @@ const storage: Storage = {
 
     /**
      * Get multiple key-value pairs for the give array of keys in a batch.
-     * Overlays dirty map values on top of provider results.
+     * Overlays dirty map SET values on top of provider results.
      */
     multiGet: (keys) =>
         tryOrDegradePerformance(() => {
-            // Split keys into dirty (already in memory) and clean (need provider read)
+            // Split keys into those with SET entries (in memory) and the rest (need provider read)
             const dirtyKeys: string[] = [];
             const cleanKeys: string[] = [];
 
@@ -114,7 +123,7 @@ const storage: Storage = {
                 }
             }
 
-            // If all keys are dirty, skip the provider call entirely
+            // If all keys have SET entries, skip the provider call entirely
             if (cleanKeys.length === 0) {
                 return Promise.resolve(dirtyKeys.map((key) => [key, dirtyMap.get(key)]));
             }
@@ -128,7 +137,7 @@ const storage: Storage = {
 
     /**
      * Sets the value for a given key. The value is staged in the dirty map
-     * and flushed to storage asynchronously in a coalesced batch.
+     * as a SET entry and flushed to storage asynchronously in a coalesced batch.
      */
     setItem: (key, value) =>
         tryOrDegradePerformance(() => {
@@ -143,7 +152,7 @@ const storage: Storage = {
 
     /**
      * Stores multiple key-value pairs. All values are staged in the dirty map
-     * and flushed to storage asynchronously in a coalesced batch.
+     * as SET entries and flushed to storage asynchronously in a coalesced batch.
      */
     multiSet: (pairs) =>
         tryOrDegradePerformance(() => {
@@ -158,45 +167,38 @@ const storage: Storage = {
 
     /**
      * Merging an existing value with a new one.
-     * Merge operations bypass the dirty map and go directly to the provider,
-     * since merges require knowledge of the existing value in storage and
-     * on native leverage SQLite's JSON_PATCH for efficient partial updates.
+     * The patch is staged in the dirty map as a MERGE entry. If the key
+     * already has a pending SET, the patch is applied to the full value
+     * in-memory. If it already has a pending MERGE, patches are accumulated.
+     * Returns immediately -- no flushNow() needed.
      */
     mergeItem: (key, change, replaceNullPatches) =>
         tryOrDegradePerformance(() => {
-            // Flush any pending dirty writes for this key before merging,
-            // so the provider's merge operates on the latest persisted value.
-            const flushPromise = dirtyMap.has(key) ? dirtyMap.flushNow() : Promise.resolve();
+            dirtyMap.merge(key, change, replaceNullPatches);
 
-            return flushPromise.then(() => {
-                const promise = provider.mergeItem(key, change, replaceNullPatches);
+            if (shouldKeepInstancesSync) {
+                InstanceSync.mergeItem(key);
+            }
 
-                if (shouldKeepInstancesSync) {
-                    return promise.then(() => InstanceSync.mergeItem(key));
-                }
-
-                return promise;
-            });
+            return Promise.resolve();
         }),
 
     /**
      * Multiple merging of existing and new values in a batch.
-     * Like mergeItem, this bypasses coalescing and goes directly to the provider.
+     * Each pair's patch is staged in the dirty map as a MERGE entry.
+     * Returns immediately -- no flushNow() needed.
      */
     multiMerge: (pairs) =>
         tryOrDegradePerformance(() => {
-            // Flush any pending dirty writes before merging
-            const flushPromise = dirtyMap.size > 0 ? dirtyMap.flushNow() : Promise.resolve();
+            for (const [key, value, replaceNullPatches] of pairs) {
+                dirtyMap.merge(key, value, replaceNullPatches);
+            }
 
-            return flushPromise.then(() => {
-                const promise = provider.multiMerge(pairs);
+            if (shouldKeepInstancesSync) {
+                InstanceSync.multiMerge(pairs.map((pair) => pair[0]));
+            }
 
-                if (shouldKeepInstancesSync) {
-                    return promise.then(() => InstanceSync.multiMerge(pairs.map((pair) => pair[0])));
-                }
-
-                return promise;
-            });
+            return Promise.resolve();
         }),
 
     /**
@@ -232,7 +234,7 @@ const storage: Storage = {
         }),
 
     /**
-     * Clears everything. Flushes and clears the dirty map first.
+     * Clears everything. Clears the dirty map first, then the provider.
      */
     clear: () =>
         tryOrDegradePerformance(() => {
