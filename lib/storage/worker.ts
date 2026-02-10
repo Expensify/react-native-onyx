@@ -1,0 +1,186 @@
+/**
+ * Unified Storage Web Worker
+ *
+ * Provider-agnostic worker that handles all database operations off the main
+ * thread. On init, it receives a backend choice ('sqlite' or 'idb') and
+ * dynamically imports the appropriate StorageProvider implementation.
+ *
+ * After each write operation, changed keys are broadcast to other tabs via
+ * BroadcastChannel so they can update their caches.
+ */
+
+import type StorageProvider from './providers/types';
+
+// ---------------------------------------------------------------------------
+// Message types for main-thread <-> worker communication
+// ---------------------------------------------------------------------------
+
+type InitMessage = {type: 'init'; id: string; backend: 'sqlite' | 'idb'};
+type GetItemMessage = {type: 'getItem'; id: string; key: string};
+type MultiGetMessage = {type: 'multiGet'; id: string; keys: string[]};
+type SetItemMessage = {type: 'setItem'; id: string; key: string; value: unknown};
+type MultiSetMessage = {type: 'multiSet'; id: string; pairs: [string, unknown][]};
+type MultiMergeMessage = {type: 'multiMerge'; id: string; pairs: [string, unknown, unknown[] | undefined][]};
+type GetAllKeysMessage = {type: 'getAllKeys'; id: string};
+type RemoveItemMessage = {type: 'removeItem'; id: string; key: string};
+type RemoveItemsMessage = {type: 'removeItems'; id: string; keys: string[]};
+type ClearMessage = {type: 'clear'; id: string};
+type GetDatabaseSizeMessage = {type: 'getDatabaseSize'; id: string};
+
+type WorkerMessage =
+    | InitMessage
+    | GetItemMessage
+    | MultiGetMessage
+    | SetItemMessage
+    | MultiSetMessage
+    | MultiMergeMessage
+    | GetAllKeysMessage
+    | RemoveItemMessage
+    | RemoveItemsMessage
+    | ClearMessage
+    | GetDatabaseSizeMessage;
+
+type ResultMessage = {type: 'result'; id: string; data?: unknown; error?: string};
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+
+let provider: StorageProvider<unknown> | null = null;
+let broadcastChannel: BroadcastChannel | null = null;
+
+const BROADCAST_CHANNEL_NAME = 'onyx-sync';
+
+// ---------------------------------------------------------------------------
+// Broadcasting
+// ---------------------------------------------------------------------------
+
+/**
+ * Broadcast changed keys to other tabs after persistence.
+ */
+function broadcastChangedKeys(keys: string[]): void {
+    if (broadcastChannel && keys.length > 0) {
+        broadcastChannel.postMessage({type: 'keysChanged', keys});
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Result helper
+// ---------------------------------------------------------------------------
+
+function sendResult(id: string, data?: unknown, error?: string): void {
+    const msg: ResultMessage = {type: 'result', id};
+    if (data !== undefined) {
+        msg.data = data;
+    }
+    if (error !== undefined) {
+        msg.error = error;
+    }
+    self.postMessage(msg);
+}
+
+// ---------------------------------------------------------------------------
+// Message handler
+// ---------------------------------------------------------------------------
+
+self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
+    const msg = event.data;
+
+    try {
+        switch (msg.type) {
+            case 'init': {
+                // Dynamically import and initialize the chosen backend
+                if (msg.backend === 'sqlite') {
+                    const sqliteModule = await import('./providers/SQLiteProvider/index.web');
+                    const sqliteProvider = sqliteModule.default;
+
+                    // SQLite needs async init (dynamic WASM import)
+                    await sqliteModule.initAsync();
+                    provider = sqliteProvider;
+                } else {
+                    const idbModule = await import('./providers/IDBKeyValProvider');
+                    provider = idbModule.default;
+                    provider.init();
+                }
+
+                // Initialize BroadcastChannel for cross-tab sync
+                broadcastChannel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
+                sendResult(msg.id);
+                break;
+            }
+
+            case 'getItem': {
+                const result = await provider!.getItem(msg.key);
+                sendResult(msg.id, result);
+                break;
+            }
+
+            case 'multiGet': {
+                const results = await provider!.multiGet(msg.keys);
+                sendResult(msg.id, results);
+                break;
+            }
+
+            case 'setItem': {
+                await provider!.setItem(msg.key, msg.value);
+                broadcastChangedKeys([msg.key]);
+                sendResult(msg.id);
+                break;
+            }
+
+            case 'multiSet': {
+                await provider!.multiSet(msg.pairs as [string, unknown][]);
+                broadcastChangedKeys(msg.pairs.map(([key]) => key));
+                sendResult(msg.id);
+                break;
+            }
+
+            case 'multiMerge': {
+                await provider!.multiMerge(msg.pairs as [string, unknown, unknown[] | undefined][]);
+                broadcastChangedKeys(msg.pairs.map(([key]) => key));
+                sendResult(msg.id);
+                break;
+            }
+
+            case 'getAllKeys': {
+                const keys = await provider!.getAllKeys();
+                sendResult(msg.id, keys);
+                break;
+            }
+
+            case 'removeItem': {
+                await provider!.removeItem(msg.key);
+                broadcastChangedKeys([msg.key]);
+                sendResult(msg.id);
+                break;
+            }
+
+            case 'removeItems': {
+                await provider!.removeItems(msg.keys);
+                broadcastChangedKeys(msg.keys);
+                sendResult(msg.id);
+                break;
+            }
+
+            case 'clear': {
+                await provider!.clear();
+                broadcastChangedKeys(['__clear__']);
+                sendResult(msg.id);
+                break;
+            }
+
+            case 'getDatabaseSize': {
+                const size = await provider!.getDatabaseSize();
+                sendResult(msg.id, size);
+                break;
+            }
+
+            default:
+                sendResult((msg as {id: string}).id, undefined, `Unknown message type: ${(msg as {type: string}).type}`);
+        }
+    } catch (error) {
+        sendResult(msg.id, undefined, error instanceof Error ? error.message : String(error));
+    }
+};
+
+export type {WorkerMessage, ResultMessage};

@@ -1,13 +1,13 @@
 /**
  * Web storage platform selection.
  *
- * Uses the SQLiteProvider (backed by @sqlite.org/sqlite-wasm with opfs-sahpool)
- * as the primary provider, with a runtime fallback to IDBKeyValProvider if OPFS
- * is not supported by the browser.
+ * Uses the WorkerStorageProvider to run all persistence off the main thread.
+ * If OPFS is available, the worker uses the SQLite WASM backend (opfs-sahpool).
+ * Otherwise, it falls back to the IndexedDB backend (idb-keyval).
+ *
+ * Both backends run inside the same unified worker (lib/storage/worker.ts).
  */
-import SQLiteWebProvider from '../providers/SQLiteProvider';
-import IDBKeyValProvider from '../providers/IDBKeyValProvider';
-import type StorageProvider from '../providers/types';
+import createWorkerStorageProvider from '../WorkerStorageProvider';
 
 /**
  * Check if OPFS (via FileSystemSyncAccessHandle) is available.
@@ -26,18 +26,13 @@ function isOPFSSupported(): boolean {
 }
 
 /**
- * Check if Workers are supported (required for SQLite WASM with opfs-sahpool).
+ * Check if Workers are supported (required for both backends).
  */
 function isWorkerSupported(): boolean {
     return typeof Worker !== 'undefined';
 }
 
-let WebStorage: StorageProvider<unknown>;
-
-if (isWorkerSupported() && isOPFSSupported()) {
-    WebStorage = SQLiteWebProvider;
-} else {
-    WebStorage = IDBKeyValProvider;
-}
+const backend = isWorkerSupported() && isOPFSSupported() ? 'sqlite' : 'idb';
+const WebStorage = createWorkerStorageProvider(backend);
 
 export default WebStorage;
