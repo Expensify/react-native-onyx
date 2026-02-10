@@ -579,3 +579,36 @@ npm run bench:save
 # Compare against saved baseline
 npx vitest bench --config vitest.bench.config.ts --compare .bench-baseline.json
 ```
+
+## HTML benchmark reports
+
+For a visual, color-coded comparison of benchmark results, use the report scripts:
+
+```bash
+# Run benchmarks and generate an HTML report (opens in browser)
+npm run bench:report
+
+# Compare current branch vs main with a visual report
+npm run bench:report:compare main
+
+# Don't auto-open the browser
+./scripts/benchAndReport.sh --no-open
+
+# Compare multiple configurations (e.g. different storage providers)
+./scripts/benchAndReport.sh \
+  --run "SQLite (default)" \
+  --run "IDB only:printf 'import W from \"../providers/IDBKeyValProvider\";\nexport default W;\n' > lib/storage/platforms/index.ts"
+```
+
+The report generator can also be used standalone on previously-captured JSON files:
+
+```bash
+# Generate a comparison report from saved JSON files
+npx tsx scripts/generateBenchReport.ts baseline.json current.json \
+  --labels "Baseline,Current" -o bench-results.html --open
+```
+
+The generated HTML uses green/red highlighting:
+- **Green** = faster (improvement >= 5% and >= 1ms absolute)
+- **Red** = slower (regression >= 5% and >= 1ms absolute)
+- **Gray** = negligible change

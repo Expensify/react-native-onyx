@@ -37,6 +37,8 @@
     "bench": "vitest bench --config vitest.bench.config.ts",
     "bench:compare": "./scripts/compareBenchmarks.sh",
     "bench:save": "vitest bench --config vitest.bench.config.ts --outputJson .bench-baseline.json",
+    "bench:report": "./scripts/benchAndReport.sh",
+    "bench:report:compare": "./scripts/benchAndReport.sh --compare",
     "build": "tsc -p tsconfig.build.json",
     "build:watch": "nodemon --watch lib --ext js,json,ts,tsx --exec \"npm run build && npm pack\"",
     "prebuild:docs": "npm run build",
@@ -104,6 +106,7 @@
     "reassure": "1.4.0",
     "tinybench": "^6.0.0",
     "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
     "type-fest": "^3.12.0",
     "typescript": "^5.9.2",
     "vitest": "^4.0.18"
