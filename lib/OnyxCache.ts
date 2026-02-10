@@ -55,6 +55,9 @@ class OnyxCache {
     /** Set of collection keys for fast lookup */
     private collectionKeys = new Set<OnyxKey>();
 
+    /** Set of RAM-only keys for fast lookup */
+    private ramOnlyKeys = new Set<OnyxKey>();
+
     constructor() {
         this.storageKeys = new Set();
         this.nullishStorageKeys = new Set();
@@ -94,6 +97,8 @@ class OnyxCache {
             'isCollectionKey',
             'getCollectionKey',
             'getCollectionData',
+            'setRamOnlyKeys',
+            'isRamOnlyKey',
         );
     }
 
@@ -473,6 +478,20 @@ class OnyxCache {
 
         // Return a shallow copy to ensure React detects changes when items are added/removed
         return {...cachedCollection};
+    }
+
+    /**
+     * Set the RAM-only keys for optimized storage
+     */
+    setRamOnlyKeys(ramOnlyKeys: Set<OnyxKey>): void {
+        this.ramOnlyKeys = ramOnlyKeys;
+    }
+
+    /**
+     * Check if a key is a RAM-only key
+     */
+    isRamOnlyKey(key: OnyxKey): boolean {
+        return this.ramOnlyKeys.has(key);
     }
 }
 

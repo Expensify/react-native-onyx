@@ -58,6 +58,18 @@ is associated with a collection of keys.</p>
 <dt><a href="#isCollectionMember">isCollectionMember(key)</a> ⇒</dt>
 <dd><p>Checks if a given key is a collection member key (not just a collection key).</p>
 </dd>
+<dt><a href="#isRamOnlyKey">isRamOnlyKey(key)</a> ⇒</dt>
+<dd><p>Checks if a given key is a RAM-only key, RAM-only collection key, or a RAM-only collection member</p>
+<p>For example:</p>
+<p>For the following Onyx setup</p>
+<p>ramOnlyKeys: [&quot;ramOnlyKey&quot;, &quot;ramOnlyCollection_&quot;]</p>
+<ul>
+<li><code>isRamOnlyKey(&quot;ramOnlyKey&quot;)</code> would return true</li>
+<li><code>isRamOnlyKey(&quot;ramOnlyCollection_&quot;)</code> would return true</li>
+<li><code>isRamOnlyKey(&quot;ramOnlyCollection_1&quot;)</code> would return true</li>
+<li><code>isRamOnlyKey(&quot;someOtherKey&quot;)</code> would return false</li>
+</ul>
+</dd>
 <dt><a href="#splitCollectionMemberKey">splitCollectionMemberKey(key, collectionKey)</a> ⇒</dt>
 <dd><p>Splits a collection member key into the collection key part and the ID part.</p>
 </dd>
@@ -302,6 +314,29 @@ Checks if a given key is a collection member key (not just a collection key).
 
 **Kind**: global function  
 **Returns**: true if the key is a collection member, false otherwise  
+
+| Param | Description |
+| --- | --- |
+| key | The key to check |
+
+<a name="isRamOnlyKey"></a>
+
+## isRamOnlyKey(key) ⇒
+Checks if a given key is a RAM-only key, RAM-only collection key, or a RAM-only collection member
+
+For example:
+
+For the following Onyx setup
+
+ramOnlyKeys: ["ramOnlyKey", "ramOnlyCollection_"]
+
+- `isRamOnlyKey("ramOnlyKey")` would return true
+- `isRamOnlyKey("ramOnlyCollection_")` would return true
+- `isRamOnlyKey("ramOnlyCollection_1")` would return true
+- `isRamOnlyKey("someOtherKey")` would return false
+
+**Kind**: global function  
+**Returns**: true if key is a RAM-only key, RAM-only collection key, or a RAM-only collection member  
 
 | Param | Description |
 | --- | --- |

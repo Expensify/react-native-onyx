@@ -24,7 +24,10 @@ const ONYX_KEYS = {
         ANIMALS: 'animals_',
         SNAPSHOT: 'snapshot_',
         ROUTES: 'routes_',
+        RAM_ONLY_COLLECTION: 'ramOnlyCollection_',
     },
+    RAM_ONLY_TEST_KEY: 'ramOnlyKey',
+    RAM_ONLY_WITH_INITIAL_VALUE: 'ramOnlyWithInitialValue',
 };
 
 Onyx.init({
@@ -32,8 +35,11 @@ Onyx.init({
     initialKeyStates: {
         [ONYX_KEYS.OTHER_TEST]: 42,
         [ONYX_KEYS.KEY_WITH_UNDERSCORE]: 'default',
+        [ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE]: 'default',
     },
+    ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
     skippableCollectionMemberIDs: ['skippable-id'],
+    snapshotMergeKeys: ['pendingAction', 'pendingFields'],
 });
 
 describe('Onyx', () => {
@@ -2155,6 +2161,26 @@ describe('Onyx', () => {
                         [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`, entry2ExpectedResult],
                     ]);
                 });
+
+                it('should not save a RAM-only collection to storage', async () => {
+                    const key1 = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
+                    const key2 = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`;
+
+                    await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, {
+                        [key1]: 'value 1',
+                        [key2]: 'value 2',
+                    });
+
+                    await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, {
+                        [key1]: 'updated value 1',
+                        [key2]: 'updated value 2',
+                    });
+
+                    expect(await cache.get(key1)).toEqual('updated value 1');
+                    expect(await cache.get(key2)).toEqual('updated value 2');
+                    expect(await StorageMock.getItem(key1)).toBeNull();
+                    expect(await StorageMock.getItem(key2)).toBeNull();
+                });
             });
         });
 
@@ -2305,6 +2331,43 @@ describe('Onyx', () => {
 
             Onyx.disconnect(connection1);
             Onyx.disconnect(connection2);
+        });
+
+        it('should not save a RAM-only collection to storage', async () => {
+            const queuedUpdates: Array<OnyxUpdate<OnyxKey>> = [];
+
+            queuedUpdates.push(
+                {
+                    key: `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`,
+                    onyxMethod: 'merge',
+                    value: null,
+                },
+                {
+                    key: `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`,
+                    onyxMethod: 'merge',
+                    value: null,
+                },
+            );
+
+            queuedUpdates.push(
+                {
+                    key: `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`,
+                    onyxMethod: 'merge',
+                    value: 'updated test 1',
+                },
+                {
+                    key: `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`,
+                    onyxMethod: 'merge',
+                    value: 'updated test 2',
+                },
+            );
+
+            await Onyx.update(queuedUpdates);
+
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`)).toEqual('updated test 1');
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`)).toEqual('updated test 2');
+            expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`)).toBeNull();
+            expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`)).toBeNull();
         });
     });
 
@@ -2535,6 +2598,21 @@ describe('Onyx', () => {
                     });
                 });
         });
+
+        it('should not save a RAM-only key to storage when using merge', async () => {
+            await Onyx.merge(ONYX_KEYS.RAM_ONLY_TEST_KEY, {someProperty: 'value'});
+
+            expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toEqual({someProperty: 'value'});
+            expect(await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeNull();
+        });
+
+        it('should not save a RAM-only collection member to storage when using merge', async () => {
+            const collectionMemberKey = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
+            await Onyx.merge(collectionMemberKey, {data: 'test'});
+
+            expect(cache.get(collectionMemberKey)).toEqual({data: 'test'});
+            expect(await StorageMock.getItem(collectionMemberKey)).toBeNull();
+        });
     });
 
     describe('set', () => {
@@ -2560,6 +2638,40 @@ describe('Onyx', () => {
                 .then(() => {
                     expect(testKeyValue).toEqual(testData);
                 });
+        });
+
+        it('should not save a RAM-only key to storage', async () => {
+            await Onyx.set(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'test');
+
+            expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toEqual('test');
+            expect(await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeNull();
+        });
+
+        it('should not save a member of a RAM-only collection to storage', async () => {
+            const collectionMemberKey = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
+            await Onyx.set(collectionMemberKey, 'test');
+
+            expect(cache.get(collectionMemberKey)).toEqual('test');
+            expect(await StorageMock.getItem(collectionMemberKey)).toBeNull();
+        });
+    });
+
+    describe('multiSet', () => {
+        it('should only save non RAM-only keys to storage', async () => {
+            const otherTestValue = 'non ram only value';
+            const collectionMemberKey = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`;
+
+            await Onyx.multiSet({
+                [ONYX_KEYS.OTHER_TEST]: otherTestValue,
+                [ONYX_KEYS.RAM_ONLY_TEST_KEY]: 'test value 1',
+                [collectionMemberKey]: 'test value 2',
+            });
+
+            expect(await StorageMock.getItem(ONYX_KEYS.OTHER_TEST)).toEqual(otherTestValue);
+            expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toEqual('test value 1');
+            expect(await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeNull();
+            expect(cache.get(collectionMemberKey)).toEqual('test value 2');
+            expect(await StorageMock.getItem(collectionMemberKey)).toBeNull();
         });
     });
 
@@ -2675,6 +2787,21 @@ describe('Onyx', () => {
             expect(receivedData).toEqual({
                 [routeB]: {name: 'Route B'},
             });
+        });
+
+        it('should not save a RAM-only collection to storage', async () => {
+            const key1 = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
+            const key2 = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`;
+
+            await Onyx.setCollection(ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, {
+                [key1]: 'test1',
+                [key2]: 'test2',
+            });
+
+            expect(cache.get(key1)).toEqual('test1');
+            expect(cache.get(key2)).toEqual('test2');
+            expect(await StorageMock.getItem(key1)).toBeNull();
+            expect(await StorageMock.getItem(key2)).toBeNull();
         });
     });
 
@@ -2804,6 +2931,23 @@ describe('Onyx', () => {
             expect(mockMergeQueue[testKey]).toBeUndefined();
 
             jest.restoreAllMocks();
+        });
+    });
+
+    describe('clear', () => {
+        it('should handle RAM-only keys with defaults correctly during clear', async () => {
+            // Set a value for RAM-only key
+            await Onyx.set(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'some value');
+            await Onyx.set(ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE, 'some other value');
+
+            await Onyx.clear();
+
+            // Verify it's not in storage
+            expect(await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeNull();
+            expect(await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE)).toBeNull();
+            // Verify cache state based on whether there's a default
+            expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeUndefined();
+            expect(cache.get(ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE)).toEqual('default');
         });
     });
 });
