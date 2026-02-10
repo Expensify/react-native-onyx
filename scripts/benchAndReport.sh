@@ -23,8 +23,6 @@
 #   --run "<label>:<cmd>" Run <cmd> before benchmarking, label the column <label>
 #   --output <path>       HTML output path (default: bench-results.html)
 #   --no-open             Don't auto-open the report in a browser
-#   --no-stabilize        Skip automatic re-runs for noisy results
-#   --max-retries <n>     Max stabilization passes per run (default: 3)
 #   -- <args>             Extra args passed to vitest bench
 #
 # Examples:
@@ -49,8 +47,6 @@ OUTPUT="bench-results.html"
 AUTO_OPEN=true
 COMPARE_BRANCH=""
 VITEST_ARGS=()
-MAX_RETRIES=3
-STABILIZE=true
 
 # Parallel arrays for multi-run mode
 RUN_LABELS=()
@@ -68,9 +64,16 @@ while [[ $# -gt 0 ]]; do
             ;;
         --run)
             # Format: "Label" or "Label:setup-command"
-            IFS=':' read -r label setup <<< "$2"
+            # Use parameter expansion instead of IFS splitting so colons
+            # inside the setup command don't get misinterpreted.
+            label="${2%%:*}"
+            if [[ "$2" == *:* ]]; then
+                setup="${2#*:}"
+            else
+                setup=""
+            fi
             RUN_LABELS+=("$label")
-            RUN_SETUPS+=("${setup:-}")
+            RUN_SETUPS+=("$setup")
             shift 2
             ;;
         --output)
@@ -80,14 +83,6 @@ while [[ $# -gt 0 ]]; do
         --no-open)
             AUTO_OPEN=false
             shift
-            ;;
-        --no-stabilize)
-            STABILIZE=false
-            shift
-            ;;
-        --max-retries)
-            MAX_RETRIES="$2"
-            shift 2
             ;;
         --)
             shift
@@ -133,21 +128,10 @@ trap cleanup EXIT
 
 run_bench() {
     local json_out="$1"
-    local extra_vitest=""
-    if [[ ${#VITEST_ARGS[@]} -gt 0 ]]; then
-        extra_vitest="-- ${VITEST_ARGS[*]}"
-    fi
-
-    if $STABILIZE; then
-        echo "==> Running benchmarks (with stabilization, max ${MAX_RETRIES} retries)..."
-        npx tsx "$SCRIPT_DIR/stabilizeBenchmarks.ts" \
-            -o "$json_out" \
-            --max-retries "$MAX_RETRIES" \
-            ${extra_vitest:+$extra_vitest} 2>&1
-    else
-        echo "==> Running benchmarks (no stabilization)..."
-        npx vitest bench --config vitest.bench.config.ts --outputJson "$json_out" ${VITEST_ARGS[@]+"${VITEST_ARGS[@]}"} 2>&1
-    fi
+    echo "==> Running benchmarks..."
+    npx vitest bench --run --config vitest.bench.config.ts \
+        --outputJson "$json_out" \
+        ${VITEST_ARGS[@]+"${VITEST_ARGS[@]}"} 2>&1
     echo "==> Results saved to $json_out"
 }
 

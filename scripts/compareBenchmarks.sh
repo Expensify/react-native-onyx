@@ -76,7 +76,7 @@ npm ci --silent 2>/dev/null || npm install --silent
 
 echo ""
 echo "==> Running baseline benchmarks on '$BASE_BRANCH'..."
-npx vitest bench --config vitest.bench.config.ts --outputJson "$BASELINE_FILE" "${EXTRA_ARGS[@]}" || {
+npx vitest bench --run --config vitest.bench.config.ts --outputJson "$BASELINE_FILE" "${EXTRA_ARGS[@]}" || {
     echo "ERROR: Baseline benchmarks failed on '$BASE_BRANCH'"
     exit 1
 }
@@ -107,7 +107,7 @@ echo "  BENCHMARK COMPARISON: $BASE_BRANCH → $CURRENT_BRANCH"
 echo "============================================================"
 echo ""
 
-npx vitest bench --config vitest.bench.config.ts --compare "$BASELINE_FILE" "${EXTRA_ARGS[@]}" || {
+npx vitest bench --run --config vitest.bench.config.ts --compare "$BASELINE_FILE" "${EXTRA_ARGS[@]}" || {
     echo "ERROR: Benchmarks failed on '$CURRENT_BRANCH'"
     exit 1
 }
