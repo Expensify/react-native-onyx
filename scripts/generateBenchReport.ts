@@ -122,20 +122,22 @@ for (const results of allResults) {
     }
 }
 
-// Sort keys by tier then operation type
+// Sort keys by operation group then tier (size)
 const TIERS = ['small', 'modest', 'heavy', 'extreme'];
-const OP_ORDER = [
-    'set() -',
-    'multiSet()',
-    'setCollection()',
-    'merge() -',
-    'mergeCollection()',
-    'update()',
-    'connect() - register',
-    'collection subscriber',
-    'Notification',
-    'init()',
-    'clear()',
+
+// Operation groups: each entry is [matchString, groupLabel]
+const OP_GROUPS: [string, string][] = [
+    ['set() -', 'Onyx.set()'],
+    ['multiSet()', 'Onyx.multiSet()'],
+    ['setCollection()', 'Onyx.setCollection()'],
+    ['merge() -', 'Onyx.merge()'],
+    ['mergeCollection()', 'Onyx.mergeCollection()'],
+    ['update()', 'Onyx.update()'],
+    ['connect() - register', 'Onyx.connect() - register subscribers'],
+    ['collection subscriber', 'Onyx.connect() - collection subscriber'],
+    ['Notification', 'Notification throughput'],
+    ['init()', 'Onyx.init()'],
+    ['clear()', 'Onyx.clear()'],
 ];
 
 function getTierIndex(key: string): number {
@@ -144,15 +146,20 @@ function getTierIndex(key: string): number {
 }
 
 function getOpIndex(key: string): number {
-    const idx = OP_ORDER.findIndex((op) => key.includes(op));
+    const idx = OP_GROUPS.findIndex(([match]) => key.includes(match));
     return idx >= 0 ? idx : 99;
 }
 
+function getOpGroupLabel(key: string): string {
+    const entry = OP_GROUPS.find(([match]) => key.includes(match));
+    return entry ? entry[1] : '';
+}
+
 allKeys.sort((a, b) => {
-    const ta = getTierIndex(a);
-    const tb = getTierIndex(b);
-    if (ta !== tb) return ta - tb;
-    return getOpIndex(a) - getOpIndex(b);
+    const oa = getOpIndex(a);
+    const ob = getOpIndex(b);
+    if (oa !== ob) return oa - ob;
+    return getTierIndex(a) - getTierIndex(b);
 });
 
 // ---------------------------------------------------------------------------
@@ -234,21 +241,25 @@ function getOperationName(key: string): string {
     return parts[parts.length - 1];
 }
 
-// Build rows grouped by tier
+// Build rows grouped by operation, ordered by tier within each group
 let tableRows = '';
-let lastTier = '';
+let lastOpGroup = '';
 
 for (const key of allKeys) {
-    const tier = getTierLabel(key);
+    const opGroup = getOpGroupLabel(key);
 
-    if (tier !== lastTier) {
-        lastTier = tier;
-        const desc = getTierDescription(key);
+    if (opGroup !== lastOpGroup) {
+        lastOpGroup = opGroup;
         const colspan = 1 + allResults.length;
-        tableRows += `<tr class="tier-header"><td colspan="${colspan}">${tier} (${desc})</td></tr>\n`;
+        tableRows += `<tr class="tier-header"><td colspan="${colspan}">${escapeHtml(opGroup)}</td></tr>\n`;
     }
 
+    const tier = getTierLabel(key);
+    const desc = getTierDescription(key);
     const opName = getOperationName(key);
+    // Show tier + size context alongside the operation name
+    const rowLabel = tier ? `${tier} (${desc})` : opName;
+
     const baseEntry = baseline.get(key);
 
     let cells = renderCell(baseEntry, undefined, true);
@@ -256,7 +267,7 @@ for (const key of allKeys) {
         cells += renderCell(variant.get(key), baseEntry, false);
     }
 
-    tableRows += `<tr><td>${escapeHtml(opName)}</td>${cells}</tr>\n`;
+    tableRows += `<tr><td>${escapeHtml(rowLabel)}</td>${cells}</tr>\n`;
 }
 
 function escapeHtml(s: string): string {
