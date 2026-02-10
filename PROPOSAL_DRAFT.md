@@ -112,13 +112,22 @@ This approach has several limitations:
 
 **What this refactor changes:**
 
-Cross-tab sync is replaced with the [`BroadcastChannel` API](https://developer.mozilla.org/en-US/docs/Web/API/BroadcastChannel), and the notification is moved to the persistence boundary:
+Cross-tab sync is replaced with the [`BroadcastChannel` API](https://developer.mozilla.org/en-US/docs/Web/API/BroadcastChannel), and the notification is moved to the persistence boundary. Crucially, **values are broadcast directly** -- receiving tabs never need to re-read from storage:
 
-- After the SQLite worker persists a batch of writes, it broadcasts the changed keys over a `BroadcastChannel`. This ensures the notification happens **after** the data is on disk, eliminating the race condition.
-- Other tabs' workers receive the message and notify their main threads.
-- The main threads re-read the changed keys from the shared SQLite database (via OPFS, which is shared across same-origin tabs).
-- Multiple keys are batched into a single `BroadcastChannel` message, reducing event overhead compared to one `localStorage` event per key.
+- After the unified worker persists a batch of writes, it broadcasts **value-bearing messages** over a `BroadcastChannel` (`onyx-sync`). Since the worker already has the raw objects in scope (received via `postMessage` from the main thread), the broadcast is effectively free.
+- The message types are:
+  - `set`: `{type: 'set', pairs: [[key, value], ...]}` -- full value replacements
+  - `merge`: `{type: 'merge', pairs: [[key, patch, replaceNullPatches], ...]}` -- raw merge patches
+  - `remove`: `{type: 'remove', keys: [...]}` -- key deletions
+  - `clear`: `{type: 'clear'}` -- full store clear
+- **InstanceSync** on each receiving tab's main thread listens on `onyx-sync` and handles messages directly:
+  - For `set` messages: calls `onStorageKeyChanged(key, value)` immediately -- no storage read.
+  - For `merge` messages: applies `fastMerge(cachedValue, patch)` against the tab's in-memory cache, then calls `onStorageKeyChanged(key, mergedValue)`. If the key isn't cached, falls back to `provider.getItem(key)` to get the base value (rare in practice).
+  - For `remove` messages: calls `onStorageKeyChanged(key, null)`.
+  - For `clear` messages: calls `onStorageKeyChanged(key, null)` for all cached keys.
+- The **sending side** is eliminated entirely: since the unified worker handles broadcasting for all backends, `storage/index.ts` no longer calls any InstanceSync send methods. The `keepInstancesSync` method only initializes the *receiver* (InstanceSync's BroadcastChannel listener).
 - `localStorage` is no longer touched for synchronization purposes.
+- A legacy `onyx-instance-sync` channel is retained as a fallback receiver for any edge cases during migration. It will be removed once fully validated.
 
 ---
 
@@ -156,11 +165,12 @@ Main Thread (Tab)                        Unified Web Worker
                                     |  └─────────────────┘  |
                                     |                        |
                                     |  BroadcastChannel      |
-                                    |  (notify other tabs)   |
+                                    |  (broadcast values to  |
+                                    |   other tabs)          |
                                     +-----------------------+
 ```
 
-A single unified worker (`lib/storage/worker.ts`) handles all persistence regardless of the backend. On init, it receives a backend choice (`'sqlite'` or `'idb'`) and dynamically imports the appropriate `StorageProvider` implementation. The main thread communicates through a generic `WorkerStorageProvider` proxy that knows nothing about which backend is active. BroadcastChannel broadcasting happens in the worker after each write, also provider-agnostic.
+A single unified worker (`lib/storage/worker.ts`) handles all persistence regardless of the backend. On init, it receives a backend choice (`'sqlite'` or `'idb'`) and dynamically imports the appropriate `StorageProvider` implementation. The main thread communicates through a generic `WorkerStorageProvider` proxy that knows nothing about which backend is active. After each write, the worker broadcasts **value-bearing messages** (not just key names) over BroadcastChannel, so receiving tabs can update their caches directly without re-reading from storage. InstanceSync on each tab's main thread handles the incoming messages, applying `fastMerge` for merge patches.
 
 ---
 
@@ -188,6 +198,14 @@ Created a provider-agnostic architecture where both SQLite and IndexedDB run off
 ### Phase 4: Patch staging refinement
 
 Evolved the WriteBuffer from a simple "latest value per key" model to a proper patch-staging layer with distinct `SET` and `MERGE` entry types. This eliminated the need for synchronous flushes before merge operations (which had caused regressions in Phase 2) and enabled merge patches to be coalesced in memory before being sent to the provider.
+
+### Phase 5: Value-bearing cross-tab sync
+
+Upgraded cross-tab synchronization from key-only notifications (where receiving tabs re-read values from storage) to value-bearing broadcasts:
+
+- `lib/storage/worker.ts`: Replaced the generic `broadcastChangedKeys(keys)` function with typed broadcast functions (`broadcastSets`, `broadcastMerges`, `broadcastRemoves`, `broadcastClear`) that include actual values/patches in the BroadcastChannel messages.
+- `lib/storage/InstanceSync/index.web.ts`: Rewrote to listen on `onyx-sync` for value-bearing messages. For `set` messages, calls `onStorageKeyChanged(key, value)` directly. For `merge` messages, applies `fastMerge(cachedValue, patch)` against the in-memory cache (falling back to `provider.getItem` if the key isn't cached). For `remove`/`clear`, notifies with `null`.
+- `lib/storage/index.ts`: Removed all InstanceSync send-side calls (`setItem`, `multiSet`, `mergeItem`, etc.) since the worker handles broadcasting. The `keepInstancesSync` method now only initializes the receiver.
 
 ---
 

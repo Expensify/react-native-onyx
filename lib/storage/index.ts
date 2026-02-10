@@ -6,10 +6,9 @@ import MemoryOnlyProvider from './providers/MemoryOnlyProvider';
 import type StorageProvider from './providers/types';
 import * as GlobalSettings from '../GlobalSettings';
 import decorateWithMetrics from '../metrics';
-import DirtyMap from './DirtyMap';
+import WriteBuffer from './WriteBuffer';
 
 let provider = PlatformStorage as StorageProvider<unknown>;
-let shouldKeepInstancesSync = false;
 let finishInitalization: (value?: unknown) => void;
 const initPromise = new Promise((resolve) => {
     finishInitalization = resolve;
@@ -59,16 +58,16 @@ function tryOrDegradePerformance<T>(fn: () => Promise<T> | T, waitForInitializat
 }
 
 /**
- * The DirtyMap is a patch-staging layer between Onyx's cache and the storage
+ * The WriteBuffer is a patch-staging layer between Onyx's cache and the storage
  * provider. It tracks two types of pending entries:
  * - SET entries (full values) flushed via provider.multiSet()
  * - MERGE entries (accumulated patches) flushed via provider.multiMerge(),
  *   preserving JSON_PATCH efficiency on SQLite
  *
- * All writes (set, merge) return immediately after staging in the DirtyMap.
+ * All writes (set, merge) return immediately after staging in the WriteBuffer.
  * Persistence happens asynchronously in coalesced batches.
  */
-const dirtyMap = new DirtyMap({
+const writeBuffer = new WriteBuffer({
     multiSet: (pairs) => provider.multiSet(pairs),
     multiMerge: (pairs) => provider.multiMerge(pairs),
 });
@@ -93,157 +92,139 @@ const storage: Storage = {
 
     /**
      * Get the value of a given key or return `null` if it's not available.
-     * Checks the dirty map for pending SET entries first. MERGE entries
-     * (patches) are not served since they don't contain complete values.
+     *
+     * - If the key has a pending SET entry, it is returned directly from memory.
+     * - If the key has a pending MERGE entry (a patch delta, not a full value),
+     *   the write buffer is flushed first so the provider has the correct merged
+     *   value on disk, then the read proceeds normally.
+     * - Otherwise, the read goes straight to the provider.
      */
     getItem: (key) =>
         tryOrDegradePerformance(() => {
-            // Read-through: check the dirty map for SET entries
-            if (dirtyMap.has(key)) {
-                return Promise.resolve(dirtyMap.get(key));
+            if (writeBuffer.has(key)) {
+                return Promise.resolve(writeBuffer.get(key));
+            }
+            if (writeBuffer.hasAny(key)) {
+                return writeBuffer.flushNow().then(() => provider.getItem(key));
             }
             return provider.getItem(key);
         }),
 
     /**
      * Get multiple key-value pairs for the give array of keys in a batch.
-     * Overlays dirty map SET values on top of provider results.
+     *
+     * Keys with pending SET entries are served from memory. If any remaining
+     * keys have pending MERGE entries, the write buffer is flushed before
+     * reading from the provider so the on-disk values are up to date.
      */
     multiGet: (keys) =>
         tryOrDegradePerformance(() => {
-            // Split keys into those with SET entries (in memory) and the rest (need provider read)
-            const dirtyKeys: string[] = [];
+            const bufferedKeys: string[] = [];
             const cleanKeys: string[] = [];
+            let hasPendingMerges = false;
 
             for (const key of keys) {
-                if (dirtyMap.has(key)) {
-                    dirtyKeys.push(key);
+                if (writeBuffer.has(key)) {
+                    bufferedKeys.push(key);
                 } else {
                     cleanKeys.push(key);
+                    if (writeBuffer.hasAny(key)) {
+                        hasPendingMerges = true;
+                    }
                 }
             }
 
             // If all keys have SET entries, skip the provider call entirely
             if (cleanKeys.length === 0) {
-                return Promise.resolve(dirtyKeys.map((key) => [key, dirtyMap.get(key)]));
+                return Promise.resolve(bufferedKeys.map((key) => [key, writeBuffer.get(key)]));
             }
 
-            return provider.multiGet(cleanKeys).then((providerResults) => {
-                // Merge dirty values with provider results
-                const dirtyResults = dirtyKeys.map((key) => [key, dirtyMap.get(key)] as [string, unknown]);
-                return [...providerResults, ...dirtyResults];
-            });
+            // If any clean keys have pending MERGE entries, flush first
+            const readyPromise = hasPendingMerges ? writeBuffer.flushNow() : Promise.resolve();
+
+            return readyPromise.then(() =>
+                provider.multiGet(cleanKeys).then((providerResults) => {
+                    const bufferedResults = bufferedKeys.map((key) => [key, writeBuffer.get(key)] as [string, unknown]);
+                    return [...providerResults, ...bufferedResults];
+                }),
+            );
         }),
 
     /**
-     * Sets the value for a given key. The value is staged in the dirty map
+     * Sets the value for a given key. The value is staged in the write buffer
      * as a SET entry and flushed to storage asynchronously in a coalesced batch.
+     *
+     * Cross-tab broadcasting is handled by the unified worker after persistence,
+     * so no InstanceSync send calls are needed here.
      */
     setItem: (key, value) =>
         tryOrDegradePerformance(() => {
-            dirtyMap.set(key, value);
-
-            if (shouldKeepInstancesSync) {
-                InstanceSync.setItem(key);
-            }
-
+            writeBuffer.set(key, value);
             return Promise.resolve();
         }),
 
     /**
-     * Stores multiple key-value pairs. All values are staged in the dirty map
+     * Stores multiple key-value pairs. All values are staged in the write buffer
      * as SET entries and flushed to storage asynchronously in a coalesced batch.
      */
     multiSet: (pairs) =>
         tryOrDegradePerformance(() => {
-            dirtyMap.setMany(pairs);
-
-            if (shouldKeepInstancesSync) {
-                InstanceSync.multiSet(pairs.map((pair) => pair[0]));
-            }
-
+            writeBuffer.setMany(pairs);
             return Promise.resolve();
         }),
 
     /**
      * Merging an existing value with a new one.
-     * The patch is staged in the dirty map as a MERGE entry. If the key
+     * The patch is staged in the write buffer as a MERGE entry. If the key
      * already has a pending SET, the patch is applied to the full value
      * in-memory. If it already has a pending MERGE, patches are accumulated.
      * Returns immediately -- no flushNow() needed.
      */
     mergeItem: (key, change, replaceNullPatches) =>
         tryOrDegradePerformance(() => {
-            dirtyMap.merge(key, change, replaceNullPatches);
-
-            if (shouldKeepInstancesSync) {
-                InstanceSync.mergeItem(key);
-            }
-
+            writeBuffer.merge(key, change, replaceNullPatches);
             return Promise.resolve();
         }),
 
     /**
      * Multiple merging of existing and new values in a batch.
-     * Each pair's patch is staged in the dirty map as a MERGE entry.
+     * Each pair's patch is staged in the write buffer as a MERGE entry.
      * Returns immediately -- no flushNow() needed.
      */
     multiMerge: (pairs) =>
         tryOrDegradePerformance(() => {
             for (const [key, value, replaceNullPatches] of pairs) {
-                dirtyMap.merge(key, value, replaceNullPatches);
+                writeBuffer.merge(key, value, replaceNullPatches);
             }
-
-            if (shouldKeepInstancesSync) {
-                InstanceSync.multiMerge(pairs.map((pair) => pair[0]));
-            }
-
             return Promise.resolve();
         }),
 
     /**
      * Removes given key and its value.
-     * Also removes the key from the dirty map if it has a pending write.
+     * Also removes the key from the write buffer if it has a pending write.
      */
     removeItem: (key) =>
         tryOrDegradePerformance(() => {
-            dirtyMap.remove(key);
-            const promise = provider.removeItem(key);
-
-            if (shouldKeepInstancesSync) {
-                return promise.then(() => InstanceSync.removeItem(key));
-            }
-
-            return promise;
+            writeBuffer.remove(key);
+            return provider.removeItem(key);
         }),
 
     /**
      * Remove given keys and their values.
-     * Also removes the keys from the dirty map if they have pending writes.
+     * Also removes the keys from the write buffer if they have pending writes.
      */
     removeItems: (keys) =>
         tryOrDegradePerformance(() => {
-            dirtyMap.removeMany(keys);
-            const promise = provider.removeItems(keys);
-
-            if (shouldKeepInstancesSync) {
-                return promise.then(() => InstanceSync.removeItems(keys));
-            }
-
-            return promise;
+            writeBuffer.removeMany(keys);
+            return provider.removeItems(keys);
         }),
 
     /**
-     * Clears everything. Clears the dirty map first, then the provider.
+     * Clears everything. Clears the write buffer first, then the provider.
      */
     clear: () =>
         tryOrDegradePerformance(() => {
-            dirtyMap.clear();
-
-            if (shouldKeepInstancesSync) {
-                return InstanceSync.clear(() => provider.clear());
-            }
-
+            writeBuffer.clear();
             return provider.clear();
         }),
 
@@ -258,13 +239,17 @@ const storage: Storage = {
     getDatabaseSize: () => tryOrDegradePerformance(() => provider.getDatabaseSize()),
 
     /**
-     * @param onStorageKeyChanged - Storage synchronization mechanism keeping all opened tabs in sync (web only)
+     * Initializes the cross-tab sync receiver. On web, InstanceSync listens on
+     * BroadcastChannel for value-bearing messages from other tabs' workers and
+     * calls onStorageKeyChanged to update the cache. No send-side logic is
+     * needed here -- the unified worker handles broadcasting after persistence.
+     *
+     * @param onStorageKeyChanged - Callback invoked when another tab changes a key
      */
     keepInstancesSync(onStorageKeyChanged) {
         // If InstanceSync shouldn't be used, it means we're on a native platform and we don't need to keep instances in sync
         if (!InstanceSync.shouldBeUsed) return;
 
-        shouldKeepInstancesSync = true;
         InstanceSync.init(onStorageKeyChanged, this);
     },
 };

@@ -208,16 +208,18 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             throw new Error('Store is not initialized!');
         }
 
-        return Promise.all([provider.store.executeAsync<PageSizeResult>(Queries.PRAGMA_PAGE_SIZE), provider.store.executeAsync<PageCountResult>(Queries.PRAGMA_PAGE_COUNT), getFreeDiskStorage()]).then(
-            ([pageSizeResult, pageCountResult, bytesRemaining]) => {
-                const pageSize = pageSizeResult.rows?.item(0)?.page_size ?? 0;
-                const pageCount = pageCountResult.rows?.item(0)?.page_count ?? 0;
-                return {
-                    bytesUsed: pageSize * pageCount,
-                    bytesRemaining,
-                };
-            },
-        );
+        return Promise.all([
+            provider.store.executeAsync<PageSizeResult>(Queries.PRAGMA_PAGE_SIZE),
+            provider.store.executeAsync<PageCountResult>(Queries.PRAGMA_PAGE_COUNT),
+            getFreeDiskStorage(),
+        ]).then(([pageSizeResult, pageCountResult, bytesRemaining]) => {
+            const pageSize = pageSizeResult.rows?.item(0)?.page_size ?? 0;
+            const pageCount = pageCountResult.rows?.item(0)?.page_count ?? 0;
+            return {
+                bytesUsed: pageSize * pageCount,
+                bytesRemaining,
+            };
+        });
     },
 };
 

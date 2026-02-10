@@ -52,16 +52,44 @@ let broadcastChannel: BroadcastChannel | null = null;
 const BROADCAST_CHANNEL_NAME = 'onyx-sync';
 
 // ---------------------------------------------------------------------------
-// Broadcasting
+// Value-bearing broadcasting
 // ---------------------------------------------------------------------------
 
 /**
- * Broadcast changed keys to other tabs after persistence.
+ * Broadcast SET operations with full values to other tabs.
+ * Called concurrently with persistence so receiving tabs can update caches
+ * immediately without re-reading from storage.
  */
-function broadcastChangedKeys(keys: string[]): void {
-    if (broadcastChannel && keys.length > 0) {
-        broadcastChannel.postMessage({type: 'keysChanged', keys});
+function broadcastSets(pairs: [string, unknown][]): void {
+    if (broadcastChannel && pairs.length > 0) {
+        broadcastChannel.postMessage({type: 'set', pairs});
     }
+}
+
+/**
+ * Broadcast MERGE operations with raw patches to other tabs.
+ * Receiving tabs apply fastMerge(cachedValue, patch) against their cache.
+ */
+function broadcastMerges(pairs: [string, unknown, unknown[] | undefined][]): void {
+    if (broadcastChannel && pairs.length > 0) {
+        broadcastChannel.postMessage({type: 'merge', pairs});
+    }
+}
+
+/**
+ * Broadcast REMOVE operations to other tabs.
+ */
+function broadcastRemoves(keys: string[]): void {
+    if (broadcastChannel && keys.length > 0) {
+        broadcastChannel.postMessage({type: 'remove', keys});
+    }
+}
+
+/**
+ * Broadcast CLEAR operation to other tabs.
+ */
+function broadcastClear(): void {
+    broadcastChannel?.postMessage({type: 'clear'});
 }
 
 // ---------------------------------------------------------------------------
@@ -123,21 +151,21 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
 
             case 'setItem': {
                 await provider!.setItem(msg.key, msg.value);
-                broadcastChangedKeys([msg.key]);
+                broadcastSets([[msg.key, msg.value]]);
                 sendResult(msg.id);
                 break;
             }
 
             case 'multiSet': {
                 await provider!.multiSet(msg.pairs as [string, unknown][]);
-                broadcastChangedKeys(msg.pairs.map(([key]) => key));
+                broadcastSets(msg.pairs);
                 sendResult(msg.id);
                 break;
             }
 
             case 'multiMerge': {
                 await provider!.multiMerge(msg.pairs as [string, unknown, unknown[] | undefined][]);
-                broadcastChangedKeys(msg.pairs.map(([key]) => key));
+                broadcastMerges(msg.pairs);
                 sendResult(msg.id);
                 break;
             }
@@ -150,21 +178,21 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
 
             case 'removeItem': {
                 await provider!.removeItem(msg.key);
-                broadcastChangedKeys([msg.key]);
+                broadcastRemoves([msg.key]);
                 sendResult(msg.id);
                 break;
             }
 
             case 'removeItems': {
                 await provider!.removeItems(msg.keys);
-                broadcastChangedKeys(msg.keys);
+                broadcastRemoves(msg.keys);
                 sendResult(msg.id);
                 break;
             }
 
             case 'clear': {
                 await provider!.clear();
-                broadcastChangedKeys(['__clear__']);
+                broadcastClear();
                 sendResult(msg.id);
                 break;
             }

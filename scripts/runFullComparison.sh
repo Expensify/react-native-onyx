@@ -3,9 +3,9 @@
 # runFullComparison.sh — Run benchmarks for three configurations and generate HTML.
 #
 # Configs:
-#   1. Baseline:   Rory-Benchmarks branch (no DirtyMap, no workers, IDB only)
+#   1. Baseline:   Rory-Benchmarks branch (no WriteBuffer, no workers, IDB only)
 #   2. DM+IDB:     Rory-OnyxWasm branch with IDB storage forced
-#   3. DM+SQLite:  Rory-OnyxWasm branch as-is (DirtyMap + workers + SQLite)
+#   3. DM+SQLite:  Rory-OnyxWasm branch as-is (WriteBuffer + workers + SQLite)
 #
 # Output:
 #   bench-results/baseline.json

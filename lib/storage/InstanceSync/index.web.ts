@@ -1,59 +1,135 @@
 /**
  * The InstancesSync object provides data-changed events across browser tabs.
  *
- * This implementation uses BroadcastChannel for cross-tab communication,
- * replacing the previous localStorage-based approach. BroadcastChannel is
- * more reliable, supports structured data, and doesn't pollute localStorage.
+ * This implementation listens on the unified `onyx-sync` BroadcastChannel for
+ * value-bearing messages from the storage worker. When another tab's worker
+ * persists changes, it broadcasts the values directly, so this tab can update
+ * its cache without re-reading from storage.
  *
- * Note: When using the SQLiteProvider (web), cross-tab sync is also handled
- * at the worker/provider level via BroadcastChannel. This InstanceSync layer
- * serves as a fallback for IDBKeyValProvider and as the storage-layer
- * integration point that the storage/index.ts module calls.
+ * For merge operations, the raw patch is broadcast and applied against the
+ * local cache using fastMerge. If the key is not in cache, we fall back to
+ * reading from the storage provider.
+ *
+ * The InstanceSync also retains its sending capabilities (setItem, multiSet, etc.)
+ * for the IDB fallback path. When the worker handles broadcasting (the normal
+ * case), these send methods are skipped by storage/index.ts.
  */
 import type {OnyxKey} from '../../types';
+import cache from '../../OnyxCache';
+import utils from '../../utils';
 import NoopProvider from '../providers/NoopProvider';
 import type {StorageKeyList, OnStorageKeyChanged} from '../providers/types';
 import type StorageProvider from '../providers/types';
 
-const CHANNEL_NAME = 'onyx-instance-sync';
+const SYNC_CHANNEL_NAME = 'onyx-sync';
 
-let channel: BroadcastChannel | null = null;
+/**
+ * Legacy channel for key-only messages from the IDB fallback path.
+ * Once IDB is moved to a worker, this can be removed.
+ */
+const LEGACY_CHANNEL_NAME = 'onyx-instance-sync';
+
+let syncChannel: BroadcastChannel | null = null;
+let legacyChannel: BroadcastChannel | null = null;
 let storage: StorageProvider<unknown> = NoopProvider;
 
 /**
- * Broadcast a single key change to other tabs.
+ * Broadcast a single key change to other tabs (legacy IDB fallback path).
  */
 function raiseStorageSyncEvent(onyxKey: OnyxKey) {
-    channel?.postMessage({type: 'keyChanged', key: onyxKey});
+    legacyChannel?.postMessage({type: 'keyChanged', key: onyxKey});
 }
 
 /**
- * Broadcast multiple key changes to other tabs in a single message.
+ * Broadcast multiple key changes to other tabs in a single message (legacy IDB fallback path).
  */
 function raiseStorageSyncManyKeysEvent(onyxKeys: StorageKeyList) {
     if (onyxKeys.length === 0) return;
-    channel?.postMessage({type: 'keysChanged', keys: onyxKeys});
+    legacyChannel?.postMessage({type: 'keysChanged', keys: onyxKeys});
 }
 
 const InstanceSync = {
     shouldBeUsed: true,
 
     /**
-     * Initialize the BroadcastChannel listener for cross-tab synchronization.
+     * Initialize the BroadcastChannel listeners for cross-tab synchronization.
+     *
+     * Two channels are set up:
+     * 1. `onyx-sync` - Value-bearing messages from the unified worker. This is
+     *    the primary sync path for both SQLite and IDB (since both now run in
+     *    the worker). Messages carry actual values/patches, avoiding re-reads.
+     * 2. `onyx-instance-sync` - Legacy key-only messages. Retained as fallback
+     *    for any edge cases. Will be removed once fully migrated.
+     *
      * @param onStorageKeyChanged - Callback invoked when another tab changes a key
-     * @param store - The storage provider to read updated values from
+     * @param store - The storage provider to read updated values from (fallback only)
      */
     init: (onStorageKeyChanged: OnStorageKeyChanged, store: StorageProvider<unknown>) => {
         storage = store;
 
-        // Close any existing channel before creating a new one
-        if (channel) {
-            channel.close();
+        // Close any existing channels before creating new ones
+        if (syncChannel) {
+            syncChannel.close();
+        }
+        if (legacyChannel) {
+            legacyChannel.close();
         }
 
-        channel = new BroadcastChannel(CHANNEL_NAME);
+        // --- Primary channel: value-bearing messages from the worker ---
+        syncChannel = new BroadcastChannel(SYNC_CHANNEL_NAME);
+        syncChannel.onmessage = (event: MessageEvent) => {
+            const data = event.data;
+            if (!data) return;
 
-        channel.onmessage = (event: MessageEvent) => {
+            if (data.type === 'set' && Array.isArray(data.pairs)) {
+                // SET: full values included, no storage reads needed
+                for (const [key, value] of data.pairs) {
+                    onStorageKeyChanged(key, value);
+                }
+            } else if (data.type === 'merge' && Array.isArray(data.pairs)) {
+                // MERGE: raw patch included, apply fastMerge against cache
+                for (const [key, patch] of data.pairs) {
+                    const cachedValue = cache.get(key);
+                    if (cachedValue !== undefined) {
+                        // Fast path: merge against cached value
+                        const mergedValue = utils.fastMerge(cachedValue as Record<string, unknown>, patch as Record<string, unknown>, {
+                            shouldRemoveNestedNulls: true,
+                            objectRemovalMode: 'replace',
+                        }).result;
+                        onStorageKeyChanged(key, mergedValue);
+                    } else {
+                        // Slow path: key not in cache, read from storage then apply merge
+                        storage.getItem(key).then((storedValue) => {
+                            if (storedValue !== null && storedValue !== undefined) {
+                                const mergedValue = utils.fastMerge(storedValue as Record<string, unknown>, patch as Record<string, unknown>, {
+                                    shouldRemoveNestedNulls: true,
+                                    objectRemovalMode: 'replace',
+                                }).result;
+                                onStorageKeyChanged(key, mergedValue);
+                            } else {
+                                // No stored value either -- treat the patch as the full value
+                                onStorageKeyChanged(key, patch);
+                            }
+                        });
+                    }
+                }
+            } else if (data.type === 'remove' && Array.isArray(data.keys)) {
+                // REMOVE: notify with null value
+                for (const key of data.keys) {
+                    onStorageKeyChanged(key, null);
+                }
+            } else if (data.type === 'clear') {
+                // CLEAR: notify all cached keys with null
+                const allCachedKeys = cache.getAllKeys();
+                for (const key of allCachedKeys) {
+                    onStorageKeyChanged(key, null);
+                }
+            }
+        };
+
+        // --- Legacy channel: key-only messages (IDB fallback) ---
+        legacyChannel = new BroadcastChannel(LEGACY_CHANNEL_NAME);
+        legacyChannel.onmessage = (event: MessageEvent) => {
             const data = event.data;
             if (!data) return;
 
@@ -64,7 +140,6 @@ const InstanceSync = {
                     storage.getItem(key).then((value) => onStorageKeyChanged(key, value));
                 }
             } else if (data.type === 'clear' && Array.isArray(data.keys)) {
-                // When a clear happens, notify about all the keys that were cleared
                 for (const key of data.keys) {
                     storage.getItem(key).then((value) => onStorageKeyChanged(key, value));
                 }
@@ -91,7 +166,7 @@ const InstanceSync = {
             .then(() => clearImplementation())
             .then(() => {
                 // Now that storage is cleared, broadcast the clear event with all affected keys
-                channel?.postMessage({type: 'clear', keys: allKeys});
+                legacyChannel?.postMessage({type: 'clear', keys: allKeys});
             });
     },
 };

@@ -1,5 +1,5 @@
 /**
- * DirtyMap implements a patch-staging layer for storage operations.
+ * WriteBuffer implements a patch-staging layer for storage operations.
  *
  * It tracks two types of pending entries:
  * - SET entries: full values from set()/multiSet(), flushed via multiSet
@@ -22,7 +22,7 @@ import type {StorageKeyValuePair} from './providers/types';
 
 type EntryType = 'set' | 'merge';
 
-type DirtyEntry = {
+type BufferEntry = {
     key: OnyxKey;
     value: OnyxValue<OnyxKey>;
     entryType: EntryType;
@@ -35,12 +35,22 @@ type FlushHandlers = {
     multiMerge: (pairs: StorageKeyValuePair[]) => Promise<void>;
 };
 
-/** Default idle-callback timeout in milliseconds. */
-const FLUSH_TIMEOUT_MS = 50;
+/**
+ * Maximum delay before a scheduled flush is forced, in milliseconds.
+ *
+ * Under normal conditions, requestIdleCallback fires during the next idle
+ * period (often within a few ms). This timeout is a safety net: if the
+ * browser stays busy for longer than FLUSH_TIMEOUT_MS, the flush is forced.
+ *
+ * 200ms lets typical write bursts (10-50ms) fully coalesce before flushing,
+ * while still being well under perceptible delay. The WriteBuffer's
+ * read-through ensures in-memory consistency regardless of flush timing.
+ */
+const FLUSH_TIMEOUT_MS = 200;
 
-class DirtyMap {
-    /** Map of pending dirty entries keyed by OnyxKey. */
-    private dirtyEntries: Map<OnyxKey, DirtyEntry> = new Map();
+class WriteBuffer {
+    /** Map of pending buffer entries keyed by OnyxKey. */
+    private pendingEntries: Map<OnyxKey, BufferEntry> = new Map();
 
     /** Handle returned by the scheduled flush, used for cancellation. */
     private flushHandle: number | null = null;
@@ -60,7 +70,7 @@ class DirtyMap {
      * the set replaces it entirely. A flush is scheduled if not already pending.
      */
     set(key: OnyxKey, value: OnyxValue<OnyxKey>): void {
-        this.dirtyEntries.set(key, {key, value, entryType: 'set'});
+        this.pendingEntries.set(key, {key, value, entryType: 'set'});
         this.scheduleFlush();
     }
 
@@ -69,7 +79,7 @@ class DirtyMap {
      */
     setMany(pairs: StorageKeyValuePair[]): void {
         for (const [key, value] of pairs) {
-            this.dirtyEntries.set(key, {key, value, entryType: 'set'});
+            this.pendingEntries.set(key, {key, value, entryType: 'set'});
         }
         this.scheduleFlush();
     }
@@ -81,25 +91,25 @@ class DirtyMap {
      * - Existing MERGE entry: merge patches together, keep as MERGE
      */
     merge(key: OnyxKey, patch: OnyxValue<OnyxKey>, replaceNullPatches?: FastMergeReplaceNullPatch[]): void {
-        const existing = this.dirtyEntries.get(key);
+        const existing = this.pendingEntries.get(key);
 
         if (!existing) {
             // No pending write -- stage as a MERGE entry (just the patch)
-            this.dirtyEntries.set(key, {key, value: patch, entryType: 'merge', replaceNullPatches});
+            this.pendingEntries.set(key, {key, value: patch, entryType: 'merge', replaceNullPatches});
         } else if (existing.entryType === 'set') {
             // Pending SET -- apply patch to the full value, stay as SET
             const {result: merged} = utils.fastMerge(existing.value as Record<string, unknown>, patch as Record<string, unknown>, {
                 shouldRemoveNestedNulls: true,
                 objectRemovalMode: 'replace',
             });
-            this.dirtyEntries.set(key, {key, value: merged as OnyxValue<OnyxKey>, entryType: 'set'});
+            this.pendingEntries.set(key, {key, value: merged as OnyxValue<OnyxKey>, entryType: 'set'});
         } else {
             // Pending MERGE -- merge patches together, stay as MERGE
             const {result: mergedPatch} = utils.fastMerge(existing.value as Record<string, unknown>, patch as Record<string, unknown>, {
                 shouldRemoveNestedNulls: false, // preserve nulls -- provider handles them
             });
             const combinedPatches = [...(existing.replaceNullPatches ?? []), ...(replaceNullPatches ?? [])];
-            this.dirtyEntries.set(key, {
+            this.pendingEntries.set(key, {
                 key,
                 value: mergedPatch as OnyxValue<OnyxKey>,
                 entryType: 'merge',
@@ -111,19 +121,19 @@ class DirtyMap {
     }
 
     /**
-     * Remove a key from the dirty map. This is used when a key is being
+     * Remove a key from the write buffer. This is used when a key is being
      * removed from storage entirely (not just set to null).
      */
     remove(key: OnyxKey): void {
-        this.dirtyEntries.delete(key);
+        this.pendingEntries.delete(key);
     }
 
     /**
-     * Remove multiple keys from the dirty map.
+     * Remove multiple keys from the write buffer.
      */
     removeMany(keys: OnyxKey[]): void {
         for (const key of keys) {
-            this.dirtyEntries.delete(key);
+            this.pendingEntries.delete(key);
         }
     }
 
@@ -134,7 +144,7 @@ class DirtyMap {
      * should fall through to the provider for those.
      */
     get(key: OnyxKey): OnyxValue<OnyxKey> | undefined {
-        const entry = this.dirtyEntries.get(key);
+        const entry = this.pendingEntries.get(key);
         if (entry?.entryType === 'set') {
             return entry.value;
         }
@@ -147,7 +157,7 @@ class DirtyMap {
      * contain a patch, not a complete value.
      */
     has(key: OnyxKey): boolean {
-        const entry = this.dirtyEntries.get(key);
+        const entry = this.pendingEntries.get(key);
         return entry?.entryType === 'set';
     }
 
@@ -155,26 +165,26 @@ class DirtyMap {
      * Check whether the key has any pending entry (SET or MERGE).
      */
     hasAny(key: OnyxKey): boolean {
-        return this.dirtyEntries.has(key);
+        return this.pendingEntries.has(key);
     }
 
     /**
-     * Returns the number of pending dirty entries (both SET and MERGE).
+     * Returns the number of pending entries (both SET and MERGE).
      */
     get size(): number {
-        return this.dirtyEntries.size;
+        return this.pendingEntries.size;
     }
 
     /**
-     * Clear all pending dirty entries and cancel any scheduled flush.
+     * Clear all pending entries and cancel any scheduled flush.
      */
     clear(): void {
-        this.dirtyEntries.clear();
+        this.pendingEntries.clear();
         this.cancelScheduledFlush();
     }
 
     /**
-     * Immediately flush all pending dirty entries to the storage provider.
+     * Immediately flush all pending entries to the storage provider.
      *
      * SET entries use reference identity: they stay in the map during flush and
      * are only removed afterward if their reference hasn't changed (handling
@@ -200,7 +210,7 @@ class DirtyMap {
 
         this.cancelScheduledFlush();
 
-        if (this.dirtyEntries.size === 0) {
+        if (this.pendingEntries.size === 0) {
             return;
         }
 
@@ -208,11 +218,11 @@ class DirtyMap {
         try {
             // Separate entries by type
             const setPairs: StorageKeyValuePair[] = [];
-            const setSnapshot: Map<OnyxKey, DirtyEntry> = new Map();
+            const setSnapshot: Map<OnyxKey, BufferEntry> = new Map();
             const mergePairs: StorageKeyValuePair[] = [];
             const mergeKeys: OnyxKey[] = [];
 
-            for (const [key, entry] of this.dirtyEntries) {
+            for (const [key, entry] of this.pendingEntries) {
                 if (entry.entryType === 'set') {
                     setPairs.push([entry.key, entry.value]);
                     setSnapshot.set(key, entry);
@@ -225,7 +235,7 @@ class DirtyMap {
             // Remove MERGE entries from the map at flush start.
             // New merges during flush will create fresh entries.
             for (const key of mergeKeys) {
-                this.dirtyEntries.delete(key);
+                this.pendingEntries.delete(key);
             }
 
             // Flush both types concurrently
@@ -242,8 +252,8 @@ class DirtyMap {
             // For SET entries: only remove if the reference hasn't changed
             // (i.e., no set or merge was applied to this key during flush)
             for (const [key, flushedEntry] of setSnapshot) {
-                if (this.dirtyEntries.get(key) === flushedEntry) {
-                    this.dirtyEntries.delete(key);
+                if (this.pendingEntries.get(key) === flushedEntry) {
+                    this.pendingEntries.delete(key);
                 }
             }
         } finally {
@@ -251,7 +261,7 @@ class DirtyMap {
         }
 
         // If new entries were added during flush, schedule another one
-        if (this.dirtyEntries.size > 0) {
+        if (this.pendingEntries.size > 0) {
             this.scheduleFlush();
         }
     }
@@ -298,5 +308,5 @@ class DirtyMap {
     }
 }
 
-export default DirtyMap;
-export type {FlushHandlers, DirtyEntry, EntryType};
+export default WriteBuffer;
+export type {FlushHandlers, BufferEntry, EntryType};
