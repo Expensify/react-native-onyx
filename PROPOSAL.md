@@ -1,4 +1,4 @@
-*Proposal:* Make react-native-onyx up to 99% faster.
+*Proposal:* Multi-Threaded Storage Engine for react-native-onyx
 
 *Background:*
 *_Onyx who?_*
@@ -67,7 +67,7 @@ There are several ways to create "worker threads" in React Native:
 - Native C++ threads can be spawned with `std::thread`.
 - [react-native-worklets](https://docs.swmansion.com/react-native-worklets/docs/) provides a convenient method to spawn JS runtimes in separate threads. We already use this in E/App, because it's the underlying core mechanic used in [Reanimated](https://docs.swmansion.com/react-native-reanimated/).
 
-*Problem:* When expensive and/or inefficient storage operations happen on the main thread, if a user has high traffic or data volume, then the main thread gets jammed up persisting data, which slows down rendering, interactions, and just about everything else, which in turn prevents users from experiencing the app as snappy and responsive.
+*Problem:* When storage operations happen on the main thread, if a user has high traffic or data volume, then the main thread gets jammed up persisting data, which slows down rendering, interactions, and just about everything else, which in turn prevents users from experiencing the app as snappy and responsive.
 
 *Solution:*
 
@@ -83,45 +83,45 @@ There are several ways to create "worker threads" in React Native:
         - *If there's no pending entry*: The read goes straight to the provider.
         - _Note:_  In practice this path is rarely (never?) hit because Onyx's in-memory cache (which sits above the WriteBuffer) handles most reads without reaching the storage layer. It's unclear in what scenario data could be missing from the cache _and_ have a pending write, but it's probably best to plug this correctness gap/potential race condition from the get-go.
     - The storage and flushing behavior of the `WriteBuffer` will be implemented differently on web vs native, with a consistent interface we'll call `BufferStore`.
-1. Move the Onyx persistence layer to a worker thread.
+2. Move the Onyx persistence layer to a worker thread.
     - On both platforms, a worker thread wraps the persistence layer, keeping that layer storage-provider-agnostic
         - On web, we use web workers and `postMessage` to spawn and communicate with the worker thread.
         - On native, we use react-native-worklets to spawn and communicate with the worker thread.
     - The `BufferStore` data storage:
-        - On web keeps the `WriteBuffer` data as a pure JS `Map`
-            - On flush, the main thread passes raw JS objects from the main thread to the worker thread via `postMessage` (this is a structured clone). The worker thread handles serialization and persistence.
-        - On native keeps the `WriteBuffer` as a thread-safe NitroModules `HybridObject` with memory shared across threads.
-            - Keeps the `WriteBuffer` data as thread-safe NitroModules `HybridObject` with memory shared across threads.
-            - On flush, schedules a task in the worker to drain the `W
-        - The `BufferStore` implementation keeps the `WriteBuffer` as a pure JS `Map`
-        - On flush, raw JS objects are passed from the main JS thread to the worker thread via `postMessage`. The worker thread handles serailization and persistence.
-        - A web worker wraps the storage layer, handling `onmessage` events and keeping the persistence layer storage-provider-agnostic.
+        - On web, keeps the `WriteBuffer` data as a pure JS `Map`
+        - On native, keeps the `WriteBuffer` as a thread-safe NitroModules `HybridObject` with memory shared across threads. The underlying C++ implementation will use `std::mutex`, `shared_lock`, and `unique_lock` to coordinate thread safety.
     - The `BufferStore` flush scheduling:
-        - On web, the main thread uses `requestIdleCallback` with a max 200ms timeout to schedule flush
-        - On native, the main thread never flushes. It just populates the `BufferStore` and then the worker thread handles flushing
-
-
-1. Move the Onyx persistence layer to a worker thread.
-    - Raw JS objects are passed from the main JS thread to the worker thread via `postMessage`. The worker thread handles serialization and persistence.
-    - A web worker wraps the storage layer, handling `onmessage` events, and keeping the persistence layer it storage-provider-agnostic.
-2. Update the main thread to use a `WriteBuffer` that sits between the cache layer and the persistence layer. The `WriteBuffer` will:
-    - Track two types of pending entries per key:
-        - *`SET` entries*: Full value replacements (from `set()`, `multiSet()`, `setCollection()`). If a key already has a pending write (of any type), a new `SET` replaces it entirely.
-        - *`MERGE` entries*: Patch deltas (from `merge()`, `multiMerge()`, `mergeCollection()`). If a key already has a pending `MERGE`, the new patch is `fastMerge`'d into the existing pending patch. If it has a pending `SET`, the merge is applied to the full value instead.
-    - Periodically flush writes to the persistence layer (now running in another thread) using `requestIdleCallback` (with a 200ms timeout fallback). i.e: "persist data when idle, or at most every 200ms".
-    - The storage provider receives already-coalesced operations, reducing the total number of I/O operations
-    - In the (rare) even that there's a cache miss in the cache layer and Onyx needs to read data from disk, the WriteBuffer is checked first:
-        - *If there's a pending `SET` entry*: The full value is returned immediately from memory without hitting the provider.
-        - *If there's a pending `MERGE` entry*: The WriteBuffer is flushed first, ensuring the provider has the correct merged value on disk, then the read proceeds normally.
-        - *If there's no pending entry*: The read goes straight to the provider.
-        - _Note:_  In practice this path is rarely (never?) hit because Onyx's in-memory cache (which sits above the WriteBuffer) handles most reads without reaching the storage layer. It's unclear in what scenario data could be missing from the cache _and_ have a pending write, but it's probably best to plug this correctness gap/potential race condition from the get-go.
-3. Update the storage provider on web from IndexedDB to SQLite.
+        - On web, the main thread uses `requestIdleCallback` with a max 200ms timeout to schedule flush. It uses `postMessage` with raw JS objects, which does a structured clone to pass the data to a worker thread.
+        - On native, the main thread never flushes. It just populates the `BufferStore` in shared memory and then the worker thread handles periodic flushing.
+    - The `BufferStore` flush implementation in the worker thread:
+        - On web:
+            1. accepts the data with an `onmessage` listener
+            2. Serializes it to JSON with `JSON.serialize()`
+            3. Persists it (storage provider agnostic)
+            4. Broadcasts the data to other tabs with `BroadcastChannel` (more on this later)
+        - On native:
+            1. Clears the HybridObject. Under the hood, this calls Nitro's `toJSI` to create a JS object on the worker runtime, which is very fast.
+            2. Serializes it to JSON with `JSON.serialize()`
+            3. Persists it (storage provider agnostic)
+3. (web only) Refactor `InstanceSync` to accept write changes from other tabs:
+    - When the `WriteBuffer` is flushed in the "leader tab", we no longer pass just modified keys, but the structured JS buffered writes.
+    - `InstanceSync` will perform those buffered writes directly, updating the cache and notifying subscribers. No storage I/O needed.
+4. (web only) Make the official SQLite wasm build the default storage provider on the web.
     - This allows us to leverage SQLite's built-in `JSON_PATCH` utilities to merge data, avoiding the `read` -> `deserialize` -> `merge` -> `serialize` -> `write` paradigm we have with `IndexedDB`.
-    - We use the official SQLite WebAssembly (wasm) build directly, no 3rd-party wrapper needed.
-    - For SQLite to work on the web, it must run in a worker thread. Fortunately, this proposal does just that.
-4. Implement cross-tab synchronization via the [BroadcastChannel API](https://developer.mozilla.org/en-US/docs/Web/API/Broadcast_Channel_API)
-    - 
+    - Apples-to-Apples, SQLite WASM [signficantly outperforms](https://haroonwaves.com/blog/building-email-client) IndexedDB. It requires using a worker thread, which is why it wasn't an "automatic" performance improvement when we tried it in the past. But paired with cleverly buffered writes and throttled flush, we can get the performance benefits from SQLite WASM.
+    - This also unlocks other kinds of future optimizations to the persistence layer, consistently across web and native.
 
+*Benchmarks and results:*
 
+Benchmark run in a _real browser environment_ (headless Chromium via Playwright) using Vitest in browser mode, with tinybench for statistical rigor.
 
-TODO: what are the risks of data loss if the persistence layer is lagging behind and the tab is closed
+Data generators attempt to create production-realistic Onyx data (reports, transactions) at four scales:
+
+- Small (50 reports, 50 transactions)
+- Modest (250 reports, 250 transactions)
+- Heavy (1000 reports, 1000 transactions)
+- Extreme (5000 reports, 5000 transactions)
+
+Currently, the benchmarks measure throughput of Onyx methods such as `Onyx.set`, `Onyx.merge`, and `Onyx.mergeCollection` on the main thread. They do not capture metrics from the worker thread(s), because slowness on the main thread is the main problem we seek to solve.
+
+[The results speak for themselves](https://lighthearted-otter-b9124d.netlify.app/) - *~98% improvement in Onyx.update throughput in the Heavy and Extreme tiers*
