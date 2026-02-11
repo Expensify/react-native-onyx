@@ -11,14 +11,21 @@
  * the pending patch. A merge after a set applies the patch to the full value
  * in-memory (unavoidable since the set hasn't been persisted yet).
  *
- * Flush is scheduled via requestIdleCallback (with a 50ms timeout fallback) to
- * keep the main thread responsive while persisting data promptly.
+ * The backing data structure is pluggable via the `BufferStore` interface:
+ * - Web: JS `Map` (BufferStore/index.ts)
+ * - Native: NitroModules HybridObject with shared C++ memory
+ *   (BufferStore/index.native.ts)
+ *
+ * Flush scheduling is also pluggable. On web, `requestIdleCallback` is used.
+ * On native, the background C++ thread handles flushing, so the scheduler is
+ * a no-op.
  */
 
 import type {OnyxKey, OnyxValue} from '../types';
 import type {FastMergeReplaceNullPatch} from '../utils';
 import utils from '../utils';
 import type {StorageKeyValuePair} from './providers/types';
+import type BufferStore from './BufferStore/types';
 
 type EntryType = 'set' | 'merge';
 
@@ -36,6 +43,21 @@ type FlushHandlers = {
 };
 
 /**
+ * A function that schedules a flush. The implementation is platform-specific:
+ * - Web: schedules via requestIdleCallback with a timeout
+ * - Native: no-op (the native BufferStore's background thread handles it)
+ *
+ * Returns a handle that can be passed to `cancelFlush`, or null if no
+ * cancellation is needed.
+ */
+type FlushScheduler = (doFlush: () => void) => number | null;
+
+/**
+ * A function that cancels a previously scheduled flush.
+ */
+type CancelFlush = (handle: number) => void;
+
+/**
  * Maximum delay before a scheduled flush is forced, in milliseconds.
  *
  * Under normal conditions, requestIdleCallback fires during the next idle
@@ -48,9 +70,33 @@ type FlushHandlers = {
  */
 const FLUSH_TIMEOUT_MS = 200;
 
+/** Default web flush scheduler using requestIdleCallback with setTimeout fallback. */
+function defaultScheduleFlush(doFlush: () => void): number | null {
+    if (typeof requestIdleCallback === 'function') {
+        return requestIdleCallback(doFlush, {timeout: FLUSH_TIMEOUT_MS}) as unknown as number;
+    }
+    return setTimeout(doFlush, FLUSH_TIMEOUT_MS) as unknown as number;
+}
+
+/** Default web cancel flush using cancelIdleCallback with clearTimeout fallback. */
+function defaultCancelFlush(handle: number): void {
+    if (typeof cancelIdleCallback === 'function') {
+        cancelIdleCallback(handle);
+    } else {
+        clearTimeout(handle);
+    }
+}
+
+type WriteBufferConfig = {
+    handlers: FlushHandlers;
+    store: BufferStore;
+    scheduleFlush?: FlushScheduler;
+    cancelFlush?: CancelFlush;
+};
+
 class WriteBuffer {
-    /** Map of pending buffer entries keyed by OnyxKey. */
-    private pendingEntries: Map<OnyxKey, BufferEntry> = new Map();
+    /** The pluggable backing store for pending buffer entries. */
+    private store: BufferStore;
 
     /** Handle returned by the scheduled flush, used for cancellation. */
     private flushHandle: number | null = null;
@@ -61,8 +107,17 @@ class WriteBuffer {
     /** The handlers called on flush for each entry type. */
     private readonly handlers: FlushHandlers;
 
-    constructor(handlers: FlushHandlers) {
-        this.handlers = handlers;
+    /** Platform-specific flush scheduler. */
+    private readonly scheduleFlushFn: FlushScheduler;
+
+    /** Platform-specific flush cancellation. */
+    private readonly cancelFlushFn: CancelFlush;
+
+    constructor(config: WriteBufferConfig) {
+        this.handlers = config.handlers;
+        this.store = config.store;
+        this.scheduleFlushFn = config.scheduleFlush ?? defaultScheduleFlush;
+        this.cancelFlushFn = config.cancelFlush ?? defaultCancelFlush;
     }
 
     /**
@@ -70,7 +125,7 @@ class WriteBuffer {
      * the set replaces it entirely. A flush is scheduled if not already pending.
      */
     set(key: OnyxKey, value: OnyxValue<OnyxKey>): void {
-        this.pendingEntries.set(key, {key, value, entryType: 'set'});
+        this.store.set(key, {key, value, entryType: 'set'});
         this.scheduleFlush();
     }
 
@@ -79,7 +134,7 @@ class WriteBuffer {
      */
     setMany(pairs: StorageKeyValuePair[]): void {
         for (const [key, value] of pairs) {
-            this.pendingEntries.set(key, {key, value, entryType: 'set'});
+            this.store.set(key, {key, value, entryType: 'set'});
         }
         this.scheduleFlush();
     }
@@ -91,25 +146,25 @@ class WriteBuffer {
      * - Existing MERGE entry: merge patches together, keep as MERGE
      */
     merge(key: OnyxKey, patch: OnyxValue<OnyxKey>, replaceNullPatches?: FastMergeReplaceNullPatch[]): void {
-        const existing = this.pendingEntries.get(key);
+        const existing = this.store.get(key);
 
         if (!existing) {
             // No pending write -- stage as a MERGE entry (just the patch)
-            this.pendingEntries.set(key, {key, value: patch, entryType: 'merge', replaceNullPatches});
+            this.store.set(key, {key, value: patch, entryType: 'merge', replaceNullPatches});
         } else if (existing.entryType === 'set') {
             // Pending SET -- apply patch to the full value, stay as SET
             const {result: merged} = utils.fastMerge(existing.value as Record<string, unknown>, patch as Record<string, unknown>, {
                 shouldRemoveNestedNulls: true,
                 objectRemovalMode: 'replace',
             });
-            this.pendingEntries.set(key, {key, value: merged as OnyxValue<OnyxKey>, entryType: 'set'});
+            this.store.set(key, {key, value: merged as OnyxValue<OnyxKey>, entryType: 'set'});
         } else {
             // Pending MERGE -- merge patches together, stay as MERGE
             const {result: mergedPatch} = utils.fastMerge(existing.value as Record<string, unknown>, patch as Record<string, unknown>, {
                 shouldRemoveNestedNulls: false, // preserve nulls -- provider handles them
             });
             const combinedPatches = [...(existing.replaceNullPatches ?? []), ...(replaceNullPatches ?? [])];
-            this.pendingEntries.set(key, {
+            this.store.set(key, {
                 key,
                 value: mergedPatch as OnyxValue<OnyxKey>,
                 entryType: 'merge',
@@ -125,7 +180,7 @@ class WriteBuffer {
      * removed from storage entirely (not just set to null).
      */
     remove(key: OnyxKey): void {
-        this.pendingEntries.delete(key);
+        this.store.delete(key);
     }
 
     /**
@@ -133,7 +188,7 @@ class WriteBuffer {
      */
     removeMany(keys: OnyxKey[]): void {
         for (const key of keys) {
-            this.pendingEntries.delete(key);
+            this.store.delete(key);
         }
     }
 
@@ -144,7 +199,7 @@ class WriteBuffer {
      * should fall through to the provider for those.
      */
     get(key: OnyxKey): OnyxValue<OnyxKey> | undefined {
-        const entry = this.pendingEntries.get(key);
+        const entry = this.store.get(key);
         if (entry?.entryType === 'set') {
             return entry.value;
         }
@@ -157,7 +212,7 @@ class WriteBuffer {
      * contain a patch, not a complete value.
      */
     has(key: OnyxKey): boolean {
-        const entry = this.pendingEntries.get(key);
+        const entry = this.store.get(key);
         return entry?.entryType === 'set';
     }
 
@@ -165,21 +220,21 @@ class WriteBuffer {
      * Check whether the key has any pending entry (SET or MERGE).
      */
     hasAny(key: OnyxKey): boolean {
-        return this.pendingEntries.has(key);
+        return this.store.has(key);
     }
 
     /**
      * Returns the number of pending entries (both SET and MERGE).
      */
     get size(): number {
-        return this.pendingEntries.size;
+        return this.store.size;
     }
 
     /**
      * Clear all pending entries and cancel any scheduled flush.
      */
     clear(): void {
-        this.pendingEntries.clear();
+        this.store.clear();
         this.cancelScheduledFlush();
     }
 
@@ -210,7 +265,7 @@ class WriteBuffer {
 
         this.cancelScheduledFlush();
 
-        if (this.pendingEntries.size === 0) {
+        if (this.store.size === 0) {
             return;
         }
 
@@ -222,7 +277,7 @@ class WriteBuffer {
             const mergePairs: StorageKeyValuePair[] = [];
             const mergeKeys: OnyxKey[] = [];
 
-            for (const [key, entry] of this.pendingEntries) {
+            for (const [key, entry] of this.store.entries()) {
                 if (entry.entryType === 'set') {
                     setPairs.push([entry.key, entry.value]);
                     setSnapshot.set(key, entry);
@@ -235,7 +290,7 @@ class WriteBuffer {
             // Remove MERGE entries from the map at flush start.
             // New merges during flush will create fresh entries.
             for (const key of mergeKeys) {
-                this.pendingEntries.delete(key);
+                this.store.delete(key);
             }
 
             // Flush both types concurrently
@@ -252,8 +307,8 @@ class WriteBuffer {
             // For SET entries: only remove if the reference hasn't changed
             // (i.e., no set or merge was applied to this key during flush)
             for (const [key, flushedEntry] of setSnapshot) {
-                if (this.pendingEntries.get(key) === flushedEntry) {
-                    this.pendingEntries.delete(key);
+                if (this.store.get(key) === flushedEntry) {
+                    this.store.delete(key);
                 }
             }
         } finally {
@@ -261,13 +316,13 @@ class WriteBuffer {
         }
 
         // If new entries were added during flush, schedule another one
-        if (this.pendingEntries.size > 0) {
+        if (this.store.size > 0) {
             this.scheduleFlush();
         }
     }
 
     /**
-     * Schedule a flush using requestIdleCallback (with fallback to setTimeout).
+     * Schedule a flush using the platform-specific scheduler.
      * If a flush is already scheduled, this is a no-op.
      */
     private scheduleFlush(): void {
@@ -275,20 +330,10 @@ class WriteBuffer {
             return;
         }
 
-        if (typeof requestIdleCallback === 'function') {
-            this.flushHandle = requestIdleCallback(
-                () => {
-                    this.flushHandle = null;
-                    void this.flushNow();
-                },
-                {timeout: FLUSH_TIMEOUT_MS},
-            ) as unknown as number;
-        } else {
-            this.flushHandle = setTimeout(() => {
-                this.flushHandle = null;
-                void this.flushNow();
-            }, FLUSH_TIMEOUT_MS) as unknown as number;
-        }
+        this.flushHandle = this.scheduleFlushFn(() => {
+            this.flushHandle = null;
+            void this.flushNow();
+        });
     }
 
     /**
@@ -299,14 +344,10 @@ class WriteBuffer {
             return;
         }
 
-        if (typeof cancelIdleCallback === 'function') {
-            cancelIdleCallback(this.flushHandle);
-        } else {
-            clearTimeout(this.flushHandle);
-        }
+        this.cancelFlushFn(this.flushHandle);
         this.flushHandle = null;
     }
 }
 
 export default WriteBuffer;
-export type {FlushHandlers, BufferEntry, EntryType};
+export type {FlushHandlers, BufferEntry, EntryType, FlushScheduler, CancelFlush, WriteBufferConfig};

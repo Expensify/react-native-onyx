@@ -118,7 +118,8 @@
     "react-native-device-info": "^10.3.0",
     "react-native-nitro-modules": ">=0.27.2",
     "react-native-nitro-sqlite": "^9.2.0",
-    "react-native-performance": ">=5.1.0"
+    "react-native-performance": ">=5.1.0",
+    "react-native-worklets-core": "^1.6.2"
   },
   "peerDependenciesMeta": {
     "idb-keyval": {

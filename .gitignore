@@ -26,3 +26,5 @@ yalc.lock
 .bench-baseline.json
 .bench-writebuffer.json
 bench-results.html
+cpp/build/
+cpp/build-wasm/

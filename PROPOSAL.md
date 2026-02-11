@@ -17,13 +17,13 @@ JavaScript is generally single-threaded, so all of this happens in a single thre
 * Notify subscribers
 * Persist the change to disk
 
-To be clear, this doesn't happen synchronously with every call to `Onyx.update`. We have some batching mechanisms (for `Onyx.merge` only), and we notify subscribers optimistically from the cache before asynchronously persisting the change to disk. But it does all happen in a single thread - the same thread that also handles all React rendering and nearly all the rest of the app logic. This fundamentally means that CPU cycles spent on persistence can't be used for other work like React rendering.
+To be clear, this doesn't happen _synchronously_ with every call to `Onyx.update`. We have some batching mechanisms (for `Onyx.merge` only), and we notify subscribers optimistically from the cache before asynchronously persisting the change to disk. But it does all happen in a single thread - the same thread that also handles all React rendering and nearly all the rest of the app logic. This fundamentally means that CPU cycles spent on persistence can't be used for other work like React rendering.
 
 *_How Onyx merge works_*
-Furthermore, `Onyx.merge()` is the most common write operation in the app. Each merge on IndexedDB follows a read-merge-write cycle:
+`Onyx.merge()` is the most common write operation in the app. Each merge on IndexedDB follows a read-merge-write cycle:
 
 1. *Read* the full JSON blob from IndexedDB
-2. *Deserialize* it in JavaScripht
+2. *Deserialize* it in JavaScript
 3. *Deep-merge* the patch into the full value
 4. *Re-serialize* the entire merged value
 5. *Write* the full blob back to IndexedDB
@@ -49,18 +49,52 @@ On the web platform, JS provides the [Web Workers API](https://developer.mozilla
 
 So practically the only way to share data between threads in JavaScript in New Expensify today is with `postMessage` - you send data from one thread and listen on the other with an `onmessage` event handler. You can pass most serializable data you want across (no functions, but most other types are fair game). That data gets passed via a structured clone, which has some overhead, but less overhead than serialization+deserialization. This data passing can be problematic if you aren't careful, because that structured cloning can be slower than just doing everything in the main thread.
 
-_Fun fact: https://github.com/tc39/proposal-structs exists specifically to address this shortcoming on the web platform. Alas, we shouldn't hold our breath..._
-
 *_Multithreading on iOS/Android_*
 On iOS/Android, the story is different. React Native is [architectured to run on two threads](https://reactnative.dev/architecture/threading-model), the JS thread where React runs and the main thread where the native C++/Swift/Kotlin code runs. They communicate with each other with low overhead using [Meta's JavaScriptInterface (JSI)](https://github.com/facebook/react-native/blob/main/packages/react-native/ReactCommon/jsi/jsi/jsi.h).
 
-There are multiple module systems in the React Native ecosystem, but I'll be focusing on [NitroModules](https://nitro.margelo.com/), because it's the most performant, and in my opinion the easiest to understand in this context. The key building block is the [HybridObject](https://nitro.margelo.com/docs/hybrid-objects) - you define an object schema in TypeScript, and then [nitrogen](https://nitro.margelo.com/docs/nitrogen) generates rich C++ stucts for your schema at compile time. At runtime, you call `NitroModules.createHybridObject<MyType>()` and you get a JS object with the TypeScript type you specify, but with the memory for that object automagically shared between JS and a native thread. The JS HybridObject can (synchronously or asynchronously) interact with the native thread with very low overhead.
+There are multiple module systems in the React Native ecosystem, but I'll be focusing on [NitroModules](https://nitro.margelo.com/), because it's the most performant, and in my opinion the easiest to understand in this context. The key building block is the [HybridObject](https://nitro.margelo.com/docs/hybrid-objects) - you define an object schema in TypeScript, and then [nitrogen](https://nitro.margelo.com/docs/nitrogen) generates rich C++ stucts for your schema at compile time, which you then fill in implementation details for. At runtime, you call `NitroModules.createHybridObject<MyType>()` and you get a JS object with the TypeScript type you specify, but with the memory for that object automagically shared between JS and a native thread. The JS HybridObject can (synchronously or asynchronously) interact with the native thread with very low overhead. Furthermore, [HybridObjects are runtime-agnostic](https://nitro.margelo.com/docs/worklets):
 
-Thanks to JSI and NitroModules, it becomes possible to interact with native C++ APIs like `std::mutex` to synchronize work across threads without the overhead of structured cloning or message passing.
+> Nitro itself is fully runtime-agnostic, which means every Hybrid Object can be used from any JS Runtime or Worklet Context.
+> 
+> This allows the caller to call into native Nitro Modules from libraries like react-native-worklets-core, or react-native-reanimated. You can use a Nitro Hybrid Object on the default React JS context, on the UI context, or on any other background worklet context.
+
+This does not, however, imply that they are inherently thread-safe. Synchronization and locking must be handled in the C++ implemnetation you fill in.
+
+Thanks to JSI and NitroModules, it becomes possible to interact with native C++ APIs like `std::mutex` to do synchronized work across threads without the overhead of structured cloning or message passing.
+
+There are several ways to create "worker threads" in React Native:
+
+- Native C++ threads can be spawned with `std::thread`.
+- [react-native-worklets](https://docs.swmansion.com/react-native-worklets/docs/) provides a convenient method to spawn JS runtimes in separate threads. We already use this in E/App, because it's the underlying core mechanic used in [Reanimated](https://docs.swmansion.com/react-native-reanimated/).
 
 *Problem:* When expensive and/or inefficient storage operations happen on the main thread, if a user has high traffic or data volume, then the main thread gets jammed up persisting data, which slows down rendering, interactions, and just about everything else, which in turn prevents users from experiencing the app as snappy and responsive.
 
 *Solution:*
+
+1. Create a `WriteBuffer` that sits between the main Onyx API and the persistence layer. The `WriteBuffer` will:
+    - Track two types of pending entries per key:
+        - *`SET` entries*: Full value replacements (from `set()`, `multiSet()`, `setCollection()`). If a key already has a pending write (of any type), a new `SET` replaces it entirely.
+        - *`MERGE` entries*: Patch deltas (from `merge()`, `multiMerge()`, `mergeCollection()`). If a key already has a pending `MERGE`, the new patch is `fastMerge`'d into the existing pending patch. If it has a pending `SET`, the merge is applied to the full value instead.
+    - Periodically flush writes to the persistence layer
+    - The storage provider receives already-coalesced operations, reducing the total number of I/O operations
+    - In the (rare) even that there's a cache miss in the cache layer and Onyx needs to read data from disk, the WriteBuffer is checked first:
+        - *If there's a pending `SET` entry*: The full value is returned immediately from memory without hitting the provider.
+        - *If there's a pending `MERGE` entry*: The WriteBuffer is flushed first, ensuring the provider has the correct merged value on disk, then the read proceeds normally.
+        - *If there's no pending entry*: The read goes straight to the provider.
+        - _Note:_  In practice this path is rarely (never?) hit because Onyx's in-memory cache (which sits above the WriteBuffer) handles most reads without reaching the storage layer. It's unclear in what scenario data could be missing from the cache _and_ have a pending write, but it's probably best to plug this correctness gap/potential race condition from the get-go.
+    - The storage and flushing behavior of the `WriteBuffer` will be implemented differently on web vs native, with a consistent interface we'll call `BufferStore`.
+1. Move the Onyx persistence layer to a worker thread.
+    - On both platforms, a worker thread wraps the persistence layer, keeping that layer storage-provider-agnostic
+        - On web, we use web workers and `postMessage` to spawn and communicate with the worker thread.
+        - On native, we use react-native-worklets to spawn and communicate with the worker thread.
+    - The `BufferStore` implementation:
+        - On web:
+            - Keeps the `WriteBuffer` data as a pure JS `Map`
+            - On flush, passes raw JS objects from the main thread to the worker thread via `postMessage` (this is a structured clone). 
+        - The `BufferStore` implementation keeps the `WriteBuffer` as a pure JS `Map`
+        - On flush, raw JS objects are passed from the main JS thread to the worker thread via `postMessage`. The worker thread handles serailization and persistence.
+        - A web worker wraps the storage layer, handling `onmessage` events and keeping the persistence layer storage-provider-agnostic.
+
 
 1. Move the Onyx persistence layer to a worker thread.
     - Raw JS objects are passed from the main JS thread to the worker thread via `postMessage`. The worker thread handles serialization and persistence.
@@ -82,3 +116,7 @@ Thanks to JSI and NitroModules, it becomes possible to interact with native C++ 
     - For SQLite to work on the web, it must run in a worker thread. Fortunately, this proposal does just that.
 4. Implement cross-tab synchronization via the [BroadcastChannel API](https://developer.mozilla.org/en-US/docs/Web/API/Broadcast_Channel_API)
     - 
+
+
+
+TODO: what are the risks of data loss if the persistence layer is lagging behind and the tab is closed

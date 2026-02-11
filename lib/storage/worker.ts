@@ -52,15 +52,14 @@ let broadcastChannel: BroadcastChannel | null = null;
 const BROADCAST_CHANNEL_NAME = 'onyx-sync';
 
 // ---------------------------------------------------------------------------
-// Value-bearing broadcasting
+// Broadcasting (value-bearing messages for cross-tab sync)
 // ---------------------------------------------------------------------------
 
 /**
  * Broadcast SET operations with full values to other tabs.
- * Called concurrently with persistence so receiving tabs can update caches
- * immediately without re-reading from storage.
+ * Receiving tabs can update their caches directly without re-reading from storage.
  */
-function broadcastSets(pairs: [string, unknown][]): void {
+function broadcastSet(pairs: [string, unknown][]): void {
     if (broadcastChannel && pairs.length > 0) {
         broadcastChannel.postMessage({type: 'set', pairs});
     }
@@ -68,9 +67,9 @@ function broadcastSets(pairs: [string, unknown][]): void {
 
 /**
  * Broadcast MERGE operations with raw patches to other tabs.
- * Receiving tabs apply fastMerge(cachedValue, patch) against their cache.
+ * Receiving tabs apply fastMerge against their cached values.
  */
-function broadcastMerges(pairs: [string, unknown, unknown[] | undefined][]): void {
+function broadcastMerge(pairs: [string, unknown][]): void {
     if (broadcastChannel && pairs.length > 0) {
         broadcastChannel.postMessage({type: 'merge', pairs});
     }
@@ -79,7 +78,7 @@ function broadcastMerges(pairs: [string, unknown, unknown[] | undefined][]): voi
 /**
  * Broadcast REMOVE operations to other tabs.
  */
-function broadcastRemoves(keys: string[]): void {
+function broadcastRemove(keys: string[]): void {
     if (broadcastChannel && keys.length > 0) {
         broadcastChannel.postMessage({type: 'remove', keys});
     }
@@ -89,7 +88,9 @@ function broadcastRemoves(keys: string[]): void {
  * Broadcast CLEAR operation to other tabs.
  */
 function broadcastClear(): void {
-    broadcastChannel?.postMessage({type: 'clear'});
+    if (broadcastChannel) {
+        broadcastChannel.postMessage({type: 'clear'});
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -117,14 +118,23 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
     try {
         switch (msg.type) {
             case 'init': {
-                // Dynamically import and initialize the chosen backend
+                // Dynamically import and initialize the chosen backend.
+                // If SQLite WASM fails (missing WASM binary, no OPFS, etc.)
+                // we automatically fall back to IndexedDB so operations never hang.
                 if (msg.backend === 'sqlite') {
-                    const sqliteModule = await import('./providers/SQLiteProvider/index.web');
-                    const sqliteProvider = sqliteModule.default;
+                    try {
+                        const sqliteModule = await import('./providers/SQLiteProvider/index.web');
+                        const sqliteProvider = sqliteModule.default;
 
-                    // SQLite needs async init (dynamic WASM import)
-                    await sqliteModule.initAsync();
-                    provider = sqliteProvider;
+                        // SQLite needs async init (dynamic WASM import)
+                        await sqliteModule.initAsync();
+                        provider = sqliteProvider;
+                    } catch (sqliteError) {
+                        console.warn('SQLite WASM init failed, falling back to IDB:', sqliteError);
+                        const idbModule = await import('./providers/IDBKeyValProvider');
+                        provider = idbModule.default;
+                        provider.init();
+                    }
                 } else {
                     const idbModule = await import('./providers/IDBKeyValProvider');
                     provider = idbModule.default;
@@ -151,21 +161,24 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
 
             case 'setItem': {
                 await provider!.setItem(msg.key, msg.value);
-                broadcastSets([[msg.key, msg.value]]);
+                broadcastSet([[msg.key, msg.value]]);
                 sendResult(msg.id);
                 break;
             }
 
             case 'multiSet': {
-                await provider!.multiSet(msg.pairs as [string, unknown][]);
-                broadcastSets(msg.pairs);
+                const pairs = msg.pairs as [string, unknown][];
+                await provider!.multiSet(pairs);
+                broadcastSet(pairs);
                 sendResult(msg.id);
                 break;
             }
 
             case 'multiMerge': {
-                await provider!.multiMerge(msg.pairs as [string, unknown, unknown[] | undefined][]);
-                broadcastMerges(msg.pairs);
+                const mergePairs = msg.pairs as [string, unknown, unknown[] | undefined][];
+                await provider!.multiMerge(mergePairs);
+                // Broadcast raw patches (key + change value) so receiving tabs can fastMerge
+                broadcastMerge(mergePairs.map(([key, value]) => [key, value]));
                 sendResult(msg.id);
                 break;
             }
@@ -178,14 +191,14 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
 
             case 'removeItem': {
                 await provider!.removeItem(msg.key);
-                broadcastRemoves([msg.key]);
+                broadcastRemove([msg.key]);
                 sendResult(msg.id);
                 break;
             }
 
             case 'removeItems': {
                 await provider!.removeItems(msg.keys);
-                broadcastRemoves(msg.keys);
+                broadcastRemove(msg.keys);
                 sendResult(msg.id);
                 break;
             }

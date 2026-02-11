@@ -1,6 +1,13 @@
 /**
- * The SQLiteStorage provider stores everything in a key/value store by
- * converting the value to a JSON string
+ * Native SQLite Storage Provider
+ *
+ * Implements the StorageProvider interface using react-native-nitro-sqlite.
+ * This module is called from the Worklet Worker Runtime (background JS thread)
+ * managed by NativeFlushWorker, NOT from the main thread.
+ *
+ * Uses synchronous APIs (execute, executeBatch) since the Worklet Worker Runtime
+ * runs on a dedicated background thread where blocking is acceptable and avoids
+ * unnecessary Promise overhead.
  */
 import type {BatchQueryCommand, NitroSQLiteConnection} from 'react-native-nitro-sqlite';
 import {enableSimpleNullHandling, open} from 'react-native-nitro-sqlite';
@@ -90,18 +97,15 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             throw new Error('Store is not initialized!');
         }
 
-        return provider.store.executeAsync<OnyxSQLiteKeyValuePair>(Queries.GET_ITEM, [key]).then(({rows}) => {
-            if (!rows || rows?.length === 0) {
-                return null;
-            }
-            const result = rows?.item(0);
-
-            if (result == null) {
-                return null;
-            }
-
-            return JSON.parse(result.valueJSON);
-        });
+        const {rows} = provider.store.execute<OnyxSQLiteKeyValuePair>(Queries.GET_ITEM, [key]);
+        if (!rows || rows.length === 0) {
+            return Promise.resolve(null);
+        }
+        const result = rows.item(0);
+        if (result == null) {
+            return Promise.resolve(null);
+        }
+        return Promise.resolve(JSON.parse(result.valueJSON));
     },
     multiGet(keys) {
         if (!provider.store) {
@@ -109,18 +113,18 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
         }
 
         const command = Queries.buildMultiGetQuery(keys.length);
-        return provider.store.executeAsync<OnyxSQLiteKeyValuePair>(command, keys).then(({rows}) => {
-            // eslint-disable-next-line no-underscore-dangle
-            const result = rows?._array.map((row) => [row.record_key, JSON.parse(row.valueJSON)]);
-            return (result ?? []) as StorageKeyValuePair[];
-        });
+        const {rows} = provider.store.execute<OnyxSQLiteKeyValuePair>(command, keys);
+        // eslint-disable-next-line no-underscore-dangle
+        const result = rows?._array.map((row) => [row.record_key, JSON.parse(row.valueJSON)]);
+        return Promise.resolve((result ?? []) as StorageKeyValuePair[]);
     },
     setItem(key, value) {
         if (!provider.store) {
             throw new Error('Store is not initialized!');
         }
 
-        return provider.store.executeAsync(Queries.SET_ITEM, [key, JSON.stringify(value)]).then(() => undefined);
+        provider.store.execute(Queries.SET_ITEM, [key, JSON.stringify(value)]);
+        return Promise.resolve();
     },
     multiSet(pairs) {
         if (!provider.store) {
@@ -131,7 +135,8 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
         if (utils.isEmptyObject(params)) {
             return Promise.resolve();
         }
-        return provider.store.executeBatchAsync([{query: Queries.MULTI_SET_ITEM, params}]).then(() => undefined);
+        provider.store.executeBatch([{query: Queries.MULTI_SET_ITEM, params}]);
+        return Promise.resolve();
     },
     multiMerge(pairs) {
         if (!provider.store) {
@@ -164,7 +169,8 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             commands.push({query: Queries.MERGE_ITEM_REPLACE, params: replaceQueryArguments});
         }
 
-        return provider.store.executeBatchAsync(commands).then(() => undefined);
+        provider.store.executeBatch(commands);
+        return Promise.resolve();
     },
     mergeItem(key, change, replaceNullPatches) {
         // Since Onyx already merged the existing value with the changes, we can just set the value directly.
@@ -175,18 +181,18 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             throw new Error('Store is not initialized!');
         }
 
-        return provider.store.executeAsync(Queries.GET_ALL_KEYS).then(({rows}) => {
-            // eslint-disable-next-line no-underscore-dangle
-            const result = rows?._array.map((row) => row.record_key);
-            return (result ?? []) as StorageKeyList;
-        });
+        const {rows} = provider.store.execute(Queries.GET_ALL_KEYS);
+        // eslint-disable-next-line no-underscore-dangle
+        const result = rows?._array.map((row: {record_key: string}) => row.record_key);
+        return Promise.resolve((result ?? []) as StorageKeyList);
     },
     removeItem(key) {
         if (!provider.store) {
             throw new Error('Store is not initialized!');
         }
 
-        return provider.store.executeAsync(Queries.REMOVE_ITEM, [key]).then(() => undefined);
+        provider.store.execute(Queries.REMOVE_ITEM, [key]);
+        return Promise.resolve();
     },
     removeItems(keys) {
         if (!provider.store) {
@@ -194,32 +200,31 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
         }
 
         const query = Queries.buildRemoveItemsQuery(keys.length);
-        return provider.store.executeAsync(query, keys).then(() => undefined);
+        provider.store.execute(query, keys);
+        return Promise.resolve();
     },
     clear() {
         if (!provider.store) {
             throw new Error('Store is not initialized!');
         }
 
-        return provider.store.executeAsync(Queries.CLEAR, []).then(() => undefined);
+        provider.store.execute(Queries.CLEAR, []);
+        return Promise.resolve();
     },
     getDatabaseSize() {
         if (!provider.store) {
             throw new Error('Store is not initialized!');
         }
 
-        return Promise.all([
-            provider.store.executeAsync<PageSizeResult>(Queries.PRAGMA_PAGE_SIZE),
-            provider.store.executeAsync<PageCountResult>(Queries.PRAGMA_PAGE_COUNT),
-            getFreeDiskStorage(),
-        ]).then(([pageSizeResult, pageCountResult, bytesRemaining]) => {
-            const pageSize = pageSizeResult.rows?.item(0)?.page_size ?? 0;
-            const pageCount = pageCountResult.rows?.item(0)?.page_count ?? 0;
-            return {
-                bytesUsed: pageSize * pageCount,
-                bytesRemaining,
-            };
-        });
+        const pageSizeResult = provider.store.execute<PageSizeResult>(Queries.PRAGMA_PAGE_SIZE);
+        const pageCountResult = provider.store.execute<PageCountResult>(Queries.PRAGMA_PAGE_COUNT);
+        const pageSize = pageSizeResult.rows?.item(0)?.page_size ?? 0;
+        const pageCount = pageCountResult.rows?.item(0)?.page_count ?? 0;
+
+        return getFreeDiskStorage().then((bytesRemaining) => ({
+            bytesUsed: pageSize * pageCount,
+            bytesRemaining,
+        }));
     },
 };
 

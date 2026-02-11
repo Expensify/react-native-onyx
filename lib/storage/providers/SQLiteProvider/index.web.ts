@@ -12,6 +12,7 @@
 import utils from '../../../utils';
 import type StorageProvider from '../types';
 import type {StorageKeyList, StorageKeyValuePair} from '../types';
+import * as Queries from '../SQLiteQueries';
 
 // Type declarations for the SQLite WASM API
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -134,8 +135,8 @@ const provider: StorageProvider<SQLiteDB | null> = {
                 // Stringify the change, stripping internal object-replacement markers
                 const changeJSON = JSON.stringify(change, objectMarkRemover);
 
-                // Apply JSON_PATCH merge
-                stmtMergePatch.bind([key, changeJSON, changeJSON]);
+                // Apply JSON_PATCH merge (named params match SQLiteQueries.MERGE_ITEM_PATCH)
+                stmtMergePatch.bind({':key': key, ':value': changeJSON});
                 stmtMergePatch.stepReset();
 
                 // Generate and apply JSON_REPLACE patches if any
@@ -238,29 +239,20 @@ async function initAsync(): Promise<void> {
     }
 
     // Initialize the schema and pragmas
-    db.exec('CREATE TABLE IF NOT EXISTS keyvaluepairs (record_key TEXT NOT NULL PRIMARY KEY, valueJSON JSON NOT NULL) WITHOUT ROWID;');
-    db.exec('PRAGMA CACHE_SIZE=-20000;');
-    db.exec('PRAGMA synchronous=NORMAL;');
-    db.exec('PRAGMA journal_mode=WAL;');
+    db.exec(Queries.CREATE_TABLE);
+    db.exec(Queries.PRAGMA_CACHE_SIZE);
+    db.exec(Queries.PRAGMA_SYNCHRONOUS);
+    db.exec(Queries.PRAGMA_JOURNAL_MODE);
 
-    // Prepare reusable statements
-    stmtGetItem = db.prepare('SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key = ?;');
-    stmtSetItem = db.prepare('REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);');
-    stmtSetItemJson = db.prepare('REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, json(?));');
-    stmtMergePatch = db.prepare(
-        `INSERT INTO keyvaluepairs (record_key, valueJSON)
-         VALUES (?, JSON(?))
-         ON CONFLICT DO UPDATE
-         SET valueJSON = JSON_PATCH(valueJSON, JSON(?));`,
-    );
-    stmtMergeReplace = db.prepare(
-        `UPDATE keyvaluepairs
-         SET valueJSON = JSON_REPLACE(valueJSON, ?, JSON(?))
-         WHERE record_key = ?;`,
-    );
-    stmtRemoveItem = db.prepare('DELETE FROM keyvaluepairs WHERE record_key = ?;');
-    stmtGetAllKeys = db.prepare('SELECT record_key FROM keyvaluepairs;');
-    stmtClear = db.prepare('DELETE FROM keyvaluepairs;');
+    // Prepare reusable statements using shared SQL query constants
+    stmtGetItem = db.prepare(Queries.GET_ITEM);
+    stmtSetItem = db.prepare(Queries.SET_ITEM);
+    stmtSetItemJson = db.prepare(Queries.MULTI_SET_ITEM);
+    stmtMergePatch = db.prepare(Queries.MERGE_ITEM_PATCH);
+    stmtMergeReplace = db.prepare(Queries.MERGE_ITEM_REPLACE);
+    stmtRemoveItem = db.prepare(Queries.REMOVE_ITEM);
+    stmtGetAllKeys = db.prepare(Queries.GET_ALL_KEYS);
+    stmtClear = db.prepare(Queries.CLEAR);
 
     provider.store = db;
 }

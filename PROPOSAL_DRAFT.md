@@ -1,355 +1,327 @@
-# Proposal: Onyx Web Storage Layer Refactor
+# Proposal: Multi-Threaded Storage Engine for react-native-onyx
 
 ## Problem Statement
 
 Onyx is the client-side data persistence and state management layer used across the Expensify App on all platforms (web, iOS, Android). It provides an offline-first, reactive key-value store that synchronizes with the backend.
 
-On web, Onyx currently uses **IndexedDB** (`idb-keyval`) for persistence. This approach has three architectural problems that become increasingly costly at scale:
+The current storage architecture has several problems that become increasingly costly at scale:
 
 ### 1. The read-merge-write pattern is expensive for merge operations
 
-`Onyx.merge()` is the most common write operation in the app. Each merge on IndexedDB follows a read-merge-write cycle:
-
-1. **Read** the full JSON blob from IndexedDB
-2. **Deserialize** it in JavaScript
-3. **Deep-merge** the patch into the full value
-4. **Re-serialize** the entire merged value
-5. **Write** the full blob back to IndexedDB
-
-For large objects (e.g. a report with hundreds of actions), this means reading and writing potentially hundreds of KB even when the patch is only a few bytes. This pattern applies to `merge()`, `multiMerge()`, `mergeCollection()`, and `update()` with merge operations.
+`Onyx.merge()` is the most common write operation in the app. On IndexedDB (web), each merge follows a read-merge-write cycle: read the full JSON blob, deserialize it, deep-merge the patch, re-serialize, and write the full blob back. For large objects (e.g. a report with hundreds of actions), this means reading and writing potentially hundreds of KB even when the patch is only a few bytes.
 
 ### 2. Every write blocks the main thread and hits storage immediately
 
-When a write is issued (e.g. `Onyx.set()` or `Onyx.merge()`), the storage call is made immediately and synchronously from the caller's perspective. While IndexedDB itself is asynchronous, the JS thread still bears the cost of serializing the data, posting the IDB transaction, and managing the callback. Rapid successive writes to the same key each independently go through this full cycle, even when intermediate values are never read back.
+When a write is issued, the storage call is made immediately. While IndexedDB itself is asynchronous, the JS thread still bears the cost of serializing the data and managing the transaction. Rapid successive writes to the same key each independently go through this full cycle, even when intermediate values are never read back.
 
-### 3. SQL queries are duplicated across platforms
+### 3. Divergent storage implementations across platforms
 
-On iOS and Android, Onyx already uses SQLite via `react-native-nitro-sqlite`. On web, it uses a completely different storage engine (IndexedDB). The SQL queries for the native implementation exist only in the native provider, and web has no SQL at all. This divergence means:
-- Bug fixes and optimizations apply to one platform but not the other
-- The web platform cannot benefit from SQL features like `JSON_PATCH` for efficient partial updates
+On iOS and Android, Onyx uses SQLite via `react-native-nitro-sqlite`. On web, it uses IndexedDB (`idb-keyval`). The native implementation has separate SQL queries, and web has no SQL at all. Bug fixes and optimizations apply to one platform but not the other.
+
+### 4. No shared code between platforms
+
+The native and web storage providers are completely separate codebases. This duplication makes maintenance expensive and means improvements must be implemented twice.
 
 ---
 
 ## Proposed Solution
 
-This refactor introduces three complementary changes to the Onyx web storage layer:
+This refactor introduces a **multi-threaded storage engine** with a symmetric "JS worker thread" pattern on both platforms. The architecture has three layers:
 
-### A. SQLite WASM as the web storage provider
+### Layer 1: WriteBuffer (TypeScript, Main Thread, All Platforms)
 
-Replace IndexedDB with the official [SQLite WASM build](https://sqlite.org/wasm/) running in a **dedicated Web Worker**, backed by the **Origin Private File System (OPFS)** via the `opfs-sahpool` VFS for durable persistence.
-
-**Key design decisions:**
-
-- **Official SQLite WASM**: We use `@sqlite.org/sqlite-wasm` directly -- the mainline SQLite project's own WebAssembly build -- not a third-party wrapper.
-- **Unified worker**: Both SQLite and IndexedDB run in the same provider-agnostic Web Worker (`lib/storage/worker.ts`). The main thread communicates via `postMessage()` through a single generic proxy (`WorkerStorageProvider`), meaning all persistence -- SQL execution, IndexedDB transactions, and serialization -- happens off the main thread.
-- **Worker-side serialization**: The main-thread proxy sends raw JavaScript objects to the worker via `postMessage()` (leveraging the browser's internal structured clone for transfer). The worker performs `JSON.stringify` before binding values to SQL prepared statements. This moves serialization CPU cost off the main thread entirely.
-- **OPFS persistence**: The `opfs-sahpool` VFS provides synchronous file access within the worker (via `FileSystemSyncAccessHandle`), giving SQLite near-native I/O performance without the overhead of IndexedDB transactions.
-- **Fallback to IndexedDB**: If the browser lacks OPFS support (`FileSystemSyncAccessHandle` not available), the unified worker falls back to the `idb-keyval` provider -- still running in the worker thread, still with the same proxy and BroadcastChannel architecture. In practice, OPFS is supported in all modern browsers (Chrome 102+, Firefox 111+, Safari 15.2+).
-- **`JSON_PATCH` for merges**: Instead of the read-merge-write cycle, merges use SQLite's built-in `JSON_PATCH()` function directly in SQL:
-
-```sql
-INSERT INTO keyvaluepairs (record_key, valueJSON)
-VALUES (?, ?)
-ON CONFLICT (record_key) DO UPDATE SET
-  valueJSON = JSON_PATCH(valueJSON, excluded.valueJSON);
-```
-
-This means the merge happens inside SQLite, in the worker thread, without ever deserializing the full blob into JavaScript. For a small patch against a large value, this is dramatically more efficient.
-
-- **Shared SQL queries**: A new `SQLiteQueries.ts` module centralizes the SQL strings used by both the web and native SQLite providers. This DRYs up the query logic, making it easier to keep optimizations consistent across platforms.
-- **WAL mode**: The database runs with `journal_mode=WAL` for better concurrent read/write performance.
-
-### B. WriteBuffer: write coalescing and patch staging
-
-A `WriteBuffer` sits between Onyx's cache layer and the storage provider. It intercepts all writes and stages them in memory before flushing to the provider in batches.
-
-**How it works:**
+A `WriteBuffer` sits between Onyx's cache layer and the storage provider. It intercepts all writes and stages them in memory before flushing to the persistence layer in batches.
 
 The WriteBuffer tracks two types of pending entries per key:
+- **`SET` entries**: Full value replacements. A new `SET` replaces any pending entry entirely.
+- **`MERGE` entries**: Patch deltas. Successive merges are coalesced via `fastMerge`. A merge after a SET applies the patch to the full value in-memory.
 
-- **`SET` entries**: Full value replacements (from `set()`, `multiSet()`, `setCollection()`). If a key already has a pending write (of any type), a new `SET` replaces it entirely.
-- **`MERGE` entries**: Patch deltas (from `merge()`, `multiMerge()`, `mergeCollection()`). If a key already has a pending `MERGE`, the new patch is `fastMerge`'d into the existing pending patch. If it has a pending `SET`, the merge is applied to the full value instead.
+The WriteBuffer's backing data structure is modular via the `BufferStore` interface:
+- **Web**: `BufferStore/index.ts` -- a simple JS `Map`. On flush, entries are serialized and sent to a Web Worker via `postMessage`.
+- **Native (iOS/Android)**: `BufferStore/index.native.ts` -- a NitroModules `HybridObject` wrapping a mutex-protected C++ `AnyMap`. JS objects are converted to `AnyValue` via NitroModules' `JSIConverter` at zero-copy cost (no `JSON.stringify` on the main thread). A Worklet Worker Runtime drains this shared buffer, serializes entries on the background thread, and persists via SQLite.
 
-**Flush behavior:**
+Read-through ensures cache consistency: pending `SET` entries are served from memory; pending `MERGE` entries trigger a flush before reading from the provider.
 
-- Flushes are scheduled via `requestIdleCallback` (with a 50ms timeout fallback), so writes are batched during idle periods without blocking the main thread.
-- `SET` entries are sent to the provider via `multiSet()`.
-- `MERGE` entries are sent via `multiMerge()`.
-- The provider (SQLite or IDB) receives already-coalesced operations, reducing the total number of I/O operations.
+### Layer 2: Shared SQL Queries + Official SQLite Packages
 
-**Read-through for SET entries:**
+Rather than maintaining a custom C++ SQLite wrapper and WASM build, we leverage **official, battle-tested SQLite packages**:
 
-When a `getItem()` or `multiGet()` is called, the WriteBuffer is checked first:
+- **Web**: `@sqlite.org/sqlite-wasm` with `opfs-sahpool` VFS for OPFS-backed persistence
+- **Native (iOS/Android)**: `react-native-nitro-sqlite` with synchronous APIs for maximum throughput from the worker thread
 
-- **Pending `SET` entry**: The full value is returned immediately from memory without hitting the provider.
-- **Pending `MERGE` entry**: The WriteBuffer is flushed first, ensuring the provider has the correct merged value on disk, then the read proceeds normally. A `MERGE` entry contains only a patch delta (not a complete value), so it can't be served directly. Since the read is already async (going to disk), the flush adds minimal overhead. In practice this path is rarely hit because Onyx's in-memory cache (which sits above the WriteBuffer) handles most reads without reaching the storage layer.
-- **No pending entry**: The read goes straight to the provider.
+Both platforms share a single source of truth for all SQL queries: `SQLiteQueries.ts`. This file contains all `CREATE TABLE`, `INSERT`, `UPDATE`, `DELETE`, and `PRAGMA` statements.
 
-**Why this matters:**
+Key SQL operations:
+- `SET`: `REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, json(?));`
+- `MERGE`: `INSERT ... ON CONFLICT DO UPDATE SET valueJSON = JSON_PATCH(valueJSON, JSON(?));` (atomic, no read-merge-write)
+- `REMOVE`: `DELETE FROM keyvaluepairs WHERE record_key = ?;`
+- Batch writes execute in a single transaction for atomicity
 
-Consider a user quickly navigating through several reports. Each navigation triggers multiple `merge()` calls to update report metadata. Without the WriteBuffer, each of these would independently serialize and write to storage. With it:
+### Layer 3: Symmetric JS Worker Threads
 
-1. Successive merges to the same key are coalesced into a single patch in memory
-2. The patch is flushed to SQLite (via `JSON_PATCH`) only during the next idle period
-3. The main thread returns immediately after updating the in-memory cache
+Both platforms use a dedicated JS background thread for persistence, achieving a symmetric architecture:
 
-### C. Cross-tab synchronization via BroadcastChannel
+**Web:** A standard Web Worker (`lib/storage/worker.ts`) receives batched writes from the main thread via `postMessage`. It dynamically imports either `@sqlite.org/sqlite-wasm` (for OPFS-capable browsers) or `IDBKeyValProvider` (fallback for older browsers). After persisting, the worker broadcasts value-bearing messages over `BroadcastChannel` for cross-tab sync.
 
-**How cross-tab sync works today (on `main`):**
+**Native (iOS/Android):** A `react-native-worklets-core` Worker Runtime (`lib/storage/NativeFlushWorker.ts`) runs on a background JS thread. It periodically drains the shared `HybridObject` buffer (shared memory, no `postMessage` overhead), `JSON.stringify`s the entries off the main thread, and calls `react-native-nitro-sqlite`'s synchronous APIs to persist to SQLite.
 
-Onyx's existing `InstanceSync` module (`lib/storage/InstanceSync/index.web.ts`) keeps multiple browser tabs in sync using the [`storage` event](https://developer.mozilla.org/en-US/docs/Web/API/Window/storage_event) on `localStorage`:
+### Cross-Tab Synchronization (Web Only)
 
-1. When any storage write occurs (set, merge, remove, clear), the storage layer calls `InstanceSync.setItem(key)` (or the multi-key equivalent).
-2. `InstanceSync` writes the changed key name to `localStorage` under a sentinel key (`SYNC_ONYX`), then immediately removes it. This `set` + `remove` cycle fires a `storage` event in other tabs (the `storage` event only fires in tabs *other* than the one that triggered it).
-3. In each receiving tab, the `storage` event listener reads the key name from `event.newValue`, then calls `storage.getItem(key)` to fetch the updated value from IndexedDB.
-4. The fetched value is passed to Onyx's `onStorageKeyChanged` callback, which updates the in-memory cache and notifies subscribers.
-
-This approach has several limitations:
-- **One key per event**: Each `localStorage.setItem` fires a separate event, so a `multiSet` of N keys fires N events in every other tab, each triggering an IndexedDB read.
-- **`localStorage` pollution**: The sentinel key is written to `localStorage` on every single storage operation, even though it is immediately removed.
-- **No payload**: The `storage` event only carries the key name, not the value. Every receiving tab must independently re-read the full value from IndexedDB.
-- **Race conditions**: The write to the storage provider and the `InstanceSync` event are fired sequentially in the same tick, but there's no guarantee the value has been persisted by the time the other tab reads it.
-
-**What this refactor changes:**
-
-Cross-tab sync is replaced with the [`BroadcastChannel` API](https://developer.mozilla.org/en-US/docs/Web/API/BroadcastChannel), and the notification is moved to the persistence boundary. Crucially, **values are broadcast directly** -- receiving tabs never need to re-read from storage:
-
-- After the unified worker persists a batch of writes, it broadcasts **value-bearing messages** over a `BroadcastChannel` (`onyx-sync`). Since the worker already has the raw objects in scope (received via `postMessage` from the main thread), the broadcast is effectively free.
-- The message types are:
-  - `set`: `{type: 'set', pairs: [[key, value], ...]}` -- full value replacements
-  - `merge`: `{type: 'merge', pairs: [[key, patch, replaceNullPatches], ...]}` -- raw merge patches
-  - `remove`: `{type: 'remove', keys: [...]}` -- key deletions
-  - `clear`: `{type: 'clear'}` -- full store clear
-- **InstanceSync** on each receiving tab's main thread listens on `onyx-sync` and handles messages directly:
-  - For `set` messages: calls `onStorageKeyChanged(key, value)` immediately -- no storage read.
-  - For `merge` messages: applies `fastMerge(cachedValue, patch)` against the tab's in-memory cache, then calls `onStorageKeyChanged(key, mergedValue)`. If the key isn't cached, falls back to `provider.getItem(key)` to get the base value (rare in practice).
-  - For `remove` messages: calls `onStorageKeyChanged(key, null)`.
-  - For `clear` messages: calls `onStorageKeyChanged(key, null)` for all cached keys.
-- The **sending side** is eliminated entirely: since the unified worker handles broadcasting for all backends, `storage/index.ts` no longer calls any InstanceSync send methods. The `keepInstancesSync` method only initializes the *receiver* (InstanceSync's BroadcastChannel listener).
-- `localStorage` is no longer touched for synchronization purposes.
-- A legacy `onyx-instance-sync` channel is retained as a fallback receiver for any edge cases during migration. It will be removed once fully validated.
+After persisting a batch, the worker broadcasts **value-bearing messages** over `BroadcastChannel('onyx-sync')`. `InstanceSync` on each receiving tab's main thread handles incoming messages:
+- `set`: `onStorageKeyChanged(key, value)` directly -- no storage read
+- `merge`: `fastMerge(cachedValue, patch)` against the local cache (fallback to `provider.getItem` if not cached)
+- `remove`: `onStorageKeyChanged(key, null)`
+- `clear`: notify all cached keys with null
 
 ---
 
 ## Architecture Overview
 
+```mermaid
+graph TD
+    subgraph mainThread [Main Thread -- All Platforms]
+        Onyx["Onyx.set / Onyx.merge / useOnyx"]
+        Cache["OnyxCache.set + notify subscribers"]
+        WB["WriteBuffer (TypeScript): coalescing via fastMerge"]
+        Store["BufferStore interface"]
+        Onyx --> Cache
+        Onyx --> WB
+        WB --> Store
+    end
+
+    subgraph storeImpl [BufferStore Implementation]
+        JSMap["Web: BufferStore/index.ts (JS Map)"]
+        HybridBS["Native: BufferStore/index.native.ts (NitroModules AnyMap + shared_mutex)"]
+    end
+
+    Store --> JSMap
+    Store --> HybridBS
+
+    subgraph webPath [Web: requestIdleCallback flush]
+        WebFlush["drain JS Map, JSON.stringify, postMessage(batch)"]
+        JSMap --> WebFlush
+    end
+
+    subgraph webWorker [Web Worker]
+        Worker["worker.ts (unified)"]
+        SQLiteWeb["@sqlite.org/sqlite-wasm + opfs-sahpool VFS"]
+        IDBFallback["Fallback: IDBKeyValProvider"]
+        BChan["BroadcastChannel"]
+        WebFlush -->|"postMessage"| Worker
+        Worker -->|"OPFS available"| SQLiteWeb
+        Worker -->|"no OPFS"| IDBFallback
+        Worker --> BChan
+    end
+
+    subgraph nativePath [Native: Worklet Worker Runtime]
+        WorkletRT["NativeFlushWorker (react-native-worklets-core)"]
+        SQLiteNative["react-native-nitro-sqlite (sync APIs)"]
+        HybridBS -.->|"shared memory drain()"| WorkletRT
+        WorkletRT -->|"JSON.stringify on worker"| SQLiteNative
+    end
+
+    subgraph otherTab [Other Tab Main Thread -- Web Only]
+        IS["InstanceSync receiver"]
+        Cache2["OnyxCache + subscribers"]
+        BChan --> IS
+        IS --> Cache2
+    end
 ```
-Main Thread (Tab)                        Unified Web Worker
-=================                        ==================
 
-  Onyx.set/merge/etc.
-        |
-        v
-  +-----------+
-  | In-Memory  |  <-- Onyx cache (synchronous reads)
-  |   Cache    |
-  +-----------+
-        |
-        v
-  +-----------+
-  | WriteBuffer|  <-- Coalesces SET/MERGE entries in memory
-  | (staging)  |      Flushes on requestIdleCallback
-  +-----------+
-        |  postMessage(raw objects)
-        v  (structured clone, no JSON.stringify on main thread)
-  +---------------+                 +-----------------------+
-  | Worker        |  --- msg --->   | worker.ts             |
-  | Storage       |  <-- msg ---   | (provider-agnostic)    |
-  | Provider      |                 |                        |
-  | (main-thread  |                 |  init({backend}) -->   |
-  |  proxy)       |                 |  ┌─────────────────┐  |
-  +---------------+                 |  │ SQLite WASM      │  |
-                                    |  │ (opfs-sahpool)   │  |
-                                    |  │ or               │  |
-                                    |  │ IDB (idb-keyval) │  |
-                                    |  └─────────────────┘  |
-                                    |                        |
-                                    |  BroadcastChannel      |
-                                    |  (broadcast values to  |
-                                    |   other tabs)          |
-                                    +-----------------------+
+### Data Flow: Native (iOS/Android)
+
+```
+JS Main Thread                              Worklet Worker Runtime
+--------------                              ----------------------
+Onyx.set(key, value)
+  -> cache.set(key, value)
+  -> subscribers notified
+  -> writeBuffer.set(key, value)
+    -> [TS coalescing via fastMerge]
+    -> bufferStore.set(key, entry)
+      -> [NitroModules fromJSI: AnyValue conversion, NOT JSON]
+      -> [C++: shared_mutex unique_lock, insert, unlock]
+  -> return (fire-and-forget)
+                                            ...flush interval fires...
+                                            drain() shared HybridObject buffer
+                                              -> [C++: shared_mutex unique_lock, swap, unlock]
+                                            [NitroModules toJSI: AnyValue -> JS objects]
+                                            JSON.stringify entries (on worker thread!)
+                                            nativeSQLiteProvider.multiSet() (sync API)
+                                            nativeSQLiteProvider.multiMerge() (sync API)
 ```
 
-A single unified worker (`lib/storage/worker.ts`) handles all persistence regardless of the backend. On init, it receives a backend choice (`'sqlite'` or `'idb'`) and dynamically imports the appropriate `StorageProvider` implementation. The main thread communicates through a generic `WorkerStorageProvider` proxy that knows nothing about which backend is active. After each write, the worker broadcasts **value-bearing messages** (not just key names) over BroadcastChannel, so receiving tabs can update their caches directly without re-reading from storage. InstanceSync on each tab's main thread handles the incoming messages, applying `fastMerge` for merge patches.
+### Data Flow: Web
+
+```
+Main Thread                                 Web Worker
+-----------                                 ----------
+Onyx.set(key, value)
+  -> cache.set(key, value)
+  -> subscribers notified
+  -> writeBuffer.set(key, value)
+    -> [TS coalescing via fastMerge]
+    -> jsMap.set(key, entry)
+  -> return (fire-and-forget)
+
+  ...requestIdleCallback fires...
+  -> writeBuffer.flushNow()
+    -> drain JS Map
+    -> JSON.stringify entries
+    -> postMessage(batch)                   onmessage
+                                            provider.multiSet(batch)
+                                            provider.multiMerge(batch)
+                                            BroadcastChannel.postMessage({type, values})
+```
 
 ---
 
-## Implementation
+## Key Files
 
-The refactor was implemented incrementally in self-contained commits:
+### Shared SQL Queries
 
-### Phase 1: Extract shared SQL queries
+| File | Description |
+|------|-------------|
+| `lib/storage/providers/SQLiteQueries.ts` | Single source of truth for all SQL: CREATE TABLE, INSERT, UPDATE, DELETE, PRAGMA. Used by both web and native SQLite providers. |
 
-Centralized SQL query strings into `lib/storage/providers/SQLiteQueries.ts` and moved the native SQLite provider to `lib/storage/providers/SQLiteProvider/index.native.ts`. This DRYs up the schema, pragma, and CRUD queries shared between web and native.
+### C++ (Native Only)
 
-### Phase 2: WriteBuffer write coalescing
+| File | Description |
+|------|-------------|
+| `cpp/NativeBufferStore.h` / `.cpp` | `std::shared_mutex`-protected `AnyMap` HybridObject. Pure buffer -- no threading, no SQLite. Provides `set`, `get`, `drain`, `entries`, `clear`. |
+| `cpp/CMakeLists.txt` | CMake build for the NativeBufferStore library and its tests |
+| `cpp/test_native_buffer_store.cpp` | Unit tests for thread-safe buffer operations |
 
-Added `lib/storage/WriteBuffer.ts` and integrated it into `lib/storage/index.ts`. All storage writes are staged through the WriteBuffer. Read-through for `SET` entries ensures cache consistency. Flush scheduling uses `requestIdleCallback` with a timeout fallback.
+### TypeScript (Shared)
 
-### Phase 3: Unified storage web worker
+| File | Description |
+|------|-------------|
+| `lib/storage/WriteBuffer.ts` | Write coalescing with pluggable `BufferStore` and `FlushScheduler` |
+| `lib/storage/BufferStore/types.ts` | `BufferStore` interface |
+| `lib/storage/BufferStore/index.ts` | Web: JS `Map` wrapper |
+| `lib/storage/BufferStore/index.native.ts` | Native: NitroModules HybridObject (with JS Map fallback) |
+| `lib/storage/index.ts` | Main storage API with WriteBuffer integration |
 
-Created a provider-agnostic architecture where both SQLite and IndexedDB run off the main thread in the same unified worker:
+### Web Worker
 
-- `lib/storage/providers/SQLiteProvider/index.web.ts`: A `StorageProvider` implementation that wraps SQLite WASM with `opfs-sahpool`. Runs `JSON_PATCH` for merges, batches writes in transactions, and uses prepared statements.
-- `lib/storage/worker.ts`: The unified worker. On init, it receives a backend choice (`'sqlite'` or `'idb'`) and dynamically imports the appropriate `StorageProvider`. All operations delegate to the standard `StorageProvider` interface. BroadcastChannel broadcasting (for cross-tab sync) happens here, provider-agnostically.
-- `lib/storage/WorkerStorageProvider.ts`: A single main-thread proxy replacing both the old `SQLiteProvider/index.ts` and direct `IDBKeyValProvider` usage. It manages the `postMessage` protocol and Promise resolution. Values pass through structured clone as native JS objects.
-- `lib/storage/platforms/index.ts`: Selects the backend (`'sqlite'` if OPFS is available, `'idb'` otherwise) and creates a `WorkerStorageProvider` with that choice.
+| File | Description |
+|------|-------------|
+| `lib/storage/worker.ts` | Unified web worker: dynamically loads SQLite WASM or IDB backend, handles all storage ops, broadcasts value-bearing cross-tab messages |
+| `lib/storage/WorkerStorageProvider.ts` | Main-thread proxy: postMessage-based request/response to the worker |
+| `lib/storage/providers/SQLiteProvider/index.web.ts` | `@sqlite.org/sqlite-wasm` with `opfs-sahpool` VFS, prepared statements |
 
-### Phase 4: Patch staging refinement
+### Native Worker
 
-Evolved the WriteBuffer from a simple "latest value per key" model to a proper patch-staging layer with distinct `SET` and `MERGE` entry types. This eliminated the need for synchronous flushes before merge operations (which had caused regressions in Phase 2) and enabled merge patches to be coalesced in memory before being sent to the provider.
+| File | Description |
+|------|-------------|
+| `lib/storage/NativeFlushWorker.ts` | `react-native-worklets-core` Worker Runtime: periodic drain + JSON.stringify + nitro-sqlite persistence |
+| `lib/storage/providers/SQLiteProvider/index.native.ts` | `react-native-nitro-sqlite` with synchronous APIs for worker-thread usage |
+| `lib/storage/platforms/index.native.ts` | Wires HybridObject BufferStore with NativeFlushWorker |
 
-### Phase 5: Value-bearing cross-tab sync
+### Cross-tab sync
 
-Upgraded cross-tab synchronization from key-only notifications (where receiving tabs re-read values from storage) to value-bearing broadcasts:
-
-- `lib/storage/worker.ts`: Replaced the generic `broadcastChangedKeys(keys)` function with typed broadcast functions (`broadcastSets`, `broadcastMerges`, `broadcastRemoves`, `broadcastClear`) that include actual values/patches in the BroadcastChannel messages.
-- `lib/storage/InstanceSync/index.web.ts`: Rewrote to listen on `onyx-sync` for value-bearing messages. For `set` messages, calls `onStorageKeyChanged(key, value)` directly. For `merge` messages, applies `fastMerge(cachedValue, patch)` against the in-memory cache (falling back to `provider.getItem` if the key isn't cached). For `remove`/`clear`, notifies with `null`.
-- `lib/storage/index.ts`: Removed all InstanceSync send-side calls (`setItem`, `multiSet`, `mergeItem`, etc.) since the worker handles broadcasting. The `keepInstancesSync` method now only initializes the receiver.
-
----
-
-## Benchmarking Methodology
-
-### Infrastructure
-
-Benchmarks run in **real browser environments** (headless Chromium via Playwright) using [Vitest](https://vitest.dev/) in browser mode with [tinybench](https://github.com/tinylibs/tinybench) for timing. This was chosen over Jest/jsdom because:
-
-- IndexedDB, Web Workers, OPFS, and `BroadcastChannel` require a real browser
-- tinybench provides statistical rigor (RME, percentiles, multiple samples)
-- Running in Chromium reflects the actual execution environment for most users
-
-### Data generation
-
-Benchmarks use **production-realistic data** modeled after actual Expensify stores. The data generators (in `benchmarks/dataGenerators.ts`) create:
-
-- **Reports** with realistic field distributions (reportName, participants, lastVisibleActionCreated, etc.)
-- **Transactions** with amount, merchant, category, tag, and comment fields
-- Matching key structures from `ONYXKEYS` in the actual App
-
-### Data scale tiers
-
-Operations are tested at four scales to capture behavior from light to heavy usage:
-
-| Tier     | Reports | Transactions | Total keys |
-|----------|---------|--------------|------------|
-| Small    | 50      | 50           | ~100       |
-| Modest   | 250     | 250          | ~500       |
-| Heavy    | 1,000   | 1,000        | ~2,000     |
-| Extreme  | 5,000   | 5,000        | ~10,000    |
-
-### Operations benchmarked
-
-- `Onyx.set()` - individual key writes
-- `Onyx.multiSet()` - batch writes of the full store
-- `Onyx.setCollection()` - collection writes
-- `Onyx.merge()` - partial updates (the most common operation)
-- `Onyx.mergeCollection()` - partial batch updates
-- `Onyx.update()` - mixed set/merge operations
-- `Onyx.init()` - initialization with initial key states
-- `Onyx.connect()` - subscriber registration and notification throughput
-- `Onyx.clear()` - clearing the store
-
-### Configurations compared
-
-Three configurations were benchmarked on the same machine in the same session:
-
-1. **Baseline**: Onyx `main` branch with IndexedDB (no WriteBuffer, no SQLite)
-2. **WB+IDB**: WriteBuffer patch staging layer + IndexedDB as the storage provider
-3. **WB+SQLite**: WriteBuffer patch staging layer + SQLite WASM (the full refactor)
+| File | Description |
+|------|-------------|
+| `lib/storage/InstanceSync/index.web.ts` | BroadcastChannel receiver: handles value-bearing set/merge/remove/clear messages |
 
 ---
 
-## Results
+## What Gets Replaced (from baseline)
 
-All values are **mean time in milliseconds** (lower is better). Percentage change is relative to the Baseline.
+| Old | New |
+|-----|-----|
+| Single-threaded IDB writes on main thread | WriteBuffer + Web Worker with batched persistence |
+| Key-only cross-tab broadcasts (requiring storage reads) | Value-bearing BroadcastChannel messages |
+| Platform-divergent SQL queries | Shared `SQLiteQueries.ts` |
+| No write coalescing | `WriteBuffer` with SET/MERGE entry coalescing via `fastMerge` |
 
-### Write operations (`set`, `multiSet`, `setCollection`)
+## What Gets Kept
 
-| Operation | Tier | Baseline | WB+IDB | WB+SQLite |
-|-----------|------|----------|--------|-----------|
-| `set()` - individual | Small (50) | 4.78 | 4.81 (0%) | 4.98 (+4%) |
-| `set()` - individual | Modest (250) | 4.64 | 4.71 (+2%) | 4.68 (+1%) |
-| `set()` - individual | Heavy (1000) | 5.88 | 5.93 (+1%) | 5.69 (**-3%**) |
-| `set()` - individual | Extreme (5000) | 35.55 | 37.11 (+4%) | 33.17 (**-7%**) |
-| `multiSet()` - full store | Small (50) | 6.14 | 6.19 (+1%) | 6.01 (**-2%**) |
-| `multiSet()` - full store | Modest (250) | 14.18 | 14.86 (+5%) | 13.89 (**-2%**) |
-| `multiSet()` - full store | Heavy (1000) | 54.04 | 54.40 (+1%) | 52.77 (**-2%**) |
-| `multiSet()` - full store | Extreme (5000) | 220.52 | 254.37 (+15%) | 207.77 (**-6%**) |
-| `setCollection()` | Small (50) | 4.48 | 4.47 (0%) | 4.63 (+3%) |
-| `setCollection()` | Modest (250) | 6.16 | 6.06 (-2%) | 5.82 (**-6%**) |
-| `setCollection()` | Heavy (1000) | 8.77 | 8.84 (+1%) | 8.97 (+2%) |
-| `setCollection()` | Extreme (5000) | 67.91 | 104.34 (+54%)\* | 67.83 (0%) |
+| File | Reason |
+|------|--------|
+| `react-native-nitro-sqlite` | Official native SQLite package, called from worker thread |
+| `@sqlite.org/sqlite-wasm` | Official web SQLite WASM package with OPFS VFS |
+| `lib/storage/providers/IDBKeyValProvider/` | Retained as fallback for browsers without OPFS |
+| `lib/OnyxCache.ts` | In-memory cache stays in JS on the main thread |
+| `lib/storage/InstanceSync/index.web.ts` | Receiver unchanged, already handles value-bearing messages |
+| `lib/storage/providers/types.ts` | `StorageProvider` interface stays |
 
-### Merge operations (`merge`, `mergeCollection`, `update`)
+## New Dependencies
 
-| Operation | Tier | Baseline | WB+IDB | WB+SQLite |
-|-----------|------|----------|--------|-----------|
-| `merge()` - partial | Small (50) | 4.77 | 4.75 (0%) | 4.75 (0%) |
-| `merge()` - partial | Modest (250) | 4.66 | 4.58 (-2%) | 4.50 (**-3%**) |
-| `merge()` - partial | Heavy (1000) | 5.76 | 5.70 (-1%) | 5.63 (**-2%**) |
-| `merge()` - partial | Extreme (5000) | 27.84 | 34.51 (+24%)\* | 49.07\* |
-| `mergeCollection()` | Small (50) | 4.85 | 4.81 (-1%) | 4.80 (-1%) |
-| `mergeCollection()` | Modest (250) | 6.03 | 12.23\* | 5.95 (**-1%**) |
-| `mergeCollection()` | Heavy (1000) | 10.90 | 10.35 (**-5%**) | 10.90 (0%) |
-| `mergeCollection()` | Extreme (5000) | 67.07 | 45.79 (**-32%**) | 32.76 (**-51%**) |
-| `update()` - mixed | Small (50) | 4.94 | 4.91 (-1%) | 4.89 (-1%) |
-| `update()` - mixed | Modest (250) | 6.16 | 5.69 (**-8%**) | 6.18 (0%) |
-| `update()` - mixed | Heavy (1000) | 9.70 | 9.90 (+2%) | 9.45 (**-3%**) |
-| `update()` - mixed | Extreme (5000) | 46.23 | 50.62 (+10%)\* | 61.72\* |
-
-### Initialization and read operations
-
-| Operation | Tier | Baseline | WB+IDB | WB+SQLite |
-|-----------|------|----------|--------|-----------|
-| `init()` | Small (50) | 3.50 | 3.37 (**-4%**) | 3.34 (**-5%**) |
-| `init()` | Modest (250) | 22.47 | 21.50 (**-4%**) | 21.49 (**-4%**) |
-| `init()` | Heavy (1000) | 94.02 | 85.90 (**-9%**) | 88.36 (**-6%**) |
-| `init()` | Extreme (5000) | 418.63 | 404.96 (**-3%**) | 393.98 (**-6%**) |
-
-\* High variance / outlier results -- treat with caution.
-
-### Key takeaways
-
-1. **`mergeCollection()` at extreme scale sees a 51% improvement** with WB+SQLite (67ms -> 33ms). This is the operation most representative of app startup and Pusher update patterns, where many keys are merged in batch.
-
-2. **`init()` is consistently 4-6% faster** across all scales, because the WriteBuffer's read-through eliminates redundant provider round-trips during initialization.
-
-3. **`multiSet()` at extreme scale improves by 6%** (221ms -> 208ms), benefiting from write coalescing.
-
-4. **Small-scale operations (50-250 keys) are within noise** of the baseline. The WriteBuffer and SQLite add negligible overhead at small scale, meaning there is no regression for light users.
-
-5. **Some extreme-scale results have high variance** (marked with \*), particularly for operations that run few iterations. These should be re-validated with dedicated profiling.
-
-6. **WB+IDB (WriteBuffer alone) provides meaningful gains**, particularly for `mergeCollection()` and `init()`. The WriteBuffer's coalescing and staging behavior helps regardless of the underlying storage provider.
+| Package | Purpose | Scope |
+|---------|---------|-------|
+| `react-native-worklets-core` | Background JS Worker Runtime for native platforms | Peer dependency (native only) |
 
 ---
 
-## What's Not Included (Future Work)
+## Benchmarking
 
-- **iOS / Android**: The WriteBuffer and patch-staging architecture could be ported to native platforms. The native SQLite provider already exists; the main gap is adding write coalescing there too.
-- **Prepared statements on web**: The SQLite WASM API supports prepared statements, which could further reduce query parsing overhead for repeated operations.
-- **SharedWorker**: Using a `SharedWorker` instead of per-tab workers could reduce memory usage for users with many tabs. This was deferred because `SharedWorker` support on Android WebView is inconsistent.
-- **Subscriber notification optimization**: The Onyx subscriber/notification layer was not changed in this refactor. There may be opportunities to batch or defer notifications.
+Benchmarks run in **real browser environments** (headless Chromium via Playwright) using Vitest in browser mode with tinybench. Data generators create production-realistic Expensify data (reports, transactions) at four scale tiers (50, 250, 1000, 5000 keys).
+
+The unified architecture will be benchmarked against the current implementation on all three platforms (web, iOS, Android) to validate performance gains from:
+- Write coalescing (reducing total storage operations)
+- Off-main-thread JSON serialization (native)
+- Batched SQLite transactions
+- Value-bearing cross-tab broadcasts (eliminating redundant reads)
 
 ---
 
-## How to Reproduce
+## How to Build
+
+### Native (iOS/Android) -- C++ Buffer Tests
 
 ```bash
-# Install dependencies
-npm install
-
-# Run benchmarks for the current branch
-npm run bench
-
-# Compare three configurations (Baseline, WB+IDB, WB+SQLite)
-./scripts/benchAndReport.sh \
-  --run "Baseline" \
-  --run "WB+IDB:printf 'import W from \"../providers/IDBKeyValProvider\";\nexport default W;\n' > lib/storage/platforms/index.ts" \
-  --run "WB+SQLite"
-
-# The HTML report opens automatically in your default browser
+cd cpp
+mkdir -p build && cd build
+cmake .. -DBUILD_TESTING=ON
+make -j8
+./native_buffer_store_test    # Thread-safe buffer tests
 ```
 
-The benchmarking infrastructure (`vitest.bench.config.ts`, `benchmarks/`, `scripts/`) is fully committed and documented in the repository README.
+### TypeScript Tests
+
+```bash
+npm install
+npm test
+```
+
+### Benchmarks
+
+```bash
+# Run benchmarks in headless Chromium
+npx vitest bench --run --config vitest.bench.config.ts --outputJson bench-results/current.json
+
+# Generate comparison report
+npx tsx scripts/generateBenchReport.ts bench-results/baseline.json bench-results/current.json --open
+```
+
+---
+
+## Future Optimizations
+
+### Glaze-based JSON Serialization in a Native C++ Worker Thread
+
+The current architecture performs `JSON.stringify` in the Worklet Worker Runtime (a JS background thread). A further optimization would be to move JSON serialization entirely into C++ using [Glaze](https://github.com/stephenberry/glaze), a high-performance C++ JSON library.
+
+This would enable:
+1. **True native C++ worker thread** (not a JS runtime) for persistence
+2. **Zero-copy JSON serialization** from `AnyValue` to SQLite-ready strings in C++
+3. **Shared C++ worker code across all platforms** -- including web via WASM compilation
+4. **Elimination of `react-native-nitro-sqlite`** in favor of a direct C++ SQLite wrapper using the SQLite C API, enabling a single SQLite provider implementation for iOS, Android, and web
+
+This optimization was deferred because it requires:
+- Building and maintaining a custom SQLite WASM module with Emscripten (including OPFS VFS)
+- Writing C++ bindings for `AnyValue` to Glaze's reflection system
+- More complex build toolchain (Emscripten SDK for web, CMake for native)
+
+The current architecture is designed to make this migration straightforward: the `SQLiteQueries.ts` file already defines all SQL as platform-agnostic constants, and the `BufferStore` HybridObject pattern cleanly separates the buffer from the persistence layer.
+
+---
+
+## Open Questions
+
+1. **`react-native-worklets-core` compatibility**: Verify the Worklet Worker Runtime can access `react-native-nitro-sqlite` synchronous APIs and that the NitroModules HybridObject is accessible from the worker context.
+2. **AnyValue thread safety with NitroModules**: Confirmed that `AnyValue` is a deep-copied C++ value type, safe to pass between threads. The `NativeBufferStore` uses `std::shared_mutex` for concurrent access (shared locks for reads, unique locks for writes).
+3. **`flushNow()` on shutdown**: On native, `flushNow()` synchronously drains and executes SQL. On web `beforeunload`, verify time budgets.
+4. **OPFS availability**: Modern browsers support OPFS; the architecture gracefully falls back to IDB when OPFS is unavailable.
+5. **Nitro module packaging**: Standalone package vs embedded in `react-native-onyx`.

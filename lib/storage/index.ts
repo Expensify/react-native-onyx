@@ -7,6 +7,7 @@ import type StorageProvider from './providers/types';
 import * as GlobalSettings from '../GlobalSettings';
 import decorateWithMetrics from '../metrics';
 import WriteBuffer from './WriteBuffer';
+import createBufferStore from './BufferStore';
 
 let provider = PlatformStorage as StorageProvider<unknown>;
 let finishInitalization: (value?: unknown) => void;
@@ -68,8 +69,11 @@ function tryOrDegradePerformance<T>(fn: () => Promise<T> | T, waitForInitializat
  * Persistence happens asynchronously in coalesced batches.
  */
 const writeBuffer = new WriteBuffer({
-    multiSet: (pairs) => provider.multiSet(pairs),
-    multiMerge: (pairs) => provider.multiMerge(pairs),
+    handlers: {
+        multiSet: (pairs) => provider.multiSet(pairs),
+        multiMerge: (pairs) => provider.multiMerge(pairs),
+    },
+    store: createBufferStore(),
 });
 
 const storage: Storage = {

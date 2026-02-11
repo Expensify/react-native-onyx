@@ -1,10 +1,13 @@
 /**
  * Worker Storage Provider
  *
- * Generic main-thread proxy that communicates with the unified storage
- * Web Worker (lib/storage/worker.ts). Implements the StorageProvider
- * interface so it can be used as a drop-in replacement for both
- * SQLiteProvider and IDBKeyValProvider on web.
+ * Main-thread proxy that communicates with the storage Web Worker
+ * (lib/storage/worker.ts). Implements the StorageProvider interface
+ * so it can be used as a drop-in replacement for any storage backend on web.
+ *
+ * The caller chooses the backend at creation time:
+ * - 'sqlite': @sqlite.org/sqlite-wasm with opfs-sahpool VFS
+ * - 'idb': IDBKeyValProvider fallback for browsers without OPFS
  *
  * All database operations are offloaded to the worker. This provider only
  * manages the postMessage protocol and Promise resolution. Values pass
@@ -75,7 +78,11 @@ function handleWorkerMessage(event: MessageEvent): void {
 
 /**
  * Create a WorkerStorageProvider that delegates all operations to the
- * unified storage worker, using the specified backend.
+ * storage web worker. The caller specifies the backend to use:
+ * - 'sqlite': @sqlite.org/sqlite-wasm with opfs-sahpool VFS (preferred)
+ * - 'idb': IDBKeyValProvider fallback
+ *
+ * @param backend - The storage backend for the worker to use
  */
 function createWorkerStorageProvider(backend: 'sqlite' | 'idb'): StorageProvider<Worker | null> {
     const provider: StorageProvider<Worker | null> = {
@@ -87,8 +94,8 @@ function createWorkerStorageProvider(backend: 'sqlite' | 'idb'): StorageProvider
         name: `WorkerStorageProvider (${backend})`,
 
         /**
-         * Initializes the storage provider by spawning the unified worker
-         * and sending the init message with the chosen backend.
+         * Initializes the storage provider by spawning the web worker.
+         * The worker is told which backend to use via the init message.
          */
         init() {
             // Create the worker. The bundler (webpack/vite) will handle the URL resolution.
@@ -100,7 +107,7 @@ function createWorkerStorageProvider(backend: 'sqlite' | 'idb'): StorageProvider
 
             provider.store = worker;
 
-            // Send init message with the backend choice
+            // Send init message with the chosen backend
             const initPromise = postToWorker<void>({type: 'init', backend});
 
             initPromise.catch((error) => {

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Onyx Benchmark Results</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 1400px; margin: 20px auto; padding: 0 20px; background: #1a1a2e; color: #e0e0e0; }
+h1 { color: #fff; }
+.meta { font-size: 12px; color: #888; margin-bottom: 1em; }
+table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 13px; }
+th, td { padding: 6px 10px; border: 1px solid #333; text-align: right; white-space: nowrap; }
+th { background: #16213e; color: #fff; text-align: center; }
+td:first-child { text-align: left; font-family: monospace; font-size: 12px; }
+.green { background: #1b4332; color: #95d5b2; font-weight: 600; }
+.red { background: #3d0000; color: #ff8a8a; font-weight: 600; }
+.neutral { color: #999; }
+.baseline { color: #bbb; }
+.tier-header td { background: #16213e; color: #fff; font-weight: bold; font-size: 14px; text-align: left !important; }
+.legend { margin: 1em 0; font-size: 13px; }
+.legend span { padding: 2px 8px; border-radius: 3px; margin-right: 12px; }
+</style>
+</head>
+<body>
+<h1>Onyx Benchmark Results</h1>
+<p class="meta">Generated 2/9/2026, 11:53:09 PM</p>
+<div class="legend">
+All values are <strong>mean time in milliseconds</strong> (lower is better).
+<span class="green">Green</span> = faster (improvement, &ge;5% and &ge;1ms)
+<span class="red">Red</span> = slower (regression, &ge;5% and &ge;1ms)
+<span class="neutral">Gray</span> = negligible
+&#9888; = unreliable (high variance, few samples)
+</div>
+
+<table>
+<thead>
+<tr>
+<th style="text-align:left; min-width:300px">Operation</th>
+<th>Baseline (IDB only)</th><th>DM+IDB (prev)</th><th>DM+SQLite (prev)</th><th>DM+IDB (new)</th><th>DM+SQLite (new)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="tier-header"><td colspan="6">Onyx.set()</td></tr>
+<tr><td>Small (50 reports, 50 txns)</td><td class="baseline">676</td><td class="green">4.90 (-99%)</td><td class="green">4.93 (-99%)</td><td class="green">4.94 (-99%)</td><td class="green">4.96 (-99%)</td></tr>
+<tr><td>Modest (250 reports, 250 txns)</td><td class="baseline">75.4</td><td class="green">4.71 (-94%)</td><td class="green">4.67 (-94%)</td><td class="green">4.70 (-94%)</td><td class="green">4.71 (-94%)</td></tr>
+<tr><td>Heavy (1000 reports, 1000 txns)</td><td class="baseline">490</td><td class="green">6.01 (-99%)</td><td class="green">6.00 (-99%)</td><td class="green">5.62 (-99%)</td><td class="green">5.66 (-99%)</td></tr>
+<tr><td>Extreme (5000 reports, 5000 txns)</td><td class="baseline">6023</td><td class="green">35.5 (-99%)</td><td class="green">36.0 (-99%)</td><td class="green">32.4 (-99%)</td><td class="green">32.3 (-99%)</td></tr>
+<tr class="tier-header"><td colspan="6">Onyx.multiSet()</td></tr>
+<tr><td>Small (50 reports, 50 txns)</td><td class="baseline">82.7</td><td class="green">6.15 (-93%)</td><td class="green">6.17 (-93%)</td><td class="green">6.05 (-93%)</td><td class="green">6.10 (-93%)</td></tr>
+<tr><td>Modest (250 reports, 250 txns)</td><td class="baseline">630</td><td class="green">14.4 (-98%)</td><td class="green">14.5 (-98%)</td><td class="green">14.2 (-98%)</td><td class="green">14.1 (-98%)</td></tr>
+<tr><td>Heavy (1000 reports, 1000 txns)</td><td class="baseline">2179</td><td class="green">53.6 (-98%)</td><td class="green">55.2 (-97%)</td><td class="green">52.1 (-98%)</td><td class="green">52.7 (-98%)</td></tr>
+<tr><td>Extreme (5000 reports, 5000 txns)</td><td class="baseline">10939</td><td class="green">223 (-98%)</td><td class="green">249 (-98%)</td><td class="green">228 (-98%)</td><td class="green">241 (-98%)</td></tr>
+<tr class="tier-header"><td colspan="6">Onyx.setCollection()</td></tr>
+<tr><td>Small (50 reports, 50 txns)</td><td class="baseline">11.7</td><td class="green">4.53 (-61%)</td><td class="green">4.58 (-61%)</td><td class="green">4.84 (-59%)</td><td class="green">4.61 (-61%)</td></tr>
+<tr><td>Modest (250 reports, 250 txns)</td><td class="baseline">89.8</td><td class="green">5.75 (-94%)</td><td class="green">5.98 (-93%)</td><td class="green">5.82 (-94%)</td><td class="green">5.66 (-94%)</td></tr>
+<tr><td>Heavy (1000 reports, 1000 txns)</td><td class="baseline">409</td><td class="green">9.52 (-98%)</td><td class="green">9.22 (-98%)</td><td class="green">8.66 (-98%)</td><td class="green">8.90 (-98%)</td></tr>
+<tr><td>Extreme (5000 reports, 5000 txns)</td><td class="baseline">2259</td><td class="green">73.0 (-97%)</td><td class="green">189 (-92%) <span title="High variance">&#9888;</span></td><td class="green">180 (-92%) <span title="High variance">&#9888;</span></td><td class="green">192 (-91%) <span title="High variance">&#9888;</span></td></tr>
+<tr class="tier-header"><td colspan="6">Onyx.merge()</td></tr>
+<tr><td>Small (50 reports, 50 txns)</td><td class="baseline">19.7</td><td class="green">4.76 (-76%)</td><td class="green">4.77 (-76%)</td><td class="green">4.81 (-76%)</td><td class="green">4.75 (-76%)</td></tr>
+<tr><td>Modest (250 reports, 250 txns)</td><td class="baseline">106</td><td class="green">4.59 (-96%)</td><td class="green">4.59 (-96%)</td><td class="green">4.84 (-95%)</td><td class="green">4.52 (-96%)</td></tr>
+<tr><td>Heavy (1000 reports, 1000 txns)</td><td class="baseline">653</td><td class="green">5.80 (-99%)</td><td class="green">5.65 (-99%)</td><td class="green">5.39 (-99%)</td><td class="green">5.65 (-99%)</td></tr>
+<tr><td>Extreme (5000 reports, 5000 txns)</td><td class="baseline">2491</td><td class="green">28.4 (-99%)</td><td class="green">26.3 (-99%)</td><td class="green">30.1 (-99%)</td><td class="green">25.4 (-99%)</td></tr>
+<tr class="tier-header"><td colspan="6">Onyx.mergeCollection()</td></tr>
+<tr><td>Small (50 reports, 50 txns)</td><td class="baseline">17.8</td><td class="green">4.79 (-73%)</td><td class="green">4.80 (-73%)</td><td class="green">4.93 (-72%)</td><td class="green">4.81 (-73%)</td></tr>
+<tr><td>Modest (250 reports, 250 txns)</td><td class="baseline">97.3</td><td class="green">10.8 (-89%)</td><td class="green">5.96 (-94%)</td><td class="green">5.60 (-94%)</td><td class="green">5.94 (-94%)</td></tr>
+<tr><td>Heavy (1000 reports, 1000 txns)</td><td class="baseline">715</td><td class="green">10.6 (-99%)</td><td class="green">11.8 (-98%)</td><td class="green">9.97 (-99%)</td><td class="green">11.0 (-98%)</td></tr>
+<tr><td>Extreme (5000 reports, 5000 txns)</td><td class="baseline">1952</td><td class="green">48.0 (-98%)</td><td class="green">34.3 (-98%)</td><td class="green">31.8 (-98%)</td><td class="green">35.9 (-98%)</td></tr>
+<tr class="tier-header"><td colspan="6">Onyx.update()</td></tr>
+<tr><td>Small (50 reports, 50 txns)</td><td class="baseline">20.8</td><td class="green">4.95 (-76%)</td><td class="green">4.88 (-77%)</td><td class="green">4.99 (-76%)</td><td class="green">4.91 (-76%)</td></tr>
+<tr><td>Modest (250 reports, 250 txns)</td><td class="baseline">127</td><td class="green">5.85 (-95%)</td><td class="green">6.15 (-95%)</td><td class="green">5.45 (-96%)</td><td class="green">6.30 (-95%)</td></tr>
+<tr><td>Heavy (1000 reports, 1000 txns)</td><td class="baseline">528</td><td class="green">10.1 (-98%)</td><td class="green">9.52 (-98%)</td><td class="green">9.02 (-98%)</td><td class="green">9.41 (-98%)</td></tr>
+<tr><td>Extreme (5000 reports, 5000 txns)</td><td class="baseline">1958</td><td class="green">53.3 (-97%)</td><td class="green">43.8 (-98%)</td><td class="green">41.7 (-98%)</td><td class="green">42.4 (-98%)</td></tr>
+<tr class="tier-header"><td colspan="6">Onyx.connect() - register subscribers</td></tr>
+<tr><td>Small (50 reports, 50 txns)</td><td class="baseline">0.075</td><td class="neutral">0.065 (-13%)</td><td class="neutral">0.099 (+33%)</td><td class="neutral">0.086 (+16%)</td><td class="neutral">0.104 (+40%)</td></tr>
+<tr><td>Modest (250 reports, 250 txns)</td><td class="baseline">0.358</td><td class="neutral">0.354 (-1%)</td><td class="neutral">0.408 (+14%)</td><td class="neutral">0.546 (+52%)</td><td class="neutral">0.419 (+17%)</td></tr>
+<tr><td>Heavy (1000 reports, 1000 txns)</td><td class="baseline">1.57</td><td class="neutral">1.52 (-4%)</td><td class="red">3.16 (+101%)</td><td class="red">6.35 (+304%)</td><td class="red">3.45 (+120%)</td></tr>
+<tr><td>Extreme (5000 reports, 5000 txns)</td><td class="baseline">10.7</td><td class="green">8.23 (-23%)</td><td class="red">31.9 (+198%)</td><td class="neutral">9.71 (-9%)</td><td class="red">33.2 (+211%)</td></tr>
+<tr class="tier-header"><td colspan="6">Onyx.connect() - collection subscriber</td></tr>
+<tr><td>Small (50 reports, 50 txns)</td><td class="baseline">4.29</td><td class="neutral">4.57 (+7%)</td><td class="neutral">4.91 (+14%)</td><td class="neutral">4.51 (+5%)</td><td class="neutral">4.85 (+13%)</td></tr>
+<tr><td>Modest (250 reports, 250 txns)</td><td class="baseline">4.33</td><td class="neutral">4.51 (+4%)</td><td class="neutral">4.82 (+11%)</td><td class="neutral">4.54 (+5%)</td><td class="neutral">4.56 (+5%)</td></tr>
+<tr><td>Heavy (1000 reports, 1000 txns)</td><td class="baseline">4.56</td><td class="neutral">4.58 (+0%)</td><td class="neutral">4.73 (+4%)</td><td class="neutral">4.55 (-0%)</td><td class="neutral">4.75 (+4%)</td></tr>
+<tr><td>Extreme (5000 reports, 5000 txns)</td><td class="baseline">4.74</td><td class="neutral">4.38 (-7%)</td><td class="neutral">4.80 (+1%)</td><td class="red">102 (+2054%)</td><td class="neutral">4.76 (+1%)</td></tr>
+<tr class="tier-header"><td colspan="6">Notification throughput</td></tr>
+<tr><td>Small (50 reports, 50 txns)</td><td class="baseline">114</td><td class="neutral">113 (-1%)</td><td class="neutral">117 (+2%)</td><td class="neutral">109 (-5%)</td><td class="neutral">111 (-3%)</td></tr>
+<tr><td>Modest (250 reports, 250 txns)</td><td class="baseline">123</td><td class="neutral">118 (-5%)</td><td class="neutral">117 (-5%)</td><td class="green">112 (-9%)</td><td class="green">114 (-7%)</td></tr>
+<tr><td>Heavy (1000 reports, 1000 txns)</td><td class="baseline">124</td><td class="neutral">121 (-2%)</td><td class="neutral">119 (-3%)</td><td class="green">112 (-10%)</td><td class="neutral">122 (-1%)</td></tr>
+<tr><td>Extreme (5000 reports, 5000 txns)</td><td class="baseline">129</td><td class="green">122 (-6%)</td><td class="green">116 (-11%)</td><td class="neutral">125 (-3%)</td><td class="green">116 (-10%)</td></tr>
+<tr class="tier-header"><td colspan="6">Onyx.init()</td></tr>
+<tr><td>Small (50 reports, 50 txns)</td><td class="baseline">69.1</td><td class="green">7.74 (-89%)</td><td class="green">4.10 (-94%)</td><td class="green">3.27 (-95%)</td><td class="green">4.10 (-94%)</td></tr>
+<tr><td>Modest (250 reports, 250 txns)</td><td class="baseline">71.0</td><td class="green">22.4 (-68%)</td><td class="green">22.0 (-69%)</td><td class="green">21.0 (-70%)</td><td class="green">21.9 (-69%)</td></tr>
+<tr><td>Heavy (1000 reports, 1000 txns)</td><td class="baseline">246</td><td class="green">90.0 (-63%)</td><td class="green">91.1 (-63%)</td><td class="green">86.1 (-65%)</td><td class="green">94.5 (-62%)</td></tr>
+<tr><td>Extreme (5000 reports, 5000 txns)</td><td class="baseline">1422</td><td class="green">413 (-71%)</td><td class="green">410 (-71%)</td><td class="green">384 (-73%)</td><td class="green">392 (-72%)</td></tr>
+<tr class="tier-header"><td colspan="6">Onyx.clear()</td></tr>
+<tr><td>Small (50 reports, 50 txns)</td><td class="baseline">0.300</td><td class="neutral">0.184 (-39%)</td><td class="neutral">0.175 (-41%)</td><td class="neutral">0.108 (-64%)</td><td class="neutral">0.189 (-37%)</td></tr>
+<tr><td>Modest (250 reports, 250 txns)</td><td class="baseline">0.275</td><td class="neutral">0.139 (-49%)</td><td class="neutral">0.149 (-46%)</td><td class="neutral">0.107 (-61%)</td><td class="neutral">0.139 (-49%)</td></tr>
+<tr><td>Heavy (1000 reports, 1000 txns)</td><td class="baseline">58.1</td><td class="green">0.174 (-100%)</td><td class="green">0.191 (-100%)</td><td class="green">0.112 (-100%)</td><td class="green">0.180 (-100%)</td></tr>
+<tr><td>Extreme (5000 reports, 5000 txns)</td><td class="baseline">726</td><td class="green">63.2 (-91%) <span title="High variance">&#9888;</span></td><td class="green">72.0 (-90%) <span title="High variance">&#9888;</span></td><td class="green">0.159 (-100%)</td><td class="green">68.2 (-91%) <span title="High variance">&#9888;</span></td></tr>
+
+</tbody>
+</table>
+</body>
+</html>

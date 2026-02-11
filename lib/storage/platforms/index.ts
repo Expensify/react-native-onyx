@@ -2,37 +2,41 @@
  * Web storage platform selection.
  *
  * Uses the WorkerStorageProvider to run all persistence off the main thread.
- * If OPFS is available, the worker uses the SQLite WASM backend (opfs-sahpool).
- * Otherwise, it falls back to the IndexedDB backend (idb-keyval).
- *
- * Both backends run inside the same unified worker (lib/storage/worker.ts).
+ * Detects OPFS support to choose the best backend:
+ * - OPFS + Worker available: SQLite via @sqlite.org/sqlite-wasm with opfs-sahpool VFS
+ * - No OPFS: IDBKeyValProvider fallback (still runs in a worker)
  */
 import createWorkerStorageProvider from '../WorkerStorageProvider';
 
 /**
- * Check if OPFS (via FileSystemSyncAccessHandle) is available.
- * opfs-sahpool requires this API, which is available in Workers on modern browsers.
- */
-function isOPFSSupported(): boolean {
-    try {
-        // FileSystemSyncAccessHandle is the key API that opfs-sahpool needs.
-        // It's available in Worker contexts on Chrome 102+, Firefox 111+, Safari 15.2+.
-        // We use a string-based check to avoid TypeScript errors since the type
-        // isn't in the standard lib definitions.
-        return 'FileSystemSyncAccessHandle' in globalThis;
-    } catch {
-        return false;
-    }
-}
-
-/**
- * Check if Workers are supported (required for both backends).
+ * Check if Web Workers are supported in the current environment.
  */
 function isWorkerSupported(): boolean {
     return typeof Worker !== 'undefined';
 }
 
-const backend = isWorkerSupported() && isOPFSSupported() ? 'sqlite' : 'idb';
+/**
+ * Check if the Origin Private File System (OPFS) is available.
+ * OPFS is required for SQLite persistence via the opfs-sahpool VFS.
+ * This is a synchronous heuristic -- actual OPFS availability is confirmed
+ * by the SQLite WASM library at init time.
+ */
+function isOPFSSupported(): boolean {
+    return typeof navigator !== 'undefined' && typeof navigator.storage !== 'undefined' && typeof navigator.storage.getDirectory === 'function';
+}
+
+/**
+ * Select the best backend based on browser capabilities.
+ * Falls back to IDB if OPFS is not available.
+ */
+function selectBackend(): 'sqlite' | 'idb' {
+    if (isWorkerSupported() && isOPFSSupported()) {
+        return 'sqlite';
+    }
+    return 'idb';
+}
+
+const backend = selectBackend();
 const WebStorage = createWorkerStorageProvider(backend);
 
 export default WebStorage;
