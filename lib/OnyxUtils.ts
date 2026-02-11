@@ -808,11 +808,10 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: CallbackToStateMapp
 
     // For regular callbacks, we never want to pass null values, but always just undefined if a value is not set in cache or storage.
     const valueToPass = value === null ? undefined : value;
-    const lastValue = lastConnectionCallbackData.get(mapping.subscriptionID);
-    lastConnectionCallbackData.get(mapping.subscriptionID);
 
-    // If the value has not changed we do not need to trigger the callback
-    if (lastConnectionCallbackData.has(mapping.subscriptionID) && lastValue) {
+    // If the subscriber was already notified (e.g. by a synchronous keyChanged call),
+    // skip the initial data delivery to prevent duplicate callbacks.
+    if (lastConnectionCallbackData.has(mapping.subscriptionID)) {
         return;
     }
 
@@ -846,7 +845,7 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
 }
 
 /**
- * Schedules an update that will be appended to the macro task queue (so it doesn't update the subscribers immediately).
+ * Notifies subscribers about a key change.
  *
  * @example
  * scheduleSubscriberUpdate(key, value, subscriber => subscriber.initWithStoredValues === false)
@@ -861,9 +860,8 @@ function scheduleSubscriberUpdate<TKey extends OnyxKey>(
 }
 
 /**
- * This method is similar to scheduleSubscriberUpdate but it is built for working specifically with collections
- * so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
- * subscriber callbacks receive the data in a different format than they normally expect and it breaks code.
+ * Notifies collection subscribers about changes. Uses keysChanged() instead of keyChanged() so that
+ * subscriber callbacks receive data in the expected collection format.
  */
 function scheduleNotifyCollectionSubscribers<TKey extends OnyxKey>(key: TKey, value: OnyxCollection<KeyValueMapping[TKey]>, previousValue?: OnyxCollection<KeyValueMapping[TKey]>): void {
     keysChanged(key, value, previousValue);
