@@ -1358,7 +1358,7 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
     // If a key is a RAM-only key or a member of RAM-only collection, we skip the step that modifies the storage
     if (isRamOnlyKey(key)) {
         OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
-        return updatePromise;
+        return Promise.resolve();
     }
 
     return Storage.setItem(key, valueWithoutNestedNullValues)
