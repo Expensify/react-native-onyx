@@ -96,6 +96,11 @@ function createWorkerStorageProvider(backend: 'sqlite' | 'idb'): StorageProvider
         /**
          * Initializes the storage provider by spawning the web worker.
          * The worker is told which backend to use via the init message.
+         *
+         * Returns a Promise that resolves once the worker has finished
+         * initializing its storage backend (SQLite or IDB). This ensures
+         * that callers waiting on Storage.init() don't proceed until the
+         * worker is actually ready to accept data operations.
          */
         init() {
             // Create the worker. The bundler (webpack/vite) will handle the URL resolution.
@@ -107,10 +112,9 @@ function createWorkerStorageProvider(backend: 'sqlite' | 'idb'): StorageProvider
 
             provider.store = worker;
 
-            // Send init message with the chosen backend
-            const initPromise = postToWorker<void>({type: 'init', backend});
-
-            initPromise.catch((error) => {
+            // Send init message with the chosen backend and return the Promise
+            // so that Storage.init() can await worker readiness.
+            return postToWorker<void>({type: 'init', backend}).catch((error) => {
                 console.error('Failed to initialize storage worker:', error);
             });
         },

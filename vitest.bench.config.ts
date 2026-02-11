@@ -14,6 +14,11 @@ export default defineConfig({
         // Map it to `globalThis` which works in all environments.
         global: 'globalThis',
     },
+    optimizeDeps: {
+        // Pre-bundle these dependencies to prevent Vite from discovering and
+        // reloading them mid-test, which causes flaky benchmark results.
+        include: ['idb-keyval'],
+    },
     test: {
         browser: {
             provider: playwright(),

@@ -87,13 +87,18 @@ There are several ways to create "worker threads" in React Native:
     - On both platforms, a worker thread wraps the persistence layer, keeping that layer storage-provider-agnostic
         - On web, we use web workers and `postMessage` to spawn and communicate with the worker thread.
         - On native, we use react-native-worklets to spawn and communicate with the worker thread.
-    - The `BufferStore` implementation:
-        - On web:
-            - Keeps the `WriteBuffer` data as a pure JS `Map`
-            - On flush, passes raw JS objects from the main thread to the worker thread via `postMessage` (this is a structured clone). 
+    - The `BufferStore` data storage:
+        - On web keeps the `WriteBuffer` data as a pure JS `Map`
+            - On flush, the main thread passes raw JS objects from the main thread to the worker thread via `postMessage` (this is a structured clone). The worker thread handles serialization and persistence.
+        - On native keeps the `WriteBuffer` as a thread-safe NitroModules `HybridObject` with memory shared across threads.
+            - Keeps the `WriteBuffer` data as thread-safe NitroModules `HybridObject` with memory shared across threads.
+            - On flush, schedules a task in the worker to drain the `W
         - The `BufferStore` implementation keeps the `WriteBuffer` as a pure JS `Map`
         - On flush, raw JS objects are passed from the main JS thread to the worker thread via `postMessage`. The worker thread handles serailization and persistence.
         - A web worker wraps the storage layer, handling `onmessage` events and keeping the persistence layer storage-provider-agnostic.
+    - The `BufferStore` flush scheduling:
+        - On web, the main thread uses `requestIdleCallback` with a max 200ms timeout to schedule flush
+        - On native, the main thread never flushes. It just populates the `BufferStore` and then the worker thread handles flushing
 
 
 1. Move the Onyx persistence layer to a worker thread.

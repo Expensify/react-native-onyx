@@ -86,10 +86,19 @@ const storage: Storage = {
 
     /**
      * Initializes all providers in the list of storage providers
-     * and enables fallback providers if necessary
+     * and enables fallback providers if necessary.
+     *
+     * If the provider's init() returns a Promise (e.g. WorkerStorageProvider
+     * waiting for the web worker to finish setting up its backend), we await
+     * it so that finishInitalization() only fires after the provider is truly
+     * ready for data operations.
      */
     init() {
-        tryOrDegradePerformance(provider.init, false).finally(() => {
+        tryOrDegradePerformance(() => {
+            const result = provider.init();
+            // provider.init() may return void or Promise<void>
+            return result instanceof Promise ? result : Promise.resolve();
+        }, false).finally(() => {
             finishInitalization();
         });
     },
