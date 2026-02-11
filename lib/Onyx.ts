@@ -40,6 +40,8 @@ function init({
     enablePerformanceMetrics = false,
     enableDevTools = true,
     skippableCollectionMemberIDs = [],
+    ramOnlyKeys = [],
+    snapshotMergeKeys = [],
 }: InitOptions): void {
     if (enablePerformanceMetrics) {
         GlobalSettings.setPerformanceMetricsEnabled(true);
@@ -51,6 +53,9 @@ function init({
     Storage.init();
 
     OnyxUtils.setSkippableCollectionMemberIDs(new Set(skippableCollectionMemberIDs));
+    OnyxUtils.setSnapshotMergeKeys(new Set(snapshotMergeKeys));
+
+    cache.setRamOnlyKeys(new Set<OnyxKey>(ramOnlyKeys));
 
     if (shouldSyncMultipleInstances) {
         Storage.keepInstancesSync?.((key, value) => {
@@ -365,9 +370,10 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                 keysToBeClearedFromStorage.push(key);
             }
 
+            // Exclude RAM-only keys to prevent them from being saved to storage
             const defaultKeyValuePairs = Object.entries(
                 Object.keys(defaultKeyStates)
-                    .filter((key) => !keysToPreserve.includes(key))
+                    .filter((key) => !keysToPreserve.includes(key) && !OnyxUtils.isRamOnlyKey(key))
                     .reduce((obj: KeyValueMapping, key) => {
                         // eslint-disable-next-line no-param-reassign
                         obj[key] = defaultKeyStates[key];
