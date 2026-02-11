@@ -98,22 +98,22 @@ graph TD
     Store --> HybridBS
 
     subgraph webPath [Web: requestIdleCallback flush]
-        WebFlush["drain JS Map, JSON.stringify, postMessage(batch)"]
+        WebFlush["drain JS Map, postMessage(JS objects via structured clone)"]
         JSMap --> WebFlush
     end
 
     subgraph webWorker [Web Worker]
-        Worker["worker.ts (unified)"]
+        Worker["worker.ts: JSON.stringify + persist"]
         SQLiteWeb["@sqlite.org/sqlite-wasm + opfs-sahpool VFS"]
         IDBFallback["Fallback: IDBKeyValProvider"]
         BChan["BroadcastChannel"]
-        WebFlush -->|"postMessage"| Worker
+        WebFlush -->|"structured clone"| Worker
         Worker -->|"OPFS available"| SQLiteWeb
         Worker -->|"no OPFS"| IDBFallback
         Worker --> BChan
     end
 
-    subgraph nativePath [Native: Worklet Worker Runtime]
+    subgraph nativePath [Native Worklet Worker]
         WorkletRT["NativeFlushWorker (react-native-worklets-core)"]
         SQLiteNative["react-native-nitro-sqlite (sync APIs)"]
         HybridBS -.->|"shared memory drain()"| WorkletRT
@@ -167,8 +167,8 @@ Onyx.set(key, value)
   ...requestIdleCallback fires...
   -> writeBuffer.flushNow()
     -> drain JS Map
-    -> JSON.stringify entries
-    -> postMessage(batch)                   onmessage
+    -> postMessage(JS objects)              onmessage (structured clone)
+                                            JSON.stringify entries (on worker!)
                                             provider.multiSet(batch)
                                             provider.multiMerge(batch)
                                             BroadcastChannel.postMessage({type, values})
