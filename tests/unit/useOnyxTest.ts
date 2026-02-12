@@ -8,6 +8,7 @@ import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import * as Logger from '../../lib/Logger';
 import onyxSnapshotCache from '../../lib/OnyxSnapshotCache';
 import type {UseOnyxSelector} from '../../lib/useOnyx';
+import React from 'react';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -18,6 +19,8 @@ const ONYXKEYS = {
         EVICTABLE_TEST_KEY: 'evictable_test_',
     },
 };
+
+const StrictWrapper = ({children}: React.PropsWithChildren) => React.createElement(React.StrictMode, null, children);
 
 Onyx.init({
     keys: ONYXKEYS,
@@ -439,6 +442,38 @@ describe('useOnyx', () => {
 
             selector = ((entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name} - selector changed`) as UseOnyxSelector<OnyxKey, string>;
             rerender(undefined);
+
+            expect(result.current[0]).toEqual('id - test_id, name - test_name - selector changed');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should always use the latest selector reference if it is on the dependency list', async () => {
+            Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name'});
+
+            let testSelector = ((entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name}`) as UseOnyxSelector<OnyxKey, string>;
+
+            const {result, rerender} = renderHook(({selector}: {selector: UseOnyxSelector<OnyxKey, string>}) =>
+                useOnyx(ONYXKEYS.TEST_KEY, {
+                    selector,
+                }, [selector]),
+                {
+                    initialProps: {selector: testSelector},
+                    wrapper: StrictWrapper,
+                    concurrentRoot: true,
+                },
+            );
+
+            expect(result.current[0]).toEqual('id - test_id, name - test_name');
+            expect(result.current[1].status).toEqual('loaded');
+
+            testSelector = ((entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name} - selector changed`) as UseOnyxSelector<OnyxKey, string>;
+
+            await act(async () => {
+                React.startTransition(() => {
+                  rerender({selector: testSelector});
+                });
+                await waitForPromisesToResolve();
+              });
 
             expect(result.current[0]).toEqual('id - test_id, name - test_name - selector changed');
             expect(result.current[1].status).toEqual('loaded');
