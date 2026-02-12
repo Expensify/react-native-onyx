@@ -1,4 +1,5 @@
 import * as Logger from '../Logger';
+import type {OnyxKey, OnyxValue} from '../types';
 
 import PlatformStorage from './platforms';
 import InstanceSync from './InstanceSync';
@@ -112,10 +113,10 @@ const storage: Storage = {
      *   value on disk, then the read proceeds normally.
      * - Otherwise, the read goes straight to the provider.
      */
-    getItem: (key) =>
-        tryOrDegradePerformance(() => {
+    getItem: <TKey extends OnyxKey>(key: TKey) =>
+        tryOrDegradePerformance<OnyxValue<TKey>>(() => {
             if (writeBuffer.has(key)) {
-                return Promise.resolve(writeBuffer.get(key));
+                return Promise.resolve(writeBuffer.get(key) as OnyxValue<TKey>);
             }
             if (writeBuffer.hasAny(key)) {
                 return writeBuffer.flushNow().then(() => provider.getItem(key));

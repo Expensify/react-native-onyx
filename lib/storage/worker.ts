@@ -14,6 +14,7 @@
  */
 
 import type StorageProvider from './providers/types';
+import type {StorageKeyValuePair} from './providers/types';
 
 // ---------------------------------------------------------------------------
 // Message types for main-thread <-> worker communication
@@ -207,7 +208,7 @@ async function handleMessage(msg: WorkerMessage): Promise<void> {
         }
 
         case 'multiMerge': {
-            const mergePairs = msg.pairs as [string, unknown, unknown[] | undefined][];
+            const mergePairs = msg.pairs as StorageKeyValuePair[];
             await provider!.multiMerge(mergePairs);
             // Broadcast raw patches (key + change value) so receiving tabs can fastMerge
             broadcastMerge(mergePairs.map(([key, value]) => [key, value]));

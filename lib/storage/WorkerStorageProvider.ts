@@ -104,7 +104,11 @@ function createWorkerStorageProvider(backend: 'sqlite' | 'idb'): StorageProvider
          */
         init() {
             // Create the worker. The bundler (webpack/vite) will handle the URL resolution.
-            worker = new Worker(new URL('./worker.ts', import.meta.url), {type: 'module'});
+            // The import.meta.url syntax is required for bundlers to resolve the worker path.
+            // At build time, the library is compiled with "module": "commonjs" (tsconfig.json),
+            // but consumers (App) rebundle this file with webpack/vite which support import.meta.
+            // @ts-expect-error import.meta is valid at runtime in bundler environments
+            worker = new Worker(new URL('./worker.js', import.meta.url), {type: 'module'});
             worker.onmessage = handleWorkerMessage;
             worker.onerror = (error) => {
                 console.error('Storage worker error:', error);
@@ -120,12 +124,10 @@ function createWorkerStorageProvider(backend: 'sqlite' | 'idb'): StorageProvider
         },
 
         getItem(key) {
-            return postToWorker<unknown>({type: 'getItem', key}).then((result) => {
-                if (result === null || result === undefined) {
-                    return null;
-                }
-                return result;
-            });
+            // The worker returns the deserialized value via structured clone.
+            // We cast to satisfy the generic return type; the value shape is
+            // determined by what was stored under that key.
+            return postToWorker({type: 'getItem', key}) as Promise<never>;
         },
 
         multiGet(keys) {

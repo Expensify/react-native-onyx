@@ -181,9 +181,9 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             throw new Error('Store is not initialized!');
         }
 
-        const {rows} = provider.store.execute(Queries.GET_ALL_KEYS);
+        const {rows} = provider.store.execute<{record_key: string}>(Queries.GET_ALL_KEYS);
         // eslint-disable-next-line no-underscore-dangle
-        const result = rows?._array.map((row: {record_key: string}) => row.record_key);
+        const result = rows?._array.map((row) => row.record_key);
         return Promise.resolve((result ?? []) as StorageKeyList);
     },
     removeItem(key) {
