@@ -39,14 +39,12 @@ const selectorOptions: UseOnyxOptions<string, number | undefined> = {
     selector: simpleSelector,
     initWithStoredValues: true,
     allowStaleData: false,
-    canBeMissing: true,
 };
 
 const complexSelectorOptions: UseOnyxOptions<string, ComplexSelectorResult> = {
     selector: complexSelector,
     initWithStoredValues: true,
     allowStaleData: false,
-    canBeMissing: true,
 };
 
 // Mock results
