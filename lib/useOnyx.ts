@@ -80,9 +80,10 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
     const currentDependenciesRef = useLiveRef(dependencies);
     const selector = options?.selector;
+    const memoizedSelectorRef = useRef<typeof selector | null>(null);
 
     // Create memoized version of selector for performance
-    const memoizedSelector = useMemo(() => {
+    memoizedSelectorRef.current = useMemo(() => {
         if (!selector) {
             return null;
         }
@@ -259,7 +260,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         if (isFirstConnectionRef.current || shouldGetCachedValueRef.current || key !== previousKey) {
             // Gets the value from cache and maps it with selector. It changes `null` to `undefined` for `useOnyx` compatibility.
             const value = OnyxUtils.tryGetCachedValue(key) as OnyxValue<TKey>;
-            const selectedValue = memoizedSelector ? memoizedSelector(value) : value;
+            const selectedValue = memoizedSelectorRef.current ? memoizedSelectorRef.current(value) : value;
             newValueRef.current = (selectedValue ?? undefined) as TReturnValue | undefined;
 
             // This flag is `false` when the original Onyx value (without selector) is not defined yet.
@@ -289,7 +290,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // - Non-selector cases use shallow equality for object reference checks
         // - Normalize null to undefined to ensure consistent comparison (both represent "no value")
         let areValuesEqual: boolean;
-        if (memoizedSelector) {
+        if (memoizedSelectorRef.current) {
             const normalizedPrevious = previousValueRef.current ?? undefined;
             const normalizedNew = newValueRef.current ?? undefined;
             areValuesEqual = normalizedPrevious === normalizedNew;
@@ -331,7 +332,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         }
 
         return resultRef.current;
-    }, [options?.initWithStoredValues, options?.allowStaleData, options?.canBeMissing, key, memoizedSelector, cacheKey, previousKey]);
+    }, [options?.initWithStoredValues, options?.allowStaleData, options?.canBeMissing, key, memoizedSelectorRef, cacheKey, previousKey]);
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
