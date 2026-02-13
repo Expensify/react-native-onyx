@@ -438,6 +438,9 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
 
             selector = ((entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name} - selector changed`) as UseOnyxSelector<OnyxKey, string>;
+
+            await act(async () => waitForPromisesToResolve());
+
             rerender(undefined);
 
             expect(result.current[0]).toEqual('id - test_id, name - test_name - selector changed');
@@ -681,15 +684,16 @@ describe('useOnyx', () => {
 
             const dependencies = ['constant'];
             let selectorCallCount = 0;
+            const selector = ((data) => {
+                selectorCallCount++;
+                return `${dependencies.join(',')}:${(data as {value?: string})?.value}`;
+            }) as UseOnyxSelector<OnyxKey, string>;
 
             const {result, rerender} = renderHook(() =>
                 useOnyx(
                     ONYXKEYS.TEST_KEY,
                     {
-                        selector: (data) => {
-                            selectorCallCount++;
-                            return `${dependencies.join(',')}:${(data as {value?: string})?.value}`;
-                        },
+                        selector,
                     },
                     dependencies,
                 ),
