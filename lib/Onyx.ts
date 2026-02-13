@@ -255,7 +255,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
                 }
 
                 return OnyxMerge.applyMerge(key, existingValue, validChanges).then(({mergedValue}) => {
-                OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, changes, mergedValue);
+                    OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, changes, mergedValue);
                 });
             } catch (error) {
                 Logger.logAlert(`An error occurred while applying merge for key: ${key}, Error: ${error}`);
@@ -374,8 +374,8 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                 }
 
                 // Notify the subscribers for each key/value group so they can receive the new values
-            for (const [key, value] of Object.entries(keyValuesToResetIndividually)) {
-                OnyxUtils.keyChanged(key, value);
+                for (const [key, value] of Object.entries(keyValuesToResetIndividually)) {
+                    OnyxUtils.keyChanged(key, value);
                 }
                 for (const [key, value] of Object.entries(keyValuesToResetAsCollection)) {
                     OnyxUtils.keysChanged(key, value.newValues, value.oldValues);
@@ -392,16 +392,16 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                         }, {}),
                 );
 
-            // Remove only the items that we want cleared from storage, and reset others to default
-            for (const key of keysToBeClearedFromStorage) cache.drop(key);
-            return Storage.removeItems(keysToBeClearedFromStorage)
-                .then(() => connectionManager.refreshSessionID())
-                .then(() => Storage.multiSet(defaultKeyValuePairs))
-                .then(() => {
-                    DevTools.clearState(keysToPreserve);
-                });
-        })
-        .then(() => undefined);
+                // Remove only the items that we want cleared from storage, and reset others to default
+                for (const key of keysToBeClearedFromStorage) cache.drop(key);
+                return Storage.removeItems(keysToBeClearedFromStorage)
+                    .then(() => connectionManager.refreshSessionID())
+                    .then(() => Storage.multiSet(defaultKeyValuePairs))
+                    .then(() => {
+                        DevTools.clearState(keysToPreserve);
+                    });
+            })
+            .then(() => undefined);
 
         return cache.captureTask(TASK.CLEAR, promise) as Promise<void>;
     });
