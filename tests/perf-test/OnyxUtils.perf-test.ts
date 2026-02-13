@@ -431,7 +431,7 @@ describe('OnyxUtils', () => {
         });
     });
 
-    describe('scheduleSubscriberUpdate', () => {
+    describe('keyChanged', () => {
         test('10k calls scheduling updates', async () => {
             const subscriptionMap = new Map<string, number>();
 
@@ -439,7 +439,7 @@ describe('OnyxUtils', () => {
                 Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const),
             ) as GenericCollection;
 
-            await measureAsyncFunction(() => Promise.all(Object.entries(changedReportActions).map(([key, value]) => OnyxUtils.scheduleSubscriberUpdate(key, value))), {
+            await measureAsyncFunction(() => Promise.all(Object.entries(changedReportActions).map(([key, value]) => OnyxUtils.keyChanged(key, value))), {
                 beforeEach: async () => {
                     await Onyx.multiSet(mockedReportActionsMap);
                     for (const key of mockedReportActionsKeys) {
@@ -461,7 +461,7 @@ describe('OnyxUtils', () => {
         });
     });
 
-    describe('scheduleNotifyCollectionSubscribers', () => {
+    describe('keysChanged', () => {
         test('one call with 10k heavy objects to update 10k subscribers', async () => {
             const subscriptionMap = new Map<string, number>();
 
@@ -469,7 +469,7 @@ describe('OnyxUtils', () => {
                 Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const),
             ) as GenericCollection;
 
-            await measureFunction(() => OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, changedReportActions, mockedReportActionsMap), {
+            await measureFunction(() => OnyxUtils.keysChanged(collectionKey, changedReportActions, mockedReportActionsMap), {
                 beforeEach: async () => {
                     await Onyx.multiSet(mockedReportActionsMap);
                     for (const key of mockedReportActionsKeys) {

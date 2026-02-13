@@ -390,10 +390,10 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                     DevTools.clearState(keysToPreserve);
                     // Notify the subscribers for each key/value group so they can receive the new values
                     for (const [key, value] of Object.entries(keyValuesToResetIndividually)) {
-                        OnyxUtils.scheduleSubscriberUpdate(key, value);
+                        OnyxUtils.keyChanged(key, value);
                     }
                     for (const [key, value] of Object.entries(keyValuesToResetAsCollection)) {
-                        OnyxUtils.scheduleNotifyCollectionSubscribers(key, value.newValues, value.oldValues);
+                        OnyxUtils.keysChanged(key, value.newValues, value.oldValues);
                     }
                 });
         })

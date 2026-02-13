@@ -845,34 +845,11 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
 }
 
 /**
- * Notifies subscribers about a key change.
- *
- * @example
- * scheduleSubscriberUpdate(key, value, subscriber => subscriber.initWithStoredValues === false)
- */
-function scheduleSubscriberUpdate<TKey extends OnyxKey>(
-    key: TKey,
-    value: OnyxValue<TKey>,
-    canUpdateSubscriber: (subscriber?: CallbackToStateMapping<OnyxKey>) => boolean = () => true,
-    isProcessingCollectionUpdate = false,
-): void {
-    keyChanged(key, value, canUpdateSubscriber, isProcessingCollectionUpdate);
-}
-
-/**
- * Notifies collection subscribers about changes. Uses keysChanged() instead of keyChanged() so that
- * subscriber callbacks receive data in the expected collection format.
- */
-function scheduleNotifyCollectionSubscribers<TKey extends OnyxKey>(key: TKey, value: OnyxCollection<KeyValueMapping[TKey]>, previousValue?: OnyxCollection<KeyValueMapping[TKey]>): void {
-    keysChanged(key, value, previousValue);
-}
-
-/**
  * Remove a key from Onyx and update the subscribers
  */
 function remove<TKey extends OnyxKey>(key: TKey, isProcessingCollectionUpdate?: boolean): Promise<void> {
     cache.drop(key);
-    scheduleSubscriberUpdate(key, undefined as OnyxValue<TKey>, undefined, isProcessingCollectionUpdate);
+    keyChanged(key, undefined as OnyxValue<TKey>, undefined, isProcessingCollectionUpdate);
 
     if (isRamOnlyKey(key)) {
         return Promise.resolve();
@@ -952,7 +929,7 @@ function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>
         cache.addToAccessedKeys(key);
     }
 
-    scheduleSubscriberUpdate(key, value, (subscriber) => hasChanged || subscriber?.initWithStoredValues === false);
+    keyChanged(key, value, (subscriber) => hasChanged || subscriber?.initWithStoredValues === false);
 }
 
 function hasPendingMergeForKey(key: OnyxKey): boolean {
@@ -1405,7 +1382,7 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
 
         // Update cache and optimistically inform subscribers on the next tick
         cache.set(key, value);
-        return OnyxUtils.scheduleSubscriberUpdate(key, value);
+        return OnyxUtils.keyChanged(key, value);
     });
 
     const keyValuePairsToStore = keyValuePairsToSet.filter((keyValuePair) => {
@@ -1481,7 +1458,7 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
 
         for (const [key, value] of keyValuePairs) cache.set(key, value);
 
-        const updatePromise = OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
+        const updatePromise = OnyxUtils.keysChanged(collectionKey, mutableCollection, previousCollection);
 
         // RAM-only keys are not supposed to be saved to storage
         if (isRamOnlyKey(collectionKey)) {
@@ -1616,7 +1593,7 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
             // and update all subscribers
             const promiseUpdate = previousCollectionPromise.then((previousCollection) => {
                 cache.merge(finalMergedCollection);
-                return scheduleNotifyCollectionSubscribers(collectionKey, finalMergedCollection, previousCollection);
+                return keysChanged(collectionKey, finalMergedCollection, previousCollection);
             });
 
             return Promise.all(promises)
@@ -1682,7 +1659,7 @@ function partialSetCollection<TKey extends CollectionKeyBase>({collectionKey, co
 
         for (const [key, value] of keyValuePairs) cache.set(key, value);
 
-        const updatePromise = scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
+        const updatePromise = keysChanged(collectionKey, mutableCollection, previousCollection);
 
         if (isRamOnlyKey(collectionKey)) {
             sendActionToDevTools(METHOD.SET_COLLECTION, undefined, mutableCollection);
@@ -1740,8 +1717,6 @@ const OnyxUtils = {
     sendDataToConnection,
     getCollectionKey,
     getCollectionDataAndSendAsObject,
-    scheduleSubscriberUpdate,
-    scheduleNotifyCollectionSubscribers,
     remove,
     reportStorageQuota,
     retryOperation,
@@ -1797,10 +1772,6 @@ GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
     keyChanged = decorateWithMetrics(keyChanged, 'OnyxUtils.keyChanged');
     // @ts-expect-error Reassign
     sendDataToConnection = decorateWithMetrics(sendDataToConnection, 'OnyxUtils.sendDataToConnection');
-    // @ts-expect-error Reassign
-    scheduleSubscriberUpdate = decorateWithMetrics(scheduleSubscriberUpdate, 'OnyxUtils.scheduleSubscriberUpdate');
-    // @ts-expect-error Reassign
-    scheduleNotifyCollectionSubscribers = decorateWithMetrics(scheduleNotifyCollectionSubscribers, 'OnyxUtils.scheduleNotifyCollectionSubscribers');
     // @ts-expect-error Reassign
     remove = decorateWithMetrics(remove, 'OnyxUtils.remove');
     // @ts-expect-error Reassign
