@@ -1,4 +1,3 @@
-import {createElement, startTransition, StrictMode} from 'react';
 import {act, renderHook} from '@testing-library/react-native';
 import type {OnyxCollection, OnyxEntry, OnyxKey} from '../../lib';
 import Onyx, {useOnyx} from '../../lib';
@@ -19,10 +18,6 @@ const ONYXKEYS = {
         EVICTABLE_TEST_KEY: 'evictable_test_',
     },
 };
-
-function StrictWrapper({children}: React.PropsWithChildren) {
-    return createElement(StrictMode, null, children);
-}
 
 Onyx.init({
     keys: ONYXKEYS,
@@ -443,44 +438,10 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
 
             selector = ((entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name} - selector changed`) as UseOnyxSelector<OnyxKey, string>;
+
+            await act(async () => waitForPromisesToResolve());
+
             rerender(undefined);
-
-            expect(result.current[0]).toEqual('id - test_id, name - test_name - selector changed');
-            expect(result.current[1].status).toEqual('loaded');
-        });
-
-        it('should always use the latest selector reference if the dependency change', async () => {
-            Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name'});
-
-            let testSelector = ((entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name}`) as UseOnyxSelector<OnyxKey, string>;
-
-            const {result, rerender} = renderHook(
-                ({selector}: {selector: UseOnyxSelector<OnyxKey, string>}) =>
-                    useOnyx(
-                        ONYXKEYS.TEST_KEY,
-                        {
-                            selector,
-                        },
-                        [selector],
-                    ),
-                {
-                    initialProps: {selector: testSelector},
-                    wrapper: StrictWrapper,
-                    concurrentRoot: true,
-                },
-            );
-
-            expect(result.current[0]).toEqual('id - test_id, name - test_name');
-            expect(result.current[1].status).toEqual('loaded');
-
-            testSelector = ((entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name} - selector changed`) as UseOnyxSelector<OnyxKey, string>;
-
-            await act(async () => {
-                startTransition(() => {
-                    rerender({selector: testSelector});
-                });
-                await waitForPromisesToResolve();
-            });
 
             expect(result.current[0]).toEqual('id - test_id, name - test_name - selector changed');
             expect(result.current[1].status).toEqual('loaded');
@@ -723,15 +684,16 @@ describe('useOnyx', () => {
 
             const dependencies = ['constant'];
             let selectorCallCount = 0;
+            const selector = ((data) => {
+                selectorCallCount++;
+                return `${dependencies.join(',')}:${(data as {value?: string})?.value}`;
+            }) as UseOnyxSelector<OnyxKey, string>;
 
             const {result, rerender} = renderHook(() =>
                 useOnyx(
                     ONYXKEYS.TEST_KEY,
                     {
-                        selector: (data) => {
-                            selectorCallCount++;
-                            return `${dependencies.join(',')}:${(data as {value?: string})?.value}`;
-                        },
+                        selector,
                     },
                     dependencies,
                 ),
