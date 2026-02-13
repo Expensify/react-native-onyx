@@ -1,6 +1,8 @@
 import lodashClone from 'lodash/clone';
 import lodashCloneDeep from 'lodash/cloneDeep';
+import {act} from '@testing-library/react-native';
 import Onyx from '../../lib';
+import * as Logger from '../../lib/Logger';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import OnyxUtils from '../../lib/OnyxUtils';
 import type OnyxCache from '../../lib/OnyxCache';
@@ -9,6 +11,7 @@ import type {OnyxCollection, OnyxKey, OnyxUpdate} from '../../lib/types';
 import type {GenericDeepRecord} from '../types';
 import type GenericCollection from '../utils/GenericCollection';
 import type {Connection} from '../../lib/OnyxConnectionManager';
+import createDeferredTask from '../../lib/createDeferredTask';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
@@ -30,22 +33,23 @@ const ONYX_KEYS = {
     RAM_ONLY_WITH_INITIAL_VALUE: 'ramOnlyWithInitialValue',
 };
 
-Onyx.init({
-    keys: ONYX_KEYS,
-    initialKeyStates: {
-        [ONYX_KEYS.OTHER_TEST]: 42,
-        [ONYX_KEYS.KEY_WITH_UNDERSCORE]: 'default',
-        [ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE]: 'default',
-    },
-    ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
-    skippableCollectionMemberIDs: ['skippable-id'],
-    snapshotMergeKeys: ['pendingAction', 'pendingFields'],
-});
-
 describe('Onyx', () => {
+    beforeAll(() => {
+        Onyx.init({
+            keys: ONYX_KEYS,
+            initialKeyStates: {
+                [ONYX_KEYS.OTHER_TEST]: 42,
+                [ONYX_KEYS.KEY_WITH_UNDERSCORE]: 'default',
+                [ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE]: 'default',
+            },
+            ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
+            skippableCollectionMemberIDs: ['skippable-id'],
+            snapshotMergeKeys: ['pendingAction', 'pendingFields'],
+        });
+    });
+
     let connection: Connection | undefined;
 
-    /** @type OnyxCache */
     let cache: typeof OnyxCache;
 
     beforeEach(() => {
@@ -934,43 +938,6 @@ describe('Onyx', () => {
             });
     });
 
-    it('should throw an error when the data object is incorrect in Onyx.update', () => {
-        // Given the invalid data object with onyxMethod='multiSet'
-        const data: unknown[] = [
-            {onyxMethod: 'set', key: ONYX_KEYS.TEST_KEY, value: 'four'},
-            {onyxMethod: 'murge', key: ONYX_KEYS.OTHER_TEST, value: {test2: 'test2'}},
-        ];
-
-        try {
-            // When we pass it to Onyx.update
-            // @ts-expect-error This is an invalid call to Onyx.update
-            Onyx.update(data);
-        } catch (error) {
-            if (error instanceof Error) {
-                // Then we should expect the error message below
-                expect(error.message).toEqual('Invalid onyxMethod murge in Onyx update.');
-            } else {
-                throw error;
-            }
-        }
-
-        try {
-            // Given the invalid data object with key=true
-            data[1] = {onyxMethod: 'merge', key: true, value: {test2: 'test2'}};
-
-            // When we pass it to Onyx.update
-            // @ts-expect-error This is an invalid call to Onyx.update
-            Onyx.update(data);
-        } catch (error) {
-            if (error instanceof Error) {
-                // Then we should expect the error message below
-                expect(error.message).toEqual('Invalid boolean key provided in Onyx update. Onyx key must be of type string.');
-            } else {
-                throw error;
-            }
-        }
-    });
-
     it('should properly set all keys provided in a multiSet called via update', () => {
         const valuesReceived: Record<string, unknown> = {};
         connection = Onyx.connect({
@@ -1016,32 +983,6 @@ describe('Onyx', () => {
                     },
                 });
             });
-    });
-
-    it('should reject an improperly formatted multiset operation called via update', () => {
-        try {
-            Onyx.update([
-                {
-                    onyxMethod: 'multiset',
-                    value: [
-                        {
-                            ID: 123,
-                            value: 'one',
-                        },
-                        {
-                            ID: 234,
-                            value: 'two',
-                        },
-                    ],
-                },
-            ] as unknown as Array<OnyxUpdate<OnyxKey>>);
-        } catch (error) {
-            if (error instanceof Error) {
-                expect(error.message).toEqual('Invalid value provided in Onyx multiSet. Onyx multiSet value must be of type object.');
-            } else {
-                throw error;
-            }
-        }
     });
 
     it('should return all collection keys as a single object when waitForCollectionCallback = true', () => {
@@ -1613,6 +1554,17 @@ describe('Onyx', () => {
     });
 
     describe('update', () => {
+        let logInfoFn = jest.fn();
+
+        beforeEach(() => {
+            logInfoFn = jest.fn();
+            jest.spyOn(Logger, 'logInfo').mockImplementation(logInfoFn);
+        });
+
+        afterEach(() => {
+            jest.restoreAllMocks();
+        });
+
         it('should squash all updates of collection-related keys into a single mergeCollection call', () => {
             const connections: Connection[] = [];
 
@@ -2425,6 +2377,53 @@ describe('Onyx', () => {
             expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`)).toBeNull();
             expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`)).toBeNull();
         });
+
+        describe('should log and skip invalid operations', () => {
+            it('invalid method', async () => {
+                await act(async () =>
+                    Onyx.update([
+                        {onyxMethod: 'set', key: ONYX_KEYS.TEST_KEY, value: 'test1'},
+                        // @ts-expect-error invalid method
+                        {onyxMethod: 'invalidMethod', key: ONYX_KEYS.OTHER_TEST, value: 'test2'},
+                    ]),
+                );
+
+                expect(logInfoFn).toHaveBeenNthCalledWith(1, 'Invalid onyxMethod invalidMethod in Onyx update. Skipping this operation.');
+            });
+
+            it('non-object value passed to multiSet', async () => {
+                await act(async () =>
+                    Onyx.update([
+                        // @ts-expect-error non-object value
+                        {onyxMethod: 'multiset', key: ONYX_KEYS.TEST_KEY, value: []},
+                    ]),
+                );
+
+                expect(logInfoFn).toHaveBeenNthCalledWith(1, 'Invalid value provided in Onyx multiSet. Value must be of type object. Skipping this operation.');
+            });
+
+            it('non-string value passed to key', async () => {
+                await act(async () =>
+                    Onyx.update([
+                        // @ts-expect-error invalid key
+                        {onyxMethod: 'set', key: 1000, value: 'test'},
+                    ]),
+                );
+
+                expect(logInfoFn).toHaveBeenNthCalledWith(1, 'Invalid number key provided in Onyx update. Key must be of type string. Skipping this operation.');
+            });
+
+            it('invalid or empty value passed to mergeCollection', async () => {
+                await act(async () =>
+                    Onyx.update([
+                        // @ts-expect-error invalid value
+                        {onyxMethod: 'mergecollection', key: ONYX_KEYS.COLLECTION.TEST_KEY, value: 'test1'},
+                    ]),
+                );
+
+                expect(logInfoFn).toHaveBeenNthCalledWith(1, 'Invalid or empty value provided in Onyx mergeCollection. Skipping this operation.');
+            });
+        });
     });
 
     describe('merge', () => {
@@ -3004,6 +3003,111 @@ describe('Onyx', () => {
             // Verify cache state based on whether there's a default
             expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeUndefined();
             expect(cache.get(ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE)).toEqual('default');
+        });
+    });
+});
+
+// Separate describe block for Onyx.init to control initialization during each test.
+describe('Onyx.init', () => {
+    let cache: typeof OnyxCache;
+
+    beforeEach(() => {
+        // Resets the deferred init task before each test.
+        Object.assign(OnyxUtils.getDeferredInitTask(), createDeferredTask());
+        cache = require('../../lib/OnyxCache').default;
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
+        return Onyx.clear();
+    });
+
+    describe('should only execute Onyx methods after initialization', () => {
+        it('set', async () => {
+            Onyx.set(ONYX_KEYS.TEST_KEY, 'test');
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(ONYX_KEYS.TEST_KEY)).toBeUndefined();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(ONYX_KEYS.TEST_KEY)).toEqual('test');
+        });
+
+        it('multiSet', async () => {
+            Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: 'test_1'});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toBeUndefined();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toEqual('test_1');
+        });
+
+        it('merge', async () => {
+            Onyx.merge(ONYX_KEYS.TEST_KEY, 'test');
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(ONYX_KEYS.TEST_KEY)).toBeUndefined();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(ONYX_KEYS.TEST_KEY)).toEqual('test');
+        });
+
+        it('mergeCollection', async () => {
+            Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {[`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: 'test_1'});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toBeUndefined();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toEqual('test_1');
+        });
+
+        it('clear', async () => {
+            // Spies on a function that is exclusively called during Onyx.clear().
+            const spyClearNullishStorageKeys = jest.spyOn(cache, 'clearNullishStorageKeys');
+
+            Onyx.clear();
+            await act(async () => waitForPromisesToResolve());
+
+            expect(spyClearNullishStorageKeys).not.toHaveBeenCalled();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(spyClearNullishStorageKeys).toHaveBeenCalled();
+        });
+
+        it('update', async () => {
+            Onyx.update([{onyxMethod: 'set', key: ONYX_KEYS.TEST_KEY, value: 'test'}]);
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(ONYX_KEYS.TEST_KEY)).toBeUndefined();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(ONYX_KEYS.TEST_KEY)).toEqual('test');
+        });
+
+        it('setCollection', async () => {
+            Onyx.setCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {[`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: 'test_1'});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toBeUndefined();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toEqual('test_1');
         });
     });
 });

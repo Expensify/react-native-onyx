@@ -160,7 +160,7 @@ function disconnect(connection: Connection): void {
  * @param options optional configuration object
  */
 function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options?: SetOptions): Promise<void> {
-    return OnyxUtils.setWithRetry({key, value, options});
+    return OnyxUtils.afterInit(() => OnyxUtils.setWithRetry({key, value, options}));
 }
 
 /**
@@ -171,7 +171,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options
  * @param data object keyed by ONYXKEYS and the values to set
  */
 function multiSet(data: OnyxMultiSetInput): Promise<void> {
-    return OnyxUtils.multiSetWithRetry(data);
+    return OnyxUtils.afterInit(() => OnyxUtils.multiSetWithRetry(data));
 }
 
 /**
@@ -191,78 +191,80 @@ function multiSet(data: OnyxMultiSetInput): Promise<void> {
  * Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Workspace'}
  */
 function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): Promise<void> {
-    const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
-    if (skippableCollectionMemberIDs.size) {
-        try {
-            const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key);
-            if (skippableCollectionMemberIDs.has(collectionMemberID)) {
-                // The key is a skippable one, so we set the new changes to undefined.
-                // eslint-disable-next-line no-param-reassign
-                changes = undefined;
-            }
-        } catch (e) {
-            // The key is not a collection one or something went wrong during split, so we proceed with the function's logic.
-        }
-    }
-
-    const mergeQueue = OnyxUtils.getMergeQueue();
-    const mergeQueuePromise = OnyxUtils.getMergeQueuePromise();
-
-    // Top-level undefined values are ignored
-    // Therefore, we need to prevent adding them to the merge queue
-    if (changes === undefined) {
-        return mergeQueue[key] ? mergeQueuePromise[key] : Promise.resolve();
-    }
-
-    // Merge attempts are batched together. The delta should be applied after a single call to get() to prevent a race condition.
-    // Using the initial value from storage in subsequent merge attempts will lead to an incorrect final merged value.
-    if (mergeQueue[key]) {
-        mergeQueue[key].push(changes);
-        return mergeQueuePromise[key];
-    }
-    mergeQueue[key] = [changes];
-
-    mergeQueuePromise[key] = OnyxUtils.get(key).then((existingValue) => {
-        // Calls to Onyx.set after a merge will terminate the current merge process and clear the merge queue
-        if (mergeQueue[key] == null) {
-            return Promise.resolve();
-        }
-
-        try {
-            const validChanges = mergeQueue[key].filter((change) => {
-                const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(change, existingValue);
-                if (!isCompatible) {
-                    Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'merge', existingValueType, newValueType));
+    return OnyxUtils.afterInit(() => {
+        const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
+        if (skippableCollectionMemberIDs.size) {
+            try {
+                const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key);
+                if (skippableCollectionMemberIDs.has(collectionMemberID)) {
+                    // The key is a skippable one, so we set the new changes to undefined.
+                    // eslint-disable-next-line no-param-reassign
+                    changes = undefined;
                 }
-                return isCompatible;
-            }) as Array<OnyxInput<TKey>>;
-
-            // Clean up the write queue, so we don't apply these changes again.
-            delete mergeQueue[key];
-            delete mergeQueuePromise[key];
-
-            if (!validChanges.length) {
-                return Promise.resolve();
+            } catch (e) {
+                // The key is not a collection one or something went wrong during split, so we proceed with the function's logic.
             }
-
-            // If the last change is null, we can just delete the key.
-            // Therefore, we don't need to further broadcast and update the value so we can return early.
-            if (validChanges.at(-1) === null) {
-                OnyxUtils.remove(key);
-                OnyxUtils.logKeyRemoved(OnyxUtils.METHOD.MERGE, key);
-                return Promise.resolve();
-            }
-
-            return OnyxMerge.applyMerge(key, existingValue, validChanges).then(({mergedValue}) => {
-                OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, changes, mergedValue);
-            });
-        } catch (error) {
-            Logger.logAlert(`An error occurred while applying merge for key: ${key}, Error: ${error}`);
-            return Promise.resolve();
         }
-    });
 
-    return mergeQueuePromise[key];
+        const mergeQueue = OnyxUtils.getMergeQueue();
+        const mergeQueuePromise = OnyxUtils.getMergeQueuePromise();
+
+        // Top-level undefined values are ignored
+        // Therefore, we need to prevent adding them to the merge queue
+        if (changes === undefined) {
+            return mergeQueue[key] ? mergeQueuePromise[key] : Promise.resolve();
+        }
+
+        // Merge attempts are batched together. The delta should be applied after a single call to get() to prevent a race condition.
+        // Using the initial value from storage in subsequent merge attempts will lead to an incorrect final merged value.
+        if (mergeQueue[key]) {
+            mergeQueue[key].push(changes);
+            return mergeQueuePromise[key];
+        }
+        mergeQueue[key] = [changes];
+
+        mergeQueuePromise[key] = OnyxUtils.get(key).then((existingValue) => {
+            // Calls to Onyx.set after a merge will terminate the current merge process and clear the merge queue
+            if (mergeQueue[key] == null) {
+                return Promise.resolve();
+            }
+
+            try {
+                const validChanges = mergeQueue[key].filter((change) => {
+                    const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(change, existingValue);
+                    if (!isCompatible) {
+                        Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'merge', existingValueType, newValueType));
+                    }
+                    return isCompatible;
+                }) as Array<OnyxInput<TKey>>;
+
+                // Clean up the write queue, so we don't apply these changes again.
+                delete mergeQueue[key];
+                delete mergeQueuePromise[key];
+
+                if (!validChanges.length) {
+                    return Promise.resolve();
+                }
+
+                // If the last change is null, we can just delete the key.
+                // Therefore, we don't need to further broadcast and update the value so we can return early.
+                if (validChanges.at(-1) === null) {
+                    OnyxUtils.remove(key);
+                    OnyxUtils.logKeyRemoved(OnyxUtils.METHOD.MERGE, key);
+                    return Promise.resolve();
+                }
+
+                return OnyxMerge.applyMerge(key, existingValue, validChanges).then(({mergedValue}) => {
+                OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, changes, mergedValue);
+                });
+            } catch (error) {
+                Logger.logAlert(`An error occurred while applying merge for key: ${key}, Error: ${error}`);
+                return Promise.resolve();
+            }
+        });
+
+        return mergeQueuePromise[key];
+    });
 }
 
 /**
@@ -279,7 +281,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
  * @param collection Object collection keyed by individual collection member keys and values
  */
 function mergeCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey>): Promise<void> {
-    return OnyxUtils.mergeCollectionWithPatches({collectionKey, collection, isProcessingCollectionUpdate: true});
+    return OnyxUtils.afterInit(() => OnyxUtils.mergeCollectionWithPatches({collectionKey, collection, isProcessingCollectionUpdate: true}));
 }
 
 /**
@@ -304,90 +306,91 @@ function mergeCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, co
  * @param keysToPreserve is a list of ONYXKEYS that should not be cleared with the rest of the data
  */
 function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
-    const defaultKeyStates = OnyxUtils.getDefaultKeyStates();
-    const initialKeys = Object.keys(defaultKeyStates);
+    return OnyxUtils.afterInit(() => {
+        const defaultKeyStates = OnyxUtils.getDefaultKeyStates();
+        const initialKeys = Object.keys(defaultKeyStates);
 
-    const promise = OnyxUtils.getAllKeys()
-        .then((cachedKeys) => {
-            cache.clearNullishStorageKeys();
+        const promise = OnyxUtils.getAllKeys()
+            .then((cachedKeys) => {
+                cache.clearNullishStorageKeys();
 
-            const keysToBeClearedFromStorage: OnyxKey[] = [];
-            const keyValuesToResetIndividually: KeyValueMapping = {};
-            // We need to store old and new values for collection keys to properly notify subscribers when clearing Onyx
-            // because the notification process needs the old values in cache but at that point they will be already removed from it.
-            const keyValuesToResetAsCollection: Record<
-                OnyxKey,
-                {oldValues: Record<string, KeyValueMapping[OnyxKey] | undefined>; newValues: Record<string, KeyValueMapping[OnyxKey] | undefined>}
-            > = {};
+                const keysToBeClearedFromStorage: OnyxKey[] = [];
+                const keyValuesToResetIndividually: KeyValueMapping = {};
+                // We need to store old and new values for collection keys to properly notify subscribers when clearing Onyx
+                // because the notification process needs the old values in cache but at that point they will be already removed from it.
+                const keyValuesToResetAsCollection: Record<
+                    OnyxKey,
+                    {oldValues: Record<string, KeyValueMapping[OnyxKey] | undefined>; newValues: Record<string, KeyValueMapping[OnyxKey] | undefined>}
+                > = {};
 
-            const allKeys = new Set([...cachedKeys, ...initialKeys]);
+                const allKeys = new Set([...cachedKeys, ...initialKeys]);
 
-            // The only keys that should not be cleared are:
-            // 1. Anything specifically passed in keysToPreserve (because some keys like language preferences, offline
-            //      status, or activeClients need to remain in Onyx even when signed out)
-            // 2. Any keys with a default state (because they need to remain in Onyx as their default, and setting them
-            //      to null would cause unknown behavior)
-            //   2.1 However, if a default key was explicitly set to null, we need to reset it to the default value
-            for (const key of allKeys) {
-                const isKeyToPreserve = keysToPreserve.includes(key);
-                const isDefaultKey = key in defaultKeyStates;
+                // The only keys that should not be cleared are:
+                // 1. Anything specifically passed in keysToPreserve (because some keys like language preferences, offline
+                //      status, or activeClients need to remain in Onyx even when signed out)
+                // 2. Any keys with a default state (because they need to remain in Onyx as their default, and setting them
+                //      to null would cause unknown behavior)
+                //   2.1 However, if a default key was explicitly set to null, we need to reset it to the default value
+                for (const key of allKeys) {
+                    const isKeyToPreserve = keysToPreserve.includes(key);
+                    const isDefaultKey = key in defaultKeyStates;
 
-                // If the key is being removed or reset to default:
-                // 1. Update it in the cache
-                // 2. Figure out whether it is a collection key or not,
-                //      since collection key subscribers need to be updated differently
-                if (!isKeyToPreserve) {
-                    const oldValue = cache.get(key);
-                    const newValue = defaultKeyStates[key] ?? null;
-                    if (newValue !== oldValue) {
-                        cache.set(key, newValue);
+                    // If the key is being removed or reset to default:
+                    // 1. Update it in the cache
+                    // 2. Figure out whether it is a collection key or not,
+                    //      since collection key subscribers need to be updated differently
+                    if (!isKeyToPreserve) {
+                        const oldValue = cache.get(key);
+                        const newValue = defaultKeyStates[key] ?? null;
+                        if (newValue !== oldValue) {
+                            cache.set(key, newValue);
 
-                        let collectionKey: string | undefined;
-                        try {
-                            collectionKey = OnyxUtils.getCollectionKey(key);
-                        } catch (e) {
-                            // If getCollectionKey() throws an error it means the key is not a collection key.
-                            collectionKey = undefined;
-                        }
-
-                        if (collectionKey) {
-                            if (!keyValuesToResetAsCollection[collectionKey]) {
-                                keyValuesToResetAsCollection[collectionKey] = {oldValues: {}, newValues: {}};
+                            let collectionKey: string | undefined;
+                            try {
+                                collectionKey = OnyxUtils.getCollectionKey(key);
+                            } catch (e) {
+                                // If getCollectionKey() throws an error it means the key is not a collection key.
+                                collectionKey = undefined;
                             }
-                            keyValuesToResetAsCollection[collectionKey].oldValues[key] = oldValue;
-                            keyValuesToResetAsCollection[collectionKey].newValues[key] = newValue ?? undefined;
-                        } else {
-                            keyValuesToResetIndividually[key] = newValue ?? undefined;
+
+                            if (collectionKey) {
+                                if (!keyValuesToResetAsCollection[collectionKey]) {
+                                    keyValuesToResetAsCollection[collectionKey] = {oldValues: {}, newValues: {}};
+                                }
+                                keyValuesToResetAsCollection[collectionKey].oldValues[key] = oldValue;
+                                keyValuesToResetAsCollection[collectionKey].newValues[key] = newValue ?? undefined;
+                            } else {
+                                keyValuesToResetIndividually[key] = newValue ?? undefined;
+                            }
                         }
                     }
+
+                    if (isKeyToPreserve || isDefaultKey) {
+                        continue;
+                    }
+
+                    // If it isn't preserved and doesn't have a default, we'll remove it
+                    keysToBeClearedFromStorage.push(key);
                 }
 
-                if (isKeyToPreserve || isDefaultKey) {
-                    continue;
-                }
-
-                // If it isn't preserved and doesn't have a default, we'll remove it
-                keysToBeClearedFromStorage.push(key);
-            }
-
-            // Notify the subscribers for each key/value group so they can receive the new values
+                // Notify the subscribers for each key/value group so they can receive the new values
             for (const [key, value] of Object.entries(keyValuesToResetIndividually)) {
                 OnyxUtils.keyChanged(key, value);
-            }
-            for (const [key, value] of Object.entries(keyValuesToResetAsCollection)) {
-                OnyxUtils.keysChanged(key, value.newValues, value.oldValues);
-            }
+                }
+                for (const [key, value] of Object.entries(keyValuesToResetAsCollection)) {
+                    OnyxUtils.keysChanged(key, value.newValues, value.oldValues);
+                }
 
-            // Exclude RAM-only keys to prevent them from being saved to storage
-            const defaultKeyValuePairs = Object.entries(
-                Object.keys(defaultKeyStates)
-                    .filter((key) => !keysToPreserve.includes(key) && !OnyxUtils.isRamOnlyKey(key))
-                    .reduce((obj: KeyValueMapping, key) => {
-                        // eslint-disable-next-line no-param-reassign
-                        obj[key] = defaultKeyStates[key];
-                        return obj;
-                    }, {}),
-            );
+                // Exclude RAM-only keys to prevent them from being saved to storage
+                const defaultKeyValuePairs = Object.entries(
+                    Object.keys(defaultKeyStates)
+                        .filter((key) => !keysToPreserve.includes(key) && !OnyxUtils.isRamOnlyKey(key))
+                        .reduce((obj: KeyValueMapping, key) => {
+                            // eslint-disable-next-line no-param-reassign
+                            obj[key] = defaultKeyStates[key];
+                            return obj;
+                        }, {}),
+                );
 
             // Remove only the items that we want cleared from storage, and reset others to default
             for (const key of keysToBeClearedFromStorage) cache.drop(key);
@@ -400,7 +403,8 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
         })
         .then(() => undefined);
 
-    return cache.captureTask(TASK.CLEAR, promise) as Promise<void>;
+        return cache.captureTask(TASK.CLEAR, promise) as Promise<void>;
+    });
 }
 
 /**
@@ -410,146 +414,148 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
  * @returns resolves when all operations are complete
  */
 function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<void> {
-    // First, validate the Onyx object is in the format we expect
-    for (const {onyxMethod, key, value} of data) {
-        if (!Object.values(OnyxUtils.METHOD).includes(onyxMethod)) {
-            throw new Error(`Invalid onyxMethod ${onyxMethod} in Onyx update.`);
-        }
-        if (onyxMethod === OnyxUtils.METHOD.MULTI_SET) {
-            // For multiset, we just expect the value to be an object
-            if (typeof value !== 'object' || Array.isArray(value) || typeof value === 'function') {
-                throw new Error('Invalid value provided in Onyx multiSet. Onyx multiSet value must be of type object.');
+    return OnyxUtils.afterInit(() => {
+        // The queue of operations within a single `update` call in the format of <item key - list of operations updating the item>.
+        // This allows us to batch the operations per item and merge them into one operation in the order they were requested.
+        const updateQueue: Record<OnyxKey, Array<OnyxValue<OnyxKey>>> = {};
+        const enqueueSetOperation = (key: OnyxKey, value: OnyxValue<OnyxKey>) => {
+            // If a `set` operation is enqueued, we should clear the whole queue.
+            // Since the `set` operation replaces the value entirely, there's no need to perform any previous operations.
+            // To do this, we first put `null` in the queue, which removes the existing value, and then merge the new value.
+            updateQueue[key] = [null, value];
+        };
+        const enqueueMergeOperation = (key: OnyxKey, value: OnyxValue<OnyxKey>) => {
+            if (value === null) {
+                // If we merge `null`, the value is removed and all the previous operations are discarded.
+                updateQueue[key] = [null];
+            } else if (!updateQueue[key]) {
+                updateQueue[key] = [value];
+            } else {
+                updateQueue[key].push(value);
             }
-        } else if (onyxMethod !== OnyxUtils.METHOD.CLEAR && typeof key !== 'string') {
-            throw new Error(`Invalid ${typeof key} key provided in Onyx update. Onyx key must be of type string.`);
-        }
-    }
-
-    // The queue of operations within a single `update` call in the format of <item key - list of operations updating the item>.
-    // This allows us to batch the operations per item and merge them into one operation in the order they were requested.
-    const updateQueue: Record<OnyxKey, Array<OnyxValue<OnyxKey>>> = {};
-    const enqueueSetOperation = (key: OnyxKey, value: OnyxValue<OnyxKey>) => {
-        // If a `set` operation is enqueued, we should clear the whole queue.
-        // Since the `set` operation replaces the value entirely, there's no need to perform any previous operations.
-        // To do this, we first put `null` in the queue, which removes the existing value, and then merge the new value.
-        updateQueue[key] = [null, value];
-    };
-    const enqueueMergeOperation = (key: OnyxKey, value: OnyxValue<OnyxKey>) => {
-        if (value === null) {
-            // If we merge `null`, the value is removed and all the previous operations are discarded.
-            updateQueue[key] = [null];
-        } else if (!updateQueue[key]) {
-            updateQueue[key] = [value];
-        } else {
-            updateQueue[key].push(value);
-        }
-    };
-
-    const promises: Array<() => Promise<void>> = [];
-    let clearPromise: Promise<void> = Promise.resolve();
-
-    for (const {onyxMethod, key, value} of data) {
-        const handlers: Record<OnyxMethodMap[keyof OnyxMethodMap], (k: typeof key, v: typeof value) => void> = {
-            [OnyxUtils.METHOD.SET]: enqueueSetOperation,
-            [OnyxUtils.METHOD.MERGE]: enqueueMergeOperation,
-            [OnyxUtils.METHOD.MERGE_COLLECTION]: () => {
-                const collection = value as OnyxMergeCollectionInput<OnyxKey>;
-                if (!OnyxUtils.isValidNonEmptyCollectionForMerge(collection)) {
-                    Logger.logInfo('mergeCollection enqueued within update() with invalid or empty value. Skipping this operation.');
-                    return;
-                }
-
-                // Confirm all the collection keys belong to the same parent
-                const collectionKeys = Object.keys(collection);
-                if (OnyxUtils.doAllCollectionItemsBelongToSameParent(key, collectionKeys)) {
-                    const mergedCollection: OnyxInputKeyValueMapping = collection;
-                    for (const collectionKey of collectionKeys) enqueueMergeOperation(collectionKey, mergedCollection[collectionKey]);
-                }
-            },
-            [OnyxUtils.METHOD.SET_COLLECTION]: (k, v) => promises.push(() => setCollection(k as TKey, v as OnyxSetCollectionInput<TKey>)),
-            [OnyxUtils.METHOD.MULTI_SET]: (k, v) => {
-                for (const [entryKey, entryValue] of Object.entries(v as Partial<OnyxInputKeyValueMapping>)) enqueueSetOperation(entryKey, entryValue);
-            },
-            [OnyxUtils.METHOD.CLEAR]: () => {
-                clearPromise = clear();
-            },
         };
 
-        handlers[onyxMethod](key, value);
-    }
+        const promises: Array<() => Promise<void>> = [];
+        let clearPromise: Promise<void> = Promise.resolve();
 
-    // Group all the collection-related keys and update each collection in a single `mergeCollection` call.
-    // This is needed to prevent multiple `mergeCollection` calls for the same collection and `merge` calls for the individual items of the said collection.
-    // This way, we ensure there is no race condition in the queued updates of the same key.
-    for (const collectionKey of OnyxUtils.getCollectionKeys()) {
-        const collectionItemKeys = Object.keys(updateQueue).filter((key) => OnyxUtils.isKeyMatch(collectionKey, key));
-        if (collectionItemKeys.length <= 1) {
-            // If there are no items of this collection in the updateQueue, we should skip it.
-            // If there is only one item, we should update it individually, therefore retain it in the updateQueue.
-            continue;
-        }
+        const onyxMethods = Object.values(OnyxUtils.METHOD);
+        for (const {onyxMethod, key, value} of data) {
+            if (!onyxMethods.includes(onyxMethod)) {
+                Logger.logInfo(`Invalid onyxMethod ${onyxMethod} in Onyx update. Skipping this operation.`);
+                continue;
+            }
+            if (onyxMethod !== OnyxUtils.METHOD.CLEAR && onyxMethod !== OnyxUtils.METHOD.MULTI_SET && typeof key !== 'string') {
+                Logger.logInfo(`Invalid ${typeof key} key provided in Onyx update. Key must be of type string. Skipping this operation.`);
+                continue;
+            }
 
-        const batchedCollectionUpdates = collectionItemKeys.reduce(
-            (queue: MixedOperationsQueue, key: string) => {
-                const operations = updateQueue[key];
-
-                // Remove the collection-related key from the updateQueue so that it won't be processed individually.
-                delete updateQueue[key];
-
-                const batchedChanges = OnyxUtils.mergeAndMarkChanges(operations);
-                if (operations[0] === null) {
-                    // eslint-disable-next-line no-param-reassign
-                    queue.set[key] = batchedChanges.result;
-                } else {
-                    // eslint-disable-next-line no-param-reassign
-                    queue.merge[key] = batchedChanges.result;
-                    if (batchedChanges.replaceNullPatches.length > 0) {
-                        // eslint-disable-next-line no-param-reassign
-                        queue.mergeReplaceNullPatches[key] = batchedChanges.replaceNullPatches;
+            const handlers: Record<OnyxMethodMap[keyof OnyxMethodMap], (k: typeof key, v: typeof value) => void> = {
+                [OnyxUtils.METHOD.SET]: enqueueSetOperation,
+                [OnyxUtils.METHOD.MERGE]: enqueueMergeOperation,
+                [OnyxUtils.METHOD.MERGE_COLLECTION]: () => {
+                    const collection = value as OnyxMergeCollectionInput<OnyxKey>;
+                    if (!OnyxUtils.isValidNonEmptyCollectionForMerge(collection)) {
+                        Logger.logInfo('Invalid or empty value provided in Onyx mergeCollection. Skipping this operation.');
+                        return;
                     }
-                }
-                return queue;
-            },
-            {
-                merge: {},
-                mergeReplaceNullPatches: {},
-                set: {},
-            },
-        );
 
-        if (!utils.isEmptyObject(batchedCollectionUpdates.merge)) {
-            promises.push(() =>
-                OnyxUtils.mergeCollectionWithPatches({
-                    collectionKey,
-                    collection: batchedCollectionUpdates.merge as OnyxMergeCollectionInput<OnyxKey>,
-                    mergeReplaceNullPatches: batchedCollectionUpdates.mergeReplaceNullPatches,
-                    isProcessingCollectionUpdate: true,
-                }),
+                    // Confirm all the collection keys belong to the same parent
+                    const collectionKeys = Object.keys(collection);
+                    if (OnyxUtils.doAllCollectionItemsBelongToSameParent(key, collectionKeys)) {
+                        const mergedCollection: OnyxInputKeyValueMapping = collection;
+                        for (const collectionKey of collectionKeys) enqueueMergeOperation(collectionKey, mergedCollection[collectionKey]);
+                    }
+                },
+                [OnyxUtils.METHOD.SET_COLLECTION]: (k, v) => promises.push(() => setCollection(k as TKey, v as OnyxSetCollectionInput<TKey>)),
+                [OnyxUtils.METHOD.MULTI_SET]: (k, v) => {
+                    if (typeof value !== 'object' || Array.isArray(value) || typeof value === 'function') {
+                        Logger.logInfo(`Invalid value provided in Onyx multiSet. Value must be of type object. Skipping this operation.`);
+                        return;
+                    }
+
+                    for (const [entryKey, entryValue] of Object.entries(v as Partial<OnyxInputKeyValueMapping>)) enqueueSetOperation(entryKey, entryValue);
+                },
+                [OnyxUtils.METHOD.CLEAR]: () => {
+                    clearPromise = clear();
+                },
+            };
+
+            handlers[onyxMethod](key, value);
+        }
+
+        // Group all the collection-related keys and update each collection in a single `mergeCollection` call.
+        // This is needed to prevent multiple `mergeCollection` calls for the same collection and `merge` calls for the individual items of the said collection.
+        // This way, we ensure there is no race condition in the queued updates of the same key.
+        for (const collectionKey of OnyxUtils.getCollectionKeys()) {
+            const collectionItemKeys = Object.keys(updateQueue).filter((key) => OnyxUtils.isKeyMatch(collectionKey, key));
+            if (collectionItemKeys.length <= 1) {
+                // If there are no items of this collection in the updateQueue, we should skip it.
+                // If there is only one item, we should update it individually, therefore retain it in the updateQueue.
+                continue;
+            }
+
+            const batchedCollectionUpdates = collectionItemKeys.reduce(
+                (queue: MixedOperationsQueue, key: string) => {
+                    const operations = updateQueue[key];
+
+                    // Remove the collection-related key from the updateQueue so that it won't be processed individually.
+                    delete updateQueue[key];
+
+                    const batchedChanges = OnyxUtils.mergeAndMarkChanges(operations);
+                    if (operations[0] === null) {
+                        // eslint-disable-next-line no-param-reassign
+                        queue.set[key] = batchedChanges.result;
+                    } else {
+                        // eslint-disable-next-line no-param-reassign
+                        queue.merge[key] = batchedChanges.result;
+                        if (batchedChanges.replaceNullPatches.length > 0) {
+                            // eslint-disable-next-line no-param-reassign
+                            queue.mergeReplaceNullPatches[key] = batchedChanges.replaceNullPatches;
+                        }
+                    }
+                    return queue;
+                },
+                {
+                    merge: {},
+                    mergeReplaceNullPatches: {},
+                    set: {},
+                },
             );
+
+            if (!utils.isEmptyObject(batchedCollectionUpdates.merge)) {
+                promises.push(() =>
+                    OnyxUtils.mergeCollectionWithPatches({
+                        collectionKey,
+                        collection: batchedCollectionUpdates.merge as OnyxMergeCollectionInput<OnyxKey>,
+                        mergeReplaceNullPatches: batchedCollectionUpdates.mergeReplaceNullPatches,
+                        isProcessingCollectionUpdate: true,
+                    }),
+                );
+            }
+            if (!utils.isEmptyObject(batchedCollectionUpdates.set)) {
+                promises.push(() => OnyxUtils.partialSetCollection({collectionKey, collection: batchedCollectionUpdates.set as OnyxSetCollectionInput<OnyxKey>}));
+            }
         }
-        if (!utils.isEmptyObject(batchedCollectionUpdates.set)) {
-            promises.push(() => OnyxUtils.partialSetCollection({collectionKey, collection: batchedCollectionUpdates.set as OnyxSetCollectionInput<OnyxKey>}));
+
+        for (const [key, operations] of Object.entries(updateQueue)) {
+            if (operations[0] === null) {
+                const batchedChanges = OnyxUtils.mergeChanges(operations).result;
+                promises.push(() => set(key, batchedChanges));
+                continue;
+            }
+
+            for (const operation of operations) {
+                promises.push(() => merge(key, operation));
+            }
         }
-    }
 
-    for (const [key, operations] of Object.entries(updateQueue)) {
-        if (operations[0] === null) {
-            const batchedChanges = OnyxUtils.mergeChanges(operations).result;
-            promises.push(() => set(key, batchedChanges));
-            continue;
-        }
+        const snapshotPromises = OnyxUtils.updateSnapshots(data, merge);
 
-        for (const operation of operations) {
-            promises.push(() => merge(key, operation));
-        }
-    }
+        // We need to run the snapshot updates before the other updates so the snapshot data can be updated before the loading state in the snapshot
+        const finalPromises = snapshotPromises.concat(promises);
 
-    const snapshotPromises = OnyxUtils.updateSnapshots(data, merge);
-
-    // We need to run the snapshot updates before the other updates so the snapshot data can be updated before the loading state in the snapshot
-    const finalPromises = snapshotPromises.concat(promises);
-
-    return clearPromise.then(() => Promise.all(finalPromises.map((p) => p()))).then(() => undefined);
+        return clearPromise.then(() => Promise.all(finalPromises.map((p) => p()))).then(() => undefined);
+    });
 }
 
 /**
@@ -566,7 +572,7 @@ function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<vo
  * @param collection Object collection keyed by individual collection member keys and values
  */
 function setCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collection: OnyxSetCollectionInput<TKey>): Promise<void> {
-    return OnyxUtils.setCollectionWithRetry({collectionKey, collection});
+    return OnyxUtils.afterInit(() => OnyxUtils.setCollectionWithRetry({collectionKey, collection}));
 }
 
 const Onyx = {

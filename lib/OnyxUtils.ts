@@ -135,6 +135,21 @@ function getDeferredInitTask(): DeferredTask {
 }
 
 /**
+ * Executes an action after Onyx has been initialized.
+ * If Onyx is already initialized, the action is executed immediately.
+ * Otherwise, it waits for initialization to complete before executing.
+ *
+ * @param action The action to execute after initialization
+ * @returns The result of the action
+ */
+function afterInit<T>(action: () => Promise<T>): Promise<T> {
+    if (deferredInitTask.isResolved) {
+        return action();
+    }
+    return deferredInitTask.promise.then(action);
+}
+
+/**
  * Getter - returns the skippable collection member IDs.
  */
 function getSkippableCollectionMemberIDs(): Set<string> {
@@ -1700,6 +1715,7 @@ const OnyxUtils = {
     getMergeQueuePromise,
     getDefaultKeyStates,
     getDeferredInitTask,
+    afterInit,
     initStoreValues,
     sendActionToDevTools,
     get,
