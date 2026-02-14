@@ -431,66 +431,6 @@ describe('OnyxUtils', () => {
         });
     });
 
-    describe('scheduleSubscriberUpdate', () => {
-        test('10k calls scheduling updates', async () => {
-            const subscriptionMap = new Map<string, number>();
-
-            const changedReportActions = Object.fromEntries(
-                Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const),
-            ) as GenericCollection;
-
-            await measureAsyncFunction(() => Promise.all(Object.entries(changedReportActions).map(([key, value]) => OnyxUtils.scheduleSubscriberUpdate(key, value))), {
-                beforeEach: async () => {
-                    await Onyx.multiSet(mockedReportActionsMap);
-                    for (const key of mockedReportActionsKeys) {
-                        const id = OnyxUtils.subscribeToKey({key, callback: jest.fn(), initWithStoredValues: false});
-                        subscriptionMap.set(key, id);
-                    }
-                },
-                afterEach: async () => {
-                    for (const key of mockedReportActionsKeys) {
-                        const id = subscriptionMap.get(key);
-                        if (id) {
-                            OnyxUtils.unsubscribeFromKey(id);
-                        }
-                    }
-                    subscriptionMap.clear();
-                    await clearOnyxAfterEachMeasure();
-                },
-            });
-        });
-    });
-
-    describe('scheduleNotifyCollectionSubscribers', () => {
-        test('one call with 10k heavy objects to update 10k subscribers', async () => {
-            const subscriptionMap = new Map<string, number>();
-
-            const changedReportActions = Object.fromEntries(
-                Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const),
-            ) as GenericCollection;
-
-            await measureAsyncFunction(() => OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, changedReportActions, mockedReportActionsMap), {
-                beforeEach: async () => {
-                    await Onyx.multiSet(mockedReportActionsMap);
-                    for (const key of mockedReportActionsKeys) {
-                        const id = OnyxUtils.subscribeToKey({key, callback: jest.fn(), initWithStoredValues: false});
-                        subscriptionMap.set(key, id);
-                    }
-                },
-                afterEach: async () => {
-                    for (const key of mockedReportActionsKeys) {
-                        const id = subscriptionMap.get(key);
-                        if (id) {
-                            OnyxUtils.unsubscribeFromKey(id);
-                        }
-                    }
-                    subscriptionMap.clear();
-                    await clearOnyxAfterEachMeasure();
-                },
-            });
-        });
-    });
-
     describe('remove', () => {
         test('10k calls', async () => {
             await measureAsyncFunction(() => Promise.all(mockedReportActionsKeys.map((key) => OnyxUtils.remove(key))), {
@@ -534,7 +474,7 @@ describe('OnyxUtils', () => {
             const reportAction = mockedReportActionsMap[`${collectionKey}0`];
             const changedReportAction = createRandomReportAction(Number(reportAction.reportActionID));
 
-            await measureAsyncFunction(() => OnyxUtils.broadcastUpdate(key, changedReportAction, true), {
+            await measureFunction(() => OnyxUtils.broadcastUpdate(key, changedReportAction, true), {
                 beforeEach: async () => {
                     await Onyx.set(key, reportAction);
                 },
