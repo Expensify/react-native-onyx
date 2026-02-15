@@ -26,12 +26,6 @@
 <dt><a href="#initStoreValues">initStoreValues(keys, initialKeyStates, evictableKeys)</a></dt>
 <dd><p>Sets the initial values for the Onyx store</p>
 </dd>
-<dt><a href="#maybeFlushBatchUpdates">maybeFlushBatchUpdates()</a></dt>
-<dd><p>We are batching together onyx updates. This helps with use cases where we schedule onyx updates after each other.
-This happens for example in the Onyx.update function, where we process API responses that might contain a lot of
-update operations. Instead of calling the subscribers for each update operation, we batch them together which will
-cause react to schedule the updates at once instead of after each other. This is mainly a performance optimization.</p>
-</dd>
 <dt><a href="#reduceCollectionWithSelector">reduceCollectionWithSelector()</a></dt>
 <dd><p>Takes a collection of items (eg. {testKey_1:{a:&#39;a&#39;}, testKey_2:{b:&#39;b&#39;}})
 and runs it through a reducer function to return a subset of the data according to a selector.
@@ -60,6 +54,21 @@ to the values for those keys (correctly typed) such as <code>[OnyxCollection&lt;
 <dt><a href="#isCollectionKey">isCollectionKey()</a></dt>
 <dd><p>Checks to see if the subscriber&#39;s supplied key
 is associated with a collection of keys.</p>
+</dd>
+<dt><a href="#isCollectionMember">isCollectionMember(key)</a> ⇒</dt>
+<dd><p>Checks if a given key is a collection member key (not just a collection key).</p>
+</dd>
+<dt><a href="#isRamOnlyKey">isRamOnlyKey(key)</a> ⇒</dt>
+<dd><p>Checks if a given key is a RAM-only key, RAM-only collection key, or a RAM-only collection member</p>
+<p>For example:</p>
+<p>For the following Onyx setup</p>
+<p>ramOnlyKeys: [&quot;ramOnlyKey&quot;, &quot;ramOnlyCollection_&quot;]</p>
+<ul>
+<li><code>isRamOnlyKey(&quot;ramOnlyKey&quot;)</code> would return true</li>
+<li><code>isRamOnlyKey(&quot;ramOnlyCollection_&quot;)</code> would return true</li>
+<li><code>isRamOnlyKey(&quot;ramOnlyCollection_1&quot;)</code> would return true</li>
+<li><code>isRamOnlyKey(&quot;someOtherKey&quot;)</code> would return false</li>
+</ul>
 </dd>
 <dt><a href="#splitCollectionMemberKey">splitCollectionMemberKey(key, collectionKey)</a> ⇒</dt>
 <dd><p>Splits a collection member key into the collection key part and the ID part.</p>
@@ -98,21 +107,27 @@ run out of storage the least recently accessed key can be removed.</p>
 <dt><a href="#getCollectionDataAndSendAsObject">getCollectionDataAndSendAsObject()</a></dt>
 <dd><p>Gets the data for a given an array of matching keys, combines them into an object, and sends the result back to the subscriber.</p>
 </dd>
+<dt><a href="#prepareSubscriberUpdate">prepareSubscriberUpdate(callback)</a></dt>
+<dd><p>Delays promise resolution until the next macrotask to prevent race condition if the key subscription is in progress.</p>
+</dd>
 <dt><a href="#scheduleSubscriberUpdate">scheduleSubscriberUpdate()</a></dt>
 <dd><p>Schedules an update that will be appended to the macro task queue (so it doesn&#39;t update the subscribers immediately).</p>
 </dd>
 <dt><a href="#scheduleNotifyCollectionSubscribers">scheduleNotifyCollectionSubscribers()</a></dt>
-<dd><p>This method is similar to notifySubscribersOnNextTick but it is built for working specifically with collections
+<dd><p>This method is similar to scheduleSubscriberUpdate but it is built for working specifically with collections
 so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
 subscriber callbacks receive the data in a different format than they normally expect and it breaks code.</p>
 </dd>
 <dt><a href="#remove">remove()</a></dt>
 <dd><p>Remove a key from Onyx and update the subscribers</p>
 </dd>
-<dt><a href="#evictStorageAndRetry">evictStorageAndRetry()</a></dt>
-<dd><p>If we fail to set or merge we must handle this by
-evicting some data from Onyx and then retrying to do
-whatever it is we attempted to do.</p>
+<dt><a href="#retryOperation">retryOperation()</a></dt>
+<dd><p>Handles storage operation failures based on the error type:</p>
+<ul>
+<li>Storage capacity errors: evicts data and retries the operation</li>
+<li>Invalid data errors: logs an alert and throws an error</li>
+<li>Other errors: retries the operation</li>
+</ul>
 </dd>
 <dt><a href="#broadcastUpdate">broadcastUpdate()</a></dt>
 <dd><p>Notifies subscribers and writes current value to cache</p>
@@ -147,14 +162,31 @@ It will also mark deep nested objects that need to be entirely replaced during t
 <dt><a href="#unsubscribeFromKey">unsubscribeFromKey(subscriptionID)</a></dt>
 <dd><p>Disconnects and removes the listener from the Onyx key.</p>
 </dd>
-<dt><a href="#mergeCollectionWithPatches">mergeCollectionWithPatches(collectionKey, collection, mergeReplaceNullPatches)</a></dt>
+<dt><a href="#setWithRetry">setWithRetry(params, retryAttempt)</a></dt>
+<dd><p>Writes a value to our store with the given key.
+Serves as core implementation for <code>Onyx.set()</code> public function, the difference being
+that this internal function allows passing an additional <code>retryAttempt</code> parameter to retry on failure.</p>
+</dd>
+<dt><a href="#multiSetWithRetry">multiSetWithRetry(data, retryAttempt)</a></dt>
+<dd><p>Sets multiple keys and values.
+Serves as core implementation for <code>Onyx.multiSet()</code> public function, the difference being
+that this internal function allows passing an additional <code>retryAttempt</code> parameter to retry on failure.</p>
+</dd>
+<dt><a href="#setCollectionWithRetry">setCollectionWithRetry(params, retryAttempt)</a></dt>
+<dd><p>Sets a collection by replacing all existing collection members with new values.
+Any existing collection members not included in the new data will be removed.
+Serves as core implementation for <code>Onyx.setCollection()</code> public function, the difference being
+that this internal function allows passing an additional <code>retryAttempt</code> parameter to retry on failure.</p>
+</dd>
+<dt><a href="#mergeCollectionWithPatches">mergeCollectionWithPatches(params, retryAttempt)</a></dt>
 <dd><p>Merges a collection based on their keys.
 Serves as core implementation for <code>Onyx.mergeCollection()</code> public function, the difference being
-that this internal function allows passing an additional <code>mergeReplaceNullPatches</code> parameter.</p>
+that this internal function allows passing an additional <code>mergeReplaceNullPatches</code> parameter and retries on failure.</p>
 </dd>
-<dt><a href="#partialSetCollection">partialSetCollection(collectionKey, collection)</a></dt>
+<dt><a href="#partialSetCollection">partialSetCollection(params, retryAttempt)</a></dt>
 <dd><p>Sets keys in a collection by replacing all targeted collection members with new values.
-Any existing collection members not included in the new data will not be removed.</p>
+Any existing collection members not included in the new data will not be removed.
+Retries on failure.</p>
 </dd>
 <dt><a href="#clearOnyxUtilsInternals">clearOnyxUtilsInternals()</a></dt>
 <dd><p>Clear internal variables used in this file, useful in test environments.</p>
@@ -210,15 +242,6 @@ Sets the initial values for the Onyx store
 | initialKeyStates | initial data to set when `init()` and `clear()` are called |
 | evictableKeys | This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal. |
 
-<a name="maybeFlushBatchUpdates"></a>
-
-## maybeFlushBatchUpdates()
-We are batching together onyx updates. This helps with use cases where we schedule onyx updates after each other.
-This happens for example in the Onyx.update function, where we process API responses that might contain a lot of
-update operations. Instead of calling the subscribers for each update operation, we batch them together which will
-cause react to schedule the updates at once instead of after each other. This is mainly a performance optimization.
-
-**Kind**: global function  
 <a name="reduceCollectionWithSelector"></a>
 
 ## reduceCollectionWithSelector()
@@ -284,6 +307,41 @@ Checks to see if the subscriber's supplied key
 is associated with a collection of keys.
 
 **Kind**: global function  
+<a name="isCollectionMember"></a>
+
+## isCollectionMember(key) ⇒
+Checks if a given key is a collection member key (not just a collection key).
+
+**Kind**: global function  
+**Returns**: true if the key is a collection member, false otherwise  
+
+| Param | Description |
+| --- | --- |
+| key | The key to check |
+
+<a name="isRamOnlyKey"></a>
+
+## isRamOnlyKey(key) ⇒
+Checks if a given key is a RAM-only key, RAM-only collection key, or a RAM-only collection member
+
+For example:
+
+For the following Onyx setup
+
+ramOnlyKeys: ["ramOnlyKey", "ramOnlyCollection_"]
+
+- `isRamOnlyKey("ramOnlyKey")` would return true
+- `isRamOnlyKey("ramOnlyCollection_")` would return true
+- `isRamOnlyKey("ramOnlyCollection_1")` would return true
+- `isRamOnlyKey("someOtherKey")` would return false
+
+**Kind**: global function  
+**Returns**: true if key is a RAM-only key, RAM-only collection key, or a RAM-only collection member  
+
+| Param | Description |
+| --- | --- |
+| key | The key to check |
+
 <a name="splitCollectionMemberKey"></a>
 
 ## splitCollectionMemberKey(key, collectionKey) ⇒
@@ -382,6 +440,17 @@ run out of storage the least recently accessed key can be removed.
 Gets the data for a given an array of matching keys, combines them into an object, and sends the result back to the subscriber.
 
 **Kind**: global function  
+<a name="prepareSubscriberUpdate"></a>
+
+## prepareSubscriberUpdate(callback)
+Delays promise resolution until the next macrotask to prevent race condition if the key subscription is in progress.
+
+**Kind**: global function  
+
+| Param | Description |
+| --- | --- |
+| callback | The keyChanged/keysChanged callback |
+
 <a name="scheduleSubscriberUpdate"></a>
 
 ## scheduleSubscriberUpdate()
@@ -395,7 +464,7 @@ scheduleSubscriberUpdate(key, value, subscriber => subscriber.initWithStoredValu
 <a name="scheduleNotifyCollectionSubscribers"></a>
 
 ## scheduleNotifyCollectionSubscribers()
-This method is similar to notifySubscribersOnNextTick but it is built for working specifically with collections
+This method is similar to scheduleSubscriberUpdate but it is built for working specifically with collections
 so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
 subscriber callbacks receive the data in a different format than they normally expect and it breaks code.
 
@@ -406,12 +475,13 @@ subscriber callbacks receive the data in a different format than they normally e
 Remove a key from Onyx and update the subscribers
 
 **Kind**: global function  
-<a name="evictStorageAndRetry"></a>
+<a name="retryOperation"></a>
 
-## evictStorageAndRetry()
-If we fail to set or merge we must handle this by
-evicting some data from Onyx and then retrying to do
-whatever it is we attempted to do.
+## retryOperation()
+Handles storage operation failures based on the error type:
+- Storage capacity errors: evicts data and retries the operation
+- Invalid data errors: logs an alert and throws an error
+- Other errors: retries the operation
 
 **Kind**: global function  
 <a name="broadcastUpdate"></a>
@@ -507,33 +577,87 @@ Disconnects and removes the listener from the Onyx key.
 | --- | --- |
 | subscriptionID | Subscription ID returned by calling `OnyxUtils.subscribeToKey()`. |
 
-<a name="mergeCollectionWithPatches"></a>
+<a name="setWithRetry"></a>
 
-## mergeCollectionWithPatches(collectionKey, collection, mergeReplaceNullPatches)
-Merges a collection based on their keys.
-Serves as core implementation for `Onyx.mergeCollection()` public function, the difference being
-that this internal function allows passing an additional `mergeReplaceNullPatches` parameter.
+## setWithRetry(params, retryAttempt)
+Writes a value to our store with the given key.
+Serves as core implementation for `Onyx.set()` public function, the difference being
+that this internal function allows passing an additional `retryAttempt` parameter to retry on failure.
 
 **Kind**: global function  
 
 | Param | Description |
 | --- | --- |
-| collectionKey | e.g. `ONYXKEYS.COLLECTION.REPORT` |
-| collection | Object collection keyed by individual collection member keys and values |
-| mergeReplaceNullPatches | Record where the key is a collection member key and the value is a list of tuples that we'll use to replace the nested objects of that collection member record with something else. |
+| params | set parameters |
+| params.key | ONYXKEY to set |
+| params.value | value to store |
+| params.options | optional configuration object |
+| retryAttempt | retry attempt |
+
+<a name="multiSetWithRetry"></a>
+
+## multiSetWithRetry(data, retryAttempt)
+Sets multiple keys and values.
+Serves as core implementation for `Onyx.multiSet()` public function, the difference being
+that this internal function allows passing an additional `retryAttempt` parameter to retry on failure.
+
+**Kind**: global function  
+
+| Param | Description |
+| --- | --- |
+| data | object keyed by ONYXKEYS and the values to set |
+| retryAttempt | retry attempt |
+
+<a name="setCollectionWithRetry"></a>
+
+## setCollectionWithRetry(params, retryAttempt)
+Sets a collection by replacing all existing collection members with new values.
+Any existing collection members not included in the new data will be removed.
+Serves as core implementation for `Onyx.setCollection()` public function, the difference being
+that this internal function allows passing an additional `retryAttempt` parameter to retry on failure.
+
+**Kind**: global function  
+
+| Param | Description |
+| --- | --- |
+| params | collection parameters |
+| params.collectionKey | e.g. `ONYXKEYS.COLLECTION.REPORT` |
+| params.collection | Object collection keyed by individual collection member keys and values |
+| retryAttempt | retry attempt |
+
+<a name="mergeCollectionWithPatches"></a>
+
+## mergeCollectionWithPatches(params, retryAttempt)
+Merges a collection based on their keys.
+Serves as core implementation for `Onyx.mergeCollection()` public function, the difference being
+that this internal function allows passing an additional `mergeReplaceNullPatches` parameter and retries on failure.
+
+**Kind**: global function  
+
+| Param | Description |
+| --- | --- |
+| params | mergeCollection parameters |
+| params.collectionKey | e.g. `ONYXKEYS.COLLECTION.REPORT` |
+| params.collection | Object collection keyed by individual collection member keys and values |
+| params.mergeReplaceNullPatches | Record where the key is a collection member key and the value is a list of tuples that we'll use to replace the nested objects of that collection member record with something else. |
+| params.isProcessingCollectionUpdate | whether this is part of a collection update operation. |
+| retryAttempt | retry attempt |
 
 <a name="partialSetCollection"></a>
 
-## partialSetCollection(collectionKey, collection)
+## partialSetCollection(params, retryAttempt)
 Sets keys in a collection by replacing all targeted collection members with new values.
 Any existing collection members not included in the new data will not be removed.
+Retries on failure.
 
 **Kind**: global function  
 
 | Param | Description |
 | --- | --- |
-| collectionKey | e.g. `ONYXKEYS.COLLECTION.REPORT` |
-| collection | Object collection keyed by individual collection member keys and values |
+| params | collection parameters |
+| params.collectionKey | e.g. `ONYXKEYS.COLLECTION.REPORT` |
+| params.collection | Object collection keyed by individual collection member keys and values |
+| retryAttempt | retry attempt |
 
 <a name="clearOnyxUtilsInternals"></a>
 

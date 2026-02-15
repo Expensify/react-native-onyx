@@ -441,7 +441,43 @@ To use the extension, simply install it from your favorite web browser store:
 - [Microsoft Edge](https://microsoftedge.microsoft.com/addons/detail/redux-devtools/nnkgneoiohoecpdiaponcejilbhhikei)
 - [Mozilla Firefox](https://addons.mozilla.org/en-US/firefox/addon/reduxdevtools/)
 
-After installing the extension, Onyx will automatically connect to it and start logging any updates made to the local storage.
+### Enabling or Disabling Redux DevTools
+
+You can control whether the Redux DevTools integration is enabled by setting the `enableDevTools` option in the `Onyx.init()` configuration.
+
+- To **enable** Redux DevTools and start logging updates to local storage, set `enableDevTools: true`.
+- To **disable** Redux DevTools and prevent any logging to the extension, set `enableDevTools: false`.
+
+This option defaults to `true` (enabled) on Web, so you only need to set it to `false` if you want to disable the integration.
+
+```javascript
+import Onyx from 'react-native-onyx';
+import Config from './config';
+
+Onyx.init({
+    keys: ONYXKEYS,
+    enableDevTools: Config.ENABLE_ONYX_DEVTOOLS,
+});
+```
+
+### Using RAM-only keys
+
+You can choose not to save certain keys on disk and keep them RAM-only, that way their values will reset with each session. You just have to pass an array of `ramOnlyKeys` to the `Onyx.init` method. You can mark entire collections as RAM-only by including the collection key (e.g., `ONYXKEYS.COLLECTION.TEMP_DATA`). This will make all members of that collection RAM-only. Individual collection member keys cannot be selectively marked as RAM-only.
+
+```javascript
+import Onyx from 'react-native-onyx';
+
+Onyx.init({
+    keys: ONYXKEYS,
+    ramOnlyKeys: [
+        ONYXKEYS.RAM_ONLY_KEY_1,
+        ONYXKEYS.RAM_ONLY_KEY_2,
+        ONYXKEYS.COLLECTION.TEMP_DATA,
+    ],
+});
+```
+
+> Note: RAM-only keys still consume memory and will remain in cache until explicitly cleared or until Onyx.clear() is called. Use them judiciously for truly ephemeral data.
 
 ### Usage
 

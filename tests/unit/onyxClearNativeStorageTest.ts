@@ -24,7 +24,7 @@ describe('Set data while storage is clearing', () => {
     // Always use a "fresh" cache instance
     beforeEach(() => {
         onyxValue = null;
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
+
         cache = require('../../lib/OnyxCache').default;
         Onyx.init({
             keys: ONYX_KEYS,

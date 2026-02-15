@@ -5,11 +5,13 @@ import {measureRenders} from 'reassure';
 import type {FetchStatus, OnyxEntry, OnyxKey, OnyxValue, ResultMetadata, UseOnyxOptions} from '../../lib';
 import Onyx, {useOnyx} from '../../lib';
 import StorageMock from '../../lib/storage';
+import type {UseOnyxSelector} from '../../lib/useOnyx';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
     TEST_KEY_2: 'test2',
     TEST_KEY_3: 'test3',
+    RAM_ONLY_TEST_KEY: 'ramOnlyTestKey',
 };
 
 const dataMatcher = (onyxKey: OnyxKey, expected: unknown) => `data: ${onyxKey}_${JSON.stringify(expected)}`;
@@ -56,6 +58,7 @@ describe('useOnyx', () => {
         Onyx.init({
             keys: ONYXKEYS,
             maxCachedKeysCount: 100000,
+            ramOnlyKeys: [ONYXKEYS.RAM_ONLY_TEST_KEY],
         });
     });
 
@@ -142,8 +145,7 @@ describe('useOnyx', () => {
                 <UseOnyxWrapper
                     onyxKey={key}
                     onyxOptions={{
-                        // @ts-expect-error bypass
-                        selector: (entry: OnyxEntry<{id: string; name: string}>) => `${entry?.name}_changed`,
+                        selector: ((entry: OnyxEntry<{id: string; name: string}>) => `${entry?.name}_changed`) as UseOnyxSelector<OnyxKey, string>,
                     }}
                 />,
                 {
@@ -173,8 +175,7 @@ describe('useOnyx', () => {
                 <UseOnyxWrapper
                     onyxKey={key}
                     onyxOptions={{
-                        // @ts-expect-error bypass
-                        selector: (entry: OnyxEntry<{id: string; name: string}>) => `${entry?.name}_changed`,
+                        selector: ((entry: OnyxEntry<{id: string; name: string}>) => `${entry?.name}_changed`) as UseOnyxSelector<OnyxKey, string>,
                     }}
                 />,
                 {

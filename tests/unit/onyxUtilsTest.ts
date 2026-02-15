@@ -5,6 +5,8 @@ import type {GenericDeepRecord} from '../types';
 import utils from '../../lib/utils';
 import type {Collection, OnyxCollection} from '../../lib/types';
 import type GenericCollection from '../utils/GenericCollection';
+import StorageMock from '../../lib/storage';
+import createDeferredTask from '../../lib/createDeferredTask';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 const testObject: GenericDeepRecord = {
@@ -75,16 +77,23 @@ const ONYXKEYS = {
         TEST_LEVEL_KEY: 'test_level_',
         TEST_LEVEL_LAST_KEY: 'test_level_last_',
         ROUTES: 'routes_',
+        RAM_ONLY_COLLECTION: 'ramOnlyCollection_',
     },
+    RAM_ONLY_KEY: 'ramOnlyKey',
 };
 
-Onyx.init({
-    keys: ONYXKEYS,
-});
-
-beforeEach(() => Onyx.clear());
-
 describe('OnyxUtils', () => {
+    beforeAll(() =>
+        Onyx.init({
+            keys: ONYXKEYS,
+            ramOnlyKeys: [ONYXKEYS.RAM_ONLY_KEY, ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION],
+        }),
+    );
+
+    beforeEach(() => Onyx.clear());
+
+    afterEach(() => jest.clearAllMocks());
+
     describe('skippable member subscriptions', () => {
         const BASE = ONYXKEYS.COLLECTION.TEST_KEY;
 
@@ -141,6 +150,7 @@ describe('OnyxUtils', () => {
             expect(Object.keys(received ?? {})).not.toContain(undefinedKey);
         });
     });
+
     describe('splitCollectionMemberKey', () => {
         describe('should return correct values', () => {
             const dataResult: Record<string, [string, string]> = {
@@ -213,11 +223,14 @@ describe('OnyxUtils', () => {
             } as GenericCollection);
 
             // Replace with new collection data
-            await OnyxUtils.partialSetCollection(ONYXKEYS.COLLECTION.ROUTES, {
-                [routeA]: {name: 'New Route A'},
-                [routeB]: {name: 'New Route B'},
-                [routeC]: {name: 'New Route C'},
-            } as GenericCollection);
+            await OnyxUtils.partialSetCollection({
+                collectionKey: ONYXKEYS.COLLECTION.ROUTES,
+                collection: {
+                    [routeA]: {name: 'New Route A'},
+                    [routeB]: {name: 'New Route B'},
+                    [routeC]: {name: 'New Route C'},
+                } as GenericCollection,
+            });
 
             expect(result).toEqual({
                 [routeA]: {name: 'New Route A'},
@@ -243,7 +256,7 @@ describe('OnyxUtils', () => {
                 [routeA]: {name: 'Route A'},
             } as GenericCollection);
 
-            await OnyxUtils.partialSetCollection(ONYXKEYS.COLLECTION.ROUTES, {} as GenericCollection);
+            await OnyxUtils.partialSetCollection({collectionKey: ONYXKEYS.COLLECTION.ROUTES, collection: {} as GenericCollection});
 
             expect(result).toEqual({
                 [routeA]: {name: 'Route A'},
@@ -267,9 +280,12 @@ describe('OnyxUtils', () => {
                 [routeA]: {name: 'Route A'},
             } as GenericCollection);
 
-            await OnyxUtils.partialSetCollection(ONYXKEYS.COLLECTION.ROUTES, {
-                [invalidRoute]: {name: 'Invalid Route'},
-            } as GenericCollection);
+            await OnyxUtils.partialSetCollection({
+                collectionKey: ONYXKEYS.COLLECTION.ROUTES,
+                collection: {
+                    [invalidRoute]: {name: 'Invalid Route'},
+                } as GenericCollection,
+            });
 
             expect(result).toEqual({
                 [routeA]: {name: 'Route A'},
@@ -341,7 +357,6 @@ describe('OnyxUtils', () => {
                 ONYXKEYS.COLLECTION.TEST_KEY,
                 {[entryKey]: updatedEntryData}, // new collection
                 initialCollection, // previous collection
-                true, // notify connect subscribers
             );
 
             // Should be called again because data changed
@@ -391,6 +406,36 @@ describe('OnyxUtils', () => {
             expect(() => {
                 OnyxUtils.getCollectionKey('');
             }).toThrowError("Invalid '' key provided, only collection keys are allowed.");
+        });
+    });
+
+    describe('isCollectionMember', () => {
+        it('should return true for collection member keys', () => {
+            expect(OnyxUtils.isCollectionMember('test_123')).toBe(true);
+            expect(OnyxUtils.isCollectionMember('test_level_456')).toBe(true);
+            expect(OnyxUtils.isCollectionMember('test_level_last_789')).toBe(true);
+            expect(OnyxUtils.isCollectionMember('test_-1_something')).toBe(true);
+            expect(OnyxUtils.isCollectionMember('routes_abc')).toBe(true);
+        });
+
+        it('should return false for collection keys themselves', () => {
+            expect(OnyxUtils.isCollectionMember('test_')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('test_level_')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('test_level_last_')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('routes_')).toBe(false);
+        });
+
+        it('should return false for non-collection keys', () => {
+            expect(OnyxUtils.isCollectionMember('test')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('someRegularKey')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('notACollection')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('')).toBe(false);
+        });
+
+        it('should return false for invalid keys', () => {
+            expect(OnyxUtils.isCollectionMember('invalid_key_123')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('notregistered_')).toBe(false);
+            expect(OnyxUtils.isCollectionMember('notregistered_123')).toBe(false);
         });
     });
 
@@ -465,6 +510,110 @@ describe('OnyxUtils', () => {
                 [['b', 'd'], {i: 'i', j: 'j'}],
                 [['b', 'g'], {k: 'k'}],
             ]);
+        });
+    });
+
+    describe('retryOperation', () => {
+        const retryOperationSpy = jest.spyOn(OnyxUtils, 'retryOperation');
+        const genericError = new Error('Generic storage error');
+        const invalidDataError = new Error("Failed to execute 'put' on 'IDBObjectStore': invalid data");
+        const memoryError = new Error('out of memory');
+
+        it('should retry only one time if the operation is firstly failed and then passed', async () => {
+            StorageMock.setItem = jest.fn(StorageMock.setItem).mockRejectedValueOnce(genericError).mockImplementation(StorageMock.setItem);
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+
+            // Should be called once, since Storage.setItem if failed only once
+            expect(retryOperationSpy).toHaveBeenCalledTimes(1);
+        });
+
+        it('should stop retrying after MAX_STORAGE_OPERATION_RETRY_ATTEMPTS retries for failing operation', async () => {
+            StorageMock.setItem = jest.fn().mockRejectedValue(genericError);
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+
+            // Should be called 6 times: initial attempt + 5 retries (MAX_STORAGE_OPERATION_RETRY_ATTEMPTS)
+            expect(retryOperationSpy).toHaveBeenCalledTimes(6);
+        });
+
+        it("should throw error for if operation failed with \"Failed to execute 'put' on 'IDBObjectStore': invalid data\" error", async () => {
+            StorageMock.setItem = jest.fn().mockRejectedValueOnce(invalidDataError);
+
+            await expect(Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'})).rejects.toThrow(invalidDataError);
+        });
+
+        it('should not retry in case of storage capacity error and no keys to evict', async () => {
+            StorageMock.setItem = jest.fn().mockRejectedValue(memoryError);
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+
+            // Should only be called once since there are no evictable keys
+            expect(retryOperationSpy).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('isRamOnlyKey', () => {
+        it('should return true for RAM-only key', () => {
+            expect(OnyxUtils.isRamOnlyKey(ONYXKEYS.RAM_ONLY_KEY)).toBeTruthy();
+        });
+
+        it('should return true for RAM-only collection', () => {
+            expect(OnyxUtils.isRamOnlyKey(ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION)).toBeTruthy();
+        });
+
+        it('should return true for RAM-only collection member', () => {
+            expect(OnyxUtils.isRamOnlyKey(`${ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION}1`)).toBeTruthy();
+        });
+
+        it('should return false for a normal key', () => {
+            expect(OnyxUtils.isRamOnlyKey(ONYXKEYS.TEST_KEY)).toBeFalsy();
+        });
+
+        it('should return false for normal collection', () => {
+            expect(OnyxUtils.isRamOnlyKey(ONYXKEYS.COLLECTION.TEST_KEY)).toBeFalsy();
+        });
+
+        it('should return false for normal collection member', () => {
+            expect(OnyxUtils.isRamOnlyKey(`${ONYXKEYS.COLLECTION.TEST_KEY}1`)).toBeFalsy();
+        });
+    });
+
+    describe('afterInit', () => {
+        beforeEach(() => {
+            // Resets the deferred init task before each test.
+            Object.assign(OnyxUtils.getDeferredInitTask(), createDeferredTask());
+        });
+
+        afterEach(() => {
+            jest.restoreAllMocks();
+            return Onyx.clear();
+        });
+
+        it('should execute the callback immediately if Onyx is already initialized', async () => {
+            Onyx.init({keys: ONYXKEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            const callback = jest.fn();
+            OnyxUtils.afterInit(callback);
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(callback).toHaveBeenCalledTimes(1);
+        });
+
+        it('should only execute the callback after Onyx initialization', async () => {
+            const callback = jest.fn();
+            OnyxUtils.afterInit(callback);
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(callback).not.toHaveBeenCalled();
+
+            Onyx.init({keys: ONYXKEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(callback).toHaveBeenCalledTimes(1);
         });
     });
 });

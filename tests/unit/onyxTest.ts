@@ -1,14 +1,17 @@
 import lodashClone from 'lodash/clone';
 import lodashCloneDeep from 'lodash/cloneDeep';
+import {act} from '@testing-library/react-native';
 import Onyx from '../../lib';
+import * as Logger from '../../lib/Logger';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import OnyxUtils from '../../lib/OnyxUtils';
 import type OnyxCache from '../../lib/OnyxCache';
 import StorageMock from '../../lib/storage';
-import type {OnyxCollection, OnyxUpdate} from '../../lib/types';
+import type {OnyxCollection, OnyxKey, OnyxUpdate} from '../../lib/types';
 import type {GenericDeepRecord} from '../types';
 import type GenericCollection from '../utils/GenericCollection';
 import type {Connection} from '../../lib/OnyxConnectionManager';
+import createDeferredTask from '../../lib/createDeferredTask';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
@@ -24,26 +27,32 @@ const ONYX_KEYS = {
         ANIMALS: 'animals_',
         SNAPSHOT: 'snapshot_',
         ROUTES: 'routes_',
+        RAM_ONLY_COLLECTION: 'ramOnlyCollection_',
     },
+    RAM_ONLY_TEST_KEY: 'ramOnlyKey',
+    RAM_ONLY_WITH_INITIAL_VALUE: 'ramOnlyWithInitialValue',
 };
 
-Onyx.init({
-    keys: ONYX_KEYS,
-    initialKeyStates: {
-        [ONYX_KEYS.OTHER_TEST]: 42,
-        [ONYX_KEYS.KEY_WITH_UNDERSCORE]: 'default',
-    },
-    skippableCollectionMemberIDs: ['skippable-id'],
-});
-
 describe('Onyx', () => {
+    beforeAll(() => {
+        Onyx.init({
+            keys: ONYX_KEYS,
+            initialKeyStates: {
+                [ONYX_KEYS.OTHER_TEST]: 42,
+                [ONYX_KEYS.KEY_WITH_UNDERSCORE]: 'default',
+                [ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE]: 'default',
+            },
+            ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
+            skippableCollectionMemberIDs: ['skippable-id'],
+            snapshotMergeKeys: ['pendingAction', 'pendingFields'],
+        });
+    });
+
     let connection: Connection | undefined;
 
-    /** @type OnyxCache */
     let cache: typeof OnyxCache;
 
     beforeEach(() => {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
         cache = require('../../lib/OnyxCache').default;
     });
 
@@ -723,6 +732,87 @@ describe('Onyx', () => {
             });
     });
 
+    it('should only trigger collection callback once when mergeCollection is called', async () => {
+        const mockCallback = jest.fn();
+        const key1 = `${ONYX_KEYS.COLLECTION.TEST_KEY}1`;
+        const key2 = `${ONYX_KEYS.COLLECTION.TEST_KEY}2`;
+        const key3 = `${ONYX_KEYS.COLLECTION.TEST_KEY}3`;
+
+        connection = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            waitForCollectionCallback: true,
+            callback: mockCallback,
+        });
+
+        await waitForPromisesToResolve();
+        expect(mockCallback).toHaveBeenCalledTimes(1);
+        mockCallback.mockClear();
+
+        // Call mergeCollection with multiple items
+        await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+            [key1]: {id: '1', name: 'Item 1'},
+            [key2]: {id: '2', name: 'Item 2'},
+            [key3]: {id: '3', name: 'Item 3'},
+        } as GenericCollection);
+
+        // Should only be called once
+        expect(mockCallback).toHaveBeenCalledTimes(1);
+
+        // Should receive the entire merged collection
+        const receivedData = mockCallback.mock.calls[0][0];
+        expect(receivedData).toEqual(
+            expect.objectContaining({
+                [key1]: {id: '1', name: 'Item 1'},
+                [key2]: {id: '2', name: 'Item 2'},
+                [key3]: {id: '3', name: 'Item 3'},
+            }),
+        );
+    });
+
+    it('should only trigger collection callback once when mergeCollection is called with null values', async () => {
+        const mockCallback = jest.fn();
+        const key1 = `${ONYX_KEYS.COLLECTION.TEST_KEY}1`;
+        const key2 = `${ONYX_KEYS.COLLECTION.TEST_KEY}2`;
+        const key3 = `${ONYX_KEYS.COLLECTION.TEST_KEY}3`;
+
+        // Set up initial data
+        await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+            [key1]: {id: '1', name: 'Item 1'},
+            [key2]: {id: '2', name: 'Item 2'},
+            [key3]: {id: '3', name: 'Item 3'},
+        } as GenericCollection);
+
+        connection = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            waitForCollectionCallback: true,
+            callback: mockCallback,
+        });
+
+        await waitForPromisesToResolve();
+        expect(mockCallback).toHaveBeenCalledTimes(1);
+        mockCallback.mockClear();
+
+        // Call mergeCollection with mixed null and data values
+        await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+            [key1]: null,
+            [key2]: {id: '2', name: 'Updated Item 2'},
+            [key3]: null,
+        } as GenericCollection);
+
+        // Should only be called once
+        expect(mockCallback).toHaveBeenCalledTimes(1);
+
+        // Should receive filtered collection
+        const receivedData = mockCallback.mock.calls[0][0];
+        expect(receivedData).toEqual({
+            [key2]: {id: '2', name: 'Updated Item 2'},
+        });
+
+        // Verify removed items are not present
+        expect(receivedData[key1]).toBeUndefined();
+        expect(receivedData[key3]).toBeUndefined();
+    });
+
     it('should use update data object to set/merge keys', () => {
         let testKeyValue: unknown;
         connection = Onyx.connect({
@@ -818,7 +908,7 @@ describe('Onyx', () => {
                                 ID: 345,
                                 value: 'three',
                             },
-                        },
+                        } as GenericCollection,
                     },
                 ]);
             })
@@ -846,43 +936,6 @@ describe('Onyx', () => {
                 expect(mockCallback).toHaveBeenNthCalledWith(4, {ID: 234, value: 'two', existingData: 'test'}, 'test_2');
                 expect(mockCallback).toHaveBeenNthCalledWith(5, {ID: 345, value: 'three'}, 'test_3');
             });
-    });
-
-    it('should throw an error when the data object is incorrect in Onyx.update', () => {
-        // Given the invalid data object with onyxMethod='multiSet'
-        const data: unknown[] = [
-            {onyxMethod: 'set', key: ONYX_KEYS.TEST_KEY, value: 'four'},
-            {onyxMethod: 'murge', key: ONYX_KEYS.OTHER_TEST, value: {test2: 'test2'}},
-        ];
-
-        try {
-            // When we pass it to Onyx.update
-            // @ts-expect-error This is an invalid call to Onyx.update
-            Onyx.update(data);
-        } catch (error) {
-            if (error instanceof Error) {
-                // Then we should expect the error message below
-                expect(error.message).toEqual('Invalid onyxMethod murge in Onyx update.');
-            } else {
-                throw error;
-            }
-        }
-
-        try {
-            // Given the invalid data object with key=true
-            data[1] = {onyxMethod: 'merge', key: true, value: {test2: 'test2'}};
-
-            // When we pass it to Onyx.update
-            // @ts-expect-error This is an invalid call to Onyx.update
-            Onyx.update(data);
-        } catch (error) {
-            if (error instanceof Error) {
-                // Then we should expect the error message below
-                expect(error.message).toEqual('Invalid boolean key provided in Onyx update. Onyx key must be of type string.');
-            } else {
-                throw error;
-            }
-        }
     });
 
     it('should properly set all keys provided in a multiSet called via update', () => {
@@ -916,7 +969,7 @@ describe('Onyx', () => {
                             },
                         },
                     },
-                ] as unknown as OnyxUpdate[]),
+                ] as unknown as Array<OnyxUpdate<OnyxKey>>),
             )
             .then(() => {
                 expect(valuesReceived).toEqual({
@@ -930,32 +983,6 @@ describe('Onyx', () => {
                     },
                 });
             });
-    });
-
-    it('should reject an improperly formatted multiset operation called via update', () => {
-        try {
-            Onyx.update([
-                {
-                    onyxMethod: 'multiset',
-                    value: [
-                        {
-                            ID: 123,
-                            value: 'one',
-                        },
-                        {
-                            ID: 234,
-                            value: 'two',
-                        },
-                    ],
-                },
-            ] as unknown as OnyxUpdate[]);
-        } catch (error) {
-            if (error instanceof Error) {
-                expect(error.message).toEqual('Invalid value provided in Onyx multiSet. Onyx multiSet value must be of type object.');
-            } else {
-                throw error;
-            }
-        }
     });
 
     it('should return all collection keys as a single object when waitForCollectionCallback = true', () => {
@@ -990,7 +1017,7 @@ describe('Onyx', () => {
             .then(() => {
                 // Then we expect the callback to be called only once and the initial stored value to be initialCollectionData
                 expect(mockCallback).toHaveBeenCalledTimes(1);
-                expect(mockCallback).toHaveBeenCalledWith(initialCollectionData, undefined, undefined);
+                expect(mockCallback).toHaveBeenCalledWith(initialCollectionData, ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION, undefined);
             });
     });
 
@@ -1016,7 +1043,7 @@ describe('Onyx', () => {
                     expect(mockCallback).toHaveBeenCalledTimes(2);
 
                     // AND the value for the first call should be null since the collection was not initialized at that point
-                    expect(mockCallback).toHaveBeenNthCalledWith(1, undefined, undefined, undefined);
+                    expect(mockCallback).toHaveBeenNthCalledWith(1, undefined, ONYX_KEYS.COLLECTION.TEST_POLICY, undefined);
 
                     // AND the value for the second call should be collectionUpdate since the collection was updated
                     expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate, ONYX_KEYS.COLLECTION.TEST_POLICY, collectionUpdate);
@@ -1074,7 +1101,7 @@ describe('Onyx', () => {
                     expect(mockCallback).toHaveBeenCalledTimes(2);
 
                     // AND the value for the second call should be collectionUpdate
-                    expect(mockCallback).toHaveBeenNthCalledWith(1, undefined, undefined, undefined);
+                    expect(mockCallback).toHaveBeenNthCalledWith(1, undefined, ONYX_KEYS.COLLECTION.TEST_POLICY, undefined);
                     expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate, ONYX_KEYS.COLLECTION.TEST_POLICY, {
                         [`${ONYX_KEYS.COLLECTION.TEST_POLICY}1`]: collectionUpdate.testPolicy_1,
                     });
@@ -1187,10 +1214,10 @@ describe('Onyx', () => {
             Onyx.update([
                 {onyxMethod: Onyx.METHOD.SET, key: ONYX_KEYS.TEST_KEY, value: 'taco'},
                 {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.OTHER_TEST, value: 'pizza'},
-                {onyxMethod: Onyx.METHOD.MERGE_COLLECTION, key: ONYX_KEYS.COLLECTION.TEST_UPDATE, value: {[itemKey]: {a: 'a'}}},
+                {onyxMethod: Onyx.METHOD.MERGE_COLLECTION, key: ONYX_KEYS.COLLECTION.TEST_UPDATE, value: {[itemKey]: {a: 'a'}} as GenericCollection},
             ]).then(() => {
                 expect(collectionCallback).toHaveBeenCalledTimes(2);
-                expect(collectionCallback).toHaveBeenNthCalledWith(1, undefined, undefined, undefined);
+                expect(collectionCallback).toHaveBeenNthCalledWith(1, undefined, ONYX_KEYS.COLLECTION.TEST_UPDATE, undefined);
                 expect(collectionCallback).toHaveBeenNthCalledWith(2, {[itemKey]: {a: 'a'}}, ONYX_KEYS.COLLECTION.TEST_UPDATE, {[itemKey]: {a: 'a'}});
 
                 expect(testCallback).toHaveBeenCalledTimes(2);
@@ -1201,7 +1228,7 @@ describe('Onyx', () => {
                 // We set an initial value of 42 for ONYX_KEYS.OTHER_TEST in Onyx.init()
                 expect(otherTestCallback).toHaveBeenNthCalledWith(1, 42, ONYX_KEYS.OTHER_TEST);
                 expect(otherTestCallback).toHaveBeenNthCalledWith(2, 'pizza', ONYX_KEYS.OTHER_TEST);
-                connections.forEach((id) => Onyx.disconnect(id));
+                for (const id of connections) Onyx.disconnect(id);
             }),
         );
     });
@@ -1457,7 +1484,7 @@ describe('Onyx', () => {
             .then(() => {
                 expect(collectionCallback).toHaveBeenCalledTimes(3);
                 expect(collectionCallback).toHaveBeenNthCalledWith(1, {[cat]: initialValue}, ONYX_KEYS.COLLECTION.ANIMALS, {[cat]: initialValue});
-                expect(collectionCallback).toHaveBeenNthCalledWith(2, {[cat]: initialValue}, undefined, undefined);
+                expect(collectionCallback).toHaveBeenNthCalledWith(2, {[cat]: initialValue}, ONYX_KEYS.COLLECTION.ANIMALS, undefined);
                 expect(collectionCallback).toHaveBeenNthCalledWith(3, collectionDiff, ONYX_KEYS.COLLECTION.ANIMALS, {[cat]: initialValue, [dog]: {name: 'Rex'}});
 
                 // Cat hasn't changed from its original value, expect only the initial connect callback
@@ -1496,7 +1523,49 @@ describe('Onyx', () => {
         expect(callback).toHaveBeenNthCalledWith(2, {data: {[cat]: finalValue}}, snapshot1);
     });
 
+    it('should merge allowlisted keys into Snapshot even if they were missing', async () => {
+        const cat = `${ONYX_KEYS.COLLECTION.ANIMALS}cat`;
+        const snapshot1 = `${ONYX_KEYS.COLLECTION.SNAPSHOT}1`;
+
+        const initialValue = {name: 'Fluffy'};
+        const finalValue = {
+            name: 'Kitty',
+            pendingAction: 'delete',
+            pendingFields: {preview: 'delete'},
+            other: 'ignored',
+        };
+
+        await Onyx.set(cat, initialValue);
+        await Onyx.set(snapshot1, {data: {[cat]: initialValue}});
+
+        const callback = jest.fn();
+
+        Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.SNAPSHOT,
+            callback,
+        });
+
+        await waitForPromisesToResolve();
+
+        await Onyx.update([{key: cat, value: finalValue, onyxMethod: Onyx.METHOD.MERGE}]);
+
+        expect(callback).toBeCalledTimes(2);
+        expect(callback).toHaveBeenNthCalledWith(1, {data: {[cat]: initialValue}}, snapshot1);
+        expect(callback).toHaveBeenNthCalledWith(2, {data: {[cat]: {name: 'Kitty', pendingAction: 'delete', pendingFields: {preview: 'delete'}}}}, snapshot1);
+    });
+
     describe('update', () => {
+        let logInfoFn = jest.fn();
+
+        beforeEach(() => {
+            logInfoFn = jest.fn();
+            jest.spyOn(Logger, 'logInfo').mockImplementation(logInfoFn);
+        });
+
+        afterEach(() => {
+            jest.restoreAllMocks();
+        });
+
         it('should squash all updates of collection-related keys into a single mergeCollection call', () => {
             const connections: Connection[] = [];
 
@@ -1549,7 +1618,7 @@ describe('Onyx', () => {
                                 0: 'Bed',
                             },
                         },
-                    },
+                    } as GenericCollection,
                 },
                 {
                     onyxMethod: Onyx.METHOD.MERGE,
@@ -1648,7 +1717,7 @@ describe('Onyx', () => {
                     value: {
                         [cat]: {age: 5, size: 'S'},
                         [dog]: {size: 'M'},
-                    },
+                    } as GenericCollection,
                 },
                 {onyxMethod: Onyx.METHOD.SET, key: cat, value: {age: 3}},
                 {onyxMethod: Onyx.METHOD.MERGE, key: cat, value: {sound: 'meow'}},
@@ -1744,7 +1813,7 @@ describe('Onyx', () => {
                 },
             });
 
-            const queuedUpdates: OnyxUpdate[] = [
+            const queuedUpdates: Array<OnyxUpdate<OnyxKey>> = [
                 {
                     key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
                     onyxMethod: 'merge',
@@ -1791,7 +1860,7 @@ describe('Onyx', () => {
                 await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1});
 
                 const entry1ExpectedResult = lodashCloneDeep(entry1);
-                const queuedUpdates: OnyxUpdate[] = [];
+                const queuedUpdates: Array<OnyxUpdate<OnyxKey>> = [];
 
                 queuedUpdates.push({
                     key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
@@ -1838,7 +1907,7 @@ describe('Onyx', () => {
                 await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1});
 
                 const entry1ExpectedResult = lodashCloneDeep(entry1);
-                const queuedUpdates: OnyxUpdate[] = [];
+                const queuedUpdates: Array<OnyxUpdate<OnyxKey>> = [];
 
                 queuedUpdates.push({
                     key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
@@ -1910,7 +1979,7 @@ describe('Onyx', () => {
                 await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1});
 
                 const entry1ExpectedResult = lodashCloneDeep(entry1);
-                const queuedUpdates: OnyxUpdate[] = [];
+                const queuedUpdates: Array<OnyxUpdate<OnyxKey>> = [];
 
                 queuedUpdates.push({
                     key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
@@ -1967,7 +2036,7 @@ describe('Onyx', () => {
                 });
 
                 let entry1ExpectedResult = lodashCloneDeep(entry1) as GenericDeepRecord | undefined;
-                const queuedUpdates: OnyxUpdate[] = [];
+                const queuedUpdates: Array<OnyxUpdate<OnyxKey>> = [];
 
                 queuedUpdates.push({
                     key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
@@ -2040,7 +2109,7 @@ describe('Onyx', () => {
 
                     const entry1ExpectedResult = lodashCloneDeep(entry1);
                     const entry2ExpectedResult = lodashCloneDeep(entry2);
-                    const queuedUpdates: OnyxUpdate[] = [];
+                    const queuedUpdates: Array<OnyxUpdate<OnyxKey>> = [];
 
                     queuedUpdates.push(
                         {
@@ -2101,6 +2170,26 @@ describe('Onyx', () => {
                         [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`, entry2ExpectedResult],
                     ]);
                 });
+
+                it('should not save a RAM-only collection to storage', async () => {
+                    const key1 = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
+                    const key2 = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`;
+
+                    await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, {
+                        [key1]: 'value 1',
+                        [key2]: 'value 2',
+                    });
+
+                    await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, {
+                        [key1]: 'updated value 1',
+                        [key2]: 'updated value 2',
+                    });
+
+                    expect(await cache.get(key1)).toEqual('updated value 1');
+                    expect(await cache.get(key2)).toEqual('updated value 2');
+                    expect(await StorageMock.getItem(key1)).toBeNull();
+                    expect(await StorageMock.getItem(key2)).toBeNull();
+                });
             });
         });
 
@@ -2125,18 +2214,18 @@ describe('Onyx', () => {
                 [routeB]: {name: 'Route B'},
                 [routeC]: {name: 'Route C'},
             } as GenericCollection)
-                .then(() => {
-                    return Onyx.update([
+                .then(() =>
+                    Onyx.update([
                         {
                             onyxMethod: Onyx.METHOD.SET_COLLECTION,
                             key: ONYX_KEYS.COLLECTION.ROUTES,
                             value: {
                                 [routeA]: {name: 'New Route A'},
                                 [routeB]: {name: 'New Route B'},
-                            },
+                            } as GenericCollection,
                         },
-                    ]);
-                })
+                    ]),
+                )
                 .then(() => {
                     expect(routesCollection).toEqual({
                         [routeA]: {name: 'New Route A'},
@@ -2172,8 +2261,8 @@ describe('Onyx', () => {
                 [routeA]: {name: 'Route A'},
                 [routeB]: {name: 'Route B'},
             } as GenericCollection)
-                .then(() => {
-                    return Onyx.update([
+                .then(() =>
+                    Onyx.update([
                         {
                             onyxMethod: Onyx.METHOD.SET,
                             key: testKey,
@@ -2184,15 +2273,15 @@ describe('Onyx', () => {
                             key: ONYX_KEYS.COLLECTION.ROUTES,
                             value: {
                                 [routeA]: {name: 'Final Route A'},
-                            },
+                            } as GenericCollection,
                         },
                         {
                             onyxMethod: Onyx.METHOD.MERGE,
                             key: testKey,
                             value: 'merged value',
                         },
-                    ]);
-                })
+                    ]),
+                )
                 .then(() => {
                     expect(routesCollection).toEqual({
                         [routeA]: {name: 'Final Route A'},
@@ -2200,6 +2289,141 @@ describe('Onyx', () => {
 
                     expect(testKeyValue).toBe('merged value');
                 });
+        });
+
+        it('should trigger individual callbacks for each key when update is called with mergeCollection', async () => {
+            const collectionCallback = jest.fn();
+            const individualCallback1 = jest.fn();
+            const individualCallback2 = jest.fn();
+            const key1 = `${ONYX_KEYS.COLLECTION.TEST_KEY}1`;
+            const key2 = `${ONYX_KEYS.COLLECTION.TEST_KEY}2`;
+
+            connection = Onyx.connect({
+                key: ONYX_KEYS.COLLECTION.TEST_KEY,
+                waitForCollectionCallback: true,
+                callback: collectionCallback,
+            });
+
+            const connection1 = Onyx.connect({
+                key: key1,
+                callback: individualCallback1,
+            });
+
+            const connection2 = Onyx.connect({
+                key: key2,
+                callback: individualCallback2,
+            });
+
+            await waitForPromisesToResolve();
+            collectionCallback.mockClear();
+            individualCallback1.mockClear();
+            individualCallback2.mockClear();
+
+            // Perform update with mergeCollection
+            await Onyx.update([
+                {
+                    onyxMethod: 'mergecollection',
+                    key: ONYX_KEYS.COLLECTION.TEST_KEY,
+                    value: {
+                        [key1]: {id: '1', name: 'Updated Item 1'},
+                        [key2]: {id: '2', name: 'Updated Item 2'},
+                    } as GenericCollection,
+                },
+            ]);
+
+            // Collection callback should be called
+            expect(collectionCallback).toHaveBeenCalled();
+
+            // Individual callbacks should still work
+            expect(individualCallback1).toHaveBeenCalledWith({id: '1', name: 'Updated Item 1'}, key1);
+            expect(individualCallback2).toHaveBeenCalledWith({id: '2', name: 'Updated Item 2'}, key2);
+
+            Onyx.disconnect(connection1);
+            Onyx.disconnect(connection2);
+        });
+
+        it('should not save a RAM-only collection to storage', async () => {
+            const queuedUpdates: Array<OnyxUpdate<OnyxKey>> = [];
+
+            queuedUpdates.push(
+                {
+                    key: `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`,
+                    onyxMethod: 'merge',
+                    value: null,
+                },
+                {
+                    key: `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`,
+                    onyxMethod: 'merge',
+                    value: null,
+                },
+            );
+
+            queuedUpdates.push(
+                {
+                    key: `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`,
+                    onyxMethod: 'merge',
+                    value: 'updated test 1',
+                },
+                {
+                    key: `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`,
+                    onyxMethod: 'merge',
+                    value: 'updated test 2',
+                },
+            );
+
+            await Onyx.update(queuedUpdates);
+
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`)).toEqual('updated test 1');
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`)).toEqual('updated test 2');
+            expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`)).toBeNull();
+            expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`)).toBeNull();
+        });
+
+        describe('should log and skip invalid operations', () => {
+            it('invalid method', async () => {
+                await act(async () =>
+                    Onyx.update([
+                        {onyxMethod: 'set', key: ONYX_KEYS.TEST_KEY, value: 'test1'},
+                        // @ts-expect-error invalid method
+                        {onyxMethod: 'invalidMethod', key: ONYX_KEYS.OTHER_TEST, value: 'test2'},
+                    ]),
+                );
+
+                expect(logInfoFn).toHaveBeenNthCalledWith(1, 'Invalid onyxMethod invalidMethod in Onyx update. Skipping this operation.');
+            });
+
+            it('non-object value passed to multiSet', async () => {
+                await act(async () =>
+                    Onyx.update([
+                        // @ts-expect-error non-object value
+                        {onyxMethod: 'multiset', key: ONYX_KEYS.TEST_KEY, value: []},
+                    ]),
+                );
+
+                expect(logInfoFn).toHaveBeenNthCalledWith(1, 'Invalid value provided in Onyx multiSet. Value must be of type object. Skipping this operation.');
+            });
+
+            it('non-string value passed to key', async () => {
+                await act(async () =>
+                    Onyx.update([
+                        // @ts-expect-error invalid key
+                        {onyxMethod: 'set', key: 1000, value: 'test'},
+                    ]),
+                );
+
+                expect(logInfoFn).toHaveBeenNthCalledWith(1, 'Invalid number key provided in Onyx update. Key must be of type string. Skipping this operation.');
+            });
+
+            it('invalid or empty value passed to mergeCollection', async () => {
+                await act(async () =>
+                    Onyx.update([
+                        // @ts-expect-error invalid value
+                        {onyxMethod: 'mergecollection', key: ONYX_KEYS.COLLECTION.TEST_KEY, value: 'test1'},
+                    ]),
+                );
+
+                expect(logInfoFn).toHaveBeenNthCalledWith(1, 'Invalid or empty value provided in Onyx mergeCollection. Skipping this operation.');
+            });
         });
     });
 
@@ -2430,6 +2654,21 @@ describe('Onyx', () => {
                     });
                 });
         });
+
+        it('should not save a RAM-only key to storage when using merge', async () => {
+            await Onyx.merge(ONYX_KEYS.RAM_ONLY_TEST_KEY, {someProperty: 'value'});
+
+            expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toEqual({someProperty: 'value'});
+            expect(await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeNull();
+        });
+
+        it('should not save a RAM-only collection member to storage when using merge', async () => {
+            const collectionMemberKey = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
+            await Onyx.merge(collectionMemberKey, {data: 'test'});
+
+            expect(cache.get(collectionMemberKey)).toEqual({data: 'test'});
+            expect(await StorageMock.getItem(collectionMemberKey)).toBeNull();
+        });
     });
 
     describe('set', () => {
@@ -2455,6 +2694,40 @@ describe('Onyx', () => {
                 .then(() => {
                     expect(testKeyValue).toEqual(testData);
                 });
+        });
+
+        it('should not save a RAM-only key to storage', async () => {
+            await Onyx.set(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'test');
+
+            expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toEqual('test');
+            expect(await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeNull();
+        });
+
+        it('should not save a member of a RAM-only collection to storage', async () => {
+            const collectionMemberKey = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
+            await Onyx.set(collectionMemberKey, 'test');
+
+            expect(cache.get(collectionMemberKey)).toEqual('test');
+            expect(await StorageMock.getItem(collectionMemberKey)).toBeNull();
+        });
+    });
+
+    describe('multiSet', () => {
+        it('should only save non RAM-only keys to storage', async () => {
+            const otherTestValue = 'non ram only value';
+            const collectionMemberKey = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`;
+
+            await Onyx.multiSet({
+                [ONYX_KEYS.OTHER_TEST]: otherTestValue,
+                [ONYX_KEYS.RAM_ONLY_TEST_KEY]: 'test value 1',
+                [collectionMemberKey]: 'test value 2',
+            });
+
+            expect(await StorageMock.getItem(ONYX_KEYS.OTHER_TEST)).toEqual(otherTestValue);
+            expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toEqual('test value 1');
+            expect(await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeNull();
+            expect(cache.get(collectionMemberKey)).toEqual('test value 2');
+            expect(await StorageMock.getItem(collectionMemberKey)).toBeNull();
         });
     });
 
@@ -2532,11 +2805,59 @@ describe('Onyx', () => {
 
             await Onyx.setCollection(ONYX_KEYS.COLLECTION.ROUTES, {
                 [invalidRoute]: {name: 'Invalid Route'},
-            } as GenericCollection);
+            });
 
             expect(result).toEqual({
                 [routeA]: {name: 'Route A'},
             });
+        });
+
+        it('should only trigger collection callback once when setCollection is called with null values', async () => {
+            const mockCallback = jest.fn();
+            const routeA = `${ONYX_KEYS.COLLECTION.ROUTES}A`;
+            const routeB = `${ONYX_KEYS.COLLECTION.ROUTES}B`;
+            const routeC = `${ONYX_KEYS.COLLECTION.ROUTES}C`;
+
+            connection = Onyx.connect({
+                key: ONYX_KEYS.COLLECTION.ROUTES,
+                waitForCollectionCallback: true,
+                callback: mockCallback,
+            });
+
+            await waitForPromisesToResolve();
+            expect(mockCallback).toHaveBeenCalledTimes(1);
+            mockCallback.mockClear();
+
+            // Call setCollection with mixed null and data values
+            await Onyx.setCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                [routeA]: null,
+                [routeB]: {name: 'Route B'},
+                [routeC]: null,
+            } as GenericCollection);
+
+            // Should only be called once
+            expect(mockCallback).toHaveBeenCalledTimes(1);
+
+            // Should receive filtered collection (only non-null values)
+            const receivedData = mockCallback.mock.calls[0][0];
+            expect(receivedData).toEqual({
+                [routeB]: {name: 'Route B'},
+            });
+        });
+
+        it('should not save a RAM-only collection to storage', async () => {
+            const key1 = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
+            const key2 = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`;
+
+            await Onyx.setCollection(ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, {
+                [key1]: 'test1',
+                [key2]: 'test2',
+            });
+
+            expect(cache.get(key1)).toEqual('test1');
+            expect(cache.get(key2)).toEqual('test2');
+            expect(await StorageMock.getItem(key1)).toBeNull();
+            expect(await StorageMock.getItem(key2)).toBeNull();
         });
     });
 
@@ -2666,6 +2987,128 @@ describe('Onyx', () => {
             expect(mockMergeQueue[testKey]).toBeUndefined();
 
             jest.restoreAllMocks();
+        });
+    });
+
+    describe('clear', () => {
+        it('should handle RAM-only keys with defaults correctly during clear', async () => {
+            // Set a value for RAM-only key
+            await Onyx.set(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'some value');
+            await Onyx.set(ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE, 'some other value');
+
+            await Onyx.clear();
+
+            // Verify it's not in storage
+            expect(await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeNull();
+            expect(await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE)).toBeNull();
+            // Verify cache state based on whether there's a default
+            expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeUndefined();
+            expect(cache.get(ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE)).toEqual('default');
+        });
+    });
+});
+
+// Separate describe block for Onyx.init to control initialization during each test.
+describe('Onyx.init', () => {
+    let cache: typeof OnyxCache;
+
+    beforeEach(() => {
+        // Resets the deferred init task before each test.
+        Object.assign(OnyxUtils.getDeferredInitTask(), createDeferredTask());
+        cache = require('../../lib/OnyxCache').default;
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
+        return Onyx.clear();
+    });
+
+    describe('should only execute Onyx methods after initialization', () => {
+        it('set', async () => {
+            Onyx.set(ONYX_KEYS.TEST_KEY, 'test');
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(ONYX_KEYS.TEST_KEY)).toBeUndefined();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(ONYX_KEYS.TEST_KEY)).toEqual('test');
+        });
+
+        it('multiSet', async () => {
+            Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: 'test_1'});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toBeUndefined();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toEqual('test_1');
+        });
+
+        it('merge', async () => {
+            Onyx.merge(ONYX_KEYS.TEST_KEY, 'test');
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(ONYX_KEYS.TEST_KEY)).toBeUndefined();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(ONYX_KEYS.TEST_KEY)).toEqual('test');
+        });
+
+        it('mergeCollection', async () => {
+            Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {[`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: 'test_1'});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toBeUndefined();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toEqual('test_1');
+        });
+
+        it('clear', async () => {
+            // Spies on a function that is exclusively called during Onyx.clear().
+            const spyClearNullishStorageKeys = jest.spyOn(cache, 'clearNullishStorageKeys');
+
+            Onyx.clear();
+            await act(async () => waitForPromisesToResolve());
+
+            expect(spyClearNullishStorageKeys).not.toHaveBeenCalled();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(spyClearNullishStorageKeys).toHaveBeenCalled();
+        });
+
+        it('update', async () => {
+            Onyx.update([{onyxMethod: 'set', key: ONYX_KEYS.TEST_KEY, value: 'test'}]);
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(ONYX_KEYS.TEST_KEY)).toBeUndefined();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(ONYX_KEYS.TEST_KEY)).toEqual('test');
+        });
+
+        it('setCollection', async () => {
+            Onyx.setCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {[`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: 'test_1'});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toBeUndefined();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toEqual('test_1');
         });
     });
 });

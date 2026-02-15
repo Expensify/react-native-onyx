@@ -1,7 +1,9 @@
 import type {OnyxValue} from '../../types';
 import type StorageProvider from './types';
 
-const provider: StorageProvider = {
+const provider: StorageProvider<unknown> = {
+    store: undefined,
+
     /**
      * The name of the provider that can be printed to the logs
      */
@@ -17,8 +19,8 @@ const provider: StorageProvider = {
     /**
      * Get the value of a given key or return `null` if it's not available in memory
      */
-    getItem(key) {
-        return Promise.resolve(null as OnyxValue<typeof key>);
+    getItem(_key) {
+        return Promise.resolve(null as OnyxValue<typeof _key>);
     },
 
     /**

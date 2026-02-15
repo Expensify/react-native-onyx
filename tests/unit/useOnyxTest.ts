@@ -1,5 +1,5 @@
 import {act, renderHook} from '@testing-library/react-native';
-import type {OnyxCollection, OnyxEntry} from '../../lib';
+import type {OnyxCollection, OnyxEntry, OnyxKey} from '../../lib';
 import Onyx, {useOnyx} from '../../lib';
 import OnyxCache from '../../lib/OnyxCache';
 import StorageMock from '../../lib/storage';
@@ -7,6 +7,7 @@ import type GenericCollection from '../utils/GenericCollection';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import * as Logger from '../../lib/Logger';
 import onyxSnapshotCache from '../../lib/OnyxSnapshotCache';
+import type {UseOnyxSelector} from '../../lib/useOnyx';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -236,7 +237,7 @@ describe('useOnyx', () => {
             expect(result2.current[1].status).toEqual('loaded');
         });
 
-        it('should return updated state when connecting to the same key after an Onyx.clear() call', async () => {
+        it('should return updated state when connecting to the same regular key after an Onyx.clear() call', async () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
 
             const {result: result1} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
@@ -270,6 +271,41 @@ describe('useOnyx', () => {
             expect(result3.current[0]).toEqual('test2');
             expect(result3.current[1].status).toEqual('loaded');
         });
+
+        it('should return updated state when connecting to the same colection member key after an Onyx.clear() call', async () => {
+            await StorageMock.setItem<string>(`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`, 'test');
+
+            const {result: result1} = renderHook(() => useOnyx(`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`));
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result1.current[0]).toEqual('test');
+            expect(result1.current[1].status).toEqual('loaded');
+
+            await act(async () => Onyx.clear());
+
+            const {result: result2} = renderHook(() => useOnyx(`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`));
+            const {result: result3} = renderHook(() => useOnyx(`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`));
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result1.current[0]).toBeUndefined();
+            expect(result1.current[1].status).toEqual('loaded');
+            expect(result2.current[0]).toBeUndefined();
+            expect(result2.current[1].status).toEqual('loaded');
+            expect(result3.current[0]).toBeUndefined();
+            expect(result3.current[1].status).toEqual('loaded');
+
+            Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`, 'test2');
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result1.current[0]).toEqual('test2');
+            expect(result1.current[1].status).toEqual('loaded');
+            expect(result2.current[0]).toEqual('test2');
+            expect(result2.current[1].status).toEqual('loaded');
+            expect(result3.current[0]).toEqual('test2');
+            expect(result3.current[1].status).toEqual('loaded');
+        });
     });
 
     describe('selector', () => {
@@ -278,8 +314,7 @@ describe('useOnyx', () => {
 
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
-                    // @ts-expect-error bypass
-                    selector: (entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name}`,
+                    selector: ((entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name}`) as UseOnyxSelector<OnyxKey, string>,
                 }),
             );
 
@@ -301,12 +336,11 @@ describe('useOnyx', () => {
 
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.COLLECTION.TEST_KEY, {
-                    // @ts-expect-error bypass
-                    selector: (entries: OnyxCollection<{id: string; name: string}>) =>
+                    selector: ((entries: OnyxCollection<{id: string; name: string}>) =>
                         Object.entries(entries ?? {}).reduce<NonNullable<OnyxCollection<string>>>((acc, [key, value]) => {
                             acc[key] = value?.id;
                             return acc;
-                        }, {}),
+                        }, {})) as UseOnyxSelector<OnyxKey, NonNullable<OnyxCollection<string>>>,
                 }),
             );
 
@@ -334,24 +368,21 @@ describe('useOnyx', () => {
             // primitive
             const {result: primitiveResult} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
-                    // @ts-expect-error bypass
-                    selector: (entry: OnyxEntry<{id: string; name: string}>) => entry?.id,
+                    selector: ((entry: OnyxEntry<{id: string; name: string}>) => entry?.id) as UseOnyxSelector<OnyxKey, string>,
                 }),
             );
 
             // object
             const {result: objectResult} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
-                    // @ts-expect-error bypass
-                    selector: (entry: OnyxEntry<{id: string; name: string}>) => ({id: entry?.id}),
+                    selector: ((entry: OnyxEntry<{id: string; name: string}>) => ({id: entry?.id})) as UseOnyxSelector<OnyxKey, {id?: string}>,
                 }),
             );
 
             // array
             const {result: arrayResult} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
-                    // @ts-expect-error bypass
-                    selector: (entry: OnyxEntry<{id: string; name: string}>) => [{id: entry?.id}],
+                    selector: ((entry: OnyxEntry<{id: string; name: string}>) => [{id: entry?.id}]) as UseOnyxSelector<OnyxKey, Array<{id?: string}>>,
                 }),
             );
 
@@ -378,8 +409,7 @@ describe('useOnyx', () => {
 
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.COLLECTION.TEST_KEY, {
-                    // @ts-expect-error bypass
-                    selector: (entry: OnyxEntry<{id: string; name: string}>) => ({id: entry?.id}),
+                    selector: ((entry: OnyxEntry<{id: string; name: string}>) => ({id: entry?.id})) as UseOnyxSelector<OnyxKey, {id?: string}>,
                 }),
             );
 
@@ -396,11 +426,10 @@ describe('useOnyx', () => {
         it('should always use the current selector reference to return new data', async () => {
             Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name'});
 
-            let selector = (entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name}`;
+            let selector = ((entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name}`) as UseOnyxSelector<OnyxKey, string>;
 
             const {result, rerender} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
-                    // @ts-expect-error bypass
                     selector,
                 }),
             );
@@ -408,8 +437,7 @@ describe('useOnyx', () => {
             expect(result.current[0]).toEqual('id - test_id, name - test_name');
             expect(result.current[1].status).toEqual('loaded');
 
-            selector = (entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name} - selector changed`;
-            // In a react app we expect the selector ref to change during a rerender (see selectorRef/useLiveRef)
+            selector = ((entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name} - selector changed`) as UseOnyxSelector<OnyxKey, string>;
             rerender(undefined);
 
             expect(result.current[0]).toEqual('id - test_id, name - test_name - selector changed');
@@ -421,11 +449,10 @@ describe('useOnyx', () => {
 
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
-                    // @ts-expect-error bypass
-                    selector: (entry: OnyxEntry<{id: string; name: string; count: number}>) => ({
+                    selector: ((entry: OnyxEntry<{id: string; name: string; count: number}>) => ({
                         id: entry?.id,
                         name: entry?.name,
-                    }),
+                    })) as UseOnyxSelector<OnyxKey, {id?: string; name?: string}>,
                 }),
             );
 
@@ -445,11 +472,10 @@ describe('useOnyx', () => {
 
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
-                    // @ts-expect-error bypass
-                    selector: (entry: OnyxEntry<{id: string; name: string}>) => ({
+                    selector: ((entry: OnyxEntry<{id: string; name: string}>) => ({
                         id: entry?.id,
                         name: entry?.name,
-                    }),
+                    })) as UseOnyxSelector<OnyxKey, {id?: string; name?: string}>,
                 }),
             );
 
@@ -472,11 +498,10 @@ describe('useOnyx', () => {
 
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
-                    // @ts-expect-error bypass
-                    selector: (entry: OnyxEntry<{id: string; name: string}>) => {
+                    selector: ((entry: OnyxEntry<{id: string; name: string}>) => {
                         selectorCallCount++;
                         return {id: entry?.id, name: entry?.name};
-                    },
+                    }) as UseOnyxSelector<OnyxKey, {id?: string; name?: string}>,
                 }),
             );
 
@@ -499,8 +524,7 @@ describe('useOnyx', () => {
 
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
-                    // @ts-expect-error bypass
-                    selector: (entry: OnyxEntry<{count: number; name: string}>) => entry?.count || 0,
+                    selector: ((entry: OnyxEntry<{count: number; name: string}>) => entry?.count || 0) as UseOnyxSelector<OnyxKey, number>,
                 }),
             );
 
@@ -722,8 +746,7 @@ describe('useOnyx', () => {
 
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
-                    // @ts-expect-error bypass
-                    selector: (entry: OnyxEntry<string>) => `${entry}_changed`,
+                    selector: ((entry: OnyxEntry<string>) => `${entry}_changed`) as UseOnyxSelector<OnyxKey, string>,
                 }),
             );
 
@@ -778,8 +801,7 @@ describe('useOnyx', () => {
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
                     initWithStoredValues: false,
-                    // @ts-expect-error bypass
-                    selector: (value: OnyxEntry<string>) => `${value}_selected`,
+                    selector: ((value: OnyxEntry<string>) => `${value}_selected`) as UseOnyxSelector<OnyxKey, string>,
                 }),
             );
 
@@ -913,12 +935,11 @@ describe('useOnyx', () => {
                 useOnyx(
                     ONYXKEYS.COLLECTION.TEST_KEY,
                     {
-                        // @ts-expect-error bypass
-                        selector: (entries: OnyxCollection<{id: string; name: string}>) =>
+                        selector: ((entries: OnyxCollection<{id: string; name: string}>) =>
                             Object.entries(entries ?? {}).reduce<NonNullable<OnyxCollection<string>>>((acc, [key, value]) => {
                                 acc[key] = `${value?.id}_${externalValue}`;
                                 return acc;
-                            }, {}),
+                            }, {})) as UseOnyxSelector<OnyxKey, NonNullable<OnyxCollection<string>>>,
                     },
                     [externalValue],
                 ),
@@ -982,8 +1003,7 @@ describe('useOnyx', () => {
         });
 
         it('should always return undefined when subscribing to a skippable collection member id', async () => {
-            // @ts-expect-error bypass
-            await StorageMock.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`, 'skippable-id_value');
+            await StorageMock.setItem<string>(`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`, 'skippable-id_value');
 
             const {result} = renderHook(() => useOnyx(`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`));
 
@@ -1071,8 +1091,7 @@ describe('useOnyx', () => {
         it('should log an alert if Onyx doesn\'t return selected data in loaded state and "canBeMissing" property is false', async () => {
             const {result: result1} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
-                    // @ts-expect-error bypass
-                    selector: (entry: OnyxEntry<string>) => (entry ? `${entry}_changed` : undefined),
+                    selector: ((entry: OnyxEntry<string>) => (entry ? `${entry}_changed` : undefined)) as UseOnyxSelector<OnyxKey, string | undefined>,
                     canBeMissing: false,
                 }),
             );
@@ -1102,9 +1121,8 @@ describe('useOnyx', () => {
         it('should log an alert if Onyx doesn\'t return data but there is a selector that always return something and "canBeMissing" property is false', async () => {
             const {result: result1} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
-                    // @ts-expect-error bypass
                     // This selector will always return a value, even if the Onyx data is missing.
-                    selector: (entry: OnyxEntry<string>) => `${entry}_changed`,
+                    selector: ((entry: OnyxEntry<string>) => `${entry}_changed`) as UseOnyxSelector<OnyxKey, string>,
                     canBeMissing: false,
                 }),
             );

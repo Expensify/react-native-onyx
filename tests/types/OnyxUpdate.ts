@@ -1,0 +1,141 @@
+import Onyx from '../../dist/Onyx';
+import type {OnyxMergeCollectionInput, OnyxUpdate} from '../../dist/types';
+import ONYX_KEYS from './setup';
+
+const onyxUpdate: OnyxUpdate<'test'> = {
+    onyxMethod: 'set',
+    key: ONYX_KEYS.TEST_KEY,
+    value: 'string',
+};
+
+const onyxUpdateCollectionMember: OnyxUpdate<typeof ONYX_KEYS.COLLECTION.TEST_KEY> = {
+    onyxMethod: 'set',
+    key: `${ONYX_KEYS.COLLECTION.TEST_KEY}1`,
+    value: {
+        str: 'test1',
+    },
+};
+
+const onyxUpdateError: OnyxUpdate<'test'> = {
+    onyxMethod: 'set',
+    key: ONYX_KEYS.TEST_KEY,
+    // @ts-expect-error TEST_KEY is a string, not a number
+    value: 2,
+};
+
+const onyxUpdateCollection: OnyxUpdate<'test_'> = {
+    onyxMethod: 'mergecollection',
+    key: ONYX_KEYS.COLLECTION.TEST_KEY,
+    value: {
+        [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {
+            str: 'test',
+        },
+        [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {
+            str: 'test2',
+        },
+    },
+};
+
+// @ts-expect-error COLLECTION.TEST_KEY is an object, not a number
+const onyxUpdateCollectionError: OnyxUpdate<'test_'> = {
+    onyxMethod: 'mergecollection',
+    key: ONYX_KEYS.COLLECTION.TEST_KEY,
+    value: {
+        [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: 2,
+    },
+};
+
+const onyxUpdateCollectionError2: OnyxUpdate<'test_'> = {
+    onyxMethod: 'mergecollection',
+    key: ONYX_KEYS.COLLECTION.TEST_KEY,
+    value: {
+        [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {
+            // @ts-expect-error nonExistingKey is not a valid key
+            nonExistingKey: 'test2',
+        },
+    },
+};
+
+const onyxUpdateCollectionError3: OnyxUpdate<'test_'> = {
+    onyxMethod: 'mergecollection',
+    key: ONYX_KEYS.COLLECTION.TEST_KEY,
+    value: {
+        // @ts-expect-error nonExistingKey is not a valid key
+        ['nonExistingKey']: {
+            str: 'test2',
+        },
+    },
+};
+
+Onyx.update([
+    {
+        onyxMethod: 'mergecollection',
+        key: ONYX_KEYS.COLLECTION.TEST_KEY,
+        value: {
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {
+                str: 'test1',
+            },
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {
+                str: 'test2',
+            },
+        },
+    },
+    {
+        onyxMethod: 'setcollection',
+        key: ONYX_KEYS.COLLECTION.TEST_KEY,
+        value: {
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {
+                str: 'test1',
+            },
+        },
+    },
+    {
+        onyxMethod: 'set',
+        key: ONYX_KEYS.TEST_KEY,
+        value: 'string',
+    },
+]);
+
+Onyx.update([
+    {
+        onyxMethod: 'clear',
+        key: ONYX_KEYS.TEST_KEY,
+    },
+]);
+
+Onyx.update([
+    {
+        onyxMethod: 'merge',
+        key: ONYX_KEYS.COLLECTION.TEST_KEY,
+        value: {
+            str: 'test1',
+        },
+    },
+    {
+        onyxMethod: 'set',
+        key: ONYX_KEYS.TEST_KEY,
+        value: 'string',
+    },
+]);
+
+Onyx.update([
+    {
+        onyxMethod: 'set',
+        key: ONYX_KEYS.TEST_KEY,
+        // @ts-expect-error TEST_KEY is a string, not a boolean
+        value: true,
+    },
+]);
+
+Onyx.update([
+    {
+        onyxMethod: 'mergecollection',
+        key: ONYX_KEYS.COLLECTION.TEST_KEY,
+        value: {
+            // @ts-expect-error nonExistingKey is not a valid key
+            ['nonExistingKey']: {
+                str: 'test1',
+            },
+        },
+    },
+]);

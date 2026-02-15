@@ -17,7 +17,7 @@ describe('Onyx', () => {
         // Always use a "fresh" instance
         beforeEach(() => {
             jest.resetModules();
-            // eslint-disable-next-line @typescript-eslint/no-var-requires
+
             cache = require('../../lib/OnyxCache').default;
         });
 
@@ -448,12 +448,12 @@ describe('Onyx', () => {
         // This reset top level static variables (in Onyx.js, OnyxCache.js, etc.)
         beforeEach(() => {
             jest.resetModules();
-            // eslint-disable-next-line @typescript-eslint/no-var-requires
+
             const OnyxModule = require('../../lib');
             Onyx = OnyxModule.default;
-            // eslint-disable-next-line @typescript-eslint/no-var-requires
+
             StorageMock = require('../../lib/storage').default;
-            // eslint-disable-next-line @typescript-eslint/no-var-requires
+
             cache = require('../../lib/OnyxCache').default;
         });
 
@@ -488,9 +488,9 @@ describe('Onyx', () => {
 
                     // With the updated implementation, all evictable keys are removed except the most recently added one
                     // Each time we connect to a safe eviction key, we remove all other evictable keys
-                    connections.forEach(({key}) => {
+                    for (const {key} of connections) {
                         expect(cache.hasCacheForKey(key)).toBe(false);
-                    });
+                    }
                 });
         });
 
@@ -521,9 +521,9 @@ describe('Onyx', () => {
                 .then(waitForPromisesToResolve)
                 .then(() => {
                     // All previously connected evictable keys are removed
-                    connections.forEach(({key}) => {
+                    for (const {key} of connections) {
                         expect(cache.hasCacheForKey(key)).toBe(false);
-                    });
+                    }
 
                     // Only the newly connected key should remain in cache
                     expect(cache.hasCacheForKey(`${keyPrefix}10`)).toBe(true);
@@ -660,6 +660,26 @@ describe('Onyx', () => {
                     // The trigger key should be in cache as it was just connected
                     expect(cache.hasCacheForKey(triggerKey)).toBe(true);
                 });
+        });
+
+        it('should save RAM-only keys', () => {
+            const testKeys = {
+                ...ONYX_KEYS,
+                COLLECTION: {
+                    ...ONYX_KEYS.COLLECTION,
+                    RAM_ONLY_COLLECTION: 'ramOnlyCollection',
+                },
+                RAM_ONLY_KEY: 'ramOnlyKey',
+            };
+
+            return initOnyx({
+                keys: testKeys,
+                ramOnlyKeys: [testKeys.COLLECTION.RAM_ONLY_COLLECTION, testKeys.RAM_ONLY_KEY],
+            }).then(() => {
+                expect(cache.isRamOnlyKey(testKeys.RAM_ONLY_KEY)).toBeTruthy();
+                expect(cache.isRamOnlyKey(testKeys.COLLECTION.RAM_ONLY_COLLECTION)).toBeTruthy();
+                expect(cache.isRamOnlyKey(testKeys.TEST_KEY)).toBeFalsy();
+            });
         });
     });
 });
