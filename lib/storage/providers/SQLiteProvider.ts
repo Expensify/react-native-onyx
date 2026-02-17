@@ -107,53 +107,13 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             throw new Error('Store is not initialized!');
         }
 
-        // For a small number of keys, it's more efficient to just use a single query with multiple placeholders.
-        if (keys.length <= 500) {
-            const placeholders = keys.map(() => '?').join(',');
-            const command = `SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
-            return provider.store.executeAsync<OnyxSQLiteKeyValuePair>(command, keys).then(({rows}) => {
-                // eslint-disable-next-line no-underscore-dangle
-                const result = rows?._array.map<StorageKeyValuePair>((row) => [row.record_key, JSON.parse(row.valueJSON)]);
-                return result ?? [];
-            });
-        }
-
-        // For a large number of keys, it becomes more performant if we insert the keys into a temporary table and perform a join.
-        // FIXME: Not working because of "-" apparently.
-        // const tableName = `temp_multiGet_${Str.guid()}`;
-        const tableName = `temp_multiGet_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        return provider.store
-            .executeAsync(`CREATE TEMP TABLE ${tableName} (record_key TEXT PRIMARY KEY);`)
-            .then(() => {
-                if (!provider.store) {
-                    throw new Error('Store is not initialized!');
-                }
-
-                const insertQuery = `INSERT INTO ${tableName} (record_key) VALUES (?);`;
-                const insertParams = keys.map((key) => [key]);
-                return provider.store.executeBatchAsync([{query: insertQuery, params: insertParams}]);
-            })
-            .then(() => {
-                if (!provider.store) {
-                    throw new Error('Store is not initialized!');
-                }
-
-                return provider.store.executeAsync<OnyxSQLiteKeyValuePair>(
-                    `SELECT k.record_key, k.valueJSON
-                    FROM keyvaluepairs AS k
-                    INNER JOIN ${tableName} AS t ON k.record_key = t.record_key;`,
-                );
-            })
-            .then(({rows}) => {
-                // eslint-disable-next-line no-underscore-dangle
-                const result = rows?._array.map<StorageKeyValuePair>((row) => [row.record_key, JSON.parse(row.valueJSON)]);
-
-                return result ?? [];
-            })
-            .finally(() => {
-                // Drops the temporary table to free up resources.
-                provider.store?.executeAsync(`DROP TABLE IF EXISTS ${tableName};`);
-            });
+        const placeholders = keys.map(() => '?').join(',');
+        const command = `SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
+        return provider.store.executeAsync<OnyxSQLiteKeyValuePair>(command, keys).then(({rows}) => {
+            // eslint-disable-next-line no-underscore-dangle
+            const result = rows?._array.map((row) => [row.record_key, JSON.parse(row.valueJSON)]);
+            return (result ?? []) as StorageKeyValuePair[];
+        });
     },
     setItem(key, value) {
         if (!provider.store) {
