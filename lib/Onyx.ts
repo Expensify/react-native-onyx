@@ -57,6 +57,12 @@ function init({
 
     cache.setRamOnlyKeys(new Set<OnyxKey>(ramOnlyKeys));
 
+    // Remove any previously persisted values for keys that are now RAM-only.
+    // This handles the case where a key was once a regular key and later changed to RAM-only.
+    if (ramOnlyKeys.length > 0) {
+        Storage.removeItems(ramOnlyKeys);
+    }
+
     if (shouldSyncMultipleInstances) {
         Storage.keepInstancesSync?.((key, value) => {
             cache.set(key, value);
