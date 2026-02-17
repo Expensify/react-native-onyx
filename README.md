@@ -460,6 +460,25 @@ Onyx.init({
 });
 ```
 
+### Using RAM-only keys
+
+You can choose not to save certain keys on disk and keep them RAM-only, that way their values will reset with each session. You just have to pass an array of `ramOnlyKeys` to the `Onyx.init` method. You can mark entire collections as RAM-only by including the collection key (e.g., `ONYXKEYS.COLLECTION.TEMP_DATA`). This will make all members of that collection RAM-only. Individual collection member keys cannot be selectively marked as RAM-only.
+
+```javascript
+import Onyx from 'react-native-onyx';
+
+Onyx.init({
+    keys: ONYXKEYS,
+    ramOnlyKeys: [
+        ONYXKEYS.RAM_ONLY_KEY_1,
+        ONYXKEYS.RAM_ONLY_KEY_2,
+        ONYXKEYS.COLLECTION.TEMP_DATA,
+    ],
+});
+```
+
+> Note: RAM-only keys still consume memory and will remain in cache until explicitly cleared or until Onyx.clear() is called. Use them judiciously for truly ephemeral data.
+
 ### Usage
 
 The extension interface is pretty simple, on the left sidebar you can see all the updates made to the local storage, in ascending order, and on the right pane you can see the whole the current state, payload of an action and the diff between the previous state and the current state after the action was triggered.

@@ -1,3 +1,4 @@
+import {act} from '@testing-library/react-native';
 import Onyx from '../../lib';
 import OnyxUtils from '../../lib/OnyxUtils';
 import type {GenericDeepRecord} from '../types';
@@ -5,6 +6,8 @@ import utils from '../../lib/utils';
 import type {Collection, OnyxCollection} from '../../lib/types';
 import type GenericCollection from '../utils/GenericCollection';
 import StorageMock from '../../lib/storage';
+import createDeferredTask from '../../lib/createDeferredTask';
+import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 const testObject: GenericDeepRecord = {
     a: 'a',
@@ -74,18 +77,23 @@ const ONYXKEYS = {
         TEST_LEVEL_KEY: 'test_level_',
         TEST_LEVEL_LAST_KEY: 'test_level_last_',
         ROUTES: 'routes_',
+        RAM_ONLY_COLLECTION: 'ramOnlyCollection_',
     },
+    RAM_ONLY_KEY: 'ramOnlyKey',
 };
 
-Onyx.init({
-    keys: ONYXKEYS,
-});
-
-beforeEach(() => Onyx.clear());
-
-afterEach(() => jest.clearAllMocks());
-
 describe('OnyxUtils', () => {
+    beforeAll(() =>
+        Onyx.init({
+            keys: ONYXKEYS,
+            ramOnlyKeys: [ONYXKEYS.RAM_ONLY_KEY, ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION],
+        }),
+    );
+
+    beforeEach(() => Onyx.clear());
+
+    afterEach(() => jest.clearAllMocks());
+
     describe('splitCollectionMemberKey', () => {
         describe('should return correct values', () => {
             const dataResult: Record<string, [string, string]> = {
@@ -485,6 +493,70 @@ describe('OnyxUtils', () => {
 
             // Should only be called once since there are no evictable keys
             expect(retryOperationSpy).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('isRamOnlyKey', () => {
+        it('should return true for RAM-only key', () => {
+            expect(OnyxUtils.isRamOnlyKey(ONYXKEYS.RAM_ONLY_KEY)).toBeTruthy();
+        });
+
+        it('should return true for RAM-only collection', () => {
+            expect(OnyxUtils.isRamOnlyKey(ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION)).toBeTruthy();
+        });
+
+        it('should return true for RAM-only collection member', () => {
+            expect(OnyxUtils.isRamOnlyKey(`${ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION}1`)).toBeTruthy();
+        });
+
+        it('should return false for a normal key', () => {
+            expect(OnyxUtils.isRamOnlyKey(ONYXKEYS.TEST_KEY)).toBeFalsy();
+        });
+
+        it('should return false for normal collection', () => {
+            expect(OnyxUtils.isRamOnlyKey(ONYXKEYS.COLLECTION.TEST_KEY)).toBeFalsy();
+        });
+
+        it('should return false for normal collection member', () => {
+            expect(OnyxUtils.isRamOnlyKey(`${ONYXKEYS.COLLECTION.TEST_KEY}1`)).toBeFalsy();
+        });
+    });
+
+    describe('afterInit', () => {
+        beforeEach(() => {
+            // Resets the deferred init task before each test.
+            Object.assign(OnyxUtils.getDeferredInitTask(), createDeferredTask());
+        });
+
+        afterEach(() => {
+            jest.restoreAllMocks();
+            return Onyx.clear();
+        });
+
+        it('should execute the callback immediately if Onyx is already initialized', async () => {
+            Onyx.init({keys: ONYXKEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            const callback = jest.fn();
+            OnyxUtils.afterInit(callback);
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(callback).toHaveBeenCalledTimes(1);
+        });
+
+        it('should only execute the callback after Onyx initialization', async () => {
+            const callback = jest.fn();
+            OnyxUtils.afterInit(callback);
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(callback).not.toHaveBeenCalled();
+
+            Onyx.init({keys: ONYXKEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(callback).toHaveBeenCalledTimes(1);
         });
     });
 });
