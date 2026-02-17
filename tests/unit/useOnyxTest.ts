@@ -426,7 +426,10 @@ describe('useOnyx', () => {
         it('should always use the current selector reference to return new data', async () => {
             Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name'});
 
-            let selector = ((entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name}`) as UseOnyxSelector<OnyxKey, string>;
+            let selector: UseOnyxSelector<OnyxKey, string> = ((entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name}`) as UseOnyxSelector<
+                OnyxKey,
+                string
+            >;
 
             const {result, rerender} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
@@ -437,13 +440,27 @@ describe('useOnyx', () => {
             expect(result.current[0]).toEqual('id - test_id, name - test_name');
             expect(result.current[1].status).toEqual('loaded');
 
-            selector = ((entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name} - selector changed`) as UseOnyxSelector<OnyxKey, string>;
-
-            await act(async () => waitForPromisesToResolve());
+            selector = ((entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name} - selector changed synchronously`) as UseOnyxSelector<
+                OnyxKey,
+                string
+            >;
 
             rerender(undefined);
 
-            expect(result.current[0]).toEqual('id - test_id, name - test_name - selector changed');
+            expect(result.current[0]).toEqual('id - test_id, name - test_name - selector changed synchronously');
+            expect(result.current[1].status).toEqual('loaded');
+
+            selector = ((entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name} - selector changed after macrotask`) as UseOnyxSelector<
+                OnyxKey,
+                string
+            >;
+
+            await act(async () => {
+                await waitForPromisesToResolve();
+                rerender(undefined);
+            });
+
+            expect(result.current[0]).toEqual('id - test_id, name - test_name - selector changed after macrotask');
             expect(result.current[1].status).toEqual('loaded');
         });
 
