@@ -477,7 +477,7 @@ function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collect
 function isCollectionMember(key: OnyxKey): boolean {
     const collectionKey = getCollectionKey(key);
     // If the key is longer than the collection key, it's a collection member
-    return collectionKey !== null && key.length > collectionKey.length;
+    return !!collectionKey && key.length > collectionKey.length;
 }
 
 /**
@@ -499,7 +499,7 @@ function isCollectionMember(key: OnyxKey): boolean {
  */
 function isRamOnlyKey(key: OnyxKey): boolean {
     const collectionKey = getCollectionKey(key);
-    if (collectionKey !== null) {
+    if (collectionKey) {
         return cache.isRamOnlyKey(collectionKey);
     }
 
@@ -523,7 +523,7 @@ function splitCollectionMemberKey<TKey extends CollectionKey, CollectionKeyType 
 
     if (!collectionKey) {
         const resolvedKey = getCollectionKey(key);
-        if (resolvedKey === null) {
+        if (!resolvedKey) {
             throw new Error(`Invalid '${key}' key provided, only collection keys are allowed.`);
         }
         // eslint-disable-next-line no-param-reassign
@@ -551,9 +551,9 @@ function isKeyMatch(configKey: OnyxKey, key: OnyxKey): boolean {
  * - `getCollectionKey("sharedNVP_user_-1_something")` would return "sharedNVP_user_"
  *
  * @param key - The collection key to process.
- * @returns The plain collection key or null if the key is not a collection one.
+ * @returns The plain collection key or undefined if the key is not a collection one.
  */
-function getCollectionKey(key: CollectionKey): string | null {
+function getCollectionKey(key: CollectionKey): string | undefined {
     // Start by finding the position of the last underscore in the string
     let lastUnderscoreIndex = key.lastIndexOf('_');
 
@@ -571,7 +571,7 @@ function getCollectionKey(key: CollectionKey): string | null {
         lastUnderscoreIndex = key.lastIndexOf('_', lastUnderscoreIndex - 1);
     }
 
-    return null;
+    return undefined;
 }
 
 /**
@@ -750,7 +750,7 @@ function keyChanged<TKey extends OnyxKey>(
     // do the same in keysChanged, because we only call that function when a collection key changes, and it doesn't happen that often.
     // For performance reason, we look for the given key and later if don't find it we look for the collection key, instead of checking if it is a collection key first.
     let stateMappingKeys = onyxKeyToSubscriptionIDs.get(key) ?? [];
-    const collectionKey = getCollectionKey(key) ?? undefined;
+    const collectionKey = getCollectionKey(key);
 
     if (collectionKey) {
         // Getting the collection key from the specific key because only collection keys were stored in the mapping.

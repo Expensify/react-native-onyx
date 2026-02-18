@@ -342,9 +342,9 @@ describe('OnyxUtils', () => {
             });
         });
 
-        it('should return null if key does not contain underscore', () => {
-            expect(OnyxUtils.getCollectionKey(ONYXKEYS.TEST_KEY)).toBeNull();
-            expect(OnyxUtils.getCollectionKey('')).toBeNull();
+        it('should return undefined if key does not contain underscore', () => {
+            expect(OnyxUtils.getCollectionKey(ONYXKEYS.TEST_KEY)).toBeUndefined();
+            expect(OnyxUtils.getCollectionKey('')).toBeUndefined();
         });
     });
 
