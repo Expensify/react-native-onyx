@@ -131,12 +131,10 @@ class OnyxSnapshotCache {
         // Always invalidate the exact key
         this.snapshotCache.delete(keyToInvalidate);
 
-        try {
-            // Check if the key is a collection member and invalidate the collection base key
-            const collectionBaseKey = OnyxUtils.getCollectionKey(keyToInvalidate);
+        // Check if the key is a collection member and invalidate the collection base key
+        const collectionBaseKey = OnyxUtils.getCollectionKey(keyToInvalidate);
+        if (collectionBaseKey) {
             this.snapshotCache.delete(collectionBaseKey);
-        } catch (e) {
-            // do nothing - this just means the key is not a collection member
         }
     }
 

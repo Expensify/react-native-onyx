@@ -475,14 +475,9 @@ function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collect
  * @returns true if the key is a collection member, false otherwise
  */
 function isCollectionMember(key: OnyxKey): boolean {
-    try {
-        const collectionKey = getCollectionKey(key);
-        // If the key is longer than the collection key, it's a collection member
-        return key.length > collectionKey.length;
-    } catch (e) {
-        // If getCollectionKey throws, the key is not a collection member
-        return false;
-    }
+    const collectionKey = getCollectionKey(key);
+    // If the key is longer than the collection key, it's a collection member
+    return !!collectionKey && key.length > collectionKey.length;
 }
 
 /**
@@ -503,12 +498,9 @@ function isCollectionMember(key: OnyxKey): boolean {
  * @returns true if key is a RAM-only key, RAM-only collection key, or a RAM-only collection member
  */
 function isRamOnlyKey(key: OnyxKey): boolean {
-    try {
-        const collectionKey = getCollectionKey(key);
-        // If collectionKey exists for a given key, check if it's a RAM-only key
+    const collectionKey = getCollectionKey(key);
+    if (collectionKey) {
         return cache.isRamOnlyKey(collectionKey);
-    } catch {
-        // If getCollectionKey throws, the key is not a collection member
     }
 
     return cache.isRamOnlyKey(key);
@@ -530,8 +522,12 @@ function splitCollectionMemberKey<TKey extends CollectionKey, CollectionKeyType 
     }
 
     if (!collectionKey) {
+        const resolvedKey = getCollectionKey(key);
+        if (!resolvedKey) {
+            throw new Error(`Invalid '${key}' key provided, only collection keys are allowed.`);
+        }
         // eslint-disable-next-line no-param-reassign
-        collectionKey = getCollectionKey(key);
+        collectionKey = resolvedKey;
     }
 
     return [collectionKey as CollectionKeyType, key.slice(collectionKey.length)];
@@ -555,9 +551,9 @@ function isKeyMatch(configKey: OnyxKey, key: OnyxKey): boolean {
  * - `getCollectionKey("sharedNVP_user_-1_something")` would return "sharedNVP_user_"
  *
  * @param key - The collection key to process.
- * @returns The plain collection key or throws an Error if the key is not a collection one.
+ * @returns The plain collection key or undefined if the key is not a collection one.
  */
-function getCollectionKey(key: CollectionKey): string {
+function getCollectionKey(key: CollectionKey): string | undefined {
     // Start by finding the position of the last underscore in the string
     let lastUnderscoreIndex = key.lastIndexOf('_');
 
@@ -575,7 +571,7 @@ function getCollectionKey(key: CollectionKey): string {
         lastUnderscoreIndex = key.lastIndexOf('_', lastUnderscoreIndex - 1);
     }
 
-    throw new Error(`Invalid '${key}' key provided, only collection keys are allowed.`);
+    return undefined;
 }
 
 /**
@@ -754,13 +750,7 @@ function keyChanged<TKey extends OnyxKey>(
     // do the same in keysChanged, because we only call that function when a collection key changes, and it doesn't happen that often.
     // For performance reason, we look for the given key and later if don't find it we look for the collection key, instead of checking if it is a collection key first.
     let stateMappingKeys = onyxKeyToSubscriptionIDs.get(key) ?? [];
-    let collectionKey: string | undefined;
-    try {
-        collectionKey = getCollectionKey(key);
-    } catch (e) {
-        // If getCollectionKey() throws an error it means the key is not a collection key.
-        collectionKey = undefined;
-    }
+    const collectionKey = getCollectionKey(key);
 
     if (collectionKey) {
         // Getting the collection key from the specific key because only collection keys were stored in the mapping.

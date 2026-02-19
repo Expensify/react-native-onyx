@@ -156,6 +156,7 @@ describe('OnyxSnapshotCache', () => {
 
         it('should invalidate non-collection keys without affecting others', () => {
             mockedOnyxUtils.isCollectionKey.mockReturnValue(false);
+            mockedOnyxUtils.getCollectionKey.mockReturnValue(undefined);
 
             cache.invalidateForKey('nonCollectionKey');
 
