@@ -20,8 +20,14 @@
 <dt><a href="#getSkippableCollectionMemberIDs">getSkippableCollectionMemberIDs()</a></dt>
 <dd><p>Getter - returns the skippable collection member IDs.</p>
 </dd>
+<dt><a href="#getSnapshotMergeKeys">getSnapshotMergeKeys()</a></dt>
+<dd><p>Getter - returns the snapshot merge keys allowlist.</p>
+</dd>
 <dt><a href="#setSkippableCollectionMemberIDs">setSkippableCollectionMemberIDs()</a></dt>
 <dd><p>Setter - sets the skippable collection member IDs.</p>
+</dd>
+<dt><a href="#setSnapshotMergeKeys">setSnapshotMergeKeys()</a></dt>
+<dd><p>Setter - sets the snapshot merge keys allowlist.</p>
 </dd>
 <dt><a href="#initStoreValues">initStoreValues(keys, initialKeyStates, evictableKeys)</a></dt>
 <dd><p>Sets the initial values for the Onyx store</p>
@@ -223,10 +229,22 @@ Getter - returns the deffered init task.
 Getter - returns the skippable collection member IDs.
 
 **Kind**: global function  
+<a name="getSnapshotMergeKeys"></a>
+
+## getSnapshotMergeKeys()
+Getter - returns the snapshot merge keys allowlist.
+
+**Kind**: global function  
 <a name="setSkippableCollectionMemberIDs"></a>
 
 ## setSkippableCollectionMemberIDs()
 Setter - sets the skippable collection member IDs.
+
+**Kind**: global function  
+<a name="setSnapshotMergeKeys"></a>
+
+## setSnapshotMergeKeys()
+Setter - sets the snapshot merge keys allowlist.
 
 **Kind**: global function  
 <a name="initStoreValues"></a>
