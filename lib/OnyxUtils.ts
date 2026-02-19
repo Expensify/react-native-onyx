@@ -74,9 +74,6 @@ type OnyxMethod = ValueOf<typeof METHOD>;
 let mergeQueue: Record<OnyxKey, Array<OnyxValue<OnyxKey>>> = {};
 let mergeQueuePromise: Record<OnyxKey, Promise<void>> = {};
 
-// Used to schedule subscriber update to the macro task queue
-let nextMacrotaskPromise: Promise<void> | null = null;
-
 // Holds a mapping of all the React components that want their state subscribed to a store key
 let callbackToStateMapping: Record<string, CallbackToStateMapping<OnyxKey>> = {};
 
@@ -694,6 +691,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
             // send the whole cached collection.
             if (isSubscribedToCollectionKey) {
                 if (subscriber.waitForCollectionCallback) {
+                    lastConnectionCallbackData.set(subscriber.subscriptionID, cachedCollection);
                     subscriber.callback(cachedCollection, subscriber.key, partialCollection);
                     continue;
                 }
@@ -708,6 +706,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
 
                     subscriber.callback(cachedCollection[dataKey], dataKey);
                 }
+                lastConnectionCallbackData.set(subscriber.subscriptionID, cachedCollection);
                 continue;
             }
 
@@ -798,6 +797,7 @@ function keyChanged<TKey extends OnyxKey>(
                 }
 
                 cachedCollection[key] = value;
+                lastConnectionCallbackData.set(subscriber.subscriptionID, cachedCollection);
                 subscriber.callback(cachedCollection, subscriber.key, {[key]: value});
                 continue;
             }
@@ -825,11 +825,10 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: CallbackToStateMapp
 
     // For regular callbacks, we never want to pass null values, but always just undefined if a value is not set in cache or storage.
     const valueToPass = value === null ? undefined : value;
-    const lastValue = lastConnectionCallbackData.get(mapping.subscriptionID);
-    lastConnectionCallbackData.get(mapping.subscriptionID);
 
-    // If the value has not changed we do not need to trigger the callback
-    if (lastConnectionCallbackData.has(mapping.subscriptionID) && valueToPass === lastValue) {
+    // If the subscriber was already notified (e.g. by a synchronous keyChanged call),
+    // skip the initial data delivery to prevent duplicate callbacks.
+    if (lastConnectionCallbackData.has(mapping.subscriptionID)) {
         return;
     }
 
@@ -863,56 +862,11 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
 }
 
 /**
- * Delays promise resolution until the next macrotask to prevent race condition if the key subscription is in progress.
- *
- * @param callback The keyChanged/keysChanged callback
- * */
-function prepareSubscriberUpdate(callback: () => void): Promise<void> {
-    if (!nextMacrotaskPromise) {
-        nextMacrotaskPromise = new Promise<void>((resolve) => {
-            setTimeout(() => {
-                nextMacrotaskPromise = null;
-                resolve();
-            }, 0);
-        });
-    }
-    return Promise.all([nextMacrotaskPromise, Promise.resolve().then(callback)]).then();
-}
-
-/**
- * Schedules an update that will be appended to the macro task queue (so it doesn't update the subscribers immediately).
- *
- * @example
- * scheduleSubscriberUpdate(key, value, subscriber => subscriber.initWithStoredValues === false)
- */
-function scheduleSubscriberUpdate<TKey extends OnyxKey>(
-    key: TKey,
-    value: OnyxValue<TKey>,
-    canUpdateSubscriber: (subscriber?: CallbackToStateMapping<OnyxKey>) => boolean = () => true,
-    isProcessingCollectionUpdate = false,
-): Promise<void> {
-    return prepareSubscriberUpdate(() => keyChanged(key, value, canUpdateSubscriber, isProcessingCollectionUpdate));
-}
-
-/**
- * This method is similar to scheduleSubscriberUpdate but it is built for working specifically with collections
- * so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
- * subscriber callbacks receive the data in a different format than they normally expect and it breaks code.
- */
-function scheduleNotifyCollectionSubscribers<TKey extends OnyxKey>(
-    key: TKey,
-    value: OnyxCollection<KeyValueMapping[TKey]>,
-    previousValue?: OnyxCollection<KeyValueMapping[TKey]>,
-): Promise<void> {
-    return prepareSubscriberUpdate(() => keysChanged(key, value, previousValue));
-}
-
-/**
  * Remove a key from Onyx and update the subscribers
  */
 function remove<TKey extends OnyxKey>(key: TKey, isProcessingCollectionUpdate?: boolean): Promise<void> {
     cache.drop(key);
-    scheduleSubscriberUpdate(key, undefined as OnyxValue<TKey>, undefined, isProcessingCollectionUpdate);
+    keyChanged(key, undefined as OnyxValue<TKey>, undefined, isProcessingCollectionUpdate);
 
     if (isRamOnlyKey(key)) {
         return Promise.resolve();
@@ -983,7 +937,7 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, on
 /**
  * Notifies subscribers and writes current value to cache
  */
-function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>, hasChanged?: boolean): Promise<void> {
+function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>, hasChanged?: boolean): void {
     // Update subscribers if the cached value has changed, or when the subscriber specifically requires
     // all updates regardless of value changes (indicated by initWithStoredValues set to false).
     if (hasChanged) {
@@ -992,7 +946,7 @@ function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>
         cache.addToAccessedKeys(key);
     }
 
-    return scheduleSubscriberUpdate(key, value, (subscriber) => hasChanged || subscriber?.initWithStoredValues === false).then(() => undefined);
+    keyChanged(key, value, (subscriber) => hasChanged || subscriber?.initWithStoredValues === false);
 }
 
 function hasPendingMergeForKey(key: OnyxKey): boolean {
@@ -1386,24 +1340,23 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
     OnyxUtils.logKeyChanged(OnyxUtils.METHOD.SET, key, value, hasChanged);
 
     // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
-    const updatePromise = OnyxUtils.broadcastUpdate(key, valueWithoutNestedNullValues, hasChanged);
+    OnyxUtils.broadcastUpdate(key, valueWithoutNestedNullValues, hasChanged);
 
     // If the value has not changed and this isn't a retry attempt, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
     if (!hasChanged && !retryAttempt) {
-        return updatePromise;
+        return Promise.resolve();
     }
 
     // If a key is a RAM-only key or a member of RAM-only collection, we skip the step that modifies the storage
     if (isRamOnlyKey(key)) {
         OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
-        return updatePromise;
+        return Promise.resolve();
     }
 
     return Storage.setItem(key, valueWithoutNestedNullValues)
         .catch((error) => OnyxUtils.retryOperation(error, setWithRetry, {key, value: valueWithoutNestedNullValues, options}, retryAttempt))
         .then(() => {
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
-            return updatePromise;
         });
 }
 
@@ -1446,7 +1399,7 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
 
         // Update cache and optimistically inform subscribers on the next tick
         cache.set(key, value);
-        return OnyxUtils.scheduleSubscriberUpdate(key, value);
+        return keyChanged(key, value);
     });
 
     const keyValuePairsToStore = keyValuePairsToSet.filter((keyValuePair) => {
@@ -1522,7 +1475,7 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
 
         for (const [key, value] of keyValuePairs) cache.set(key, value);
 
-        const updatePromise = OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
+        const updatePromise = keysChanged(collectionKey, mutableCollection, previousCollection);
 
         // RAM-only keys are not supposed to be saved to storage
         if (isRamOnlyKey(collectionKey)) {
@@ -1657,7 +1610,7 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
             // and update all subscribers
             const promiseUpdate = previousCollectionPromise.then((previousCollection) => {
                 cache.merge(finalMergedCollection);
-                return scheduleNotifyCollectionSubscribers(collectionKey, finalMergedCollection, previousCollection);
+                return keysChanged(collectionKey, finalMergedCollection, previousCollection);
             });
 
             return Promise.all(promises)
@@ -1723,7 +1676,7 @@ function partialSetCollection<TKey extends CollectionKeyBase>({collectionKey, co
 
         for (const [key, value] of keyValuePairs) cache.set(key, value);
 
-        const updatePromise = scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
+        const updatePromise = keysChanged(collectionKey, mutableCollection, previousCollection);
 
         if (isRamOnlyKey(collectionKey)) {
             sendActionToDevTools(METHOD.SET_COLLECTION, undefined, mutableCollection);
@@ -1782,8 +1735,6 @@ const OnyxUtils = {
     sendDataToConnection,
     getCollectionKey,
     getCollectionDataAndSendAsObject,
-    scheduleSubscriberUpdate,
-    scheduleNotifyCollectionSubscribers,
     remove,
     reportStorageQuota,
     retryOperation,
@@ -1839,10 +1790,6 @@ GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
     keyChanged = decorateWithMetrics(keyChanged, 'OnyxUtils.keyChanged');
     // @ts-expect-error Reassign
     sendDataToConnection = decorateWithMetrics(sendDataToConnection, 'OnyxUtils.sendDataToConnection');
-    // @ts-expect-error Reassign
-    scheduleSubscriberUpdate = decorateWithMetrics(scheduleSubscriberUpdate, 'OnyxUtils.scheduleSubscriberUpdate');
-    // @ts-expect-error Reassign
-    scheduleNotifyCollectionSubscribers = decorateWithMetrics(scheduleNotifyCollectionSubscribers, 'OnyxUtils.scheduleNotifyCollectionSubscribers');
     // @ts-expect-error Reassign
     remove = decorateWithMetrics(remove, 'OnyxUtils.remove');
     // @ts-expect-error Reassign

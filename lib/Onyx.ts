@@ -254,9 +254,8 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
                     return Promise.resolve();
                 }
 
-                return OnyxMerge.applyMerge(key, existingValue, validChanges).then(({mergedValue, updatePromise}) => {
+                return OnyxMerge.applyMerge(key, existingValue, validChanges).then(({mergedValue}) => {
                     OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, changes, mergedValue);
-                    return updatePromise;
                 });
             } catch (error) {
                 Logger.logAlert(`An error occurred while applying merge for key: ${key}, Error: ${error}`);
@@ -374,16 +373,6 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                     keysToBeClearedFromStorage.push(key);
                 }
 
-                const updatePromises: Array<Promise<void>> = [];
-
-                // Notify the subscribers for each key/value group so they can receive the new values
-                for (const [key, value] of Object.entries(keyValuesToResetIndividually)) {
-                    updatePromises.push(OnyxUtils.scheduleSubscriberUpdate(key, value));
-                }
-                for (const [key, value] of Object.entries(keyValuesToResetAsCollection)) {
-                    updatePromises.push(OnyxUtils.scheduleNotifyCollectionSubscribers(key, value.newValues, value.oldValues));
-                }
-
                 // Exclude RAM-only keys to prevent them from being saved to storage
                 const defaultKeyValuePairs = Object.entries(
                     Object.keys(defaultKeyStates)
@@ -402,7 +391,14 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                     .then(() => Storage.multiSet(defaultKeyValuePairs))
                     .then(() => {
                         DevTools.clearState(keysToPreserve);
-                        return Promise.all(updatePromises);
+
+                        // Notify the subscribers for each key/value group so they can receive the new values
+                        for (const [key, value] of Object.entries(keyValuesToResetIndividually)) {
+                            OnyxUtils.keyChanged(key, value);
+                        }
+                        for (const [key, value] of Object.entries(keyValuesToResetAsCollection)) {
+                            OnyxUtils.keysChanged(key, value.newValues, value.oldValues);
+                        }
                     });
             })
             .then(() => undefined);

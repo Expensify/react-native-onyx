@@ -1482,10 +1482,9 @@ describe('Onyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                expect(collectionCallback).toHaveBeenCalledTimes(3);
+                expect(collectionCallback).toHaveBeenCalledTimes(2);
                 expect(collectionCallback).toHaveBeenNthCalledWith(1, {[cat]: initialValue}, ONYX_KEYS.COLLECTION.ANIMALS, {[cat]: initialValue});
-                expect(collectionCallback).toHaveBeenNthCalledWith(2, {[cat]: initialValue}, ONYX_KEYS.COLLECTION.ANIMALS, undefined);
-                expect(collectionCallback).toHaveBeenNthCalledWith(3, collectionDiff, ONYX_KEYS.COLLECTION.ANIMALS, {[cat]: initialValue, [dog]: {name: 'Rex'}});
+                expect(collectionCallback).toHaveBeenNthCalledWith(2, collectionDiff, ONYX_KEYS.COLLECTION.ANIMALS, {[cat]: initialValue, [dog]: {name: 'Rex'}});
 
                 // Cat hasn't changed from its original value, expect only the initial connect callback
                 expect(catCallback).toHaveBeenCalledTimes(1);
