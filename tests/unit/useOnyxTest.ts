@@ -440,20 +440,14 @@ describe('useOnyx', () => {
             expect(result.current[0]).toEqual('id - test_id, name - test_name');
             expect(result.current[1].status).toEqual('loaded');
 
-            selector = ((entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name} - selector changed synchronously`) as UseOnyxSelector<
-                OnyxKey,
-                string
-            >;
+            selector = ((entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name} - selector changed synchronously`) as UseOnyxSelector<OnyxKey, string>;
 
             rerender(undefined);
 
             expect(result.current[0]).toEqual('id - test_id, name - test_name - selector changed synchronously');
             expect(result.current[1].status).toEqual('loaded');
 
-            selector = ((entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name} - selector changed after macrotask`) as UseOnyxSelector<
-                OnyxKey,
-                string
-            >;
+            selector = ((entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name} - selector changed after macrotask`) as UseOnyxSelector<OnyxKey, string>;
 
             await act(async () => {
                 await waitForPromisesToResolve();
