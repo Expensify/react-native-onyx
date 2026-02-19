@@ -127,7 +127,7 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             throw new Error('Store is not initialized!');
         }
 
-        const query = 'REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, json(?));';
+        const query = 'REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);';
         const params = pairs.map((pair) => [pair[0], JSON.stringify(pair[1] === undefined ? null : pair[1])]);
         if (utils.isEmptyObject(params)) {
             return Promise.resolve();
@@ -143,15 +143,15 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
 
         // Query to merge the change into the DB value.
         const patchQuery = `INSERT INTO keyvaluepairs (record_key, valueJSON)
-            VALUES (:key, JSON(:value))
+            VALUES (:key, :value)
             ON CONFLICT DO UPDATE
-            SET valueJSON = JSON_PATCH(valueJSON, JSON(:value));
+            SET valueJSON = JSON_PATCH(valueJSON, :value);
         `;
         const patchQueryArguments: string[][] = [];
 
         // Query to fully replace the nested objects of the DB value.
         const replaceQuery = `UPDATE keyvaluepairs
-            SET valueJSON = JSON_REPLACE(valueJSON, ?, JSON(?))
+            SET valueJSON = JSON_REPLACE(valueJSON, ?, ?)
             WHERE record_key = ?;
         `;
         const replaceQueryArguments: string[][] = [];
