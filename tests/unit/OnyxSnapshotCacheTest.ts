@@ -40,12 +40,10 @@ describe('OnyxSnapshotCache', () => {
                 selector,
                 initWithStoredValues: true,
                 allowStaleData: false,
-                canBeMissing: true,
             };
             const optionsWithoutSelector: UseOnyxOptions<OnyxKey, string> = {
                 initWithStoredValues: false,
                 allowStaleData: true,
-                canBeMissing: false,
             };
             const keyWithSelector = cache.registerConsumer(optionsWithSelector);
             const keyWithoutSelector = cache.registerConsumer(optionsWithoutSelector);
@@ -158,6 +156,7 @@ describe('OnyxSnapshotCache', () => {
 
         it('should invalidate non-collection keys without affecting others', () => {
             mockedOnyxUtils.isCollectionKey.mockReturnValue(false);
+            mockedOnyxUtils.getCollectionKey.mockReturnValue(undefined);
 
             cache.invalidateForKey('nonCollectionKey');
 
