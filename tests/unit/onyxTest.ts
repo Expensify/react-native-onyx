@@ -3115,17 +3115,6 @@ describe('Onyx.init', () => {
 
 // Separate describe block to control Onyx.init() per-test so we can pre-seed storage before init.
 describe('RAM-only keys should not read from storage', () => {
-    const RAM_ONLY_KEYS = {
-        TEST_KEY: 'test',
-        OTHER_TEST: 'otherTest',
-        COLLECTION: {
-            TEST_KEY: 'test_',
-            RAM_ONLY_COLLECTION: 'ramOnlyCollection_',
-        },
-        RAM_ONLY_KEY: 'ramOnlyKey',
-        RAM_ONLY_WITH_INITIAL_VALUE: 'ramOnlyWithInitialValue',
-    };
-
     let cache: typeof OnyxCache;
 
     beforeEach(() => {
@@ -3140,17 +3129,17 @@ describe('RAM-only keys should not read from storage', () => {
 
     it('should not return stale storage data for a RAM-only key via get', async () => {
         // Simulate stale data left in storage from before the key was RAM-only
-        await StorageMock.setItem(RAM_ONLY_KEYS.RAM_ONLY_KEY, 'stale_value');
+        await StorageMock.setItem(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'stale_value');
 
         Onyx.init({
-            keys: RAM_ONLY_KEYS,
-            ramOnlyKeys: [RAM_ONLY_KEYS.RAM_ONLY_KEY, RAM_ONLY_KEYS.COLLECTION.RAM_ONLY_COLLECTION, RAM_ONLY_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
+            keys: ONYX_KEYS,
+            ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
         });
         await act(async () => waitForPromisesToResolve());
 
         let receivedValue: unknown;
         const connection = Onyx.connect({
-            key: RAM_ONLY_KEYS.RAM_ONLY_KEY,
+            key: ONYX_KEYS.RAM_ONLY_TEST_KEY,
             callback: (value) => {
                 receivedValue = value;
             },
@@ -3158,28 +3147,28 @@ describe('RAM-only keys should not read from storage', () => {
         await act(async () => waitForPromisesToResolve());
 
         expect(receivedValue).toBeUndefined();
-        expect(cache.get(RAM_ONLY_KEYS.RAM_ONLY_KEY)).toBeUndefined();
+        expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeUndefined();
 
         Onyx.disconnect(connection);
     });
 
     it('should not return stale storage data for RAM-only collection members via multiGet', async () => {
-        const collectionMember1 = `${RAM_ONLY_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
-        const collectionMember2 = `${RAM_ONLY_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`;
+        const collectionMember1 = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
+        const collectionMember2 = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`;
 
         // Simulate stale collection members in storage
         await StorageMock.setItem(collectionMember1, {name: 'stale_1'});
         await StorageMock.setItem(collectionMember2, {name: 'stale_2'});
 
         Onyx.init({
-            keys: RAM_ONLY_KEYS,
-            ramOnlyKeys: [RAM_ONLY_KEYS.RAM_ONLY_KEY, RAM_ONLY_KEYS.COLLECTION.RAM_ONLY_COLLECTION, RAM_ONLY_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
+            keys: ONYX_KEYS,
+            ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
         });
         await act(async () => waitForPromisesToResolve());
 
         let receivedCollection: OnyxCollection<unknown>;
         const connection = Onyx.connect({
-            key: RAM_ONLY_KEYS.COLLECTION.RAM_ONLY_COLLECTION,
+            key: ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION,
             callback: (value) => {
                 receivedCollection = value;
             },
@@ -3196,67 +3185,67 @@ describe('RAM-only keys should not read from storage', () => {
 
     it('should not include stale RAM-only keys in getAllKeys results', async () => {
         // Simulate stale data in storage
-        await StorageMock.setItem(RAM_ONLY_KEYS.RAM_ONLY_KEY, 'stale_value');
-        await StorageMock.setItem(`${RAM_ONLY_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`, {stale: 'member'});
-        await StorageMock.setItem(RAM_ONLY_KEYS.OTHER_TEST, 'normal_value');
+        await StorageMock.setItem(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'stale_value');
+        await StorageMock.setItem(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`, {stale: 'member'});
+        await StorageMock.setItem(ONYX_KEYS.OTHER_TEST, 'normal_value');
 
         Onyx.init({
-            keys: RAM_ONLY_KEYS,
-            ramOnlyKeys: [RAM_ONLY_KEYS.RAM_ONLY_KEY, RAM_ONLY_KEYS.COLLECTION.RAM_ONLY_COLLECTION, RAM_ONLY_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
+            keys: ONYX_KEYS,
+            ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
         });
         await act(async () => waitForPromisesToResolve());
 
         const keys = await OnyxUtils.getAllKeys();
 
-        expect(keys.has(RAM_ONLY_KEYS.RAM_ONLY_KEY)).toBe(false);
-        expect(keys.has(`${RAM_ONLY_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`)).toBe(false);
+        expect(keys.has(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBe(false);
+        expect(keys.has(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`)).toBe(false);
         // Normal keys should still be present
-        expect(keys.has(RAM_ONLY_KEYS.OTHER_TEST)).toBe(true);
+        expect(keys.has(ONYX_KEYS.OTHER_TEST)).toBe(true);
     });
 
     it('should not read stale storage data for RAM-only keys during initializeWithDefaultKeyStates', async () => {
         // Simulate stale data for a RAM-only key that also has a default key state
-        await StorageMock.setItem(RAM_ONLY_KEYS.RAM_ONLY_WITH_INITIAL_VALUE, 'stale_value');
+        await StorageMock.setItem(ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE, 'stale_value');
 
         Onyx.init({
-            keys: RAM_ONLY_KEYS,
+            keys: ONYX_KEYS,
             initialKeyStates: {
-                [RAM_ONLY_KEYS.RAM_ONLY_WITH_INITIAL_VALUE]: 'default_value',
+                [ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE]: 'default_value',
             },
-            ramOnlyKeys: [RAM_ONLY_KEYS.RAM_ONLY_KEY, RAM_ONLY_KEYS.COLLECTION.RAM_ONLY_COLLECTION, RAM_ONLY_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
+            ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
         });
         await act(async () => waitForPromisesToResolve());
 
         // The cache should have the default value, not the stale storage value
-        expect(cache.get(RAM_ONLY_KEYS.RAM_ONLY_WITH_INITIAL_VALUE)).toEqual('default_value');
+        expect(cache.get(ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE)).toEqual('default_value');
     });
 
     it('should not use stale storage data as merge base for RAM-only keys', async () => {
         // Simulate stale data in storage
-        await StorageMock.setItem(RAM_ONLY_KEYS.RAM_ONLY_KEY, {name: 'stale', token: 'old_token'});
+        await StorageMock.setItem(ONYX_KEYS.RAM_ONLY_TEST_KEY, {name: 'stale', token: 'old_token'});
 
         Onyx.init({
-            keys: RAM_ONLY_KEYS,
-            ramOnlyKeys: [RAM_ONLY_KEYS.RAM_ONLY_KEY, RAM_ONLY_KEYS.COLLECTION.RAM_ONLY_COLLECTION, RAM_ONLY_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
+            keys: ONYX_KEYS,
+            ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
         });
         await act(async () => waitForPromisesToResolve());
 
         // Merge new data — should NOT merge with stale storage value
-        await Onyx.merge(RAM_ONLY_KEYS.RAM_ONLY_KEY, {name: 'new'});
+        await Onyx.merge(ONYX_KEYS.RAM_ONLY_TEST_KEY, {name: 'new'});
 
         // The result should only contain the merged value, not the stale token
-        expect(cache.get(RAM_ONLY_KEYS.RAM_ONLY_KEY)).toEqual({name: 'new'});
+        expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toEqual({name: 'new'});
     });
 
     it('should not read stale storage data when subscribing to individual RAM-only collection members', async () => {
-        const collectionMember = `${RAM_ONLY_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
+        const collectionMember = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
 
         // Simulate stale data in storage
         await StorageMock.setItem(collectionMember, {data: 'stale'});
 
         Onyx.init({
-            keys: RAM_ONLY_KEYS,
-            ramOnlyKeys: [RAM_ONLY_KEYS.RAM_ONLY_KEY, RAM_ONLY_KEYS.COLLECTION.RAM_ONLY_COLLECTION, RAM_ONLY_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
+            keys: ONYX_KEYS,
+            ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
         });
         await act(async () => waitForPromisesToResolve());
 
@@ -3277,12 +3266,12 @@ describe('RAM-only keys should not read from storage', () => {
 
     it('should still work correctly for normal keys when RAM-only keys have stale storage data', async () => {
         // Simulate both normal and RAM-only stale data in storage
-        await StorageMock.setItem(RAM_ONLY_KEYS.TEST_KEY, 'normal_value');
-        await StorageMock.setItem(RAM_ONLY_KEYS.RAM_ONLY_KEY, 'stale_ram_value');
+        await StorageMock.setItem(ONYX_KEYS.TEST_KEY, 'normal_value');
+        await StorageMock.setItem(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'stale_ram_value');
 
         Onyx.init({
-            keys: RAM_ONLY_KEYS,
-            ramOnlyKeys: [RAM_ONLY_KEYS.RAM_ONLY_KEY, RAM_ONLY_KEYS.COLLECTION.RAM_ONLY_COLLECTION, RAM_ONLY_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
+            keys: ONYX_KEYS,
+            ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
         });
         await act(async () => waitForPromisesToResolve());
 
@@ -3290,13 +3279,13 @@ describe('RAM-only keys should not read from storage', () => {
         let ramOnlyValue: unknown;
 
         const connection1 = Onyx.connect({
-            key: RAM_ONLY_KEYS.TEST_KEY,
+            key: ONYX_KEYS.TEST_KEY,
             callback: (value) => {
                 normalValue = value;
             },
         });
         const connection2 = Onyx.connect({
-            key: RAM_ONLY_KEYS.RAM_ONLY_KEY,
+            key: ONYX_KEYS.RAM_ONLY_TEST_KEY,
             callback: (value) => {
                 ramOnlyValue = value;
             },
@@ -3314,8 +3303,8 @@ describe('RAM-only keys should not read from storage', () => {
 
     it('should not sync RAM-only keys from other instances via keepInstancesSync', async () => {
         Onyx.init({
-            keys: RAM_ONLY_KEYS,
-            ramOnlyKeys: [RAM_ONLY_KEYS.RAM_ONLY_KEY, RAM_ONLY_KEYS.COLLECTION.RAM_ONLY_COLLECTION, RAM_ONLY_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
+            keys: ONYX_KEYS,
+            ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
             shouldSyncMultipleInstances: true,
         });
         await act(async () => waitForPromisesToResolve());
@@ -3326,7 +3315,7 @@ describe('RAM-only keys should not read from storage', () => {
 
         let receivedValue: unknown;
         const connection = Onyx.connect({
-            key: RAM_ONLY_KEYS.RAM_ONLY_KEY,
+            key: ONYX_KEYS.RAM_ONLY_TEST_KEY,
             callback: (value) => {
                 receivedValue = value;
             },
@@ -3334,24 +3323,24 @@ describe('RAM-only keys should not read from storage', () => {
         await act(async () => waitForPromisesToResolve());
 
         // Simulate another tab syncing a stale RAM-only key value
-        syncCallback(RAM_ONLY_KEYS.RAM_ONLY_KEY, 'synced_stale_value');
+        syncCallback(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'synced_stale_value');
         await act(async () => waitForPromisesToResolve());
 
         // The RAM-only key should NOT have been updated from the sync
         expect(receivedValue).toBeUndefined();
-        expect(cache.get(RAM_ONLY_KEYS.RAM_ONLY_KEY)).toBeUndefined();
+        expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeUndefined();
 
         // Verify that normal keys still sync correctly
         let normalValue: unknown;
         const connection2 = Onyx.connect({
-            key: RAM_ONLY_KEYS.OTHER_TEST,
+            key: ONYX_KEYS.OTHER_TEST,
             callback: (value) => {
                 normalValue = value;
             },
         });
         await act(async () => waitForPromisesToResolve());
 
-        syncCallback(RAM_ONLY_KEYS.OTHER_TEST, 'synced_normal_value');
+        syncCallback(ONYX_KEYS.OTHER_TEST, 'synced_normal_value');
         await act(async () => waitForPromisesToResolve());
 
         expect(normalValue).toEqual('synced_normal_value');
@@ -3361,16 +3350,16 @@ describe('RAM-only keys should not read from storage', () => {
     });
 
     it('should serve RAM-only keys from cache and normal keys from storage in multiGet', async () => {
-        const ramOnlyMember = `${RAM_ONLY_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
-        const normalMember = `${RAM_ONLY_KEYS.COLLECTION.TEST_KEY}1`;
+        const ramOnlyMember = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
+        const normalMember = `${ONYX_KEYS.COLLECTION.TEST_KEY}1`;
 
         // Pre-seed storage with stale data for both normal and RAM-only keys
         await StorageMock.setItem(normalMember, 'normal_from_storage');
         await StorageMock.setItem(ramOnlyMember, {data: 'stale_collection_member'});
 
         Onyx.init({
-            keys: RAM_ONLY_KEYS,
-            ramOnlyKeys: [RAM_ONLY_KEYS.RAM_ONLY_KEY, RAM_ONLY_KEYS.COLLECTION.RAM_ONLY_COLLECTION, RAM_ONLY_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
+            keys: ONYX_KEYS,
+            ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
         });
         await act(async () => waitForPromisesToResolve());
 
@@ -3387,20 +3376,20 @@ describe('RAM-only keys should not read from storage', () => {
     });
 
     it('should return cached value for RAM-only key after set then connect', async () => {
-        await StorageMock.setItem(RAM_ONLY_KEYS.RAM_ONLY_KEY, 'stale_value');
+        await StorageMock.setItem(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'stale_value');
 
         Onyx.init({
-            keys: RAM_ONLY_KEYS,
-            ramOnlyKeys: [RAM_ONLY_KEYS.RAM_ONLY_KEY, RAM_ONLY_KEYS.COLLECTION.RAM_ONLY_COLLECTION, RAM_ONLY_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
+            keys: ONYX_KEYS,
+            ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
         });
         await act(async () => waitForPromisesToResolve());
 
         // Write a fresh value to the RAM-only key
-        await Onyx.set(RAM_ONLY_KEYS.RAM_ONLY_KEY, 'fresh_value');
+        await Onyx.set(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'fresh_value');
 
         let receivedValue: unknown;
         const connection = Onyx.connect({
-            key: RAM_ONLY_KEYS.RAM_ONLY_KEY,
+            key: ONYX_KEYS.RAM_ONLY_TEST_KEY,
             callback: (value) => {
                 receivedValue = value;
             },
@@ -3409,10 +3398,10 @@ describe('RAM-only keys should not read from storage', () => {
 
         // Should get the fresh cached value, not the stale storage value
         expect(receivedValue).toEqual('fresh_value');
-        expect(cache.get(RAM_ONLY_KEYS.RAM_ONLY_KEY)).toEqual('fresh_value');
+        expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toEqual('fresh_value');
 
         // Verify storage was NOT written to
-        const storageValue = await StorageMock.getItem(RAM_ONLY_KEYS.RAM_ONLY_KEY);
+        const storageValue = await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_TEST_KEY);
         expect(storageValue).toEqual('stale_value');
 
         Onyx.disconnect(connection);
