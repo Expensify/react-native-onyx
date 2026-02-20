@@ -59,6 +59,12 @@ function init({
 
     if (shouldSyncMultipleInstances) {
         Storage.keepInstancesSync?.((key, value) => {
+            // RAM-only keys should never sync from storage as they may have stale persisted data
+            // from before the key was migrated to RAM-only.
+            if (OnyxUtils.isRamOnlyKey(key)) {
+                return;
+            }
+
             cache.set(key, value);
 
             // Check if this is a collection member key to prevent duplicate callbacks

@@ -15,13 +15,17 @@ const ONYXKEYS = {
         TEST_KEY: 'test_',
         TEST_KEY_2: 'test2_',
         EVICTABLE_TEST_KEY: 'evictable_test_',
+        RAM_ONLY_COLLECTION: 'ramOnlyCollection_',
     },
+    RAM_ONLY_KEY: 'ramOnlyKey',
+    RAM_ONLY_WITH_INITIAL_VALUE: 'ramOnlyWithInitialValue',
 };
 
 Onyx.init({
     keys: ONYXKEYS,
     evictableKeys: [ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY],
     skippableCollectionMemberIDs: ['skippable-id'],
+    ramOnlyKeys: [ONYXKEYS.RAM_ONLY_KEY, ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYXKEYS.RAM_ONLY_WITH_INITIAL_VALUE],
 });
 
 beforeEach(async () => {
@@ -1012,6 +1016,123 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
 
             await act(async () => Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`, 'skippable-id_value_changed'));
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+        });
+    });
+
+    describe('RAM-only keys', () => {
+        it('should not return stale storage data for a RAM-only key', async () => {
+            await StorageMock.setItem(ONYXKEYS.RAM_ONLY_KEY, 'stale_value');
+
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.RAM_ONLY_KEY));
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should return value and loaded state after setting a RAM-only key', async () => {
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.RAM_ONLY_KEY));
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+
+            await act(async () => Onyx.set(ONYXKEYS.RAM_ONLY_KEY, 'fresh_value'));
+
+            expect(result.current[0]).toEqual('fresh_value');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should return updated value after merge on a RAM-only key', async () => {
+            await act(async () => Onyx.set(ONYXKEYS.RAM_ONLY_KEY, {name: 'test'}));
+
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.RAM_ONLY_KEY));
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual({name: 'test'});
+            expect(result.current[1].status).toEqual('loaded');
+
+            await act(async () => Onyx.merge(ONYXKEYS.RAM_ONLY_KEY, {age: 25}));
+
+            expect(result.current[0]).toEqual({name: 'test', age: 25});
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should return collection data from cache for a RAM-only collection key', async () => {
+            await act(async () =>
+                Onyx.mergeCollection(ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION, {
+                    [`${ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION}entry1`]: {id: '1'},
+                    [`${ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION}entry2`]: {id: '2'},
+                } as GenericCollection),
+            );
+
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION));
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual({
+                [`${ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION}entry1`]: {id: '1'},
+                [`${ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION}entry2`]: {id: '2'},
+            });
+            expect(result.current[1].status).toEqual('loaded');
+
+            await act(async () => Onyx.clear());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should return value for a RAM-only collection member after set', async () => {
+            const {result} = renderHook(() => useOnyx(`${ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION}entry1`));
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+
+            await act(async () => Onyx.set(`${ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION}entry1`, {id: 'fresh'}));
+
+            expect(result.current[0]).toEqual({id: 'fresh'});
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should work with selector on a RAM-only key', async () => {
+            await act(async () => Onyx.set(ONYXKEYS.RAM_ONLY_KEY, {id: 'test_id', name: 'test_name'}));
+
+            const {result} = renderHook(() =>
+                useOnyx(ONYXKEYS.RAM_ONLY_KEY, {
+                    selector: ((entry: OnyxEntry<{id: string; name: string}>) => entry?.id) as UseOnyxSelector<OnyxKey, string | undefined>,
+                }),
+            );
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('test_id');
+            expect(result.current[1].status).toEqual('loaded');
+
+            await act(async () => Onyx.merge(ONYXKEYS.RAM_ONLY_KEY, {id: 'changed_id'}));
+
+            expect(result.current[0]).toEqual('changed_id');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should return `undefined` after clearing a RAM-only key', async () => {
+            await act(async () => Onyx.set(ONYXKEYS.RAM_ONLY_KEY, 'value'));
+
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.RAM_ONLY_KEY));
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('value');
+            expect(result.current[1].status).toEqual('loaded');
+
+            await act(async () => Onyx.clear());
 
             expect(result.current[0]).toBeUndefined();
             expect(result.current[1].status).toEqual('loaded');

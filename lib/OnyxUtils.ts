@@ -265,6 +265,14 @@ function get<TKey extends OnyxKey, TValue extends OnyxValue<TKey>>(key: TKey): P
         return Promise.resolve(cache.get(key) as TValue);
     }
 
+    // RAM-only keys should never read from storage (they may have stale persisted data
+    // from before the key was migrated to RAM-only). Mark as nullish so future get() calls
+    // short-circuit via hasCacheForKey and avoid re-running this branch.
+    if (isRamOnlyKey(key)) {
+        cache.addNullishStorageKey(key);
+        return Promise.resolve(undefined as TValue);
+    }
+
     const taskName = `${TASK.GET}:${key}` as const;
 
     // When a value retrieving task for this key is still running hook to it
@@ -324,6 +332,15 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
      * These missingKeys will be later used to multiGet the data from the storage.
      */
     for (const key of keys) {
+        // RAM-only keys should never read from storage as they may have stale persisted data
+        // from before the key was migrated to RAM-only.
+        if (isRamOnlyKey(key)) {
+            if (cache.hasCacheForKey(key)) {
+                dataMap.set(key, cache.get(key) as OnyxValue<TKey>);
+            }
+            continue;
+        }
+
         const cacheValue = cache.get(key) as OnyxValue<TKey>;
         if (cacheValue) {
             dataMap.set(key, cacheValue);
@@ -441,7 +458,10 @@ function getAllKeys(): Promise<Set<OnyxKey>> {
 
     // Otherwise retrieve the keys from storage and capture a promise to aid concurrent usages
     const promise = Storage.getAllKeys().then((keys) => {
-        cache.setAllKeys(keys);
+        // Filter out RAM-only keys from storage results as they may be stale entries
+        // from before the key was migrated to RAM-only.
+        const filteredKeys = keys.filter((key) => !isRamOnlyKey(key));
+        cache.setAllKeys(filteredKeys);
 
         // return the updated set of keys
         return cache.getAllKeys();
@@ -1091,7 +1111,10 @@ function mergeInternal<TValue extends OnyxInput<OnyxKey> | undefined, TChange ex
  * Merge user provided default key value pairs.
  */
 function initializeWithDefaultKeyStates(): Promise<void> {
-    return Storage.multiGet(Object.keys(defaultKeyStates)).then((pairs) => {
+    // Filter out RAM-only keys from storage reads as they may have stale persisted data
+    // from before the key was migrated to RAM-only.
+    const keysToFetch = Object.keys(defaultKeyStates).filter((key) => !isRamOnlyKey(key));
+    return Storage.multiGet(keysToFetch).then((pairs) => {
         const existingDataAsObject = Object.fromEntries(pairs) as Record<string, unknown>;
 
         const merged = utils.fastMerge(existingDataAsObject, defaultKeyStates, {
