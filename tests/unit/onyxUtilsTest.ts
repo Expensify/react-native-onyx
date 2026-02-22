@@ -492,6 +492,22 @@ describe('OnyxUtils', () => {
         });
     });
 
+    describe('remove', () => {
+        it('should remove RAM-only key from storage when set to null', async () => {
+            const removeItemSpy = jest.spyOn(StorageMock, 'removeItem');
+
+            // First set the RAM-only key to a value
+            await Onyx.set(ONYXKEYS.RAM_ONLY_KEY, 'testValue');
+
+            removeItemSpy.mockClear();
+
+            // Setting null should trigger OnyxUtils.remove, which should also remove from storage
+            await Onyx.set(ONYXKEYS.RAM_ONLY_KEY, null);
+
+            expect(removeItemSpy).toHaveBeenCalledWith(ONYXKEYS.RAM_ONLY_KEY);
+        });
+    });
+
     describe('isRamOnlyKey', () => {
         it('should return true for RAM-only key', () => {
             expect(OnyxUtils.isRamOnlyKey(ONYXKEYS.RAM_ONLY_KEY)).toBeTruthy();
