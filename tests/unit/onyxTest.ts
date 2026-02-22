@@ -3023,6 +3023,54 @@ describe('Onyx.init', () => {
         return Onyx.clear();
     });
 
+    describe('should remove RAM-only keys from storage during init', () => {
+        it('should remove a previously persisted key from storage when it becomes RAM-only', async () => {
+            // Simulate a key that was previously persisted in storage as a regular key
+            await StorageMock.setItem(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'previously persisted value');
+            expect(await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toEqual('previously persisted value');
+
+            Onyx.init({
+                keys: ONYX_KEYS,
+                ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY],
+            });
+            await act(async () => waitForPromisesToResolve());
+
+            // The key should have been removed from storage
+            expect(await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeNull();
+        });
+
+        it('should remove multiple previously persisted keys from storage when they become RAM-only', async () => {
+            const collectionMemberKey = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
+
+            // Simulate multiple keys that were previously persisted in storage
+            await StorageMock.setItem(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'old value 1');
+            await StorageMock.setItem(collectionMemberKey, 'old value 2');
+            expect(await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toEqual('old value 1');
+            expect(await StorageMock.getItem(collectionMemberKey)).toEqual('old value 2');
+
+            Onyx.init({
+                keys: ONYX_KEYS,
+                ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, collectionMemberKey],
+            });
+            await act(async () => waitForPromisesToResolve());
+
+            expect(await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeNull();
+            expect(await StorageMock.getItem(collectionMemberKey)).toBeNull();
+        });
+
+        it('should not call removeItems when there are no RAM-only keys', async () => {
+            jest.spyOn(StorageMock, 'removeItems').mockClear();
+
+            Onyx.init({
+                keys: ONYX_KEYS,
+                ramOnlyKeys: [],
+            });
+            await act(async () => waitForPromisesToResolve());
+
+            expect(StorageMock.removeItems).not.toHaveBeenCalled();
+        });
+    });
+
     describe('should only execute Onyx methods after initialization', () => {
         it('set', async () => {
             Onyx.set(ONYX_KEYS.TEST_KEY, 'test');
