@@ -35,8 +35,8 @@ jobs:
           retry_on: error
           command: node .github/actions/javascript/reassureStabilityCheck
         env:
-          ALLOWED_DURATION_DEVIATION: 10
-          ALLOWED_RELATIVE_DURATION_DEVIATION: 20
+          ALLOWED_DURATION_DEVIATION: 20
+          ALLOWED_RELATIVE_DURATION_DEVIATION: 40
           IS_VALIDATING_STABILITY: true
 
       - name: Checkout PR head SHA

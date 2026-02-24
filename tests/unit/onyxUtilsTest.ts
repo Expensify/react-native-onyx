@@ -342,13 +342,9 @@ describe('OnyxUtils', () => {
             });
         });
 
-        it('should throw error if key does not contain underscore', () => {
-            expect(() => {
-                OnyxUtils.getCollectionKey(ONYXKEYS.TEST_KEY);
-            }).toThrowError("Invalid 'test' key provided, only collection keys are allowed.");
-            expect(() => {
-                OnyxUtils.getCollectionKey('');
-            }).toThrowError("Invalid '' key provided, only collection keys are allowed.");
+        it('should return undefined if key does not contain underscore', () => {
+            expect(OnyxUtils.getCollectionKey(ONYXKEYS.TEST_KEY)).toBeUndefined();
+            expect(OnyxUtils.getCollectionKey('')).toBeUndefined();
         });
     });
 

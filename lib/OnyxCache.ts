@@ -458,13 +458,13 @@ class OnyxCache {
     /**
      * Get the collection key for a given member key
      */
-    getCollectionKey(key: OnyxKey): OnyxKey | null {
+    getCollectionKey(key: OnyxKey): OnyxKey | undefined {
         for (const collectionKey of this.collectionKeys) {
             if (key.startsWith(collectionKey) && key.length > collectionKey.length) {
                 return collectionKey;
             }
         }
-        return null;
+        return undefined;
     }
 
     /**

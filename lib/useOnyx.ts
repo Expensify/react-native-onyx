@@ -9,7 +9,6 @@ import * as GlobalSettings from './GlobalSettings';
 import type {CollectionKeyBase, OnyxKey, OnyxValue} from './types';
 import usePrevious from './usePrevious';
 import decorateWithMetrics from './metrics';
-import * as Logger from './Logger';
 import onyxSnapshotCache from './OnyxSnapshotCache';
 import useLiveRef from './useLiveRef';
 
@@ -42,14 +41,6 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
      * If set to `true`, the key can be changed dynamically during the component lifecycle.
      */
     allowDynamicKey?: boolean;
-
-    /**
-     * If the component calling this is the one loading the data by calling an action, then you should set this to `true`.
-     *
-     * If the component calling this does not load the data then you should set it to `false`, which means that if the data
-     * is not there, it will log an alert, as it means we are using data that no one loaded and that's most probably a bug.
-     */
-    canBeMissing?: boolean;
 
     /**
      * This will be used to subscribe to a subset of an Onyx key's data.
@@ -156,9 +147,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                 selector: options?.selector,
                 initWithStoredValues: options?.initWithStoredValues,
                 allowStaleData: options?.allowStaleData,
-                canBeMissing: options?.canBeMissing,
             }),
-        [options?.selector, options?.initWithStoredValues, options?.allowStaleData, options?.canBeMissing],
+        [options?.selector, options?.initWithStoredValues, options?.allowStaleData],
     );
 
     useEffect(() => () => onyxSnapshotCache.deregisterConsumer(key, cacheKey), [key, cacheKey]);
@@ -242,8 +232,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             }
         }
 
-        let isOnyxValueDefined = true;
-
         // We return the initial result right away during the first connection if `initWithStoredValues` is set to `false`.
         if (isFirstConnectionRef.current && options?.initWithStoredValues === false) {
             const result = resultRef.current;
@@ -261,10 +249,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             const value = OnyxUtils.tryGetCachedValue(key) as OnyxValue<TKey>;
             const selectedValue = memoizedSelector ? memoizedSelector(value) : value;
             newValueRef.current = (selectedValue ?? undefined) as TReturnValue | undefined;
-
-            // This flag is `false` when the original Onyx value (without selector) is not defined yet.
-            // It will be used later to check if we need to log an alert that the value is missing.
-            isOnyxValueDefined = value !== null && value !== undefined;
 
             // We set this flag to `false` again since we don't want to get the newest cached value every time `getSnapshot()` is executed,
             // and only when `Onyx.connect()` callback is fired.
@@ -317,13 +301,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                     sourceValue: sourceValueRef.current,
                 },
             ];
-
-            // If `canBeMissing` is set to `false` and the Onyx value of that key is not defined,
-            // we log an alert so it can be acknowledged by the consumer. Additionally, we won't log alerts
-            // if there's a `Onyx.clear()` task in progress.
-            if (options?.canBeMissing === false && newFetchStatus === 'loaded' && !isOnyxValueDefined && !OnyxCache.hasPendingTask(TASK.CLEAR)) {
-                Logger.logAlert(`useOnyx returned no data for key with canBeMissing set to false for key ${key}`, {showAlert: true});
-            }
         }
 
         if (newFetchStatus !== 'loading') {
@@ -331,7 +308,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         }
 
         return resultRef.current;
-    }, [options?.initWithStoredValues, options?.allowStaleData, options?.canBeMissing, key, memoizedSelector, cacheKey, previousKey]);
+    }, [options?.initWithStoredValues, options?.allowStaleData, key, memoizedSelector, cacheKey, previousKey]);
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {

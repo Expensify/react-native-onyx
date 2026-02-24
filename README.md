@@ -206,21 +206,6 @@ export default App;
 
 It's also beneficial to use a [selector](https://github.com/Expensify/react-native-onyx/blob/main/API.md#connectmapping--number) with the mapping in case you need to grab a single item in a collection (like a single report action).
 
-### useOnyx()'s `canBeMissing` option
-
-You must pass the `canBeMissing` configuration flag to `useOnyx` if you want the hook to log an alert when data is missing from Onyx store. Regarding usage in `Expensify/App` repo, if the component calling this is the one loading the data by calling an action, then you should set this to `true`. If the component calling this does not load the data then you should set it to `false`, which means that if the data is not there, it will log an alert, as it means we are using data that no one loaded and that's most probably a bug.
-
-```javascript
-const Component = ({reportID}) => {
-    // This hook will log an alert (via `Logger.logAlert()`) if `report` is `undefined`.
-    const [report] = useOnyx(`${ONYXKEYS.COLLECTION.REPORT}${reportID}`, {canBeMissing: false});
-    
-    // rest of the component's code.
-};
-
-export default Component;
-```
-
 ## Collections
 
 Collections allow keys with similar value types to be subscribed together by subscribing to the collection key. To define one, it must be included in the `ONYXKEYS.COLLECTION` object and it must be suffixed with an underscore. Member keys should use a unique identifier or index after the collection key prefix (e.g. `report_42`).
