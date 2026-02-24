@@ -1527,92 +1527,94 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
     }
     resultCollectionKeys = Object.keys(resultCollection);
 
-    return getAllKeys().then((persistedKeys) => {
-        // Split to keys that exist in storage and keys that don't
-        const keys = resultCollectionKeys.filter((key) => {
-            if (resultCollection[key] === null) {
-                remove(key, isProcessingCollectionUpdate);
-                return false;
-            }
-            return true;
-        });
-
-        const existingKeys = keys.filter((key) => persistedKeys.has(key));
-
-        const cachedCollectionForExistingKeys = getCachedCollection(collectionKey, existingKeys);
-
-        const existingKeyCollection = existingKeys.reduce((obj: OnyxInputKeyValueMapping, key) => {
-            const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(resultCollection[key], cachedCollectionForExistingKeys[key]);
-
-            if (!isCompatible) {
-                Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'mergeCollection', existingValueType, newValueType));
-                return obj;
-            }
-
-            // eslint-disable-next-line no-param-reassign
-            obj[key] = resultCollection[key];
-            return obj;
-        }, {}) as Record<OnyxKey, OnyxInput<TKey>>;
-
-        const newCollection: Record<OnyxKey, OnyxInput<TKey>> = {};
-        for (const key of keys) {
-            if (persistedKeys.has(key)) {
-                continue;
-            }
-            newCollection[key] = resultCollection[key];
-        }
-
-        // When (multi-)merging the values with the existing values in storage,
-        // we don't want to remove nested null values from the data that we pass to the storage layer,
-        // because the storage layer uses them to remove nested keys from storage natively.
-        const keyValuePairsForExistingCollection = prepareKeyValuePairsForStorage(existingKeyCollection, false, mergeReplaceNullPatches);
-
-        // We can safely remove nested null values when using (multi-)set,
-        // because we will simply overwrite the existing values in storage.
-        const keyValuePairsForNewCollection = prepareKeyValuePairsForStorage(newCollection, true);
-
-        const promises = [];
-
-        // We need to get the previously existing values so we can compare the new ones
-        // against them, to avoid unnecessary subscriber updates.
-        const previousCollectionPromise = Promise.all(existingKeys.map((key) => get(key).then((value) => [key, value]))).then(Object.fromEntries);
-
-        // New keys will be added via multiSet while existing keys will be updated using multiMerge
-        // This is because setting a key that doesn't exist yet with multiMerge will throw errors
-        // We can skip this step for RAM-only keys as they should never be saved to storage
-        if (!isRamOnlyKey(collectionKey) && keyValuePairsForExistingCollection.length > 0) {
-            promises.push(Storage.multiMerge(keyValuePairsForExistingCollection));
-        }
-
-        // We can skip this step for RAM-only keys as they should never be saved to storage
-        if (!isRamOnlyKey(collectionKey) && keyValuePairsForNewCollection.length > 0) {
-            promises.push(Storage.multiSet(keyValuePairsForNewCollection));
-        }
-
-        // finalMergedCollection contains all the keys that were merged, without the keys of incompatible updates
-        const finalMergedCollection = {...existingKeyCollection, ...newCollection};
-
-        // Prefill cache if necessary by calling get() on any existing keys and then merge original data to cache
-        // and update all subscribers
-        const promiseUpdate = previousCollectionPromise.then((previousCollection) => {
-            cache.merge(finalMergedCollection);
-            keysChanged(collectionKey, finalMergedCollection, previousCollection);
-        });
-
-        return Promise.all(promises)
-            .catch((error) =>
-                retryOperation(
-                    error,
-                    mergeCollectionWithPatches,
-                    {collectionKey, collection: resultCollection as OnyxMergeCollectionInput<TKey>, mergeReplaceNullPatches, isProcessingCollectionUpdate},
-                    retryAttempt,
-                ),
-            )
-            .then(() => {
-                sendActionToDevTools(METHOD.MERGE_COLLECTION, undefined, resultCollection);
-                return promiseUpdate;
+    return getAllKeys()
+        .then((persistedKeys) => {
+            // Split to keys that exist in storage and keys that don't
+            const keys = resultCollectionKeys.filter((key) => {
+                if (resultCollection[key] === null) {
+                    remove(key, isProcessingCollectionUpdate);
+                    return false;
+                }
+                return true;
             });
-    });
+
+            const existingKeys = keys.filter((key) => persistedKeys.has(key));
+
+            const cachedCollectionForExistingKeys = getCachedCollection(collectionKey, existingKeys);
+
+            const existingKeyCollection = existingKeys.reduce((obj: OnyxInputKeyValueMapping, key) => {
+                const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(resultCollection[key], cachedCollectionForExistingKeys[key]);
+
+                if (!isCompatible) {
+                    Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'mergeCollection', existingValueType, newValueType));
+                    return obj;
+                }
+
+                // eslint-disable-next-line no-param-reassign
+                obj[key] = resultCollection[key];
+                return obj;
+            }, {}) as Record<OnyxKey, OnyxInput<TKey>>;
+
+            const newCollection: Record<OnyxKey, OnyxInput<TKey>> = {};
+            for (const key of keys) {
+                if (persistedKeys.has(key)) {
+                    continue;
+                }
+                newCollection[key] = resultCollection[key];
+            }
+
+            // When (multi-)merging the values with the existing values in storage,
+            // we don't want to remove nested null values from the data that we pass to the storage layer,
+            // because the storage layer uses them to remove nested keys from storage natively.
+            const keyValuePairsForExistingCollection = prepareKeyValuePairsForStorage(existingKeyCollection, false, mergeReplaceNullPatches);
+
+            // We can safely remove nested null values when using (multi-)set,
+            // because we will simply overwrite the existing values in storage.
+            const keyValuePairsForNewCollection = prepareKeyValuePairsForStorage(newCollection, true);
+
+            const promises = [];
+
+            // We need to get the previously existing values so we can compare the new ones
+            // against them, to avoid unnecessary subscriber updates.
+            const previousCollectionPromise = Promise.all(existingKeys.map((key) => get(key).then((value) => [key, value]))).then(Object.fromEntries);
+
+            // New keys will be added via multiSet while existing keys will be updated using multiMerge
+            // This is because setting a key that doesn't exist yet with multiMerge will throw errors
+            // We can skip this step for RAM-only keys as they should never be saved to storage
+            if (!isRamOnlyKey(collectionKey) && keyValuePairsForExistingCollection.length > 0) {
+                promises.push(Storage.multiMerge(keyValuePairsForExistingCollection));
+            }
+
+            // We can skip this step for RAM-only keys as they should never be saved to storage
+            if (!isRamOnlyKey(collectionKey) && keyValuePairsForNewCollection.length > 0) {
+                promises.push(Storage.multiSet(keyValuePairsForNewCollection));
+            }
+
+            // finalMergedCollection contains all the keys that were merged, without the keys of incompatible updates
+            const finalMergedCollection = {...existingKeyCollection, ...newCollection};
+
+            // Prefill cache if necessary by calling get() on any existing keys and then merge original data to cache
+            // and update all subscribers
+            const promiseUpdate = previousCollectionPromise.then((previousCollection) => {
+                cache.merge(finalMergedCollection);
+                keysChanged(collectionKey, finalMergedCollection, previousCollection);
+            });
+
+            return Promise.all(promises)
+                .catch((error) =>
+                    retryOperation(
+                        error,
+                        mergeCollectionWithPatches,
+                        {collectionKey, collection: resultCollection as OnyxMergeCollectionInput<TKey>, mergeReplaceNullPatches, isProcessingCollectionUpdate},
+                        retryAttempt,
+                    ),
+                )
+                .then(() => {
+                    sendActionToDevTools(METHOD.MERGE_COLLECTION, undefined, resultCollection);
+                    return promiseUpdate;
+                });
+        })
+        .then(() => undefined);
 }
 
 /**
