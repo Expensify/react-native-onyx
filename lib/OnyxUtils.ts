@@ -1594,9 +1594,9 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
 
         // Prefill cache if necessary by calling get() on any existing keys and then merge original data to cache
         // and update all subscribers
-        previousCollectionPromise.then((previousCollection) => {
+        const promiseUpdate = previousCollectionPromise.then((previousCollection) => {
             cache.merge(finalMergedCollection);
-            return keysChanged(collectionKey, finalMergedCollection, previousCollection);
+            keysChanged(collectionKey, finalMergedCollection, previousCollection);
         });
 
         return Promise.all(promises)
@@ -1610,6 +1610,7 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
             )
             .then(() => {
                 sendActionToDevTools(METHOD.MERGE_COLLECTION, undefined, resultCollection);
+                return promiseUpdate;
             });
     });
 }
