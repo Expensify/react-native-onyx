@@ -12,7 +12,6 @@ import decorateWithMetrics from './metrics';
 import * as Logger from './Logger';
 import onyxSnapshotCache from './OnyxSnapshotCache';
 import useLiveRef from './useLiveRef';
-import useSelectorEpoch from './useSelectorEpoch';
 
 type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (data: OnyxValue<TKey> | undefined) => TReturnValue;
 
@@ -231,7 +230,10 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         }
     }, [key, options?.canEvict]);
 
-    const {hasSelectorComputedForCurrentEpoch, markSelectorComputedForCurrentEpoch} = useSelectorEpoch(memoizedSelector);
+    // Tracks the last memoizedSelector reference that getSnapshot() has computed with.
+    // When the selector changes, this mismatch forces getSnapshot() to re-evaluate
+    // even if all other conditions (isFirstConnection, shouldGetCachedValue, key) are false.
+    const lastComputedSelectorRef = useRef(memoizedSelector);
 
     const getSnapshot = useCallback(() => {
         // Check if we have any cache for this Onyx key
@@ -259,12 +261,12 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // We get the value from cache while the first connection to Onyx is being made or if the key has changed,
         // so we can return any cached value right away. For the case where the key has changed, If we don't return the cached value right away, then the UI will show the incorrect (previous) value for a brief period which looks like a UI glitch to the user. After the connection is made, we only
         // update `newValueRef` when `Onyx.connect()` callback is fired.
-        if (isFirstConnectionRef.current || shouldGetCachedValueRef.current || key !== previousKey || !hasSelectorComputedForCurrentEpoch) {
+        const selectorChanged = lastComputedSelectorRef.current !== memoizedSelector;
+        if (isFirstConnectionRef.current || shouldGetCachedValueRef.current || key !== previousKey || selectorChanged) {
             // Gets the value from cache and maps it with selector. It changes `null` to `undefined` for `useOnyx` compatibility.
             const value = OnyxUtils.tryGetCachedValue(key) as OnyxValue<TKey>;
             const selectedValue = memoizedSelector ? memoizedSelector(value) : value;
-
-            markSelectorComputedForCurrentEpoch();
+            lastComputedSelectorRef.current = memoizedSelector;
             newValueRef.current = (selectedValue ?? undefined) as TReturnValue | undefined;
 
             // This flag is `false` when the original Onyx value (without selector) is not defined yet.
@@ -336,17 +338,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         }
 
         return resultRef.current;
-    }, [
-        options?.initWithStoredValues,
-        options?.allowStaleData,
-        options?.canBeMissing,
-        key,
-        memoizedSelector,
-        cacheKey,
-        previousKey,
-        hasSelectorComputedForCurrentEpoch,
-        markSelectorComputedForCurrentEpoch,
-    ]);
+    }, [options?.initWithStoredValues, options?.allowStaleData, options?.canBeMissing, key, memoizedSelector, cacheKey, previousKey]);
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
