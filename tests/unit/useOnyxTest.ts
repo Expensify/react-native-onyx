@@ -450,6 +450,7 @@ describe('useOnyx', () => {
             selector = ((entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name} - selector changed after macrotask`) as UseOnyxSelector<OnyxKey, string>;
 
             await act(async () => {
+                // This is necessary to avoid regressions of the selector interleaving bug, see https://github.com/Expensify/App/issues/79449
                 await waitForPromisesToResolve();
                 rerender(undefined);
             });
