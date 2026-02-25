@@ -686,9 +686,8 @@ function keysChanged<TKey extends CollectionKeyBase>(
             // If they are subscribed to the collection key and using waitForCollectionCallback then we'll
             // send the whole cached collection.
             if (isSubscribedToCollectionKey) {
-                lastConnectionCallbackData.set(subscriber.subscriptionID, cachedCollection);
-
                 if (subscriber.waitForCollectionCallback) {
+                    lastConnectionCallbackData.set(subscriber.subscriptionID, cachedCollection);
                     subscriber.callback(cachedCollection, subscriber.key, partialCollection);
                     continue;
                 }
@@ -703,6 +702,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
 
                     subscriber.callback(cachedCollection[dataKey], dataKey);
                 }
+                lastConnectionCallbackData.set(subscriber.subscriptionID, cachedCollection);
                 continue;
             }
 
