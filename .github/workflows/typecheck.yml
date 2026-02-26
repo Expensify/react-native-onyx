@@ -5,7 +5,7 @@ on:
         types: [opened, synchronize]
 
 jobs:
-    lint:
+    typecheck:
         runs-on: ubuntu-latest
         steps:
             # v5.0.0
