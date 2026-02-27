@@ -34,9 +34,7 @@ async function run() {
         // Warn if "Automated Tests" section is empty
         const automatedTestsContent = getSectionContent(body, 'Automated Tests');
         if (automatedTestsContent.length === 0) {
-            core.warning(
-                'The "Automated Tests" section is empty. Please describe the automated tests you added, or explain why automated tests are not needed for this change.',
-            );
+            core.warning('The "Automated Tests" section is empty. Please describe the automated tests you added, or explain why automated tests are not needed for this change.');
         }
 
         // Warn if "Manual Tests" section is empty
@@ -48,9 +46,7 @@ async function run() {
         // Warn if GH_LINK placeholder is still present
         const relatedIssuesContent = getSectionContent(body, 'Related Issues');
         if (relatedIssuesContent === 'GH_LINK' || relatedIssuesContent.length === 0) {
-            core.warning(
-                'The "Related Issues" section still contains the GH_LINK placeholder or is empty. Please replace it with the actual GitHub issue link.',
-            );
+            core.warning('The "Related Issues" section still contains the GH_LINK placeholder or is empty. Please replace it with the actual GitHub issue link.');
         }
 
         // Fail if there are errors

@@ -39,9 +39,7 @@ async function run() {
         );
 
         // Identify test file changes in tests/
-        const testFiles = changedFileNames.filter(
-            (filename) => filename.startsWith('tests/') && (filename.endsWith('.ts') || filename.endsWith('.tsx')),
-        );
+        const testFiles = changedFileNames.filter((filename) => filename.startsWith('tests/') && (filename.endsWith('.ts') || filename.endsWith('.tsx')));
 
         // If source files changed but no test files changed, fail
         if (sourceFiles.length > 0 && testFiles.length === 0) {
@@ -51,9 +49,7 @@ async function run() {
 
             core.summary.addRaw(summary);
             await core.summary.write();
-            core.setFailed(
-                `This PR modifies ${sourceFiles.length} source file(s) in lib/ but no test files were added or modified. Please add or update tests to cover the changes.`,
-            );
+            core.setFailed(`This PR modifies ${sourceFiles.length} source file(s) in lib/ but no test files were added or modified. Please add or update tests to cover the changes.`);
         } else if (sourceFiles.length > 0 && testFiles.length > 0) {
             core.info(`Source files changed: ${sourceFiles.length}, test files changed: ${testFiles.length}. Looks good!`);
         } else {
