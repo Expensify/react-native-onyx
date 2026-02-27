@@ -4,78 +4,20 @@ on:
     pull_request:
         types: [opened, synchronize, edited, reopened, ready_for_review]
 
+permissions:
+    pull-requests: read
+
+concurrency:
+    group: pr-checklist-${{ github.event.pull_request.number }}
+    cancel-in-progress: true
+
 jobs:
     validate-checklist:
         if: github.event.pull_request.draft == false
         runs-on: ubuntu-latest
         steps:
+            # v5.0.0
+            - uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
+
             - name: Validate PR checklist and sections
-              uses: actions/github-script@v7
-              with:
-                  script: |
-                      const body = context.payload.pull_request.body || '';
-                      const errors = [];
-
-                      // --- Check that all checklist items are checked ---
-                      const uncheckedPattern = /- \[ \]/g;
-                      const checkedPattern = /- \[x\]/gi;
-                      const uncheckedMatches = body.match(uncheckedPattern) || [];
-                      const checkedMatches = body.match(checkedPattern) || [];
-                      const totalCheckboxes = uncheckedMatches.length + checkedMatches.length;
-
-                      if (totalCheckboxes > 0 && uncheckedMatches.length > 0) {
-                          errors.push(
-                              `${uncheckedMatches.length} checklist item(s) are unchecked. ` +
-                              'All checklist items must be checked before merging — ' +
-                              'including items that don\'t apply (check them and note why if needed).'
-                          );
-                      }
-
-                      // --- Warn if "Automated Tests" section is empty ---
-                      const automatedTestsMatch = body.match(/### Automated Tests\s*\n([\s\S]*?)(?=###|$)/);
-                      const automatedTestsContent = (automatedTestsMatch?.[1] || '')
-                          .replace(/<!-[\s\S]*?->/g, '')
-                          .trim();
-
-                      if (automatedTestsContent.length === 0) {
-                          core.warning(
-                              'The "Automated Tests" section is empty. Please describe the automated tests you added, ' +
-                              'or explain why automated tests are not needed for this change.'
-                          );
-                      }
-
-                      // --- Warn if "Manual Tests" section is empty ---
-                      const manualTestsMatch = body.match(/### Manual Tests\s*\n([\s\S]*?)(?=###|$)/);
-                      const manualTestsContent = (manualTestsMatch?.[1] || '')
-                          .replace(/<!-[\s\S]*?->/g, '')
-                          .trim();
-
-                      if (manualTestsContent.length === 0) {
-                          core.warning(
-                              'The "Manual Tests" section is empty. Please describe how you manually tested this change.'
-                          );
-                      }
-
-                      // --- Warn if GH_LINK placeholder is still present ---
-                      const relatedIssuesMatch = body.match(/### Related Issues\s*\n([\s\S]*?)(?=###|$)/);
-                      const relatedIssuesContent = (relatedIssuesMatch?.[1] || '')
-                          .replace(/<!-[\s\S]*?->/g, '')
-                          .trim();
-
-                      if (relatedIssuesContent === 'GH_LINK' || relatedIssuesContent.length === 0) {
-                          core.warning(
-                              'The "Related Issues" section still contains the GH_LINK placeholder or is empty. ' +
-                              'Please replace it with the actual GitHub issue link.'
-                          );
-                      }
-
-                      // --- Fail if there are errors ---
-                      if (errors.length > 0) {
-                          const summary = '## PR Checklist Validation Failed\n\n' +
-                              errors.map((e) => `- ${e}`).join('\n') +
-                              '\n\nPlease complete the checklist and update the PR description.';
-
-                          core.summary.addRaw(summary);
-                          await core.summary.write();
-                          core.setFailed(errors.join('\n'));
-                      }
+              uses: ./.github/actions/javascript/validatePRChecklist

@@ -4,60 +4,22 @@ on:
     pull_request:
         types: [opened, synchronize, reopened, ready_for_review]
 
+permissions:
+    pull-requests: read
+
+concurrency:
+    group: require-tests-${{ github.event.pull_request.number }}
+    cancel-in-progress: true
+
 jobs:
     require-tests:
         if: github.event.pull_request.draft == false
         runs-on: ubuntu-latest
         steps:
+            # v5.0.0
+            - uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
+
             - name: Check for test file changes
-              uses: actions/github-script@v7
-              with:
-                  script: |
-                      const {owner, repo} = context.repo;
-                      const pullNumber = context.payload.pull_request.number;
-
-                      // Fetch all changed files (handles pagination for large PRs)
-                      const files = await github.paginate(
-                          github.rest.pulls.listFiles,
-                          {owner, repo, pull_number: pullNumber, per_page: 100}
-                      );
-
-                      const changedFileNames = files.map((f) => f.filename);
-
-                      // Identify source file changes in lib/ (excluding types, .d.ts, and mocks)
-                      const sourceFiles = changedFileNames.filter((f) => {
-                          if (!f.startsWith('lib/')) return false;
-                          if (!f.endsWith('.ts') && !f.endsWith('.tsx')) return false;
-                          if (f.endsWith('.d.ts')) return false;
-                          if (f.startsWith('lib/types/')) return false;
-                          if (f.includes('__mocks__')) return false;
-                          return true;
-                      });
-
-                      // Identify test file changes in tests/
-                      const testFiles = changedFileNames.filter((f) => {
-                          if (!f.startsWith('tests/')) return false;
-                          if (!f.endsWith('.ts') && !f.endsWith('.tsx')) return false;
-                          return true;
-                      });
-
-                      // If source files changed but no test files changed, fail
-                      if (sourceFiles.length > 0 && testFiles.length === 0) {
-                          const fileList = sourceFiles.map((f) => `- \`${f}\``).join('\n');
-
-                          const summary = '## Tests Required\n\n' +
-                              'This PR modifies source files in `lib/` but does not include any test file changes in `tests/`.\n\n' +
-                              '**Changed source files:**\n' + fileList + '\n\n' +
-                              'Please add or update tests to cover these changes.';
-
-                          core.summary.addRaw(summary);
-                          await core.summary.write();
-                          core.setFailed(
-                              `This PR modifies ${sourceFiles.length} source file(s) in lib/ but no test files were added or modified. ` +
-                              'Please add or update tests to cover the changes.'
-                          );
-                      } else if (sourceFiles.length > 0 && testFiles.length > 0) {
-                          core.info(`Source files changed: ${sourceFiles.length}, test files changed: ${testFiles.length}. Looks good!`);
-                      } else {
-                          core.info('No source files in lib/ were changed. Test requirement check passed.');
-                      }
+              uses: ./.github/actions/javascript/requireTests
+              env:
+                  GITHUB_TOKEN: ${{ github.token }}
