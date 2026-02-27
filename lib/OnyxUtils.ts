@@ -1,4 +1,4 @@
-import {deepEqual} from 'fast-equals';
+import {deepEqual, shallowEqual} from 'fast-equals';
 import type {ValueOf} from 'type-fest';
 import _ from 'underscore';
 import DevTools from './DevTools';
@@ -819,6 +819,19 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: CallbackToStateMapp
     // If the subscriber was already notified (e.g. by a synchronous keyChanged call),
     // skip the initial data delivery to prevent duplicate callbacks.
     if (lastConnectionCallbackData.has(mapping.subscriptionID)) {
+        // For collection subscribers with waitForCollectionCallback, the synchronous keyChanged()
+        // may have delivered a partial collection (only members cached at that time). Now that
+        // multiGet has populated the cache with all members from storage, re-read the full
+        // collection from cache and deliver it if it differs from what was previously sent.
+        if (mapping.waitForCollectionCallback && isCollectionKey(mapping.key)) {
+            const lastValue = lastConnectionCallbackData.get(mapping.subscriptionID);
+            const freshCollection = getCachedCollection(mapping.key);
+
+            if (!shallowEqual(lastValue, freshCollection)) {
+                lastConnectionCallbackData.set(mapping.subscriptionID, freshCollection);
+                mapping.callback?.(freshCollection, matchedKey as TKey);
+            }
+        }
         return;
     }
 
