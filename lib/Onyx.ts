@@ -206,8 +206,6 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
             }
         }
 
-        const a = 'test';
-
         const mergeQueue = OnyxUtils.getMergeQueue();
         const mergeQueuePromise = OnyxUtils.getMergeQueuePromise();
 
