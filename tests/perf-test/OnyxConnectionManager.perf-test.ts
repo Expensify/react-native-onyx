@@ -66,6 +66,8 @@ describe('OnyxConnectionManager', () => {
             let connectionID = '';
 
             await measureFunction(() => fireCallbacks(connectionID), {
+                runs: 30,
+                warmupRuns: 3,
                 beforeEach: async () => {
                     connectionID = connectionManager.connect({key: mockedReportActionsKeys[0], callback: jest.fn()}).id;
                     for (let i = 0; i < 9999; i++) {

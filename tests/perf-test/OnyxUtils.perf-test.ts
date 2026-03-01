@@ -337,6 +337,8 @@ describe('OnyxUtils', () => {
             const changedReportAction = createRandomReportAction(Number(previousReportAction.reportActionID));
 
             await measureFunction(() => OnyxUtils.keyChanged(key, changedReportAction), {
+                runs: 30,
+                warmupRuns: 3,
                 beforeEach: async () => {
                     await Onyx.set(key, previousReportAction);
                     for (let i = 0; i < 10000; i++) {
@@ -440,6 +442,8 @@ describe('OnyxUtils', () => {
             ) as GenericCollection;
 
             await measureAsyncFunction(() => Promise.all(Object.entries(changedReportActions).map(([key, value]) => OnyxUtils.scheduleSubscriberUpdate(key, value))), {
+                runs: 30,
+                warmupRuns: 3,
                 beforeEach: async () => {
                     await Onyx.multiSet(mockedReportActionsMap);
                     for (const key of mockedReportActionsKeys) {
@@ -637,13 +641,19 @@ describe('OnyxUtils', () => {
 
     describe('isValidNonEmptyCollectionForMerge', () => {
         test('one call', async () => {
-            await measureFunction(() => OnyxUtils.isValidNonEmptyCollectionForMerge(mockedReportActionsMap as GenericCollection));
+            await measureFunction(() => OnyxUtils.isValidNonEmptyCollectionForMerge(mockedReportActionsMap as GenericCollection), {
+                runs: 30,
+                warmupRuns: 3,
+            });
         });
     });
 
     describe('doAllCollectionItemsBelongToSameParent', () => {
         test('one call checking 10k heavy objects', async () => {
-            await measureFunction(() => OnyxUtils.doAllCollectionItemsBelongToSameParent(collectionKey, mockedReportActionsKeys));
+            await measureFunction(() => OnyxUtils.doAllCollectionItemsBelongToSameParent(collectionKey, mockedReportActionsKeys), {
+                runs: 30,
+                warmupRuns: 3,
+            });
         });
     });
 

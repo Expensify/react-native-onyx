@@ -32,7 +32,7 @@ async function run() {
         const regressionOutput: CompareResult = JSON.parse(fs.readFileSync('.reassure/output.json', 'utf8'));
         const allowedDurationDeviation = Number(getInputOrEnv('ALLOWED_DURATION_DEVIATION'));
         const durationDeviationPercentage = Number(getInputOrEnv('ALLOWED_RELATIVE_DURATION_DEVIATION'));
-        const isValidatingStability = Boolean(getInputOrEnv('IS_VALIDATING_STABILITY'));
+        const isValidatingStability = getInputOrEnv('IS_VALIDATING_STABILITY') === 'true';
 
         if (regressionOutput.significant === undefined || regressionOutput.significant.length === 0) {
             console.log('No significant data available. Exiting...');
@@ -99,9 +99,9 @@ async function run() {
         }
 
         return true;
-    } catch (error) {
+    } catch (error: unknown) {
         console.log('error: ', error);
-        core.setFailed(error.message);
+        core.setFailed(error instanceof Error ? error.message : String(error));
     }
 }
 
