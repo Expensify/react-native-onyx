@@ -18,7 +18,6 @@ const UNCHECKED_PATTERN = /- \[ \]/g;
 const CHECKED_PATTERN = /- \[x\]/gi;
 
 function getAuthorChecklistSection(body: string): string {
-    const b = 'b';
     const startMarker = '### Author Checklist';
     const endMarker = '### Screenshots/Videos';
     const startIndex = body.indexOf(startMarker);
