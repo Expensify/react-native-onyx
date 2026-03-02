@@ -64,9 +64,7 @@ function validateChecklist(body: string): ValidationResult {
     }
 
     if (unchecked > 0) {
-        errors.push(
-            `${unchecked} checklist item(s) are unchecked. All items must be checked before merging — including items that don't apply (check them and note why if needed).`,
-        );
+        errors.push(`${unchecked} checklist item(s) are unchecked. All items must be checked before merging — including items that don't apply (check them and note why if needed).`);
     }
 
     // Section warnings
