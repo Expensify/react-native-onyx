@@ -1,0 +1,26 @@
+name: Validate Github Actions
+
+on:
+    pull_request:
+        types: [opened, synchronize]
+        paths: ['.github/**']
+
+jobs:
+    verify:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              # v4.1.1
+              uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version-file: .nvmrc
+                  cache: npm
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Verify Javascript Action Builds
+              run: ./.github/scripts/verifyActions.sh
