@@ -1,0 +1,85 @@
+import StorageMock from '../../lib/storage';
+import Onyx from '../../lib';
+import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
+
+const ONYX_KEYS = {
+    COLLECTION: {
+        TEST_KEY: 'test_',
+    },
+};
+
+describe('Collection hydration with connect() followed by immediate set()', () => {
+    beforeEach(async () => {
+        // ===== Session 1 =====
+        // Data is written to persistent storage (simulates a previous app session).
+        await StorageMock.setItem(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`, {id: 1, title: 'Test One'});
+        await StorageMock.setItem(`${ONYX_KEYS.COLLECTION.TEST_KEY}2`, {id: 2, title: 'Test Two'});
+        await StorageMock.setItem(`${ONYX_KEYS.COLLECTION.TEST_KEY}3`, {id: 3, title: 'Test Three'});
+
+        // ===== Session 2 =====
+        // App restarts. Onyx.init() calls getAllKeys() which populates storageKeys
+        // with all 3 keys, but their values are NOT read into cache yet.
+        Onyx.init({keys: ONYX_KEYS});
+    });
+
+    afterEach(() => Onyx.clear());
+
+    test('waitForCollectionCallback=true should deliver full collection from storage', async () => {
+        const mockCallback = jest.fn();
+
+        // A component connects to the collection (starts async hydration via multiGet).
+        Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            waitForCollectionCallback: true,
+            callback: mockCallback,
+        });
+
+        Onyx.set(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`, {id: 1, title: 'Updated Test One'});
+
+        await waitForPromisesToResolve();
+
+        // The subscriber should eventually receive ALL collection members.
+        // The async hydration reads test_2 and test_3 from storage.
+        const lastCall = mockCallback.mock.calls[mockCallback.mock.calls.length - 1][0];
+        expect(lastCall).toHaveProperty(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`);
+        expect(lastCall).toHaveProperty(`${ONYX_KEYS.COLLECTION.TEST_KEY}2`);
+        expect(lastCall).toHaveProperty(`${ONYX_KEYS.COLLECTION.TEST_KEY}3`);
+
+        // Verify the updated value is present (not stale)
+        expect(lastCall[`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]).toEqual({id: 1, title: 'Updated Test One'});
+    });
+
+    test('waitForCollectionCallback=false should deliver all collection members from storage', async () => {
+        const mockCallback = jest.fn();
+
+        // A component connects to the collection (callback fires per key, not batched).
+        Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            waitForCollectionCallback: false,
+            callback: mockCallback,
+        });
+
+        Onyx.set(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`, {id: 1, title: 'Updated Test One'});
+
+        await waitForPromisesToResolve();
+
+        // With waitForCollectionCallback=false, the callback fires per key individually.
+        // Collect all keys that were delivered across all calls.
+        const deliveredKeys = new Set<string>();
+        for (const call of mockCallback.mock.calls) {
+            const [, key] = call;
+            if (key) {
+                deliveredKeys.add(key);
+            }
+        }
+
+        expect(deliveredKeys).toContain(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`);
+        expect(deliveredKeys).toContain(`${ONYX_KEYS.COLLECTION.TEST_KEY}2`);
+        expect(deliveredKeys).toContain(`${ONYX_KEYS.COLLECTION.TEST_KEY}3`);
+
+        // Verify the updated value is present (not stale) by finding the last call for key 1
+        const key1Calls = mockCallback.mock.calls.filter((call) => call[1] === `${ONYX_KEYS.COLLECTION.TEST_KEY}1`);
+        const lastKey1Value = key1Calls[key1Calls.length - 1][0];
+        expect(lastKey1Value).toEqual({id: 1, title: 'Updated Test One'});
+    });
+});

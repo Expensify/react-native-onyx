@@ -806,36 +806,34 @@ function keyChanged<TKey extends OnyxKey>(
 /**
  * Sends the data obtained from the keys to the connection.
  */
-function sendDataToConnection<TKey extends OnyxKey>(mapping: CallbackToStateMapping<TKey>, value: OnyxValue<TKey> | null, matchedKey: TKey | undefined): void {
+function sendDataToConnection<TKey extends OnyxKey>(mapping: CallbackToStateMapping<TKey>, matchedKey: TKey | undefined): void {
     // If the mapping no longer exists then we should not send any data.
     // This means our subscriber was disconnected.
     if (!callbackToStateMapping[mapping.subscriptionID]) {
         return;
     }
 
+    // Always read the latest value from cache to avoid stale or duplicate data.
+    // For collection subscribers with waitForCollectionCallback, read the full collection.
+    // For individual key subscribers, read just that key's value.
+    let value: OnyxValue<TKey> | undefined;
+    if (isCollectionKey(mapping.key) && mapping.waitForCollectionCallback) {
+        const collection = getCachedCollection(mapping.key);
+        value = Object.keys(collection).length > 0 ? (collection as OnyxValue<TKey>) : undefined;
+    } else {
+        value = cache.get(matchedKey ?? mapping.key) as OnyxValue<TKey>;
+    }
+
     // For regular callbacks, we never want to pass null values, but always just undefined if a value is not set in cache or storage.
-    const valueToPass = value === null ? undefined : value;
+    value = value === null ? undefined : value;
+    const lastValue = lastConnectionCallbackData.get(mapping.subscriptionID);
 
-    // If the subscriber was already notified (e.g. by a synchronous keyChanged call),
-    // skip the initial data delivery to prevent duplicate callbacks.
-    if (lastConnectionCallbackData.has(mapping.subscriptionID)) {
-        // For collection subscribers with waitForCollectionCallback, the synchronous keyChanged()
-        // may have delivered a partial collection (only members cached at that time). Now that
-        // multiGet has populated the cache with all members from storage, re-read the full
-        // collection from cache and deliver it if it differs from what was previously sent.
-        if (mapping.waitForCollectionCallback && isCollectionKey(mapping.key)) {
-            const lastValue = lastConnectionCallbackData.get(mapping.subscriptionID);
-            const freshCollection = getCachedCollection(mapping.key);
-
-            if (!shallowEqual(lastValue, freshCollection)) {
-                lastConnectionCallbackData.set(mapping.subscriptionID, freshCollection);
-                mapping.callback?.(freshCollection, matchedKey as TKey);
-            }
-        }
+    // If the value has not changed we do not need to trigger the callback
+    if (lastConnectionCallbackData.has(mapping.subscriptionID) && shallowEqual(lastValue, value)) {
         return;
     }
 
-    (mapping as DefaultConnectOptions<TKey>).callback?.(valueToPass, matchedKey as TKey);
+    (mapping as DefaultConnectOptions<TKey>).callback?.(value, matchedKey as TKey);
 }
 
 /**
@@ -858,9 +856,8 @@ function addKeyToRecentlyAccessedIfNeeded<TKey extends OnyxKey>(key: TKey): void
  * Gets the data for a given an array of matching keys, combines them into an object, and sends the result back to the subscriber.
  */
 function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: CollectionKeyBase[], mapping: CallbackToStateMapping<TKey>): void {
-    multiGet(matchingKeys).then((dataMap) => {
-        const data = Object.fromEntries(dataMap.entries()) as OnyxValue<TKey>;
-        sendDataToConnection(mapping, data, mapping.key);
+    multiGet(matchingKeys).then(() => {
+        sendDataToConnection(mapping, mapping.key);
     });
 }
 
@@ -1163,7 +1160,7 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
 
                 // Here we cannot use batching because the nullish value is expected to be set immediately for default props
                 // or they will be undefined.
-                sendDataToConnection(mapping, null, matchedKey);
+                sendDataToConnection(mapping, matchedKey);
                 return;
             }
 
@@ -1178,16 +1175,16 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
                     }
 
                     // We did not opt into using waitForCollectionCallback mode so the callback is called for every matching key.
-                    multiGet(matchingKeys).then((values) => {
-                        for (const [key, val] of values.entries()) {
-                            sendDataToConnection(mapping, val as OnyxValue<TKey>, key as TKey);
+                    multiGet(matchingKeys).then(() => {
+                        for (const key of matchingKeys) {
+                            sendDataToConnection(mapping, key as TKey);
                         }
                     });
                     return;
                 }
 
                 // If we are not subscribed to a collection key then there's only a single key to send an update for.
-                get(mapping.key).then((val) => sendDataToConnection(mapping, val as OnyxValue<TKey>, mapping.key));
+                get(mapping.key).then(() => sendDataToConnection(mapping, mapping.key));
                 return;
             }
 
