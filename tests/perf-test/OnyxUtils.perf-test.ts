@@ -367,7 +367,6 @@ describe('OnyxUtils', () => {
                             subscriptionID,
                             callback: jest.fn(),
                         },
-                        mockedReportActionsMap,
                         undefined,
                     ),
                 {
