@@ -73,7 +73,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     const selector = options?.selector;
 
     // Create memoized version of selector for performance
-    const memoizedSelector = useMemo(() => {
+    const memoizedSelector = useMemo((): UseOnyxSelector<TKey, TReturnValue> | null => {
         if (!selector) {
             return null;
         }
@@ -220,6 +220,11 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         }
     }, [key, options?.canEvict]);
 
+    // Tracks the last memoizedSelector reference that getSnapshot() has computed with.
+    // When the selector changes, this mismatch forces getSnapshot() to re-evaluate
+    // even if all other conditions (isFirstConnection, shouldGetCachedValue, key) are false.
+    const lastComputedSelectorRef = useRef(memoizedSelector);
+
     const getSnapshot = useCallback(() => {
         // Check if we have any cache for this Onyx key
         // Don't use cache for first connection with initWithStoredValues: false
@@ -244,10 +249,12 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // We get the value from cache while the first connection to Onyx is being made or if the key has changed,
         // so we can return any cached value right away. For the case where the key has changed, If we don't return the cached value right away, then the UI will show the incorrect (previous) value for a brief period which looks like a UI glitch to the user. After the connection is made, we only
         // update `newValueRef` when `Onyx.connect()` callback is fired.
-        if (isFirstConnectionRef.current || shouldGetCachedValueRef.current || key !== previousKey) {
+        const hasSelectorChanged = lastComputedSelectorRef.current !== memoizedSelector;
+        if (isFirstConnectionRef.current || shouldGetCachedValueRef.current || key !== previousKey || hasSelectorChanged) {
             // Gets the value from cache and maps it with selector. It changes `null` to `undefined` for `useOnyx` compatibility.
             const value = OnyxUtils.tryGetCachedValue(key) as OnyxValue<TKey>;
             const selectedValue = memoizedSelector ? memoizedSelector(value) : value;
+            lastComputedSelectorRef.current = memoizedSelector;
             newValueRef.current = (selectedValue ?? undefined) as TReturnValue | undefined;
 
             // We set this flag to `false` again since we don't want to get the newest cached value every time `getSnapshot()` is executed,
