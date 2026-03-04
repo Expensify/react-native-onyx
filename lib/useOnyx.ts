@@ -5,6 +5,7 @@ import OnyxCache, {TASK} from './OnyxCache';
 import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
 import OnyxUtils from './OnyxUtils';
+import OnyxKeys from './OnyxKeys';
 import * as GlobalSettings from './GlobalSettings';
 import type {CollectionKeyBase, OnyxKey, OnyxValue} from './types';
 import usePrevious from './usePrevious';
@@ -160,10 +161,10 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         }
 
         try {
-            const previousCollectionKey = OnyxUtils.splitCollectionMemberKey(previousKey)[0];
-            const collectionKey = OnyxUtils.splitCollectionMemberKey(key)[0];
+            const previousCollectionKey = OnyxKeys.splitCollectionMemberKey(previousKey)[0];
+            const collectionKey = OnyxKeys.splitCollectionMemberKey(key)[0];
 
-            if (OnyxUtils.isCollectionMemberKey(previousCollectionKey, previousKey) && OnyxUtils.isCollectionMemberKey(collectionKey, key) && previousCollectionKey === collectionKey) {
+            if (OnyxKeys.isCollectionMemberKey(previousCollectionKey, previousKey) && OnyxKeys.isCollectionMemberKey(collectionKey, key) && previousCollectionKey === collectionKey) {
                 return;
             }
         } catch (e) {
@@ -345,7 +346,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                     onStoreChange();
                 },
                 initWithStoredValues: options?.initWithStoredValues,
-                waitForCollectionCallback: OnyxUtils.isCollectionKey(key) as true,
+                waitForCollectionCallback: OnyxKeys.isCollectionKey(key) as true,
                 reuseConnection: options?.reuseConnection,
             });
 
