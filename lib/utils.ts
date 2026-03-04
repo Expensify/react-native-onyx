@@ -89,6 +89,10 @@ function mergeObject<TObject extends Record<string, unknown>>(
 
     const targetObject = isMergeableObject(target) ? target : undefined;
 
+    // Track whether the merge actually changed anything compared to target.
+    // If nothing changed, we return the original target reference for reference stability.
+    let hasChanged = !targetObject;
+
     // First we want to copy over all keys from the target into the destination object,
     // in case "target" is a mergable object.
     // If "shouldRemoveNestedNulls" is true, we want to remove null values from the merged object
@@ -103,6 +107,7 @@ function mergeObject<TObject extends Record<string, unknown>>(
             const shouldOmitNullishProperty = options.shouldRemoveNestedNulls && (targetProperty === null || sourceProperty === null);
 
             if (targetProperty === undefined || shouldOmitNullishProperty) {
+                hasChanged = true;
                 continue;
             }
 
@@ -125,6 +130,9 @@ function mergeObject<TObject extends Record<string, unknown>>(
 
         // If the source value is not a mergable object, we need to set the key directly.
         if (!isMergeableObject(sourceProperty)) {
+            if (destination[key] !== sourceProperty) {
+                hasChanged = true;
+            }
             destination[key] = sourceProperty;
             continue;
         }
@@ -134,6 +142,7 @@ function mergeObject<TObject extends Record<string, unknown>>(
         // To achieve this, we first mark these nested objects with an internal flag.
         // When calling fastMerge again with "mark" removal mode, the marked objects will be removed.
         if (options.objectRemovalMode === 'mark' && targetProperty === null) {
+            hasChanged = true;
             targetProperty = {[ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true};
             metadata.replaceNullPatches.push([[...basePath, key], {...sourceProperty}]);
         }
@@ -142,6 +151,7 @@ function mergeObject<TObject extends Record<string, unknown>>(
         // has the internal flag set, we replace the entire destination object with the source one and remove
         // the flag.
         if (options.objectRemovalMode === 'replace' && sourceProperty[ONYX_INTERNALS__REPLACE_OBJECT_MARK]) {
+            hasChanged = true;
             // We do a spread here in order to have a new object reference and allow us to delete the internal flag
             // of the merged object only.
             const sourcePropertyWithoutMark = {...sourceProperty};
@@ -150,10 +160,14 @@ function mergeObject<TObject extends Record<string, unknown>>(
             continue;
         }
 
-        destination[key] = fastMerge(targetProperty, sourceProperty, options, metadata, [...basePath, key]).result;
+        const merged = fastMerge(targetProperty, sourceProperty, options, metadata, [...basePath, key]).result;
+        if (merged !== targetProperty) {
+            hasChanged = true;
+        }
+        destination[key] = merged;
     }
 
-    return destination as TObject;
+    return hasChanged ? (destination as TObject) : (targetObject as TObject);
 }
 
 /** Checks whether the given object is an object and not null/undefined. */
@@ -170,7 +184,7 @@ function isMergeableObject<TObject extends Record<string, unknown>>(value: unkno
     return isNonNullObject && !(value instanceof RegExp) && !(value instanceof Date) && !Array.isArray(value);
 }
 
-/** Deep removes the nested null values from the given value. */
+/** Deep removes the nested null values from the given value. Returns the original reference if no nulls were found. */
 function removeNestedNullValues<TValue extends OnyxInput<OnyxKey> | null>(value: TValue): TValue {
     if (value === null || value === undefined || typeof value !== 'object') {
         return value;
@@ -180,6 +194,7 @@ function removeNestedNullValues<TValue extends OnyxInput<OnyxKey> | null>(value:
         return [...value] as TValue;
     }
 
+    let hasChanged = false;
     const result: Record<string, unknown> = {};
 
     // eslint-disable-next-line no-restricted-syntax, guard-for-in
@@ -187,18 +202,22 @@ function removeNestedNullValues<TValue extends OnyxInput<OnyxKey> | null>(value:
         const propertyValue = value[key];
 
         if (propertyValue === null || propertyValue === undefined) {
+            hasChanged = true;
             continue;
         }
 
         if (typeof propertyValue === 'object' && !Array.isArray(propertyValue)) {
-            const valueWithoutNestedNulls = removeNestedNullValues(propertyValue);
-            result[key] = valueWithoutNestedNulls;
+            const cleaned = removeNestedNullValues(propertyValue);
+            if (cleaned !== propertyValue) {
+                hasChanged = true;
+            }
+            result[key] = cleaned;
         } else {
             result[key] = propertyValue;
         }
     }
 
-    return result as TValue;
+    return hasChanged ? (result as TValue) : value;
 }
 
 /** Formats the action name by uppercasing and adding the key if provided. */

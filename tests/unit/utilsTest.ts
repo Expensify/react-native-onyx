@@ -209,5 +209,115 @@ describe('fastMerge', () => {
             const result = utils.fastMerge<unknown>(data, testObject);
             expect(result.result).toEqual(testObject);
         });
+
+        it('should return the same reference when source values match target', () => {
+            const target = {a: 1, b: 'hello', c: true};
+            const source = {a: 1, b: 'hello'};
+            const result = utils.fastMerge(target, source);
+            expect(result.result).toBe(target);
+        });
+
+        it('should return a new reference when source adds a key', () => {
+            const target = {a: 1};
+            const source = {a: 1, b: 2};
+            const result = utils.fastMerge(target, source);
+            expect(result.result).not.toBe(target);
+            expect(result.result).toEqual({a: 1, b: 2});
+        });
+
+        it('should return a new reference when source changes a value', () => {
+            const target = {a: 1, b: 2};
+            const source = {b: 3};
+            const result = utils.fastMerge(target, source);
+            expect(result.result).not.toBe(target);
+            expect(result.result).toEqual({a: 1, b: 3});
+        });
+
+        it('should preserve nested object references when unchanged', () => {
+            const nested = {x: 1, y: 2};
+            const target = {a: 'hello', b: nested};
+            const source = {a: 'hello'};
+            const result = utils.fastMerge<GenericDeepRecord>(target, source);
+            expect(result.result).toBe(target);
+            expect(result.result.b).toBe(nested);
+        });
+
+        it('should preserve unchanged nested references when sibling changes', () => {
+            const nested = {x: 1, y: 2};
+            const target = {a: nested, b: 'old'};
+            const source = {b: 'new'};
+            const result = utils.fastMerge<GenericDeepRecord>(target, source);
+            expect(result.result).not.toBe(target);
+            expect(result.result.a).toBe(nested);
+        });
+
+        it('should return a new reference when nested object changes', () => {
+            const target = {a: {x: 1, y: 2}, b: 'hello'};
+            const source = {a: {x: 99}};
+            const result = utils.fastMerge(target, source);
+            expect(result.result).not.toBe(target);
+            expect(result.result.a).not.toBe(target.a);
+            expect(result.result.a).toEqual({x: 99, y: 2});
+        });
+
+        it('should return a new reference when shouldRemoveNestedNulls removes a key', () => {
+            const target = {a: 1, b: null};
+            const source = {a: 1};
+            const result = utils.fastMerge(target, source, {shouldRemoveNestedNulls: true});
+            expect(result.result).not.toBe(target);
+            expect(result.result).toEqual({a: 1});
+        });
+
+        it('should return the same reference when merging with empty source keys', () => {
+            const target = {a: 1, b: 2};
+            const source = {};
+            const result = utils.fastMerge(target, source);
+            expect(result.result).toBe(target);
+        });
+    });
+
+    describe('removeNestedNullValues', () => {
+        it('should return the same reference when no nulls exist', () => {
+            const value = {a: 1, b: 'hello', c: true};
+            const result = utils.removeNestedNullValues(value);
+            expect(result).toBe(value);
+        });
+
+        it('should return the same reference for nested objects without nulls', () => {
+            const nested = {x: 1, y: 2};
+            const value = {a: 'hello', b: nested};
+            const result = utils.removeNestedNullValues(value);
+            expect(result).toBe(value);
+            expect((result as Record<string, unknown>).b).toBe(nested);
+        });
+
+        it('should return a new reference when a null property is removed', () => {
+            const value = {a: 1, b: null};
+            const result = utils.removeNestedNullValues(value);
+            expect(result).not.toBe(value);
+            expect(result).toEqual({a: 1});
+        });
+
+        it('should return a new reference when an undefined property is removed', () => {
+            const value = {a: 1, b: undefined};
+            const result = utils.removeNestedNullValues(value);
+            expect(result).not.toBe(value);
+            expect(result).toEqual({a: 1});
+        });
+
+        it('should return a new reference when a deeply nested null is removed', () => {
+            const value = {a: {b: {c: null, d: 1}}};
+            const result = utils.removeNestedNullValues(value);
+            expect(result).not.toBe(value);
+            expect(result).toEqual({a: {b: {d: 1}}});
+        });
+
+        it('should preserve sibling references when a nested null is removed', () => {
+            const sibling = {x: 1};
+            const value = {a: sibling, b: {c: null}};
+            const result = utils.removeNestedNullValues(value);
+            expect(result).not.toBe(value);
+            expect((result as Record<string, unknown>).a).toBe(sibling);
+        });
     });
 });

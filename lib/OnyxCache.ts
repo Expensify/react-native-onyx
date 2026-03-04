@@ -251,10 +251,18 @@ class OnyxCache {
 
                 // Per-key merge instead of spreading the entire storageMap
                 const existing = this.storageMap[key];
-                this.storageMap[key] = utils.fastMerge(existing, value, {
+                const merged = utils.fastMerge(existing, value, {
                     shouldRemoveNestedNulls: true,
                     objectRemovalMode: 'replace',
                 }).result;
+
+                // fastMerge is reference-stable: returns the original target when
+                // nothing changed, so a simple === check detects no-ops.
+                if (merged === existing) {
+                    continue;
+                }
+
+                this.storageMap[key] = merged;
 
                 if (collectionKey) {
                     if (!changedCollectionKeys.has(collectionKey)) {
