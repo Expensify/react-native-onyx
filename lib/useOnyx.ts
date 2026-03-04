@@ -27,11 +27,6 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
     initWithStoredValues?: boolean;
 
     /**
-     * If set to `true`, data will be retrieved from cache during the first render even if there is a pending merge for the key.
-     */
-    allowStaleData?: boolean;
-
-    /**
      * If set to `false`, the connection won't be reused between other subscribers that are listening to the same Onyx key
      * with the same connect configurations.
      */
@@ -146,9 +141,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             onyxSnapshotCache.registerConsumer({
                 selector: options?.selector,
                 initWithStoredValues: options?.initWithStoredValues,
-                allowStaleData: options?.allowStaleData,
             }),
-        [options?.selector, options?.initWithStoredValues, options?.allowStaleData],
+        [options?.selector, options?.initWithStoredValues],
     );
 
     useEffect(() => () => onyxSnapshotCache.deregisterConsumer(key, cacheKey), [key, cacheKey]);
@@ -262,8 +256,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
         // If we have pending merge operations for the key during the first connection, we set the new value to `undefined`
         // and fetch status to `loading` to simulate that it is still being loaded until we have the most updated data.
-        // If `allowStaleData` is `true` this logic will be ignored and cached value will be used, even if it's stale data.
-        if (isFirstConnectionRef.current && OnyxUtils.hasPendingMergeForKey(key) && !options?.allowStaleData) {
+        if (isFirstConnectionRef.current && OnyxUtils.hasPendingMergeForKey(key)) {
             newValueRef.current = undefined;
             newFetchStatus = 'loading';
         }
@@ -308,7 +301,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         }
 
         return resultRef.current;
-    }, [options?.initWithStoredValues, options?.allowStaleData, key, memoizedSelector, cacheKey, previousKey]);
+    }, [options?.initWithStoredValues, key, memoizedSelector, cacheKey, previousKey]);
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
