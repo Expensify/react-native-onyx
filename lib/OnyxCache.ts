@@ -59,6 +59,9 @@ class OnyxCache {
     /** Versioned frozen collection snapshots for structural sharing */
     private collectionSnapshots: Map<OnyxKey, CollectionSnapshot>;
 
+    /** Collections whose snapshots need rebuilding (lazy — rebuilt on next read) */
+    private dirtyCollections: Set<OnyxKey>;
+
     constructor() {
         this.storageKeys = new Set();
         this.nullishStorageKeys = new Set();
@@ -66,6 +69,7 @@ class OnyxCache {
         this.storageMap = {};
         this.pendingPromises = new Map();
         this.collectionSnapshots = new Map();
+        this.dirtyCollections = new Set();
 
         // bind all public methods to prevent problems with `this`
         bindAll(
@@ -178,18 +182,16 @@ class OnyxCache {
         if (value === null || value === undefined) {
             delete this.storageMap[key];
 
-            // Rebuild snapshot if a collection member was removed
             if (collectionKey && oldValue !== undefined) {
-                this.rebuildCollectionSnapshot(collectionKey);
+                this.dirtyCollections.add(collectionKey);
             }
             return undefined;
         }
 
         this.storageMap[key] = value;
 
-        // Rebuild snapshot when collection member value changes
         if (collectionKey && oldValue !== value) {
-            this.rebuildCollectionSnapshot(collectionKey, key);
+            this.dirtyCollections.add(collectionKey);
         }
 
         return value;
@@ -199,10 +201,9 @@ class OnyxCache {
     drop(key: OnyxKey): void {
         delete this.storageMap[key];
 
-        // Rebuild snapshot if a collection member was dropped
         const collectionKey = OnyxKeys.getCollectionKey(key);
         if (collectionKey) {
-            this.rebuildCollectionSnapshot(collectionKey);
+            this.dirtyCollections.add(collectionKey);
         }
 
         // If this is a collection key, clear its snapshot
@@ -274,9 +275,9 @@ class OnyxCache {
             }
         }
 
-        // Rebuild frozen snapshots only for affected collections, passing new member keys
+        // Mark affected collections as dirty — snapshots will be lazily rebuilt on next read
         for (const collectionKey of affectedCollections) {
-            this.rebuildCollectionSnapshot(collectionKey, changedCollectionKeys.get(collectionKey));
+            this.dirtyCollections.add(collectionKey);
         }
     }
 
@@ -356,9 +357,8 @@ class OnyxCache {
             this.recentKeys.delete(key);
         }
 
-        // Rebuild frozen snapshots for affected collections
         for (const collectionKey of affectedCollections) {
-            this.rebuildCollectionSnapshot(collectionKey);
+            this.dirtyCollections.add(collectionKey);
         }
     }
 
@@ -486,26 +486,15 @@ class OnyxCache {
      * @param collectionKey - The collection key to rebuild
      * @param additionalKeys - New member keys not yet in the previous snapshot (single key or set of keys)
      */
-    private rebuildCollectionSnapshot(collectionKey: OnyxKey, additionalKeys?: OnyxKey | Set<OnyxKey>): void {
+    private rebuildCollectionSnapshot(collectionKey: OnyxKey): void {
         const existing = this.collectionSnapshots.get(collectionKey);
         const newVersion = (existing?.version ?? 0) + 1;
 
         const members: NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>> = {};
 
-        // Include existing members that still have values in storageMap
-        if (existing) {
-            for (const memberKey of Object.keys(existing.snapshot)) {
-                const val = this.storageMap[memberKey];
-                if (val !== undefined && val !== null) {
-                    members[memberKey] = val;
-                }
-            }
-        }
-
-        // Include newly added member keys
-        if (additionalKeys) {
-            const keys = additionalKeys instanceof Set ? additionalKeys : [additionalKeys];
-            for (const key of keys) {
+        // Discover all current members by scanning storageKeys with prefix matching
+        for (const key of this.storageKeys) {
+            if (OnyxKeys.isCollectionMemberKey(collectionKey, key)) {
                 const val = this.storageMap[key];
                 if (val !== undefined && val !== null) {
                     members[key] = val;
@@ -524,8 +513,14 @@ class OnyxCache {
     /**
      * Get all data for a collection key.
      * Returns a frozen snapshot with structural sharing — safe to return by reference.
+     * Lazily rebuilds the snapshot if the collection was modified since the last read.
      */
     getCollectionData(collectionKey: OnyxKey): Record<OnyxKey, OnyxValue<OnyxKey>> | undefined {
+        if (this.dirtyCollections.has(collectionKey)) {
+            this.rebuildCollectionSnapshot(collectionKey);
+            this.dirtyCollections.delete(collectionKey);
+        }
+
         const entry = this.collectionSnapshots.get(collectionKey);
         if (!entry || Object.keys(entry.snapshot).length === 0) {
             return undefined;
