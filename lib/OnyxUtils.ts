@@ -509,8 +509,8 @@ function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey
             return filteredCollection;
         }
 
-        // Return a copy to avoid mutations affecting the cache
-        return {...collectionData};
+        // Snapshot is frozen — safe to return by reference
+        return collectionData;
     }
 
     // Fallback to original implementation if collection data not available
@@ -680,7 +680,8 @@ function keyChanged<TKey extends OnyxKey>(
                     cachedCollections[subscriber.key] = cachedCollection;
                 }
 
-                cachedCollection[key] = value;
+                // The cache is always updated before keyChanged runs, so the snapshot
+                // already contains the new value — no need to copy or patch it.
                 subscriber.callback(cachedCollection, subscriber.key, {[key]: value});
                 continue;
             }

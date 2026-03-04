@@ -224,13 +224,6 @@ class OnyxCache {
             throw new Error('data passed to cache.merge() must be an Object of onyx key/value pairs');
         }
 
-        this.storageMap = {
-            ...utils.fastMerge(this.storageMap, data, {
-                shouldRemoveNestedNulls: true,
-                objectRemovalMode: 'replace',
-            }).result,
-        };
-
         const affectedCollections = new Set<OnyxKey>();
         const changedCollectionKeys = new Map<OnyxKey, Set<OnyxKey>>();
 
@@ -240,14 +233,28 @@ class OnyxCache {
 
             const collectionKey = OnyxKeys.getCollectionKey(key);
 
-            if (value === null || value === undefined) {
+            if (value === undefined) {
                 this.addNullishStorageKey(key);
+                // undefined means "no change" — skip storageMap modification
+                continue;
+            }
+
+            if (value === null) {
+                this.addNullishStorageKey(key);
+                delete this.storageMap[key];
 
                 if (collectionKey) {
                     affectedCollections.add(collectionKey);
                 }
             } else {
                 this.nullishStorageKeys.delete(key);
+
+                // Per-key merge instead of spreading the entire storageMap
+                const existing = this.storageMap[key];
+                this.storageMap[key] = utils.fastMerge(existing, value, {
+                    shouldRemoveNestedNulls: true,
+                    objectRemovalMode: 'replace',
+                }).result;
 
                 if (collectionKey) {
                     if (!changedCollectionKeys.has(collectionKey)) {
@@ -352,9 +359,12 @@ class OnyxCache {
         this.maxRecentKeysSize = limit;
     }
 
-    /** Check if the value has changed */
+    /** Check if the value has changed. Uses reference equality as a fast path, falls back to deep equality. */
     hasValueChanged(key: OnyxKey, value: OnyxValue<OnyxKey>): boolean {
-        const currentValue = this.get(key, false);
+        const currentValue = this.storageMap[key];
+        if (currentValue === value) {
+            return false;
+        }
         return !deepEqual(currentValue, value);
     }
 
