@@ -165,7 +165,7 @@ function disconnect(connection: Connection): void {
  * @param value value to store
  * @param options optional configuration object
  */
-function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options?: SetOptions): Promise<void> {
+function set<TKey extends OnyxKey>(key: TKey extends CollectionKeyBase ? never : TKey, value: OnyxSetInput<TKey>, options?: SetOptions): Promise<void> {
     return OnyxUtils.afterInit(() => OnyxUtils.setWithRetry({key, value, options}));
 }
 
@@ -196,7 +196,7 @@ function multiSet(data: OnyxMultiSetInput): Promise<void> {
  * Onyx.merge(ONYXKEYS.POLICY, {id: 1}); // -> {id: 1}
  * Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Workspace'}
  */
-function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): Promise<void> {
+function merge<TKey extends OnyxKey>(key: TKey extends CollectionKeyBase ? never : TKey, changes: OnyxMergeInput<TKey>): Promise<void> {
     return OnyxUtils.afterInit(() => {
         const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
         if (skippableCollectionMemberIDs.size) {
