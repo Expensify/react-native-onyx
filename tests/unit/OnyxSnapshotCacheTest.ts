@@ -39,11 +39,9 @@ describe('OnyxSnapshotCache', () => {
             const optionsWithSelector: UseOnyxOptions<OnyxKey, string> = {
                 selector,
                 initWithStoredValues: true,
-                allowStaleData: false,
             };
             const optionsWithoutSelector: UseOnyxOptions<OnyxKey, string> = {
                 initWithStoredValues: false,
-                allowStaleData: true,
             };
             const keyWithSelector = cache.registerConsumer(optionsWithSelector);
             const keyWithoutSelector = cache.registerConsumer(optionsWithoutSelector);
