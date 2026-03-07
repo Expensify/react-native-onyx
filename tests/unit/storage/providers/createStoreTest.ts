@@ -14,16 +14,16 @@ function uniqueDBName() {
  * Captures the internal IDBDatabase instance used by a store by intercepting
  * the first db.transaction() call.
  */
-function captureDB(store: ReturnType<typeof createStore>): Promise<IDBDatabase> {
-    return new Promise<IDBDatabase>((resolve) => {
-        const original = IDBDatabase.prototype.transaction;
-        const spy = jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
-            spy.mockRestore();
-            resolve(this);
-            return original.apply(this, args);
-        });
-        store('readonly', (s) => IDB.promisifyRequest(s.getAllKeys()));
+async function captureDB(store: ReturnType<typeof createStore>): Promise<IDBDatabase> {
+    const captured: {db?: IDBDatabase} = {};
+    const original = IDBDatabase.prototype.transaction;
+    const spy = jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
+        captured.db = this;
+        spy.mockRestore();
+        return original.apply(this, args);
     });
+    await store('readonly', (s) => IDB.promisifyRequest(s.getAllKeys()));
+    return captured.db!;
 }
 
 describe('createStore - connection resilience', () => {
