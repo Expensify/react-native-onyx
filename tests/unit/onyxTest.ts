@@ -594,18 +594,19 @@ describe('Onyx', () => {
         });
     });
 
-    it('should overwrite an array key nested inside an object when using merge on a collection', () => {
+    it('should overwrite an array key nested inside an object when using mergeCollection', () => {
         let testKeyValue: unknown;
         connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            waitForCollectionCallback: true,
             initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
             },
         });
 
-        Onyx.merge(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {something: [1, 2, 3]}});
-        return Onyx.merge(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {something: [4]}}).then(() => {
+        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {something: [1, 2, 3]}});
+        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {something: [4]}}).then(() => {
             expect(testKeyValue).toEqual({test_1: {something: [4]}});
         });
     });
@@ -3006,6 +3007,32 @@ describe('Onyx', () => {
             expect(cache.get(ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE)).toEqual('default');
         });
     });
+
+    describe('collection key protection', () => {
+        it('set with a collection key should log an alert and not store data', async () => {
+            const logInfoSpy = jest.spyOn(Logger, 'logInfo');
+
+            await Onyx.set(ONYX_KEYS.COLLECTION.TEST_KEY as unknown as typeof ONYX_KEYS.TEST_KEY, {str: 'should not be stored'} as unknown as string);
+
+            expect(logInfoSpy).toHaveBeenCalledWith(expect.stringContaining('"set"'));
+            expect(logInfoSpy).toHaveBeenCalledWith(expect.stringContaining(ONYX_KEYS.COLLECTION.TEST_KEY));
+            expect(cache.get(ONYX_KEYS.COLLECTION.TEST_KEY)).toBeUndefined();
+
+            logInfoSpy.mockRestore();
+        });
+
+        it('merge with a collection key should log an alert and not store data', async () => {
+            const logInfoSpy = jest.spyOn(Logger, 'logInfo');
+
+            await Onyx.merge(ONYX_KEYS.COLLECTION.TEST_KEY as unknown as typeof ONYX_KEYS.TEST_KEY, {str: 'should not be stored'} as unknown as string);
+
+            expect(logInfoSpy).toHaveBeenCalledWith(expect.stringContaining('"merge"'));
+            expect(logInfoSpy).toHaveBeenCalledWith(expect.stringContaining(ONYX_KEYS.COLLECTION.TEST_KEY));
+            expect(cache.get(ONYX_KEYS.COLLECTION.TEST_KEY)).toBeUndefined();
+
+            logInfoSpy.mockRestore();
+        });
+    });
 });
 
 // Separate describe block for Onyx.init to control initialization during each test.
@@ -3111,6 +3138,7 @@ describe('Onyx.init', () => {
             expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toEqual('test_1');
         });
     });
+
 });
 
 // Separate describe block to control Onyx.init() per-test so we can pre-seed storage before init.

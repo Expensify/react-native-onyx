@@ -327,7 +327,7 @@ type OnyxSetCollectionInput<TKey extends OnyxKey> = Collection<TKey, OnyxInput<T
 
 type OnyxMethodMap = typeof OnyxUtils.METHOD;
 
-type ExpandOnyxKeys<TKey extends OnyxKey> = TKey extends CollectionKeyBase ? NoInfer<`${TKey}${string}`> : TKey;
+type ExpandOnyxKeys<TKey extends OnyxKey> = string extends CollectionKeyBase ? TKey : TKey extends CollectionKeyBase ? never : TKey;
 
 /**
  * OnyxUpdate type includes all onyx methods used in OnyxMethodValueMap.
