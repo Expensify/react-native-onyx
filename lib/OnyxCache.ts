@@ -12,6 +12,13 @@ type CollectionSnapshot = {
     snapshot: Readonly<NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>>>;
 };
 
+/**
+ * Stable frozen empty object used as the canonical value for empty collections.
+ * Returning the same reference avoids unnecessary re-renders in useSyncExternalStore,
+ * which relies on === equality to detect changes.
+ */
+const FROZEN_EMPTY_COLLECTION: Readonly<Record<OnyxKey, OnyxValue<OnyxKey>>> = Object.freeze({});
+
 // Task constants
 const TASK = {
     GET: 'get',
@@ -523,6 +530,11 @@ class OnyxCache {
 
         const entry = this.collectionSnapshots.get(collectionKey);
         if (!entry || Object.keys(entry.snapshot).length === 0) {
+            // If we know we have storage keys loaded, return a stable empty reference
+            // to avoid new {} allocations that break useSyncExternalStore === equality.
+            if (this.storageKeys.size > 0) {
+                return FROZEN_EMPTY_COLLECTION;
+            }
             return undefined;
         }
 

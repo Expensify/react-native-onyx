@@ -482,7 +482,9 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey): OnyxValue<OnyxKey> 
             if (cache.getAllKeys().size === 0) {
                 return;
             }
-            // Set an empty collection object for collections that exist but have no data
+            // getCollectionData returns undefined only when storageKeys is empty (loading state).
+            // Since we checked getAllKeys().size > 0, this path shouldn't normally be reached,
+            // but as a safety fallback we still set an empty object.
             val = {};
         }
     }
