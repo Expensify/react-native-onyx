@@ -1018,7 +1018,6 @@ function hasPendingMergeForKey(key: OnyxKey): boolean {
  */
 function prepareKeyValuePairsForStorage(
     data: Record<OnyxKey, OnyxInput<OnyxKey>>,
-    shouldRemoveNestedNulls?: boolean,
     replaceNullPatches?: MultiMergeReplaceNullPatches,
     isProcessingCollectionUpdate?: boolean,
 ): StorageKeyValuePair[] {
@@ -1030,10 +1029,8 @@ function prepareKeyValuePairsForStorage(
             continue;
         }
 
-        const valueWithoutNestedNullValues = shouldRemoveNestedNulls ?? true ? utils.removeNestedNullValues(value) : value;
-
-        if (valueWithoutNestedNullValues !== undefined) {
-            pairs.push([key, valueWithoutNestedNullValues, replaceNullPatches?.[key]]);
+        if (value !== undefined) {
+            pairs.push([key, value, replaceNullPatches?.[key]]);
         }
     }
 
@@ -1085,7 +1082,7 @@ function mergeInternal<TValue extends OnyxInput<OnyxKey> | undefined, TChange ex
         // Object values are then merged one after the other
         return changes.reduce<FastMergeResult<TChange>>(
             (modifiedData, change) => {
-                const options: FastMergeOptions = mode === 'merge' ? {shouldRemoveNestedNulls: true, objectRemovalMode: 'replace'} : {objectRemovalMode: 'mark'};
+                const options: FastMergeOptions = mode === 'merge' ? {objectRemovalMode: 'replace'} : {objectRemovalMode: 'mark'};
                 const {result, replaceNullPatches} = utils.fastMerge(modifiedData.result, change, options);
 
                 // eslint-disable-next-line no-param-reassign
@@ -1117,9 +1114,7 @@ function initializeWithDefaultKeyStates(): Promise<void> {
     return Storage.multiGet(keysToFetch).then((pairs) => {
         const existingDataAsObject = Object.fromEntries(pairs) as Record<string, unknown>;
 
-        const merged = utils.fastMerge(existingDataAsObject, defaultKeyStates, {
-            shouldRemoveNestedNulls: true,
-        }).result;
+        const merged = utils.fastMerge(existingDataAsObject, defaultKeyStates).result;
         cache.merge(merged ?? {});
 
         for (const [key, value] of Object.entries(merged ?? {})) keyChanged(key, value);
@@ -1393,13 +1388,12 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
         return Promise.resolve();
     }
 
-    const valueWithoutNestedNullValues = utils.removeNestedNullValues(value) as OnyxValue<TKey>;
-    const hasChanged = options?.skipCacheCheck ? true : cache.hasValueChanged(key, valueWithoutNestedNullValues);
+    const hasChanged = options?.skipCacheCheck ? true : cache.hasValueChanged(key, value);
 
     OnyxUtils.logKeyChanged(OnyxUtils.METHOD.SET, key, value, hasChanged);
 
     // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
-    const updatePromise = OnyxUtils.broadcastUpdate(key, valueWithoutNestedNullValues, hasChanged);
+    const updatePromise = OnyxUtils.broadcastUpdate(key, value, hasChanged);
 
     // If the value has not changed and this isn't a retry attempt, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
     if (!hasChanged && !retryAttempt) {
@@ -1408,14 +1402,14 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
 
     // If a key is a RAM-only key or a member of RAM-only collection, we skip the step that modifies the storage
     if (isRamOnlyKey(key)) {
-        OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
+        OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, value);
         return updatePromise;
     }
 
-    return Storage.setItem(key, valueWithoutNestedNullValues)
-        .catch((error) => OnyxUtils.retryOperation(error, setWithRetry, {key, value: valueWithoutNestedNullValues, options}, retryAttempt))
+    return Storage.setItem(key, value)
+        .catch((error) => OnyxUtils.retryOperation(error, setWithRetry, {key, value, options}, retryAttempt))
         .then(() => {
-            OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
+            OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, value);
             return updatePromise;
         });
 }
@@ -1448,7 +1442,7 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
         }, {});
     }
 
-    const keyValuePairsToSet = OnyxUtils.prepareKeyValuePairsForStorage(newData, true);
+    const keyValuePairsToSet = OnyxUtils.prepareKeyValuePairsForStorage(newData);
 
     const updatePromises = keyValuePairsToSet.map(([key, value]) => {
         // When we use multiSet to set a key we want to clear the current delta changes from Onyx.merge that were queued
@@ -1530,7 +1524,7 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
             mutableCollection[key] = null;
         }
 
-        const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(mutableCollection, true, undefined, true);
+        const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(mutableCollection, undefined, true);
         const previousCollection = OnyxUtils.getCachedCollection(collectionKey);
 
         for (const [key, value] of keyValuePairs) cache.set(key, value);
@@ -1636,14 +1630,8 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
                 newCollection[key] = resultCollection[key];
             }
 
-            // When (multi-)merging the values with the existing values in storage,
-            // we don't want to remove nested null values from the data that we pass to the storage layer,
-            // because the storage layer uses them to remove nested keys from storage natively.
-            const keyValuePairsForExistingCollection = prepareKeyValuePairsForStorage(existingKeyCollection, false, mergeReplaceNullPatches);
-
-            // We can safely remove nested null values when using (multi-)set,
-            // because we will simply overwrite the existing values in storage.
-            const keyValuePairsForNewCollection = prepareKeyValuePairsForStorage(newCollection, true);
+            const keyValuePairsForExistingCollection = prepareKeyValuePairsForStorage(existingKeyCollection, mergeReplaceNullPatches);
+            const keyValuePairsForNewCollection = prepareKeyValuePairsForStorage(newCollection);
 
             const promises = [];
 
@@ -1732,7 +1720,7 @@ function partialSetCollection<TKey extends CollectionKeyBase>({collectionKey, co
         const mutableCollection: OnyxInputKeyValueMapping = {...resultCollection};
         const existingKeys = resultCollectionKeys.filter((key) => persistedKeys.has(key));
         const previousCollection = getCachedCollection(collectionKey, existingKeys);
-        const keyValuePairs = prepareKeyValuePairsForStorage(mutableCollection, true, undefined, true);
+        const keyValuePairs = prepareKeyValuePairsForStorage(mutableCollection, undefined, true);
 
         for (const [key, value] of keyValuePairs) cache.set(key, value);
 

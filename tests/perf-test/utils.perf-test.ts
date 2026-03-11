@@ -23,30 +23,13 @@ describe('utils', () => {
         test('one call', async () => {
             const target = getRandomReportActions(collectionKey, 1000);
             const source = getRandomReportActions(collectionKey, 500);
-            await measureFunction(() =>
-                utils.fastMerge(target, source, {
-                    shouldRemoveNestedNulls: true,
-                }),
-            );
+            await measureFunction(() => utils.fastMerge(target, source));
         });
     });
 
     describe('formatActionName', () => {
         test('one call', async () => {
             await measureFunction(() => utils.formatActionName(Onyx.METHOD.SET, ONYXKEYS.COLLECTION.TEST_KEY));
-        });
-    });
-
-    describe('removeNestedNullValues', () => {
-        test('one call', async () => {
-            const reportAction = createRandomReportAction(0);
-            reportAction.actorAccountID = null;
-            reportAction.person.push(null);
-            reportAction.message[0].style = null;
-            reportAction.originalMessage.whisperedTo = null;
-            reportAction.lastModified = null;
-
-            await measureFunction(() => utils.removeNestedNullValues(reportAction));
         });
     });
 

@@ -327,7 +327,7 @@ describe('Onyx', () => {
         });
     });
 
-    it('should remove keys that are set to null when merging', () => {
+    it('should preserve null values when merging', () => {
         let testKeyValue: unknown;
 
         connection = Onyx.connect({
@@ -368,7 +368,9 @@ describe('Onyx', () => {
                 expect(testKeyValue).toEqual({
                     test1: {
                         test2: 'test2',
-                        test3: {},
+                        test3: {
+                            test4: null,
+                        },
                     },
                 });
 
@@ -379,12 +381,12 @@ describe('Onyx', () => {
                 });
             })
             .then(() => {
-                expect(testKeyValue).toEqual({test1: {test2: 'test2'}});
+                expect(testKeyValue).toEqual({test1: {test2: 'test2', test3: null}});
 
                 return Onyx.merge(ONYX_KEYS.TEST_KEY, {test1: null});
             })
             .then(() => {
-                expect(testKeyValue).toEqual({});
+                expect(testKeyValue).toEqual({test1: null});
             });
     });
 
@@ -1343,7 +1345,7 @@ describe('Onyx', () => {
             });
     });
 
-    it("should not set null values in Onyx.merge, when the key doesn't exist yet", () => {
+    it("should preserve null values in Onyx.merge, when the key doesn't exist yet", () => {
         let testKeyValue: unknown;
 
         connection = Onyx.connect({
@@ -1365,6 +1367,7 @@ describe('Onyx', () => {
                 waypoints: {
                     1: 'Home',
                     2: 'Work',
+                    3: null,
                 },
             });
         });
@@ -1402,7 +1405,7 @@ describe('Onyx', () => {
             });
     });
 
-    it('mergeCollection should omit nested null values', () => {
+    it('mergeCollection should preserve nested null values', () => {
         let result: OnyxCollection<unknown>;
 
         const routineRoute = `${ONYX_KEYS.COLLECTION.TEST_KEY}routine`;
@@ -1443,6 +1446,7 @@ describe('Onyx', () => {
                     waypoints: {
                         1: 'Home',
                         2: 'Beach',
+                        3: null,
                     },
                 },
             });
@@ -2616,7 +2620,7 @@ describe('Onyx', () => {
             });
         });
 
-        it('should remove a deeply nested null when merging an existing key', () => {
+        it('should preserve a deeply nested null when merging an existing key', () => {
             let result: unknown;
 
             connection = Onyx.connect({
@@ -2650,6 +2654,7 @@ describe('Onyx', () => {
                         waypoints: {
                             1: 'Home',
                             2: 'Work',
+                            3: null,
                         },
                     });
                 });

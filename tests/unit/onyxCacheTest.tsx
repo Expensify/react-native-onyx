@@ -352,13 +352,13 @@ describe('Onyx', () => {
                 expect(() => cache.merge({})).not.toThrow();
             });
 
-            it('Should remove `null` values when merging', () => {
+            it('Should keep `null` values when merging', () => {
                 cache.set('mockKey', {ID: 5});
                 cache.set('mockNullKey', null);
 
                 cache.merge({mockKey: null});
 
-                expect(cache.get('mockKey')).toEqual(undefined);
+                expect(cache.get('mockKey')).toEqual(null);
                 expect(cache.get('mockNullKey')).toEqual(undefined);
             });
         });

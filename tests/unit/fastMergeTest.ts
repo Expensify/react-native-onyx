@@ -27,15 +27,6 @@ const testObjectWithNullishValues: DeepObject = {
     },
 };
 
-const testObjectWithNullValuesRemoved: DeepObject = {
-    b: {
-        c: {
-            h: 'h',
-        },
-        d: {},
-    },
-};
-
 const testMergeChanges: DeepObject[] = [
     {
         b: {
@@ -78,24 +69,7 @@ describe('fastMerge', () => {
     });
 
     describe('objects', () => {
-        it('should merge an object with another object and remove nested null values', () => {
-            const result = utils.fastMerge(testObject, testObjectWithNullishValues, {shouldRemoveNestedNulls: true});
-
-            expect(result.result).toEqual({
-                a: 'a',
-                b: {
-                    c: {
-                        h: 'h',
-                    },
-                    d: {
-                        f: 'f',
-                    },
-                    g: 'g',
-                },
-            });
-        });
-
-        it('should merge an object with another object and not remove nested null values', () => {
+        it('should merge an object with another object and keep nested null values', () => {
             const result = utils.fastMerge(testObject, testObjectWithNullishValues);
 
             expect(result.result).toEqual({
@@ -111,20 +85,6 @@ describe('fastMerge', () => {
                     g: 'g',
                 },
             });
-        });
-
-        it('should merge an object with an empty object and remove deeply nested null values', () => {
-            const result = utils.fastMerge({}, testObjectWithNullishValues, {
-                shouldRemoveNestedNulls: true,
-            });
-
-            expect(result.result).toEqual(testObjectWithNullValuesRemoved);
-        });
-
-        it('should remove null values by merging two identical objects with fastMerge', () => {
-            const result = utils.removeNestedNullValues(testObjectWithNullishValues);
-
-            expect(result).toEqual(testObjectWithNullValuesRemoved);
         });
 
         it('should replace Date objects', () => {
@@ -143,7 +103,6 @@ describe('fastMerge', () => {
 
         it('should add the "ONYX_INTERNALS__REPLACE_OBJECT_MARK" flag to the merged object when the change is set to null and "objectRemovalMode" is set to "mark"', () => {
             const result = utils.fastMerge(testMergeChanges[1], testMergeChanges[0], {
-                shouldRemoveNestedNulls: true,
                 objectRemovalMode: 'mark',
             });
 
@@ -172,7 +131,6 @@ describe('fastMerge', () => {
                     },
                 },
                 {
-                    shouldRemoveNestedNulls: true,
                     objectRemovalMode: 'replace',
                 },
             );

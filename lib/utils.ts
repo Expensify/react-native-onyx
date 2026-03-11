@@ -1,4 +1,4 @@
-import type {OnyxInput, OnyxKey} from './types';
+import type {OnyxKey} from './types';
 
 type EmptyObject = Record<string, never>;
 type EmptyValue = EmptyObject | null | undefined;
@@ -13,9 +13,6 @@ type EmptyValue = EmptyObject | null | undefined;
 type FastMergeReplaceNullPatch = [string[], unknown];
 
 type FastMergeOptions = {
-    /** If true, null object values will be removed. */
-    shouldRemoveNestedNulls?: boolean;
-
     /**
      * If set to "mark", we will mark objects that are set to null instead of simply removing them,
      * so that we can batch changes together, without losing information about the object removal.
@@ -40,9 +37,7 @@ type FastMergeResult<TValue> = {
 const ONYX_INTERNALS__REPLACE_OBJECT_MARK = 'ONYX_INTERNALS__REPLACE_OBJECT_MARK';
 
 /**
- * Merges two objects and removes null values if "shouldRemoveNestedNulls" is set to true
- *
- * We generally want to remove null values from objects written to disk and cache, because it decreases the amount of data stored in memory and on disk.
+ * Merges two objects.
  */
 function fastMerge<TValue>(target: TValue, source: TValue, options?: FastMergeOptions, metadata?: FastMergeMetadata, basePath: string[] = []): FastMergeResult<TValue> {
     if (!metadata) {
@@ -60,7 +55,6 @@ function fastMerge<TValue>(target: TValue, source: TValue, options?: FastMergeOp
     }
 
     const optionsWithDefaults: FastMergeOptions = {
-        shouldRemoveNestedNulls: options?.shouldRemoveNestedNulls ?? false,
         objectRemovalMode: options?.objectRemovalMode ?? 'none',
     };
 
@@ -91,18 +85,11 @@ function mergeObject<TObject extends Record<string, unknown>>(
 
     // First we want to copy over all keys from the target into the destination object,
     // in case "target" is a mergable object.
-    // If "shouldRemoveNestedNulls" is true, we want to remove null values from the merged object
-    // and therefore we need to omit keys where either the source or target value is null.
     if (targetObject) {
         for (const key of Object.keys(targetObject)) {
             const targetProperty = targetObject?.[key];
-            const sourceProperty = source?.[key];
 
-            // If "shouldRemoveNestedNulls" is true, we want to remove (nested) null values from the merged object.
-            // If either the source or target value is null, we want to omit the key from the merged object.
-            const shouldOmitNullishProperty = options.shouldRemoveNestedNulls && (targetProperty === null || sourceProperty === null);
-
-            if (targetProperty === undefined || shouldOmitNullishProperty) {
+            if (targetProperty === undefined) {
                 continue;
             }
 
@@ -115,11 +102,7 @@ function mergeObject<TObject extends Record<string, unknown>>(
         let targetProperty = targetObject?.[key];
         const sourceProperty = source?.[key] as Record<string, unknown>;
 
-        // If "shouldRemoveNestedNulls" is true, we want to remove (nested) null values from the merged object.
-        // If the source value is null, we want to omit the key from the merged object.
-        const shouldOmitNullishProperty = options.shouldRemoveNestedNulls && sourceProperty === null;
-
-        if (sourceProperty === undefined || shouldOmitNullishProperty) {
+        if (sourceProperty === undefined) {
             continue;
         }
 
@@ -168,37 +151,6 @@ function isEmptyObject<T>(obj: T | EmptyValue): obj is EmptyValue {
 function isMergeableObject<TObject extends Record<string, unknown>>(value: unknown): value is TObject {
     const isNonNullObject = value != null ? typeof value === 'object' : false;
     return isNonNullObject && !(value instanceof RegExp) && !(value instanceof Date) && !Array.isArray(value);
-}
-
-/** Deep removes the nested null values from the given value. */
-function removeNestedNullValues<TValue extends OnyxInput<OnyxKey> | null>(value: TValue): TValue {
-    if (value === null || value === undefined || typeof value !== 'object') {
-        return value;
-    }
-
-    if (Array.isArray(value)) {
-        return [...value] as TValue;
-    }
-
-    const result: Record<string, unknown> = {};
-
-    // eslint-disable-next-line no-restricted-syntax, guard-for-in
-    for (const key in value) {
-        const propertyValue = value[key];
-
-        if (propertyValue === null || propertyValue === undefined) {
-            continue;
-        }
-
-        if (typeof propertyValue === 'object' && !Array.isArray(propertyValue)) {
-            const valueWithoutNestedNulls = removeNestedNullValues(propertyValue);
-            result[key] = valueWithoutNestedNulls;
-        } else {
-            result[key] = propertyValue;
-        }
-    }
-
-    return result as TValue;
 }
 
 /** Formats the action name by uppercasing and adding the key if provided. */
@@ -284,7 +236,6 @@ export default {
     fastMerge,
     isEmptyObject,
     formatActionName,
-    removeNestedNullValues,
     checkCompatibilityWithExistingValue,
     pick,
     omit,

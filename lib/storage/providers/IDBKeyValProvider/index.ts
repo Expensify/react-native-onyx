@@ -62,7 +62,6 @@ const provider: StorageProvider<UseStore | undefined> = {
                         store.delete(key);
                     } else {
                         const newValue = utils.fastMerge(values[index] as Record<string, unknown>, value as Record<string, unknown>, {
-                            shouldRemoveNestedNulls: true,
                             objectRemovalMode: 'replace',
                         }).result;
 
