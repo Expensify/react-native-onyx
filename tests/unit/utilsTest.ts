@@ -319,5 +319,19 @@ describe('fastMerge', () => {
             expect(result).not.toBe(value);
             expect((result as Record<string, unknown>).a).toBe(sibling);
         });
+
+        it('should return the same array reference', () => {
+            const arr = [1, 2, 3];
+            const result = utils.removeNestedNullValues(arr);
+            expect(result).toBe(arr);
+        });
+
+        it('should return the same reference for objects containing arrays', () => {
+            const arr = ['a', 'b'];
+            const value = {items: arr, count: 2};
+            const result = utils.removeNestedNullValues(value);
+            expect(result).toBe(value);
+            expect((result as Record<string, unknown>).items).toBe(arr);
+        });
     });
 });
