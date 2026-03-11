@@ -82,14 +82,12 @@ const provider: StorageProvider<Store> = {
 
     /**
      * Multiple merging of existing and new values in a batch
-     * This function also removes all nested null values from an object.
      */
     multiMerge(pairs) {
         for (const [key, value] of pairs) {
             const existingValue = provider.store[key] as Record<string, unknown>;
 
             const newValue = utils.fastMerge(existingValue, value as Record<string, unknown>, {
-                shouldRemoveNestedNulls: true,
                 objectRemovalMode: 'replace',
             }).result;
 

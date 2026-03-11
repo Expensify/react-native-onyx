@@ -226,7 +226,6 @@ class OnyxCache {
 
         this.storageMap = {
             ...utils.fastMerge(this.storageMap, data, {
-                shouldRemoveNestedNulls: true,
                 objectRemovalMode: 'replace',
             }).result,
         };
