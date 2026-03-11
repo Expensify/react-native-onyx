@@ -1420,7 +1420,7 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
             delete OnyxUtils.getMergeQueue()[key];
         }
 
-        // Update cache and optimistically inform subscribers on the next tick
+        // Update cache and optimistically inform subscribers
         cache.set(key, value);
         keyChanged(key, value);
     }
