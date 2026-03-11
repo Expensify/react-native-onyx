@@ -11,6 +11,7 @@ import usePrevious from './usePrevious';
 import decorateWithMetrics from './metrics';
 import onyxSnapshotCache from './OnyxSnapshotCache';
 import useLiveRef from './useLiveRef';
+import * as Logger from './Logger';
 
 type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (data: OnyxValue<TKey> | undefined) => TReturnValue;
 
@@ -31,11 +32,6 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
      * with the same connect configurations.
      */
     reuseConnection?: boolean;
-
-    /**
-     * If set to `true`, the key can be changed dynamically during the component lifecycle.
-     */
-    allowDynamicKey?: boolean;
 
     /**
      * This will be used to subscribe to a subset of an Onyx key's data.
@@ -148,8 +144,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     useEffect(() => () => onyxSnapshotCache.deregisterConsumer(key, cacheKey), [key, cacheKey]);
 
     useEffect(() => {
-        // These conditions will ensure we can only handle dynamic collection member keys from the same collection.
-        if (options?.allowDynamicKey || previousKey === key) {
+        if (previousKey === key) {
             return;
         }
 
@@ -166,10 +161,10 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             );
         }
 
-        throw new Error(
-            `'${previousKey}' key can't be changed to '${key}'. useOnyx() only supports dynamic keys if they are both collection member keys from the same collection e.g. from 'collection_id1' to 'collection_id2'.`,
-        );
-    }, [previousKey, key, options?.allowDynamicKey]);
+        if (process.env.NODE_ENV === 'development') {
+            Logger.logAlert(`useOnyx: key changed from '${previousKey}' to '${key}' across collections.`);
+        }
+    }, [previousKey, key]);
 
     // Track previous dependencies to prevent infinite loops
     const previousDependenciesRef = useRef<DependencyList>([]);
