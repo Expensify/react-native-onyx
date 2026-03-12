@@ -130,6 +130,11 @@ class OnyxCache {
      */
     setAllKeys(keys: OnyxKey[]) {
         this.storageKeys = new Set(keys);
+
+        // Register all keys in the member→collection forward index
+        for (const key of keys) {
+            OnyxKeys.registerMemberKey(key);
+        }
     }
 
     /** Saves a key in the storage keys list
@@ -486,33 +491,62 @@ class OnyxCache {
 
     /**
      * Rebuilds the frozen collection snapshot from current storageMap references.
-     * Derives membership from the previous snapshot (existing members) + additionalKeys (newly added members).
-     * Removed members are naturally excluded because they're gone from storageMap.
-     * The snapshot uses structural sharing: unchanged members keep their original references.
+     * Uses the indexed collection→members map for O(collectionMembers) instead of O(totalKeys).
+     * Returns the previous snapshot reference when all member references are identical,
+     * preventing unnecessary re-renders in useSyncExternalStore.
      *
      * @param collectionKey - The collection key to rebuild
-     * @param additionalKeys - New member keys not yet in the previous snapshot (single key or set of keys)
      */
     private rebuildCollectionSnapshot(collectionKey: OnyxKey): void {
         const existing = this.collectionSnapshots.get(collectionKey);
-        const newVersion = (existing?.version ?? 0) + 1;
+        const oldSnapshot = existing?.snapshot;
 
         const members: NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>> = {};
+        let hasChanges = false;
+        let newMemberCount = 0;
 
-        // Discover all current members by scanning storageKeys with prefix matching
-        for (const key of this.storageKeys) {
-            if (OnyxKeys.isCollectionMemberKey(collectionKey, key)) {
-                const val = this.storageMap[key];
-                if (val !== undefined && val !== null) {
-                    members[key] = val;
+        // Use the indexed forward lookup for O(collectionMembers) iteration.
+        // Falls back to scanning all storageKeys if the index isn't populated yet.
+        const memberKeys = OnyxKeys.getMembersOfCollection(collectionKey);
+        const keysToScan = memberKeys ?? this.storageKeys;
+        const needsPrefixCheck = !memberKeys;
+
+        for (const key of keysToScan) {
+            if (needsPrefixCheck && !OnyxKeys.isCollectionMemberKey(collectionKey, key)) {
+                continue;
+            }
+            const val = this.storageMap[key];
+            if (val !== undefined && val !== null) {
+                members[key] = val;
+                newMemberCount++;
+
+                // Check if this member's reference changed from the old snapshot
+                if (!hasChanges && (!oldSnapshot || oldSnapshot[key] !== val)) {
+                    hasChanges = true;
                 }
             }
+        }
+
+        // Check if any members were removed (old snapshot had more keys)
+        if (!hasChanges && oldSnapshot) {
+            const oldMemberCount = Object.keys(oldSnapshot).length;
+            if (oldMemberCount !== newMemberCount) {
+                hasChanges = true;
+            }
+        }
+
+        // If nothing actually changed, reuse the old snapshot reference.
+        // This is critical: useSyncExternalStore uses === to detect changes,
+        // so returning the same reference prevents unnecessary re-renders.
+        if (!hasChanges && oldSnapshot) {
+            // Don't even bump the version — nothing changed
+            return;
         }
 
         Object.freeze(members);
 
         this.collectionSnapshots.set(collectionKey, {
-            version: newVersion,
+            version: (existing?.version ?? 0) + 1,
             snapshot: members,
         });
     }

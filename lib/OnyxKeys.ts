@@ -6,6 +6,9 @@ let collectionKeySet = new Set<OnyxKey>();
 /** Reverse lookup: member key → collection key for O(1) access */
 const memberToCollectionKeyMap = new Map<OnyxKey, OnyxKey>();
 
+/** Forward lookup: collection key → set of member keys for O(collectionMembers) iteration */
+const collectionToMembersMap = new Map<OnyxKey, Set<OnyxKey>>();
+
 /** Set of keys that should only be stored in RAM, not persisted to storage */
 let ramOnlyKeySet = new Set<OnyxKey>();
 
@@ -99,12 +102,30 @@ function getCollectionKey(key: CollectionKey | OnyxKey): string | undefined {
  * Called from OnyxCache.addKey() to ensure the Map stays populated.
  */
 function registerMemberKey(key: OnyxKey): void {
-    if (memberToCollectionKeyMap.has(key)) {
+    const existingCollectionKey = memberToCollectionKeyMap.get(key);
+    if (existingCollectionKey !== undefined) {
+        // Already in reverse map — ensure forward map is also populated.
+        // getCollectionKey() can populate memberToCollectionKeyMap without
+        // updating collectionToMembersMap, so we must sync here.
+        let members = collectionToMembersMap.get(existingCollectionKey);
+        if (!members) {
+            members = new Set();
+            collectionToMembersMap.set(existingCollectionKey, members);
+        }
+        members.add(key);
         return;
     }
     for (const collectionKey of collectionKeySet) {
         if (isCollectionMemberKey(collectionKey, key)) {
             memberToCollectionKeyMap.set(key, collectionKey);
+
+            // Also register in the forward lookup (collection → members)
+            let members = collectionToMembersMap.get(collectionKey);
+            if (!members) {
+                members = new Set();
+                collectionToMembersMap.set(collectionKey, members);
+            }
+            members.add(key);
             return;
         }
     }
@@ -115,7 +136,25 @@ function registerMemberKey(key: OnyxKey): void {
  * Called when a key is dropped from cache.
  */
 function deregisterMemberKey(key: OnyxKey): void {
+    const collectionKey = memberToCollectionKeyMap.get(key);
+    if (collectionKey) {
+        const members = collectionToMembersMap.get(collectionKey);
+        if (members) {
+            members.delete(key);
+            if (members.size === 0) {
+                collectionToMembersMap.delete(collectionKey);
+            }
+        }
+    }
     memberToCollectionKeyMap.delete(key);
+}
+
+/**
+ * Returns the set of member keys for a given collection key.
+ * O(1) lookup using the forward index.
+ */
+function getMembersOfCollection(collectionKey: OnyxKey): Set<OnyxKey> | undefined {
+    return collectionToMembersMap.get(collectionKey);
 }
 
 /**
@@ -180,6 +219,7 @@ export default {
     getCollectionKey,
     registerMemberKey,
     deregisterMemberKey,
+    getMembersOfCollection,
     splitCollectionMemberKey,
     setRamOnlyKeys,
     isRamOnlyKey,
