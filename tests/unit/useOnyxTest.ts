@@ -737,7 +737,7 @@ describe('useOnyx', () => {
         });
     });
 
-    describe('allowStaleData', () => {
+    describe('pending merges', () => {
         it('should return undefined and loading state while we have pending merges for the key, and then return updated value and loaded state', async () => {
             Onyx.set(ONYXKEYS.TEST_KEY, 'test1');
 
@@ -775,24 +775,6 @@ describe('useOnyx', () => {
             await act(async () => waitForPromisesToResolve());
 
             expect(result.current[0]).toEqual('test4_changed');
-            expect(result.current[1].status).toEqual('loaded');
-        });
-
-        it('should return stale value and loaded state if allowStaleData is true, and then return updated value and loaded state', async () => {
-            Onyx.set(ONYXKEYS.TEST_KEY, 'test1');
-
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test3');
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test4');
-
-            const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {allowStaleData: true}));
-
-            expect(result.current[0]).toEqual('test1');
-            expect(result.current[1].status).toEqual('loaded');
-
-            await act(async () => waitForPromisesToResolve());
-
-            expect(result.current[0]).toEqual('test4');
             expect(result.current[1].status).toEqual('loaded');
         });
     });
@@ -874,39 +856,6 @@ describe('useOnyx', () => {
             expect(result1.current[1].status).toEqual('loaded');
 
             expect(result2.current[0]).toEqual('test');
-            expect(result2.current[1].status).toEqual('loaded');
-        });
-
-        it('"allowStaleData" should work correctly for the same key if more than one hook is using it', async () => {
-            Onyx.set(ONYXKEYS.TEST_KEY, 'test1');
-
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test3');
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test4');
-
-            const {result: result1} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {allowStaleData: true}));
-
-            expect(result1.current[0]).toEqual('test1');
-            expect(result1.current[1].status).toEqual('loaded');
-
-            await act(async () => waitForPromisesToResolve());
-
-            expect(result1.current[0]).toEqual('test4');
-            expect(result1.current[1].status).toEqual('loaded');
-
-            // Second hook
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test5');
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test6');
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test7');
-
-            const {result: result2} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {allowStaleData: true}));
-
-            expect(result2.current[0]).toEqual('test4');
-            expect(result2.current[1].status).toEqual('loaded');
-
-            await act(async () => waitForPromisesToResolve());
-
-            expect(result2.current[0]).toEqual('test7');
             expect(result2.current[1].status).toEqual('loaded');
         });
 
