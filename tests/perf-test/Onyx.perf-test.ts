@@ -31,8 +31,6 @@ describe('Onyx', () => {
     beforeAll(async () => {
         Onyx.init({
             keys: ONYXKEYS,
-            maxCachedKeysCount: 100000,
-            evictableKeys: [ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY],
             skippableCollectionMemberIDs: ['skippable-id'],
         });
     });
@@ -139,8 +137,6 @@ describe('Onyx', () => {
                     Onyx.init({
                         keys: ONYXKEYS,
                         initialKeyStates: mockedReportActionsMap,
-                        maxCachedKeysCount: 100000,
-                        evictableKeys: [ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY],
                         skippableCollectionMemberIDs: ['skippable-id'],
                     });
 

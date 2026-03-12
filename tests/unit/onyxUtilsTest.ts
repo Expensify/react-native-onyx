@@ -456,7 +456,6 @@ describe('OnyxUtils', () => {
         const retryOperationSpy = jest.spyOn(OnyxUtils, 'retryOperation');
         const genericError = new Error('Generic storage error');
         const invalidDataError = new Error("Failed to execute 'put' on 'IDBObjectStore': invalid data");
-        const memoryError = new Error('out of memory');
 
         it('should retry only one time if the operation is firstly failed and then passed', async () => {
             StorageMock.setItem = jest.fn(StorageMock.setItem).mockRejectedValueOnce(genericError).mockImplementation(StorageMock.setItem);
@@ -480,15 +479,6 @@ describe('OnyxUtils', () => {
             StorageMock.setItem = jest.fn().mockRejectedValueOnce(invalidDataError);
 
             await expect(Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'})).rejects.toThrow(invalidDataError);
-        });
-
-        it('should not retry in case of storage capacity error and no keys to evict', async () => {
-            StorageMock.setItem = jest.fn().mockRejectedValue(memoryError);
-
-            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
-
-            // Should only be called once since there are no evictable keys
-            expect(retryOperationSpy).toHaveBeenCalledTimes(1);
         });
     });
 

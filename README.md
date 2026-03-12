@@ -314,43 +314,6 @@ If a platform needs to use a separate library (like using MMVK for react-native)
 
 [Docs](./API.md)
 
-# Cache Eviction
-
-Different platforms come with varying storage capacities and Onyx has a way to gracefully fail when those storage limits are encountered. When Onyx fails to set or modify a key the following steps are taken:
-1. Onyx looks at a list of recently accessed keys (access is defined as subscribed to or modified) and locates the key that was least recently accessed
-2. It then deletes this key and retries the original operation
-
-By default, Onyx will not evict anything from storage and will presume all keys are "unsafe" to remove unless explicitly told otherwise.
-
-**To flag a key as safe for removal:**
-- Add the key to the `evictableKeys` option in `Onyx.init(options)`
-- Implement `canEvict` in the Onyx config for each component subscribing to a key
-- The key will only be deleted when all subscribers return `true` for `canEvict`
-
-e.g.
-```js
-Onyx.init({
-    evictableKeys: [ONYXKEYS.COLLECTION.REPORT_ACTIONS],
-});
-```
-
-```js
-const ReportActionsView = ({reportID, isActiveReport}) => {
-    const [reportActions] = useOnyx(
-        `${ONYXKEYS.COLLECTION.REPORT_ACTIONS}${reportID}_`,
-        {canEvict: () => !isActiveReport}
-    );
-
-    return (
-        <View>
-            {/* Render with reportActions data */}
-        </View>
-    );
-};
-
-export default ReportActionsView;
-```
-
 # Benchmarks
 
 Provide the `captureMetrics` boolean flag to `Onyx.init` to capture call statistics
@@ -358,7 +321,6 @@ Provide the `captureMetrics` boolean flag to `Onyx.init` to capture call statist
 ```js
 Onyx.init({
     keys: ONYXKEYS,
-    evictableKeys: [ONYXKEYS.COLLECTION.REPORT_ACTIONS],
     captureMetrics: Config.BENCHMARK_ONYX,
 });
 ```

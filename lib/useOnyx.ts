@@ -16,11 +16,6 @@ type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (da
 
 type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
     /**
-     * Determines if this key in this subscription is safe to be evicted.
-     */
-    canEvict?: boolean;
-
-    /**
      * If set to `false`, then no data will be prefilled into the component.
      * @deprecated This param is going to be removed soon. Use RAM-only keys instead.
      */
@@ -198,22 +193,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [...dependencies]);
 
-    const checkEvictableKey = useCallback(() => {
-        if (options?.canEvict === undefined || !connectionRef.current) {
-            return;
-        }
-
-        if (!OnyxCache.isEvictableKey(key)) {
-            throw new Error(`canEvict can't be used on key '${key}'. This key must explicitly be flagged as safe for removal by adding it to Onyx.init({evictableKeys: []}).`);
-        }
-
-        if (options.canEvict) {
-            connectionManager.removeFromEvictionBlockList(connectionRef.current);
-        } else {
-            connectionManager.addToEvictionBlockList(connectionRef.current);
-        }
-    }, [key, options?.canEvict]);
-
     // Tracks the last memoizedSelector reference that getSnapshot() has computed with.
     // When the selector changes, this mismatch forces getSnapshot() to re-evaluate
     // even if all other conditions (isFirstConnection, shouldGetCachedValue, key) are false.
@@ -342,8 +321,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                 reuseConnection: options?.reuseConnection,
             });
 
-            checkEvictableKey();
-
             return () => {
                 if (!connectionRef.current) {
                     return;
@@ -355,7 +332,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                 onStoreChangeFnRef.current = null;
             };
         },
-        [key, options?.initWithStoredValues, options?.reuseConnection, checkEvictableKey],
+        [key, options?.initWithStoredValues, options?.reuseConnection],
     );
 
     const getSnapshotDecorated = useMemo(() => {
@@ -365,10 +342,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
         return decorateWithMetrics(getSnapshot, 'useOnyx.getSnapshot');
     }, [getSnapshot]);
-
-    useEffect(() => {
-        checkEvictableKey();
-    }, [checkEvictableKey]);
 
     const result = useSyncExternalStore<UseOnyxResult<TReturnValue>>(subscribe, getSnapshotDecorated);
 

@@ -17,6 +17,11 @@
 <dt><a href="#getDeferredInitTask">getDeferredInitTask()</a></dt>
 <dd><p>Getter - returns the deffered init task.</p>
 </dd>
+<dt><a href="#afterInit">afterInit(action)</a> ⇒</dt>
+<dd><p>Executes an action after Onyx has been initialized.
+If Onyx is already initialized, the action is executed immediately.
+Otherwise, it waits for initialization to complete before executing.</p>
+</dd>
 <dt><a href="#getSkippableCollectionMemberIDs">getSkippableCollectionMemberIDs()</a></dt>
 <dd><p>Getter - returns the skippable collection member IDs.</p>
 </dd>
@@ -29,7 +34,7 @@
 <dt><a href="#setSnapshotMergeKeys">setSnapshotMergeKeys()</a></dt>
 <dd><p>Setter - sets the snapshot merge keys allowlist.</p>
 </dd>
-<dt><a href="#initStoreValues">initStoreValues(keys, initialKeyStates, evictableKeys)</a></dt>
+<dt><a href="#initStoreValues">initStoreValues(keys, initialKeyStates)</a></dt>
 <dd><p>Sets the initial values for the Onyx store</p>
 </dd>
 <dt><a href="#reduceCollectionWithSelector">reduceCollectionWithSelector()</a></dt>
@@ -106,10 +111,6 @@ If the requested key is a collection, it will return an object with all the coll
 <dt><a href="#sendDataToConnection">sendDataToConnection()</a></dt>
 <dd><p>Sends the data obtained from the keys to the connection.</p>
 </dd>
-<dt><a href="#addKeyToRecentlyAccessedIfNeeded">addKeyToRecentlyAccessedIfNeeded()</a></dt>
-<dd><p>We check to see if this key is flagged as safe for eviction and add it to the recentlyAccessedKeys list so that when we
-run out of storage the least recently accessed key can be removed.</p>
-</dd>
 <dt><a href="#getCollectionDataAndSendAsObject">getCollectionDataAndSendAsObject()</a></dt>
 <dd><p>Gets the data for a given an array of matching keys, combines them into an object, and sends the result back to the subscriber.</p>
 </dd>
@@ -128,11 +129,10 @@ subscriber callbacks receive the data in a different format than they normally e
 <dd><p>Remove a key from Onyx and update the subscribers</p>
 </dd>
 <dt><a href="#retryOperation">retryOperation()</a></dt>
-<dd><p>Handles storage operation failures based on the error type:</p>
+<dd><p>Handles storage operation failures by retrying the operation.</p>
 <ul>
-<li>Storage capacity errors: evicts data and retries the operation</li>
 <li>Invalid data errors: logs an alert and throws an error</li>
-<li>Other errors: retries the operation</li>
+<li>Other errors: retries the operation up to MAX_STORAGE_OPERATION_RETRY_ATTEMPTS times</li>
 </ul>
 </dd>
 <dt><a href="#broadcastUpdate">broadcastUpdate()</a></dt>
@@ -223,6 +223,20 @@ Getter - returns the default key states.
 Getter - returns the deffered init task.
 
 **Kind**: global function  
+<a name="afterInit"></a>
+
+## afterInit(action) ⇒
+Executes an action after Onyx has been initialized.
+If Onyx is already initialized, the action is executed immediately.
+Otherwise, it waits for initialization to complete before executing.
+
+**Kind**: global function  
+**Returns**: The result of the action  
+
+| Param | Description |
+| --- | --- |
+| action | The action to execute after initialization |
+
 <a name="getSkippableCollectionMemberIDs"></a>
 
 ## getSkippableCollectionMemberIDs()
@@ -249,7 +263,7 @@ Setter - sets the snapshot merge keys allowlist.
 **Kind**: global function  
 <a name="initStoreValues"></a>
 
-## initStoreValues(keys, initialKeyStates, evictableKeys)
+## initStoreValues(keys, initialKeyStates)
 Sets the initial values for the Onyx store
 
 **Kind**: global function  
@@ -258,7 +272,6 @@ Sets the initial values for the Onyx store
 | --- | --- |
 | keys | `ONYXKEYS` constants object from Onyx.init() |
 | initialKeyStates | initial data to set when `init()` and `clear()` are called |
-| evictableKeys | This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal. |
 
 <a name="reduceCollectionWithSelector"></a>
 
@@ -393,7 +406,7 @@ For example:
 - `getCollectionKey("sharedNVP_user_-1_something")` would return "sharedNVP_user_"
 
 **Kind**: global function  
-**Returns**: The plain collection key or throws an Error if the key is not a collection one.  
+**Returns**: The plain collection key or undefined if the key is not a collection one.  
 
 | Param | Description |
 | --- | --- |
@@ -445,13 +458,6 @@ keyChanged(key, value, subscriber => subscriber.initWithStoredValues === false)
 Sends the data obtained from the keys to the connection.
 
 **Kind**: global function  
-<a name="addKeyToRecentlyAccessedIfNeeded"></a>
-
-## addKeyToRecentlyAccessedIfNeeded()
-We check to see if this key is flagged as safe for eviction and add it to the recentlyAccessedKeys list so that when we
-run out of storage the least recently accessed key can be removed.
-
-**Kind**: global function  
 <a name="getCollectionDataAndSendAsObject"></a>
 
 ## getCollectionDataAndSendAsObject()
@@ -496,10 +502,9 @@ Remove a key from Onyx and update the subscribers
 <a name="retryOperation"></a>
 
 ## retryOperation()
-Handles storage operation failures based on the error type:
-- Storage capacity errors: evicts data and retries the operation
+Handles storage operation failures by retrying the operation.
 - Invalid data errors: logs an alert and throws an error
-- Other errors: retries the operation
+- Other errors: retries the operation up to MAX_STORAGE_OPERATION_RETRY_ATTEMPTS times
 
 **Kind**: global function  
 <a name="broadcastUpdate"></a>

@@ -51,20 +51,6 @@ const METHOD = {
     CLEAR: 'clear',
 } as const;
 
-// IndexedDB errors that indicate storage capacity issues where eviction can help
-const IDB_STORAGE_ERRORS = [
-    'quotaexceedederror', // Browser storage quota exceeded
-] as const;
-
-// SQLite errors that indicate storage capacity issues where eviction can help
-const SQLITE_STORAGE_ERRORS = [
-    'database or disk is full', // Device storage is full
-    'disk I/O error', // File system I/O failure, often due to insufficient space or corrupted storage
-    'out of memory', // Insufficient RAM or storage space to complete the operation
-] as const;
-
-const STORAGE_ERRORS = [...IDB_STORAGE_ERRORS, ...SQLITE_STORAGE_ERRORS];
-
 // Max number of retries for failed storage operations
 const MAX_STORAGE_OPERATION_RETRY_ATTEMPTS = 5;
 
@@ -185,9 +171,8 @@ function setSnapshotMergeKeys(keys: Set<string>): void {
  *
  * @param keys - `ONYXKEYS` constants object from Onyx.init()
  * @param initialKeyStates - initial data to set when `init()` and `clear()` are called
- * @param evictableKeys - This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal.
  */
-function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Partial<KeyValueMapping>, evictableKeys: OnyxKey[]): void {
+function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Partial<KeyValueMapping>): void {
     // We need the value of the collection keys later for checking if a
     // key is a collection. We store it in a map for faster lookup.
     const collectionValues = Object.values(keys.COLLECTION ?? {}) as string[];
@@ -200,9 +185,6 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
     defaultKeyStates = initialKeyStates;
 
     DevTools.initState(initialKeyStates);
-
-    // Let Onyx know about which keys are safe to evict
-    cache.setEvictionAllowList(evictableKeys);
 
     // Set collection keys in cache for optimized storage
     cache.setCollectionKeys(onyxCollectionKeySet);
@@ -757,13 +739,6 @@ function keyChanged<TKey extends OnyxKey>(
     canUpdateSubscriber: (subscriber?: CallbackToStateMapping<OnyxKey>) => boolean = () => true,
     isProcessingCollectionUpdate = false,
 ): void {
-    // Add or remove this key from the recentlyAccessedKeys lists
-    if (value !== null) {
-        cache.addLastAccessedKey(key, isCollectionKey(key));
-    } else {
-        cache.removeLastAccessedKey(key);
-    }
-
     // We get the subscribers interested in the key that has just changed. If the subscriber's  key is a collection key then we will
     // notify them if the key that changed is a collection member. Or if it is a regular key notify them when there is an exact match.
     // Given the amount of times this function is called we need to make sure we are not iterating over all subscribers every time. On the other hand, we don't need to
@@ -847,22 +822,6 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: CallbackToStateMapp
 }
 
 /**
- * We check to see if this key is flagged as safe for eviction and add it to the recentlyAccessedKeys list so that when we
- * run out of storage the least recently accessed key can be removed.
- */
-function addKeyToRecentlyAccessedIfNeeded<TKey extends OnyxKey>(key: TKey): void {
-    if (!cache.isEvictableKey(key)) {
-        return;
-    }
-
-    // Add the key to recentKeys first (this makes it the most recent key)
-    cache.addToAccessedKeys(key);
-
-    // Try to free some cache whenever we connect to a safe eviction key
-    cache.removeLeastRecentlyUsedKeys();
-}
-
-/**
  * Gets the data for a given an array of matching keys, combines them into an object, and sends the result back to the subscriber.
  */
 function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: CollectionKeyBase[], mapping: CallbackToStateMapping<TKey>): void {
@@ -942,10 +901,9 @@ function reportStorageQuota(): Promise<void> {
 }
 
 /**
- * Handles storage operation failures based on the error type:
- * - Storage capacity errors: evicts data and retries the operation
+ * Handles storage operation failures by retrying the operation.
  * - Invalid data errors: logs an alert and throws an error
- * - Other errors: retries the operation
+ * - Other errors: retries the operation up to MAX_STORAGE_OPERATION_RETRY_ATTEMPTS times
  */
 function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, onyxMethod: TMethod, defaultParams: Parameters<TMethod>[0], retryAttempt: number | undefined): Promise<void> {
     const currentRetryAttempt = retryAttempt ?? 0;
@@ -958,36 +916,14 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, on
         throw error;
     }
 
-    const errorMessage = error?.message?.toLowerCase?.();
-    const errorName = error?.name?.toLowerCase?.();
-    const isStorageCapacityError = STORAGE_ERRORS.some((storageError) => errorName?.includes(storageError) || errorMessage?.includes(storageError));
-
     if (nextRetryAttempt > MAX_STORAGE_OPERATION_RETRY_ATTEMPTS) {
-        Logger.logAlert(`Storage operation failed after 5 retries. Error: ${error}. onyxMethod: ${onyxMethod.name}.`);
+        Logger.logAlert(`Storage operation failed after ${MAX_STORAGE_OPERATION_RETRY_ATTEMPTS} retries. Error: ${error}. onyxMethod: ${onyxMethod.name}.`);
+        reportStorageQuota();
         return Promise.resolve();
     }
 
-    if (!isStorageCapacityError) {
-        // @ts-expect-error No overload matches this call.
-        return onyxMethod(defaultParams, nextRetryAttempt);
-    }
-
-    // Find the first key that we can remove that has no subscribers in our blocklist
-    const keyForRemoval = cache.getKeyForEviction();
-    if (!keyForRemoval) {
-        // If we have no acceptable keys to remove then we are possibly trying to save mission critical data. If this is the case,
-        // then we should stop retrying as there is not much the user can do to fix this. Instead of getting them stuck in an infinite loop we
-        // will allow this write to be skipped.
-        Logger.logAlert('Out of storage. But found no acceptable keys to remove.');
-        return reportStorageQuota();
-    }
-
-    // Remove the least recently viewed key that is not currently being accessed and retry.
-    Logger.logInfo(`Out of storage. Evicting least recently accessed key (${keyForRemoval}) and retrying.`);
-    reportStorageQuota();
-
     // @ts-expect-error No overload matches this call.
-    return remove(keyForRemoval).then(() => onyxMethod(defaultParams, nextRetryAttempt));
+    return onyxMethod(defaultParams, nextRetryAttempt);
 }
 
 /**
@@ -998,8 +934,6 @@ function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>
     // all updates regardless of value changes (indicated by initWithStoredValues set to false).
     if (hasChanged) {
         cache.set(key, value);
-    } else {
-        cache.addToAccessedKeys(key);
     }
 
     return scheduleSubscriberUpdate(key, value, (subscriber) => hasChanged || subscriber?.initWithStoredValues === false).then(() => undefined);
@@ -1177,7 +1111,8 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
 
     // Commit connection only after init passes
     deferredInitTask.promise
-        .then(() => addKeyToRecentlyAccessedIfNeeded(mapping.key))
+        // FIXME: We need this otherwise some tests fail.
+        .then(() => undefined)
         .then(() => {
             // Performance improvement
             // If the mapping is connected to an onyx key that is not a collection
@@ -1371,7 +1306,7 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
         return Promise.resolve();
     }
 
-    const existingValue = cache.get(key, false);
+    const existingValue = cache.get(key);
 
     // If the existing value as well as the new value are null, we can return early.
     if (existingValue === undefined && value === null) {
@@ -1819,7 +1754,6 @@ const OnyxUtils = {
     setSnapshotMergeKeys,
     storeKeyBySubscriptions,
     deleteKeyBySubscriptions,
-    addKeyToRecentlyAccessedIfNeeded,
     reduceCollectionWithSelector,
     updateSnapshots,
     mergeCollectionWithPatches,
