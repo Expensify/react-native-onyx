@@ -938,8 +938,8 @@ function initializeWithDefaultKeyStates(): Promise<void> {
 
         // Only notify subscribers for default key states — same as before.
         // Other keys will be picked up by subscribers when they connect.
-        // TODO: Maybe we dont need this.
-        // for (const [key, value] of Object.entries(merged ?? {})) keyChanged(key, value);
+        // FIXME: Maybe we dont need this, but some tests in E/App are failing if we remove it.
+        for (const [key, value] of Object.entries(merged ?? {})) keyChanged(key, value);
     });
 }
 
