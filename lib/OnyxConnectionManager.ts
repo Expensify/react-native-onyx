@@ -2,6 +2,7 @@ import bindAll from 'lodash/bindAll';
 import * as Logger from './Logger';
 import type {ConnectOptions} from './Onyx';
 import OnyxUtils from './OnyxUtils';
+import OnyxKeys from './OnyxKeys';
 import * as Str from './Str';
 import type {CollectionConnectCallback, DefaultConnectCallback, DefaultConnectOptions, OnyxKey, OnyxValue} from './types';
 import cache from './OnyxCache';
@@ -129,7 +130,7 @@ class OnyxConnectionManager {
         if (
             reuseConnection === false ||
             initWithStoredValues === false ||
-            (OnyxUtils.isCollectionKey(key) && (waitForCollectionCallback === undefined || waitForCollectionCallback === false))
+            (OnyxKeys.isCollectionKey(key) && (waitForCollectionCallback === undefined || waitForCollectionCallback === false))
         ) {
             suffix += `,uniqueID=${Str.guid()}`;
         }

@@ -5,6 +5,7 @@ import OnyxCache, {TASK} from './OnyxCache';
 import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
 import OnyxUtils from './OnyxUtils';
+import OnyxKeys from './OnyxKeys';
 import * as GlobalSettings from './GlobalSettings';
 import type {CollectionKeyBase, OnyxKey, OnyxValue} from './types';
 import usePrevious from './usePrevious';
@@ -84,17 +85,17 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             // Recompute if input changed, dependencies changed, or first time
             const dependenciesChanged = !shallowEqual(lastDependencies, currentDependencies);
             if (!hasComputed || lastInput !== input || dependenciesChanged) {
-                // Only proceed if we have a valid selector
-                if (selector) {
-                    const newOutput = selector(input);
+                const newOutput = selector(input);
 
-                    // Deep equality mode: only update if output actually changed
-                    if (!hasComputed || !deepEqual(lastOutput, newOutput) || dependenciesChanged) {
-                        lastInput = input;
-                        lastOutput = newOutput;
-                        lastDependencies = [...currentDependencies];
-                        hasComputed = true;
-                    }
+                // Always track the current input to avoid re-running the selector
+                // when the same input is seen again (even if the output didn't change).
+                lastInput = input;
+
+                // Only update the output reference if it actually changed
+                if (!hasComputed || !deepEqual(lastOutput, newOutput) || dependenciesChanged) {
+                    lastOutput = newOutput;
+                    lastDependencies = [...currentDependencies];
+                    hasComputed = true;
                 }
             }
 
@@ -154,10 +155,10 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         }
 
         try {
-            const previousCollectionKey = OnyxUtils.splitCollectionMemberKey(previousKey)[0];
-            const collectionKey = OnyxUtils.splitCollectionMemberKey(key)[0];
+            const previousCollectionKey = OnyxKeys.splitCollectionMemberKey(previousKey)[0];
+            const collectionKey = OnyxKeys.splitCollectionMemberKey(key)[0];
 
-            if (OnyxUtils.isCollectionMemberKey(previousCollectionKey, previousKey) && OnyxUtils.isCollectionMemberKey(collectionKey, key) && previousCollectionKey === collectionKey) {
+            if (OnyxKeys.isCollectionMemberKey(previousCollectionKey, previousKey) && OnyxKeys.isCollectionMemberKey(collectionKey, key) && previousCollectionKey === collectionKey) {
                 return;
             }
         } catch (e) {
@@ -268,18 +269,12 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             newFetchStatus = 'loading';
         }
 
-        // Optimized equality checking:
-        // - Memoized selectors already handle deep equality internally, so we can use fast reference equality
-        // - Non-selector cases use shallow equality for object reference checks
+        // Reference equality is sufficient for both selector and non-selector paths:
+        // - Memoized selectors already handle deep equality internally and return stable references
+        // - Non-selector values have stable references thanks to frozen collection snapshots
+        //   and reference-stable fastMerge/removeNestedNullValues
         // - Normalize null to undefined to ensure consistent comparison (both represent "no value")
-        let areValuesEqual: boolean;
-        if (memoizedSelector) {
-            const normalizedPrevious = previousValueRef.current ?? undefined;
-            const normalizedNew = newValueRef.current ?? undefined;
-            areValuesEqual = normalizedPrevious === normalizedNew;
-        } else {
-            areValuesEqual = shallowEqual(previousValueRef.current ?? undefined, newValueRef.current);
-        }
+        const areValuesEqual = (previousValueRef.current ?? undefined) === (newValueRef.current ?? undefined);
 
         // We update the cached value and the result in the following conditions:
         // We will update the cached value and the result in any of the following situations:
@@ -338,7 +333,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                     onStoreChange();
                 },
                 initWithStoredValues: options?.initWithStoredValues,
-                waitForCollectionCallback: OnyxUtils.isCollectionKey(key) as true,
+                waitForCollectionCallback: OnyxKeys.isCollectionKey(key) as true,
                 reuseConnection: options?.reuseConnection,
             });
 
