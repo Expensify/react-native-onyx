@@ -1,18 +1,19 @@
-name: TypeScript Checks
+name: Validate Github Actions
 
 on:
     pull_request:
         types: [opened, synchronize]
+        paths: ['.github/**']
 
 jobs:
-    typecheck:
+    verify:
         runs-on: ubuntu-latest
         steps:
             # v5.0.0
             - uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
 
             - name: Setup Node
-              # v4
+              # v4.4.0
               uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e
               with:
                   node-version-file: ".nvmrc"
@@ -21,7 +22,5 @@ jobs:
 
             - run: npm ci
 
-            - name: Type check with TypeScript
-              run: npm run typecheck
-              env:
-                CI: true
+            - name: Verify Javascript Action Builds
+              run: ./.github/scripts/verifyActions.sh
