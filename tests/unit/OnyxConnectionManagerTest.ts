@@ -2,7 +2,6 @@ import {act} from '@testing-library/react-native';
 import Onyx from '../../lib';
 import type {Connection} from '../../lib/OnyxConnectionManager';
 import connectionManager from '../../lib/OnyxConnectionManager';
-import StorageMock from '../../lib/storage';
 import type GenericCollection from '../utils/GenericCollection';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
@@ -69,7 +68,7 @@ describe('OnyxConnectionManager', () => {
 
     describe('connect / disconnect', () => {
         it('should connect to a key and fire the callback with its value', async () => {
-            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'test');
 
             const callback1 = jest.fn();
             const connection = connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback1});
@@ -87,7 +86,7 @@ describe('OnyxConnectionManager', () => {
         });
 
         it('should connect two times to the same key and fire both callbacks with its value', async () => {
-            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'test');
 
             const callback1 = jest.fn();
             const connection1 = connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback1});
@@ -119,10 +118,10 @@ describe('OnyxConnectionManager', () => {
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: obj1,
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: obj2,
             } as GenericCollection;
-            await StorageMock.multiSet([
-                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`, obj1],
-                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`, obj2],
-            ]);
+            await Onyx.multiSet({
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: obj1,
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: obj2,
+            });
 
             const callback1 = jest.fn();
             const connection1 = connectionManager.connect({key: ONYXKEYS.COLLECTION.TEST_KEY, callback: callback1});
@@ -151,7 +150,7 @@ describe('OnyxConnectionManager', () => {
         });
 
         it('should connect to a key, connect some times more after first connection is made, and fire all subsequent callbacks immediately with its value', async () => {
-            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'test');
 
             const callback1 = jest.fn();
             connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback1});
@@ -181,7 +180,7 @@ describe('OnyxConnectionManager', () => {
         });
 
         it('should have the connection object already defined when triggering the callback of the second connection to the same key', async () => {
-            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'test');
 
             const callback1 = jest.fn();
             connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback1});
@@ -208,7 +207,7 @@ describe('OnyxConnectionManager', () => {
         });
 
         it('should create a separate connection to the same key when setting reuseConnection to false', async () => {
-            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'test');
 
             const callback1 = jest.fn();
             const connection1 = connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback1});
@@ -223,7 +222,7 @@ describe('OnyxConnectionManager', () => {
         });
 
         it('should create a separate connection to the same key when setting initWithStoredValues to false', async () => {
-            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'test');
 
             const callback1 = jest.fn();
             const connection1 = connectionManager.connect({key: ONYXKEYS.TEST_KEY, initWithStoredValues: false, callback: callback1});
@@ -309,7 +308,7 @@ describe('OnyxConnectionManager', () => {
         });
 
         it('should create a separate connection for the same key after a Onyx.clear() call', async () => {
-            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'test');
 
             const callback1 = jest.fn();
             connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback1});
@@ -361,8 +360,8 @@ describe('OnyxConnectionManager', () => {
 
     describe('disconnectAll', () => {
         it('should disconnect all connections', async () => {
-            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
-            await StorageMock.setItem(ONYXKEYS.TEST_KEY_2, 'test2');
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'test');
+            await Onyx.set(ONYXKEYS.TEST_KEY_2, 'test2');
 
             const callback1 = jest.fn();
             const connection1 = connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback1});
@@ -388,8 +387,8 @@ describe('OnyxConnectionManager', () => {
 
     describe('refreshSessionID', () => {
         it('should create a separate connection for the same key if the session ID changes', async () => {
-            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
-            await StorageMock.setItem(ONYXKEYS.TEST_KEY_2, 'test2');
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'test');
+            await Onyx.set(ONYXKEYS.TEST_KEY_2, 'test2');
 
             const connection1 = connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: jest.fn()});
 

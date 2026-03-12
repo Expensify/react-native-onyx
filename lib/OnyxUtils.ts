@@ -4,7 +4,7 @@ import _ from 'underscore';
 import DevTools from './DevTools';
 import * as Logger from './Logger';
 import type Onyx from './Onyx';
-import cache, {TASK} from './OnyxCache';
+import cache from './OnyxCache';
 import * as Str from './Str';
 import Storage from './storage';
 import type {
@@ -247,143 +247,22 @@ function get<TKey extends OnyxKey, TValue extends OnyxValue<TKey>>(key: TKey): P
         return Promise.resolve(cache.get(key) as TValue);
     }
 
-    // RAM-only keys should never read from storage (they may have stale persisted data
-    // from before the key was migrated to RAM-only). Mark as nullish so future get() calls
-    // short-circuit via hasCacheForKey and avoid re-running this branch.
-    if (isRamOnlyKey(key)) {
-        cache.addNullishStorageKey(key);
-        return Promise.resolve(undefined as TValue);
-    }
-
-    const taskName = `${TASK.GET}:${key}` as const;
-
-    // When a value retrieving task for this key is still running hook to it
-    if (cache.hasPendingTask(taskName)) {
-        return cache.getTaskPromise(taskName) as Promise<TValue>;
-    }
-
-    // Otherwise retrieve the value from storage and capture a promise to aid concurrent usages
-    const promise = Storage.getItem(key)
-        .then((val) => {
-            if (skippableCollectionMemberIDs.size) {
-                try {
-                    const [, collectionMemberID] = splitCollectionMemberKey(key);
-                    if (skippableCollectionMemberIDs.has(collectionMemberID)) {
-                        // The key is a skippable one, so we set the value to undefined.
-                        // eslint-disable-next-line no-param-reassign
-                        val = undefined as OnyxValue<TKey>;
-                    }
-                } catch (e) {
-                    // The key is not a collection one or something went wrong during split, so we proceed with the function's logic.
-                }
-            }
-
-            if (val === undefined) {
-                cache.addNullishStorageKey(key);
-                return undefined;
-            }
-
-            cache.set(key, val);
-            return val;
-        })
-        .catch((err) => Logger.logInfo(`Unable to get item from persistent storage. Key: ${key} Error: ${err}`));
-
-    return cache.captureTask(taskName, promise) as Promise<TValue>;
+    return Promise.resolve(undefined as TValue);
 }
 
 // multiGet the data first from the cache and then from the storage for the missing keys.
 function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<OnyxKey, OnyxValue<TKey>>> {
-    // Keys that are not in the cache
-    const missingKeys: OnyxKey[] = [];
-
-    // Tasks that are pending
-    const pendingTasks: Array<Promise<OnyxValue<TKey>>> = [];
-
-    // Keys for the tasks that are pending
-    const pendingKeys: OnyxKey[] = [];
-
     // Data to be sent back to the invoker
     const dataMap = new Map<OnyxKey, OnyxValue<TKey>>();
 
-    /**
-     * We are going to iterate over all the matching keys and check if we have the data in the cache.
-     * If we do then we add it to the data object. If we do not have them, then we check if there is a pending task
-     * for the key. If there is such task, then we add the promise to the pendingTasks array and the key to the pendingKeys
-     * array. If there is no pending task then we add the key to the missingKeys array.
-     *
-     * These missingKeys will be later used to multiGet the data from the storage.
-     */
     for (const key of keys) {
-        // RAM-only keys should never read from storage as they may have stale persisted data
-        // from before the key was migrated to RAM-only.
-        if (isRamOnlyKey(key)) {
-            if (cache.hasCacheForKey(key)) {
-                dataMap.set(key, cache.get(key) as OnyxValue<TKey>);
-            }
-            continue;
-        }
-
         const cacheValue = cache.get(key) as OnyxValue<TKey>;
         if (cacheValue) {
             dataMap.set(key, cacheValue);
-            continue;
-        }
-
-        const pendingKey = `${TASK.GET}:${key}` as const;
-        if (cache.hasPendingTask(pendingKey)) {
-            pendingTasks.push(cache.getTaskPromise(pendingKey) as Promise<OnyxValue<TKey>>);
-            pendingKeys.push(key);
-        } else {
-            missingKeys.push(key);
         }
     }
 
-    return (
-        Promise.all(pendingTasks)
-            // Wait for all the pending tasks to resolve and then add the data to the data map.
-            .then((values) => {
-                for (const [index, value] of values.entries()) {
-                    dataMap.set(pendingKeys[index], value);
-                }
-
-                return Promise.resolve();
-            })
-            // Get the missing keys using multiGet from the storage.
-            .then(() => {
-                if (missingKeys.length === 0) {
-                    return Promise.resolve(undefined);
-                }
-
-                return Storage.multiGet(missingKeys);
-            })
-            // Add the data from the missing keys to the data map and also merge it to the cache.
-            .then((values) => {
-                if (!values || values.length === 0) {
-                    return dataMap;
-                }
-
-                // temp object is used to merge the missing data into the cache
-                const temp: OnyxCollection<KeyValueMapping[TKey]> = {};
-                for (const [key, value] of values) {
-                    if (skippableCollectionMemberIDs.size) {
-                        try {
-                            const [, collectionMemberID] = splitCollectionMemberKey(key);
-                            if (skippableCollectionMemberIDs.has(collectionMemberID)) {
-                                // The key is a skippable one, so we skip this iteration.
-                                continue;
-                            }
-                        } catch (e) {
-                            // The key is not a collection one or something went wrong during split, so we proceed with the function's logic.
-                        }
-                    }
-
-                    dataMap.set(key, value as OnyxValue<TKey>);
-                    temp[key] = value as OnyxValue<TKey>;
-                }
-                cache.merge(temp);
-                return dataMap;
-            })
-    );
+    return Promise.resolve(dataMap);
 }
 
 /**
@@ -427,29 +306,7 @@ function deleteKeyBySubscriptions(subscriptionID: number) {
 
 /** Returns current key names stored in persisted storage */
 function getAllKeys(): Promise<Set<OnyxKey>> {
-    // When we've already read stored keys, resolve right away
-    const cachedKeys = cache.getAllKeys();
-    if (cachedKeys.size > 0) {
-        return Promise.resolve(cachedKeys);
-    }
-
-    // When a value retrieving task for all keys is still running hook to it
-    if (cache.hasPendingTask(TASK.GET_ALL_KEYS)) {
-        return cache.getTaskPromise(TASK.GET_ALL_KEYS) as Promise<Set<OnyxKey>>;
-    }
-
-    // Otherwise retrieve the keys from storage and capture a promise to aid concurrent usages
-    const promise = Storage.getAllKeys().then((keys) => {
-        // Filter out RAM-only keys from storage results as they may be stale entries
-        // from before the key was migrated to RAM-only.
-        const filteredKeys = keys.filter((key) => !isRamOnlyKey(key));
-        cache.setAllKeys(filteredKeys);
-
-        // return the updated set of keys
-        return cache.getAllKeys();
-    });
-
-    return cache.captureTask(TASK.GET_ALL_KEYS, promise) as Promise<Set<OnyxKey>>;
+    return Promise.resolve(cache.getAllKeys());
 }
 
 /**
@@ -1045,18 +902,44 @@ function mergeInternal<TValue extends OnyxInput<OnyxKey> | undefined, TChange ex
  * Merge user provided default key value pairs.
  */
 function initializeWithDefaultKeyStates(): Promise<void> {
-    // Filter out RAM-only keys from storage reads as they may have stale persisted data
-    // from before the key was migrated to RAM-only.
-    const keysToFetch = Object.keys(defaultKeyStates).filter((key) => !isRamOnlyKey(key));
-    return Storage.multiGet(keysToFetch).then((pairs) => {
-        const existingDataAsObject = Object.fromEntries(pairs) as Record<string, unknown>;
+    // Eagerly load the entire database into cache in a single batch read.
+    // This is faster than lazy-loading individual keys because:
+    // 1. One DB transaction instead of hundreds
+    // 2. All subsequent reads are synchronous cache hits
+    return Storage.getAll().then((pairs) => {
+        const allDataFromStorage: Record<string, unknown> = {};
 
-        const merged = utils.fastMerge(existingDataAsObject, defaultKeyStates, {
+        for (const [key, value] of pairs) {
+            // RAM-only keys should never be loaded from storage as they may have stale persisted data
+            // from before the key was migrated to RAM-only.
+            if (isRamOnlyKey(key)) {
+                continue;
+            }
+            allDataFromStorage[key] = value;
+        }
+
+        // Load all storage data into cache silently (no subscriber notifications)
+        cache.setAllKeys(Object.keys(allDataFromStorage));
+        cache.merge(allDataFromStorage);
+
+        // Extract only the default key states from storage and merge with defaults
+        const defaultKeysFromStorage = Object.keys(defaultKeyStates).reduce((obj: Record<string, unknown>, key) => {
+            if (key in allDataFromStorage) {
+                // eslint-disable-next-line no-param-reassign
+                obj[key] = allDataFromStorage[key];
+            }
+            return obj;
+        }, {});
+
+        const merged = utils.fastMerge(defaultKeysFromStorage, defaultKeyStates, {
             shouldRemoveNestedNulls: true,
         }).result;
         cache.merge(merged ?? {});
 
-        for (const [key, value] of Object.entries(merged ?? {})) keyChanged(key, value);
+        // Only notify subscribers for default key states — same as before.
+        // Other keys will be picked up by subscribers when they connect.
+        // TODO: Maybe we dont need this.
+        // for (const [key, value] of Object.entries(merged ?? {})) keyChanged(key, value);
     });
 }
 
