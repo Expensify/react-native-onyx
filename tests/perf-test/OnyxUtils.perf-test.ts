@@ -4,7 +4,6 @@ import createRandomReportAction, {getRandomReportActions} from '../utils/collect
 import type {Selector} from '../../lib';
 import Onyx from '../../lib';
 import StorageMock from '../../lib/storage';
-import OnyxCache from '../../lib/OnyxCache';
 import OnyxUtils, {clearOnyxUtilsInternals} from '../../lib/OnyxUtils';
 import type GenericCollection from '../utils/GenericCollection';
 import type {OnyxUpdate} from '../../lib/Onyx';
@@ -29,8 +28,6 @@ const ONYXKEYS = {
     },
 };
 
-const evictableKeys = [ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY];
-
 const initialKeyStates = {};
 
 const generateTestSelector = () =>
@@ -52,8 +49,6 @@ describe('OnyxUtils', () => {
     beforeAll(async () => {
         Onyx.init({
             keys: ONYXKEYS,
-            maxCachedKeysCount: 100000,
-            evictableKeys,
             initialKeyStates,
             skippableCollectionMemberIDs: ['skippable-id'],
             ramOnlyKeys: [ONYXKEYS.RAM_ONLY_TEST_KEY, ONYXKEYS.COLLECTION.RAM_ONLY_TEST_COLLECTION],
@@ -99,9 +94,9 @@ describe('OnyxUtils', () => {
                 ...getRandomReportActions(ONYXKEYS.COLLECTION.TEST_KEY_5),
             };
 
-            await measureFunction(() => OnyxUtils.initStoreValues(ONYXKEYS, data, evictableKeys), {
+            await measureFunction(() => OnyxUtils.initStoreValues(ONYXKEYS, data), {
                 afterEach: () => {
-                    OnyxUtils.initStoreValues(ONYXKEYS, initialKeyStates, evictableKeys);
+                    OnyxUtils.initStoreValues(ONYXKEYS, initialKeyStates);
                 },
             });
         });
@@ -191,12 +186,6 @@ describe('OnyxUtils', () => {
         });
     });
 
-    describe('isSafeEvictionKey', () => {
-        test('one call checking one key', async () => {
-            await measureFunction(() => OnyxCache.isEvictableKey(`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`));
-        });
-    });
-
     describe('tryGetCachedValue', () => {
         const key = `${collectionKey}0`;
         const reportAction = mockedReportActionsMap[`${collectionKey}0`];
@@ -218,50 +207,6 @@ describe('OnyxUtils', () => {
             await measureFunction(() => OnyxUtils.tryGetCachedValue(collectionKey), {
                 beforeEach: async () => {
                     await Onyx.multiSet(collections);
-                },
-                afterEach: clearOnyxAfterEachMeasure,
-            });
-        });
-    });
-
-    describe('removeLastAccessedKey', () => {
-        test('one call removing one key', async () => {
-            await measureFunction(() => OnyxCache.removeLastAccessedKey(`${collectionKey}5000`), {
-                beforeEach: async () => {
-                    for (const key of mockedReportActionsKeys) OnyxCache.addLastAccessedKey(key, false);
-                },
-                afterEach: async () => {
-                    for (const key of mockedReportActionsKeys) OnyxCache.removeLastAccessedKey(key);
-                },
-            });
-        });
-    });
-
-    describe('addLastAccessedKey', () => {
-        test('one call adding one key', async () => {
-            await measureFunction(() => OnyxCache.addLastAccessedKey(`${collectionKey}5000`, false), {
-                beforeEach: async () => {
-                    for (const key of mockedReportActionsKeys) OnyxCache.addLastAccessedKey(key, false);
-                },
-                afterEach: async () => {
-                    for (const key of mockedReportActionsKeys) OnyxCache.removeLastAccessedKey(key);
-                },
-            });
-        });
-    });
-
-    describe('addEvictableKeysToRecentlyAccessedList', () => {
-        const data = {
-            ...getRandomReportActions(collectionKey, 1000),
-            ...getRandomReportActions(ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY, 1000),
-        };
-        const fakeMethodParameter = () => false;
-        const fakePromiseMethodParameter = () => Promise.resolve(new Set(Object.keys(data)));
-
-        test('one call adding 1k keys', async () => {
-            await measureAsyncFunction(() => OnyxCache.addEvictableKeysToRecentlyAccessedList(fakeMethodParameter, fakePromiseMethodParameter), {
-                beforeEach: async () => {
-                    await Onyx.multiSet(data);
                 },
                 afterEach: clearOnyxAfterEachMeasure,
             });
@@ -451,19 +396,11 @@ describe('OnyxUtils', () => {
 
     describe('retryOperation', () => {
         test('one call', async () => {
-            const error = new Error();
-            const onyxMethod = jest.fn() as RetriableOnyxOperation;
+            const genericError = new Error('Generic storage error');
+            const mockOnyxMethod = jest.fn().mockResolvedValue(undefined) as unknown as RetriableOnyxOperation;
+            Object.defineProperty(mockOnyxMethod, 'name', {value: 'mockOnyxMethod'});
 
-            await measureAsyncFunction(() => OnyxUtils.retryOperation(error, onyxMethod, {key: '', value: null}, 1), {
-                beforeEach: async () => {
-                    for (const key of mockedReportActionsKeys) OnyxCache.addLastAccessedKey(key, false);
-                    OnyxCache.addLastAccessedKey(`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}1`, false);
-                },
-                afterEach: async () => {
-                    for (const key of mockedReportActionsKeys) OnyxCache.removeLastAccessedKey(key);
-                    OnyxCache.removeLastAccessedKey(`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}1`);
-                },
-            });
+            await measureAsyncFunction(() => OnyxUtils.retryOperation(genericError, mockOnyxMethod, {key: `${collectionKey}0`, value: 'test'}, 0));
         });
     });
 
@@ -527,11 +464,11 @@ describe('OnyxUtils', () => {
             await measureAsyncFunction(() => OnyxUtils.initializeWithDefaultKeyStates(), {
                 beforeEach: async () => {
                     await StorageMock.multiSet(Object.entries(changedReportActions).map(([k, v]) => [k, v]));
-                    OnyxUtils.initStoreValues(ONYXKEYS, mockedReportActionsMap, evictableKeys);
+                    OnyxUtils.initStoreValues(ONYXKEYS, mockedReportActionsMap);
                 },
                 afterEach: async () => {
                     await clearOnyxAfterEachMeasure();
-                    OnyxUtils.initStoreValues(ONYXKEYS, initialKeyStates, evictableKeys);
+                    OnyxUtils.initStoreValues(ONYXKEYS, initialKeyStates);
                 },
             });
         });
@@ -658,12 +595,6 @@ describe('OnyxUtils', () => {
         });
     });
 
-    describe('getEvictionBlocklist', () => {
-        test('one call', async () => {
-            await measureFunction(() => OnyxCache.getEvictionBlocklist());
-        });
-    });
-
     describe('getSkippableCollectionMemberIDs', () => {
         test('one call', async () => {
             const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
@@ -725,19 +656,6 @@ describe('OnyxUtils', () => {
                 },
                 afterEach: async () => {
                     OnyxUtils.unsubscribeFromKey(subscriptionID);
-                    await clearOnyxAfterEachMeasure();
-                },
-            });
-        });
-    });
-
-    describe('addKeyToRecentlyAccessedIfNeeded', () => {
-        test('one call', async () => {
-            const key = `${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}0`;
-
-            await measureFunction(() => OnyxUtils.addKeyToRecentlyAccessedIfNeeded(key), {
-                afterEach: async () => {
-                    OnyxCache.removeLastAccessedKey(key);
                     await clearOnyxAfterEachMeasure();
                 },
             });

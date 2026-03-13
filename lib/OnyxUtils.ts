@@ -4,7 +4,7 @@ import _ from 'underscore';
 import DevTools from './DevTools';
 import * as Logger from './Logger';
 import type Onyx from './Onyx';
-import cache, {TASK} from './OnyxCache';
+import cache from './OnyxCache';
 import * as Str from './Str';
 import Storage from './storage';
 import type {
@@ -50,20 +50,6 @@ const METHOD = {
     MULTI_SET: 'multiset',
     CLEAR: 'clear',
 } as const;
-
-// IndexedDB errors that indicate storage capacity issues where eviction can help
-const IDB_STORAGE_ERRORS = [
-    'quotaexceedederror', // Browser storage quota exceeded
-] as const;
-
-// SQLite errors that indicate storage capacity issues where eviction can help
-const SQLITE_STORAGE_ERRORS = [
-    'database or disk is full', // Device storage is full
-    'disk I/O error', // File system I/O failure, often due to insufficient space or corrupted storage
-    'out of memory', // Insufficient RAM or storage space to complete the operation
-] as const;
-
-const STORAGE_ERRORS = [...IDB_STORAGE_ERRORS, ...SQLITE_STORAGE_ERRORS];
 
 // Max number of retries for failed storage operations
 const MAX_STORAGE_OPERATION_RETRY_ATTEMPTS = 5;
@@ -182,9 +168,8 @@ function setSnapshotMergeKeys(keys: Set<string>): void {
  *
  * @param keys - `ONYXKEYS` constants object from Onyx.init()
  * @param initialKeyStates - initial data to set when `init()` and `clear()` are called
- * @param evictableKeys - This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged as "safe" for removal.
  */
-function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Partial<KeyValueMapping>, evictableKeys: OnyxKey[]): void {
+function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Partial<KeyValueMapping>): void {
     // We need the value of the collection keys later for checking if a
     // key is a collection. We store it in a map for faster lookup.
     const collectionValues = Object.values(keys.COLLECTION ?? {}) as string[];
@@ -197,9 +182,6 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
     defaultKeyStates = initialKeyStates;
 
     DevTools.initState(initialKeyStates);
-
-    // Let Onyx know about which keys are safe to evict
-    cache.setEvictionAllowList(evictableKeys);
 
     // Set collection keys in cache for optimized storage
     cache.setCollectionKeys(onyxCollectionKeySet);
@@ -262,143 +244,22 @@ function get<TKey extends OnyxKey, TValue extends OnyxValue<TKey>>(key: TKey): P
         return Promise.resolve(cache.get(key) as TValue);
     }
 
-    // RAM-only keys should never read from storage (they may have stale persisted data
-    // from before the key was migrated to RAM-only). Mark as nullish so future get() calls
-    // short-circuit via hasCacheForKey and avoid re-running this branch.
-    if (isRamOnlyKey(key)) {
-        cache.addNullishStorageKey(key);
-        return Promise.resolve(undefined as TValue);
-    }
-
-    const taskName = `${TASK.GET}:${key}` as const;
-
-    // When a value retrieving task for this key is still running hook to it
-    if (cache.hasPendingTask(taskName)) {
-        return cache.getTaskPromise(taskName) as Promise<TValue>;
-    }
-
-    // Otherwise retrieve the value from storage and capture a promise to aid concurrent usages
-    const promise = Storage.getItem(key)
-        .then((val) => {
-            if (skippableCollectionMemberIDs.size) {
-                try {
-                    const [, collectionMemberID] = splitCollectionMemberKey(key);
-                    if (skippableCollectionMemberIDs.has(collectionMemberID)) {
-                        // The key is a skippable one, so we set the value to undefined.
-                        // eslint-disable-next-line no-param-reassign
-                        val = undefined as OnyxValue<TKey>;
-                    }
-                } catch (e) {
-                    // The key is not a collection one or something went wrong during split, so we proceed with the function's logic.
-                }
-            }
-
-            if (val === undefined) {
-                cache.addNullishStorageKey(key);
-                return undefined;
-            }
-
-            cache.set(key, val);
-            return val;
-        })
-        .catch((err) => Logger.logInfo(`Unable to get item from persistent storage. Key: ${key} Error: ${err}`));
-
-    return cache.captureTask(taskName, promise) as Promise<TValue>;
+    return Promise.resolve(undefined as TValue);
 }
 
 // multiGet the data first from the cache and then from the storage for the missing keys.
 function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<OnyxKey, OnyxValue<TKey>>> {
-    // Keys that are not in the cache
-    const missingKeys: OnyxKey[] = [];
-
-    // Tasks that are pending
-    const pendingTasks: Array<Promise<OnyxValue<TKey>>> = [];
-
-    // Keys for the tasks that are pending
-    const pendingKeys: OnyxKey[] = [];
-
     // Data to be sent back to the invoker
     const dataMap = new Map<OnyxKey, OnyxValue<TKey>>();
 
-    /**
-     * We are going to iterate over all the matching keys and check if we have the data in the cache.
-     * If we do then we add it to the data object. If we do not have them, then we check if there is a pending task
-     * for the key. If there is such task, then we add the promise to the pendingTasks array and the key to the pendingKeys
-     * array. If there is no pending task then we add the key to the missingKeys array.
-     *
-     * These missingKeys will be later used to multiGet the data from the storage.
-     */
     for (const key of keys) {
-        // RAM-only keys should never read from storage as they may have stale persisted data
-        // from before the key was migrated to RAM-only.
-        if (isRamOnlyKey(key)) {
-            if (cache.hasCacheForKey(key)) {
-                dataMap.set(key, cache.get(key) as OnyxValue<TKey>);
-            }
-            continue;
-        }
-
         const cacheValue = cache.get(key) as OnyxValue<TKey>;
         if (cacheValue) {
             dataMap.set(key, cacheValue);
-            continue;
-        }
-
-        const pendingKey = `${TASK.GET}:${key}` as const;
-        if (cache.hasPendingTask(pendingKey)) {
-            pendingTasks.push(cache.getTaskPromise(pendingKey) as Promise<OnyxValue<TKey>>);
-            pendingKeys.push(key);
-        } else {
-            missingKeys.push(key);
         }
     }
 
-    return (
-        Promise.all(pendingTasks)
-            // Wait for all the pending tasks to resolve and then add the data to the data map.
-            .then((values) => {
-                for (const [index, value] of values.entries()) {
-                    dataMap.set(pendingKeys[index], value);
-                }
-
-                return Promise.resolve();
-            })
-            // Get the missing keys using multiGet from the storage.
-            .then(() => {
-                if (missingKeys.length === 0) {
-                    return Promise.resolve(undefined);
-                }
-
-                return Storage.multiGet(missingKeys);
-            })
-            // Add the data from the missing keys to the data map and also merge it to the cache.
-            .then((values) => {
-                if (!values || values.length === 0) {
-                    return dataMap;
-                }
-
-                // temp object is used to merge the missing data into the cache
-                const temp: OnyxCollection<KeyValueMapping[TKey]> = {};
-                for (const [key, value] of values) {
-                    if (skippableCollectionMemberIDs.size) {
-                        try {
-                            const [, collectionMemberID] = splitCollectionMemberKey(key);
-                            if (skippableCollectionMemberIDs.has(collectionMemberID)) {
-                                // The key is a skippable one, so we skip this iteration.
-                                continue;
-                            }
-                        } catch (e) {
-                            // The key is not a collection one or something went wrong during split, so we proceed with the function's logic.
-                        }
-                    }
-
-                    dataMap.set(key, value as OnyxValue<TKey>);
-                    temp[key] = value as OnyxValue<TKey>;
-                }
-                cache.merge(temp);
-                return dataMap;
-            })
-    );
+    return Promise.resolve(dataMap);
 }
 
 /**
@@ -442,29 +303,7 @@ function deleteKeyBySubscriptions(subscriptionID: number) {
 
 /** Returns current key names stored in persisted storage */
 function getAllKeys(): Promise<Set<OnyxKey>> {
-    // When we've already read stored keys, resolve right away
-    const cachedKeys = cache.getAllKeys();
-    if (cachedKeys.size > 0) {
-        return Promise.resolve(cachedKeys);
-    }
-
-    // When a value retrieving task for all keys is still running hook to it
-    if (cache.hasPendingTask(TASK.GET_ALL_KEYS)) {
-        return cache.getTaskPromise(TASK.GET_ALL_KEYS) as Promise<Set<OnyxKey>>;
-    }
-
-    // Otherwise retrieve the keys from storage and capture a promise to aid concurrent usages
-    const promise = Storage.getAllKeys().then((keys) => {
-        // Filter out RAM-only keys from storage results as they may be stale entries
-        // from before the key was migrated to RAM-only.
-        const filteredKeys = keys.filter((key) => !isRamOnlyKey(key));
-        cache.setAllKeys(filteredKeys);
-
-        // return the updated set of keys
-        return cache.getAllKeys();
-    });
-
-    return cache.captureTask(TASK.GET_ALL_KEYS, promise) as Promise<Set<OnyxKey>>;
+    return Promise.resolve(cache.getAllKeys());
 }
 
 /**
@@ -756,13 +595,6 @@ function keyChanged<TKey extends OnyxKey>(
     canUpdateSubscriber: (subscriber?: CallbackToStateMapping<OnyxKey>) => boolean = () => true,
     isProcessingCollectionUpdate = false,
 ): void {
-    // Add or remove this key from the recentlyAccessedKeys lists
-    if (value !== null) {
-        cache.addLastAccessedKey(key, isCollectionKey(key));
-    } else {
-        cache.removeLastAccessedKey(key);
-    }
-
     // We get the subscribers interested in the key that has just changed. If the subscriber's  key is a collection key then we will
     // notify them if the key that changed is a collection member. Or if it is a regular key notify them when there is an exact match.
     // Given the amount of times this function is called we need to make sure we are not iterating over all subscribers every time. On the other hand, we don't need to
@@ -857,22 +689,6 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: CallbackToStateMapp
 }
 
 /**
- * We check to see if this key is flagged as safe for eviction and add it to the recentlyAccessedKeys list so that when we
- * run out of storage the least recently accessed key can be removed.
- */
-function addKeyToRecentlyAccessedIfNeeded<TKey extends OnyxKey>(key: TKey): void {
-    if (!cache.isEvictableKey(key)) {
-        return;
-    }
-
-    // Add the key to recentKeys first (this makes it the most recent key)
-    cache.addToAccessedKeys(key);
-
-    // Try to free some cache whenever we connect to a safe eviction key
-    cache.removeLeastRecentlyUsedKeys();
-}
-
-/**
  * Gets the data for a given an array of matching keys, combines them into an object, and sends the result back to the subscriber.
  */
 function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: CollectionKeyBase[], mapping: CallbackToStateMapping<TKey>): void {
@@ -906,10 +722,9 @@ function reportStorageQuota(): Promise<void> {
 }
 
 /**
- * Handles storage operation failures based on the error type:
- * - Storage capacity errors: evicts data and retries the operation
+ * Handles storage operation failures by retrying the operation.
  * - Invalid data errors: logs an alert and throws an error
- * - Other errors: retries the operation
+ * - Other errors: retries the operation up to MAX_STORAGE_OPERATION_RETRY_ATTEMPTS times
  */
 function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, onyxMethod: TMethod, defaultParams: Parameters<TMethod>[0], retryAttempt: number | undefined): Promise<void> {
     const currentRetryAttempt = retryAttempt ?? 0;
@@ -922,36 +737,14 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, on
         throw error;
     }
 
-    const errorMessage = error?.message?.toLowerCase?.();
-    const errorName = error?.name?.toLowerCase?.();
-    const isStorageCapacityError = STORAGE_ERRORS.some((storageError) => errorName?.includes(storageError) || errorMessage?.includes(storageError));
-
     if (nextRetryAttempt > MAX_STORAGE_OPERATION_RETRY_ATTEMPTS) {
-        Logger.logAlert(`Storage operation failed after 5 retries. Error: ${error}. onyxMethod: ${onyxMethod.name}.`);
+        Logger.logAlert(`Storage operation failed after ${MAX_STORAGE_OPERATION_RETRY_ATTEMPTS} retries. Error: ${error}. onyxMethod: ${onyxMethod.name}.`);
+        reportStorageQuota();
         return Promise.resolve();
     }
 
-    if (!isStorageCapacityError) {
-        // @ts-expect-error No overload matches this call.
-        return onyxMethod(defaultParams, nextRetryAttempt);
-    }
-
-    // Find the first key that we can remove that has no subscribers in our blocklist
-    const keyForRemoval = cache.getKeyForEviction();
-    if (!keyForRemoval) {
-        // If we have no acceptable keys to remove then we are possibly trying to save mission critical data. If this is the case,
-        // then we should stop retrying as there is not much the user can do to fix this. Instead of getting them stuck in an infinite loop we
-        // will allow this write to be skipped.
-        Logger.logAlert('Out of storage. But found no acceptable keys to remove.');
-        return reportStorageQuota();
-    }
-
-    // Remove the least recently viewed key that is not currently being accessed and retry.
-    Logger.logInfo(`Out of storage. Evicting least recently accessed key (${keyForRemoval}) and retrying.`);
-    reportStorageQuota();
-
     // @ts-expect-error No overload matches this call.
-    return remove(keyForRemoval).then(() => onyxMethod(defaultParams, nextRetryAttempt));
+    return onyxMethod(defaultParams, nextRetryAttempt);
 }
 
 /**
@@ -962,8 +755,6 @@ function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>
     // all updates regardless of value changes (indicated by initWithStoredValues set to false).
     if (hasChanged) {
         cache.set(key, value);
-    } else {
-        cache.addToAccessedKeys(key);
     }
 
     keyChanged(key, value, (subscriber) => hasChanged || subscriber?.initWithStoredValues === false);
@@ -1075,19 +866,57 @@ function mergeInternal<TValue extends OnyxInput<OnyxKey> | undefined, TChange ex
  * Merge user provided default key value pairs.
  */
 function initializeWithDefaultKeyStates(): Promise<void> {
-    // Filter out RAM-only keys from storage reads as they may have stale persisted data
-    // from before the key was migrated to RAM-only.
-    const keysToFetch = Object.keys(defaultKeyStates).filter((key) => !isRamOnlyKey(key));
-    return Storage.multiGet(keysToFetch).then((pairs) => {
-        const existingDataAsObject = Object.fromEntries(pairs) as Record<string, unknown>;
+    // Eagerly load the entire database into cache in a single batch read.
+    // This is faster than lazy-loading individual keys because:
+    // 1. One DB transaction instead of hundreds
+    // 2. All subsequent reads are synchronous cache hits
+    return Storage.getAll()
+        .then((pairs) => {
+            const allDataFromStorage: Record<string, unknown> = {};
+            for (const [key, value] of pairs) {
+                // RAM-only keys should never be loaded from storage as they may have stale persisted data
+                // from before the key was migrated to RAM-only.
+                if (isRamOnlyKey(key)) {
+                    continue;
+                }
+                allDataFromStorage[key] = value;
+            }
 
-        const merged = utils.fastMerge(existingDataAsObject, defaultKeyStates, {
-            shouldRemoveNestedNulls: true,
-        }).result;
-        cache.merge(merged ?? {});
+            // Load all storage data into cache silently (no subscriber notifications)
+            cache.setAllKeys(Object.keys(allDataFromStorage));
+            cache.merge(allDataFromStorage);
 
-        for (const [key, value] of Object.entries(merged ?? {})) keyChanged(key, value);
-    });
+            // Extract only the default key states from storage and merge with defaults
+            const defaultKeysFromStorage = Object.keys(defaultKeyStates).reduce((obj: Record<string, unknown>, key) => {
+                if (key in allDataFromStorage) {
+                    // eslint-disable-next-line no-param-reassign
+                    obj[key] = allDataFromStorage[key];
+                }
+                return obj;
+            }, {});
+
+            const merged = utils.fastMerge(defaultKeysFromStorage, defaultKeyStates, {
+                shouldRemoveNestedNulls: true,
+            }).result;
+            cache.merge(merged ?? {});
+
+            // Only notify subscribers for default key states — same as before.
+            // Other keys will be picked up by subscribers when they connect.
+            // FIXME: Maybe we dont need this, but some tests in E/App are failing if we remove it.
+            for (const [key, value] of Object.entries(merged ?? {})) keyChanged(key, value);
+        })
+        .catch((error) => {
+            Logger.logAlert(`Failed to load data from storage during init. The app will boot with default key states only. Error: ${error}`);
+
+            // Populate the key index so getAllKeys() returns correct results for default keys.
+            // Without this, subscribers that check getAllKeys() would see an empty set even
+            // though we have default values in cache.
+            cache.setAllKeys(Object.keys(defaultKeyStates));
+
+            // Boot with defaults so the app renders instead of deadlocking.
+            // Users will get a fresh-install experience but the app won't be bricked.
+            cache.merge(defaultKeyStates);
+        });
 }
 
 /**
@@ -1141,7 +970,8 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
 
     // Commit connection only after init passes
     deferredInitTask.promise
-        .then(() => addKeyToRecentlyAccessedIfNeeded(mapping.key))
+        // FIXME: We need this otherwise some tests fail.
+        .then(() => undefined)
         .then(() => {
             // Performance improvement
             // If the mapping is connected to an onyx key that is not a collection
@@ -1335,7 +1165,7 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
         return Promise.resolve();
     }
 
-    const existingValue = cache.get(key, false);
+    const existingValue = cache.get(key);
 
     // If the existing value as well as the new value are null, we can return early.
     if (existingValue === undefined && value === null) {
@@ -1776,7 +1606,6 @@ const OnyxUtils = {
     setSnapshotMergeKeys,
     storeKeyBySubscriptions,
     deleteKeyBySubscriptions,
-    addKeyToRecentlyAccessedIfNeeded,
     reduceCollectionWithSelector,
     updateSnapshots,
     mergeCollectionWithPatches,

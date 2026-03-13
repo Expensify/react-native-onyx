@@ -34,8 +34,6 @@ import OnyxMerge from './OnyxMerge';
 function init({
     keys = {},
     initialKeyStates = {},
-    evictableKeys = [],
-    maxCachedKeysCount = 1000,
     shouldSyncMultipleInstances = !!global.localStorage,
     enablePerformanceMetrics = false,
     enableDevTools = true,
@@ -76,16 +74,10 @@ function init({
         });
     }
 
-    if (maxCachedKeysCount > 0) {
-        cache.setRecentKeysLimit(maxCachedKeysCount);
-    }
-
-    OnyxUtils.initStoreValues(keys, initialKeyStates, evictableKeys);
+    OnyxUtils.initStoreValues(keys, initialKeyStates);
 
     // Initialize all of our keys with data provided then give green light to any pending connections
-    Promise.all([cache.addEvictableKeysToRecentlyAccessedList(OnyxUtils.isCollectionKey, OnyxUtils.getAllKeys), OnyxUtils.initializeWithDefaultKeyStates()]).then(
-        OnyxUtils.getDeferredInitTask().resolve,
-    );
+    OnyxUtils.initializeWithDefaultKeyStates().then(OnyxUtils.getDeferredInitTask().resolve);
 }
 
 /**

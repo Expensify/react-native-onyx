@@ -46,8 +46,6 @@ describe('OnyxConnectionManager', () => {
     beforeAll(async () => {
         Onyx.init({
             keys: ONYXKEYS,
-            maxCachedKeysCount: 100000,
-            evictableKeys: [ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY],
             skippableCollectionMemberIDs: ['skippable-id'],
             ramOnlyKeys: [ONYXKEYS.RAM_ONLY_TEST_KEY, ONYXKEYS.COLLECTION.RAM_ONLY_TEST_COLLECTION],
         });
@@ -144,40 +142,6 @@ describe('OnyxConnectionManager', () => {
         test('one call', async () => {
             await measureFunction(() => connectionManager.refreshSessionID(), {
                 afterEach: resetConectionManagerAfterEachMeasure,
-            });
-        });
-    });
-
-    describe('addToEvictionBlockList', () => {
-        let connection: Connection | undefined;
-
-        test('one call', async () => {
-            await measureFunction(() => connectionManager.addToEvictionBlockList(connection as Connection), {
-                beforeEach: async () => {
-                    connection = connectionManager.connect({key: mockedReportActionsKeys[0], callback: jest.fn()});
-                },
-                afterEach: async () => {
-                    connectionManager.removeFromEvictionBlockList(connection as Connection);
-                    resetConectionManagerAfterEachMeasure();
-                    await clearOnyxAfterEachMeasure();
-                },
-            });
-        });
-    });
-
-    describe('removeFromEvictionBlockList', () => {
-        let connection: Connection | undefined;
-
-        test('one call', async () => {
-            await measureFunction(() => connectionManager.removeFromEvictionBlockList(connection as Connection), {
-                beforeEach: async () => {
-                    connection = connectionManager.connect({key: mockedReportActionsKeys[0], callback: jest.fn()});
-                    connectionManager.addToEvictionBlockList(connection as Connection);
-                },
-                afterEach: async () => {
-                    resetConectionManagerAfterEachMeasure();
-                    await clearOnyxAfterEachMeasure();
-                },
             });
         });
     });
