@@ -906,41 +906,53 @@ function initializeWithDefaultKeyStates(): Promise<void> {
     // This is faster than lazy-loading individual keys because:
     // 1. One DB transaction instead of hundreds
     // 2. All subsequent reads are synchronous cache hits
-    return Storage.getAll().then((pairs) => {
-        const allDataFromStorage: Record<string, unknown> = {};
-
-        for (const [key, value] of pairs) {
-            // RAM-only keys should never be loaded from storage as they may have stale persisted data
-            // from before the key was migrated to RAM-only.
-            if (isRamOnlyKey(key)) {
-                continue;
+    return Storage.getAll()
+        .then((pairs) => {
+            const allDataFromStorage: Record<string, unknown> = {};
+            for (const [key, value] of pairs) {
+                // RAM-only keys should never be loaded from storage as they may have stale persisted data
+                // from before the key was migrated to RAM-only.
+                if (isRamOnlyKey(key)) {
+                    continue;
+                }
+                allDataFromStorage[key] = value;
             }
-            allDataFromStorage[key] = value;
-        }
 
-        // Load all storage data into cache silently (no subscriber notifications)
-        cache.setAllKeys(Object.keys(allDataFromStorage));
-        cache.merge(allDataFromStorage);
+            // Load all storage data into cache silently (no subscriber notifications)
+            cache.setAllKeys(Object.keys(allDataFromStorage));
+            cache.merge(allDataFromStorage);
 
-        // Extract only the default key states from storage and merge with defaults
-        const defaultKeysFromStorage = Object.keys(defaultKeyStates).reduce((obj: Record<string, unknown>, key) => {
-            if (key in allDataFromStorage) {
-                // eslint-disable-next-line no-param-reassign
-                obj[key] = allDataFromStorage[key];
-            }
-            return obj;
-        }, {});
+            // Extract only the default key states from storage and merge with defaults
+            const defaultKeysFromStorage = Object.keys(defaultKeyStates).reduce((obj: Record<string, unknown>, key) => {
+                if (key in allDataFromStorage) {
+                    // eslint-disable-next-line no-param-reassign
+                    obj[key] = allDataFromStorage[key];
+                }
+                return obj;
+            }, {});
 
-        const merged = utils.fastMerge(defaultKeysFromStorage, defaultKeyStates, {
-            shouldRemoveNestedNulls: true,
-        }).result;
-        cache.merge(merged ?? {});
+            const merged = utils.fastMerge(defaultKeysFromStorage, defaultKeyStates, {
+                shouldRemoveNestedNulls: true,
+            }).result;
+            cache.merge(merged ?? {});
 
-        // Only notify subscribers for default key states — same as before.
-        // Other keys will be picked up by subscribers when they connect.
-        // FIXME: Maybe we dont need this, but some tests in E/App are failing if we remove it.
-        for (const [key, value] of Object.entries(merged ?? {})) keyChanged(key, value);
-    });
+            // Only notify subscribers for default key states — same as before.
+            // Other keys will be picked up by subscribers when they connect.
+            // FIXME: Maybe we dont need this, but some tests in E/App are failing if we remove it.
+            for (const [key, value] of Object.entries(merged ?? {})) keyChanged(key, value);
+        })
+        .catch((error) => {
+            Logger.logAlert(`Failed to load data from storage during init. The app will boot with default key states only. Error: ${error}`);
+
+            // Populate the key index so getAllKeys() returns correct results for default keys.
+            // Without this, subscribers that check getAllKeys() would see an empty set even
+            // though we have default values in cache.
+            cache.setAllKeys(Object.keys(defaultKeyStates));
+
+            // Boot with defaults so the app renders instead of deadlocking.
+            // Users will get a fresh-install experience but the app won't be bricked.
+            cache.merge(defaultKeyStates);
+        });
 }
 
 /**
