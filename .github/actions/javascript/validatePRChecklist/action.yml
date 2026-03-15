@@ -1,0 +1,5 @@
+name: 'Validate PR Checklist'
+description: 'Validates that the PR description has a completed checklist and filled-in sections.'
+runs:
+    using: 'node20'
+    main: './index.js'

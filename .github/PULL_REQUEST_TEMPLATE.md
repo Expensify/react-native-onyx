@@ -30,7 +30,6 @@ Each set of changes should be tested against the Expensify/App repo on all platf
     - [ ] iOS / native
     - [ ] iOS / Safari
     - [ ] MacOS / Chrome / Safari
-    - [ ] MacOS / Desktop
 - [ ] I verified there are no console errors (if there's a console error not related to the PR, report it or open an issue for it to be fixed)
 - [ ] I followed proper code patterns (see [Reviewing the code](https://github.com/Expensify/App/blob/main/contributingGuides/PR_REVIEW_GUIDELINES.md#reviewing-the-code))
     - [ ] I verified that any callback methods that were added or modified are named for what the method does and never what callback they handle (i.e. `toggleReport` and not `onIconClick`)
@@ -98,9 +97,3 @@ Each set of changes should be tested against the Expensify/App repo on all platf
 
 </details>
 
-<details>
-<summary>MacOS: Desktop</summary>
-
-<!-- add screenshots or videos here -->
-
-</details>
