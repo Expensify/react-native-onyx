@@ -236,6 +236,10 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
             }
 
             try {
+                if (Array.isArray(existingValue) && existingValue.length === 0) {
+                    Logger.logAlert(`[ENSURE_BUGBOT] Onyx merge called on key "${key}" whose existing value is an empty array. Will coerce to object.`);
+                }
+
                 const validChanges = mergeQueue[key].filter((change) => {
                     const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(change, existingValue);
                     if (!isCompatible) {
