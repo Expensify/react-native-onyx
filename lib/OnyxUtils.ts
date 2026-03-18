@@ -989,7 +989,7 @@ function prepareKeyValuePairsForStorage(
     const pairs: StorageKeyValuePair[] = [];
 
     for (const [key, value] of Object.entries(data)) {
-        if (value === null) {
+        if (value === null || (Array.isArray(value) && value.length === 0)) {
             remove(key, isProcessingCollectionUpdate);
             continue;
         }
@@ -1333,6 +1333,15 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
     // Onyx.set will ignore `undefined` values as inputs, therefore we can return early.
     if (value === undefined) {
         return Promise.resolve();
+    }
+
+    // Empty arrays are treated as null to prevent them from poisoning the cache.
+    // When a key holds [], subsequent merge operations with objects are rejected as
+    // incompatible, breaking important flows. Normalizing [] to null here ensures
+    // the key is removed and future merges can apply cleanly.
+    if (Array.isArray(value) && value.length === 0) {
+        // eslint-disable-next-line no-param-reassign
+        value = null;
     }
 
     const existingValue = cache.get(key, false);

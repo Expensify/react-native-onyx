@@ -495,6 +495,119 @@ describe('Onyx', () => {
             });
     });
 
+    it('should treat empty arrays as null in Onyx.set and remove the key', () => {
+        let testKeyValue: unknown;
+
+        connection = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        return Onyx.set(ONYX_KEYS.TEST_KEY, {existing: 'data'})
+            .then(() => {
+                expect(testKeyValue).toEqual({existing: 'data'});
+
+                // Setting an empty array should remove the key, same as setting null
+                return Onyx.set(ONYX_KEYS.TEST_KEY, []);
+            })
+            .then(() => {
+                expect(testKeyValue).toBeUndefined();
+            });
+    });
+
+    it('should treat empty arrays as null in Onyx.multiSet and remove the key', () => {
+        let testKeyValue: unknown;
+        let otherTestKeyValue: unknown;
+
+        connection = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        connection = Onyx.connect({
+            key: ONYX_KEYS.OTHER_TEST,
+            initWithStoredValues: false,
+            callback: (value) => {
+                otherTestKeyValue = value;
+            },
+        });
+
+        return Onyx.multiSet({
+            [ONYX_KEYS.TEST_KEY]: {existing: 'data'},
+            [ONYX_KEYS.OTHER_TEST]: 'otherData',
+        })
+            .then(() => {
+                expect(testKeyValue).toEqual({existing: 'data'});
+                expect(otherTestKeyValue).toEqual('otherData');
+
+                return Onyx.multiSet({
+                    [ONYX_KEYS.TEST_KEY]: [],
+                    [ONYX_KEYS.OTHER_TEST]: [],
+                });
+            })
+            .then(() => {
+                expect(testKeyValue).toBeUndefined();
+                expect(otherTestKeyValue).toBeUndefined();
+            });
+    });
+
+    it('should allow merging objects after an empty array was set (empty array clears the key)', () => {
+        let testKeyValue: unknown;
+
+        connection = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        return Onyx.set(ONYX_KEYS.TEST_KEY, [])
+            .then(() => {
+                expect(testKeyValue).toBeUndefined();
+
+                // Merging an object should succeed because the key was removed, not stuck as []
+                return Onyx.merge(ONYX_KEYS.TEST_KEY, {name: 'test'});
+            })
+            .then(() => {
+                expect(testKeyValue).toEqual({name: 'test'});
+            });
+    });
+
+    it('should treat empty arrays as null in Onyx.update with SET method', () => {
+        let testKeyValue: unknown;
+
+        connection = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        return Onyx.set(ONYX_KEYS.TEST_KEY, {existing: 'data'})
+            .then(() => {
+                expect(testKeyValue).toEqual({existing: 'data'});
+
+                return Onyx.update([
+                    {
+                        onyxMethod: Onyx.METHOD.SET,
+                        key: ONYX_KEYS.TEST_KEY,
+                        value: [],
+                    },
+                ]);
+            })
+            .then(() => {
+                expect(testKeyValue).toBeUndefined();
+            });
+    });
+
     it('should ignore top-level and remove nested `undefined` values in Onyx.merge', () => {
         let testKeyValue: unknown;
 
