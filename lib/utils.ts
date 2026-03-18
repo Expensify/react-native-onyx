@@ -213,6 +213,12 @@ function checkCompatibilityWithExistingValue(value: unknown, existingValue: unkn
             isCompatible: true,
         };
     }
+    // Empty arrays are compatible with objects — PHP's json_encode produces []
+    // for empty associative arrays that should be {}.
+    if (Array.isArray(existingValue) && existingValue.length === 0 && !Array.isArray(value)) {
+        return {isCompatible: true};
+    }
+
     const existingValueType = Array.isArray(existingValue) ? 'array' : 'non-array';
     const newValueType = Array.isArray(value) ? 'array' : 'non-array';
     if (existingValueType !== newValueType) {

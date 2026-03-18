@@ -182,6 +182,48 @@ describe('Onyx', () => {
             });
     });
 
+    it('should merge an object into an empty array (treating [] as {})', () => {
+        let testKeyValue: unknown;
+
+        connection = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        return Onyx.set(ONYX_KEYS.TEST_KEY, [])
+            .then(() => {
+                expect(testKeyValue).toStrictEqual([]);
+                return Onyx.merge(ONYX_KEYS.TEST_KEY, {test: 'value'});
+            })
+            .then(() => {
+                expect(testKeyValue).toStrictEqual({test: 'value'});
+            });
+    });
+
+    it('should still reject merging an object into a non-empty array', () => {
+        let testKeyValue: unknown;
+
+        connection = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        return Onyx.merge(ONYX_KEYS.TEST_KEY, ['existing'])
+            .then(() => {
+                expect(testKeyValue).toStrictEqual(['existing']);
+                return Onyx.merge(ONYX_KEYS.TEST_KEY, {test: 'value'});
+            })
+            .then(() => {
+                expect(testKeyValue).toStrictEqual(['existing']);
+            });
+    });
+
     it('should notify subscribers when data has been cleared', () => {
         let testKeyValue: unknown;
         connection = Onyx.connect({

@@ -1060,7 +1060,7 @@ function mergeInternal<TValue extends OnyxInput<OnyxKey> | undefined, TChange ex
                 return modifiedData;
             },
             {
-                result: (existingValue ?? {}) as TChange,
+                result: ((Array.isArray(existingValue) && existingValue.length === 0 ? {} : existingValue) ?? {}) as TChange,
                 replaceNullPatches: [],
             },
         );
