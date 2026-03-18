@@ -207,16 +207,17 @@ function formatActionName(method: string, key?: OnyxKey): string {
 }
 
 /** validate that the update and the existing value are compatible */
-function checkCompatibilityWithExistingValue(value: unknown, existingValue: unknown): {isCompatible: boolean; existingValueType?: string; newValueType?: string} {
+function checkCompatibilityWithExistingValue(value: unknown, existingValue: unknown): {isCompatible: boolean; existingValueType?: string; newValueType?: string; isEmptyArrayCoercion?: boolean} {
     if (!existingValue || !value) {
         return {
             isCompatible: true,
         };
     }
-    // Empty arrays are compatible with objects — PHP's json_encode produces []
-    // for empty associative arrays that should be {}.
-    if (Array.isArray(existingValue) && existingValue.length === 0 && !Array.isArray(value)) {
-        return {isCompatible: true};
+    // An empty array existing value is compatible with an object update.
+    // PHP's json_encode produces [] for empty associative arrays that should be {}.
+    const isObjectValue = typeof value === 'object' && !Array.isArray(value);
+    if (Array.isArray(existingValue) && existingValue.length === 0 && isObjectValue) {
+        return {isCompatible: true, isEmptyArrayCoercion: true};
     }
 
     const existingValueType = Array.isArray(existingValue) ? 'array' : 'non-array';

@@ -1576,8 +1576,11 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
             const cachedCollectionForExistingKeys = getCachedCollection(collectionKey, existingKeys);
 
             const existingKeyCollection = existingKeys.reduce((obj: OnyxInputKeyValueMapping, key) => {
-                const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(resultCollection[key], cachedCollectionForExistingKeys[key]);
+                const {isCompatible, existingValueType, newValueType, isEmptyArrayCoercion} = utils.checkCompatibilityWithExistingValue(resultCollection[key], cachedCollectionForExistingKeys[key]);
 
+                if (isEmptyArrayCoercion) {
+                    Logger.logAlert(`[ENSURE_BUGBOT] Onyx mergeCollection called on key "${key}" whose existing value is an empty array. Will coerce to object.`);
+                }
                 if (!isCompatible) {
                     Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'mergeCollection', existingValueType, newValueType));
                     return obj;
