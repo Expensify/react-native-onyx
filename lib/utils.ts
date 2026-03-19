@@ -207,7 +207,10 @@ function formatActionName(method: string, key?: OnyxKey): string {
 }
 
 /** validate that the update and the existing value are compatible */
-function checkCompatibilityWithExistingValue(value: unknown, existingValue: unknown): {isCompatible: boolean; existingValueType?: string; newValueType?: string; isEmptyArrayCoercion?: boolean} {
+function checkCompatibilityWithExistingValue(
+    value: unknown,
+    existingValue: unknown,
+): {isCompatible: boolean; existingValueType?: string; newValueType?: string; isEmptyArrayCoercion?: boolean} {
     if (!existingValue || !value) {
         return {
             isCompatible: true,
