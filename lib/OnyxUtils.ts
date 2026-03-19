@@ -30,6 +30,7 @@ import type {
     SetParams,
     OnyxMultiSetInput,
     RetriableOnyxOperation,
+    NonUndefined,
 } from './types';
 import type {FastMergeOptions, FastMergeResult} from './utils';
 import utils from './utils';
@@ -1279,8 +1280,11 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
     // Group keys by collection for batched notification, and track non-collection keys separately.
     // This avoids firing N individual keyChanged() calls for N collection members — instead we
     // update all members in cache first, then notify collection subscribers once per collection.
-    const collectionBatches = new Map<string, {partial: Record<string, OnyxValue<OnyxKey>>; previous: Record<string, OnyxValue<OnyxKey>>}>();
-    const nonCollectionPairs: Array<[string, OnyxValue<OnyxKey>]> = [];
+    const collectionBatches = new Map<
+        CollectionKeyBase,
+        {partial: NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>>; previous: NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>>}
+    >();
+    const nonCollectionPairs: Array<[OnyxKey, OnyxValue<OnyxKey>]> = [];
 
     for (const [key, value] of keyValuePairsToSet) {
         // Clear any pending merge deltas for this key
@@ -1309,7 +1313,7 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
 
     // Notify collection subscribers once per collection (batched)
     for (const [collectionKey, batch] of collectionBatches) {
-        keysChanged(collectionKey as CollectionKeyBase, batch.partial, batch.previous);
+        keysChanged(collectionKey, batch.partial, batch.previous);
     }
 
     // Notify non-collection key subscribers individually

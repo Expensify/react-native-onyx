@@ -2,22 +2,18 @@ import {deepEqual} from 'fast-equals';
 import bindAll from 'lodash/bindAll';
 import type {ValueOf} from 'type-fest';
 import utils from './utils';
-import type {KeyValueMapping, NonUndefined, OnyxCollection, OnyxKey, OnyxValue} from './types';
+import type {CollectionKeyBase, KeyValueMapping, NonUndefined, OnyxCollection, OnyxKey, OnyxValue} from './types';
 import OnyxKeys from './OnyxKeys';
 
-type CollectionSnapshot = {
-    /** Monotonically increasing version number, bumped on any member change */
-    version: number;
-    /** Frozen object containing all collection members — safe to return by reference */
-    snapshot: Readonly<NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>>>;
-};
+/** Frozen object containing all collection members — safe to return by reference */
+type CollectionSnapshot = Readonly<NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>>>;
 
 /**
  * Stable frozen empty object used as the canonical value for empty collections.
  * Returning the same reference avoids unnecessary re-renders in useSyncExternalStore,
  * which relies on === equality to detect changes.
  */
-const FROZEN_EMPTY_COLLECTION: Readonly<Record<OnyxKey, OnyxValue<OnyxKey>>> = Object.freeze({});
+const FROZEN_EMPTY_COLLECTION: Readonly<NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>>> = Object.freeze({});
 
 // Task constants
 const TASK = {
@@ -63,11 +59,11 @@ class OnyxCache {
     /** List of keys that have been directly subscribed to or recently modified from least to most recent */
     private recentlyAccessedKeys = new Set<OnyxKey>();
 
-    /** Versioned frozen collection snapshots for structural sharing */
+    /** Frozen collection snapshots for structural sharing */
     private collectionSnapshots: Map<OnyxKey, CollectionSnapshot>;
 
     /** Collections whose snapshots need rebuilding (lazy — rebuilt on next read) */
-    private dirtyCollections: Set<OnyxKey>;
+    private dirtyCollections: Set<CollectionKeyBase>;
 
     constructor() {
         this.storageKeys = new Set();
@@ -108,7 +104,6 @@ class OnyxCache {
             'setCollectionKeys',
             'hasValueChanged',
             'getCollectionData',
-            'getCollectionVersion',
         );
     }
 
@@ -476,10 +471,7 @@ class OnyxCache {
         // Initialize frozen snapshots for collection keys
         for (const collectionKey of collectionKeys) {
             if (!this.collectionSnapshots.has(collectionKey)) {
-                this.collectionSnapshots.set(collectionKey, {
-                    version: 0,
-                    snapshot: Object.freeze({}),
-                });
+                this.collectionSnapshots.set(collectionKey, Object.freeze({}));
             }
         }
 
@@ -498,8 +490,7 @@ class OnyxCache {
      * @param collectionKey - The collection key to rebuild
      */
     private rebuildCollectionSnapshot(collectionKey: OnyxKey): void {
-        const existing = this.collectionSnapshots.get(collectionKey);
-        const oldSnapshot = existing?.snapshot;
+        const oldSnapshot = this.collectionSnapshots.get(collectionKey);
 
         const members: NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>> = {};
         let hasChanges = false;
@@ -539,16 +530,12 @@ class OnyxCache {
         // This is critical: useSyncExternalStore uses === to detect changes,
         // so returning the same reference prevents unnecessary re-renders.
         if (!hasChanges && oldSnapshot) {
-            // Don't even bump the version — nothing changed
             return;
         }
 
         Object.freeze(members);
 
-        this.collectionSnapshots.set(collectionKey, {
-            version: (existing?.version ?? 0) + 1,
-            snapshot: members,
-        });
+        this.collectionSnapshots.set(collectionKey, members);
     }
 
     /**
@@ -562,8 +549,8 @@ class OnyxCache {
             this.dirtyCollections.delete(collectionKey);
         }
 
-        const entry = this.collectionSnapshots.get(collectionKey);
-        if (!entry || Object.keys(entry.snapshot).length === 0) {
+        const snapshot = this.collectionSnapshots.get(collectionKey);
+        if (!snapshot || Object.keys(snapshot).length === 0) {
             // If we know we have storage keys loaded, return a stable empty reference
             // to avoid new {} allocations that break useSyncExternalStore === equality.
             if (this.storageKeys.size > 0) {
@@ -572,15 +559,7 @@ class OnyxCache {
             return undefined;
         }
 
-        return entry.snapshot;
-    }
-
-    /**
-     * Get the version number for a collection's snapshot.
-     * Useful for cheap O(1) change detection.
-     */
-    getCollectionVersion(collectionKey: OnyxKey): number {
-        return this.collectionSnapshots.get(collectionKey)?.version ?? 0;
+        return snapshot;
     }
 }
 
