@@ -1,4 +1,4 @@
-import {deepEqual, shallowEqual} from 'fast-equals';
+import {shallowEqual} from 'fast-equals';
 import type {ValueOf} from 'type-fest';
 import _ from 'underscore';
 import DevTools from './DevTools';
@@ -506,8 +506,8 @@ function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey
             return filteredCollection;
         }
 
-        // Return a copy to avoid mutations affecting the cache
-        return {...collectionData};
+        // Snapshot is frozen — safe to return by reference
+        return collectionData;
     }
 
     // Fallback to original implementation if collection data not available
@@ -542,78 +542,50 @@ function keysChanged<TKey extends CollectionKeyBase>(
     partialCollection: OnyxCollection<KeyValueMapping[TKey]>,
     partialPreviousCollection: OnyxCollection<KeyValueMapping[TKey]> | undefined,
 ): void {
-    // We prepare the "cached collection" which is the entire collection + the new partial data that
-    // was merged in via mergeCollection().
     const cachedCollection = getCachedCollection(collectionKey);
-
     const previousCollection = partialPreviousCollection ?? {};
+    const changedMemberKeys = Object.keys(partialCollection ?? {});
 
-    // We are iterating over all subscribers similar to keyChanged(). However, we are looking for subscribers who are subscribing to either a collection key or
-    // individual collection key member for the collection that is being updated. It is important to note that the collection parameter cane be a PARTIAL collection
-    // and does not represent all of the combined keys and values for a collection key. It is just the "new" data that was merged in via mergeCollection().
-    const stateMappingKeys = Object.keys(callbackToStateMapping);
-
-    for (const stateMappingKey of stateMappingKeys) {
-        const subscriber = callbackToStateMapping[stateMappingKey];
-        if (!subscriber) {
-            continue;
-        }
-
-        // Skip iteration if we do not have a collection key or a collection member key on this subscriber
-        if (!Str.startsWith(subscriber.key, collectionKey)) {
-            continue;
-        }
-
-        /**
-         * e.g. Onyx.connect({key: ONYXKEYS.COLLECTION.REPORT, callback: ...});
-         */
-        const isSubscribedToCollectionKey = subscriber.key === collectionKey;
-
-        /**
-         * e.g. Onyx.connect({key: `${ONYXKEYS.COLLECTION.REPORT}{reportID}`, callback: ...});
-         */
-        const isSubscribedToCollectionMemberKey = OnyxKeys.isCollectionMemberKey(collectionKey, subscriber.key);
-
-        // Regular Onyx.connect() subscriber found.
-        if (typeof subscriber.callback === 'function') {
-            // If they are subscribed to the collection key and using waitForCollectionCallback then we'll
-            // send the whole cached collection.
-            if (isSubscribedToCollectionKey) {
-                lastConnectionCallbackData.set(subscriber.subscriptionID, cachedCollection);
-
-                if (subscriber.waitForCollectionCallback) {
-                    subscriber.callback(cachedCollection, subscriber.key, partialCollection);
-                    continue;
-                }
-
-                // If they are not using waitForCollectionCallback then we notify the subscriber with
-                // the new merged data but only for any keys in the partial collection.
-                const dataKeys = Object.keys(partialCollection ?? {});
-                for (const dataKey of dataKeys) {
-                    if (deepEqual(cachedCollection[dataKey], previousCollection[dataKey])) {
-                        continue;
-                    }
-
-                    subscriber.callback(cachedCollection[dataKey], dataKey);
-                }
-                continue;
+    // Use indexed lookup instead of scanning all subscribers
+    const collectionSubscriberIDs = onyxKeyToSubscriptionIDs.get(collectionKey) ?? [];
+    const memberSubscriberIDs: number[] = [];
+    for (const memberKey of changedMemberKeys) {
+        const ids = onyxKeyToSubscriptionIDs.get(memberKey);
+        if (ids) {
+            for (const id of ids) {
+                memberSubscriberIDs.push(id);
             }
+        }
+    }
 
-            // And if the subscriber is specifically only tracking a particular collection member key then we will
-            // notify them with the cached data for that key only.
-            if (isSubscribedToCollectionMemberKey) {
-                if (deepEqual(cachedCollection[subscriber.key], previousCollection[subscriber.key])) {
-                    continue;
-                }
+    // Notify collection-level subscribers
+    for (const subID of collectionSubscriberIDs) {
+        const subscriber = callbackToStateMapping[subID];
+        if (!subscriber || typeof subscriber.callback !== 'function') continue;
 
-                const subscriberCallback = subscriber.callback as DefaultConnectCallback<TKey>;
-                subscriberCallback(cachedCollection[subscriber.key], subscriber.key as TKey);
-                lastConnectionCallbackData.set(subscriber.subscriptionID, cachedCollection[subscriber.key]);
-                continue;
-            }
+        lastConnectionCallbackData.set(subscriber.subscriptionID, cachedCollection);
 
+        if (subscriber.waitForCollectionCallback) {
+            subscriber.callback(cachedCollection, subscriber.key, partialCollection);
             continue;
         }
+
+        // Not using waitForCollectionCallback — notify per changed key
+        for (const dataKey of changedMemberKeys) {
+            if (cachedCollection[dataKey] === previousCollection[dataKey]) continue; // === instead of deepEqual
+            subscriber.callback(cachedCollection[dataKey], dataKey);
+        }
+    }
+
+    // Notify member-level subscribers
+    for (const subID of memberSubscriberIDs) {
+        const subscriber = callbackToStateMapping[subID];
+        if (!subscriber || typeof subscriber.callback !== 'function') continue;
+        if (cachedCollection[subscriber.key] === previousCollection[subscriber.key]) continue; // === instead of deepEqual
+
+        const subscriberCallback = subscriber.callback as DefaultConnectCallback<TKey>;
+        subscriberCallback(cachedCollection[subscriber.key], subscriber.key as TKey);
+        lastConnectionCallbackData.set(subscriber.subscriptionID, cachedCollection[subscriber.key]);
     }
 }
 
@@ -679,7 +651,8 @@ function keyChanged<TKey extends OnyxKey>(
                     cachedCollections[subscriber.key] = cachedCollection;
                 }
 
-                cachedCollection[key] = value;
+                // The cache is always updated before keyChanged runs, so the frozen snapshot
+                // already contains the new value — no need to copy or patch it.
                 lastConnectionCallbackData.set(subscriber.subscriptionID, cachedCollection);
                 subscriber.callback(cachedCollection, subscriber.key, {[key]: value});
                 continue;

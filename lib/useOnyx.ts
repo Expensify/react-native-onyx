@@ -80,17 +80,17 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             // Recompute if input changed, dependencies changed, or first time
             const dependenciesChanged = !shallowEqual(lastDependencies, currentDependencies);
             if (!hasComputed || lastInput !== input || dependenciesChanged) {
-                // Only proceed if we have a valid selector
-                if (selector) {
-                    const newOutput = selector(input);
+                const newOutput = selector(input);
 
-                    // Deep equality mode: only update if output actually changed
-                    if (!hasComputed || !deepEqual(lastOutput, newOutput) || dependenciesChanged) {
-                        lastInput = input;
-                        lastOutput = newOutput;
-                        lastDependencies = [...currentDependencies];
-                        hasComputed = true;
-                    }
+                // Always track the current input to avoid re-running the selector
+                // when the same input is seen again (even if the output didn't change).
+                lastInput = input;
+
+                // Only update the output reference if it actually changed
+                if (!hasComputed || !deepEqual(lastOutput, newOutput) || dependenciesChanged) {
+                    lastOutput = newOutput;
+                    lastDependencies = [...currentDependencies];
+                    hasComputed = true;
                 }
             }
 
@@ -240,18 +240,11 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             newFetchStatus = 'loading';
         }
 
-        // Optimized equality checking:
-        // - Memoized selectors already handle deep equality internally, so we can use fast reference equality
-        // - Non-selector cases use shallow equality for object reference checks
+        // Reference equality is sufficient because:
+        // - Memoized selectors return stable references (deep equality is handled internally)
+        // - Non-selector values have stable references from frozen cache snapshots
         // - Normalize null to undefined to ensure consistent comparison (both represent "no value")
-        let areValuesEqual: boolean;
-        if (memoizedSelector) {
-            const normalizedPrevious = previousValueRef.current ?? undefined;
-            const normalizedNew = newValueRef.current ?? undefined;
-            areValuesEqual = normalizedPrevious === normalizedNew;
-        } else {
-            areValuesEqual = shallowEqual(previousValueRef.current ?? undefined, newValueRef.current);
-        }
+        const areValuesEqual = (previousValueRef.current ?? undefined) === (newValueRef.current ?? undefined);
 
         // We update the cached value and the result in the following conditions:
         // We will update the cached value and the result in any of the following situations:
