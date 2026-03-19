@@ -107,9 +107,8 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             throw new Error('Store is not initialized!');
         }
 
-        const placeholders = keys.map(() => '?').join(',');
-        const command = `SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
-        return provider.store.executeAsync<OnyxSQLiteKeyValuePair>(command, keys).then(({rows}) => {
+        const command = `SELECT kv.record_key, kv.valueJSON FROM keyvaluepairs kv INNER JOIN json_each(?) je ON kv.record_key = je.value;`;
+        return provider.store.executeAsync<OnyxSQLiteKeyValuePair>(command, [JSON.stringify(keys)]).then(({rows}) => {
             // eslint-disable-next-line no-underscore-dangle
             const result = rows?._array.map((row) => [row.record_key, JSON.parse(row.valueJSON)]);
             return (result ?? []) as StorageKeyValuePair[];
