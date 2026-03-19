@@ -1,4 +1,4 @@
-import OnyxUtils from './OnyxUtils';
+import OnyxKeys from './OnyxKeys';
 import type {OnyxKey, OnyxValue} from './types';
 import type {UseOnyxOptions, UseOnyxResult, UseOnyxSelector} from './useOnyx';
 
@@ -130,7 +130,7 @@ class OnyxSnapshotCache {
         this.snapshotCache.delete(keyToInvalidate);
 
         // Check if the key is a collection member and invalidate the collection base key
-        const collectionBaseKey = OnyxUtils.getCollectionKey(keyToInvalidate);
+        const collectionBaseKey = OnyxKeys.getCollectionKey(keyToInvalidate);
         if (collectionBaseKey) {
             this.snapshotCache.delete(collectionBaseKey);
         }

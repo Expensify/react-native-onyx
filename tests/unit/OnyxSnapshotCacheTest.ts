@@ -1,15 +1,18 @@
 import type {OnyxKey} from '../../lib';
 import {OnyxSnapshotCache} from '../../lib/OnyxSnapshotCache';
-import OnyxUtils from '../../lib/OnyxUtils';
+import OnyxKeys from '../../lib/OnyxKeys';
 import type {UseOnyxOptions, UseOnyxResult, UseOnyxSelector} from '../../lib/useOnyx';
 
-// Mock OnyxUtils for testing
-jest.mock('../../lib/OnyxUtils', () => ({
-    isCollectionKey: jest.fn(),
-    getCollectionKey: jest.fn(),
+// Mock OnyxKeys for testing
+jest.mock('../../lib/OnyxKeys', () => ({
+    __esModule: true,
+    default: {
+        isCollectionKey: jest.fn(),
+        getCollectionKey: jest.fn(),
+    },
 }));
 
-const mockedOnyxUtils = OnyxUtils as jest.Mocked<typeof OnyxUtils>;
+const mockedOnyxKeys = OnyxKeys as jest.Mocked<typeof OnyxKeys>;
 
 // Test types
 type TestData = {
@@ -153,8 +156,8 @@ describe('OnyxSnapshotCache', () => {
         });
 
         it('should invalidate non-collection keys without affecting others', () => {
-            mockedOnyxUtils.isCollectionKey.mockReturnValue(false);
-            mockedOnyxUtils.getCollectionKey.mockReturnValue(undefined);
+            mockedOnyxKeys.isCollectionKey.mockReturnValue(false);
+            mockedOnyxKeys.getCollectionKey.mockReturnValue(undefined);
 
             cache.invalidateForKey('nonCollectionKey');
 
@@ -170,8 +173,8 @@ describe('OnyxSnapshotCache', () => {
         });
 
         it('should invalidate collection member key and its base collection only', () => {
-            mockedOnyxUtils.isCollectionKey.mockReturnValue(true);
-            mockedOnyxUtils.getCollectionKey.mockReturnValue('reports_');
+            mockedOnyxKeys.isCollectionKey.mockReturnValue(true);
+            mockedOnyxKeys.getCollectionKey.mockReturnValue('reports_');
 
             cache.invalidateForKey('reports_123');
 
@@ -189,8 +192,8 @@ describe('OnyxSnapshotCache', () => {
         });
 
         it('should invalidate collection base key without cascading to members', () => {
-            mockedOnyxUtils.isCollectionKey.mockReturnValue(true);
-            mockedOnyxUtils.getCollectionKey.mockReturnValue('reports_');
+            mockedOnyxKeys.isCollectionKey.mockReturnValue(true);
+            mockedOnyxKeys.getCollectionKey.mockReturnValue('reports_');
 
             // When base key equals the key to invalidate, it's a collection base key
             cache.invalidateForKey('reports_');
@@ -210,13 +213,13 @@ describe('OnyxSnapshotCache', () => {
 
         it('should handle multiple different collection keys independently', () => {
             // Invalidate reports collection member
-            mockedOnyxUtils.isCollectionKey.mockReturnValueOnce(true);
-            mockedOnyxUtils.getCollectionKey.mockReturnValueOnce('reports_');
+            mockedOnyxKeys.isCollectionKey.mockReturnValueOnce(true);
+            mockedOnyxKeys.getCollectionKey.mockReturnValueOnce('reports_');
             cache.invalidateForKey('reports_123');
 
             // Invalidate users collection member
-            mockedOnyxUtils.isCollectionKey.mockReturnValueOnce(true);
-            mockedOnyxUtils.getCollectionKey.mockReturnValueOnce('users_');
+            mockedOnyxKeys.isCollectionKey.mockReturnValueOnce(true);
+            mockedOnyxKeys.getCollectionKey.mockReturnValueOnce('users_');
             cache.invalidateForKey('users_789');
 
             // Reports: member and base should be invalidated

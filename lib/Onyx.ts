@@ -23,6 +23,7 @@ import type {
     SetOptions,
 } from './types';
 import OnyxUtils from './OnyxUtils';
+import OnyxKeys from './OnyxKeys';
 import logMessages from './logMessages';
 import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
@@ -55,13 +56,13 @@ function init({
     OnyxUtils.setSkippableCollectionMemberIDs(new Set(skippableCollectionMemberIDs));
     OnyxUtils.setSnapshotMergeKeys(new Set(snapshotMergeKeys));
 
-    cache.setRamOnlyKeys(new Set<OnyxKey>(ramOnlyKeys));
+    OnyxKeys.setRamOnlyKeys(new Set<OnyxKey>(ramOnlyKeys));
 
     if (shouldSyncMultipleInstances) {
         Storage.keepInstancesSync?.((key, value) => {
             // RAM-only keys should never sync from storage as they may have stale persisted data
             // from before the key was migrated to RAM-only.
-            if (OnyxUtils.isRamOnlyKey(key)) {
+            if (OnyxKeys.isRamOnlyKey(key)) {
                 return;
             }
 
@@ -70,7 +71,7 @@ function init({
             // Check if this is a collection member key to prevent duplicate callbacks
             // When a collection is updated, individual members sync separately to other tabs
             // Setting isProcessingCollectionUpdate=true prevents triggering collection callbacks for each individual update
-            const isKeyCollectionMember = OnyxUtils.isCollectionMember(key);
+            const isKeyCollectionMember = OnyxKeys.isCollectionMember(key);
 
             OnyxUtils.keyChanged(key, value as OnyxValue<typeof key>, undefined, isKeyCollectionMember);
         });
@@ -83,7 +84,7 @@ function init({
     OnyxUtils.initStoreValues(keys, initialKeyStates, evictableKeys);
 
     // Initialize all of our keys with data provided then give green light to any pending connections
-    Promise.all([cache.addEvictableKeysToRecentlyAccessedList(OnyxUtils.isCollectionKey, OnyxUtils.getAllKeys), OnyxUtils.initializeWithDefaultKeyStates()]).then(
+    Promise.all([cache.addEvictableKeysToRecentlyAccessedList(OnyxKeys.isCollectionKey, OnyxUtils.getAllKeys), OnyxUtils.initializeWithDefaultKeyStates()]).then(
         OnyxUtils.getDeferredInitTask().resolve,
     );
 }
@@ -201,7 +202,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
         const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
         if (skippableCollectionMemberIDs.size) {
             try {
-                const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key);
+                const [, collectionMemberID] = OnyxKeys.splitCollectionMemberKey(key);
                 if (skippableCollectionMemberIDs.has(collectionMemberID)) {
                     // The key is a skippable one, so we set the new changes to undefined.
                     // eslint-disable-next-line no-param-reassign
@@ -351,7 +352,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                         if (newValue !== oldValue) {
                             cache.set(key, newValue);
 
-                            const collectionKey = OnyxUtils.getCollectionKey(key);
+                            const collectionKey = OnyxKeys.getCollectionKey(key);
 
                             if (collectionKey) {
                                 if (!keyValuesToResetAsCollection[collectionKey]) {
@@ -376,7 +377,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                 // Exclude RAM-only keys to prevent them from being saved to storage
                 const defaultKeyValuePairs = Object.entries(
                     Object.keys(defaultKeyStates)
-                        .filter((key) => !keysToPreserve.includes(key) && !OnyxUtils.isRamOnlyKey(key))
+                        .filter((key) => !keysToPreserve.includes(key) && !OnyxKeys.isRamOnlyKey(key))
                         .reduce((obj: KeyValueMapping, key) => {
                             // eslint-disable-next-line no-param-reassign
                             obj[key] = defaultKeyStates[key];
@@ -486,8 +487,8 @@ function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<vo
         // Group all the collection-related keys and update each collection in a single `mergeCollection` call.
         // This is needed to prevent multiple `mergeCollection` calls for the same collection and `merge` calls for the individual items of the said collection.
         // This way, we ensure there is no race condition in the queued updates of the same key.
-        for (const collectionKey of OnyxUtils.getCollectionKeys()) {
-            const collectionItemKeys = Object.keys(updateQueue).filter((key) => OnyxUtils.isKeyMatch(collectionKey, key));
+        for (const collectionKey of OnyxKeys.getCollectionKeys()) {
+            const collectionItemKeys = Object.keys(updateQueue).filter((key) => OnyxKeys.isKeyMatch(collectionKey, key));
             if (collectionItemKeys.length <= 1) {
                 // If there are no items of this collection in the updateQueue, we should skip it.
                 // If there is only one item, we should update it individually, therefore retain it in the updateQueue.
