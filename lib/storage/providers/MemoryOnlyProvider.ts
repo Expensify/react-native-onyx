@@ -136,6 +136,13 @@ const provider: StorageProvider<Store> = {
     },
 
     /**
+     * Returns all key-value pairs from memory
+     */
+    getAll() {
+        return Promise.resolve(Object.entries(provider.store) as StorageKeyValuePair[]);
+    },
+
+    /**
      * Gets the total bytes of the store.
      * `bytesRemaining` will always be `Number.POSITIVE_INFINITY` since we don't have a hard limit on memory.
      */

@@ -1075,19 +1075,72 @@ function mergeInternal<TValue extends OnyxInput<OnyxKey> | undefined, TChange ex
  * Merge user provided default key value pairs.
  */
 function initializeWithDefaultKeyStates(): Promise<void> {
-    // Filter out RAM-only keys from storage reads as they may have stale persisted data
-    // from before the key was migrated to RAM-only.
-    const keysToFetch = Object.keys(defaultKeyStates).filter((key) => !isRamOnlyKey(key));
-    return Storage.multiGet(keysToFetch).then((pairs) => {
-        const existingDataAsObject = Object.fromEntries(pairs) as Record<string, unknown>;
+    // Eagerly load the entire database into cache in a single batch read.
+    // This is faster than lazy-loading individual keys because:
+    // 1. One DB transaction instead of hundreds
+    // 2. All subsequent reads are synchronous cache hits
+    return Storage.getAll()
+        .then((pairs) => {
+            const allDataFromStorage: Record<string, unknown> = {};
+            for (const [key, value] of pairs) {
+                // RAM-only keys should never be loaded from storage as they may have stale persisted data
+                // from before the key was migrated to RAM-only.
+                if (isRamOnlyKey(key)) {
+                    continue;
+                }
 
-        const merged = utils.fastMerge(existingDataAsObject, defaultKeyStates, {
-            shouldRemoveNestedNulls: true,
-        }).result;
-        cache.merge(merged ?? {});
+                // Skip collection members that are marked as skippable
+                if (skippableCollectionMemberIDs.size && getCollectionKey(key)) {
+                    const [, collectionMemberID] = splitCollectionMemberKey(key);
 
-        for (const [key, value] of Object.entries(merged ?? {})) keyChanged(key, value);
-    });
+                    if (skippableCollectionMemberIDs.has(collectionMemberID)) {
+                        continue;
+                    }
+                }
+
+                allDataFromStorage[key] = value;
+            }
+
+            // Load all storage data into cache silently (no subscriber notifications)
+            cache.setAllKeys(Object.keys(allDataFromStorage));
+            cache.merge(allDataFromStorage);
+
+            // For keys that have a developer-defined default (via `initialKeyStates`), merge the
+            // persisted value with the default so new properties added in code updates are applied
+            // without wiping user data that already exists in storage.
+            const defaultKeysFromStorage = Object.keys(defaultKeyStates).reduce((obj: Record<string, unknown>, key) => {
+                if (key in allDataFromStorage) {
+                    // eslint-disable-next-line no-param-reassign
+                    obj[key] = allDataFromStorage[key];
+                }
+                return obj;
+            }, {});
+
+            const merged = utils.fastMerge(defaultKeysFromStorage, defaultKeyStates, {
+                shouldRemoveNestedNulls: true,
+            }).result;
+            cache.merge(merged ?? {});
+
+            // Notify subscribers about default key states so that any subscriber that connected
+            // before init (e.g. during module load) receives the merged default values immediately
+            for (const [key, value] of Object.entries(merged ?? {})) keyChanged(key, value);
+        })
+        .catch((error) => {
+            Logger.logAlert(`Failed to load data from storage during init. The app will boot with default key states only. Error: ${error}`);
+
+            // Populate the key index so getAllKeys() returns correct results for default keys.
+            // Without this, subscribers that check getAllKeys() would see an empty set even
+            // though we have default values in cache.
+            cache.setAllKeys(Object.keys(defaultKeyStates));
+
+            // Boot with defaults so the app renders instead of deadlocking.
+            // Users will get a fresh-install experience but the app won't be bricked.
+            cache.merge(defaultKeyStates);
+
+            // Notify subscribers about default key states so that any subscriber that connected
+            // before init (e.g. during module load) receives the merged default values immediately
+            for (const [key, value] of Object.entries(defaultKeyStates)) keyChanged(key, value);
+        });
 }
 
 /**

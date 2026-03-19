@@ -82,10 +82,13 @@ function init({
 
     OnyxUtils.initStoreValues(keys, initialKeyStates, evictableKeys);
 
-    // Initialize all of our keys with data provided then give green light to any pending connections
-    Promise.all([cache.addEvictableKeysToRecentlyAccessedList(OnyxUtils.isCollectionKey, OnyxUtils.getAllKeys), OnyxUtils.initializeWithDefaultKeyStates()]).then(
-        OnyxUtils.getDeferredInitTask().resolve,
-    );
+    // Initialize all of our keys with data provided then give green light to any pending connections.
+    // addEvictableKeysToRecentlyAccessedList must run after initializeWithDefaultKeyStates because
+    // eager cache loading populates the key index (cache.setAllKeys) inside initializeWithDefaultKeyStates,
+    // and the evictable keys list depends on that index being populated.
+    OnyxUtils.initializeWithDefaultKeyStates()
+        .then(() => cache.addEvictableKeysToRecentlyAccessedList(OnyxUtils.isCollectionKey, OnyxUtils.getAllKeys))
+        .then(OnyxUtils.getDeferredInitTask().resolve);
 }
 
 /**
