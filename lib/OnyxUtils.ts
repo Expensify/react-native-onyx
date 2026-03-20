@@ -1343,7 +1343,13 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
     }
 
     // Check if the value is compatible with the existing value in the storage
-    const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(value, existingValue);
+    const {isCompatible, existingValueType, newValueType, isEmptyArrayCoercion} = utils.checkCompatibilityWithExistingValue(value, existingValue);
+    if (isEmptyArrayCoercion) {
+        // Setting an object over empty array isn't semantically correct, but we allow it
+        // in case we accidentally encoded an empty object as an empty array in PHP. If you're
+        // looking at a bugbot from this message, we're probably missing that key in OnyxKeys::KEYS_REQUIRING_EMPTY_OBJECT
+        Logger.logAlert(`[ENSURE_BUGBOT] Onyx setWithRetry called on key "${key}" whose existing value is an empty array. Will coerce to object.`);
+    }
     if (!isCompatible) {
         Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'set', existingValueType, newValueType));
         return Promise.resolve();
@@ -1576,8 +1582,17 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
             const cachedCollectionForExistingKeys = getCachedCollection(collectionKey, existingKeys);
 
             const existingKeyCollection = existingKeys.reduce((obj: OnyxInputKeyValueMapping, key) => {
-                const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(resultCollection[key], cachedCollectionForExistingKeys[key]);
+                const {isCompatible, existingValueType, newValueType, isEmptyArrayCoercion} = utils.checkCompatibilityWithExistingValue(
+                    resultCollection[key],
+                    cachedCollectionForExistingKeys[key],
+                );
 
+                if (isEmptyArrayCoercion) {
+                    // Merging an object into an empty array isn't semantically correct, but we allow it
+                    // in case we accidentally encoded an empty object as an empty array in PHP. If you're
+                    // looking at a bugbot from this message, we're probably missing that key in OnyxKeys::KEYS_REQUIRING_EMPTY_OBJECT
+                    Logger.logAlert(`[ENSURE_BUGBOT] Onyx mergeCollection called on key "${key}" whose existing value is an empty array. Will coerce to object.`);
+                }
                 if (!isCompatible) {
                     Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'mergeCollection', existingValueType, newValueType));
                     return obj;
