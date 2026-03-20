@@ -1,0 +1,23 @@
+name: PR Checklist Validation
+
+on:
+    pull_request:
+        types: [opened, synchronize, edited, reopened, ready_for_review]
+
+permissions:
+    pull-requests: read
+
+concurrency:
+    group: pr-checklist-${{ github.event.pull_request.number }}
+    cancel-in-progress: true
+
+jobs:
+    validate-checklist:
+        if: github.event.pull_request.draft == false
+        runs-on: ubuntu-latest
+        steps:
+            # v5.0.0
+            - uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
+
+            - name: Validate PR checklist and sections
+              uses: ./.github/actions/javascript/validatePRChecklist
