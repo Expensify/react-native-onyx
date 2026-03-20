@@ -1242,7 +1242,7 @@ function unsubscribeFromKey(subscriptionID: number): void {
         return;
     }
 
-    deleteKeyBySubscriptions(lastSubscriptionID);
+    deleteKeyBySubscriptions(subscriptionID);
     delete callbackToStateMapping[subscriptionID];
 }
 
