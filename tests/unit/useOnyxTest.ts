@@ -138,6 +138,89 @@ describe('useOnyx', () => {
                 fail("Expected to don't throw any errors.");
             }
         });
+
+        it('should transition through loading when switching between collection member keys that both resolve to undefined', async () => {
+            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string});
+
+            // Wait for initial key to fully load
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+
+            // Switch to another collection member key that also has no data
+            rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}2`);
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loading');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should return cached value immediately with loaded status when switching to a key that has data', async () => {
+            Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}2`, 'test_value');
+
+            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string});
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+
+            // Switch to a key that has cached data
+            rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}2`);
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('test_value');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should clear previous data and transition through loading when switching from a key with data to one without', async () => {
+            Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}1`, 'initial_value');
+
+            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string});
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('initial_value');
+            expect(result.current[1].status).toEqual('loaded');
+
+            // Switch to a key that has no data
+            rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}2`);
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loading');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should transition through loading when switching between collection member keys using allowDynamicKey', async () => {
+            const {result, rerender} = renderHook((key: string) => useOnyx(key, {allowDynamicKey: true}), {
+                initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string,
+            });
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+
+            rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}2`);
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loading');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+        });
     });
 
     describe('misc', () => {

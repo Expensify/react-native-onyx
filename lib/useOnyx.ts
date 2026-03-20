@@ -135,6 +135,17 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     // Inside useOnyx.ts, we need to track the sourceValue separately
     const sourceValueRef = useRef<NonNullable<TReturnValue> | undefined>(undefined);
 
+    // When the key changes, reset internal state so the hook properly transitions through loading
+    // for the new key instead of preserving stale status from the previous key.
+    if (key !== previousKey) {
+        previousValueRef.current = null;
+        newValueRef.current = null;
+        isFirstConnectionRef.current = true;
+        shouldGetCachedValueRef.current = true;
+        sourceValueRef.current = undefined;
+        resultRef.current = [undefined, {status: options?.initWithStoredValues === false ? 'loaded' : 'loading'}];
+    }
+
     // Cache the options key to avoid regenerating it every getSnapshot call
     const cacheKey = useMemo(
         () =>
