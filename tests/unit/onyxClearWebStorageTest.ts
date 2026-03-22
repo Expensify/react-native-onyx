@@ -138,10 +138,8 @@ describe('Set data while storage is clearing', () => {
             [collectionItemKey1]: {id: 1, name: 'first'},
             [collectionItemKey2]: {id: 2, name: 'second'},
         } as GenericCollection)
-            .then(() => {
-                // When clear is called with the collection prefix as a key to preserve
-                return Onyx.clear([ONYX_KEYS.COLLECTION.TEST]);
-            })
+            // When clear is called with the collection prefix as a key to preserve
+            .then(() => Onyx.clear([ONYX_KEYS.COLLECTION.TEST]))
             .then(() => waitForPromisesToResolve())
             .then(() => {
                 // Then both collection members are preserved in the cache and storage
@@ -167,10 +165,8 @@ describe('Set data while storage is clearing', () => {
 
         // Given that Onyx has both a collection item and a regular key set
         return Promise.all([Onyx.set(ONYX_KEYS.REGULAR_KEY, SET_VALUE), Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST, {[collectionItemKey1]: 'value'} as GenericCollection)])
-            .then(() => {
-                // When clear is called preserving only the collection
-                return Onyx.clear([ONYX_KEYS.COLLECTION.TEST]);
-            })
+            // When clear is called preserving only the collection
+            .then(() => Onyx.clear([ONYX_KEYS.COLLECTION.TEST]))
             .then(() => waitForPromisesToResolve())
             .then(() => {
                 // Then the collection member is preserved
@@ -191,10 +187,8 @@ describe('Set data while storage is clearing', () => {
 
         // Given that Onyx has a collection item and a regular key set
         return Promise.all([Onyx.set(ONYX_KEYS.REGULAR_KEY, SET_VALUE), Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST, {[collectionItemKey1]: 'value'} as GenericCollection)])
-            .then(() => {
-                // When clear is called preserving both the collection and the regular key
-                return Onyx.clear([ONYX_KEYS.COLLECTION.TEST, ONYX_KEYS.REGULAR_KEY]);
-            })
+            // When clear is called preserving both the collection and the regular key
+            .then(() => Onyx.clear([ONYX_KEYS.COLLECTION.TEST, ONYX_KEYS.REGULAR_KEY]))
             .then(() => waitForPromisesToResolve())
             .then(() => {
                 // Then both the collection member and the regular key are preserved
