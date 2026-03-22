@@ -127,6 +127,87 @@ describe('Set data while storage is clearing', () => {
         });
     });
 
+    it('should preserve all collection members when a collection key is passed to keysToPreserve', () => {
+        expect.assertions(6);
+
+        const collectionItemKey1 = `${ONYX_KEYS.COLLECTION.TEST}1`;
+        const collectionItemKey2 = `${ONYX_KEYS.COLLECTION.TEST}2`;
+
+        // Given that Onyx has a collection with two items
+        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST, {
+            [collectionItemKey1]: {id: 1, name: 'first'},
+            [collectionItemKey2]: {id: 2, name: 'second'},
+        } as GenericCollection)
+            .then(() => {
+                // When clear is called with the collection prefix as a key to preserve
+                return Onyx.clear([ONYX_KEYS.COLLECTION.TEST]);
+            })
+            .then(() => waitForPromisesToResolve())
+            .then(() => {
+                // Then both collection members are preserved in the cache and storage
+                expect(cache.get(collectionItemKey1)).toEqual({id: 1, name: 'first'});
+                expect(cache.get(collectionItemKey2)).toEqual({id: 2, name: 'second'});
+
+                return Promise.all([StorageMock.getItem(collectionItemKey1), StorageMock.getItem(collectionItemKey2)]);
+            })
+            .then(([storedValue1, storedValue2]) => {
+                expect(storedValue1).toEqual({id: 1, name: 'first'});
+                expect(storedValue2).toEqual({id: 2, name: 'second'});
+
+                // And non-collection keys are still cleared (default key reset to default)
+                expect(cache.get(ONYX_KEYS.DEFAULT_KEY)).toBe(DEFAULT_VALUE);
+                return expect(StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY)).resolves.toBe(DEFAULT_VALUE);
+            });
+    });
+
+    it('should preserve collection members and still clear regular keys not in keysToPreserve', () => {
+        expect.assertions(4);
+
+        const collectionItemKey1 = `${ONYX_KEYS.COLLECTION.TEST}1`;
+
+        // Given that Onyx has both a collection item and a regular key set
+        return Promise.all([Onyx.set(ONYX_KEYS.REGULAR_KEY, SET_VALUE), Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST, {[collectionItemKey1]: 'value'} as GenericCollection)])
+            .then(() => {
+                // When clear is called preserving only the collection
+                return Onyx.clear([ONYX_KEYS.COLLECTION.TEST]);
+            })
+            .then(() => waitForPromisesToResolve())
+            .then(() => {
+                // Then the collection member is preserved
+                expect(cache.get(collectionItemKey1)).toBe('value');
+                return expect(StorageMock.getItem(collectionItemKey1)).resolves.toBe('value');
+            })
+            .then(() => {
+                // And the regular key is cleared
+                expect(cache.get(ONYX_KEYS.REGULAR_KEY)).toBeUndefined();
+                return expect(StorageMock.getItem(ONYX_KEYS.REGULAR_KEY)).resolves.toBeNull();
+            });
+    });
+
+    it('should preserve both collection keys and individual keys when both are passed to keysToPreserve', () => {
+        expect.assertions(4);
+
+        const collectionItemKey1 = `${ONYX_KEYS.COLLECTION.TEST}1`;
+
+        // Given that Onyx has a collection item and a regular key set
+        return Promise.all([Onyx.set(ONYX_KEYS.REGULAR_KEY, SET_VALUE), Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST, {[collectionItemKey1]: 'value'} as GenericCollection)])
+            .then(() => {
+                // When clear is called preserving both the collection and the regular key
+                return Onyx.clear([ONYX_KEYS.COLLECTION.TEST, ONYX_KEYS.REGULAR_KEY]);
+            })
+            .then(() => waitForPromisesToResolve())
+            .then(() => {
+                // Then both the collection member and the regular key are preserved
+                expect(cache.get(collectionItemKey1)).toBe('value');
+                expect(cache.get(ONYX_KEYS.REGULAR_KEY)).toBe(SET_VALUE);
+                return Promise.all([StorageMock.getItem(collectionItemKey1), StorageMock.getItem(ONYX_KEYS.REGULAR_KEY)]);
+            })
+            .then(([storedCollectionValue, storedRegularValue]) => {
+                expect(storedCollectionValue).toBe('value');
+                expect(storedRegularValue).toBe(SET_VALUE);
+            });
+    });
+
     it('should only trigger the connection callback once when using wait for collection callback', () => {
         expect.assertions(4);
 
