@@ -237,7 +237,13 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
 
             try {
                 const validChanges = mergeQueue[key].filter((change) => {
-                    const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(change, existingValue);
+                    const {isCompatible, existingValueType, newValueType, isEmptyArrayCoercion} = utils.checkCompatibilityWithExistingValue(change, existingValue);
+                    if (isEmptyArrayCoercion) {
+                        // Merging an object into an empty array isn't semantically correct, but we allow it
+                        // in case we accidentally encoded an empty object as an empty array in PHP. If you're
+                        // looking at a bugbot from this message, we're probably missing that key in OnyxKeys::KEYS_REQUIRING_EMPTY_OBJECT
+                        Logger.logAlert(`[ENSURE_BUGBOT] Onyx merge called on key "${key}" whose existing value is an empty array. Will coerce to object.`);
+                    }
                     if (!isCompatible) {
                         Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'merge', existingValueType, newValueType));
                     }
@@ -260,8 +266,9 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
                     return Promise.resolve();
                 }
 
-                return OnyxMerge.applyMerge(key, existingValue, validChanges).then(({mergedValue}) => {
+                return OnyxMerge.applyMerge(key, existingValue, validChanges).then(({mergedValue, updatePromise}) => {
                     OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, changes, mergedValue);
+                    return updatePromise;
                 });
             } catch (error) {
                 Logger.logAlert(`An error occurred while applying merge for key: ${key}, Error: ${error}`);
@@ -373,6 +380,16 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                     keysToBeClearedFromStorage.push(key);
                 }
 
+                const updatePromises: Array<Promise<void>> = [];
+
+                // Notify the subscribers for each key/value group so they can receive the new values
+                for (const [key, value] of Object.entries(keyValuesToResetIndividually)) {
+                    updatePromises.push(OnyxUtils.scheduleSubscriberUpdate(key, value));
+                }
+                for (const [key, value] of Object.entries(keyValuesToResetAsCollection)) {
+                    updatePromises.push(OnyxUtils.scheduleNotifyCollectionSubscribers(key, value.newValues, value.oldValues));
+                }
+
                 // Exclude RAM-only keys to prevent them from being saved to storage
                 const defaultKeyValuePairs = Object.entries(
                     Object.keys(defaultKeyStates)
@@ -391,14 +408,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                     .then(() => Storage.multiSet(defaultKeyValuePairs))
                     .then(() => {
                         DevTools.clearState(keysToPreserve);
-
-                        // Notify the subscribers for each key/value group so they can receive the new values
-                        for (const [key, value] of Object.entries(keyValuesToResetIndividually)) {
-                            OnyxUtils.keyChanged(key, value);
-                        }
-                        for (const [key, value] of Object.entries(keyValuesToResetAsCollection)) {
-                            OnyxUtils.keysChanged(key, value.newValues, value.oldValues);
-                        }
+                        return Promise.all(updatePromises);
                     });
             })
             .then(() => undefined);
