@@ -7,7 +7,6 @@ import connectionManager from './OnyxConnectionManager';
 import OnyxUtils from './OnyxUtils';
 import type {CollectionKeyBase, OnyxKey, OnyxValue} from './types';
 import usePrevious from './usePrevious';
-import * as Logger from './Logger';
 import onyxSnapshotCache from './OnyxSnapshotCache';
 import useLiveRef from './useLiveRef';
 
@@ -21,32 +20,15 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
 
     /**
      * If set to `false`, then no data will be prefilled into the component.
+     * @deprecated This param is going to be removed soon. Use RAM-only keys instead.
      */
     initWithStoredValues?: boolean;
-
-    /**
-     * If set to `true`, data will be retrieved from cache during the first render even if there is a pending merge for the key.
-     */
-    allowStaleData?: boolean;
 
     /**
      * If set to `false`, the connection won't be reused between other subscribers that are listening to the same Onyx key
      * with the same connect configurations.
      */
     reuseConnection?: boolean;
-
-    /**
-     * If set to `true`, the key can be changed dynamically during the component lifecycle.
-     */
-    allowDynamicKey?: boolean;
-
-    /**
-     * If the component calling this is the one loading the data by calling an action, then you should set this to `true`.
-     *
-     * If the component calling this does not load the data then you should set it to `false`, which means that if the data
-     * is not there, it will log an alert, as it means we are using data that no one loaded and that's most probably a bug.
-     */
-    canBeMissing?: boolean;
 
     /**
      * This will be used to subscribe to a subset of an Onyx key's data.
@@ -79,7 +61,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     const selector = options?.selector;
 
     // Create memoized version of selector for performance
-    const memoizedSelector = useMemo(() => {
+    const memoizedSelector = useMemo((): UseOnyxSelector<TKey, TReturnValue> | null => {
         if (!selector) {
             return null;
         }
@@ -152,37 +134,11 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             onyxSnapshotCache.registerConsumer({
                 selector: options?.selector,
                 initWithStoredValues: options?.initWithStoredValues,
-                allowStaleData: options?.allowStaleData,
-                canBeMissing: options?.canBeMissing,
             }),
-        [options?.selector, options?.initWithStoredValues, options?.allowStaleData, options?.canBeMissing],
+        [options?.selector, options?.initWithStoredValues],
     );
 
     useEffect(() => () => onyxSnapshotCache.deregisterConsumer(key, cacheKey), [key, cacheKey]);
-
-    useEffect(() => {
-        // These conditions will ensure we can only handle dynamic collection member keys from the same collection.
-        if (options?.allowDynamicKey || previousKey === key) {
-            return;
-        }
-
-        try {
-            const previousCollectionKey = OnyxUtils.splitCollectionMemberKey(previousKey)[0];
-            const collectionKey = OnyxUtils.splitCollectionMemberKey(key)[0];
-
-            if (OnyxUtils.isCollectionMemberKey(previousCollectionKey, previousKey) && OnyxUtils.isCollectionMemberKey(collectionKey, key) && previousCollectionKey === collectionKey) {
-                return;
-            }
-        } catch (e) {
-            throw new Error(
-                `'${previousKey}' key can't be changed to '${key}'. useOnyx() only supports dynamic keys if they are both collection member keys from the same collection e.g. from 'collection_id1' to 'collection_id2'.`,
-            );
-        }
-
-        throw new Error(
-            `'${previousKey}' key can't be changed to '${key}'. useOnyx() only supports dynamic keys if they are both collection member keys from the same collection e.g. from 'collection_id1' to 'collection_id2'.`,
-        );
-    }, [previousKey, key, options?.allowDynamicKey]);
 
     // Track previous dependencies to prevent infinite loops
     const previousDependenciesRef = useRef<DependencyList>([]);
@@ -227,6 +183,11 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         }
     }, [key, options?.canEvict]);
 
+    // Tracks the last memoizedSelector reference that getSnapshot() has computed with.
+    // When the selector changes, this mismatch forces getSnapshot() to re-evaluate
+    // even if all other conditions (isFirstConnection, shouldGetCachedValue, key) are false.
+    const lastComputedSelectorRef = useRef(memoizedSelector);
+
     const getSnapshot = useCallback(() => {
         // Check if we have any cache for this Onyx key
         // Don't use cache for first connection with initWithStoredValues: false
@@ -238,8 +199,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                 return cachedResult;
             }
         }
-
-        let isOnyxValueDefined = true;
 
         // We return the initial result right away during the first connection if `initWithStoredValues` is set to `false`.
         if (isFirstConnectionRef.current && options?.initWithStoredValues === false) {
@@ -253,15 +212,13 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // We get the value from cache while the first connection to Onyx is being made or if the key has changed,
         // so we can return any cached value right away. For the case where the key has changed, If we don't return the cached value right away, then the UI will show the incorrect (previous) value for a brief period which looks like a UI glitch to the user. After the connection is made, we only
         // update `newValueRef` when `Onyx.connect()` callback is fired.
-        if (isFirstConnectionRef.current || shouldGetCachedValueRef.current || key !== previousKey) {
+        const hasSelectorChanged = lastComputedSelectorRef.current !== memoizedSelector;
+        if (isFirstConnectionRef.current || shouldGetCachedValueRef.current || key !== previousKey || hasSelectorChanged) {
             // Gets the value from cache and maps it with selector. It changes `null` to `undefined` for `useOnyx` compatibility.
             const value = OnyxUtils.tryGetCachedValue(key) as OnyxValue<TKey>;
             const selectedValue = memoizedSelector ? memoizedSelector(value) : value;
+            lastComputedSelectorRef.current = memoizedSelector;
             newValueRef.current = (selectedValue ?? undefined) as TReturnValue | undefined;
-
-            // This flag is `false` when the original Onyx value (without selector) is not defined yet.
-            // It will be used later to check if we need to log an alert that the value is missing.
-            isOnyxValueDefined = value !== null && value !== undefined;
 
             // We set this flag to `false` again since we don't want to get the newest cached value every time `getSnapshot()` is executed,
             // and only when `Onyx.connect()` callback is fired.
@@ -275,8 +232,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
         // If we have pending merge operations for the key during the first connection, we set the new value to `undefined`
         // and fetch status to `loading` to simulate that it is still being loaded until we have the most updated data.
-        // If `allowStaleData` is `true` this logic will be ignored and cached value will be used, even if it's stale data.
-        if (isFirstConnectionRef.current && OnyxUtils.hasPendingMergeForKey(key) && !options?.allowStaleData) {
+        if (isFirstConnectionRef.current && OnyxUtils.hasPendingMergeForKey(key)) {
             newValueRef.current = undefined;
             newFetchStatus = 'loading';
         }
@@ -314,13 +270,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                     sourceValue: sourceValueRef.current,
                 },
             ];
-
-            // If `canBeMissing` is set to `false` and the Onyx value of that key is not defined,
-            // we log an alert so it can be acknowledged by the consumer. Additionally, we won't log alerts
-            // if there's a `Onyx.clear()` task in progress.
-            if (options?.canBeMissing === false && newFetchStatus === 'loaded' && !isOnyxValueDefined && !OnyxCache.hasPendingTask(TASK.CLEAR)) {
-                Logger.logAlert(`useOnyx returned no data for key with canBeMissing set to false for key ${key}`, {showAlert: true});
-            }
         }
 
         if (newFetchStatus !== 'loading') {
@@ -328,7 +277,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         }
 
         return resultRef.current;
-    }, [options?.initWithStoredValues, options?.allowStaleData, options?.canBeMissing, key, memoizedSelector, cacheKey, previousKey]);
+    }, [options?.initWithStoredValues, key, memoizedSelector, cacheKey, previousKey]);
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {

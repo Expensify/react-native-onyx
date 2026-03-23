@@ -1,6 +1,5 @@
 import {deepEqual} from 'fast-equals';
 import type {ValueOf} from 'type-fest';
-import lodashPick from 'lodash/pick';
 import _ from 'underscore';
 import DevTools from './DevTools';
 import * as Logger from './Logger';
@@ -103,6 +102,8 @@ const deferredInitTask = createDeferredTask();
 
 // Holds a set of collection member IDs which updates will be ignored when using Onyx methods.
 let skippableCollectionMemberIDs = new Set<string>();
+// Holds a set of keys that should always be merged into snapshot entries.
+let snapshotMergeKeys = new Set<string>();
 
 function getSnapshotKey(): OnyxKey | null {
     return snapshotKey;
@@ -137,6 +138,21 @@ function getDeferredInitTask(): DeferredTask {
 }
 
 /**
+ * Executes an action after Onyx has been initialized.
+ * If Onyx is already initialized, the action is executed immediately.
+ * Otherwise, it waits for initialization to complete before executing.
+ *
+ * @param action The action to execute after initialization
+ * @returns The result of the action
+ */
+function afterInit<T>(action: () => Promise<T>): Promise<T> {
+    if (deferredInitTask.isResolved) {
+        return action();
+    }
+    return deferredInitTask.promise.then(action);
+}
+
+/**
  * Getter - returns the skippable collection member IDs.
  */
 function getSkippableCollectionMemberIDs(): Set<string> {
@@ -144,10 +160,24 @@ function getSkippableCollectionMemberIDs(): Set<string> {
 }
 
 /**
+ * Getter - returns the snapshot merge keys allowlist.
+ */
+function getSnapshotMergeKeys(): Set<string> {
+    return snapshotMergeKeys;
+}
+
+/**
  * Setter - sets the skippable collection member IDs.
  */
 function setSkippableCollectionMemberIDs(ids: Set<string>): void {
     skippableCollectionMemberIDs = ids;
+}
+
+/**
+ * Setter - sets the snapshot merge keys allowlist.
+ */
+function setSnapshotMergeKeys(keys: Set<string>): void {
+    snapshotMergeKeys = keys;
 }
 
 /**
@@ -235,6 +265,14 @@ function get<TKey extends OnyxKey, TValue extends OnyxValue<TKey>>(key: TKey): P
         return Promise.resolve(cache.get(key) as TValue);
     }
 
+    // RAM-only keys should never read from storage (they may have stale persisted data
+    // from before the key was migrated to RAM-only). Mark as nullish so future get() calls
+    // short-circuit via hasCacheForKey and avoid re-running this branch.
+    if (isRamOnlyKey(key)) {
+        cache.addNullishStorageKey(key);
+        return Promise.resolve(undefined as TValue);
+    }
+
     const taskName = `${TASK.GET}:${key}` as const;
 
     // When a value retrieving task for this key is still running hook to it
@@ -294,6 +332,15 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
      * These missingKeys will be later used to multiGet the data from the storage.
      */
     for (const key of keys) {
+        // RAM-only keys should never read from storage as they may have stale persisted data
+        // from before the key was migrated to RAM-only.
+        if (isRamOnlyKey(key)) {
+            if (cache.hasCacheForKey(key)) {
+                dataMap.set(key, cache.get(key) as OnyxValue<TKey>);
+            }
+            continue;
+        }
+
         const cacheValue = cache.get(key) as OnyxValue<TKey>;
         if (cacheValue) {
             dataMap.set(key, cacheValue);
@@ -411,7 +458,10 @@ function getAllKeys(): Promise<Set<OnyxKey>> {
 
     // Otherwise retrieve the keys from storage and capture a promise to aid concurrent usages
     const promise = Storage.getAllKeys().then((keys) => {
-        cache.setAllKeys(keys);
+        // Filter out RAM-only keys from storage results as they may be stale entries
+        // from before the key was migrated to RAM-only.
+        const filteredKeys = keys.filter((key) => !isRamOnlyKey(key));
+        cache.setAllKeys(filteredKeys);
 
         // return the updated set of keys
         return cache.getAllKeys();
@@ -445,14 +495,35 @@ function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collect
  * @returns true if the key is a collection member, false otherwise
  */
 function isCollectionMember(key: OnyxKey): boolean {
-    try {
-        const collectionKey = getCollectionKey(key);
-        // If the key is longer than the collection key, it's a collection member
-        return key.length > collectionKey.length;
-    } catch (e) {
-        // If getCollectionKey throws, the key is not a collection member
-        return false;
+    const collectionKey = getCollectionKey(key);
+    // If the key is longer than the collection key, it's a collection member
+    return !!collectionKey && key.length > collectionKey.length;
+}
+
+/**
+ * Checks if a given key is a RAM-only key, RAM-only collection key, or a RAM-only collection member
+ *
+ * For example:
+ *
+ * For the following Onyx setup
+ *
+ * ramOnlyKeys: ["ramOnlyKey", "ramOnlyCollection_"]
+ *
+ * - `isRamOnlyKey("ramOnlyKey")` would return true
+ * - `isRamOnlyKey("ramOnlyCollection_")` would return true
+ * - `isRamOnlyKey("ramOnlyCollection_1")` would return true
+ * - `isRamOnlyKey("someOtherKey")` would return false
+ *
+ * @param key - The key to check
+ * @returns true if key is a RAM-only key, RAM-only collection key, or a RAM-only collection member
+ */
+function isRamOnlyKey(key: OnyxKey): boolean {
+    const collectionKey = getCollectionKey(key);
+    if (collectionKey) {
+        return cache.isRamOnlyKey(collectionKey);
     }
+
+    return cache.isRamOnlyKey(key);
 }
 
 /**
@@ -471,8 +542,12 @@ function splitCollectionMemberKey<TKey extends CollectionKey, CollectionKeyType 
     }
 
     if (!collectionKey) {
+        const resolvedKey = getCollectionKey(key);
+        if (!resolvedKey) {
+            throw new Error(`Invalid '${key}' key provided, only collection keys are allowed.`);
+        }
         // eslint-disable-next-line no-param-reassign
-        collectionKey = getCollectionKey(key);
+        collectionKey = resolvedKey;
     }
 
     return [collectionKey as CollectionKeyType, key.slice(collectionKey.length)];
@@ -496,9 +571,9 @@ function isKeyMatch(configKey: OnyxKey, key: OnyxKey): boolean {
  * - `getCollectionKey("sharedNVP_user_-1_something")` would return "sharedNVP_user_"
  *
  * @param key - The collection key to process.
- * @returns The plain collection key or throws an Error if the key is not a collection one.
+ * @returns The plain collection key or undefined if the key is not a collection one.
  */
-function getCollectionKey(key: CollectionKey): string {
+function getCollectionKey(key: CollectionKey): string | undefined {
     // Start by finding the position of the last underscore in the string
     let lastUnderscoreIndex = key.lastIndexOf('_');
 
@@ -516,7 +591,7 @@ function getCollectionKey(key: CollectionKey): string {
         lastUnderscoreIndex = key.lastIndexOf('_', lastUnderscoreIndex - 1);
     }
 
-    throw new Error(`Invalid '${key}' key provided, only collection keys are allowed.`);
+    return undefined;
 }
 
 /**
@@ -695,13 +770,7 @@ function keyChanged<TKey extends OnyxKey>(
     // do the same in keysChanged, because we only call that function when a collection key changes, and it doesn't happen that often.
     // For performance reason, we look for the given key and later if don't find it we look for the collection key, instead of checking if it is a collection key first.
     let stateMappingKeys = onyxKeyToSubscriptionIDs.get(key) ?? [];
-    let collectionKey: string | undefined;
-    try {
-        collectionKey = getCollectionKey(key);
-    } catch (e) {
-        // If getCollectionKey() throws an error it means the key is not a collection key.
-        collectionKey = undefined;
-    }
+    const collectionKey = getCollectionKey(key);
 
     if (collectionKey) {
         // Getting the collection key from the specific key because only collection keys were stored in the mapping.
@@ -854,6 +923,11 @@ function scheduleNotifyCollectionSubscribers<TKey extends OnyxKey>(
 function remove<TKey extends OnyxKey>(key: TKey, isProcessingCollectionUpdate?: boolean): Promise<void> {
     cache.drop(key);
     scheduleSubscriberUpdate(key, undefined as OnyxValue<TKey>, undefined, isProcessingCollectionUpdate);
+
+    if (isRamOnlyKey(key)) {
+        return Promise.resolve();
+    }
+
     return Storage.removeItem(key).then(() => undefined);
 }
 
@@ -1037,7 +1111,10 @@ function mergeInternal<TValue extends OnyxInput<OnyxKey> | undefined, TChange ex
  * Merge user provided default key value pairs.
  */
 function initializeWithDefaultKeyStates(): Promise<void> {
-    return Storage.multiGet(Object.keys(defaultKeyStates)).then((pairs) => {
+    // Filter out RAM-only keys from storage reads as they may have stale persisted data
+    // from before the key was migrated to RAM-only.
+    const keysToFetch = Object.keys(defaultKeyStates).filter((key) => !isRamOnlyKey(key));
+    return Storage.multiGet(keysToFetch).then((pairs) => {
         const existingDataAsObject = Object.fromEntries(pairs) as Record<string, unknown>;
 
         const merged = utils.fastMerge(existingDataAsObject, defaultKeyStates, {
@@ -1234,7 +1311,15 @@ function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, me
             }
 
             const oldValue = updatedData[key] || {};
-            const newValue = lodashPick(value, Object.keys(snapshotData[key]));
+
+            // Snapshot entries are stored as a "shape" of the last known data per key, so by default we only
+            // merge fields that already exist in the snapshot to avoid unintentionally bloating snapshot data.
+            // Some clients need specific fields (like pending status) even when they are missing in the snapshot,
+            // so we allow an explicit, opt-in list of keys to always include during snapshot merges.
+            const snapshotExistingKeys = Object.keys(snapshotData[key] || {});
+            const allowedNewKeys = getSnapshotMergeKeys();
+            const keysToCopy = new Set([...snapshotExistingKeys, ...allowedNewKeys]);
+            const newValue = typeof value === 'object' && value !== null ? utils.pick(value as Record<string, unknown>, [...keysToCopy]) : {};
 
             updatedData = {...updatedData, [key]: Object.assign(oldValue, newValue)};
         }
@@ -1294,7 +1379,13 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
     }
 
     // Check if the value is compatible with the existing value in the storage
-    const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(value, existingValue);
+    const {isCompatible, existingValueType, newValueType, isEmptyArrayCoercion} = utils.checkCompatibilityWithExistingValue(value, existingValue);
+    if (isEmptyArrayCoercion) {
+        // Setting an object over empty array isn't semantically correct, but we allow it
+        // in case we accidentally encoded an empty object as an empty array in PHP. If you're
+        // looking at a bugbot from this message, we're probably missing that key in OnyxKeys::KEYS_REQUIRING_EMPTY_OBJECT
+        Logger.logAlert(`[ENSURE_BUGBOT] Onyx setWithRetry called on key "${key}" whose existing value is an empty array. Will coerce to object.`);
+    }
     if (!isCompatible) {
         Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'set', existingValueType, newValueType));
         return Promise.resolve();
@@ -1318,6 +1409,12 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
 
     // If the value has not changed and this isn't a retry attempt, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
     if (!hasChanged && !retryAttempt) {
+        return updatePromise;
+    }
+
+    // If a key is a RAM-only key or a member of RAM-only collection, we skip the step that modifies the storage
+    if (isRamOnlyKey(key)) {
+        OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
         return updatePromise;
     }
 
@@ -1371,7 +1468,13 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
         return OnyxUtils.scheduleSubscriberUpdate(key, value);
     });
 
-    return Storage.multiSet(keyValuePairsToSet)
+    const keyValuePairsToStore = keyValuePairsToSet.filter((keyValuePair) => {
+        const [key] = keyValuePair;
+        // Filter out the RAM-only key value pairs, as they should not be saved to storage
+        return !isRamOnlyKey(key);
+    });
+
+    return Storage.multiSet(keyValuePairsToStore)
         .catch((error) => OnyxUtils.retryOperation(error, multiSetWithRetry, newData, retryAttempt))
         .then(() => {
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MULTI_SET, undefined, newData);
@@ -1439,6 +1542,12 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
         for (const [key, value] of keyValuePairs) cache.set(key, value);
 
         const updatePromise = OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
+
+        // RAM-only keys are not supposed to be saved to storage
+        if (isRamOnlyKey(collectionKey)) {
+            OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET_COLLECTION, undefined, mutableCollection);
+            return updatePromise;
+        }
 
         return Storage.multiSet(keyValuePairs)
             .catch((error) => OnyxUtils.retryOperation(error, setCollectionWithRetry, {collectionKey, collection}, retryAttempt))
@@ -1513,8 +1622,17 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
             const cachedCollectionForExistingKeys = getCachedCollection(collectionKey, existingKeys);
 
             const existingKeyCollection = existingKeys.reduce((obj: OnyxInputKeyValueMapping, key) => {
-                const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(resultCollection[key], cachedCollectionForExistingKeys[key]);
+                const {isCompatible, existingValueType, newValueType, isEmptyArrayCoercion} = utils.checkCompatibilityWithExistingValue(
+                    resultCollection[key],
+                    cachedCollectionForExistingKeys[key],
+                );
 
+                if (isEmptyArrayCoercion) {
+                    // Merging an object into an empty array isn't semantically correct, but we allow it
+                    // in case we accidentally encoded an empty object as an empty array in PHP. If you're
+                    // looking at a bugbot from this message, we're probably missing that key in OnyxKeys::KEYS_REQUIRING_EMPTY_OBJECT
+                    Logger.logAlert(`[ENSURE_BUGBOT] Onyx mergeCollection called on key "${key}" whose existing value is an empty array. Will coerce to object.`);
+                }
                 if (!isCompatible) {
                     Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'mergeCollection', existingValueType, newValueType));
                     return obj;
@@ -1550,11 +1668,13 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
 
             // New keys will be added via multiSet while existing keys will be updated using multiMerge
             // This is because setting a key that doesn't exist yet with multiMerge will throw errors
-            if (keyValuePairsForExistingCollection.length > 0) {
+            // We can skip this step for RAM-only keys as they should never be saved to storage
+            if (!isRamOnlyKey(collectionKey) && keyValuePairsForExistingCollection.length > 0) {
                 promises.push(Storage.multiMerge(keyValuePairsForExistingCollection));
             }
 
-            if (keyValuePairsForNewCollection.length > 0) {
+            // We can skip this step for RAM-only keys as they should never be saved to storage
+            if (!isRamOnlyKey(collectionKey) && keyValuePairsForNewCollection.length > 0) {
                 promises.push(Storage.multiSet(keyValuePairsForNewCollection));
             }
 
@@ -1633,6 +1753,11 @@ function partialSetCollection<TKey extends CollectionKeyBase>({collectionKey, co
 
         const updatePromise = scheduleNotifyCollectionSubscribers(collectionKey, mutableCollection, previousCollection);
 
+        if (isRamOnlyKey(collectionKey)) {
+            sendActionToDevTools(METHOD.SET_COLLECTION, undefined, mutableCollection);
+            return updatePromise;
+        }
+
         return Storage.multiSet(keyValuePairs)
             .catch((error) => retryOperation(error, partialSetCollection, {collectionKey, collection}, retryAttempt))
             .then(() => {
@@ -1667,6 +1792,7 @@ const OnyxUtils = {
     getMergeQueuePromise,
     getDefaultKeyStates,
     getDeferredInitTask,
+    afterInit,
     initStoreValues,
     sendActionToDevTools,
     get,
@@ -1704,6 +1830,8 @@ const OnyxUtils = {
     unsubscribeFromKey,
     getSkippableCollectionMemberIDs,
     setSkippableCollectionMemberIDs,
+    getSnapshotMergeKeys,
+    setSnapshotMergeKeys,
     storeKeyBySubscriptions,
     deleteKeyBySubscriptions,
     addKeyToRecentlyAccessedIfNeeded,
@@ -1716,6 +1844,7 @@ const OnyxUtils = {
     setWithRetry,
     multiSetWithRetry,
     setCollectionWithRetry,
+    isRamOnlyKey,
 };
 
 GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {

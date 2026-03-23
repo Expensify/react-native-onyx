@@ -334,7 +334,7 @@ type ExpandOnyxKeys<TKey extends OnyxKey> = TKey extends CollectionKeyBase ? NoI
  * If a new method is added to OnyxUtils.METHOD constant, it must be added to OnyxMethodValueMap type.
  * Otherwise it will show static type errors.
  */
-type OnyxUpdate<TKey extends OnyxKey = OnyxKey> = {
+type OnyxUpdate<TKey extends OnyxKey> = {
     // ⚠️ DO NOT CHANGE THIS TYPE, UNLESS YOU KNOW WHAT YOU ARE DOING. ⚠️
     [K in TKey]:
         | {onyxMethod: typeof OnyxUtils.METHOD.SET; key: ExpandOnyxKeys<K>; value: OnyxSetInput<K>}
@@ -425,6 +425,20 @@ type InitOptions = {
      * Additionally, any subscribers from these keys to won't receive any data from Onyx.
      */
     skippableCollectionMemberIDs?: string[];
+
+    /**
+     * Array of keys that when provided to Onyx are flagged as RAM-only keys, and thus are not saved to disk.
+     */
+    ramOnlyKeys?: OnyxKey[];
+
+    /**
+     * A list of field names that should always be merged into snapshot entries even if those fields are
+     * missing in the snapshot. Snapshots are saved "views" of a key's data used to populate read-only
+     * or cached lists, and by default Onyx only merges fields that already exist in that saved view.
+     * Use this to opt-in to additional fields that must appear in snapshots (for example, pending flags)
+     * without hardcoding app-specific logic inside Onyx.
+     */
+    snapshotMergeKeys?: string[];
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

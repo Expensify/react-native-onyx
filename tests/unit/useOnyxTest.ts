@@ -5,7 +5,6 @@ import OnyxCache from '../../lib/OnyxCache';
 import StorageMock from '../../lib/storage';
 import type GenericCollection from '../utils/GenericCollection';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
-import * as Logger from '../../lib/Logger';
 import onyxSnapshotCache from '../../lib/OnyxSnapshotCache';
 import type {UseOnyxSelector} from '../../lib/useOnyx';
 
@@ -16,13 +15,17 @@ const ONYXKEYS = {
         TEST_KEY: 'test_',
         TEST_KEY_2: 'test2_',
         EVICTABLE_TEST_KEY: 'evictable_test_',
+        RAM_ONLY_COLLECTION: 'ramOnlyCollection_',
     },
+    RAM_ONLY_KEY: 'ramOnlyKey',
+    RAM_ONLY_WITH_INITIAL_VALUE: 'ramOnlyWithInitialValue',
 };
 
 Onyx.init({
     keys: ONYXKEYS,
     evictableKeys: [ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY],
     skippableCollectionMemberIDs: ['skippable-id'],
+    ramOnlyKeys: [ONYXKEYS.RAM_ONLY_KEY, ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYXKEYS.RAM_ONLY_WITH_INITIAL_VALUE],
 });
 
 beforeEach(async () => {
@@ -32,111 +35,6 @@ beforeEach(async () => {
 });
 
 describe('useOnyx', () => {
-    describe('dynamic key', () => {
-        const error = (key1: string, key2: string) =>
-            `'${key1}' key can't be changed to '${key2}'. useOnyx() only supports dynamic keys if they are both collection member keys from the same collection e.g. from 'collection_id1' to 'collection_id2'.`;
-
-        beforeEach(() => {
-            jest.spyOn(console, 'error').mockImplementation(jest.fn);
-        });
-
-        afterEach(() => {
-            (console.error as unknown as jest.SpyInstance<void, Parameters<typeof console.error>>).mockRestore();
-        });
-
-        it('should throw an error when changing from a non-collection key to another one', async () => {
-            const {rerender} = renderHook((key: string) => useOnyx(key), {initialProps: ONYXKEYS.TEST_KEY});
-
-            try {
-                await act(async () => {
-                    rerender(ONYXKEYS.TEST_KEY_2);
-                });
-
-                fail('Expected to throw an error.');
-            } catch (e) {
-                expect((e as Error).message).toBe(error(ONYXKEYS.TEST_KEY, ONYXKEYS.TEST_KEY_2));
-            }
-        });
-
-        it('should throw an error when changing from a collection key to another one', async () => {
-            const {rerender} = renderHook((key: string) => useOnyx(key), {initialProps: ONYXKEYS.COLLECTION.TEST_KEY});
-
-            try {
-                await act(async () => {
-                    rerender(ONYXKEYS.COLLECTION.TEST_KEY_2);
-                });
-
-                fail('Expected to throw an error.');
-            } catch (e) {
-                expect((e as Error).message).toBe(error(ONYXKEYS.COLLECTION.TEST_KEY, ONYXKEYS.COLLECTION.TEST_KEY_2));
-            }
-        });
-
-        it('should throw an error when changing from a collection key to a collectiom member key', async () => {
-            const {rerender} = renderHook((key: string) => useOnyx(key), {initialProps: ONYXKEYS.COLLECTION.TEST_KEY});
-
-            try {
-                await act(async () => {
-                    rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}1`);
-                });
-
-                fail('Expected to throw an error.');
-            } catch (e) {
-                expect((e as Error).message).toBe(error(ONYXKEYS.COLLECTION.TEST_KEY, `${ONYXKEYS.COLLECTION.TEST_KEY}1`));
-            }
-        });
-
-        it('should not throw any errors when changing from a collection member key to another one', async () => {
-            const {rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string});
-
-            try {
-                await act(async () => {
-                    rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}2`);
-                });
-            } catch (e) {
-                fail("Expected to don't throw any errors.");
-            }
-        });
-
-        it('should not throw an error when changing from a non-collection key to another one if allowDynamicKey is true', async () => {
-            const {rerender} = renderHook((key: string) => useOnyx(key, {allowDynamicKey: true}), {initialProps: ONYXKEYS.TEST_KEY});
-
-            try {
-                await act(async () => {
-                    rerender(ONYXKEYS.TEST_KEY_2);
-                });
-            } catch (e) {
-                fail("Expected to don't throw any errors.");
-            }
-        });
-
-        it('should throw an error when changing from a non-collection key to another one if allowDynamicKey is false', async () => {
-            const {rerender} = renderHook((key: string) => useOnyx(key, {allowDynamicKey: false}), {initialProps: ONYXKEYS.TEST_KEY});
-
-            try {
-                await act(async () => {
-                    rerender(ONYXKEYS.TEST_KEY_2);
-                });
-
-                fail('Expected to throw an error.');
-            } catch (e) {
-                expect((e as Error).message).toBe(error(ONYXKEYS.TEST_KEY, ONYXKEYS.TEST_KEY_2));
-            }
-        });
-
-        it('should not throw an error when changing from a collection member key to another one if allowDynamicKey is true', async () => {
-            const {rerender} = renderHook((key: string) => useOnyx(key, {allowDynamicKey: true}), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}` as string});
-
-            try {
-                await act(async () => {
-                    rerender(`${ONYXKEYS.COLLECTION.TEST_KEY_2}`);
-                });
-            } catch (e) {
-                fail("Expected to don't throw any errors.");
-            }
-        });
-    });
-
     describe('misc', () => {
         it('should initially return loading state while loading non-existent key, and then return `undefined` and loaded state', async () => {
             const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
@@ -426,7 +324,10 @@ describe('useOnyx', () => {
         it('should always use the current selector reference to return new data', async () => {
             Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name'});
 
-            let selector = ((entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name}`) as UseOnyxSelector<OnyxKey, string>;
+            let selector: UseOnyxSelector<OnyxKey, string> = ((entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name}`) as UseOnyxSelector<
+                OnyxKey,
+                string
+            >;
 
             const {result, rerender} = renderHook(() =>
                 useOnyx(ONYXKEYS.TEST_KEY, {
@@ -437,10 +338,22 @@ describe('useOnyx', () => {
             expect(result.current[0]).toEqual('id - test_id, name - test_name');
             expect(result.current[1].status).toEqual('loaded');
 
-            selector = ((entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name} - selector changed`) as UseOnyxSelector<OnyxKey, string>;
+            selector = ((entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name} - selector changed synchronously`) as UseOnyxSelector<OnyxKey, string>;
+
             rerender(undefined);
 
-            expect(result.current[0]).toEqual('id - test_id, name - test_name - selector changed');
+            expect(result.current[0]).toEqual('id - test_id, name - test_name - selector changed synchronously');
+            expect(result.current[1].status).toEqual('loaded');
+
+            selector = ((entry: OnyxEntry<{id: string; name: string}>) => `id - ${entry?.id}, name - ${entry?.name} - selector changed after macrotask`) as UseOnyxSelector<OnyxKey, string>;
+
+            await act(async () => {
+                // This is necessary to avoid regressions of the selector interleaving bug, see https://github.com/Expensify/App/issues/79449
+                await waitForPromisesToResolve();
+                rerender(undefined);
+            });
+
+            expect(result.current[0]).toEqual('id - test_id, name - test_name - selector changed after macrotask');
             expect(result.current[1].status).toEqual('loaded');
         });
 
@@ -681,15 +594,16 @@ describe('useOnyx', () => {
 
             const dependencies = ['constant'];
             let selectorCallCount = 0;
+            const selector = ((data) => {
+                selectorCallCount++;
+                return `${dependencies.join(',')}:${(data as {value?: string})?.value}`;
+            }) as UseOnyxSelector<OnyxKey, string>;
 
             const {result, rerender} = renderHook(() =>
                 useOnyx(
                     ONYXKEYS.TEST_KEY,
                     {
-                        selector: (data) => {
-                            selectorCallCount++;
-                            return `${dependencies.join(',')}:${(data as {value?: string})?.value}`;
-                        },
+                        selector,
                     },
                     dependencies,
                 ),
@@ -718,7 +632,7 @@ describe('useOnyx', () => {
         });
     });
 
-    describe('allowStaleData', () => {
+    describe('pending merges', () => {
         it('should return undefined and loading state while we have pending merges for the key, and then return updated value and loaded state', async () => {
             Onyx.set(ONYXKEYS.TEST_KEY, 'test1');
 
@@ -756,24 +670,6 @@ describe('useOnyx', () => {
             await act(async () => waitForPromisesToResolve());
 
             expect(result.current[0]).toEqual('test4_changed');
-            expect(result.current[1].status).toEqual('loaded');
-        });
-
-        it('should return stale value and loaded state if allowStaleData is true, and then return updated value and loaded state', async () => {
-            Onyx.set(ONYXKEYS.TEST_KEY, 'test1');
-
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test3');
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test4');
-
-            const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {allowStaleData: true}));
-
-            expect(result.current[0]).toEqual('test1');
-            expect(result.current[1].status).toEqual('loaded');
-
-            await act(async () => waitForPromisesToResolve());
-
-            expect(result.current[0]).toEqual('test4');
             expect(result.current[1].status).toEqual('loaded');
         });
     });
@@ -855,39 +751,6 @@ describe('useOnyx', () => {
             expect(result1.current[1].status).toEqual('loaded');
 
             expect(result2.current[0]).toEqual('test');
-            expect(result2.current[1].status).toEqual('loaded');
-        });
-
-        it('"allowStaleData" should work correctly for the same key if more than one hook is using it', async () => {
-            Onyx.set(ONYXKEYS.TEST_KEY, 'test1');
-
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test3');
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test4');
-
-            const {result: result1} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {allowStaleData: true}));
-
-            expect(result1.current[0]).toEqual('test1');
-            expect(result1.current[1].status).toEqual('loaded');
-
-            await act(async () => waitForPromisesToResolve());
-
-            expect(result1.current[0]).toEqual('test4');
-            expect(result1.current[1].status).toEqual('loaded');
-
-            // Second hook
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test5');
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test6');
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test7');
-
-            const {result: result2} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {allowStaleData: true}));
-
-            expect(result2.current[0]).toEqual('test4');
-            expect(result2.current[1].status).toEqual('loaded');
-
-            await act(async () => waitForPromisesToResolve());
-
-            expect(result2.current[0]).toEqual('test7');
             expect(result2.current[1].status).toEqual('loaded');
         });
 
@@ -1019,155 +882,115 @@ describe('useOnyx', () => {
         });
     });
 
-    describe('canBeMissing', () => {
-        let logAlertFn = jest.fn();
-        const alertMessage = 'useOnyx returned no data for key with canBeMissing set to false for key test';
+    describe('RAM-only keys', () => {
+        it('should not return stale storage data for a RAM-only key', async () => {
+            await StorageMock.setItem(ONYXKEYS.RAM_ONLY_KEY, 'stale_value');
 
-        beforeEach(() => {
-            logAlertFn = jest.fn();
-            jest.spyOn(Logger, 'logAlert').mockImplementation(logAlertFn);
-        });
-
-        afterEach(() => {
-            (Logger.logAlert as unknown as jest.SpyInstance<void, Parameters<typeof Logger.logAlert>>).mockRestore();
-        });
-
-        it('should not log an alert if Onyx doesn\'t return data in loaded state and "canBeMissing" property is not provided', async () => {
-            const {result: result1} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
-
-            expect(result1.current[0]).toBeUndefined();
-            expect(result1.current[1].status).toEqual('loading');
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.RAM_ONLY_KEY));
 
             await act(async () => waitForPromisesToResolve());
 
-            expect(result1.current[0]).toBeUndefined();
-            expect(result1.current[1].status).toEqual('loaded');
-            expect(logAlertFn).not.toBeCalled();
-
-            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'test'));
-
-            expect(result1.current[0]).toBe('test');
-
-            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, null));
-
-            expect(result1.current[0]).toBeUndefined();
-            expect(logAlertFn).not.toBeCalled();
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
         });
 
-        it('should not log an alert if Onyx doesn\'t return data, "canBeMissing" property is false but "initWithStoredValues" is also false', async () => {
-            const {result: result1} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {canBeMissing: false, initWithStoredValues: false}));
-
-            expect(result1.current[0]).toBeUndefined();
-            expect(result1.current[1].status).toEqual('loaded');
-
-            expect(logAlertFn).not.toBeCalled();
-        });
-
-        it('should log an alert if Onyx doesn\'t return data in loaded state and "canBeMissing" property is false', async () => {
-            const {result: result1} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {canBeMissing: false}));
-
-            expect(result1.current[0]).toBeUndefined();
-            expect(result1.current[1].status).toEqual('loading');
-            expect(logAlertFn).not.toBeCalled();
+        it('should return value and loaded state after setting a RAM-only key', async () => {
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.RAM_ONLY_KEY));
 
             await act(async () => waitForPromisesToResolve());
 
-            expect(result1.current[0]).toBeUndefined();
-            expect(result1.current[1].status).toEqual('loaded');
-            expect(logAlertFn).toHaveBeenCalledTimes(1);
-            expect(logAlertFn).toHaveBeenNthCalledWith(1, alertMessage, {showAlert: true});
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
 
-            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'test'));
+            await act(async () => Onyx.set(ONYXKEYS.RAM_ONLY_KEY, 'fresh_value'));
 
-            expect(result1.current[0]).toBe('test');
-
-            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, null));
-
-            expect(result1.current[0]).toBeUndefined();
-            expect(logAlertFn).toHaveBeenCalledTimes(2);
-            expect(logAlertFn).toHaveBeenNthCalledWith(2, alertMessage, {showAlert: true});
+            expect(result.current[0]).toEqual('fresh_value');
+            expect(result.current[1].status).toEqual('loaded');
         });
 
-        it('should log an alert if Onyx doesn\'t return selected data in loaded state and "canBeMissing" property is false', async () => {
-            const {result: result1} = renderHook(() =>
-                useOnyx(ONYXKEYS.TEST_KEY, {
-                    selector: ((entry: OnyxEntry<string>) => (entry ? `${entry}_changed` : undefined)) as UseOnyxSelector<OnyxKey, string | undefined>,
-                    canBeMissing: false,
-                }),
+        it('should return updated value after merge on a RAM-only key', async () => {
+            await act(async () => Onyx.set(ONYXKEYS.RAM_ONLY_KEY, {name: 'test'}));
+
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.RAM_ONLY_KEY));
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual({name: 'test'});
+            expect(result.current[1].status).toEqual('loaded');
+
+            await act(async () => Onyx.merge(ONYXKEYS.RAM_ONLY_KEY, {age: 25}));
+
+            expect(result.current[0]).toEqual({name: 'test', age: 25});
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should return collection data from cache for a RAM-only collection key', async () => {
+            await act(async () =>
+                Onyx.mergeCollection(ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION, {
+                    [`${ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION}entry1`]: {id: '1'},
+                    [`${ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION}entry2`]: {id: '2'},
+                } as GenericCollection),
             );
 
-            expect(result1.current[0]).toBeUndefined();
-            expect(result1.current[1].status).toEqual('loading');
-            expect(logAlertFn).not.toBeCalled();
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION));
 
             await act(async () => waitForPromisesToResolve());
 
-            expect(result1.current[0]).toBeUndefined();
-            expect(result1.current[1].status).toEqual('loaded');
-            expect(logAlertFn).toHaveBeenCalledTimes(1);
-            expect(logAlertFn).toHaveBeenNthCalledWith(1, alertMessage, {showAlert: true});
-
-            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'test'));
-
-            expect(result1.current[0]).toBe('test_changed');
-
-            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, null));
-
-            expect(result1.current[0]).toBeUndefined();
-            expect(logAlertFn).toHaveBeenCalledTimes(2);
-            expect(logAlertFn).toHaveBeenNthCalledWith(2, alertMessage, {showAlert: true});
+            expect(result.current[0]).toEqual({
+                [`${ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION}entry1`]: {id: '1'},
+                [`${ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION}entry2`]: {id: '2'},
+            });
+            expect(result.current[1].status).toEqual('loaded');
         });
 
-        it('should log an alert if Onyx doesn\'t return data but there is a selector that always return something and "canBeMissing" property is false', async () => {
-            const {result: result1} = renderHook(() =>
-                useOnyx(ONYXKEYS.TEST_KEY, {
-                    // This selector will always return a value, even if the Onyx data is missing.
-                    selector: ((entry: OnyxEntry<string>) => `${entry}_changed`) as UseOnyxSelector<OnyxKey, string>,
-                    canBeMissing: false,
+        it('should return value for a RAM-only collection member after set', async () => {
+            const {result} = renderHook(() => useOnyx(`${ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION}entry1`));
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+
+            await act(async () => Onyx.set(`${ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION}entry1`, {id: 'fresh'}));
+
+            expect(result.current[0]).toEqual({id: 'fresh'});
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should work with selector on a RAM-only key', async () => {
+            await act(async () => Onyx.set(ONYXKEYS.RAM_ONLY_KEY, {id: 'test_id', name: 'test_name'}));
+
+            const {result} = renderHook(() =>
+                useOnyx(ONYXKEYS.RAM_ONLY_KEY, {
+                    selector: ((entry: OnyxEntry<{id: string; name: string}>) => entry?.id) as UseOnyxSelector<OnyxKey, string | undefined>,
                 }),
             );
 
             await act(async () => waitForPromisesToResolve());
 
-            expect(result1.current[0]).toBe('undefined_changed');
-            expect(result1.current[1].status).toEqual('loaded');
-            expect(logAlertFn).toHaveBeenCalledTimes(1);
-            expect(logAlertFn).toHaveBeenNthCalledWith(1, alertMessage, {showAlert: true});
+            expect(result.current[0]).toEqual('test_id');
+            expect(result.current[1].status).toEqual('loaded');
 
-            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'test'));
+            await act(async () => Onyx.merge(ONYXKEYS.RAM_ONLY_KEY, {id: 'changed_id'}));
 
-            expect(result1.current[0]).toBe('test_changed');
-
-            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, null));
-
-            expect(result1.current[0]).toBe('undefined_changed');
-            expect(logAlertFn).toHaveBeenCalledTimes(2);
-            expect(logAlertFn).toHaveBeenNthCalledWith(2, alertMessage, {showAlert: true});
+            expect(result.current[0]).toEqual('changed_id');
+            expect(result.current[1].status).toEqual('loaded');
         });
 
-        it('should not log an alert if "canBeMissing" property is false but there is a Onyx.clear() task in progress', async () => {
-            const {result: result1} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {canBeMissing: false}));
+        it('should return `undefined` after clearing a RAM-only key', async () => {
+            await act(async () => Onyx.set(ONYXKEYS.RAM_ONLY_KEY, 'value'));
 
-            expect(result1.current[0]).toBeUndefined();
-            expect(result1.current[1].status).toEqual('loading');
-            expect(logAlertFn).not.toBeCalled();
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.RAM_ONLY_KEY));
 
             await act(async () => waitForPromisesToResolve());
 
-            expect(result1.current[0]).toBeUndefined();
-            expect(result1.current[1].status).toEqual('loaded');
-            expect(logAlertFn).toHaveBeenCalledTimes(1);
-            expect(logAlertFn).toHaveBeenNthCalledWith(1, alertMessage, {showAlert: true});
+            expect(result.current[0]).toEqual('value');
+            expect(result.current[1].status).toEqual('loaded');
 
-            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'test'));
-
-            expect(result1.current[0]).toBe('test');
-
-            logAlertFn.mockReset();
             await act(async () => Onyx.clear());
 
-            expect(result1.current[0]).toBeUndefined();
-            expect(logAlertFn).not.toBeCalled();
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
         });
     });
 
