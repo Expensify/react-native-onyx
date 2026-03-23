@@ -4,6 +4,8 @@ import utils from '../../../utils';
 import type StorageProvider from '../types';
 import type {OnyxKey, OnyxValue} from '../../../types';
 import createStore from './createStore';
+import * as GlobalSettings from '../../../GlobalSettings';
+import decorateWithMetrics from '../../../metrics';
 
 const DB_NAME = 'OnyxDB';
 const STORE_NAME = 'keyvaluepairs';
@@ -154,5 +156,23 @@ const provider: StorageProvider<UseStore | undefined> = {
             });
     },
 };
+
+GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
+    if (!enablePerformanceMetrics) {
+        return;
+    }
+
+    // Apply decorators
+    provider.getItem = decorateWithMetrics(provider.getItem, 'IDBKeyValProvider.getItem');
+    provider.multiGet = decorateWithMetrics(provider.multiGet, 'IDBKeyValProvider.multiGet');
+    provider.setItem = decorateWithMetrics(provider.setItem, 'IDBKeyValProvider.setItem');
+    provider.multiSet = decorateWithMetrics(provider.multiSet, 'IDBKeyValProvider.multiSet');
+    provider.mergeItem = decorateWithMetrics(provider.mergeItem, 'IDBKeyValProvider.mergeItem');
+    provider.multiMerge = decorateWithMetrics(provider.multiMerge, 'IDBKeyValProvider.multiMerge');
+    provider.removeItem = decorateWithMetrics(provider.removeItem, 'IDBKeyValProvider.removeItem');
+    provider.removeItems = decorateWithMetrics(provider.removeItems, 'IDBKeyValProvider.removeItems');
+    provider.clear = decorateWithMetrics(provider.clear, 'IDBKeyValProvider.clear');
+    provider.getAllKeys = decorateWithMetrics(provider.getAllKeys, 'IDBKeyValProvider.getAllKeys');
+});
 
 export default provider;
