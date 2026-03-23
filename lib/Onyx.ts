@@ -345,7 +345,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                 //      to null would cause unknown behavior)
                 //   2.1 However, if a default key was explicitly set to null, we need to reset it to the default value
                 for (const key of allKeys) {
-                    const isKeyToPreserve = keysToPreserve.includes(key);
+                    const isKeyToPreserve = keysToPreserve.some((preserveKey) => OnyxUtils.isKeyMatch(preserveKey, key));
                     const isDefaultKey = key in defaultKeyStates;
 
                     // If the key is being removed or reset to default:
@@ -393,7 +393,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                 // Exclude RAM-only keys to prevent them from being saved to storage
                 const defaultKeyValuePairs = Object.entries(
                     Object.keys(defaultKeyStates)
-                        .filter((key) => !keysToPreserve.includes(key) && !OnyxUtils.isRamOnlyKey(key))
+                        .filter((key) => !keysToPreserve.some((preserveKey) => OnyxUtils.isKeyMatch(preserveKey, key)) && !OnyxUtils.isRamOnlyKey(key))
                         .reduce((obj: KeyValueMapping, key) => {
                             // eslint-disable-next-line no-param-reassign
                             obj[key] = defaultKeyStates[key];
