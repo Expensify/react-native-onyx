@@ -182,6 +182,76 @@ describe('Onyx', () => {
             });
     });
 
+    it('should merge an object into an empty array (treating [] as {})', async () => {
+        let testKeyValue: unknown;
+
+        connection = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        await Onyx.set(ONYX_KEYS.TEST_KEY, []);
+        expect(testKeyValue).toStrictEqual([]);
+        await Onyx.merge(ONYX_KEYS.TEST_KEY, {test: 'value'});
+        expect(testKeyValue).toStrictEqual({test: 'value'});
+    });
+
+    it('should still reject merging an object into a non-empty array', async () => {
+        let testKeyValue: unknown;
+
+        connection = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        await Onyx.merge(ONYX_KEYS.TEST_KEY, ['existing']);
+        expect(testKeyValue).toStrictEqual(['existing']);
+        await Onyx.merge(ONYX_KEYS.TEST_KEY, {test: 'value'});
+        expect(testKeyValue).toStrictEqual(['existing']);
+    });
+
+    it('should mergeCollection an object into an empty array (treating [] as {})', async () => {
+        const collectionKey = `${ONYX_KEYS.COLLECTION.TEST_KEY}1`;
+        let testKeyValue: unknown;
+
+        connection = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            initWithStoredValues: false,
+            waitForCollectionCallback: true,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        await Onyx.set(collectionKey, []);
+        expect((testKeyValue as Record<string, unknown>)?.[collectionKey]).toStrictEqual([]);
+        await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {[collectionKey]: {test: 'value'}});
+        expect((testKeyValue as Record<string, unknown>)?.[collectionKey]).toStrictEqual({test: 'value'});
+    });
+
+    it('should set an object over an empty array (treating [] as {})', async () => {
+        let testKeyValue: unknown;
+
+        connection = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        await Onyx.set(ONYX_KEYS.TEST_KEY, []);
+        expect(testKeyValue).toStrictEqual([]);
+        await Onyx.set(ONYX_KEYS.TEST_KEY, {test: 'value'});
+        expect(testKeyValue).toStrictEqual({test: 'value'});
+    });
+
     it('should notify subscribers when data has been cleared', () => {
         let testKeyValue: unknown;
         connection = Onyx.connect({
@@ -1482,9 +1552,10 @@ describe('Onyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                expect(collectionCallback).toHaveBeenCalledTimes(2);
+                expect(collectionCallback).toHaveBeenCalledTimes(3);
                 expect(collectionCallback).toHaveBeenNthCalledWith(1, {[cat]: initialValue}, ONYX_KEYS.COLLECTION.ANIMALS, {[cat]: initialValue});
-                expect(collectionCallback).toHaveBeenNthCalledWith(2, collectionDiff, ONYX_KEYS.COLLECTION.ANIMALS, {[cat]: initialValue, [dog]: {name: 'Rex'}});
+                expect(collectionCallback).toHaveBeenNthCalledWith(2, {[cat]: initialValue}, ONYX_KEYS.COLLECTION.ANIMALS, undefined);
+                expect(collectionCallback).toHaveBeenNthCalledWith(3, collectionDiff, ONYX_KEYS.COLLECTION.ANIMALS, {[cat]: initialValue, [dog]: {name: 'Rex'}});
 
                 // Cat hasn't changed from its original value, expect only the initial connect callback
                 expect(catCallback).toHaveBeenCalledTimes(1);
