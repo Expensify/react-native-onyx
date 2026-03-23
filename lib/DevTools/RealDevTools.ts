@@ -1,4 +1,5 @@
 import type {IDevTools, DevtoolsOptions, DevtoolsConnection, ReduxDevtools} from './types';
+import OnyxUtils from '../OnyxUtils';
 
 const ERROR_LABEL = 'Onyx DevTools - Error: ';
 
@@ -76,7 +77,7 @@ class RealDevTools implements IDevTools {
     clearState(keysToPreserve: string[] = []): void {
         const newState = Object.entries(this.state).reduce((obj: Record<string, unknown>, [key, value]) => {
             // eslint-disable-next-line no-param-reassign
-            obj[key] = keysToPreserve.includes(key) ? value : this.defaultState[key];
+            obj[key] = keysToPreserve.some((preserveKey) => OnyxUtils.isKeyMatch(preserveKey, key)) ? value : this.defaultState[key];
             return obj;
         }, {});
 
