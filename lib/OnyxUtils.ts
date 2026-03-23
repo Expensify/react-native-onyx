@@ -100,7 +100,9 @@ let lastSubscriptionID = 0;
 // Connections can be made before `Onyx.init`. They would wait for this task before resolving
 const deferredInitTask = createDeferredTask();
 
-// Holds a set of collection member IDs which updates will be ignored when using Onyx methods.
+// Collection member IDs that Onyx should silently ignore across all operations — reads, writes, cache, and subscriber
+// notifications. This is used to filter out keys formed from invalid/default IDs (e.g. "-1", "0",
+// "undefined", "null", "NaN") that can appear when an ID variable is accidentally coerced to string.
 let skippableCollectionMemberIDs = new Set<string>();
 // Holds a set of keys that should always be merged into snapshot entries.
 let snapshotMergeKeys = new Set<string>();
@@ -1119,7 +1121,7 @@ function initializeWithDefaultKeyStates(): Promise<void> {
         .then((pairs) => {
             const allDataFromStorage: Record<string, unknown> = {};
             for (const [key, value] of pairs) {
-                // RAM-only keys should never be loaded from storage as they may have stale persisted data
+                // RAM-only keys should not be cached from storage as they may have stale persisted data
                 // from before the key was migrated to RAM-only.
                 if (isRamOnlyKey(key)) {
                     continue;
@@ -1159,7 +1161,9 @@ function initializeWithDefaultKeyStates(): Promise<void> {
 
             // Notify subscribers about default key states so that any subscriber that connected
             // before init (e.g. during module load) receives the merged default values immediately
-            for (const [key, value] of Object.entries(merged ?? {})) keyChanged(key, value);
+            for (const [key, value] of Object.entries(merged ?? {})) {
+                keyChanged(key, value);
+            }
         })
         .catch((error) => {
             Logger.logAlert(`Failed to load data from storage during init. The app will boot with default key states only. Error: ${error}`);
@@ -1175,7 +1179,9 @@ function initializeWithDefaultKeyStates(): Promise<void> {
 
             // Notify subscribers about default key states so that any subscriber that connected
             // before init (e.g. during module load) receives the merged default values immediately
-            for (const [key, value] of Object.entries(defaultKeyStates)) keyChanged(key, value);
+            for (const [key, value] of Object.entries(defaultKeyStates)) {
+                keyChanged(key, value);
+            }
         });
 }
 
