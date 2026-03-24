@@ -451,7 +451,6 @@ class OnyxCache {
         // Return a shallow copy to ensure React detects changes when items are added/removed
         return {...cachedCollection};
     }
-
 }
 
 const instance = new OnyxCache();

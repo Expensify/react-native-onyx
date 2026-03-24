@@ -672,6 +672,88 @@ describe('Onyx', () => {
                 });
         });
 
+        describe('eager loading during initialisation', () => {
+            beforeEach(() => {
+                StorageMock = require('../../lib/storage').default;
+            });
+
+            it('should load all storage data into cache during init', async () => {
+                await StorageMock.setItem(ONYX_KEYS.TEST_KEY, 'storageValue');
+                await StorageMock.setItem(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1, name: 'Item 1'});
+                await StorageMock.setItem(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}2`, {id: 2, name: 'Item 2'});
+                await initOnyx();
+
+                expect(cache.getAllKeys().size).toBe(3);
+                expect(cache.get(ONYX_KEYS.TEST_KEY)).toBe('storageValue');
+                expect(cache.get(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`)).toEqual({id: 1, name: 'Item 1'});
+                expect(cache.get(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}2`)).toEqual({id: 2, name: 'Item 2'});
+            });
+
+            it('should not load RAM-only keys from storage during init', async () => {
+                const testKeys = {
+                    ...ONYX_KEYS,
+                    RAM_ONLY_KEY: 'ramOnlyKey',
+                };
+
+                await StorageMock.setItem(testKeys.RAM_ONLY_KEY, 'staleValue');
+                await StorageMock.setItem(ONYX_KEYS.TEST_KEY, 'normalValue');
+                await initOnyx({keys: testKeys, ramOnlyKeys: [testKeys.RAM_ONLY_KEY]});
+
+                expect(cache.getAllKeys().size).toBe(1);
+                expect(cache.get(testKeys.RAM_ONLY_KEY)).toBeUndefined();
+                expect(cache.get(ONYX_KEYS.TEST_KEY)).toBe('normalValue');
+            });
+
+            it('should merge default key states with storage data during init', async () => {
+                await StorageMock.setItem(ONYX_KEYS.OTHER_TEST, {fromStorage: true});
+                await initOnyx({
+                    initialKeyStates: {
+                        [ONYX_KEYS.OTHER_TEST]: {fromDefault: true},
+                    },
+                });
+
+                // Default key states are merged on top of storage data.
+                expect(cache.get(ONYX_KEYS.OTHER_TEST)).toEqual({fromStorage: true, fromDefault: true});
+            });
+
+            it('should use default key states when storage data is not available for a key', async () => {
+                await StorageMock.clear();
+                await initOnyx({
+                    initialKeyStates: {
+                        [ONYX_KEYS.OTHER_TEST]: 42,
+                    },
+                });
+
+                expect(cache.get(ONYX_KEYS.OTHER_TEST)).toBe(42);
+            });
+
+            it('should gracefully handle Storage.getAll() failure and boot with defaults', async () => {
+                (StorageMock.getAll as jest.Mock).mockImplementationOnce(() => Promise.reject(new Error('Database corrupted')));
+
+                await initOnyx({
+                    initialKeyStates: {
+                        [ONYX_KEYS.OTHER_TEST]: 42,
+                    },
+                });
+
+                expect(cache.getAllKeys().size).toBe(1);
+                expect(cache.get(ONYX_KEYS.OTHER_TEST)).toBe(42);
+            });
+
+            it('should populate cache key index with all storage keys during init', async () => {
+                await StorageMock.setItem(ONYX_KEYS.TEST_KEY, 'value1');
+                await StorageMock.setItem(ONYX_KEYS.OTHER_TEST, 'value2');
+                await StorageMock.setItem(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1});
+                await initOnyx();
+
+                const allKeys = cache.getAllKeys();
+                expect(allKeys.size).toBe(3);
+                expect(allKeys.has(ONYX_KEYS.TEST_KEY)).toBe(true);
+                expect(allKeys.has(ONYX_KEYS.OTHER_TEST)).toBe(true);
+                expect(allKeys.has(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`)).toBe(true);
+            });
+        });
+
         it('should save RAM-only keys', () => {
             const testKeys = {
                 ...ONYX_KEYS,
