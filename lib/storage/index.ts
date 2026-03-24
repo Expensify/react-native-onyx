@@ -4,6 +4,7 @@ import PlatformStorage from './platforms';
 import InstanceSync from './InstanceSync';
 import MemoryOnlyProvider from './providers/MemoryOnlyProvider';
 import type StorageProvider from './providers/types';
+
 let provider = PlatformStorage as StorageProvider<unknown>;
 let shouldKeepInstancesSync = false;
 let finishInitalization: (value?: unknown) => void;
