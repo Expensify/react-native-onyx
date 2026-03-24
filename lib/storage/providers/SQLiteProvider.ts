@@ -198,6 +198,17 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             return (result ?? []) as StorageKeyList;
         });
     },
+    getAll() {
+        if (!provider.store) {
+            throw new Error('Store is not initialized!');
+        }
+
+        return provider.store.executeAsync<OnyxSQLiteKeyValuePair>('SELECT record_key, valueJSON FROM keyvaluepairs;').then(({rows}) => {
+            // eslint-disable-next-line no-underscore-dangle
+            const result = rows?._array.map((row) => [row.record_key, JSON.parse(row.valueJSON)]);
+            return (result ?? []) as StorageKeyValuePair[];
+        });
+    },
     removeItem(key) {
         if (!provider.store) {
             throw new Error('Store is not initialized!');
