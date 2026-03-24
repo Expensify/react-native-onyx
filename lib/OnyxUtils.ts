@@ -87,7 +87,7 @@ let onyxKeyToSubscriptionIDs = new Map();
 let defaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
 
 // Used for comparison with a new update to avoid invoking the Onyx.connect callback with the same data.
-let lastConnectionCallbackData = new Map<number, OnyxValue<OnyxKey>>();
+let lastConnectionCallbackData = new Map<number, {value: OnyxValue<OnyxKey>; matchedKey: OnyxKey | undefined}>();
 
 let snapshotKey: OnyxKey | null = null;
 
@@ -706,7 +706,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
             // If they are subscribed to the collection key and using waitForCollectionCallback then we'll
             // send the whole cached collection.
             if (isSubscribedToCollectionKey) {
-                lastConnectionCallbackData.set(subscriber.subscriptionID, cachedCollection);
+                lastConnectionCallbackData.set(subscriber.subscriptionID, {value: cachedCollection, matchedKey: subscriber.key});
 
                 if (subscriber.waitForCollectionCallback) {
                     subscriber.callback(cachedCollection, subscriber.key, partialCollection);
@@ -735,7 +735,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
 
                 const subscriberCallback = subscriber.callback as DefaultConnectCallback<TKey>;
                 subscriberCallback(cachedCollection[subscriber.key], subscriber.key as TKey);
-                lastConnectionCallbackData.set(subscriber.subscriptionID, cachedCollection[subscriber.key]);
+                lastConnectionCallbackData.set(subscriber.subscriptionID, {value: cachedCollection[subscriber.key], matchedKey: subscriber.key});
                 continue;
             }
 
@@ -789,7 +789,8 @@ function keyChanged<TKey extends OnyxKey>(
 
         // Subscriber is a regular call to connect() and provided a callback
         if (typeof subscriber.callback === 'function') {
-            if (lastConnectionCallbackData.has(subscriber.subscriptionID) && lastConnectionCallbackData.get(subscriber.subscriptionID) === value) {
+            const lastData = lastConnectionCallbackData.get(subscriber.subscriptionID);
+            if (lastData && lastData.matchedKey === key && lastData.value === value) {
                 continue;
             }
 
@@ -807,7 +808,7 @@ function keyChanged<TKey extends OnyxKey>(
                 }
 
                 cachedCollection[key] = value;
-                lastConnectionCallbackData.set(subscriber.subscriptionID, cachedCollection);
+                lastConnectionCallbackData.set(subscriber.subscriptionID, {value: cachedCollection, matchedKey: subscriber.key});
                 subscriber.callback(cachedCollection, subscriber.key, {[key]: value});
                 continue;
             }
@@ -815,7 +816,7 @@ function keyChanged<TKey extends OnyxKey>(
             const subscriberCallback = subscriber.callback as DefaultConnectCallback<TKey>;
             subscriberCallback(value, key);
 
-            lastConnectionCallbackData.set(subscriber.subscriptionID, value);
+            lastConnectionCallbackData.set(subscriber.subscriptionID, {value, matchedKey: key});
             continue;
         }
 
@@ -846,10 +847,12 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: CallbackToStateMapp
 
     // For regular callbacks, we never want to pass null values, but always just undefined if a value is not set in cache or storage.
     value = value === null ? undefined : value;
-    const lastValue = lastConnectionCallbackData.get(mapping.subscriptionID);
+    const lastData = lastConnectionCallbackData.get(mapping.subscriptionID);
 
-    // If the value has not changed we do not need to trigger the callback
-    if (lastConnectionCallbackData.has(mapping.subscriptionID) && shallowEqual(lastValue, value)) {
+    // If the value has not changed for the same key we do not need to trigger the callback.
+    // We compare matchedKey to avoid suppressing callbacks for different collection members
+    // that happen to have shallow-equal values (e.g. during hydration racing with set()).
+    if (lastData && lastData.matchedKey === matchedKey && shallowEqual(lastData.value, value)) {
         return;
     }
 
