@@ -114,9 +114,12 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         },
     ]);
 
-    // Indicates if it's the first Onyx connection of this hook or not, as we don't want certain use cases
-    // in `getSnapshot()` to be satisfied several times.
-    const isFirstConnectionRef = useRef(true);
+    // Tracks which key has completed its first Onyx connection callback. When this doesn't match the
+    // current key, getSnapshot() treats the hook as being in its "first connection" state for that key.
+    // This is key-aware by design: when the key changes, connectedKeyRef still holds the old key (or null
+    // after cleanup), so the hook automatically enters first-connection mode for the new key without any
+    // explicit reset logic — eliminating the race condition where cleanup could clobber a boolean flag.
+    const connectedKeyRef = useRef<OnyxKey | null>(null);
 
     // Indicates if the hook is connecting to an Onyx key.
     const isConnectingRef = useRef(false);
@@ -129,17 +132,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
     // Inside useOnyx.ts, we need to track the sourceValue separately
     const sourceValueRef = useRef<NonNullable<TReturnValue> | undefined>(undefined);
-
-    // When the key changes, reset internal state so the hook properly transitions through loading
-    // for the new key instead of preserving stale status from the previous key.
-    if (key !== previousKey) {
-        previousValueRef.current = null;
-        newValueRef.current = null;
-        isFirstConnectionRef.current = true;
-        shouldGetCachedValueRef.current = true;
-        sourceValueRef.current = undefined;
-        resultRef.current = [undefined, {status: options?.initWithStoredValues === false ? 'loaded' : 'loading'}];
-    }
 
     // Cache the options key to avoid regenerating it every getSnapshot call
     const cacheKey = useMemo(
@@ -169,7 +161,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
         previousDependenciesRef.current = dependencies;
 
-        if (connectionRef.current === null || isConnectingRef.current || !onStoreChangeFnRef.current) {
+        if (connectionRef.current === null || isConnectingRef.current || connectedKeyRef.current !== key || !onStoreChangeFnRef.current) {
             return;
         }
 
@@ -205,7 +197,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // Check if we have any cache for this Onyx key
         // Don't use cache for first connection with initWithStoredValues: false
         // Also don't use cache during active data updates (when shouldGetCachedValueRef is true)
-        if (!(isFirstConnectionRef.current && options?.initWithStoredValues === false) && !shouldGetCachedValueRef.current) {
+        const isFirstConnection = connectedKeyRef.current !== key;
+        if (!(isFirstConnection && options?.initWithStoredValues === false) && !shouldGetCachedValueRef.current) {
             const cachedResult = onyxSnapshotCache.getCachedResult<UseOnyxResult<TReturnValue>>(key, cacheKey);
             if (cachedResult !== undefined) {
                 resultRef.current = cachedResult;
@@ -214,7 +207,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         }
 
         // We return the initial result right away during the first connection if `initWithStoredValues` is set to `false`.
-        if (isFirstConnectionRef.current && options?.initWithStoredValues === false) {
+        if (isFirstConnection && options?.initWithStoredValues === false) {
             const result = resultRef.current;
 
             // Store result in snapshot cache
@@ -226,7 +219,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // so we can return any cached value right away. For the case where the key has changed, If we don't return the cached value right away, then the UI will show the incorrect (previous) value for a brief period which looks like a UI glitch to the user. After the connection is made, we only
         // update `newValueRef` when `Onyx.connect()` callback is fired.
         const hasSelectorChanged = lastComputedSelectorRef.current !== memoizedSelector;
-        if (isFirstConnectionRef.current || shouldGetCachedValueRef.current || key !== previousKey || hasSelectorChanged) {
+        if (isFirstConnection || shouldGetCachedValueRef.current || key !== previousKey || hasSelectorChanged) {
             // Gets the value from cache and maps it with selector. It changes `null` to `undefined` for `useOnyx` compatibility.
             const value = OnyxUtils.tryGetCachedValue(key) as OnyxValue<TKey>;
             const selectedValue = memoizedSelector ? memoizedSelector(value) : value;
@@ -245,7 +238,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
         // If we have pending merge operations for the key during the first connection, we set the new value to `undefined`
         // and fetch status to `loading` to simulate that it is still being loaded until we have the most updated data.
-        if (isFirstConnectionRef.current && OnyxUtils.hasPendingMergeForKey(key)) {
+        if (isFirstConnection && OnyxUtils.hasPendingMergeForKey(key)) {
             newValueRef.current = undefined;
             newFetchStatus = 'loading';
         }
@@ -270,7 +263,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         //   OR we have a pending `Onyx.clear()` task (if `Onyx.clear()` is running cache might not be available anymore
         //   OR the subscriber is triggered (the value is gotten from the storage)
         //   so we update the cached value/result right away in order to prevent infinite loading state issues).
-        const shouldUpdateResult = !areValuesEqual || (previousValueRef.current === null && (hasCacheForKey || OnyxCache.hasPendingTask(TASK.CLEAR) || !isFirstConnectionRef.current));
+        const shouldUpdateResult = !areValuesEqual || (previousValueRef.current === null && (hasCacheForKey || OnyxCache.hasPendingTask(TASK.CLEAR) || !isFirstConnection));
         if (shouldUpdateResult) {
             previousValueRef.current = newValueRef.current;
 
@@ -294,6 +287,14 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
+            // Reset internal state so the hook properly transitions through loading
+            // for the new key instead of preserving stale state from the previous one.
+            previousValueRef.current = null;
+            newValueRef.current = null;
+            shouldGetCachedValueRef.current = true;
+            sourceValueRef.current = undefined;
+            resultRef.current = [undefined, {status: options?.initWithStoredValues === false ? 'loaded' : 'loading'}];
+
             isConnectingRef.current = true;
             onStoreChangeFnRef.current = onStoreChange;
 
@@ -303,9 +304,9 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                     isConnectingRef.current = false;
                     onStoreChangeFnRef.current = onStoreChange;
 
-                    // Signals that the first connection was made, so some logics in `getSnapshot()`
-                    // won't be executed anymore.
-                    isFirstConnectionRef.current = false;
+                    // Signals that the first connection was made for this key, so some logics
+                    // in `getSnapshot()` won't be executed anymore.
+                    connectedKeyRef.current = key;
 
                     // Signals that we want to get the newest cached value again in `getSnapshot()`.
                     shouldGetCachedValueRef.current = true;
@@ -332,7 +333,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                 }
 
                 connectionManager.disconnect(connectionRef.current);
-                isFirstConnectionRef.current = false;
+                connectedKeyRef.current = null;
                 isConnectingRef.current = false;
                 onStoreChangeFnRef.current = null;
             };
