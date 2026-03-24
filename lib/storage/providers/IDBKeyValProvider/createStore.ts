@@ -1,6 +1,8 @@
 import * as IDB from 'idb-keyval';
 import type {UseStore} from 'idb-keyval';
-import {logAlert, logInfo} from '../../../Logger';
+import * as Logger from '../../../Logger';
+
+type ConnectionClosedReason = 'browser' | 'versionchange' | 'verifyStoreExists' | 'unknown';
 
 // This is a copy of the createStore function from idb-keyval, we need a custom implementation
 // because we need to create the database manually in order to ensure that the store exists before we use it.
@@ -8,14 +10,15 @@ import {logAlert, logInfo} from '../../../Logger';
 // source: https://github.com/jakearchibald/idb-keyval/blob/9d19315b4a83897df1e0193dccdc29f78466a0f3/src/index.ts#L12
 function createStore(dbName: string, storeName: string): UseStore {
     let dbp: Promise<IDBDatabase> | undefined;
-    let closedBy: 'browser' | 'versionchange' | 'verifyStoreExists' | 'unknown' = 'unknown';
+    let closedBy: ConnectionClosedReason = 'unknown';
 
     const attachHandlers = (db: IDBDatabase) => {
-        // It seems like Safari sometimes likes to just close the connection.
-        // It's supposed to fire this event when that happens. Let's hope it does!
+        // Browsers may close idle IDB connections at any time, especially Safari.
+        // We clear the cached promise so the next operation opens a fresh connection.
+        // https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/close_event
         // eslint-disable-next-line no-param-reassign
         db.onclose = () => {
-            logInfo('IDB connection closed by browser', {dbName, storeName});
+            Logger.logInfo('IDB connection closed by browser', {dbName, storeName});
             closedBy = 'browser';
             dbp = undefined;
         };
@@ -25,7 +28,7 @@ function createStore(dbName: string, storeName: string): UseStore {
         // https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/versionchange_event
         // eslint-disable-next-line no-param-reassign
         db.onversionchange = () => {
-            logInfo('IDB connection closing due to versionchange', {dbName, storeName});
+            Logger.logInfo('IDB connection closing due to version change', {dbName, storeName});
             closedBy = 'versionchange';
             db.close();
             dbp = undefined;
@@ -53,7 +56,7 @@ function createStore(dbName: string, storeName: string): UseStore {
             return db;
         }
 
-        logInfo(`Store ${storeName} does not exist in database ${dbName}.`);
+        Logger.logInfo(`Store ${storeName} does not exist in database ${dbName}.`);
         const nextVersion = db.version + 1;
         closedBy = 'verifyStoreExists';
         db.close();
@@ -65,7 +68,7 @@ function createStore(dbName: string, storeName: string): UseStore {
                 return;
             }
 
-            logInfo(`Creating store ${storeName} in database ${dbName}.`);
+            Logger.logInfo(`Creating store ${storeName} in database ${dbName}.`);
             updatedDatabase.createObjectStore(storeName);
         };
 
@@ -81,10 +84,12 @@ function createStore(dbName: string, storeName: string): UseStore {
             .then((db) => callback(db.transaction(storeName, txMode).objectStore(storeName)));
     }
 
+    // If the connection was closed between getDB() resolving and db.transaction() executing,
+    // the transaction throws InvalidStateError. We catch it and retry once with a fresh connection.
     return (txMode, callback) =>
         executeTransaction(txMode, callback).catch((error) => {
             if (error instanceof DOMException && error.name === 'InvalidStateError') {
-                logAlert('IDB InvalidStateError, retrying with fresh connection', {
+                Logger.logAlert('IDB InvalidStateError, retrying with fresh connection', {
                     dbName,
                     storeName,
                     txMode,

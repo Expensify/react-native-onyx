@@ -14,7 +14,7 @@ function uniqueDBName() {
  * Captures the internal IDBDatabase instance used by a store by intercepting
  * the first db.transaction() call.
  */
-async function captureDB(store: ReturnType<typeof createStore>): Promise<IDBDatabase> {
+async function captureDB(store: ReturnType<typeof createStore>): Promise<IDBDatabase | undefined> {
     const captured: {db?: IDBDatabase} = {};
     const original = IDBDatabase.prototype.transaction;
     const spy = jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
@@ -23,10 +23,10 @@ async function captureDB(store: ReturnType<typeof createStore>): Promise<IDBData
         return original.apply(this, args);
     });
     await store('readonly', (s) => IDB.promisifyRequest(s.getAllKeys()));
-    return captured.db!;
+    return captured.db;
 }
 
-describe('createStore - connection resilience', () => {
+describe('createStore', () => {
     let logAlertSpy: jest.SpyInstance;
     let logInfoSpy: jest.SpyInstance;
 
@@ -188,7 +188,8 @@ describe('createStore - connection resilience', () => {
             const store = createStore(dbName, STORE_NAME);
 
             const db = await captureDB(store);
-            db.onclose!.call(db, new Event('close'));
+            expect(db).toBeDefined();
+            db?.onclose?.call(db, new Event('close'));
 
             const original = IDBDatabase.prototype.transaction;
             let callCount = 0;
@@ -210,8 +211,9 @@ describe('createStore - connection resilience', () => {
             const store = createStore(dbName, STORE_NAME);
 
             const db = await captureDB(store);
+            expect(db).toBeDefined();
             // @ts-expect-error -- our handler ignores the event argument
-            db.onversionchange!.call(db, new Event('versionchange'));
+            db?.onversionchange?.call(db, new Event('versionchange'));
 
             const original = IDBDatabase.prototype.transaction;
             let callCount = 0;
@@ -233,7 +235,8 @@ describe('createStore - connection resilience', () => {
             const store = createStore(dbName, STORE_NAME);
 
             const db = await captureDB(store);
-            db.onclose!.call(db, new Event('close'));
+            expect(db).toBeDefined();
+            db?.onclose?.call(db, new Event('close'));
 
             const original = IDBDatabase.prototype.transaction;
             let callCount = 0;
@@ -265,7 +268,8 @@ describe('createStore - connection resilience', () => {
             const store = createStore(dbName, STORE_NAME);
 
             const db = await captureDB(store);
-            db.onclose!.call(db, new Event('close'));
+            expect(db).toBeDefined();
+            db?.onclose?.call(db, new Event('close'));
 
             expect(logInfoSpy).toHaveBeenCalledWith('IDB connection closed by browser', {dbName, storeName: STORE_NAME});
         });
@@ -279,7 +283,8 @@ describe('createStore - connection resilience', () => {
             });
 
             const db = await captureDB(store);
-            db.onclose!.call(db, new Event('close'));
+            expect(db).toBeDefined();
+            db?.onclose?.call(db, new Event('close'));
 
             const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
             expect(result).toBe('value');
@@ -292,13 +297,14 @@ describe('createStore - connection resilience', () => {
             const store = createStore(dbName, STORE_NAME);
 
             const db = await captureDB(store);
-            const closeSpy = jest.spyOn(db, 'close');
+            expect(db).toBeDefined();
+            const closeSpy = jest.spyOn(db!, 'close');
 
             // @ts-expect-error -- our handler ignores the event argument
-            db.onversionchange!.call(db, new Event('versionchange'));
+            db?.onversionchange?.call(db, new Event('versionchange'));
 
             expect(closeSpy).toHaveBeenCalled();
-            expect(logInfoSpy).toHaveBeenCalledWith('IDB connection closing due to versionchange', {dbName, storeName: STORE_NAME});
+            expect(logInfoSpy).toHaveBeenCalledWith('IDB connection closing due to version change', {dbName, storeName: STORE_NAME});
         });
 
         it('should recover with a fresh connection after versionchange', async () => {
@@ -310,8 +316,9 @@ describe('createStore - connection resilience', () => {
             });
 
             const db = await captureDB(store);
+            expect(db).toBeDefined();
             // @ts-expect-error -- our handler ignores the event argument
-            db.onversionchange!.call(db, new Event('versionchange'));
+            db?.onversionchange?.call(db, new Event('versionchange'));
 
             const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
             expect(result).toBe('value');
