@@ -3208,7 +3208,6 @@ describe('Onyx.init', () => {
             expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toEqual('test_1');
         });
     });
-
 });
 
 // Separate describe block to control Onyx.init() per-test so we can pre-seed storage before init.

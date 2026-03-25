@@ -168,7 +168,11 @@ function disconnect(connection: Connection): void {
  * @param value value to store
  * @param options optional configuration object
  */
-function set<TKey extends OnyxKey>(key: string extends CollectionKeyBase ? TKey : TKey extends CollectionKeyBase ? never : TKey, value: OnyxSetInput<TKey>, options?: SetOptions): Promise<void> {
+function set<TKey extends OnyxKey>(
+    key: string extends CollectionKeyBase ? TKey : TKey extends CollectionKeyBase ? never : TKey,
+    value: OnyxSetInput<TKey>,
+    options?: SetOptions,
+): Promise<void> {
     if (OnyxUtils.isCollectionKey(key as OnyxKey)) {
         Logger.logInfo(logMessages.collectionKeyOperationAlert(key as string, 'set'));
         return Promise.resolve();
