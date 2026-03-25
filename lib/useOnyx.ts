@@ -7,7 +7,6 @@ import connectionManager from './OnyxConnectionManager';
 import OnyxUtils from './OnyxUtils';
 import * as GlobalSettings from './GlobalSettings';
 import type {CollectionKeyBase, OnyxKey, OnyxValue} from './types';
-import usePrevious from './usePrevious';
 import decorateWithMetrics from './metrics';
 import onyxSnapshotCache from './OnyxSnapshotCache';
 import useLiveRef from './useLiveRef';
@@ -57,8 +56,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     dependencies: DependencyList = [],
 ): UseOnyxResult<TReturnValue> {
     const connectionRef = useRef<Connection | null>(null);
-    const previousKey = usePrevious(key);
-
     const currentDependenciesRef = useLiveRef(dependencies);
     const selector = options?.selector;
 
@@ -219,7 +216,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // so we can return any cached value right away. For the case where the key has changed, If we don't return the cached value right away, then the UI will show the incorrect (previous) value for a brief period which looks like a UI glitch to the user. After the connection is made, we only
         // update `newValueRef` when `Onyx.connect()` callback is fired.
         const hasSelectorChanged = lastComputedSelectorRef.current !== memoizedSelector;
-        if (isFirstConnection || shouldGetCachedValueRef.current || key !== previousKey || hasSelectorChanged) {
+        if (isFirstConnection || shouldGetCachedValueRef.current || hasSelectorChanged) {
             // Gets the value from cache and maps it with selector. It changes `null` to `undefined` for `useOnyx` compatibility.
             const value = OnyxUtils.tryGetCachedValue(key) as OnyxValue<TKey>;
             const selectedValue = memoizedSelector ? memoizedSelector(value) : value;
@@ -283,7 +280,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         }
 
         return resultRef.current;
-    }, [options?.initWithStoredValues, key, memoizedSelector, cacheKey, previousKey]);
+    }, [options?.initWithStoredValues, key, memoizedSelector, cacheKey]);
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {

@@ -117,6 +117,69 @@ describe('useOnyx', () => {
             expect(result.current[0]).toBeUndefined();
             expect(result.current[1].status).toEqual('loaded');
         });
+
+        it('should return the new value when switching from a key with data to another key with different data', async () => {
+            Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}1`, 'value_one');
+            Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}2`, 'value_two');
+
+            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string});
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('value_one');
+            expect(result.current[1].status).toEqual('loaded');
+
+            // Switch to another key that also has data
+            rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}2`);
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('value_two');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should apply the selector against the new key data when switching keys', async () => {
+            Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}1`, {id: 'entry1_id', name: 'entry1_name'});
+            Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}2`, {id: 'entry2_id', name: 'entry2_name'});
+
+            const selector = ((entry: OnyxEntry<{id: string; name: string}>) => entry?.name) as UseOnyxSelector<OnyxKey, string | undefined>;
+
+            const {result, rerender} = renderHook((key: string) => useOnyx(key, {selector}), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string});
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('entry1_name');
+            expect(result.current[1].status).toEqual('loaded');
+
+            // Switch key — selector should run against the new key's data
+            rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}2`);
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('entry2_name');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should handle rapid key switching and settle on the final key value', async () => {
+            Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}1`, 'value_one');
+            Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}2`, 'value_two');
+            Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}3`, 'value_three');
+
+            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string});
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('value_one');
+
+            // Rapidly switch keys without waiting for promises between switches
+            rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}2`);
+            rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}3`);
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('value_three');
+            expect(result.current[1].status).toEqual('loaded');
+        });
     });
 
     describe('misc', () => {
