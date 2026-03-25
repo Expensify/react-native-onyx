@@ -136,22 +136,32 @@ Onyx.disconnect(connection);
 <a name="set"></a>
 
 ## set(key, value, options)
-Write a value to our store with the given key
+Write a value to our store with the given key.
 
-**Kind**: global function  
+Cannot be used with bare collection keys like `report_` (i.e. `ONYXKEYS.COLLECTION.REPORT`).
+Use `setCollection()` for collection-wide operations.
+Setting individual collection members like `report_123` is allowed.
+
+**Kind**: global function
 
 | Param | Description |
 | --- | --- |
-| key | ONYXKEY to set |
+| key | ONYXKEY to set (must not be a collection key) |
 | value | value to store |
 | options | optional configuration object |
+
+**Example**
+```js
+Onyx.set(ONYXKEYS.SESSION, {token: 'abc'}); // -> {token: 'abc'}
+Onyx.set(`${ONYXKEYS.COLLECTION.REPORT}${reportID}`, {name: 'My Report'}); // -> {name: 'My Report'}
+```
 
 <a name="multiSet"></a>
 
 ## multiSet(data)
 Sets multiple keys and values
 
-**Kind**: global function  
+**Kind**: global function
 
 | Param | Description |
 | --- | --- |
@@ -173,13 +183,18 @@ Calls to `Onyx.merge()` are batched so that any calls performed in a single tick
 applied in the order they were called. Note: `Onyx.set()` calls do not work this way so use caution when mixing
 `Onyx.merge()` and `Onyx.set()`.
 
-**Kind**: global function  
-**Example**  
+Cannot be used with bare collection keys like `report_` (i.e. `ONYXKEYS.COLLECTION.REPORT`).
+Use `mergeCollection()` for collection-wide operations. 
+Merging individual collection members like `report_123` is allowed.
+
+**Kind**: global function
+**Example**
 ```js
 Onyx.merge(ONYXKEYS.EMPLOYEE_LIST, ['Joe']); // -> ['Joe']
 Onyx.merge(ONYXKEYS.EMPLOYEE_LIST, ['Jack']); // -> ['Joe', 'Jack']
 Onyx.merge(ONYXKEYS.POLICY, {id: 1}); // -> {id: 1}
 Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Workspace'}
+Onyx.merge(`${ONYXKEYS.COLLECTION.REPORT}${reportID}`, {name: 'Updated Report'}); // -> {name: 'Updated Report', ...existingData}
 ```
 <a name="mergeCollection"></a>
 
