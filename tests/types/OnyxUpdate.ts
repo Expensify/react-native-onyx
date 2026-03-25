@@ -8,8 +8,16 @@ const onyxUpdate: OnyxUpdate<'test'> = {
     value: 'string',
 };
 
-const onyxUpdateCollectionMember: OnyxUpdate<typeof ONYX_KEYS.COLLECTION.TEST_KEY> = {
+const onyxUpdateCollectionMember: OnyxUpdate<'test_1'> = {
     onyxMethod: 'set',
+    key: `${ONYX_KEYS.COLLECTION.TEST_KEY}1`,
+    value: {
+        str: 'test1',
+    },
+};
+
+const onyxUpdateCollectionMemberMerge: OnyxUpdate<'test_1'> = {
+    onyxMethod: 'merge',
     key: `${ONYX_KEYS.COLLECTION.TEST_KEY}1`,
     value: {
         str: 'test1',
@@ -21,6 +29,20 @@ const onyxUpdateError: OnyxUpdate<'test'> = {
     key: ONYX_KEYS.TEST_KEY,
     // @ts-expect-error TEST_KEY is a string, not a number
     value: 2,
+};
+
+// @ts-expect-error setting a bare collection key via 'set' is not allowed
+const onyxUpdateSetCollectionKeyError: OnyxUpdate<'test_'> = {
+    onyxMethod: 'set',
+    key: ONYX_KEYS.COLLECTION.TEST_KEY,
+    value: {str: 'test1'},
+};
+
+// @ts-expect-error merging a bare collection key via 'merge' is not allowed
+const onyxUpdateMergeCollectionKeyError: OnyxUpdate<'test_'> = {
+    onyxMethod: 'merge',
+    key: ONYX_KEYS.COLLECTION.TEST_KEY,
+    value: {str: 'test1'},
 };
 
 const onyxUpdateCollection: OnyxUpdate<'test_'> = {
@@ -105,10 +127,12 @@ Onyx.update([
 
 Onyx.update([
     {
-        onyxMethod: 'merge',
+        onyxMethod: 'mergecollection',
         key: ONYX_KEYS.COLLECTION.TEST_KEY,
         value: {
-            str: 'test1',
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {
+                str: 'test1',
+            },
         },
     },
     {
