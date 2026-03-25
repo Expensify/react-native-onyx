@@ -209,6 +209,24 @@ describe('OnyxKeys', () => {
             OnyxKeys.deregisterMemberKey(memberKey);
         });
 
+        it('should resolve to the most specific (longest) collection key for overlapping prefixes', () => {
+            // 'test_level_' and 'test_' both match 'test_level_1', but 'test_level_' is more specific
+            const memberKey = `${ONYXKEYS.COLLECTION.TEST_LEVEL_KEY}1`;
+            OnyxKeys.registerMemberKey(memberKey);
+
+            expect(OnyxKeys.getCollectionKey(memberKey)).toBe(ONYXKEYS.COLLECTION.TEST_LEVEL_KEY);
+
+            const testLevelMembers = OnyxKeys.getMembersOfCollection(ONYXKEYS.COLLECTION.TEST_LEVEL_KEY);
+            expect(testLevelMembers?.has(memberKey)).toBe(true);
+
+            // Should NOT be registered under the shorter 'test_' collection
+            const testMembers = OnyxKeys.getMembersOfCollection(ONYXKEYS.COLLECTION.TEST_KEY);
+            expect(testMembers?.has(memberKey)).toBeFalsy();
+
+            // Clean up
+            OnyxKeys.deregisterMemberKey(memberKey);
+        });
+
         it('should populate the reverse lookup so getCollectionKey returns O(1)', () => {
             const memberKey = `${ONYXKEYS.COLLECTION.ROUTES}xyz`;
             OnyxKeys.registerMemberKey(memberKey);
