@@ -35,111 +35,6 @@ beforeEach(async () => {
 });
 
 describe('useOnyx', () => {
-    describe('dynamic key', () => {
-        const error = (key1: string, key2: string) =>
-            `'${key1}' key can't be changed to '${key2}'. useOnyx() only supports dynamic keys if they are both collection member keys from the same collection e.g. from 'collection_id1' to 'collection_id2'.`;
-
-        beforeEach(() => {
-            jest.spyOn(console, 'error').mockImplementation(jest.fn);
-        });
-
-        afterEach(() => {
-            (console.error as unknown as jest.SpyInstance<void, Parameters<typeof console.error>>).mockRestore();
-        });
-
-        it('should throw an error when changing from a non-collection key to another one', async () => {
-            const {rerender} = renderHook((key: string) => useOnyx(key), {initialProps: ONYXKEYS.TEST_KEY});
-
-            try {
-                await act(async () => {
-                    rerender(ONYXKEYS.TEST_KEY_2);
-                });
-
-                fail('Expected to throw an error.');
-            } catch (e) {
-                expect((e as Error).message).toBe(error(ONYXKEYS.TEST_KEY, ONYXKEYS.TEST_KEY_2));
-            }
-        });
-
-        it('should throw an error when changing from a collection key to another one', async () => {
-            const {rerender} = renderHook((key: string) => useOnyx(key), {initialProps: ONYXKEYS.COLLECTION.TEST_KEY});
-
-            try {
-                await act(async () => {
-                    rerender(ONYXKEYS.COLLECTION.TEST_KEY_2);
-                });
-
-                fail('Expected to throw an error.');
-            } catch (e) {
-                expect((e as Error).message).toBe(error(ONYXKEYS.COLLECTION.TEST_KEY, ONYXKEYS.COLLECTION.TEST_KEY_2));
-            }
-        });
-
-        it('should throw an error when changing from a collection key to a collectiom member key', async () => {
-            const {rerender} = renderHook((key: string) => useOnyx(key), {initialProps: ONYXKEYS.COLLECTION.TEST_KEY});
-
-            try {
-                await act(async () => {
-                    rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}1`);
-                });
-
-                fail('Expected to throw an error.');
-            } catch (e) {
-                expect((e as Error).message).toBe(error(ONYXKEYS.COLLECTION.TEST_KEY, `${ONYXKEYS.COLLECTION.TEST_KEY}1`));
-            }
-        });
-
-        it('should not throw any errors when changing from a collection member key to another one', async () => {
-            const {rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string});
-
-            try {
-                await act(async () => {
-                    rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}2`);
-                });
-            } catch (e) {
-                fail("Expected to don't throw any errors.");
-            }
-        });
-
-        it('should not throw an error when changing from a non-collection key to another one if allowDynamicKey is true', async () => {
-            const {rerender} = renderHook((key: string) => useOnyx(key, {allowDynamicKey: true}), {initialProps: ONYXKEYS.TEST_KEY});
-
-            try {
-                await act(async () => {
-                    rerender(ONYXKEYS.TEST_KEY_2);
-                });
-            } catch (e) {
-                fail("Expected to don't throw any errors.");
-            }
-        });
-
-        it('should throw an error when changing from a non-collection key to another one if allowDynamicKey is false', async () => {
-            const {rerender} = renderHook((key: string) => useOnyx(key, {allowDynamicKey: false}), {initialProps: ONYXKEYS.TEST_KEY});
-
-            try {
-                await act(async () => {
-                    rerender(ONYXKEYS.TEST_KEY_2);
-                });
-
-                fail('Expected to throw an error.');
-            } catch (e) {
-                expect((e as Error).message).toBe(error(ONYXKEYS.TEST_KEY, ONYXKEYS.TEST_KEY_2));
-            }
-        });
-
-        it('should not throw an error when changing from a collection member key to another one if allowDynamicKey is true', async () => {
-            const {rerender} = renderHook((key: string) => useOnyx(key, {allowDynamicKey: true}), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}` as string});
-
-            try {
-                await act(async () => {
-                    rerender(`${ONYXKEYS.COLLECTION.TEST_KEY_2}`);
-                });
-            } catch (e) {
-                fail("Expected to don't throw any errors.");
-            }
-        });
-    });
-
     describe('misc', () => {
         it('should initially return loading state while loading non-existent key, and then return `undefined` and loaded state', async () => {
             const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
@@ -737,7 +632,7 @@ describe('useOnyx', () => {
         });
     });
 
-    describe('allowStaleData', () => {
+    describe('pending merges', () => {
         it('should return undefined and loading state while we have pending merges for the key, and then return updated value and loaded state', async () => {
             Onyx.set(ONYXKEYS.TEST_KEY, 'test1');
 
@@ -775,24 +670,6 @@ describe('useOnyx', () => {
             await act(async () => waitForPromisesToResolve());
 
             expect(result.current[0]).toEqual('test4_changed');
-            expect(result.current[1].status).toEqual('loaded');
-        });
-
-        it('should return stale value and loaded state if allowStaleData is true, and then return updated value and loaded state', async () => {
-            Onyx.set(ONYXKEYS.TEST_KEY, 'test1');
-
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test3');
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test4');
-
-            const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {allowStaleData: true}));
-
-            expect(result.current[0]).toEqual('test1');
-            expect(result.current[1].status).toEqual('loaded');
-
-            await act(async () => waitForPromisesToResolve());
-
-            expect(result.current[0]).toEqual('test4');
             expect(result.current[1].status).toEqual('loaded');
         });
     });
@@ -874,39 +751,6 @@ describe('useOnyx', () => {
             expect(result1.current[1].status).toEqual('loaded');
 
             expect(result2.current[0]).toEqual('test');
-            expect(result2.current[1].status).toEqual('loaded');
-        });
-
-        it('"allowStaleData" should work correctly for the same key if more than one hook is using it', async () => {
-            Onyx.set(ONYXKEYS.TEST_KEY, 'test1');
-
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test3');
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test4');
-
-            const {result: result1} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {allowStaleData: true}));
-
-            expect(result1.current[0]).toEqual('test1');
-            expect(result1.current[1].status).toEqual('loaded');
-
-            await act(async () => waitForPromisesToResolve());
-
-            expect(result1.current[0]).toEqual('test4');
-            expect(result1.current[1].status).toEqual('loaded');
-
-            // Second hook
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test5');
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test6');
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'test7');
-
-            const {result: result2} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {allowStaleData: true}));
-
-            expect(result2.current[0]).toEqual('test4');
-            expect(result2.current[1].status).toEqual('loaded');
-
-            await act(async () => waitForPromisesToResolve());
-
-            expect(result2.current[0]).toEqual('test7');
             expect(result2.current[1].status).toEqual('loaded');
         });
 

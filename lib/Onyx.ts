@@ -82,10 +82,13 @@ function init({
 
     OnyxUtils.initStoreValues(keys, initialKeyStates, evictableKeys);
 
-    // Initialize all of our keys with data provided then give green light to any pending connections
-    Promise.all([cache.addEvictableKeysToRecentlyAccessedList(OnyxUtils.isCollectionKey, OnyxUtils.getAllKeys), OnyxUtils.initializeWithDefaultKeyStates()]).then(
-        OnyxUtils.getDeferredInitTask().resolve,
-    );
+    // Initialize all of our keys with data provided then give green light to any pending connections.
+    // addEvictableKeysToRecentlyAccessedList must run after initializeWithDefaultKeyStates because
+    // eager cache loading populates the key index (cache.setAllKeys) inside initializeWithDefaultKeyStates,
+    // and the evictable keys list depends on that index being populated.
+    OnyxUtils.initializeWithDefaultKeyStates()
+        .then(() => cache.addEvictableKeysToRecentlyAccessedList(OnyxUtils.isCollectionKey, OnyxUtils.getAllKeys))
+        .then(OnyxUtils.getDeferredInitTask().resolve);
 }
 
 /**
@@ -245,7 +248,13 @@ function merge<TKey extends OnyxKey>(key: string extends CollectionKeyBase ? TKe
 
             try {
                 const validChanges = mergeQueue[key].filter((change) => {
-                    const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(change, existingValue);
+                    const {isCompatible, existingValueType, newValueType, isEmptyArrayCoercion} = utils.checkCompatibilityWithExistingValue(change, existingValue);
+                    if (isEmptyArrayCoercion) {
+                        // Merging an object into an empty array isn't semantically correct, but we allow it
+                        // in case we accidentally encoded an empty object as an empty array in PHP. If you're
+                        // looking at a bugbot from this message, we're probably missing that key in OnyxKeys::KEYS_REQUIRING_EMPTY_OBJECT
+                        Logger.logAlert(`[ENSURE_BUGBOT] Onyx merge called on key "${key}" whose existing value is an empty array. Will coerce to object.`);
+                    }
                     if (!isCompatible) {
                         Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'merge', existingValueType, newValueType));
                     }
@@ -347,7 +356,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                 //      to null would cause unknown behavior)
                 //   2.1 However, if a default key was explicitly set to null, we need to reset it to the default value
                 for (const key of allKeys) {
-                    const isKeyToPreserve = keysToPreserve.includes(key);
+                    const isKeyToPreserve = keysToPreserve.some((preserveKey) => OnyxUtils.isKeyMatch(preserveKey, key));
                     const isDefaultKey = key in defaultKeyStates;
 
                     // If the key is being removed or reset to default:
@@ -395,7 +404,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                 // Exclude RAM-only keys to prevent them from being saved to storage
                 const defaultKeyValuePairs = Object.entries(
                     Object.keys(defaultKeyStates)
-                        .filter((key) => !keysToPreserve.includes(key) && !OnyxUtils.isRamOnlyKey(key))
+                        .filter((key) => !keysToPreserve.some((preserveKey) => OnyxUtils.isKeyMatch(preserveKey, key)) && !OnyxUtils.isRamOnlyKey(key))
                         .reduce((obj: KeyValueMapping, key) => {
                             // eslint-disable-next-line no-param-reassign
                             obj[key] = defaultKeyStates[key];

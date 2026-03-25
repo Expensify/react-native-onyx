@@ -100,7 +100,9 @@ let lastSubscriptionID = 0;
 // Connections can be made before `Onyx.init`. They would wait for this task before resolving
 const deferredInitTask = createDeferredTask();
 
-// Holds a set of collection member IDs which updates will be ignored when using Onyx methods.
+// Collection member IDs that Onyx should silently ignore across all operations — reads, writes, cache, and subscriber
+// notifications. This is used to filter out keys formed from invalid/default IDs (e.g. "-1", "0",
+// "undefined", "null", "NaN") that can appear when an ID variable is accidentally coerced to string.
 let skippableCollectionMemberIDs = new Set<string>();
 // Holds a set of keys that should always be merged into snapshot entries.
 let snapshotMergeKeys = new Set<string>();
@@ -1111,19 +1113,76 @@ function mergeInternal<TValue extends OnyxInput<OnyxKey> | undefined, TChange ex
  * Merge user provided default key value pairs.
  */
 function initializeWithDefaultKeyStates(): Promise<void> {
-    // Filter out RAM-only keys from storage reads as they may have stale persisted data
-    // from before the key was migrated to RAM-only.
-    const keysToFetch = Object.keys(defaultKeyStates).filter((key) => !isRamOnlyKey(key));
-    return Storage.multiGet(keysToFetch).then((pairs) => {
-        const existingDataAsObject = Object.fromEntries(pairs) as Record<string, unknown>;
+    // Eagerly load the entire database into cache in a single batch read.
+    // This is faster than lazy-loading individual keys because:
+    // 1. One DB transaction instead of hundreds
+    // 2. All subsequent reads are synchronous cache hits
+    return Storage.getAll()
+        .then((pairs) => {
+            const allDataFromStorage: Record<string, unknown> = {};
+            for (const [key, value] of pairs) {
+                // RAM-only keys should not be cached from storage as they may have stale persisted data
+                // from before the key was migrated to RAM-only.
+                if (isRamOnlyKey(key)) {
+                    continue;
+                }
 
-        const merged = utils.fastMerge(existingDataAsObject, defaultKeyStates, {
-            shouldRemoveNestedNulls: true,
-        }).result;
-        cache.merge(merged ?? {});
+                // Skip collection members that are marked as skippable
+                if (skippableCollectionMemberIDs.size && getCollectionKey(key)) {
+                    const [, collectionMemberID] = splitCollectionMemberKey(key);
 
-        for (const [key, value] of Object.entries(merged ?? {})) keyChanged(key, value);
-    });
+                    if (skippableCollectionMemberIDs.has(collectionMemberID)) {
+                        continue;
+                    }
+                }
+
+                allDataFromStorage[key] = value;
+            }
+
+            // Load all storage data into cache silently (no subscriber notifications)
+            cache.setAllKeys(Object.keys(allDataFromStorage));
+            cache.merge(allDataFromStorage);
+
+            // For keys that have a developer-defined default (via `initialKeyStates`), merge the
+            // persisted value with the default so new properties added in code updates are applied
+            // without wiping user data that already exists in storage.
+            const defaultKeysFromStorage = Object.keys(defaultKeyStates).reduce((obj: Record<string, unknown>, key) => {
+                if (key in allDataFromStorage) {
+                    // eslint-disable-next-line no-param-reassign
+                    obj[key] = allDataFromStorage[key];
+                }
+                return obj;
+            }, {});
+
+            const merged = utils.fastMerge(defaultKeysFromStorage, defaultKeyStates, {
+                shouldRemoveNestedNulls: true,
+            }).result;
+            cache.merge(merged ?? {});
+
+            // Notify subscribers about default key states so that any subscriber that connected
+            // before init (e.g. during module load) receives the merged default values immediately
+            for (const [key, value] of Object.entries(merged ?? {})) {
+                keyChanged(key, value);
+            }
+        })
+        .catch((error) => {
+            Logger.logAlert(`Failed to load data from storage during init. The app will boot with default key states only. Error: ${error}`);
+
+            // Populate the key index so getAllKeys() returns correct results for default keys.
+            // Without this, subscribers that check getAllKeys() would see an empty set even
+            // though we have default values in cache.
+            cache.setAllKeys(Object.keys(defaultKeyStates));
+
+            // Boot with defaults so the app renders instead of deadlocking.
+            // Users will get a fresh-install experience but the app won't be bricked.
+            cache.merge(defaultKeyStates);
+
+            // Notify subscribers about default key states so that any subscriber that connected
+            // before init (e.g. during module load) receives the merged default values immediately
+            for (const [key, value] of Object.entries(defaultKeyStates)) {
+                keyChanged(key, value);
+            }
+        });
 }
 
 /**
@@ -1265,7 +1324,7 @@ function unsubscribeFromKey(subscriptionID: number): void {
         return;
     }
 
-    deleteKeyBySubscriptions(lastSubscriptionID);
+    deleteKeyBySubscriptions(subscriptionID);
     delete callbackToStateMapping[subscriptionID];
 }
 
@@ -1379,7 +1438,13 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
     }
 
     // Check if the value is compatible with the existing value in the storage
-    const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(value, existingValue);
+    const {isCompatible, existingValueType, newValueType, isEmptyArrayCoercion} = utils.checkCompatibilityWithExistingValue(value, existingValue);
+    if (isEmptyArrayCoercion) {
+        // Setting an object over empty array isn't semantically correct, but we allow it
+        // in case we accidentally encoded an empty object as an empty array in PHP. If you're
+        // looking at a bugbot from this message, we're probably missing that key in OnyxKeys::KEYS_REQUIRING_EMPTY_OBJECT
+        Logger.logAlert(`[ENSURE_BUGBOT] Onyx setWithRetry called on key "${key}" whose existing value is an empty array. Will coerce to object.`);
+    }
     if (!isCompatible) {
         Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'set', existingValueType, newValueType));
         return Promise.resolve();
@@ -1616,8 +1681,17 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
             const cachedCollectionForExistingKeys = getCachedCollection(collectionKey, existingKeys);
 
             const existingKeyCollection = existingKeys.reduce((obj: OnyxInputKeyValueMapping, key) => {
-                const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(resultCollection[key], cachedCollectionForExistingKeys[key]);
+                const {isCompatible, existingValueType, newValueType, isEmptyArrayCoercion} = utils.checkCompatibilityWithExistingValue(
+                    resultCollection[key],
+                    cachedCollectionForExistingKeys[key],
+                );
 
+                if (isEmptyArrayCoercion) {
+                    // Merging an object into an empty array isn't semantically correct, but we allow it
+                    // in case we accidentally encoded an empty object as an empty array in PHP. If you're
+                    // looking at a bugbot from this message, we're probably missing that key in OnyxKeys::KEYS_REQUIRING_EMPTY_OBJECT
+                    Logger.logAlert(`[ENSURE_BUGBOT] Onyx mergeCollection called on key "${key}" whose existing value is an empty array. Will coerce to object.`);
+                }
                 if (!isCompatible) {
                     Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'mergeCollection', existingValueType, newValueType));
                     return obj;

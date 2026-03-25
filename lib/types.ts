@@ -421,8 +421,9 @@ type InitOptions = {
     enableDevTools?: boolean;
 
     /**
-     * Array of collection member IDs which updates will be ignored when using Onyx methods.
-     * Additionally, any subscribers from these keys to won't receive any data from Onyx.
+     * Array of collection member IDs that Onyx should silently ignore across all operations.
+     * This prevents keys formed from invalid or default IDs (e.g. "-1", "0", "undefined") from
+     * polluting cache or triggering subscriber notifications.
      */
     skippableCollectionMemberIDs?: string[];
 

@@ -27,20 +27,10 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
     initWithStoredValues?: boolean;
 
     /**
-     * If set to `true`, data will be retrieved from cache during the first render even if there is a pending merge for the key.
-     */
-    allowStaleData?: boolean;
-
-    /**
      * If set to `false`, the connection won't be reused between other subscribers that are listening to the same Onyx key
      * with the same connect configurations.
      */
     reuseConnection?: boolean;
-
-    /**
-     * If set to `true`, the key can be changed dynamically during the component lifecycle.
-     */
-    allowDynamicKey?: boolean;
 
     /**
      * This will be used to subscribe to a subset of an Onyx key's data.
@@ -146,36 +136,11 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             onyxSnapshotCache.registerConsumer({
                 selector: options?.selector,
                 initWithStoredValues: options?.initWithStoredValues,
-                allowStaleData: options?.allowStaleData,
             }),
-        [options?.selector, options?.initWithStoredValues, options?.allowStaleData],
+        [options?.selector, options?.initWithStoredValues],
     );
 
     useEffect(() => () => onyxSnapshotCache.deregisterConsumer(key, cacheKey), [key, cacheKey]);
-
-    useEffect(() => {
-        // These conditions will ensure we can only handle dynamic collection member keys from the same collection.
-        if (options?.allowDynamicKey || previousKey === key) {
-            return;
-        }
-
-        try {
-            const previousCollectionKey = OnyxUtils.splitCollectionMemberKey(previousKey)[0];
-            const collectionKey = OnyxUtils.splitCollectionMemberKey(key)[0];
-
-            if (OnyxUtils.isCollectionMemberKey(previousCollectionKey, previousKey) && OnyxUtils.isCollectionMemberKey(collectionKey, key) && previousCollectionKey === collectionKey) {
-                return;
-            }
-        } catch (e) {
-            throw new Error(
-                `'${previousKey}' key can't be changed to '${key}'. useOnyx() only supports dynamic keys if they are both collection member keys from the same collection e.g. from 'collection_id1' to 'collection_id2'.`,
-            );
-        }
-
-        throw new Error(
-            `'${previousKey}' key can't be changed to '${key}'. useOnyx() only supports dynamic keys if they are both collection member keys from the same collection e.g. from 'collection_id1' to 'collection_id2'.`,
-        );
-    }, [previousKey, key, options?.allowDynamicKey]);
 
     // Track previous dependencies to prevent infinite loops
     const previousDependenciesRef = useRef<DependencyList>([]);
@@ -269,8 +234,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
         // If we have pending merge operations for the key during the first connection, we set the new value to `undefined`
         // and fetch status to `loading` to simulate that it is still being loaded until we have the most updated data.
-        // If `allowStaleData` is `true` this logic will be ignored and cached value will be used, even if it's stale data.
-        if (isFirstConnectionRef.current && OnyxUtils.hasPendingMergeForKey(key) && !options?.allowStaleData) {
+        if (isFirstConnectionRef.current && OnyxUtils.hasPendingMergeForKey(key)) {
             newValueRef.current = undefined;
             newFetchStatus = 'loading';
         }
@@ -315,7 +279,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         }
 
         return resultRef.current;
-    }, [options?.initWithStoredValues, options?.allowStaleData, key, memoizedSelector, cacheKey, previousKey]);
+    }, [options?.initWithStoredValues, key, memoizedSelector, cacheKey, previousKey]);
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
