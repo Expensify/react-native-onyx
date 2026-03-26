@@ -210,11 +210,7 @@ function setRamOnlyKeys(keys: Set<OnyxKey>): void {
  * - isRamOnlyKey("someOtherKey") → false
  */
 function isRamOnlyKey(key: OnyxKey): boolean {
-    const collectionKey = getCollectionKey(key);
-    if (collectionKey) {
-        return ramOnlyKeySet.has(collectionKey);
-    }
-    return ramOnlyKeySet.has(key);
+    return ramOnlyKeySet.has(key) || ramOnlyKeySet.has(getCollectionKey(key) ?? '');
 }
 
 export default {

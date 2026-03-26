@@ -28,13 +28,20 @@ describe('OnyxKeys', () => {
     describe('splitCollectionMemberKey', () => {
         describe('should return correct values', () => {
             const dataResult: Record<string, [string, string]> = {
+                // Collection key with no member ID
                 test_: ['test_', ''],
+                // Nested collection key with no member ID
                 test_level_: ['test_level_', ''],
+                // Nested collection keys with member IDs
                 test_level_1: ['test_level_', '1'],
                 test_level_2: ['test_level_', '2'],
+                // Deeply nested collection member key, matches longest prefix
                 test_level_last_3: ['test_level_last_', '3'],
+                // Underscores in the ID portion, only the first matching prefix is the collection key
                 test___FAKE__: ['test_', '__FAKE__'],
+                // Negative/compound IDs, the collection is 'test_', everything after is the ID
                 'test_-1_something': ['test_', '-1_something'],
+                // Nested collection with compound ID, 'test_level_' is the longest matching collection
                 'test_level_-1_something': ['test_level_', '-1_something'],
             };
 
