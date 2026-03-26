@@ -432,11 +432,6 @@ class OnyxCache {
             }
             this.collectionData[collectionKey] = {};
         }
-
-        // Register existing storageKeys with OnyxKeys
-        for (const key of this.storageKeys) {
-            OnyxKeys.registerMemberKey(key);
-        }
     }
 
     /**
