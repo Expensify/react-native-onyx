@@ -52,7 +52,7 @@ describe('useOnyx', () => {
                     rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}2`);
                 });
             } catch (e) {
-                fail("Expected to don't throw any errors.");
+                fail('Expected to not throw any errors.');
             }
         });
 
