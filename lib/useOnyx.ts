@@ -5,6 +5,7 @@ import OnyxCache, {TASK} from './OnyxCache';
 import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
 import OnyxUtils from './OnyxUtils';
+import OnyxKeys from './OnyxKeys';
 import type {CollectionKeyBase, OnyxKey, OnyxValue} from './types';
 import usePrevious from './usePrevious';
 import onyxSnapshotCache from './OnyxSnapshotCache';
@@ -307,7 +308,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                     onStoreChange();
                 },
                 initWithStoredValues: options?.initWithStoredValues,
-                waitForCollectionCallback: OnyxUtils.isCollectionKey(key) as true,
+                waitForCollectionCallback: OnyxKeys.isCollectionKey(key) as true,
                 reuseConnection: options?.reuseConnection,
             });
 

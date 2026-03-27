@@ -17,6 +17,11 @@
 <dt><a href="#getDeferredInitTask">getDeferredInitTask()</a></dt>
 <dd><p>Getter - returns the deffered init task.</p>
 </dd>
+<dt><a href="#afterInit">afterInit(action)</a> ⇒</dt>
+<dd><p>Executes an action after Onyx has been initialized.
+If Onyx is already initialized, the action is executed immediately.
+Otherwise, it waits for initialization to complete before executing.</p>
+</dd>
 <dt><a href="#getSkippableCollectionMemberIDs">getSkippableCollectionMemberIDs()</a></dt>
 <dd><p>Getter - returns the skippable collection member IDs.</p>
 </dd>
@@ -53,45 +58,6 @@ to the values for those keys (correctly typed) such as <code>[OnyxCollection&lt;
 </dd>
 <dt><a href="#getAllKeys">getAllKeys()</a></dt>
 <dd><p>Returns current key names stored in persisted storage</p>
-</dd>
-<dt><a href="#getCollectionKeys">getCollectionKeys()</a></dt>
-<dd><p>Returns set of all registered collection keys</p>
-</dd>
-<dt><a href="#isCollectionKey">isCollectionKey()</a></dt>
-<dd><p>Checks to see if the subscriber&#39;s supplied key
-is associated with a collection of keys.</p>
-</dd>
-<dt><a href="#isCollectionMember">isCollectionMember(key)</a> ⇒</dt>
-<dd><p>Checks if a given key is a collection member key (not just a collection key).</p>
-</dd>
-<dt><a href="#isRamOnlyKey">isRamOnlyKey(key)</a> ⇒</dt>
-<dd><p>Checks if a given key is a RAM-only key, RAM-only collection key, or a RAM-only collection member</p>
-<p>For example:</p>
-<p>For the following Onyx setup</p>
-<p>ramOnlyKeys: [&quot;ramOnlyKey&quot;, &quot;ramOnlyCollection_&quot;]</p>
-<ul>
-<li><code>isRamOnlyKey(&quot;ramOnlyKey&quot;)</code> would return true</li>
-<li><code>isRamOnlyKey(&quot;ramOnlyCollection_&quot;)</code> would return true</li>
-<li><code>isRamOnlyKey(&quot;ramOnlyCollection_1&quot;)</code> would return true</li>
-<li><code>isRamOnlyKey(&quot;someOtherKey&quot;)</code> would return false</li>
-</ul>
-</dd>
-<dt><a href="#splitCollectionMemberKey">splitCollectionMemberKey(key, collectionKey)</a> ⇒</dt>
-<dd><p>Splits a collection member key into the collection key part and the ID part.</p>
-</dd>
-<dt><a href="#isKeyMatch">isKeyMatch()</a></dt>
-<dd><p>Checks to see if a provided key is the exact configured key of our connected subscriber
-or if the provided key is a collection member key (in case our configured key is a &quot;collection key&quot;)</p>
-</dd>
-<dt><a href="#getCollectionKey">getCollectionKey(key)</a> ⇒</dt>
-<dd><p>Extracts the collection identifier of a given collection member key.</p>
-<p>For example:</p>
-<ul>
-<li><code>getCollectionKey(&quot;report_123&quot;)</code> would return &quot;report_&quot;</li>
-<li><code>getCollectionKey(&quot;report_&quot;)</code> would return &quot;report_&quot;</li>
-<li><code>getCollectionKey(&quot;report_-1_something&quot;)</code> would return &quot;report_&quot;</li>
-<li><code>getCollectionKey(&quot;sharedNVP_user_-1_something&quot;)</code> would return &quot;sharedNVP_user_&quot;</li>
-</ul>
 </dd>
 <dt><a href="#tryGetCachedValue">tryGetCachedValue()</a></dt>
 <dd><p>Tries to get a value from the cache. If the value is not present in cache it will return the default value or undefined.
@@ -223,6 +189,20 @@ Getter - returns the default key states.
 Getter - returns the deffered init task.
 
 **Kind**: global function  
+<a name="afterInit"></a>
+
+## afterInit(action) ⇒
+Executes an action after Onyx has been initialized.
+If Onyx is already initialized, the action is executed immediately.
+Otherwise, it waits for initialization to complete before executing.
+
+**Kind**: global function  
+**Returns**: The result of the action  
+
+| Param | Description |
+| --- | --- |
+| action | The action to execute after initialization |
+
 <a name="getSkippableCollectionMemberIDs"></a>
 
 ## getSkippableCollectionMemberIDs()
@@ -312,93 +292,6 @@ Deletes a subscription ID associated with its corresponding key.
 Returns current key names stored in persisted storage
 
 **Kind**: global function  
-<a name="getCollectionKeys"></a>
-
-## getCollectionKeys()
-Returns set of all registered collection keys
-
-**Kind**: global function  
-<a name="isCollectionKey"></a>
-
-## isCollectionKey()
-Checks to see if the subscriber's supplied key
-is associated with a collection of keys.
-
-**Kind**: global function  
-<a name="isCollectionMember"></a>
-
-## isCollectionMember(key) ⇒
-Checks if a given key is a collection member key (not just a collection key).
-
-**Kind**: global function  
-**Returns**: true if the key is a collection member, false otherwise  
-
-| Param | Description |
-| --- | --- |
-| key | The key to check |
-
-<a name="isRamOnlyKey"></a>
-
-## isRamOnlyKey(key) ⇒
-Checks if a given key is a RAM-only key, RAM-only collection key, or a RAM-only collection member
-
-For example:
-
-For the following Onyx setup
-
-ramOnlyKeys: ["ramOnlyKey", "ramOnlyCollection_"]
-
-- `isRamOnlyKey("ramOnlyKey")` would return true
-- `isRamOnlyKey("ramOnlyCollection_")` would return true
-- `isRamOnlyKey("ramOnlyCollection_1")` would return true
-- `isRamOnlyKey("someOtherKey")` would return false
-
-**Kind**: global function  
-**Returns**: true if key is a RAM-only key, RAM-only collection key, or a RAM-only collection member  
-
-| Param | Description |
-| --- | --- |
-| key | The key to check |
-
-<a name="splitCollectionMemberKey"></a>
-
-## splitCollectionMemberKey(key, collectionKey) ⇒
-Splits a collection member key into the collection key part and the ID part.
-
-**Kind**: global function  
-**Returns**: A tuple where the first element is the collection part and the second element is the ID part,
-or throws an Error if the key is not a collection one.  
-
-| Param | Description |
-| --- | --- |
-| key | The collection member key to split. |
-| collectionKey | The collection key of the `key` param that can be passed in advance to optimize the function. |
-
-<a name="isKeyMatch"></a>
-
-## isKeyMatch()
-Checks to see if a provided key is the exact configured key of our connected subscriber
-or if the provided key is a collection member key (in case our configured key is a "collection key")
-
-**Kind**: global function  
-<a name="getCollectionKey"></a>
-
-## getCollectionKey(key) ⇒
-Extracts the collection identifier of a given collection member key.
-
-For example:
-- `getCollectionKey("report_123")` would return "report_"
-- `getCollectionKey("report_")` would return "report_"
-- `getCollectionKey("report_-1_something")` would return "report_"
-- `getCollectionKey("sharedNVP_user_-1_something")` would return "sharedNVP_user_"
-
-**Kind**: global function  
-**Returns**: The plain collection key or throws an Error if the key is not a collection one.  
-
-| Param | Description |
-| --- | --- |
-| key | The collection key to process. |
-
 <a name="tryGetCachedValue"></a>
 
 ## tryGetCachedValue()
