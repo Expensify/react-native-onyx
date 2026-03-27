@@ -9,7 +9,10 @@ declare -r RED='\033[0;31m'
 declare -r NC='\033[0m'
 
 printf '\nRebuilding API docs...\n'
-npm run build:docs
+if ! npm run build:docs; then
+    echo -e "${RED}Error: \`npm run build:docs\` failed. Please fix the build errors before continuing.${NC}"
+    exit 1
+fi
 
 DIFF_OUTPUT=$(git diff --exit-code API.md API-INTERNAL.md)
 EXIT_CODE=$?

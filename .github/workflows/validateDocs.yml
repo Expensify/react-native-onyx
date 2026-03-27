@@ -3,7 +3,7 @@ name: Validate API Docs
 on:
     pull_request:
         types: [opened, synchronize]
-        paths: ['lib/**', 'buildDocs.ts', 'API.md', 'API-INTERNAL.md']
+        paths: ['lib/**', 'buildDocs.ts', 'API.md', 'API-INTERNAL.md', '.github/workflows/validateDocs.yml', '.github/scripts/verifyDocs.sh']
 
 jobs:
     verify:
