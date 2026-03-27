@@ -6,7 +6,7 @@
 
 <dl>
 <dt><a href="#init">init()</a></dt>
-<dd><p>Initialize the store with actions and listening for storage events</p>
+<dd><p>Initialize the store with actions and listening for storage events events events</p>
 </dd>
 <dt><a href="#connect">connect(connectOptions)</a> ⇒</dt>
 <dd><p>Connects to an Onyx key given the options passed and listens to its changes.
