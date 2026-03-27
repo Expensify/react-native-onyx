@@ -3,7 +3,7 @@ import bindAll from 'lodash/bindAll';
 import type {ValueOf} from 'type-fest';
 import utils from './utils';
 import type {OnyxKey, OnyxValue} from './types';
-import * as Str from './Str';
+import OnyxKeys from './OnyxKeys';
 
 // Task constants
 const TASK = {
@@ -52,12 +52,6 @@ class OnyxCache {
     /** List of keys that have been directly subscribed to or recently modified from least to most recent */
     private recentlyAccessedKeys = new Set<OnyxKey>();
 
-    /** Set of collection keys for fast lookup */
-    private collectionKeys = new Set<OnyxKey>();
-
-    /** Set of RAM-only keys for fast lookup */
-    private ramOnlyKeys = new Set<OnyxKey>();
-
     constructor() {
         this.storageKeys = new Set();
         this.nullishStorageKeys = new Set();
@@ -94,11 +88,8 @@ class OnyxCache {
             'addEvictableKeysToRecentlyAccessedList',
             'getKeyForEviction',
             'setCollectionKeys',
-            'isCollectionKey',
-            'getCollectionKey',
             'getCollectionData',
-            'setRamOnlyKeys',
-            'isRamOnlyKey',
+            'hasValueChanged',
         );
     }
 
@@ -120,6 +111,9 @@ class OnyxCache {
      */
     setAllKeys(keys: OnyxKey[]) {
         this.storageKeys = new Set(keys);
+        for (const key of keys) {
+            OnyxKeys.registerMemberKey(key);
+        }
     }
 
     /** Saves a key in the storage keys list
@@ -127,6 +121,7 @@ class OnyxCache {
      */
     addKey(key: OnyxKey): void {
         this.storageKeys.add(key);
+        OnyxKeys.registerMemberKey(key);
     }
 
     /** Used to set keys that are null/undefined in storage without adding null to the storage map */
@@ -172,7 +167,7 @@ class OnyxCache {
         // since it will either be set to a non nullish value or removed from the cache completely.
         this.nullishStorageKeys.delete(key);
 
-        const collectionKey = this.getCollectionKey(key);
+        const collectionKey = OnyxKeys.getCollectionKey(key);
         if (value === null || value === undefined) {
             delete this.storageMap[key];
 
@@ -201,18 +196,19 @@ class OnyxCache {
         delete this.storageMap[key];
 
         // Remove from collection data cache if this is a collection member
-        const collectionKey = this.getCollectionKey(key);
+        const collectionKey = OnyxKeys.getCollectionKey(key);
         if (collectionKey && this.collectionData[collectionKey]) {
             delete this.collectionData[collectionKey][key];
         }
 
         // If this is a collection key, clear its data
-        if (this.isCollectionKey(key)) {
+        if (OnyxKeys.isCollectionKey(key)) {
             delete this.collectionData[key];
         }
 
         this.storageKeys.delete(key);
         this.recentKeys.delete(key);
+        OnyxKeys.deregisterMemberKey(key);
     }
 
     /**
@@ -235,7 +231,7 @@ class OnyxCache {
             this.addKey(key);
             this.addToAccessedKeys(key);
 
-            const collectionKey = this.getCollectionKey(key);
+            const collectionKey = OnyxKeys.getCollectionKey(key);
 
             if (value === null || value === undefined) {
                 this.addNullishStorageKey(key);
@@ -325,7 +321,7 @@ class OnyxCache {
             delete this.storageMap[key];
 
             // Remove from collection data cache if this is a collection member
-            const collectionKey = this.getCollectionKey(key);
+            const collectionKey = OnyxKeys.getCollectionKey(key);
             if (collectionKey && this.collectionData[collectionKey]) {
                 delete this.collectionData[collectionKey][key];
             }
@@ -364,17 +360,7 @@ class OnyxCache {
      * @param testKey - Key to check
      */
     isEvictableKey(testKey: OnyxKey): boolean {
-        return this.evictionAllowList.some((key) => this.isKeyMatch(key, testKey));
-    }
-
-    /**
-     * Check if a given key matches a pattern key
-     * @param configKey - Pattern that may contain a wildcard
-     * @param key - Key to test against the pattern
-     */
-    private isKeyMatch(configKey: OnyxKey, key: OnyxKey): boolean {
-        const isCollectionKey = configKey.endsWith('_');
-        return isCollectionKey ? Str.startsWith(key, configKey) : configKey === key;
+        return this.evictionAllowList.some((key) => OnyxKeys.isKeyMatch(key, testKey));
     }
 
     /**
@@ -411,7 +397,7 @@ class OnyxCache {
         return getAllKeysFn().then((keys: Set<OnyxKey>) => {
             for (const evictableKey of this.evictionAllowList) {
                 for (const key of keys) {
-                    if (!this.isKeyMatch(evictableKey, key)) {
+                    if (!OnyxKeys.isKeyMatch(evictableKey, key)) {
                         continue;
                     }
 
@@ -437,7 +423,7 @@ class OnyxCache {
      * Set the collection keys for optimized storage
      */
     setCollectionKeys(collectionKeys: Set<OnyxKey>): void {
-        this.collectionKeys = collectionKeys;
+        OnyxKeys.setCollectionKeys(collectionKeys);
 
         // Initialize collection data for existing collection keys
         for (const collectionKey of collectionKeys) {
@@ -446,25 +432,6 @@ class OnyxCache {
             }
             this.collectionData[collectionKey] = {};
         }
-    }
-
-    /**
-     * Check if a key is a collection key
-     */
-    isCollectionKey(key: OnyxKey): boolean {
-        return this.collectionKeys.has(key);
-    }
-
-    /**
-     * Get the collection key for a given member key
-     */
-    getCollectionKey(key: OnyxKey): OnyxKey | undefined {
-        for (const collectionKey of this.collectionKeys) {
-            if (key.startsWith(collectionKey) && key.length > collectionKey.length) {
-                return collectionKey;
-            }
-        }
-        return undefined;
     }
 
     /**
@@ -478,20 +445,6 @@ class OnyxCache {
 
         // Return a shallow copy to ensure React detects changes when items are added/removed
         return {...cachedCollection};
-    }
-
-    /**
-     * Set the RAM-only keys for optimized storage
-     */
-    setRamOnlyKeys(ramOnlyKeys: Set<OnyxKey>): void {
-        this.ramOnlyKeys = ramOnlyKeys;
-    }
-
-    /**
-     * Check if a key is a RAM-only key
-     */
-    isRamOnlyKey(key: OnyxKey): boolean {
-        return this.ramOnlyKeys.has(key);
     }
 }
 

@@ -5,10 +5,10 @@ import DevTools from './DevTools';
 import * as Logger from './Logger';
 import type Onyx from './Onyx';
 import cache, {TASK} from './OnyxCache';
+import OnyxKeys from './OnyxKeys';
 import * as Str from './Str';
 import Storage from './storage';
 import type {
-    CollectionKey,
     CollectionKeyBase,
     ConnectOptions,
     DeepRecord,
@@ -77,9 +77,6 @@ let mergeQueuePromise: Record<OnyxKey, Promise<void>> = {};
 // Holds a mapping of all the React components that want their state subscribed to a store key
 let callbackToStateMapping: Record<string, CallbackToStateMapping<OnyxKey>> = {};
 
-// Keeps a copy of the values of the onyx collection keys as a map for faster lookups
-let onyxCollectionKeySet = new Set<OnyxKey>();
-
 // Holds a mapping of the connected key to the subscriptionID for faster lookups
 let onyxKeyToSubscriptionIDs = new Map();
 
@@ -97,7 +94,9 @@ let lastSubscriptionID = 0;
 // Connections can be made before `Onyx.init`. They would wait for this task before resolving
 const deferredInitTask = createDeferredTask();
 
-// Holds a set of collection member IDs which updates will be ignored when using Onyx methods.
+// Collection member IDs that Onyx should silently ignore across all operations — reads, writes, cache, and subscriber
+// notifications. This is used to filter out keys formed from invalid/default IDs (e.g. "-1", "0",
+// "undefined", "null", "NaN") that can appear when an ID variable is accidentally coerced to string.
 let skippableCollectionMemberIDs = new Set<string>();
 // Holds a set of keys that should always be merged into snapshot entries.
 let snapshotMergeKeys = new Set<string>();
@@ -188,7 +187,7 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
     // We need the value of the collection keys later for checking if a
     // key is a collection. We store it in a map for faster lookup.
     const collectionValues = Object.values(keys.COLLECTION ?? {}) as string[];
-    onyxCollectionKeySet = collectionValues.reduce((acc, val) => {
+    const collectionKeySet = collectionValues.reduce((acc, val) => {
         acc.add(val);
         return acc;
     }, new Set<OnyxKey>());
@@ -202,7 +201,7 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
     cache.setEvictionAllowList(evictableKeys);
 
     // Set collection keys in cache for optimized storage
-    cache.setCollectionKeys(onyxCollectionKeySet);
+    cache.setCollectionKeys(collectionKeySet);
 
     if (typeof keys.COLLECTION === 'object' && typeof keys.COLLECTION.SNAPSHOT === 'string') {
         snapshotKey = keys.COLLECTION.SNAPSHOT;
@@ -265,7 +264,7 @@ function get<TKey extends OnyxKey, TValue extends OnyxValue<TKey>>(key: TKey): P
     // RAM-only keys should never read from storage (they may have stale persisted data
     // from before the key was migrated to RAM-only). Mark as nullish so future get() calls
     // short-circuit via hasCacheForKey and avoid re-running this branch.
-    if (isRamOnlyKey(key)) {
+    if (OnyxKeys.isRamOnlyKey(key)) {
         cache.addNullishStorageKey(key);
         return Promise.resolve(undefined as TValue);
     }
@@ -282,7 +281,7 @@ function get<TKey extends OnyxKey, TValue extends OnyxValue<TKey>>(key: TKey): P
         .then((val) => {
             if (skippableCollectionMemberIDs.size) {
                 try {
-                    const [, collectionMemberID] = splitCollectionMemberKey(key);
+                    const [, collectionMemberID] = OnyxKeys.splitCollectionMemberKey(key);
                     if (skippableCollectionMemberIDs.has(collectionMemberID)) {
                         // The key is a skippable one, so we set the value to undefined.
                         // eslint-disable-next-line no-param-reassign
@@ -331,7 +330,7 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
     for (const key of keys) {
         // RAM-only keys should never read from storage as they may have stale persisted data
         // from before the key was migrated to RAM-only.
-        if (isRamOnlyKey(key)) {
+        if (OnyxKeys.isRamOnlyKey(key)) {
             if (cache.hasCacheForKey(key)) {
                 dataMap.set(key, cache.get(key) as OnyxValue<TKey>);
             }
@@ -382,7 +381,7 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
                 for (const [key, value] of values) {
                     if (skippableCollectionMemberIDs.size) {
                         try {
-                            const [, collectionMemberID] = splitCollectionMemberKey(key);
+                            const [, collectionMemberID] = OnyxKeys.splitCollectionMemberKey(key);
                             if (skippableCollectionMemberIDs.has(collectionMemberID)) {
                                 // The key is a skippable one, so we skip this iteration.
                                 continue;
@@ -457,7 +456,7 @@ function getAllKeys(): Promise<Set<OnyxKey>> {
     const promise = Storage.getAllKeys().then((keys) => {
         // Filter out RAM-only keys from storage results as they may be stale entries
         // from before the key was migrated to RAM-only.
-        const filteredKeys = keys.filter((key) => !isRamOnlyKey(key));
+        const filteredKeys = keys.filter((key) => !OnyxKeys.isRamOnlyKey(key));
         cache.setAllKeys(filteredKeys);
 
         // return the updated set of keys
@@ -468,137 +467,13 @@ function getAllKeys(): Promise<Set<OnyxKey>> {
 }
 
 /**
- * Returns set of all registered collection keys
- */
-function getCollectionKeys(): Set<OnyxKey> {
-    return onyxCollectionKeySet;
-}
-
-/**
- * Checks to see if the subscriber's supplied key
- * is associated with a collection of keys.
- */
-function isCollectionKey(key: OnyxKey): key is CollectionKeyBase {
-    return onyxCollectionKeySet.has(key);
-}
-
-function isCollectionMemberKey<TCollectionKey extends CollectionKeyBase>(collectionKey: TCollectionKey, key: string): key is `${TCollectionKey}${string}` {
-    return key.startsWith(collectionKey) && key.length > collectionKey.length;
-}
-
-/**
- * Checks if a given key is a collection member key (not just a collection key).
- * @param key - The key to check
- * @returns true if the key is a collection member, false otherwise
- */
-function isCollectionMember(key: OnyxKey): boolean {
-    const collectionKey = getCollectionKey(key);
-    // If the key is longer than the collection key, it's a collection member
-    return !!collectionKey && key.length > collectionKey.length;
-}
-
-/**
- * Checks if a given key is a RAM-only key, RAM-only collection key, or a RAM-only collection member
- *
- * For example:
- *
- * For the following Onyx setup
- *
- * ramOnlyKeys: ["ramOnlyKey", "ramOnlyCollection_"]
- *
- * - `isRamOnlyKey("ramOnlyKey")` would return true
- * - `isRamOnlyKey("ramOnlyCollection_")` would return true
- * - `isRamOnlyKey("ramOnlyCollection_1")` would return true
- * - `isRamOnlyKey("someOtherKey")` would return false
- *
- * @param key - The key to check
- * @returns true if key is a RAM-only key, RAM-only collection key, or a RAM-only collection member
- */
-function isRamOnlyKey(key: OnyxKey): boolean {
-    const collectionKey = getCollectionKey(key);
-    if (collectionKey) {
-        return cache.isRamOnlyKey(collectionKey);
-    }
-
-    return cache.isRamOnlyKey(key);
-}
-
-/**
- * Splits a collection member key into the collection key part and the ID part.
- * @param key - The collection member key to split.
- * @param collectionKey - The collection key of the `key` param that can be passed in advance to optimize the function.
- * @returns A tuple where the first element is the collection part and the second element is the ID part,
- * or throws an Error if the key is not a collection one.
- */
-function splitCollectionMemberKey<TKey extends CollectionKey, CollectionKeyType = TKey extends `${infer Prefix}_${string}` ? `${Prefix}_` : never>(
-    key: TKey,
-    collectionKey?: string,
-): [CollectionKeyType, string] {
-    if (collectionKey && !isCollectionMemberKey(collectionKey, key)) {
-        throw new Error(`Invalid '${collectionKey}' collection key provided, it isn't compatible with '${key}' key.`);
-    }
-
-    if (!collectionKey) {
-        const resolvedKey = getCollectionKey(key);
-        if (!resolvedKey) {
-            throw new Error(`Invalid '${key}' key provided, only collection keys are allowed.`);
-        }
-        // eslint-disable-next-line no-param-reassign
-        collectionKey = resolvedKey;
-    }
-
-    return [collectionKey as CollectionKeyType, key.slice(collectionKey.length)];
-}
-
-/**
- * Checks to see if a provided key is the exact configured key of our connected subscriber
- * or if the provided key is a collection member key (in case our configured key is a "collection key")
- */
-function isKeyMatch(configKey: OnyxKey, key: OnyxKey): boolean {
-    return isCollectionKey(configKey) ? Str.startsWith(key, configKey) : configKey === key;
-}
-
-/**
- * Extracts the collection identifier of a given collection member key.
- *
- * For example:
- * - `getCollectionKey("report_123")` would return "report_"
- * - `getCollectionKey("report_")` would return "report_"
- * - `getCollectionKey("report_-1_something")` would return "report_"
- * - `getCollectionKey("sharedNVP_user_-1_something")` would return "sharedNVP_user_"
- *
- * @param key - The collection key to process.
- * @returns The plain collection key or undefined if the key is not a collection one.
- */
-function getCollectionKey(key: CollectionKey): string | undefined {
-    // Start by finding the position of the last underscore in the string
-    let lastUnderscoreIndex = key.lastIndexOf('_');
-
-    // Iterate backwards to find the longest key that ends with '_'
-    while (lastUnderscoreIndex > 0) {
-        const possibleKey = key.slice(0, lastUnderscoreIndex + 1);
-
-        // Check if the substring is a key in the Set
-        if (isCollectionKey(possibleKey)) {
-            // Return the matching key and the rest of the string
-            return possibleKey;
-        }
-
-        // Move to the next underscore to check smaller possible keys
-        lastUnderscoreIndex = key.lastIndexOf('_', lastUnderscoreIndex - 1);
-    }
-
-    return undefined;
-}
-
-/**
  * Tries to get a value from the cache. If the value is not present in cache it will return the default value or undefined.
  * If the requested key is a collection, it will return an object with all the collection members.
  */
 function tryGetCachedValue<TKey extends OnyxKey>(key: TKey): OnyxValue<OnyxKey> {
     let val = cache.get(key);
 
-    if (isCollectionKey(key)) {
+    if (OnyxKeys.isCollectionKey(key)) {
         const collectionData = cache.getCollectionData(key);
         if (collectionData !== undefined) {
             val = collectionData;
@@ -645,7 +520,7 @@ function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey
         // If we don't have collectionMemberKeys array then we have to check whether a key is a collection member key.
         // Because in that case the keys will be coming from `cache.getAllKeys()` and we need to filter out the keys that
         // are not part of the collection.
-        if (!collectionMemberKeys && !isCollectionMemberKey(collectionKey, key)) {
+        if (!collectionMemberKeys && !OnyxKeys.isCollectionMemberKey(collectionKey, key)) {
             continue;
         }
 
@@ -700,7 +575,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
             /**
              * e.g. Onyx.connect({key: `${ONYXKEYS.COLLECTION.REPORT}{reportID}`, callback: ...});
              */
-            const isSubscribedToCollectionMemberKey = isCollectionMemberKey(collectionKey, subscriber.key);
+            const isSubscribedToCollectionMemberKey = OnyxKeys.isCollectionMemberKey(collectionKey, subscriber.key);
 
             // Regular Onyx.connect() subscriber found.
             if (typeof subscriber.callback === 'function') {
@@ -763,7 +638,7 @@ function keyChanged<TKey extends OnyxKey>(
     try {
         // Add or remove this key from the recentlyAccessedKeys lists
         if (value !== null) {
-            cache.addLastAccessedKey(key, isCollectionKey(key));
+            cache.addLastAccessedKey(key, OnyxKeys.isCollectionKey(key));
         } else {
             cache.removeLastAccessedKey(key);
         }
@@ -774,7 +649,7 @@ function keyChanged<TKey extends OnyxKey>(
         // do the same in keysChanged, because we only call that function when a collection key changes, and it doesn't happen that often.
         // For performance reason, we look for the given key and later if don't find it we look for the collection key, instead of checking if it is a collection key first.
         let stateMappingKeys = onyxKeyToSubscriptionIDs.get(key) ?? [];
-        const collectionKey = getCollectionKey(key);
+        const collectionKey = OnyxKeys.getCollectionKey(key);
 
         if (collectionKey) {
             // Getting the collection key from the specific key because only collection keys were stored in the mapping.
@@ -788,7 +663,7 @@ function keyChanged<TKey extends OnyxKey>(
 
         for (const stateMappingKey of stateMappingKeys) {
             const subscriber = callbackToStateMapping[stateMappingKey];
-            if (!subscriber || !isKeyMatch(subscriber.key, key) || !canUpdateSubscriber(subscriber)) {
+            if (!subscriber || !OnyxKeys.isKeyMatch(subscriber.key, key) || !canUpdateSubscriber(subscriber)) {
                 continue;
             }
 
@@ -799,7 +674,7 @@ function keyChanged<TKey extends OnyxKey>(
                     continue;
                 }
 
-                if (isCollectionKey(subscriber.key) && subscriber.waitForCollectionCallback) {
+                if (OnyxKeys.isCollectionKey(subscriber.key) && subscriber.waitForCollectionCallback) {
                     // Skip individual key changes for collection callbacks during collection updates
                     // to prevent duplicate callbacks - the collection update will handle this properly
                     if (isProcessingCollectionUpdate) {
@@ -846,7 +721,7 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: CallbackToStateMapp
     // For collection subscribers with waitForCollectionCallback, read the full collection.
     // For individual key subscribers, read just that key's value.
     let value: OnyxValue<TKey> | undefined;
-    if (isCollectionKey(mapping.key) && mapping.waitForCollectionCallback) {
+    if (OnyxKeys.isCollectionKey(mapping.key) && mapping.waitForCollectionCallback) {
         const collection = getCachedCollection(mapping.key);
         value = Object.keys(collection).length > 0 ? (collection as OnyxValue<TKey>) : undefined;
     } else {
@@ -899,7 +774,7 @@ function remove<TKey extends OnyxKey>(key: TKey, isProcessingCollectionUpdate?: 
     cache.drop(key);
     keyChanged(key, undefined as OnyxValue<TKey>, undefined, isProcessingCollectionUpdate);
 
-    if (isRamOnlyKey(key)) {
+    if (OnyxKeys.isRamOnlyKey(key)) {
         return Promise.resolve();
     }
 
@@ -1086,19 +961,76 @@ function mergeInternal<TValue extends OnyxInput<OnyxKey> | undefined, TChange ex
  * Merge user provided default key value pairs.
  */
 function initializeWithDefaultKeyStates(): Promise<void> {
-    // Filter out RAM-only keys from storage reads as they may have stale persisted data
-    // from before the key was migrated to RAM-only.
-    const keysToFetch = Object.keys(defaultKeyStates).filter((key) => !isRamOnlyKey(key));
-    return Storage.multiGet(keysToFetch).then((pairs) => {
-        const existingDataAsObject = Object.fromEntries(pairs) as Record<string, unknown>;
+    // Eagerly load the entire database into cache in a single batch read.
+    // This is faster than lazy-loading individual keys because:
+    // 1. One DB transaction instead of hundreds
+    // 2. All subsequent reads are synchronous cache hits
+    return Storage.getAll()
+        .then((pairs) => {
+            const allDataFromStorage: Record<string, unknown> = {};
+            for (const [key, value] of pairs) {
+                // RAM-only keys should not be cached from storage as they may have stale persisted data
+                // from before the key was migrated to RAM-only.
+                if (OnyxKeys.isRamOnlyKey(key)) {
+                    continue;
+                }
 
-        const merged = utils.fastMerge(existingDataAsObject, defaultKeyStates, {
-            shouldRemoveNestedNulls: true,
-        }).result;
-        cache.merge(merged ?? {});
+                // Skip collection members that are marked as skippable
+                if (skippableCollectionMemberIDs.size && OnyxKeys.getCollectionKey(key)) {
+                    const [, collectionMemberID] = OnyxKeys.splitCollectionMemberKey(key);
 
-        for (const [key, value] of Object.entries(merged ?? {})) keyChanged(key, value);
-    });
+                    if (skippableCollectionMemberIDs.has(collectionMemberID)) {
+                        continue;
+                    }
+                }
+
+                allDataFromStorage[key] = value;
+            }
+
+            // Load all storage data into cache silently (no subscriber notifications)
+            cache.setAllKeys(Object.keys(allDataFromStorage));
+            cache.merge(allDataFromStorage);
+
+            // For keys that have a developer-defined default (via `initialKeyStates`), merge the
+            // persisted value with the default so new properties added in code updates are applied
+            // without wiping user data that already exists in storage.
+            const defaultKeysFromStorage = Object.keys(defaultKeyStates).reduce((obj: Record<string, unknown>, key) => {
+                if (key in allDataFromStorage) {
+                    // eslint-disable-next-line no-param-reassign
+                    obj[key] = allDataFromStorage[key];
+                }
+                return obj;
+            }, {});
+
+            const merged = utils.fastMerge(defaultKeysFromStorage, defaultKeyStates, {
+                shouldRemoveNestedNulls: true,
+            }).result;
+            cache.merge(merged ?? {});
+
+            // Notify subscribers about default key states so that any subscriber that connected
+            // before init (e.g. during module load) receives the merged default values immediately
+            for (const [key, value] of Object.entries(merged ?? {})) {
+                keyChanged(key, value);
+            }
+        })
+        .catch((error) => {
+            Logger.logAlert(`Failed to load data from storage during init. The app will boot with default key states only. Error: ${error}`);
+
+            // Populate the key index so getAllKeys() returns correct results for default keys.
+            // Without this, subscribers that check getAllKeys() would see an empty set even
+            // though we have default values in cache.
+            cache.setAllKeys(Object.keys(defaultKeyStates));
+
+            // Boot with defaults so the app renders instead of deadlocking.
+            // Users will get a fresh-install experience but the app won't be bricked.
+            cache.merge(defaultKeyStates);
+
+            // Notify subscribers about default key states so that any subscriber that connected
+            // before init (e.g. during module load) receives the merged default values immediately
+            for (const [key, value] of Object.entries(defaultKeyStates)) {
+                keyChanged(key, value);
+            }
+        });
 }
 
 /**
@@ -1114,7 +1046,7 @@ function isValidNonEmptyCollectionForMerge<TKey extends CollectionKeyBase>(colle
 function doAllCollectionItemsBelongToSameParent<TKey extends CollectionKeyBase>(collectionKey: TKey, collectionKeys: string[]): boolean {
     let hasCollectionKeyCheckFailed = false;
     for (const dataKey of collectionKeys) {
-        if (isKeyMatch(collectionKey, dataKey)) {
+        if (OnyxKeys.isKeyMatch(collectionKey, dataKey)) {
             continue;
         }
 
@@ -1157,7 +1089,7 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
             // Performance improvement
             // If the mapping is connected to an onyx key that is not a collection
             // we can skip the call to getAllKeys() and return an array with a single item
-            if (!!mapping.key && typeof mapping.key === 'string' && !isCollectionKey(mapping.key) && cache.getAllKeys().has(mapping.key)) {
+            if (!!mapping.key && typeof mapping.key === 'string' && !OnyxKeys.isCollectionKey(mapping.key) && cache.getAllKeys().has(mapping.key)) {
                 return new Set([mapping.key]);
             }
             return getAllKeys();
@@ -1169,14 +1101,14 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
             const matchingKeys: string[] = [];
 
             // Performance optimization: For single key subscriptions, avoid O(n) iteration
-            if (!isCollectionKey(mapping.key)) {
+            if (!OnyxKeys.isCollectionKey(mapping.key)) {
                 if (keys.has(mapping.key)) {
                     matchingKeys.push(mapping.key);
                 }
             } else {
                 // Collection case - need to iterate through all keys to find matches (O(n))
                 for (const key of keys) {
-                    if (!isKeyMatch(mapping.key, key)) {
+                    if (!OnyxKeys.isKeyMatch(mapping.key, key)) {
                         continue;
                     }
                     matchingKeys.push(key);
@@ -1190,7 +1122,7 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
                     cache.addNullishStorageKey(mapping.key);
                 }
 
-                const matchedKey = isCollectionKey(mapping.key) && mapping.waitForCollectionCallback ? mapping.key : undefined;
+                const matchedKey = OnyxKeys.isCollectionKey(mapping.key) && mapping.waitForCollectionCallback ? mapping.key : undefined;
 
                 // Here we cannot use batching because the nullish value is expected to be set immediately for default props
                 // or they will be undefined.
@@ -1202,7 +1134,7 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
             // into an object and just make a single call. The latter behavior is enabled by providing a waitForCollectionCallback key
             // combined with a subscription to a collection key.
             if (typeof mapping.callback === 'function') {
-                if (isCollectionKey(mapping.key)) {
+                if (OnyxKeys.isCollectionKey(mapping.key)) {
                     if (mapping.waitForCollectionCallback) {
                         getCollectionDataAndSendAsObject(matchingKeys, mapping);
                         return;
@@ -1240,7 +1172,7 @@ function unsubscribeFromKey(subscriptionID: number): void {
         return;
     }
 
-    deleteKeyBySubscriptions(lastSubscriptionID);
+    deleteKeyBySubscriptions(subscriptionID);
     delete callbackToStateMapping[subscriptionID];
 }
 
@@ -1262,7 +1194,7 @@ function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, me
 
         for (const {key, value} of data) {
             // snapshots are normal keys so we want to skip update if they are written to Onyx
-            if (isCollectionMemberKey(snapshotCollectionKey, key)) {
+            if (OnyxKeys.isCollectionMemberKey(snapshotCollectionKey, key)) {
                 continue;
             }
 
@@ -1330,7 +1262,7 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
 
     if (skippableCollectionMemberIDs.size) {
         try {
-            const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key);
+            const [, collectionMemberID] = OnyxKeys.splitCollectionMemberKey(key);
             if (skippableCollectionMemberIDs.has(collectionMemberID)) {
                 // The key is a skippable one, so we set the new value to null.
                 // eslint-disable-next-line no-param-reassign
@@ -1388,7 +1320,7 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
     }
 
     // If a key is a RAM-only key or a member of RAM-only collection, we skip the step that modifies the storage
-    if (isRamOnlyKey(key)) {
+    if (OnyxKeys.isRamOnlyKey(key)) {
         OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
         return Promise.resolve();
     }
@@ -1414,7 +1346,7 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
     if (skippableCollectionMemberIDs.size) {
         newData = Object.keys(newData).reduce((result: OnyxMultiSetInput, key) => {
             try {
-                const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key);
+                const [, collectionMemberID] = OnyxKeys.splitCollectionMemberKey(key);
                 // If the collection member key is a skippable one we set its value to null.
                 // eslint-disable-next-line no-param-reassign
                 result[key] = !skippableCollectionMemberIDs.has(collectionMemberID) ? newData[key] : null;
@@ -1445,7 +1377,7 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
     const keyValuePairsToStore = keyValuePairsToSet.filter((keyValuePair) => {
         const [key] = keyValuePair;
         // Filter out the RAM-only key value pairs, as they should not be saved to storage
-        return !isRamOnlyKey(key);
+        return !OnyxKeys.isRamOnlyKey(key);
     });
 
     return Storage.multiSet(keyValuePairsToStore)
@@ -1479,7 +1411,7 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
     if (skippableCollectionMemberIDs.size) {
         resultCollection = resultCollectionKeys.reduce((result: OnyxInputKeyValueMapping, key) => {
             try {
-                const [, collectionMemberID] = OnyxUtils.splitCollectionMemberKey(key, collectionKey);
+                const [, collectionMemberID] = OnyxKeys.splitCollectionMemberKey(key, collectionKey);
                 // If the collection member key is a skippable one we set its value to null.
                 // eslint-disable-next-line no-param-reassign
                 result[key] = !skippableCollectionMemberIDs.has(collectionMemberID) ? resultCollection[key] : null;
@@ -1516,7 +1448,7 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
         keysChanged(collectionKey, mutableCollection, previousCollection);
 
         // RAM-only keys are not supposed to be saved to storage
-        if (isRamOnlyKey(collectionKey)) {
+        if (OnyxKeys.isRamOnlyKey(collectionKey)) {
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET_COLLECTION, undefined, mutableCollection);
             return;
         }
@@ -1562,7 +1494,7 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
     if (skippableCollectionMemberIDs.size) {
         resultCollection = resultCollectionKeys.reduce((result: OnyxInputKeyValueMapping, key) => {
             try {
-                const [, collectionMemberID] = splitCollectionMemberKey(key, collectionKey);
+                const [, collectionMemberID] = OnyxKeys.splitCollectionMemberKey(key, collectionKey);
                 // If the collection member key is a skippable one we set its value to null.
                 // eslint-disable-next-line no-param-reassign
                 result[key] = !skippableCollectionMemberIDs.has(collectionMemberID) ? resultCollection[key] : null;
@@ -1640,12 +1572,12 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
             // New keys will be added via multiSet while existing keys will be updated using multiMerge
             // This is because setting a key that doesn't exist yet with multiMerge will throw errors
             // We can skip this step for RAM-only keys as they should never be saved to storage
-            if (!isRamOnlyKey(collectionKey) && keyValuePairsForExistingCollection.length > 0) {
+            if (!OnyxKeys.isRamOnlyKey(collectionKey) && keyValuePairsForExistingCollection.length > 0) {
                 promises.push(Storage.multiMerge(keyValuePairsForExistingCollection));
             }
 
             // We can skip this step for RAM-only keys as they should never be saved to storage
-            if (!isRamOnlyKey(collectionKey) && keyValuePairsForNewCollection.length > 0) {
+            if (!OnyxKeys.isRamOnlyKey(collectionKey) && keyValuePairsForNewCollection.length > 0) {
                 promises.push(Storage.multiSet(keyValuePairsForNewCollection));
             }
 
@@ -1699,7 +1631,7 @@ function partialSetCollection<TKey extends CollectionKeyBase>({collectionKey, co
     if (skippableCollectionMemberIDs.size) {
         resultCollection = resultCollectionKeys.reduce((result: OnyxInputKeyValueMapping, key) => {
             try {
-                const [, collectionMemberID] = splitCollectionMemberKey(key, collectionKey);
+                const [, collectionMemberID] = OnyxKeys.splitCollectionMemberKey(key, collectionKey);
                 // If the collection member key is a skippable one we set its value to null.
                 // eslint-disable-next-line no-param-reassign
                 result[key] = !skippableCollectionMemberIDs.has(collectionMemberID) ? resultCollection[key] : null;
@@ -1724,7 +1656,7 @@ function partialSetCollection<TKey extends CollectionKeyBase>({collectionKey, co
 
         keysChanged(collectionKey, mutableCollection, previousCollection);
 
-        if (isRamOnlyKey(collectionKey)) {
+        if (OnyxKeys.isRamOnlyKey(collectionKey)) {
             sendActionToDevTools(METHOD.SET_COLLECTION, undefined, mutableCollection);
             return;
         }
@@ -1767,18 +1699,11 @@ const OnyxUtils = {
     sendActionToDevTools,
     get,
     getAllKeys,
-    getCollectionKeys,
-    isCollectionKey,
-    isCollectionMemberKey,
-    isCollectionMember,
-    splitCollectionMemberKey,
-    isKeyMatch,
     tryGetCachedValue,
     getCachedCollection,
     keysChanged,
     keyChanged,
     sendDataToConnection,
-    getCollectionKey,
     getCollectionDataAndSendAsObject,
     remove,
     reportStorageQuota,
@@ -1812,7 +1737,6 @@ const OnyxUtils = {
     setWithRetry,
     multiSetWithRetry,
     setCollectionWithRetry,
-    isRamOnlyKey,
 };
 
 GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
@@ -1827,8 +1751,6 @@ GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
     get = decorateWithMetrics(get, 'OnyxUtils.get');
     // @ts-expect-error Reassign
     getAllKeys = decorateWithMetrics(getAllKeys, 'OnyxUtils.getAllKeys');
-    // @ts-expect-error Reassign
-    getCollectionKeys = decorateWithMetrics(getCollectionKeys, 'OnyxUtils.getCollectionKeys');
     // @ts-expect-error Reassign
     keysChanged = decorateWithMetrics(keysChanged, 'OnyxUtils.keysChanged');
     // @ts-expect-error Reassign

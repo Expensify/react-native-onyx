@@ -188,6 +188,11 @@ const storage: Storage = {
     getAllKeys: () => tryOrDegradePerformance(() => provider.getAllKeys()),
 
     /**
+     * Returns all key-value pairs from storage in a single batch operation
+     */
+    getAll: () => tryOrDegradePerformance(() => provider.getAll()),
+
+    /**
      * Gets the total bytes of the store
      */
     getDatabaseSize: () => tryOrDegradePerformance(() => provider.getDatabaseSize()),
@@ -220,6 +225,7 @@ GlobalSettings.addGlobalSettingsChangeListener(({enablePerformanceMetrics}) => {
     storage.removeItems = decorateWithMetrics(storage.removeItems, 'Storage.removeItems');
     storage.clear = decorateWithMetrics(storage.clear, 'Storage.clear');
     storage.getAllKeys = decorateWithMetrics(storage.getAllKeys, 'Storage.getAllKeys');
+    storage.getAll = decorateWithMetrics(storage.getAll, 'Storage.getAll');
 });
 
 export default storage;
