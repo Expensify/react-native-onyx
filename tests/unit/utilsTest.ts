@@ -205,6 +205,8 @@ describe('fastMerge', () => {
             ['a number', 1000],
             ['a boolean', true],
             ['an array', []],
+            ['null', null],
+            ['undefined', undefined],
         ])('should replace %s with an object', (_label, data) => {
             const result = utils.fastMerge<unknown>(data, testObject);
             expect(result.result).toEqual(testObject);
@@ -274,6 +276,32 @@ describe('fastMerge', () => {
             const result = utils.fastMerge(target, source);
             expect(result.result).toBe(target);
         });
+
+        it('should skip undefined source values and preserve target reference', () => {
+            const target = {a: 1, b: 2};
+            const source = {a: undefined};
+            const result = utils.fastMerge(target, source);
+            expect(result.result).toBe(target);
+        });
+
+        it('should preserve references through deeply nested merges (3+ levels)', () => {
+            const deepNested = {x: 1};
+            const target = {a: {b: {c: deepNested}}, d: 'hello'};
+            const source = {d: 'hello'};
+            const result = utils.fastMerge<GenericDeepRecord>(target, source);
+            expect(result.result).toBe(target);
+            expect(result.result.a.b.c).toBe(deepNested);
+        });
+
+        it('should return a new reference at each changed level in a deep merge', () => {
+            const target = {a: {b: {c: 1, d: 2}}, e: 'unchanged'};
+            const source = {a: {b: {c: 99}}};
+            const result = utils.fastMerge<GenericDeepRecord>(target, source);
+            expect(result.result).not.toBe(target);
+            expect(result.result.a).not.toBe(target.a);
+            expect(result.result.a.b).not.toBe(target.a.b);
+            expect(result.result.a.b).toEqual({c: 99, d: 2});
+        });
     });
 
     describe('removeNestedNullValues', () => {
@@ -332,6 +360,27 @@ describe('fastMerge', () => {
             const result = utils.removeNestedNullValues(value);
             expect(result).toBe(value);
             expect((result as Record<string, unknown>).items).toBe(arr);
+        });
+
+        it('should pass through primitives unchanged', () => {
+            expect(utils.removeNestedNullValues('hello')).toBe('hello');
+            expect(utils.removeNestedNullValues(42)).toBe(42);
+            expect(utils.removeNestedNullValues(true)).toBe(true);
+            expect(utils.removeNestedNullValues(null)).toBe(null);
+            expect(utils.removeNestedNullValues(undefined)).toBe(undefined);
+        });
+
+        it('should return the same reference for an empty object', () => {
+            const value = {};
+            const result = utils.removeNestedNullValues(value);
+            expect(result).toBe(value);
+        });
+
+        it('should return a new empty object when all properties are null/undefined', () => {
+            const value = {a: null, b: undefined, c: null};
+            const result = utils.removeNestedNullValues(value);
+            expect(result).not.toBe(value);
+            expect(result).toEqual({});
         });
     });
 });
