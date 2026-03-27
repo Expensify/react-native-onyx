@@ -222,12 +222,27 @@ function formatActionName(method: string, key?: OnyxKey): string {
 }
 
 /** validate that the update and the existing value are compatible */
-function checkCompatibilityWithExistingValue(value: unknown, existingValue: unknown): {isCompatible: boolean; existingValueType?: string; newValueType?: string} {
+function checkCompatibilityWithExistingValue(
+    value: unknown,
+    existingValue: unknown,
+): {isCompatible: boolean; existingValueType?: string; newValueType?: string; isEmptyArrayCoercion?: boolean} {
     if (!existingValue || !value) {
         return {
             isCompatible: true,
         };
     }
+
+    // PHP's associative arrays cannot distinguish between an empty list and an
+    // empty object, so it encodes both as []. A key that should hold an
+    // object may arrive from the server as [] and be stored that way. If
+    // we then try to MERGE an object into that key, the array-vs-object type check
+    // would normally block it. Since an empty array carries no data worth
+    // preserving, we treat it as compatible with an object update and coerce it.
+    const isObjectValue = typeof value === 'object' && !Array.isArray(value);
+    if (Array.isArray(existingValue) && existingValue.length === 0 && isObjectValue) {
+        return {isCompatible: true, isEmptyArrayCoercion: true};
+    }
+
     const existingValueType = Array.isArray(existingValue) ? 'array' : 'non-array';
     const newValueType = Array.isArray(value) ? 'array' : 'non-array';
     if (existingValueType !== newValueType) {
