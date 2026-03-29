@@ -2,15 +2,12 @@ import * as IDB from 'idb-keyval';
 import type {UseStore} from 'idb-keyval';
 import * as Logger from '../../../Logger';
 
-type ConnectionClosedReason = 'browser' | 'versionchange' | 'verifyStoreExists' | 'unknown';
-
 // This is a copy of the createStore function from idb-keyval, we need a custom implementation
 // because we need to create the database manually in order to ensure that the store exists before we use it.
 // If the store does not exist, idb-keyval will throw an error
 // source: https://github.com/jakearchibald/idb-keyval/blob/9d19315b4a83897df1e0193dccdc29f78466a0f3/src/index.ts#L12
 function createStore(dbName: string, storeName: string): UseStore {
     let dbp: Promise<IDBDatabase> | undefined;
-    let closedBy: ConnectionClosedReason = 'unknown';
 
     const attachHandlers = (db: IDBDatabase) => {
         // Browsers may close idle IDB connections at any time, especially Safari.
@@ -19,7 +16,6 @@ function createStore(dbName: string, storeName: string): UseStore {
         // eslint-disable-next-line no-param-reassign
         db.onclose = () => {
             Logger.logInfo('IDB connection closed by browser', {dbName, storeName});
-            closedBy = 'browser';
             dbp = undefined;
         };
 
@@ -29,7 +25,6 @@ function createStore(dbName: string, storeName: string): UseStore {
         // eslint-disable-next-line no-param-reassign
         db.onversionchange = () => {
             Logger.logInfo('IDB connection closing due to version change', {dbName, storeName});
-            closedBy = 'versionchange';
             db.close();
             dbp = undefined;
         };
@@ -58,7 +53,6 @@ function createStore(dbName: string, storeName: string): UseStore {
 
         Logger.logInfo(`Store ${storeName} does not exist in database ${dbName}.`);
         const nextVersion = db.version + 1;
-        closedBy = 'verifyStoreExists';
         db.close();
 
         const request = indexedDB.open(dbName, nextVersion);
@@ -93,11 +87,9 @@ function createStore(dbName: string, storeName: string): UseStore {
                     dbName,
                     storeName,
                     txMode,
-                    closedBy,
                     errorMessage: error.message,
                 });
                 dbp = undefined;
-                closedBy = 'unknown';
                 // Retry only once — this call is not wrapped, so if it also fails the error propagates normally.
                 return executeTransaction(txMode, callback);
             }

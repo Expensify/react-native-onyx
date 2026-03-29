@@ -178,87 +178,8 @@ describe('createStore', () => {
                 dbName,
                 storeName: STORE_NAME,
                 txMode: 'readwrite',
-                closedBy: 'unknown',
                 errorMessage: 'The database connection is closing.',
             });
-        });
-
-        it('should log closedBy as "browser" when onclose preceded the error', async () => {
-            const dbName = uniqueDBName();
-            const store = createStore(dbName, STORE_NAME);
-
-            const db = await captureDB(store);
-            expect(db).toBeDefined();
-            db?.onclose?.call(db, new Event('close'));
-
-            const original = IDBDatabase.prototype.transaction;
-            let callCount = 0;
-            jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
-                callCount += 1;
-                if (callCount === 1) {
-                    throw new DOMException('The database connection is closing.', 'InvalidStateError');
-                }
-                return original.apply(this, args);
-            });
-
-            await store('readonly', (s) => IDB.promisifyRequest(s.getAllKeys()));
-
-            expect(logAlertSpy).toHaveBeenCalledWith('IDB InvalidStateError, retrying with fresh connection', expect.objectContaining({closedBy: 'browser'}));
-        });
-
-        it('should log closedBy as "versionchange" when onversionchange preceded the error', async () => {
-            const dbName = uniqueDBName();
-            const store = createStore(dbName, STORE_NAME);
-
-            const db = await captureDB(store);
-            expect(db).toBeDefined();
-            // @ts-expect-error -- our handler ignores the event argument
-            db?.onversionchange?.call(db, new Event('versionchange'));
-
-            const original = IDBDatabase.prototype.transaction;
-            let callCount = 0;
-            jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
-                callCount += 1;
-                if (callCount === 1) {
-                    throw new DOMException('The database connection is closing.', 'InvalidStateError');
-                }
-                return original.apply(this, args);
-            });
-
-            await store('readonly', (s) => IDB.promisifyRequest(s.getAllKeys()));
-
-            expect(logAlertSpy).toHaveBeenCalledWith('IDB InvalidStateError, retrying with fresh connection', expect.objectContaining({closedBy: 'versionchange'}));
-        });
-
-        it('should reset closedBy to "unknown" after a retry', async () => {
-            const dbName = uniqueDBName();
-            const store = createStore(dbName, STORE_NAME);
-
-            const db = await captureDB(store);
-            expect(db).toBeDefined();
-            db?.onclose?.call(db, new Event('close'));
-
-            const original = IDBDatabase.prototype.transaction;
-            let callCount = 0;
-            jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
-                callCount += 1;
-                if (callCount === 1) {
-                    throw new DOMException('The database connection is closing.', 'InvalidStateError');
-                }
-                return original.apply(this, args);
-            });
-
-            // First operation triggers retry with closedBy: 'browser'
-            await store('readonly', (s) => IDB.promisifyRequest(s.getAllKeys()));
-            expect(logAlertSpy).toHaveBeenCalledWith('IDB InvalidStateError, retrying with fresh connection', expect.objectContaining({closedBy: 'browser'}));
-
-            logAlertSpy.mockClear();
-
-            // Force another InvalidStateError — closedBy should now be 'unknown'
-            callCount = 0;
-
-            await store('readonly', (s) => IDB.promisifyRequest(s.getAllKeys()));
-            expect(logAlertSpy).toHaveBeenCalledWith('IDB InvalidStateError, retrying with fresh connection', expect.objectContaining({closedBy: 'unknown'}));
         });
     });
 
