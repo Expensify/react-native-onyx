@@ -94,48 +94,6 @@ describe('OnyxUtils', () => {
 
     afterEach(() => jest.clearAllMocks());
 
-    describe('splitCollectionMemberKey', () => {
-        describe('should return correct values', () => {
-            const dataResult: Record<string, [string, string]> = {
-                test_: ['test_', ''],
-                test_level_: ['test_level_', ''],
-                test_level_1: ['test_level_', '1'],
-                test_level_2: ['test_level_', '2'],
-                test_level_last_3: ['test_level_last_', '3'],
-                test___FAKE__: ['test_', '__FAKE__'],
-                'test_-1_something': ['test_', '-1_something'],
-                'test_level_-1_something': ['test_level_', '-1_something'],
-            };
-
-            it.each(Object.keys(dataResult))('%s', (key) => {
-                const [collectionKey, id] = OnyxUtils.splitCollectionMemberKey(key);
-                expect(collectionKey).toEqual(dataResult[key][0]);
-                expect(id).toEqual(dataResult[key][1]);
-            });
-        });
-
-        it('should throw error if key does not contain underscore', () => {
-            expect(() => {
-                OnyxUtils.splitCollectionMemberKey(ONYXKEYS.TEST_KEY);
-            }).toThrowError("Invalid 'test' key provided, only collection keys are allowed.");
-            expect(() => {
-                OnyxUtils.splitCollectionMemberKey('');
-            }).toThrowError("Invalid '' key provided, only collection keys are allowed.");
-        });
-
-        it('should allow passing the collection key beforehand for performance gains', () => {
-            const [collectionKey, id] = OnyxUtils.splitCollectionMemberKey(`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, ONYXKEYS.COLLECTION.TEST_KEY);
-            expect(collectionKey).toEqual(ONYXKEYS.COLLECTION.TEST_KEY);
-            expect(id).toEqual('id1');
-        });
-
-        it("should throw error if the passed collection key isn't compatible with the key", () => {
-            expect(() => {
-                OnyxUtils.splitCollectionMemberKey(`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, ONYXKEYS.COLLECTION.TEST_LEVEL_KEY);
-            }).toThrowError("Invalid 'test_level_' collection key provided, it isn't compatible with 'test_id1' key.");
-        });
-    });
-
     describe('partialSetCollection', () => {
         beforeEach(() => {
             Onyx.clear();
@@ -323,61 +281,6 @@ describe('OnyxUtils', () => {
         });
     });
 
-    describe('getCollectionKey', () => {
-        describe('should return correct values', () => {
-            const dataResult: Record<string, string> = {
-                test_: 'test_',
-                test_level_: 'test_level_',
-                test_level_1: 'test_level_',
-                test_level_2: 'test_level_',
-                test_level_last_3: 'test_level_last_',
-                test___FAKE__: 'test_',
-                'test_-1_something': 'test_',
-                'test_level_-1_something': 'test_level_',
-            };
-
-            it.each(Object.keys(dataResult))('%s', (key) => {
-                const collectionKey = OnyxUtils.getCollectionKey(key);
-                expect(collectionKey).toEqual(dataResult[key]);
-            });
-        });
-
-        it('should return undefined if key does not contain underscore', () => {
-            expect(OnyxUtils.getCollectionKey(ONYXKEYS.TEST_KEY)).toBeUndefined();
-            expect(OnyxUtils.getCollectionKey('')).toBeUndefined();
-        });
-    });
-
-    describe('isCollectionMember', () => {
-        it('should return true for collection member keys', () => {
-            expect(OnyxUtils.isCollectionMember('test_123')).toBe(true);
-            expect(OnyxUtils.isCollectionMember('test_level_456')).toBe(true);
-            expect(OnyxUtils.isCollectionMember('test_level_last_789')).toBe(true);
-            expect(OnyxUtils.isCollectionMember('test_-1_something')).toBe(true);
-            expect(OnyxUtils.isCollectionMember('routes_abc')).toBe(true);
-        });
-
-        it('should return false for collection keys themselves', () => {
-            expect(OnyxUtils.isCollectionMember('test_')).toBe(false);
-            expect(OnyxUtils.isCollectionMember('test_level_')).toBe(false);
-            expect(OnyxUtils.isCollectionMember('test_level_last_')).toBe(false);
-            expect(OnyxUtils.isCollectionMember('routes_')).toBe(false);
-        });
-
-        it('should return false for non-collection keys', () => {
-            expect(OnyxUtils.isCollectionMember('test')).toBe(false);
-            expect(OnyxUtils.isCollectionMember('someRegularKey')).toBe(false);
-            expect(OnyxUtils.isCollectionMember('notACollection')).toBe(false);
-            expect(OnyxUtils.isCollectionMember('')).toBe(false);
-        });
-
-        it('should return false for invalid keys', () => {
-            expect(OnyxUtils.isCollectionMember('invalid_key_123')).toBe(false);
-            expect(OnyxUtils.isCollectionMember('notregistered_')).toBe(false);
-            expect(OnyxUtils.isCollectionMember('notregistered_123')).toBe(false);
-        });
-    });
-
     describe('mergeChanges', () => {
         it("should return the last change if it's an array", () => {
             const {result} = OnyxUtils.mergeChanges([...testMergeChanges, [0, 1, 2]], testObject);
@@ -489,32 +392,6 @@ describe('OnyxUtils', () => {
 
             // Should only be called once since there are no evictable keys
             expect(retryOperationSpy).toHaveBeenCalledTimes(1);
-        });
-    });
-
-    describe('isRamOnlyKey', () => {
-        it('should return true for RAM-only key', () => {
-            expect(OnyxUtils.isRamOnlyKey(ONYXKEYS.RAM_ONLY_KEY)).toBeTruthy();
-        });
-
-        it('should return true for RAM-only collection', () => {
-            expect(OnyxUtils.isRamOnlyKey(ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION)).toBeTruthy();
-        });
-
-        it('should return true for RAM-only collection member', () => {
-            expect(OnyxUtils.isRamOnlyKey(`${ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION}1`)).toBeTruthy();
-        });
-
-        it('should return false for a normal key', () => {
-            expect(OnyxUtils.isRamOnlyKey(ONYXKEYS.TEST_KEY)).toBeFalsy();
-        });
-
-        it('should return false for normal collection', () => {
-            expect(OnyxUtils.isRamOnlyKey(ONYXKEYS.COLLECTION.TEST_KEY)).toBeFalsy();
-        });
-
-        it('should return false for normal collection member', () => {
-            expect(OnyxUtils.isRamOnlyKey(`${ONYXKEYS.COLLECTION.TEST_KEY}1`)).toBeFalsy();
         });
     });
 

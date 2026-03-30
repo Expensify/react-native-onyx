@@ -88,6 +88,13 @@ const provider: StorageProvider<unknown> = {
     },
 
     /**
+     * Returns all key-value pairs from storage
+     */
+    getAll() {
+        return Promise.resolve([]);
+    },
+
+    /**
      * Gets the total bytes of the store.
      * `bytesRemaining` will always be `Number.POSITIVE_INFINITY` since we don't have a hard limit on memory.
      */

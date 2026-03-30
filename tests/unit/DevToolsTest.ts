@@ -137,5 +137,12 @@ describe('DevTools', () => {
             const devToolsInstance = getDevToolsInstance() as RealDevToolsType;
             expect(devToolsInstance['state']).toEqual({...initialKeyStates, [ONYX_KEYS.NUM_KEY]: 2});
         });
+
+        it('Preserves collection member keys when a collection key is passed to keysToPreserve', async () => {
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.NUM_KEY, exampleCollection);
+            await Onyx.clear([ONYX_KEYS.COLLECTION.NUM_KEY]);
+            const devToolsInstance = getDevToolsInstance() as RealDevToolsType;
+            expect(devToolsInstance['state']).toEqual({...initialKeyStates, ...exampleCollection});
+        });
     });
 });
