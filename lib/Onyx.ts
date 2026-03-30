@@ -27,8 +27,6 @@ import OnyxKeys from './OnyxKeys';
 import logMessages from './logMessages';
 import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
-import * as GlobalSettings from './GlobalSettings';
-import decorateWithMetrics from './metrics';
 import OnyxMerge from './OnyxMerge';
 
 /** Initialize the store with actions and listening for storage events */
@@ -38,17 +36,11 @@ function init({
     evictableKeys = [],
     maxCachedKeysCount = 1000,
     shouldSyncMultipleInstances = !!global.localStorage,
-    enablePerformanceMetrics = false,
     enableDevTools = true,
     skippableCollectionMemberIDs = [],
     ramOnlyKeys = [],
     snapshotMergeKeys = [],
 }: InitOptions): void {
-    if (enablePerformanceMetrics) {
-        GlobalSettings.setPerformanceMetricsEnabled(true);
-        applyDecorators();
-    }
-
     initDevTools(enableDevTools);
 
     Storage.init();
@@ -600,26 +592,6 @@ const Onyx = {
     init,
     registerLogger: Logger.registerLogger,
 };
-
-function applyDecorators() {
-    // We are reassigning the functions directly so that internal function calls are also decorated
-    // @ts-expect-error Reassign
-    connect = decorateWithMetrics(connect, 'Onyx.connect');
-    // @ts-expect-error Reassign
-    connectWithoutView = decorateWithMetrics(connectWithoutView, 'Onyx.connectWithoutView');
-    // @ts-expect-error Reassign
-    set = decorateWithMetrics(set, 'Onyx.set');
-    // @ts-expect-error Reassign
-    multiSet = decorateWithMetrics(multiSet, 'Onyx.multiSet');
-    // @ts-expect-error Reassign
-    merge = decorateWithMetrics(merge, 'Onyx.merge');
-    // @ts-expect-error Reassign
-    mergeCollection = decorateWithMetrics(mergeCollection, 'Onyx.mergeCollection');
-    // @ts-expect-error Reassign
-    update = decorateWithMetrics(update, 'Onyx.update');
-    // @ts-expect-error Reassign
-    clear = decorateWithMetrics(clear, 'Onyx.clear');
-}
 
 export default Onyx;
 export type {OnyxUpdate, ConnectOptions, SetOptions};
