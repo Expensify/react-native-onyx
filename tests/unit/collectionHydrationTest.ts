@@ -6,6 +6,7 @@ const ONYX_KEYS = {
     COLLECTION: {
         TEST_KEY: 'test_',
     },
+    SINGLE_KEY: 'single',
 };
 
 describe('Collection hydration with connect() followed by immediate set()', () => {
@@ -15,6 +16,7 @@ describe('Collection hydration with connect() followed by immediate set()', () =
         await StorageMock.setItem(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`, {id: 1, title: 'Test One'});
         await StorageMock.setItem(`${ONYX_KEYS.COLLECTION.TEST_KEY}2`, {id: 2, title: 'Test Two'});
         await StorageMock.setItem(`${ONYX_KEYS.COLLECTION.TEST_KEY}3`, {id: 3, title: 'Test Three'});
+        await StorageMock.setItem(ONYX_KEYS.SINGLE_KEY, {title: 'old'});
 
         // ===== Session 2 =====
         // App restarts. Onyx.init() calls getAllKeys() which populates storageKeys
@@ -84,6 +86,47 @@ describe('Collection hydration with connect() followed by immediate set()', () =
         expect(deliveredKeys).toContain(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`);
         expect(deliveredKeys).toContain(`${ONYX_KEYS.COLLECTION.TEST_KEY}2`);
         expect(deliveredKeys).toContain(`${ONYX_KEYS.COLLECTION.TEST_KEY}3`);
+    });
+
+    test('single key: set() with non-shallow-equal value should not be overwritten by stale hydration', async () => {
+        const mockCallback = jest.fn();
+
+        Onyx.connect({
+            key: ONYX_KEYS.SINGLE_KEY,
+            callback: mockCallback,
+        });
+
+        // Immediately update the key with a non-shallow-equal
+        Onyx.set(ONYX_KEYS.SINGLE_KEY, {title: 'new'});
+
+        await waitForPromisesToResolve();
+
+        // The LAST value delivered to the subscriber must be the fresh one, not the stale storage value
+        const lastValue = mockCallback.mock.calls[mockCallback.mock.calls.length - 1][0];
+        expect(lastValue).toEqual({title: 'new'});
+    });
+
+    test('collection key: set() with non-shallow-equal value should not be regressed by hydration multiGet', async () => {
+        const mockCallback = jest.fn();
+
+        Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            waitForCollectionCallback: true,
+            callback: mockCallback,
+        });
+
+        // Update key 1 with a non-shallow-equal value while hydration multiGet is in-flight
+        Onyx.set(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`, {id: 1, title: 'Freshly Updated'});
+
+        await waitForPromisesToResolve();
+
+        const lastCall = mockCallback.mock.calls[mockCallback.mock.calls.length - 1][0];
+
+        // The final collection snapshot must have the fresh value, not the stale storage one
+        expect(lastCall[`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]).toEqual({id: 1, title: 'Freshly Updated'});
+        // Other members should still be present from storage
+        expect(lastCall[`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]).toEqual({id: 2, title: 'Test Two'});
+        expect(lastCall[`${ONYX_KEYS.COLLECTION.TEST_KEY}3`]).toEqual({id: 3, title: 'Test Three'});
     });
 
     test('waitForCollectionCallback=false should deliver all collection members from storage', async () => {
