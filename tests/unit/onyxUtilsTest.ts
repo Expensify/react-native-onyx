@@ -414,6 +414,131 @@ describe('OnyxUtils', () => {
         });
     });
 
+    describe('storage eviction', () => {
+        const diskFullError = new Error('database or disk is full');
+
+        // Use local references that get fresh instances after jest.resetModules()
+        let LocalOnyx: typeof Onyx;
+        let LocalOnyxUtils: typeof OnyxUtils;
+        let LocalOnyxCache: typeof OnyxCache;
+        let LocalStorageMock: typeof StorageMock;
+
+        // Reset all modules to get fresh singletons (OnyxCache, OnyxUtils, etc.)
+        // then re-init Onyx with evictableKeys configured
+        beforeEach(async () => {
+            jest.resetModules();
+
+            LocalOnyx = require('../../lib').default;
+            LocalOnyxUtils = require('../../lib/OnyxUtils').default;
+            LocalOnyxCache = require('../../lib/OnyxCache').default;
+            LocalStorageMock = require('../../lib/storage').default;
+
+            LocalOnyx.init({
+                keys: ONYXKEYS,
+                evictableKeys: [ONYXKEYS.COLLECTION.TEST_KEY],
+            });
+            await waitForPromisesToResolve();
+        });
+
+        it('should evict the least recently accessed evictable key on storage capacity error and retry successfully', async () => {
+            const key1 = `${ONYXKEYS.COLLECTION.TEST_KEY}1`;
+            const key2 = `${ONYXKEYS.COLLECTION.TEST_KEY}2`;
+
+            await LocalOnyx.set(key1, {id: 1});
+            await LocalOnyx.set(key2, {id: 2});
+            expect(LocalOnyxCache.hasCacheForKey(key1)).toBe(true);
+            expect(LocalOnyxCache.hasCacheForKey(key2)).toBe(true);
+
+            // Fail once with capacity error, then succeed
+            LocalStorageMock.setItem = jest.fn(LocalStorageMock.setItem).mockRejectedValueOnce(diskFullError).mockImplementation(LocalStorageMock.setItem);
+
+            await LocalOnyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+
+            // key1 was least recently accessed, so it should have been evicted
+            expect(LocalOnyxCache.hasCacheForKey(key1)).toBe(false);
+            // key2 was more recently accessed, so it should still be in cache
+            expect(LocalOnyxCache.hasCacheForKey(key2)).toBe(true);
+            // The write that triggered the error should have succeeded on retry
+            expect(LocalOnyxCache.get(ONYXKEYS.TEST_KEY)).toEqual({test: 'data'});
+        });
+
+        it('should evict the least recently accessed key first (LRU order)', async () => {
+            const key1 = `${ONYXKEYS.COLLECTION.TEST_KEY}1`;
+            const key2 = `${ONYXKEYS.COLLECTION.TEST_KEY}2`;
+            const key3 = `${ONYXKEYS.COLLECTION.TEST_KEY}3`;
+
+            // Set in order: key1, key2, key3
+            await LocalOnyx.set(key1, {id: 1});
+            await LocalOnyx.set(key2, {id: 2});
+            await LocalOnyx.set(key3, {id: 3});
+
+            // Now access key1 again so it becomes most recent
+            await LocalOnyx.merge(key1, {id: 1, updated: true});
+
+            // LRU order should now be: key2 (least recent), key3, key1 (most recent)
+            expect(LocalOnyxCache.getKeyForEviction()).toBe(key2);
+        });
+
+        it('should not evict non-evictable keys', async () => {
+            const evictableKey = `${ONYXKEYS.COLLECTION.TEST_KEY}1`;
+
+            await LocalOnyx.set(evictableKey, {id: 1});
+            await LocalOnyx.set(ONYXKEYS.TEST_KEY, {test: 'not evictable'});
+
+            // The evictable key should be a candidate for eviction
+            expect(LocalOnyxCache.isEvictableKey(evictableKey)).toBe(true);
+            // The non-evictable key should NOT be a candidate
+            expect(LocalOnyxCache.isEvictableKey(ONYXKEYS.TEST_KEY)).toBe(false);
+
+            // Evict it
+            await LocalOnyxUtils.remove(evictableKey);
+
+            // No more evictable candidates
+            expect(LocalOnyxCache.getKeyForEviction()).toBeUndefined();
+            // Non-evictable key should still be in cache
+            expect(LocalOnyxCache.get(ONYXKEYS.TEST_KEY)).toEqual({test: 'not evictable'});
+        });
+
+        it('should not add collection keys to eviction candidates, only their members', async () => {
+            const memberKey = `${ONYXKEYS.COLLECTION.TEST_KEY}1`;
+
+            await LocalOnyx.set(memberKey, {id: 1});
+
+            // The member key should be evictable
+            expect(LocalOnyxCache.getKeyForEviction()).toBe(memberKey);
+
+            // Attempting to add the collection key directly should be filtered out
+            LocalOnyxCache.addLastAccessedKey(ONYXKEYS.COLLECTION.TEST_KEY, true);
+
+            // Should still return the member key, not the collection key
+            expect(LocalOnyxCache.getKeyForEviction()).toBe(memberKey);
+        });
+
+        it('should seed evictable keys from storage at init', async () => {
+            // Set up storage with pre-existing evictable keys before init
+            jest.resetModules();
+
+            LocalOnyx = require('../../lib').default;
+            LocalOnyxCache = require('../../lib/OnyxCache').default;
+            const storage = require('../../lib/storage').default;
+
+            await storage.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}pre1`, {id: 'pre1'});
+            await storage.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}pre2`, {id: 'pre2'});
+
+            // Init — addEvictableKeysToRecentlyAccessedList should seed them
+            LocalOnyx.init({
+                keys: ONYXKEYS,
+                evictableKeys: [ONYXKEYS.COLLECTION.TEST_KEY],
+            });
+            await waitForPromisesToResolve();
+
+            // Pre-existing keys should be available for eviction without being explicitly accessed
+            const keyForEviction = LocalOnyxCache.getKeyForEviction();
+            expect(keyForEviction).toBeDefined();
+            expect(keyForEviction?.startsWith(ONYXKEYS.COLLECTION.TEST_KEY)).toBe(true);
+        });
+    });
+
     describe('afterInit', () => {
         beforeEach(() => {
             // Resets the deferred init task before each test.
