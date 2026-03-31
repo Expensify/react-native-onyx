@@ -408,12 +408,6 @@ type InitOptions = {
     shouldSyncMultipleInstances?: boolean;
 
     /**
-     * If enabled it will use the performance API to measure the time taken by Onyx operations.
-     * @default false
-     */
-    enablePerformanceMetrics?: boolean;
-
-    /**
      * If enabled, it will connect to Redux DevTools Extension for debugging.
      * This allows you to see all Onyx state changes in the Redux DevTools.
      * @default true
