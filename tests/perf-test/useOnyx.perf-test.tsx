@@ -57,7 +57,6 @@ describe('useOnyx', () => {
     beforeAll(async () => {
         Onyx.init({
             keys: ONYXKEYS,
-            maxCachedKeysCount: 100000,
             ramOnlyKeys: [ONYXKEYS.RAM_ONLY_TEST_KEY],
         });
     });

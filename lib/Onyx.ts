@@ -34,7 +34,6 @@ function init({
     keys = {},
     initialKeyStates = {},
     evictableKeys = [],
-    maxCachedKeysCount = 1000,
     shouldSyncMultipleInstances = !!global.localStorage,
     enableDevTools = true,
     skippableCollectionMemberIDs = [],
@@ -67,10 +66,6 @@ function init({
 
             OnyxUtils.keyChanged(key, value as OnyxValue<typeof key>, undefined, isKeyCollectionMember);
         });
-    }
-
-    if (maxCachedKeysCount > 0) {
-        cache.setRecentKeysLimit(maxCachedKeysCount);
     }
 
     OnyxUtils.initStoreValues(keys, initialKeyStates, evictableKeys);

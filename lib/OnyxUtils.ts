@@ -630,7 +630,7 @@ function keyChanged<TKey extends OnyxKey>(
     canUpdateSubscriber: (subscriber?: CallbackToStateMapping<OnyxKey>) => boolean = () => true,
     isProcessingCollectionUpdate = false,
 ): void {
-    // Add or remove this key from the recentlyAccessedKeys lists
+    // Add or remove this key from the recentlyAccessedKeys list
     if (value !== null) {
         cache.addLastAccessedKey(key, OnyxKeys.isCollectionKey(key));
     } else {
@@ -717,22 +717,6 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: CallbackToStateMapp
     }
 
     (mapping as DefaultConnectOptions<TKey>).callback?.(valueToPass, matchedKey as TKey);
-}
-
-/**
- * We check to see if this key is flagged as safe for eviction and add it to the recentlyAccessedKeys list so that when we
- * run out of storage the least recently accessed key can be removed.
- */
-function addKeyToRecentlyAccessedIfNeeded<TKey extends OnyxKey>(key: TKey): void {
-    if (!cache.isEvictableKey(key)) {
-        return;
-    }
-
-    // Add the key to recentKeys first (this makes it the most recent key)
-    cache.addToAccessedKeys(key);
-
-    // Try to free some cache whenever we connect to a safe eviction key
-    cache.removeLeastRecentlyUsedKeys();
 }
 
 /**
@@ -845,7 +829,7 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, on
         return onyxMethod(defaultParams, nextRetryAttempt);
     }
 
-    // Find the first key that we can remove that has no subscribers in our blocklist
+    // Find the least recently accessed evictable key that we can remove
     const keyForRemoval = cache.getKeyForEviction();
     if (!keyForRemoval) {
         // If we have no acceptable keys to remove then we are possibly trying to save mission critical data. If this is the case,
@@ -855,7 +839,7 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, on
         return reportStorageQuota();
     }
 
-    // Remove the least recently viewed key that is not currently being accessed and retry.
+    // Remove the least recently accessed key and retry.
     Logger.logInfo(`Out of storage. Evicting least recently accessed key (${keyForRemoval}) and retrying.`);
     reportStorageQuota();
 
@@ -871,8 +855,6 @@ function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>
     // all updates regardless of value changes (indicated by initWithStoredValues set to false).
     if (hasChanged) {
         cache.set(key, value);
-    } else {
-        cache.addToAccessedKeys(key);
     }
 
     return scheduleSubscriberUpdate(key, value, (subscriber) => hasChanged || subscriber?.initWithStoredValues === false).then(() => undefined);
@@ -1107,7 +1089,10 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
 
     // Commit connection only after init passes
     deferredInitTask.promise
-        .then(() => addKeyToRecentlyAccessedIfNeeded(mapping.key))
+        .then(() => {
+            // Track evictable keys in the recently accessed list for storage eviction
+            cache.addLastAccessedKey(mapping.key, OnyxKeys.isCollectionKey(mapping.key));
+        })
         .then(() => {
             // Performance improvement
             // If the mapping is connected to an onyx key that is not a collection
@@ -1301,7 +1286,7 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
         return Promise.resolve();
     }
 
-    const existingValue = cache.get(key, false);
+    const existingValue = cache.get(key);
 
     // If the existing value as well as the new value are null, we can return early.
     if (existingValue === undefined && value === null) {
@@ -1757,7 +1742,6 @@ const OnyxUtils = {
     setSnapshotMergeKeys,
     storeKeyBySubscriptions,
     deleteKeyBySubscriptions,
-    addKeyToRecentlyAccessedIfNeeded,
     reduceCollectionWithSelector,
     updateSnapshots,
     mergeCollectionWithPatches,
