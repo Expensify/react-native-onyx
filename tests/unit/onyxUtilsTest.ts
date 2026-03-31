@@ -5,6 +5,7 @@ import type {GenericDeepRecord} from '../types';
 import utils from '../../lib/utils';
 import type {Collection, OnyxCollection} from '../../lib/types';
 import type GenericCollection from '../utils/GenericCollection';
+import OnyxCache from '../../lib/OnyxCache';
 import StorageMock from '../../lib/storage';
 import createDeferredTask from '../../lib/createDeferredTask';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
@@ -392,6 +393,24 @@ describe('OnyxUtils', () => {
 
             // Should only be called once since there are no evictable keys
             expect(retryOperationSpy).toHaveBeenCalledTimes(1);
+        });
+
+        it('should not re-add an evicted key to recentlyAccessedKeys after removal', async () => {
+            // Re-init with evictable keys so getKeyForEviction() has something to return
+            Object.assign(OnyxUtils.getDeferredInitTask(), createDeferredTask());
+            Onyx.init({
+                keys: ONYXKEYS,
+                evictableKeys: [ONYXKEYS.COLLECTION.TEST_KEY],
+            });
+            await waitForPromisesToResolve();
+
+            const evictableKey = `${ONYXKEYS.COLLECTION.TEST_KEY}1`;
+
+            await Onyx.set(evictableKey, {id: 1});
+            expect(OnyxCache.getKeyForEviction()).toBe(evictableKey);
+
+            await OnyxUtils.remove(evictableKey);
+            expect(OnyxCache.getKeyForEviction()).toBeUndefined();
         });
     });
 

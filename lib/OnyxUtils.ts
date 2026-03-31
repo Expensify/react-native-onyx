@@ -631,7 +631,7 @@ function keyChanged<TKey extends OnyxKey>(
     isProcessingCollectionUpdate = false,
 ): void {
     // Add or remove this key from the recentlyAccessedKeys list
-    if (value !== null) {
+    if (value !== null && value !== undefined) {
         cache.addLastAccessedKey(key, OnyxKeys.isCollectionKey(key));
     } else {
         cache.removeLastAccessedKey(key);
