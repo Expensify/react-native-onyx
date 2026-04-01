@@ -467,11 +467,6 @@ class OnyxCache {
                 this.collectionSnapshots.set(collectionKey, Object.freeze({}));
             }
         }
-
-        // Pre-populate the reverse lookup map for any existing keys
-        for (const key of this.storageKeys) {
-            OnyxKeys.registerMemberKey(key);
-        }
     }
 
     /**

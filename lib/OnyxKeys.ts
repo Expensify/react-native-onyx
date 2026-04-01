@@ -115,19 +115,27 @@ function registerMemberKey(key: OnyxKey): void {
         members.add(key);
         return;
     }
+    // Find the longest (most specific) matching collection key.
+    // e.g. for 'test_level_1', prefer 'test_level_' over 'test_'.
+    let matchedCollectionKey: OnyxKey | undefined;
     for (const collectionKey of collectionKeySet) {
         if (isCollectionMemberKey(collectionKey, key)) {
-            memberToCollectionKeyMap.set(key, collectionKey);
-
-            // Also register in the forward lookup (collection → members)
-            let members = collectionToMembersMap.get(collectionKey);
-            if (!members) {
-                members = new Set();
-                collectionToMembersMap.set(collectionKey, members);
+            if (!matchedCollectionKey || collectionKey.length > matchedCollectionKey.length) {
+                matchedCollectionKey = collectionKey;
             }
-            members.add(key);
-            return;
         }
+    }
+
+    if (matchedCollectionKey) {
+        memberToCollectionKeyMap.set(key, matchedCollectionKey);
+
+        // Also register in the forward lookup (collection → members)
+        let members = collectionToMembersMap.get(matchedCollectionKey);
+        if (!members) {
+            members = new Set();
+            collectionToMembersMap.set(matchedCollectionKey, members);
+        }
+        members.add(key);
     }
 }
 
@@ -202,11 +210,7 @@ function setRamOnlyKeys(keys: Set<OnyxKey>): void {
  * - isRamOnlyKey("someOtherKey") → false
  */
 function isRamOnlyKey(key: OnyxKey): boolean {
-    const collectionKey = getCollectionKey(key);
-    if (collectionKey) {
-        return ramOnlyKeySet.has(collectionKey);
-    }
-    return ramOnlyKeySet.has(key);
+    return ramOnlyKeySet.has(key) || ramOnlyKeySet.has(getCollectionKey(key) ?? '');
 }
 
 export default {
