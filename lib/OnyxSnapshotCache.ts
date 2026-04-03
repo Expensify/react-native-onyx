@@ -33,7 +33,7 @@ class OnyxSnapshotCache {
 
     constructor() {
         this.snapshotCache = new Map();
-        this.selectorIDMap = new Map();
+        this.selectorIDMap = new WeakMap();
         this.selectorIDCounter = 0;
         this.cacheKeyRefCounts = new Map();
     }

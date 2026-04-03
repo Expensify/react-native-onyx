@@ -32,6 +32,212 @@ beforeEach(async () => {
 });
 
 describe('useOnyx', () => {
+    describe('dynamic key', () => {
+        beforeEach(() => {
+            jest.spyOn(console, 'error').mockImplementation(jest.fn);
+        });
+
+        afterEach(() => {
+            (console.error as unknown as jest.SpyInstance<void, Parameters<typeof console.error>>).mockRestore();
+        });
+
+        it('should not throw any errors when changing from a collection member key to another one', async () => {
+            const {rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string});
+
+            try {
+                await act(async () => {
+                    rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}2`);
+                });
+            } catch (e) {
+                fail('Expected to not throw any errors.');
+            }
+        });
+
+        it('should transition through loading when switching between collection member keys that both resolve to undefined', async () => {
+            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string});
+
+            // Wait for initial key to fully load
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+
+            // Switch to another collection member key that also has no data
+            rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}2`);
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loading');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should return cached value immediately with loaded status when switching to a key that has data', async () => {
+            Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}2`, 'test_value');
+
+            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string});
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+
+            // Switch to a key that has cached data
+            rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}2`);
+
+            // Value and loaded status should be available synchronously, without waiting for promises
+            expect(result.current[0]).toEqual('test_value');
+            expect(result.current[1].status).toEqual('loaded');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('test_value');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should clear previous data and transition through loading when switching from a key with data to one without', async () => {
+            Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}1`, 'initial_value');
+
+            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string});
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('initial_value');
+            expect(result.current[1].status).toEqual('loaded');
+
+            // Switch to a key that has no data
+            rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}2`);
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loading');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should return the new value when switching from a key with data to another key with different data', async () => {
+            Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}1`, 'value_one');
+            Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}2`, 'value_two');
+
+            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string});
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('value_one');
+            expect(result.current[1].status).toEqual('loaded');
+
+            // Switch to another key that also has data
+            rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}2`);
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('value_two');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should apply the selector against the new key data when switching keys', async () => {
+            Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}1`, {id: 'entry1_id', name: 'entry1_name'});
+            Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}2`, {id: 'entry2_id', name: 'entry2_name'});
+
+            const selector = ((entry: OnyxEntry<{id: string; name: string}>) => entry?.name) as UseOnyxSelector<OnyxKey, string | undefined>;
+
+            const {result, rerender} = renderHook((key: string) => useOnyx(key, {selector}), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string});
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('entry1_name');
+            expect(result.current[1].status).toEqual('loaded');
+
+            // Switch key — selector should run against the new key's data
+            rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}2`);
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('entry2_name');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should handle rapid key switching and settle on the final key value', async () => {
+            Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}1`, 'value_one');
+            Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}2`, 'value_two');
+            Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}3`, 'value_three');
+
+            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string});
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('value_one');
+
+            // Rapidly switch keys without waiting for promises between switches
+            rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}2`);
+            rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}3`);
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('value_three');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should correctly switch between non-collection keys', async () => {
+            Onyx.set(ONYXKEYS.TEST_KEY, 'value_one');
+            Onyx.set(ONYXKEYS.TEST_KEY_2, 'value_two');
+
+            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: ONYXKEYS.TEST_KEY as string});
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('value_one');
+            expect(result.current[1].status).toEqual('loaded');
+
+            rerender(ONYXKEYS.TEST_KEY_2);
+
+            // Cached value should be available synchronously
+            expect(result.current[0]).toEqual('value_two');
+            expect(result.current[1].status).toEqual('loaded');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('value_two');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should correctly return to a previously used key (A → B → A round-trip)', async () => {
+            Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}1`, 'value_one');
+            Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}2`, 'value_two');
+
+            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string});
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('value_one');
+            expect(result.current[1].status).toEqual('loaded');
+
+            // A → B
+            rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}2`);
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('value_two');
+            expect(result.current[1].status).toEqual('loaded');
+
+            // B → A
+            rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}1`);
+
+            // Cached value should be available synchronously
+            expect(result.current[0]).toEqual('value_one');
+            expect(result.current[1].status).toEqual('loaded');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('value_one');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+    });
+
     describe('misc', () => {
         it('should initially return loading state while loading non-existent key, and then return `undefined` and loaded state', async () => {
             const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
@@ -706,6 +912,33 @@ describe('useOnyx', () => {
             await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, 'test'));
 
             expect(result.current[0]).toEqual('test_selected');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should suppress stored values for the new key when switching keys with initWithStoredValues: false', async () => {
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'stored_value_one');
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY_2, 'stored_value_two');
+
+            const {result, rerender} = renderHook((key: string) => useOnyx(key, {initWithStoredValues: false}), {initialProps: ONYXKEYS.TEST_KEY as string});
+
+            await act(async () => waitForPromisesToResolve());
+
+            // initWithStoredValues: false — stored value should be suppressed
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+
+            rerender(ONYXKEYS.TEST_KEY_2);
+
+            await act(async () => waitForPromisesToResolve());
+
+            // Stored value for the new key should also be suppressed
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+
+            // But live updates should still come through
+            await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY_2, 'live_value'));
+
+            expect(result.current[0]).toEqual('live_value');
             expect(result.current[1].status).toEqual('loaded');
         });
     });
