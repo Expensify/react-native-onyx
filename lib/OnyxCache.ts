@@ -491,7 +491,7 @@ class OnyxCache {
         const needsPrefixCheck = !memberKeys;
 
         for (const key of keysToScan) {
-            if (needsPrefixCheck && !OnyxKeys.isCollectionMemberKey(collectionKey, key)) {
+            if (needsPrefixCheck && OnyxKeys.getCollectionKey(key) !== collectionKey) {
                 continue;
             }
             const val = this.storageMap[key];
