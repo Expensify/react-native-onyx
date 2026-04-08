@@ -360,6 +360,53 @@ describe('OnyxConnectionManager', () => {
         });
     });
 
+    describe('unsubscribeFromKey', () => {
+        it('should clean up the correct subscription ID from lastConnectionCallbackData on disconnect', async () => {
+            const deleteSpy = jest.spyOn(Map.prototype, 'delete');
+
+            const connectionA = Onyx.connect({key: ONYXKEYS.TEST_KEY, callback: jest.fn(), reuseConnection: false});
+            Onyx.connect({key: ONYXKEYS.TEST_KEY, callback: jest.fn(), reuseConnection: false});
+            await act(async () => waitForPromisesToResolve());
+
+            const subscriptionIdA = connectionsMap.get(connectionA.id)?.subscriptionID;
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'value1');
+            await act(async () => waitForPromisesToResolve());
+
+            deleteSpy.mockClear();
+            Onyx.disconnect(connectionA);
+
+            const numericDeleteArgs = deleteSpy.mock.calls.map((call) => call[0]).filter((arg): arg is number => typeof arg === 'number');
+            expect(numericDeleteArgs).toContain(subscriptionIdA);
+
+            deleteSpy.mockRestore();
+        });
+
+        it('should remove the subscription ID from onyxKeyToSubscriptionIDs on disconnect', async () => {
+            const setSpy = jest.spyOn(Map.prototype, 'set');
+
+            const connectionA = Onyx.connect({key: ONYXKEYS.TEST_KEY, callback: jest.fn(), reuseConnection: false});
+            const connectionB = Onyx.connect({key: ONYXKEYS.TEST_KEY, callback: jest.fn(), reuseConnection: false});
+            await act(async () => waitForPromisesToResolve());
+
+            const subscriptionIdA = connectionsMap.get(connectionA.id)?.subscriptionID;
+            const subscriptionIdB = connectionsMap.get(connectionB.id)?.subscriptionID;
+
+            setSpy.mockClear();
+            Onyx.disconnect(connectionA);
+
+            const setCallsForKey = setSpy.mock.calls.filter((call) => call[0] === ONYXKEYS.TEST_KEY);
+            expect(setCallsForKey.length).toBeGreaterThan(0);
+
+            const updatedIDs = setCallsForKey[setCallsForKey.length - 1][1] as number[];
+            expect(updatedIDs).not.toContain(subscriptionIdA);
+            expect(updatedIDs).toContain(subscriptionIdB);
+
+            setSpy.mockRestore();
+            Onyx.disconnect(connectionB);
+        });
+    });
+
     describe('disconnectAll', () => {
         it('should disconnect all connections', async () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');

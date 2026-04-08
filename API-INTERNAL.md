@@ -17,11 +17,22 @@
 <dt><a href="#getDeferredInitTask">getDeferredInitTask()</a></dt>
 <dd><p>Getter - returns the deffered init task.</p>
 </dd>
+<dt><a href="#afterInit">afterInit(action)</a> ⇒</dt>
+<dd><p>Executes an action after Onyx has been initialized.
+If Onyx is already initialized, the action is executed immediately.
+Otherwise, it waits for initialization to complete before executing.</p>
+</dd>
 <dt><a href="#getSkippableCollectionMemberIDs">getSkippableCollectionMemberIDs()</a></dt>
 <dd><p>Getter - returns the skippable collection member IDs.</p>
 </dd>
+<dt><a href="#getSnapshotMergeKeys">getSnapshotMergeKeys()</a></dt>
+<dd><p>Getter - returns the snapshot merge keys allowlist.</p>
+</dd>
 <dt><a href="#setSkippableCollectionMemberIDs">setSkippableCollectionMemberIDs()</a></dt>
 <dd><p>Setter - sets the skippable collection member IDs.</p>
+</dd>
+<dt><a href="#setSnapshotMergeKeys">setSnapshotMergeKeys()</a></dt>
+<dd><p>Setter - sets the snapshot merge keys allowlist.</p>
 </dd>
 <dt><a href="#initStoreValues">initStoreValues(keys, initialKeyStates, evictableKeys)</a></dt>
 <dd><p>Sets the initial values for the Onyx store</p>
@@ -48,45 +59,6 @@ to the values for those keys (correctly typed) such as <code>[OnyxCollection&lt;
 <dt><a href="#getAllKeys">getAllKeys()</a></dt>
 <dd><p>Returns current key names stored in persisted storage</p>
 </dd>
-<dt><a href="#getCollectionKeys">getCollectionKeys()</a></dt>
-<dd><p>Returns set of all registered collection keys</p>
-</dd>
-<dt><a href="#isCollectionKey">isCollectionKey()</a></dt>
-<dd><p>Checks to see if the subscriber&#39;s supplied key
-is associated with a collection of keys.</p>
-</dd>
-<dt><a href="#isCollectionMember">isCollectionMember(key)</a> ⇒</dt>
-<dd><p>Checks if a given key is a collection member key (not just a collection key).</p>
-</dd>
-<dt><a href="#isRamOnlyKey">isRamOnlyKey(key)</a> ⇒</dt>
-<dd><p>Checks if a given key is a RAM-only key, RAM-only collection key, or a RAM-only collection member</p>
-<p>For example:</p>
-<p>For the following Onyx setup</p>
-<p>ramOnlyKeys: [&quot;ramOnlyKey&quot;, &quot;ramOnlyCollection_&quot;]</p>
-<ul>
-<li><code>isRamOnlyKey(&quot;ramOnlyKey&quot;)</code> would return true</li>
-<li><code>isRamOnlyKey(&quot;ramOnlyCollection_&quot;)</code> would return true</li>
-<li><code>isRamOnlyKey(&quot;ramOnlyCollection_1&quot;)</code> would return true</li>
-<li><code>isRamOnlyKey(&quot;someOtherKey&quot;)</code> would return false</li>
-</ul>
-</dd>
-<dt><a href="#splitCollectionMemberKey">splitCollectionMemberKey(key, collectionKey)</a> ⇒</dt>
-<dd><p>Splits a collection member key into the collection key part and the ID part.</p>
-</dd>
-<dt><a href="#isKeyMatch">isKeyMatch()</a></dt>
-<dd><p>Checks to see if a provided key is the exact configured key of our connected subscriber
-or if the provided key is a collection member key (in case our configured key is a &quot;collection key&quot;)</p>
-</dd>
-<dt><a href="#getCollectionKey">getCollectionKey(key)</a> ⇒</dt>
-<dd><p>Extracts the collection identifier of a given collection member key.</p>
-<p>For example:</p>
-<ul>
-<li><code>getCollectionKey(&quot;report_123&quot;)</code> would return &quot;report_&quot;</li>
-<li><code>getCollectionKey(&quot;report_&quot;)</code> would return &quot;report_&quot;</li>
-<li><code>getCollectionKey(&quot;report_-1_something&quot;)</code> would return &quot;report_&quot;</li>
-<li><code>getCollectionKey(&quot;sharedNVP_user_-1_something&quot;)</code> would return &quot;sharedNVP_user_&quot;</li>
-</ul>
-</dd>
 <dt><a href="#tryGetCachedValue">tryGetCachedValue()</a></dt>
 <dd><p>Tries to get a value from the cache. If the value is not present in cache it will return the default value or undefined.
 If the requested key is a collection, it will return an object with all the collection members.</p>
@@ -106,17 +78,6 @@ run out of storage the least recently accessed key can be removed.</p>
 </dd>
 <dt><a href="#getCollectionDataAndSendAsObject">getCollectionDataAndSendAsObject()</a></dt>
 <dd><p>Gets the data for a given an array of matching keys, combines them into an object, and sends the result back to the subscriber.</p>
-</dd>
-<dt><a href="#prepareSubscriberUpdate">prepareSubscriberUpdate(callback)</a></dt>
-<dd><p>Delays promise resolution until the next macrotask to prevent race condition if the key subscription is in progress.</p>
-</dd>
-<dt><a href="#scheduleSubscriberUpdate">scheduleSubscriberUpdate()</a></dt>
-<dd><p>Schedules an update that will be appended to the macro task queue (so it doesn&#39;t update the subscribers immediately).</p>
-</dd>
-<dt><a href="#scheduleNotifyCollectionSubscribers">scheduleNotifyCollectionSubscribers()</a></dt>
-<dd><p>This method is similar to scheduleSubscriberUpdate but it is built for working specifically with collections
-so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
-subscriber callbacks receive the data in a different format than they normally expect and it breaks code.</p>
 </dd>
 <dt><a href="#remove">remove()</a></dt>
 <dd><p>Remove a key from Onyx and update the subscribers</p>
@@ -217,16 +178,42 @@ Getter - returns the default key states.
 Getter - returns the deffered init task.
 
 **Kind**: global function  
+<a name="afterInit"></a>
+
+## afterInit(action) ⇒
+Executes an action after Onyx has been initialized.
+If Onyx is already initialized, the action is executed immediately.
+Otherwise, it waits for initialization to complete before executing.
+
+**Kind**: global function  
+**Returns**: The result of the action  
+
+| Param | Description |
+| --- | --- |
+| action | The action to execute after initialization |
+
 <a name="getSkippableCollectionMemberIDs"></a>
 
 ## getSkippableCollectionMemberIDs()
 Getter - returns the skippable collection member IDs.
 
 **Kind**: global function  
+<a name="getSnapshotMergeKeys"></a>
+
+## getSnapshotMergeKeys()
+Getter - returns the snapshot merge keys allowlist.
+
+**Kind**: global function  
 <a name="setSkippableCollectionMemberIDs"></a>
 
 ## setSkippableCollectionMemberIDs()
 Setter - sets the skippable collection member IDs.
+
+**Kind**: global function  
+<a name="setSnapshotMergeKeys"></a>
+
+## setSnapshotMergeKeys()
+Setter - sets the snapshot merge keys allowlist.
 
 **Kind**: global function  
 <a name="initStoreValues"></a>
@@ -294,93 +281,6 @@ Deletes a subscription ID associated with its corresponding key.
 Returns current key names stored in persisted storage
 
 **Kind**: global function  
-<a name="getCollectionKeys"></a>
-
-## getCollectionKeys()
-Returns set of all registered collection keys
-
-**Kind**: global function  
-<a name="isCollectionKey"></a>
-
-## isCollectionKey()
-Checks to see if the subscriber's supplied key
-is associated with a collection of keys.
-
-**Kind**: global function  
-<a name="isCollectionMember"></a>
-
-## isCollectionMember(key) ⇒
-Checks if a given key is a collection member key (not just a collection key).
-
-**Kind**: global function  
-**Returns**: true if the key is a collection member, false otherwise  
-
-| Param | Description |
-| --- | --- |
-| key | The key to check |
-
-<a name="isRamOnlyKey"></a>
-
-## isRamOnlyKey(key) ⇒
-Checks if a given key is a RAM-only key, RAM-only collection key, or a RAM-only collection member
-
-For example:
-
-For the following Onyx setup
-
-ramOnlyKeys: ["ramOnlyKey", "ramOnlyCollection_"]
-
-- `isRamOnlyKey("ramOnlyKey")` would return true
-- `isRamOnlyKey("ramOnlyCollection_")` would return true
-- `isRamOnlyKey("ramOnlyCollection_1")` would return true
-- `isRamOnlyKey("someOtherKey")` would return false
-
-**Kind**: global function  
-**Returns**: true if key is a RAM-only key, RAM-only collection key, or a RAM-only collection member  
-
-| Param | Description |
-| --- | --- |
-| key | The key to check |
-
-<a name="splitCollectionMemberKey"></a>
-
-## splitCollectionMemberKey(key, collectionKey) ⇒
-Splits a collection member key into the collection key part and the ID part.
-
-**Kind**: global function  
-**Returns**: A tuple where the first element is the collection part and the second element is the ID part,
-or throws an Error if the key is not a collection one.  
-
-| Param | Description |
-| --- | --- |
-| key | The collection member key to split. |
-| collectionKey | The collection key of the `key` param that can be passed in advance to optimize the function. |
-
-<a name="isKeyMatch"></a>
-
-## isKeyMatch()
-Checks to see if a provided key is the exact configured key of our connected subscriber
-or if the provided key is a collection member key (in case our configured key is a "collection key")
-
-**Kind**: global function  
-<a name="getCollectionKey"></a>
-
-## getCollectionKey(key) ⇒
-Extracts the collection identifier of a given collection member key.
-
-For example:
-- `getCollectionKey("report_123")` would return "report_"
-- `getCollectionKey("report_")` would return "report_"
-- `getCollectionKey("report_-1_something")` would return "report_"
-- `getCollectionKey("sharedNVP_user_-1_something")` would return "sharedNVP_user_"
-
-**Kind**: global function  
-**Returns**: The plain collection key or throws an Error if the key is not a collection one.  
-
-| Param | Description |
-| --- | --- |
-| key | The collection key to process. |
-
 <a name="tryGetCachedValue"></a>
 
 ## tryGetCachedValue()
@@ -438,35 +338,6 @@ run out of storage the least recently accessed key can be removed.
 
 ## getCollectionDataAndSendAsObject()
 Gets the data for a given an array of matching keys, combines them into an object, and sends the result back to the subscriber.
-
-**Kind**: global function  
-<a name="prepareSubscriberUpdate"></a>
-
-## prepareSubscriberUpdate(callback)
-Delays promise resolution until the next macrotask to prevent race condition if the key subscription is in progress.
-
-**Kind**: global function  
-
-| Param | Description |
-| --- | --- |
-| callback | The keyChanged/keysChanged callback |
-
-<a name="scheduleSubscriberUpdate"></a>
-
-## scheduleSubscriberUpdate()
-Schedules an update that will be appended to the macro task queue (so it doesn't update the subscribers immediately).
-
-**Kind**: global function  
-**Example**  
-```js
-scheduleSubscriberUpdate(key, value, subscriber => subscriber.initWithStoredValues === false)
-```
-<a name="scheduleNotifyCollectionSubscribers"></a>
-
-## scheduleNotifyCollectionSubscribers()
-This method is similar to scheduleSubscriberUpdate but it is built for working specifically with collections
-so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
-subscriber callbacks receive the data in a different format than they normally expect and it breaks code.
 
 **Kind**: global function  
 <a name="remove"></a>
