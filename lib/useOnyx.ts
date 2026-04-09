@@ -141,44 +141,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
     useEffect(() => () => onyxSnapshotCache.deregisterConsumer(key, cacheKey), [key, cacheKey]);
 
-    // Precompute whether this key is a skippable collection member key.
-    const isSkippableKey = useMemo(() => {
-        const skippableIDs = OnyxUtils.getSkippableCollectionMemberIDs();
-        if (!skippableIDs.size) {
-            return false;
-        }
-        try {
-            const [, memberId] = OnyxUtils.splitCollectionMemberKey(key);
-            return skippableIDs.has(memberId);
-        } catch {
-            return false;
-        }
-    }, [key]);
-
-    useEffect(() => {
-        // These conditions will ensure we can only handle dynamic collection member keys from the same collection.
-        if (options?.allowDynamicKey || previousKey === key) {
-            return;
-        }
-
-        try {
-            const previousCollectionKey = OnyxUtils.splitCollectionMemberKey(previousKey)[0];
-            const collectionKey = OnyxUtils.splitCollectionMemberKey(key)[0];
-
-            if (OnyxUtils.isCollectionMemberKey(previousCollectionKey, previousKey) && OnyxUtils.isCollectionMemberKey(collectionKey, key) && previousCollectionKey === collectionKey) {
-                return;
-            }
-        } catch (e) {
-            throw new Error(
-                `'${previousKey}' key can't be changed to '${key}'. useOnyx() only supports dynamic keys if they are both collection member keys from the same collection e.g. from 'collection_id1' to 'collection_id2'.`,
-            );
-        }
-
-        throw new Error(
-            `'${previousKey}' key can't be changed to '${key}'. useOnyx() only supports dynamic keys if they are both collection member keys from the same collection e.g. from 'collection_id1' to 'collection_id2'.`,
-        );
-    }, [previousKey, key, options?.allowDynamicKey]);
-
     // Track previous dependencies to prevent infinite loops
     const previousDependenciesRef = useRef<DependencyList>([]);
 
@@ -228,16 +190,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     const lastComputedSelectorRef = useRef(memoizedSelector);
 
     const getSnapshot = useCallback(() => {
-        // Fast path: if subscribing to a skippable collection member id, return undefined as loaded immediately.
-        if (isFirstConnectionRef.current && isSkippableKey) {
-            if (resultRef.current[1].status !== 'loaded' || resultRef.current[0] !== undefined) {
-                resultRef.current = [undefined, {status: 'loaded'}];
-                onyxSnapshotCache.setCachedResult<UseOnyxResult<TReturnValue>>(key, cacheKey, resultRef.current);
-            }
-            isFirstConnectionRef.current = false;
-            shouldGetCachedValueRef.current = false;
-            return resultRef.current;
-        }
         // Check if we have any cache for this Onyx key
         // Don't use cache for first connection with initWithStoredValues: false
         // Also don't use cache during active data updates (when shouldGetCachedValueRef is true)
@@ -327,7 +279,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         }
 
         return resultRef.current;
-    }, [options?.initWithStoredValues, options?.allowStaleData, options?.canBeMissing, key, memoizedSelector, cacheKey, previousKey, isSkippableKey]);
+    }, [options?.initWithStoredValues, key, memoizedSelector, cacheKey]);
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {

@@ -1079,7 +1079,7 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
     try {
         const skippableIDs = getSkippableCollectionMemberIDs();
         if (skippableIDs.size) {
-            const [, collectionMemberID] = splitCollectionMemberKey(mapping.key);
+            const [, collectionMemberID] = OnyxKeys.splitCollectionMemberKey(mapping.key);
             if (skippableIDs.has(collectionMemberID)) {
                 // Clean up the provisional mapping to avoid retaining unused subscribers
                 // Mark this key as known-nullish and present in cache so hooks see a loaded undefined state
