@@ -534,8 +534,11 @@ class OnyxCache {
 
         const snapshot = this.collectionSnapshots.get(collectionKey);
         if (utils.isEmptyObject(snapshot)) {
-            // If we know we have storage keys loaded, return a stable empty reference
-            // to avoid new {} allocations that break useSyncExternalStore === equality.
+            // We check storageKeys.size (not collection-specific keys) to distinguish
+            // "init complete, this collection is genuinely empty" from "init not done yet."
+            // During init, setAllKeys loads ALL keys at once — so if any key exists,
+            // the full storage picture is loaded and an empty collection is truly empty.
+            // Returning undefined before init prevents subscribers from seeing a false empty state.
             if (this.storageKeys.size > 0) {
                 return FROZEN_EMPTY_COLLECTION;
             }
