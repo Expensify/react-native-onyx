@@ -483,6 +483,8 @@ class OnyxCache {
         const needsPrefixCheck = !memberKeys;
 
         for (const key of keysToScan) {
+            // When using the fallback path (scanning all storageKeys instead of the indexed
+            // forward lookup), skip keys that don't belong to this collection.
             if (needsPrefixCheck && OnyxKeys.getCollectionKey(key) !== collectionKey) {
                 continue;
             }
