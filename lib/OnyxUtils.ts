@@ -1064,12 +1064,10 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
         return subscriptionID;
     }
 
-    // Commit connection only after init passes
     deferredInitTask.promise
-        .then(() => {
-            // Track evictable keys in the recently accessed list for storage eviction
-            cache.addLastAccessedKey(mapping.key, OnyxKeys.isCollectionKey(mapping.key));
-        })
+        // This first .then() adds a microtask tick for compatibility reasons and
+        // to ensure subscribers don't receive an extra initial callback before Onyx.update() data arrives.
+        .then(() => undefined)
         .then(() => {
             // Performance improvement
             // If the mapping is connected to an onyx key that is not a collection
