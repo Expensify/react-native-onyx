@@ -475,7 +475,6 @@ class OnyxCache {
 
         const members: NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>> = {};
         let hasMemberChanges = false;
-        let newMemberCount = 0;
 
         // Use the indexed forward lookup for O(collectionMembers) iteration.
         // Falls back to scanning all storageKeys if the index isn't populated yet.
@@ -492,7 +491,6 @@ class OnyxCache {
             // and should not be included in the frozen collection snapshot.
             if (val !== undefined && val !== null) {
                 members[key] = val;
-                newMemberCount++;
 
                 // Check if this member's reference changed from the old snapshot
                 if (!hasMemberChanges && (!previousSnapshot || previousSnapshot[key] !== val)) {
@@ -501,11 +499,16 @@ class OnyxCache {
             }
         }
 
-        // Check if any members were removed (old snapshot had more keys)
+        // Check if any members were removed from the previous snapshot.
+        // We can't rely on count comparison alone — if one key is removed and another added,
+        // the counts match but the snapshot content is different.
         if (!hasMemberChanges && previousSnapshot) {
-            const oldMemberCount = Object.keys(previousSnapshot).length;
-            if (oldMemberCount !== newMemberCount) {
-                hasMemberChanges = true;
+            // eslint-disable-next-line no-restricted-syntax
+            for (const key in previousSnapshot) {
+                if (!(key in members)) {
+                    hasMemberChanges = true;
+                    break;
+                }
             }
         }
 

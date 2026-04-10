@@ -820,6 +820,25 @@ describe('Onyx', () => {
                 expect(result).toBeUndefined();
             });
 
+            it('should return a new reference when a member is removed and another added simultaneously', async () => {
+                await initOnyx();
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1});
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}2`, {id: 2});
+
+                const before = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+
+                // Remove member 1 and add member 3 — count stays the same (2) but content changed
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, null);
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}3`, {id: 3});
+                const after = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+
+                expect(before).not.toBe(after);
+                expect(after).toEqual({
+                    [`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}2`]: {id: 2},
+                    [`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}3`]: {id: 3},
+                });
+            });
+
             it('should preserve unchanged member references when a sibling is updated', async () => {
                 await initOnyx();
                 const member1Value = {id: 1, name: 'unchanged'};
