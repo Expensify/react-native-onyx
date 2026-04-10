@@ -314,42 +314,24 @@ If a platform needs to use a separate library (like using MMVK for react-native)
 
 [Docs](./API.md)
 
-# Cache Eviction
+# Storage Eviction
 
 Different platforms come with varying storage capacities and Onyx has a way to gracefully fail when those storage limits are encountered. When Onyx fails to set or modify a key the following steps are taken:
-1. Onyx looks at a list of recently accessed keys (access is defined as subscribed to or modified) and locates the key that was least recently accessed
-2. It then deletes this key and retries the original operation
+1. Onyx looks at a list of evictable keys ordered by recent access and locates the least recently accessed one
+2. It then deletes this key from both cache and storage, and retries the original operation
+3. This process repeats up to 5 times until the write succeeds or no more evictable keys are available
 
 By default, Onyx will not evict anything from storage and will presume all keys are "unsafe" to remove unless explicitly told otherwise.
 
-**To flag a key as safe for removal:**
-- Add the key to the `evictableKeys` option in `Onyx.init(options)`
-- Implement `canEvict` in the Onyx config for each component subscribing to a key
-- The key will only be deleted when all subscribers return `true` for `canEvict`
+**To flag a key as safe for removal**, add the key to the `evictableKeys` option in `Onyx.init(options)`:
 
-e.g.
 ```js
 Onyx.init({
     evictableKeys: [ONYXKEYS.COLLECTION.REPORT_ACTIONS],
 });
 ```
 
-```js
-const ReportActionsView = ({reportID, isActiveReport}) => {
-    const [reportActions] = useOnyx(
-        `${ONYXKEYS.COLLECTION.REPORT_ACTIONS}${reportID}_`,
-        {canEvict: () => !isActiveReport}
-    );
-
-    return (
-        <View>
-            {/* Render with reportActions data */}
-        </View>
-    );
-};
-
-export default ReportActionsView;
-```
+Only individual (non-collection) keys matching the `evictableKeys` patterns will be considered for eviction. Collection keys themselves cannot be evicted — only their individual members can.
 
 # Debug mode
 

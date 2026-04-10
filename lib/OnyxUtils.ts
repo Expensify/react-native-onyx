@@ -633,8 +633,8 @@ function keyChanged<TKey extends OnyxKey>(
     canUpdateSubscriber: (subscriber?: CallbackToStateMapping<OnyxKey>) => boolean = () => true,
     isProcessingCollectionUpdate = false,
 ): void {
-    // Add or remove this key from the recentlyAccessedKeys lists
-    if (value !== null) {
+    // Add or remove this key from the recentlyAccessedKeys list
+    if (value !== null && value !== undefined) {
         cache.addLastAccessedKey(key, OnyxKeys.isCollectionKey(key));
     } else {
         cache.removeLastAccessedKey(key);
@@ -743,22 +743,6 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: CallbackToStateMapp
 }
 
 /**
- * We check to see if this key is flagged as safe for eviction and add it to the recentlyAccessedKeys list so that when we
- * run out of storage the least recently accessed key can be removed.
- */
-function addKeyToRecentlyAccessedIfNeeded<TKey extends OnyxKey>(key: TKey): void {
-    if (!cache.isEvictableKey(key)) {
-        return;
-    }
-
-    // Add the key to recentKeys first (this makes it the most recent key)
-    cache.addToAccessedKeys(key);
-
-    // Try to free some cache whenever we connect to a safe eviction key
-    cache.removeLeastRecentlyUsedKeys();
-}
-
-/**
  * Gets the data for a given an array of matching keys, combines them into an object, and sends the result back to the subscriber.
  */
 function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: CollectionKeyBase[], mapping: CallbackToStateMapping<TKey>): void {
@@ -822,7 +806,7 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, on
         return onyxMethod(defaultParams, nextRetryAttempt);
     }
 
-    // Find the first key that we can remove that has no subscribers in our blocklist
+    // Find the least recently accessed evictable key that we can remove
     const keyForRemoval = cache.getKeyForEviction();
     if (!keyForRemoval) {
         // If we have no acceptable keys to remove then we are possibly trying to save mission critical data. If this is the case,
@@ -832,7 +816,7 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, on
         return reportStorageQuota();
     }
 
-    // Remove the least recently viewed key that is not currently being accessed and retry.
+    // Remove the least recently accessed key and retry.
     Logger.logInfo(`Out of storage. Evicting least recently accessed key (${keyForRemoval}) and retrying.`);
     reportStorageQuota();
 
@@ -848,8 +832,6 @@ function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>
     // all updates regardless of value changes (indicated by initWithStoredValues set to false).
     if (hasChanged) {
         cache.set(key, value);
-    } else {
-        cache.addToAccessedKeys(key);
     }
 
     keyChanged(key, value, (subscriber) => hasChanged || subscriber?.initWithStoredValues === false);
@@ -1084,7 +1066,9 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
 
     // Commit connection only after init passes
     deferredInitTask.promise
-        .then(() => addKeyToRecentlyAccessedIfNeeded(mapping.key))
+        // This first .then() adds a microtask tick for compatibility reasons and
+        // to ensure subscribers don't receive an extra initial callback before Onyx.update() data arrives.
+        .then(() => undefined)
         .then(() => {
             // Performance improvement
             // If the mapping is connected to an onyx key that is not a collection
@@ -1278,7 +1262,7 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
         return Promise.resolve();
     }
 
-    const existingValue = cache.get(key, false);
+    const existingValue = cache.get(key);
 
     // If the existing value as well as the new value are null, we can return early.
     if (existingValue === undefined && value === null) {
@@ -1727,7 +1711,6 @@ const OnyxUtils = {
     setSnapshotMergeKeys,
     storeKeyBySubscriptions,
     deleteKeyBySubscriptions,
-    addKeyToRecentlyAccessedIfNeeded,
     reduceCollectionWithSelector,
     updateSnapshots,
     mergeCollectionWithPatches,
