@@ -344,21 +344,14 @@ class OnyxCache {
             iterResult = iterator.next();
         }
 
-        const affectedCollections = new Set<OnyxKey>();
-
         for (const key of keysToRemove) {
             delete this.storageMap[key];
 
-            // Track affected collections for snapshot rebuild
             const collectionKey = OnyxKeys.getCollectionKey(key);
             if (collectionKey) {
-                affectedCollections.add(collectionKey);
+                this.dirtyCollections.add(collectionKey);
             }
             this.recentKeys.delete(key);
-        }
-
-        for (const collectionKey of affectedCollections) {
-            this.dirtyCollections.add(collectionKey);
         }
     }
 
@@ -478,10 +471,10 @@ class OnyxCache {
      * @param collectionKey - The collection key to rebuild
      */
     private rebuildCollectionSnapshot(collectionKey: OnyxKey): void {
-        const oldSnapshot = this.collectionSnapshots.get(collectionKey);
+        const previousSnapshot = this.collectionSnapshots.get(collectionKey);
 
         const members: NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>> = {};
-        let hasChanges = false;
+        let hasMemberChanges = false;
         let newMemberCount = 0;
 
         // Use the indexed forward lookup for O(collectionMembers) iteration.
@@ -495,29 +488,31 @@ class OnyxCache {
                 continue;
             }
             const val = this.storageMap[key];
+            // Skip null/undefined values — they represent deleted or unset keys
+            // and should not be included in the frozen collection snapshot.
             if (val !== undefined && val !== null) {
                 members[key] = val;
                 newMemberCount++;
 
                 // Check if this member's reference changed from the old snapshot
-                if (!hasChanges && (!oldSnapshot || oldSnapshot[key] !== val)) {
-                    hasChanges = true;
+                if (!hasMemberChanges && (!previousSnapshot || previousSnapshot[key] !== val)) {
+                    hasMemberChanges = true;
                 }
             }
         }
 
         // Check if any members were removed (old snapshot had more keys)
-        if (!hasChanges && oldSnapshot) {
-            const oldMemberCount = Object.keys(oldSnapshot).length;
+        if (!hasMemberChanges && previousSnapshot) {
+            const oldMemberCount = Object.keys(previousSnapshot).length;
             if (oldMemberCount !== newMemberCount) {
-                hasChanges = true;
+                hasMemberChanges = true;
             }
         }
 
         // If nothing actually changed, reuse the old snapshot reference.
         // This is critical: useSyncExternalStore uses === to detect changes,
         // so returning the same reference prevents unnecessary re-renders.
-        if (!hasChanges && oldSnapshot) {
+        if (!hasMemberChanges && previousSnapshot) {
             return;
         }
 
@@ -538,7 +533,7 @@ class OnyxCache {
         }
 
         const snapshot = this.collectionSnapshots.get(collectionKey);
-        if (!snapshot || Object.keys(snapshot).length === 0) {
+        if (utils.isEmptyObject(snapshot)) {
             // If we know we have storage keys loaded, return a stable empty reference
             // to avoid new {} allocations that break useSyncExternalStore === equality.
             if (this.storageKeys.size > 0) {
