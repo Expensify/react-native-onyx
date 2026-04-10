@@ -1,4 +1,5 @@
 import cache from '../OnyxCache';
+import OnyxKeys from '../OnyxKeys';
 import OnyxUtils from '../OnyxUtils';
 import Storage from '../storage';
 import type {OnyxInput, OnyxKey, OnyxValue} from '../types';
@@ -18,20 +19,19 @@ const applyMerge: ApplyMerge = <TKey extends OnyxKey, TValue extends OnyxInput<T
     OnyxUtils.logKeyChanged(OnyxUtils.METHOD.MERGE, key, mergedValue, hasChanged);
 
     // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
-    const updatePromise = OnyxUtils.broadcastUpdate(key, mergedValue as OnyxValue<TKey>, hasChanged);
+    OnyxUtils.broadcastUpdate(key, mergedValue as OnyxValue<TKey>, hasChanged);
 
-    const shouldSkipStorageOperations = !hasChanged || OnyxUtils.isRamOnlyKey(key);
+    const shouldSkipStorageOperations = !hasChanged || OnyxKeys.isRamOnlyKey(key);
 
     // If the value has not changed, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
     // If the key is marked as RAM-only, it should not be saved nor updated in the storage.
     if (shouldSkipStorageOperations) {
-        return Promise.resolve({mergedValue, updatePromise});
+        return Promise.resolve({mergedValue});
     }
 
     // For web platforms we use `setItem` since the object was already merged with its changes before.
     return Storage.setItem(key, mergedValue as OnyxValue<TKey>).then(() => ({
         mergedValue,
-        updatePromise,
     }));
 };
 

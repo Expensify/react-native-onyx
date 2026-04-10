@@ -1,6 +1,6 @@
 {
   "name": "react-native-onyx",
-  "version": "3.0.50",
+  "version": "3.0.61",
   "author": "Expensify, Inc.",
   "homepage": "https://expensify.com",
   "description": "State management for React Native",
@@ -93,7 +93,6 @@
     "react-native-device-info": "^10.3.0",
     "react-native-nitro-modules": "^0.35.0",
     "react-native-nitro-sqlite": "^9.6.0",
-    "react-native-performance": "^5.1.0",
     "react-test-renderer": "18.2.0",
     "reassure": "1.4.0",
     "ts-node": "^10.9.2",
@@ -106,14 +105,10 @@
     "react-native": ">=0.75.0",
     "react-native-device-info": "^10.3.0",
     "react-native-nitro-modules": ">=0.35.0",
-    "react-native-nitro-sqlite": "^9.6.0",
-    "react-native-performance": ">=5.1.0"
+    "react-native-nitro-sqlite": "^9.6.0"
   },
   "peerDependenciesMeta": {
     "idb-keyval": {
-      "optional": true
-    },
-    "react-native-performance": {
       "optional": true
     },
     "react-native-nitro-modules": {
