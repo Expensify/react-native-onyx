@@ -1064,6 +1064,7 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
         return subscriptionID;
     }
 
+    // Commit connection only after init passes
     deferredInitTask.promise
         // This first .then() adds a microtask tick for compatibility reasons and
         // to ensure subscribers don't receive an extra initial callback before Onyx.update() data arrives.
