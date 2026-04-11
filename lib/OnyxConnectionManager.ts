@@ -2,9 +2,9 @@ import bindAll from 'lodash/bindAll';
 import * as Logger from './Logger';
 import type {ConnectOptions} from './Onyx';
 import OnyxUtils from './OnyxUtils';
+import OnyxKeys from './OnyxKeys';
 import * as Str from './Str';
 import type {CollectionConnectCallback, DefaultConnectCallback, DefaultConnectOptions, OnyxKey, OnyxValue} from './types';
-import cache from './OnyxCache';
 import onyxSnapshotCache from './OnyxSnapshotCache';
 
 type ConnectCallback = DefaultConnectCallback<OnyxKey> | CollectionConnectCallback<OnyxKey>;
@@ -105,7 +105,7 @@ class OnyxConnectionManager {
         this.sessionID = Str.guid();
 
         // Binds all public methods to prevent problems with `this`.
-        bindAll(this, 'generateConnectionID', 'fireCallbacks', 'connect', 'disconnect', 'disconnectAll', 'refreshSessionID', 'addToEvictionBlockList', 'removeFromEvictionBlockList');
+        bindAll(this, 'generateConnectionID', 'fireCallbacks', 'connect', 'disconnect', 'disconnectAll', 'refreshSessionID');
     }
 
     /**
@@ -129,7 +129,7 @@ class OnyxConnectionManager {
         if (
             reuseConnection === false ||
             initWithStoredValues === false ||
-            (OnyxUtils.isCollectionKey(key) && (waitForCollectionCallback === undefined || waitForCollectionCallback === false))
+            (OnyxKeys.isCollectionKey(key) && (waitForCollectionCallback === undefined || waitForCollectionCallback === false))
         ) {
             suffix += `,uniqueID=${Str.guid()}`;
         }
@@ -239,7 +239,6 @@ class OnyxConnectionManager {
         // If the connection's callbacks map is empty we can safely unsubscribe from the Onyx key.
         if (connectionMetadata.callbacks.size === 0) {
             OnyxUtils.unsubscribeFromKey(connectionMetadata.subscriptionID);
-            this.removeFromEvictionBlockList(connection);
 
             this.connectionsMap.delete(connection.id);
         }
@@ -249,11 +248,8 @@ class OnyxConnectionManager {
      * Disconnect all subscribers from Onyx.
      */
     disconnectAll(): void {
-        for (const [connectionID, connectionMetadata] of this.connectionsMap.entries()) {
+        for (const connectionMetadata of this.connectionsMap.values()) {
             OnyxUtils.unsubscribeFromKey(connectionMetadata.subscriptionID);
-            for (const callbackID of connectionMetadata.callbacks.keys()) {
-                this.removeFromEvictionBlockList({id: connectionID, callbackID});
-            }
         }
 
         this.connectionsMap.clear();
@@ -270,55 +266,6 @@ class OnyxConnectionManager {
 
         // Clear snapshot cache when session refreshes to avoid stale cache issues
         onyxSnapshotCache.clear();
-    }
-
-    /**
-     * Adds the connection to the eviction block list. Connections added to this list can never be evicted.
-     * */
-    addToEvictionBlockList(connection: Connection): void {
-        if (!connection) {
-            Logger.logInfo(`[ConnectionManager] Attempted to add connection to eviction block list passing an undefined connection object.`);
-            return;
-        }
-
-        const connectionMetadata = this.connectionsMap.get(connection.id);
-        if (!connectionMetadata) {
-            Logger.logInfo(`[ConnectionManager] Attempted to add connection to eviction block list but no connection was found.`);
-            return;
-        }
-
-        const evictionBlocklist = cache.getEvictionBlocklist();
-        if (!evictionBlocklist[connectionMetadata.onyxKey]) {
-            evictionBlocklist[connectionMetadata.onyxKey] = [];
-        }
-
-        evictionBlocklist[connectionMetadata.onyxKey]?.push(`${connection.id}_${connection.callbackID}`);
-    }
-
-    /**
-     * Removes a connection previously added to this list
-     * which will enable it to be evicted again.
-     */
-    removeFromEvictionBlockList(connection: Connection): void {
-        if (!connection) {
-            Logger.logInfo(`[ConnectionManager] Attempted to remove connection from eviction block list passing an undefined connection object.`);
-            return;
-        }
-
-        const connectionMetadata = this.connectionsMap.get(connection.id);
-        if (!connectionMetadata) {
-            Logger.logInfo(`[ConnectionManager] Attempted to remove connection from eviction block list but no connection was found.`);
-            return;
-        }
-
-        const evictionBlocklist = cache.getEvictionBlocklist();
-        evictionBlocklist[connectionMetadata.onyxKey] =
-            evictionBlocklist[connectionMetadata.onyxKey]?.filter((evictionKey) => evictionKey !== `${connection.id}_${connection.callbackID}`) ?? [];
-
-        // Remove the key if there are no more subscribers.
-        if (evictionBlocklist[connectionMetadata.onyxKey]?.length === 0) {
-            delete evictionBlocklist[connectionMetadata.onyxKey];
-        }
     }
 }
 

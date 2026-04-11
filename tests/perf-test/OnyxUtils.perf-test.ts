@@ -5,6 +5,7 @@ import type {Selector} from '../../lib';
 import Onyx from '../../lib';
 import StorageMock from '../../lib/storage';
 import OnyxCache from '../../lib/OnyxCache';
+import OnyxKeys from '../../lib/OnyxKeys';
 import OnyxUtils, {clearOnyxUtilsInternals} from '../../lib/OnyxUtils';
 import type GenericCollection from '../utils/GenericCollection';
 import type {OnyxUpdate} from '../../lib/Onyx';
@@ -52,7 +53,6 @@ describe('OnyxUtils', () => {
     beforeAll(async () => {
         Onyx.init({
             keys: ONYXKEYS,
-            maxCachedKeysCount: 100000,
             evictableKeys,
             initialKeyStates,
             skippableCollectionMemberIDs: ['skippable-id'],
@@ -137,57 +137,57 @@ describe('OnyxUtils', () => {
 
     describe('getCollectionKeys', () => {
         test('one call', async () => {
-            await measureFunction(() => OnyxUtils.getCollectionKeys());
+            await measureFunction(() => OnyxKeys.getCollectionKeys());
         });
     });
 
     describe('isCollectionKey', () => {
         test('one call', async () => {
-            await measureFunction(() => OnyxUtils.isCollectionKey(collectionKey));
+            await measureFunction(() => OnyxKeys.isCollectionKey(collectionKey));
         });
     });
 
     describe('isRamOnlyKey', () => {
         test('one call for RAM-only key', async () => {
-            await measureFunction(() => OnyxUtils.isRamOnlyKey(ONYXKEYS.RAM_ONLY_TEST_KEY));
+            await measureFunction(() => OnyxKeys.isRamOnlyKey(ONYXKEYS.RAM_ONLY_TEST_KEY));
         });
 
         test('one call for RAM-only collection key', async () => {
-            await measureFunction(() => OnyxUtils.isRamOnlyKey(ONYXKEYS.COLLECTION.RAM_ONLY_TEST_COLLECTION));
+            await measureFunction(() => OnyxKeys.isRamOnlyKey(ONYXKEYS.COLLECTION.RAM_ONLY_TEST_COLLECTION));
         });
 
         test('one call for RAM-only collection member key', async () => {
-            await measureFunction(() => OnyxUtils.isRamOnlyKey(`${ONYXKEYS.COLLECTION.RAM_ONLY_TEST_COLLECTION}1`));
+            await measureFunction(() => OnyxKeys.isRamOnlyKey(`${ONYXKEYS.COLLECTION.RAM_ONLY_TEST_COLLECTION}1`));
         });
     });
 
     describe('isCollectionMemberKey', () => {
         test('one call with correct key', async () => {
-            await measureFunction(() => OnyxUtils.isCollectionMemberKey(collectionKey, `${collectionKey}entry1`));
+            await measureFunction(() => OnyxKeys.isCollectionMemberKey(collectionKey, `${collectionKey}entry1`));
         });
 
         test('one call with wrong key', async () => {
-            await measureFunction(() => OnyxUtils.isCollectionMemberKey(collectionKey, `${ONYXKEYS.COLLECTION.TEST_KEY_2}entry1`));
+            await measureFunction(() => OnyxKeys.isCollectionMemberKey(collectionKey, `${ONYXKEYS.COLLECTION.TEST_KEY_2}entry1`));
         });
     });
 
     describe('splitCollectionMemberKey', () => {
         test('one call without passing the collection key', async () => {
-            await measureFunction(() => OnyxUtils.splitCollectionMemberKey(`${collectionKey}entry1`));
+            await measureFunction(() => OnyxKeys.splitCollectionMemberKey(`${collectionKey}entry1`));
         });
 
         test('one call passing the collection key', async () => {
-            await measureFunction(() => OnyxUtils.splitCollectionMemberKey(`${collectionKey}entry1`, collectionKey));
+            await measureFunction(() => OnyxKeys.splitCollectionMemberKey(`${collectionKey}entry1`, collectionKey));
         });
     });
 
     describe('isKeyMatch', () => {
         test('one call passing normal key', async () => {
-            await measureFunction(() => OnyxUtils.isKeyMatch(ONYXKEYS.TEST_KEY, ONYXKEYS.TEST_KEY_2));
+            await measureFunction(() => OnyxKeys.isKeyMatch(ONYXKEYS.TEST_KEY, ONYXKEYS.TEST_KEY_2));
         });
 
         test('one call passing collection key', async () => {
-            await measureFunction(() => OnyxUtils.isKeyMatch(collectionKey, `${collectionKey}entry1`));
+            await measureFunction(() => OnyxKeys.isKeyMatch(collectionKey, `${collectionKey}entry1`));
         });
     });
 
@@ -367,7 +367,6 @@ describe('OnyxUtils', () => {
                             subscriptionID,
                             callback: jest.fn(),
                         },
-                        mockedReportActionsMap,
                         undefined,
                     ),
                 {
@@ -388,7 +387,7 @@ describe('OnyxUtils', () => {
 
     describe('getCollectionKey', () => {
         test('one call', async () => {
-            await measureFunction(() => OnyxUtils.getCollectionKey(`${ONYXKEYS.COLLECTION.TEST_NESTED_NESTED_KEY}entry1`));
+            await measureFunction(() => OnyxKeys.getCollectionKey(`${ONYXKEYS.COLLECTION.TEST_NESTED_NESTED_KEY}entry1`));
         });
     });
 
@@ -428,66 +427,6 @@ describe('OnyxUtils', () => {
                     },
                 },
             );
-        });
-    });
-
-    describe('scheduleSubscriberUpdate', () => {
-        test('10k calls scheduling updates', async () => {
-            const subscriptionMap = new Map<string, number>();
-
-            const changedReportActions = Object.fromEntries(
-                Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const),
-            ) as GenericCollection;
-
-            await measureAsyncFunction(() => Promise.all(Object.entries(changedReportActions).map(([key, value]) => OnyxUtils.scheduleSubscriberUpdate(key, value))), {
-                beforeEach: async () => {
-                    await Onyx.multiSet(mockedReportActionsMap);
-                    for (const key of mockedReportActionsKeys) {
-                        const id = OnyxUtils.subscribeToKey({key, callback: jest.fn(), initWithStoredValues: false});
-                        subscriptionMap.set(key, id);
-                    }
-                },
-                afterEach: async () => {
-                    for (const key of mockedReportActionsKeys) {
-                        const id = subscriptionMap.get(key);
-                        if (id) {
-                            OnyxUtils.unsubscribeFromKey(id);
-                        }
-                    }
-                    subscriptionMap.clear();
-                    await clearOnyxAfterEachMeasure();
-                },
-            });
-        });
-    });
-
-    describe('scheduleNotifyCollectionSubscribers', () => {
-        test('one call with 10k heavy objects to update 10k subscribers', async () => {
-            const subscriptionMap = new Map<string, number>();
-
-            const changedReportActions = Object.fromEntries(
-                Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const),
-            ) as GenericCollection;
-
-            await measureAsyncFunction(() => OnyxUtils.scheduleNotifyCollectionSubscribers(collectionKey, changedReportActions, mockedReportActionsMap), {
-                beforeEach: async () => {
-                    await Onyx.multiSet(mockedReportActionsMap);
-                    for (const key of mockedReportActionsKeys) {
-                        const id = OnyxUtils.subscribeToKey({key, callback: jest.fn(), initWithStoredValues: false});
-                        subscriptionMap.set(key, id);
-                    }
-                },
-                afterEach: async () => {
-                    for (const key of mockedReportActionsKeys) {
-                        const id = subscriptionMap.get(key);
-                        if (id) {
-                            OnyxUtils.unsubscribeFromKey(id);
-                        }
-                    }
-                    subscriptionMap.clear();
-                    await clearOnyxAfterEachMeasure();
-                },
-            });
         });
     });
 
@@ -534,7 +473,7 @@ describe('OnyxUtils', () => {
             const reportAction = mockedReportActionsMap[`${collectionKey}0`];
             const changedReportAction = createRandomReportAction(Number(reportAction.reportActionID));
 
-            await measureAsyncFunction(() => OnyxUtils.broadcastUpdate(key, changedReportAction, true), {
+            await measureFunction(() => OnyxUtils.broadcastUpdate(key, changedReportAction, true), {
                 beforeEach: async () => {
                     await Onyx.set(key, reportAction);
                 },
@@ -719,12 +658,6 @@ describe('OnyxUtils', () => {
         });
     });
 
-    describe('getEvictionBlocklist', () => {
-        test('one call', async () => {
-            await measureFunction(() => OnyxCache.getEvictionBlocklist());
-        });
-    });
-
     describe('getSkippableCollectionMemberIDs', () => {
         test('one call', async () => {
             const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
@@ -786,19 +719,6 @@ describe('OnyxUtils', () => {
                 },
                 afterEach: async () => {
                     OnyxUtils.unsubscribeFromKey(subscriptionID);
-                    await clearOnyxAfterEachMeasure();
-                },
-            });
-        });
-    });
-
-    describe('addKeyToRecentlyAccessedIfNeeded', () => {
-        test('one call', async () => {
-            const key = `${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}0`;
-
-            await measureFunction(() => OnyxUtils.addKeyToRecentlyAccessedIfNeeded(key), {
-                afterEach: async () => {
-                    OnyxCache.removeLastAccessedKey(key);
                     await clearOnyxAfterEachMeasure();
                 },
             });

@@ -5,10 +5,8 @@ import OnyxCache, {TASK} from './OnyxCache';
 import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
 import OnyxUtils from './OnyxUtils';
-import * as GlobalSettings from './GlobalSettings';
+import OnyxKeys from './OnyxKeys';
 import type {CollectionKeyBase, OnyxKey, OnyxValue} from './types';
-import usePrevious from './usePrevious';
-import decorateWithMetrics from './metrics';
 import onyxSnapshotCache from './OnyxSnapshotCache';
 import useLiveRef from './useLiveRef';
 
@@ -16,31 +14,16 @@ type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (da
 
 type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
     /**
-     * Determines if this key in this subscription is safe to be evicted.
-     */
-    canEvict?: boolean;
-
-    /**
      * If set to `false`, then no data will be prefilled into the component.
      * @deprecated This param is going to be removed soon. Use RAM-only keys instead.
      */
     initWithStoredValues?: boolean;
 
     /**
-     * If set to `true`, data will be retrieved from cache during the first render even if there is a pending merge for the key.
-     */
-    allowStaleData?: boolean;
-
-    /**
      * If set to `false`, the connection won't be reused between other subscribers that are listening to the same Onyx key
      * with the same connect configurations.
      */
     reuseConnection?: boolean;
-
-    /**
-     * If set to `true`, the key can be changed dynamically during the component lifecycle.
-     */
-    allowDynamicKey?: boolean;
 
     /**
      * This will be used to subscribe to a subset of an Onyx key's data.
@@ -67,13 +50,11 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     dependencies: DependencyList = [],
 ): UseOnyxResult<TReturnValue> {
     const connectionRef = useRef<Connection | null>(null);
-    const previousKey = usePrevious(key);
-
     const currentDependenciesRef = useLiveRef(dependencies);
     const selector = options?.selector;
 
     // Create memoized version of selector for performance
-    const memoizedSelector = useMemo(() => {
+    const memoizedSelector = useMemo((): UseOnyxSelector<TKey, TReturnValue> | null => {
         if (!selector) {
             return null;
         }
@@ -124,9 +105,12 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         },
     ]);
 
-    // Indicates if it's the first Onyx connection of this hook or not, as we don't want certain use cases
-    // in `getSnapshot()` to be satisfied several times.
-    const isFirstConnectionRef = useRef(true);
+    // Tracks which key has completed its first Onyx connection callback. When this doesn't match the
+    // current key, getSnapshot() treats the hook as being in its "first connection" state for that key.
+    // This is key-aware by design: when the key changes, connectedKeyRef still holds the old key (or null
+    // after cleanup), so the hook automatically enters first-connection mode for the new key without any
+    // explicit reset logic — eliminating the race condition where cleanup could clobber a boolean flag.
+    const connectedKeyRef = useRef<OnyxKey | null>(null);
 
     // Indicates if the hook is connecting to an Onyx key.
     const isConnectingRef = useRef(false);
@@ -146,36 +130,11 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             onyxSnapshotCache.registerConsumer({
                 selector: options?.selector,
                 initWithStoredValues: options?.initWithStoredValues,
-                allowStaleData: options?.allowStaleData,
             }),
-        [options?.selector, options?.initWithStoredValues, options?.allowStaleData],
+        [options?.selector, options?.initWithStoredValues],
     );
 
     useEffect(() => () => onyxSnapshotCache.deregisterConsumer(key, cacheKey), [key, cacheKey]);
-
-    useEffect(() => {
-        // These conditions will ensure we can only handle dynamic collection member keys from the same collection.
-        if (options?.allowDynamicKey || previousKey === key) {
-            return;
-        }
-
-        try {
-            const previousCollectionKey = OnyxUtils.splitCollectionMemberKey(previousKey)[0];
-            const collectionKey = OnyxUtils.splitCollectionMemberKey(key)[0];
-
-            if (OnyxUtils.isCollectionMemberKey(previousCollectionKey, previousKey) && OnyxUtils.isCollectionMemberKey(collectionKey, key) && previousCollectionKey === collectionKey) {
-                return;
-            }
-        } catch (e) {
-            throw new Error(
-                `'${previousKey}' key can't be changed to '${key}'. useOnyx() only supports dynamic keys if they are both collection member keys from the same collection e.g. from 'collection_id1' to 'collection_id2'.`,
-            );
-        }
-
-        throw new Error(
-            `'${previousKey}' key can't be changed to '${key}'. useOnyx() only supports dynamic keys if they are both collection member keys from the same collection e.g. from 'collection_id1' to 'collection_id2'.`,
-        );
-    }, [previousKey, key, options?.allowDynamicKey]);
 
     // Track previous dependencies to prevent infinite loops
     const previousDependenciesRef = useRef<DependencyList>([]);
@@ -193,7 +152,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
         previousDependenciesRef.current = dependencies;
 
-        if (connectionRef.current === null || isConnectingRef.current || !onStoreChangeFnRef.current) {
+        if (connectionRef.current === null || isConnectingRef.current || connectedKeyRef.current !== key || !onStoreChangeFnRef.current) {
             return;
         }
 
@@ -204,27 +163,17 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [...dependencies]);
 
-    const checkEvictableKey = useCallback(() => {
-        if (options?.canEvict === undefined || !connectionRef.current) {
-            return;
-        }
-
-        if (!OnyxCache.isEvictableKey(key)) {
-            throw new Error(`canEvict can't be used on key '${key}'. This key must explicitly be flagged as safe for removal by adding it to Onyx.init({evictableKeys: []}).`);
-        }
-
-        if (options.canEvict) {
-            connectionManager.removeFromEvictionBlockList(connectionRef.current);
-        } else {
-            connectionManager.addToEvictionBlockList(connectionRef.current);
-        }
-    }, [key, options?.canEvict]);
+    // Tracks the last memoizedSelector reference that getSnapshot() has computed with.
+    // When the selector changes, this mismatch forces getSnapshot() to re-evaluate
+    // even if all other conditions (isFirstConnection, shouldGetCachedValue, key) are false.
+    const lastComputedSelectorRef = useRef(memoizedSelector);
 
     const getSnapshot = useCallback(() => {
         // Check if we have any cache for this Onyx key
         // Don't use cache for first connection with initWithStoredValues: false
         // Also don't use cache during active data updates (when shouldGetCachedValueRef is true)
-        if (!(isFirstConnectionRef.current && options?.initWithStoredValues === false) && !shouldGetCachedValueRef.current) {
+        const isFirstConnection = connectedKeyRef.current !== key;
+        if (!(isFirstConnection && options?.initWithStoredValues === false) && !shouldGetCachedValueRef.current) {
             const cachedResult = onyxSnapshotCache.getCachedResult<UseOnyxResult<TReturnValue>>(key, cacheKey);
             if (cachedResult !== undefined) {
                 resultRef.current = cachedResult;
@@ -233,7 +182,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         }
 
         // We return the initial result right away during the first connection if `initWithStoredValues` is set to `false`.
-        if (isFirstConnectionRef.current && options?.initWithStoredValues === false) {
+        if (isFirstConnection && options?.initWithStoredValues === false) {
             const result = resultRef.current;
 
             // Store result in snapshot cache
@@ -244,10 +193,12 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // We get the value from cache while the first connection to Onyx is being made or if the key has changed,
         // so we can return any cached value right away. For the case where the key has changed, If we don't return the cached value right away, then the UI will show the incorrect (previous) value for a brief period which looks like a UI glitch to the user. After the connection is made, we only
         // update `newValueRef` when `Onyx.connect()` callback is fired.
-        if (isFirstConnectionRef.current || shouldGetCachedValueRef.current || key !== previousKey) {
+        const hasSelectorChanged = lastComputedSelectorRef.current !== memoizedSelector;
+        if (isFirstConnection || shouldGetCachedValueRef.current || hasSelectorChanged) {
             // Gets the value from cache and maps it with selector. It changes `null` to `undefined` for `useOnyx` compatibility.
             const value = OnyxUtils.tryGetCachedValue(key) as OnyxValue<TKey>;
             const selectedValue = memoizedSelector ? memoizedSelector(value) : value;
+            lastComputedSelectorRef.current = memoizedSelector;
             newValueRef.current = (selectedValue ?? undefined) as TReturnValue | undefined;
 
             // We set this flag to `false` again since we don't want to get the newest cached value every time `getSnapshot()` is executed,
@@ -262,8 +213,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
         // If we have pending merge operations for the key during the first connection, we set the new value to `undefined`
         // and fetch status to `loading` to simulate that it is still being loaded until we have the most updated data.
-        // If `allowStaleData` is `true` this logic will be ignored and cached value will be used, even if it's stale data.
-        if (isFirstConnectionRef.current && OnyxUtils.hasPendingMergeForKey(key) && !options?.allowStaleData) {
+        if (isFirstConnection && OnyxUtils.hasPendingMergeForKey(key)) {
             newValueRef.current = undefined;
             newFetchStatus = 'loading';
         }
@@ -288,7 +238,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         //   OR we have a pending `Onyx.clear()` task (if `Onyx.clear()` is running cache might not be available anymore
         //   OR the subscriber is triggered (the value is gotten from the storage)
         //   so we update the cached value/result right away in order to prevent infinite loading state issues).
-        const shouldUpdateResult = !areValuesEqual || (previousValueRef.current === null && (hasCacheForKey || OnyxCache.hasPendingTask(TASK.CLEAR) || !isFirstConnectionRef.current));
+        const shouldUpdateResult = !areValuesEqual || (previousValueRef.current === null && (hasCacheForKey || OnyxCache.hasPendingTask(TASK.CLEAR) || !isFirstConnection));
         if (shouldUpdateResult) {
             previousValueRef.current = newValueRef.current;
 
@@ -308,10 +258,18 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         }
 
         return resultRef.current;
-    }, [options?.initWithStoredValues, options?.allowStaleData, key, memoizedSelector, cacheKey, previousKey]);
+    }, [options?.initWithStoredValues, key, memoizedSelector, cacheKey]);
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
+            // Reset internal state so the hook properly transitions through loading
+            // for the new key instead of preserving stale state from the previous one.
+            previousValueRef.current = null;
+            newValueRef.current = null;
+            shouldGetCachedValueRef.current = true;
+            sourceValueRef.current = undefined;
+            resultRef.current = [undefined, {status: options?.initWithStoredValues === false ? 'loaded' : 'loading'}];
+
             isConnectingRef.current = true;
             onStoreChangeFnRef.current = onStoreChange;
 
@@ -321,9 +279,9 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                     isConnectingRef.current = false;
                     onStoreChangeFnRef.current = onStoreChange;
 
-                    // Signals that the first connection was made, so some logics in `getSnapshot()`
-                    // won't be executed anymore.
-                    isFirstConnectionRef.current = false;
+                    // Signals that the first connection was made for this key, so some logics
+                    // in `getSnapshot()` won't be executed anymore.
+                    connectedKeyRef.current = key;
 
                     // Signals that we want to get the newest cached value again in `getSnapshot()`.
                     shouldGetCachedValueRef.current = true;
@@ -338,11 +296,9 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                     onStoreChange();
                 },
                 initWithStoredValues: options?.initWithStoredValues,
-                waitForCollectionCallback: OnyxUtils.isCollectionKey(key) as true,
+                waitForCollectionCallback: OnyxKeys.isCollectionKey(key) as true,
                 reuseConnection: options?.reuseConnection,
             });
-
-            checkEvictableKey();
 
             return () => {
                 if (!connectionRef.current) {
@@ -350,27 +306,15 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                 }
 
                 connectionManager.disconnect(connectionRef.current);
-                isFirstConnectionRef.current = false;
+                connectedKeyRef.current = null;
                 isConnectingRef.current = false;
                 onStoreChangeFnRef.current = null;
             };
         },
-        [key, options?.initWithStoredValues, options?.reuseConnection, checkEvictableKey],
+        [key, options?.initWithStoredValues, options?.reuseConnection],
     );
 
-    const getSnapshotDecorated = useMemo(() => {
-        if (!GlobalSettings.isPerformanceMetricsEnabled()) {
-            return getSnapshot;
-        }
-
-        return decorateWithMetrics(getSnapshot, 'useOnyx.getSnapshot');
-    }, [getSnapshot]);
-
-    useEffect(() => {
-        checkEvictableKey();
-    }, [checkEvictableKey]);
-
-    const result = useSyncExternalStore<UseOnyxResult<TReturnValue>>(subscribe, getSnapshotDecorated);
+    const result = useSyncExternalStore<UseOnyxResult<TReturnValue>>(subscribe, getSnapshot);
 
     return result;
 }

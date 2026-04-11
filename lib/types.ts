@@ -390,28 +390,15 @@ type InitOptions = {
 
     /**
      * This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged
-     * as "safe" for removal. Any components subscribing to these keys must also implement a canEvict option. See the README for more info.
+     * as "safe" for removal.
      */
     evictableKeys?: OnyxKey[];
-
-    /**
-     * Sets how many recent keys should we try to keep in cache
-     * Setting this to 0 would practically mean no cache
-     * We try to free cache when we connect to a safe eviction key
-     */
-    maxCachedKeysCount?: number;
 
     /**
      * Auto synchronize storage events between multiple instances
      * of Onyx running in different tabs/windows. Defaults to true for platforms that support local storage (web/desktop)
      */
     shouldSyncMultipleInstances?: boolean;
-
-    /**
-     * If enabled it will use the performance API to measure the time taken by Onyx operations.
-     * @default false
-     */
-    enablePerformanceMetrics?: boolean;
 
     /**
      * If enabled, it will connect to Redux DevTools Extension for debugging.
@@ -421,8 +408,9 @@ type InitOptions = {
     enableDevTools?: boolean;
 
     /**
-     * Array of collection member IDs which updates will be ignored when using Onyx methods.
-     * Additionally, any subscribers from these keys to won't receive any data from Onyx.
+     * Array of collection member IDs that Onyx should silently ignore across all operations.
+     * This prevents keys formed from invalid or default IDs (e.g. "-1", "0", "undefined") from
+     * polluting cache or triggering subscriber notifications.
      */
     skippableCollectionMemberIDs?: string[];
 

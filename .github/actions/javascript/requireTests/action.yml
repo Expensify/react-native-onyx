@@ -1,0 +1,5 @@
+name: 'Require Tests'
+description: 'Checks that PRs modifying source files in lib/ include corresponding test changes.'
+runs:
+    using: 'node20'
+    main: './index.js'

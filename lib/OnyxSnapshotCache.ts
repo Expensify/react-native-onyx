@@ -1,4 +1,4 @@
-import OnyxUtils from './OnyxUtils';
+import OnyxKeys from './OnyxKeys';
 import type {OnyxKey, OnyxValue} from './types';
 import type {UseOnyxOptions, UseOnyxResult, UseOnyxSelector} from './useOnyx';
 
@@ -33,7 +33,7 @@ class OnyxSnapshotCache {
 
     constructor() {
         this.snapshotCache = new Map();
-        this.selectorIDMap = new Map();
+        this.selectorIDMap = new WeakMap();
         this.selectorIDCounter = 0;
         this.cacheKeyRefCounts = new Map();
     }
@@ -59,18 +59,16 @@ class OnyxSnapshotCache {
      *
      * - `selector`: Different selectors produce different results, so each selector needs its own cache entry
      * - `initWithStoredValues`: This flag changes the initial loading behavior and affects the returned fetch status
-     * - `allowStaleData`: Controls whether stale data can be returned during pending merges, affecting result timing
      *
-     * Other options like `canEvict`, `reuseConnection`, and `allowDynamicKey` don't affect the data transformation
+     * Other options like `reuseConnection` don't affect the data transformation
      * or timing behavior of getSnapshot, so they're excluded from the cache key for better cache hit rates.
      */
-    registerConsumer<TKey extends OnyxKey, TReturnValue>(options: Pick<UseOnyxOptions<TKey, TReturnValue>, 'selector' | 'initWithStoredValues' | 'allowStaleData'>): string {
+    registerConsumer<TKey extends OnyxKey, TReturnValue>(options: Pick<UseOnyxOptions<TKey, TReturnValue>, 'selector' | 'initWithStoredValues'>): string {
         const selectorID = options?.selector ? this.getSelectorID(options.selector) : 'no_selector';
 
         // Create options hash without expensive JSON.stringify
         const initWithStoredValues = options?.initWithStoredValues ?? true;
-        const allowStaleData = options?.allowStaleData ?? false;
-        const cacheKey = `${selectorID}_${initWithStoredValues}_${allowStaleData}`;
+        const cacheKey = `${selectorID}_${initWithStoredValues}`;
 
         // Increment reference count for this cache key
         const currentCount = this.cacheKeyRefCounts.get(cacheKey) || 0;
@@ -132,7 +130,7 @@ class OnyxSnapshotCache {
         this.snapshotCache.delete(keyToInvalidate);
 
         // Check if the key is a collection member and invalidate the collection base key
-        const collectionBaseKey = OnyxUtils.getCollectionKey(keyToInvalidate);
+        const collectionBaseKey = OnyxKeys.getCollectionKey(keyToInvalidate);
         if (collectionBaseKey) {
             this.snapshotCache.delete(collectionBaseKey);
         }
