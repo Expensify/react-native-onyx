@@ -72,10 +72,6 @@ If the requested key is a collection, it will return an object with all the coll
 <dt><a href="#sendDataToConnection">sendDataToConnection()</a></dt>
 <dd><p>Sends the data obtained from the keys to the connection.</p>
 </dd>
-<dt><a href="#addKeyToRecentlyAccessedIfNeeded">addKeyToRecentlyAccessedIfNeeded()</a></dt>
-<dd><p>We check to see if this key is flagged as safe for eviction and add it to the recentlyAccessedKeys list so that when we
-run out of storage the least recently accessed key can be removed.</p>
-</dd>
 <dt><a href="#getCollectionDataAndSendAsObject">getCollectionDataAndSendAsObject()</a></dt>
 <dd><p>Gets the data for a given an array of matching keys, combines them into an object, and sends the result back to the subscriber.</p>
 </dd>
@@ -325,13 +321,6 @@ keyChanged(key, value, subscriber => subscriber.initWithStoredValues === false)
 
 ## sendDataToConnection()
 Sends the data obtained from the keys to the connection.
-
-**Kind**: global function  
-<a name="addKeyToRecentlyAccessedIfNeeded"></a>
-
-## addKeyToRecentlyAccessedIfNeeded()
-We check to see if this key is flagged as safe for eviction and add it to the recentlyAccessedKeys list so that when we
-run out of storage the least recently accessed key can be removed.
 
 **Kind**: global function  
 <a name="getCollectionDataAndSendAsObject"></a>

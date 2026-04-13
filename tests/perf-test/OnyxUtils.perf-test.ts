@@ -53,7 +53,6 @@ describe('OnyxUtils', () => {
     beforeAll(async () => {
         Onyx.init({
             keys: ONYXKEYS,
-            maxCachedKeysCount: 100000,
             evictableKeys,
             initialKeyStates,
             skippableCollectionMemberIDs: ['skippable-id'],
@@ -659,12 +658,6 @@ describe('OnyxUtils', () => {
         });
     });
 
-    describe('getEvictionBlocklist', () => {
-        test('one call', async () => {
-            await measureFunction(() => OnyxCache.getEvictionBlocklist());
-        });
-    });
-
     describe('getSkippableCollectionMemberIDs', () => {
         test('one call', async () => {
             const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
@@ -726,19 +719,6 @@ describe('OnyxUtils', () => {
                 },
                 afterEach: async () => {
                     OnyxUtils.unsubscribeFromKey(subscriptionID);
-                    await clearOnyxAfterEachMeasure();
-                },
-            });
-        });
-    });
-
-    describe('addKeyToRecentlyAccessedIfNeeded', () => {
-        test('one call', async () => {
-            const key = `${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}0`;
-
-            await measureFunction(() => OnyxUtils.addKeyToRecentlyAccessedIfNeeded(key), {
-                afterEach: async () => {
-                    OnyxCache.removeLastAccessedKey(key);
                     await clearOnyxAfterEachMeasure();
                 },
             });

@@ -178,34 +178,6 @@ describe('OnyxCache', () => {
         });
     });
 
-    describe('addToAccessedKeys', () => {
-        test('one call adding one key', async () => {
-            await measureFunction(() => cache.addToAccessedKeys(mockedReportActionsKeys[0]), {
-                beforeEach: resetCacheBeforeEachMeasure,
-            });
-        });
-    });
-
-    describe('removeLeastRecentlyUsedKeys', () => {
-        test('one call removing 1000 keys', async () => {
-            await measureFunction(() => cache.removeLeastRecentlyUsedKeys(), {
-                beforeEach: async () => {
-                    resetCacheBeforeEachMeasure();
-                    cache.setRecentKeysLimit(mockedReportActionsKeys.length - 1000);
-                    for (const k of mockedReportActionsKeys) cache.addToAccessedKeys(k);
-                },
-            });
-        });
-    });
-
-    describe('setRecentKeysLimit', () => {
-        test('one call', async () => {
-            await measureFunction(() => cache.setRecentKeysLimit(10000), {
-                beforeEach: resetCacheBeforeEachMeasure,
-            });
-        });
-    });
-
     describe('hasValueChanged', () => {
         const key = mockedReportActionsKeys[0];
         const reportAction = mockedReportActionsMap[key];

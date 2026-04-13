@@ -35,9 +35,6 @@ class OnyxCache {
     /** A list of keys where a nullish value has been fetched from storage before, but the key still exists in cache */
     private nullishStorageKeys: Set<OnyxKey>;
 
-    /** Unique list of keys maintained in access order (most recent at the end) */
-    private recentKeys: Set<OnyxKey>;
-
     /** A map of cached values */
     private storageMap: Record<OnyxKey, OnyxValue<OnyxKey>>;
 
@@ -47,14 +44,8 @@ class OnyxCache {
      */
     private pendingPromises: Map<string, Promise<OnyxValue<OnyxKey> | OnyxKey[]>>;
 
-    /** Maximum size of the keys store din cache */
-    private maxRecentKeysSize = 0;
-
     /** List of keys that are safe to remove when we reach max storage */
     private evictionAllowList: OnyxKey[] = [];
-
-    /** Map of keys and connection arrays whose keys will never be automatically evicted */
-    private evictionBlocklist: Record<OnyxKey, string[] | undefined> = {};
 
     /** List of keys that have been directly subscribed to or recently modified from least to most recent */
     private recentlyAccessedKeys = new Set<OnyxKey>();
@@ -68,7 +59,6 @@ class OnyxCache {
     constructor() {
         this.storageKeys = new Set();
         this.nullishStorageKeys = new Set();
-        this.recentKeys = new Set();
         this.storageMap = {};
         this.pendingPromises = new Map();
         this.collectionSnapshots = new Map();
@@ -90,12 +80,8 @@ class OnyxCache {
             'hasPendingTask',
             'getTaskPromise',
             'captureTask',
-            'addToAccessedKeys',
-            'removeLeastRecentlyUsedKeys',
-            'setRecentKeysLimit',
             'setAllKeys',
             'setEvictionAllowList',
-            'getEvictionBlocklist',
             'isEvictableKey',
             'removeLastAccessedKey',
             'addLastAccessedKey',
@@ -158,14 +144,8 @@ class OnyxCache {
         return this.storageMap[key] !== undefined || this.hasNullishStorageKey(key);
     }
 
-    /**
-     * Get a cached value from storage
-     * @param [shouldReindexCache] – This is an LRU cache, and by default accessing a value will make it become last in line to be evicted. This flag can be used to skip that and just access the value directly without side-effects.
-     */
-    get(key: OnyxKey, shouldReindexCache = true): OnyxValue<OnyxKey> {
-        if (shouldReindexCache) {
-            this.addToAccessedKeys(key);
-        }
+    /** Get a cached value from storage */
+    get(key: OnyxKey): OnyxValue<OnyxKey> {
         return this.storageMap[key];
     }
 
@@ -175,7 +155,6 @@ class OnyxCache {
      */
     set(key: OnyxKey, value: OnyxValue<OnyxKey>): OnyxValue<OnyxKey> {
         this.addKey(key);
-        this.addToAccessedKeys(key);
 
         // When a key is explicitly set in cache, we can remove it from the list of nullish keys,
         // since it will either be set to a non nullish value or removed from the cache completely.
@@ -217,7 +196,6 @@ class OnyxCache {
         }
 
         this.storageKeys.delete(key);
-        this.recentKeys.delete(key);
         OnyxKeys.deregisterMemberKey(key);
     }
 
@@ -234,7 +212,6 @@ class OnyxCache {
 
         for (const [key, value] of Object.entries(data)) {
             this.addKey(key);
-            this.addToAccessedKeys(key);
 
             const collectionKey = OnyxKeys.getCollectionKey(key);
 
@@ -314,52 +291,6 @@ class OnyxCache {
         return returnPromise;
     }
 
-    /** Adds a key to the top of the recently accessed keys */
-    addToAccessedKeys(key: OnyxKey): void {
-        this.recentKeys.delete(key);
-        this.recentKeys.add(key);
-    }
-
-    /** Remove keys that don't fall into the range of recently used keys */
-    removeLeastRecentlyUsedKeys(): void {
-        const numKeysToRemove = this.recentKeys.size - this.maxRecentKeysSize;
-        if (numKeysToRemove <= 0) {
-            return;
-        }
-
-        const iterator = this.recentKeys.values();
-        const keysToRemove: OnyxKey[] = [];
-
-        const recentKeysArray = Array.from(this.recentKeys);
-        const mostRecentKey = recentKeysArray[recentKeysArray.length - 1];
-
-        let iterResult = iterator.next();
-        while (!iterResult.done) {
-            const key = iterResult.value;
-            // Don't consider the most recently accessed key for eviction
-            // This ensures we don't immediately evict a key we just added
-            if (key !== undefined && key !== mostRecentKey && this.isEvictableKey(key)) {
-                keysToRemove.push(key);
-            }
-            iterResult = iterator.next();
-        }
-
-        for (const key of keysToRemove) {
-            delete this.storageMap[key];
-
-            const collectionKey = OnyxKeys.getCollectionKey(key);
-            if (collectionKey) {
-                this.dirtyCollections.add(collectionKey);
-            }
-            this.recentKeys.delete(key);
-        }
-    }
-
-    /** Set the recent keys list size */
-    setRecentKeysLimit(limit: number): void {
-        this.maxRecentKeysSize = limit;
-    }
-
     /** Check if the value has changed. Uses reference equality as a fast path, falls back to deep equality. */
     hasValueChanged(key: OnyxKey, value: OnyxValue<OnyxKey>): boolean {
         const currentValue = this.storageMap[key];
@@ -375,13 +306,6 @@ class OnyxCache {
      */
     setEvictionAllowList(keys: OnyxKey[]): void {
         this.evictionAllowList = keys;
-    }
-
-    /**
-     * Get the eviction block list that prevents keys from being evicted
-     */
-    getEvictionBlocklist(): Record<OnyxKey, string[] | undefined> {
-        return this.evictionBlocklist;
     }
 
     /**
@@ -437,15 +361,12 @@ class OnyxCache {
     }
 
     /**
-     * Finds a key that can be safely evicted
+     * Finds the least recently accessed key that can be safely evicted from storage.
      */
     getKeyForEviction(): OnyxKey | undefined {
-        for (const key of this.recentlyAccessedKeys) {
-            if (!this.evictionBlocklist[key]) {
-                return key;
-            }
-        }
-        return undefined;
+        // recentlyAccessedKeys is ordered from least to most recently accessed,
+        // so the first element is the best candidate for eviction.
+        return this.recentlyAccessedKeys.values().next().value;
     }
 
     /**

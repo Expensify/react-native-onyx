@@ -3,19 +3,12 @@
  * converting the value to a JSON string
  */
 import type {BatchQueryCommand, NitroSQLiteConnection} from 'react-native-nitro-sqlite';
-import {enableSimpleNullHandling, open} from 'react-native-nitro-sqlite';
+import {open} from 'react-native-nitro-sqlite';
 import {getFreeDiskStorage} from 'react-native-device-info';
 import type {FastMergeReplaceNullPatch} from '../../utils';
 import utils from '../../utils';
 import type StorageProvider from './types';
 import type {StorageKeyList, StorageKeyValuePair} from './types';
-
-// By default, NitroSQLite does not accept nullish values due to current limitations in Nitro Modules.
-// This flag enables a feature in NitroSQLite that allows for nullish values to be passed to operations, such as "execute" or "executeBatch".
-// Simple null handling can potentially add a minor performance overhead,
-// since parameters and results from SQLite queries need to be parsed from and to JavaScript nullish values.
-// https://github.com/margelo/react-native-nitro-sqlite#sending-and-receiving-nullish-values
-enableSimpleNullHandling();
 
 /**
  * The type of the key-value pair stored in the SQLite database
