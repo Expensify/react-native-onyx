@@ -21,10 +21,3 @@ yalc.lock
 
 # Perf tests
 .reassure
-
-# Benchmark output files
-.bench-baseline.json
-.bench-writebuffer.json
-bench-results.html
-cpp/build/
-cpp/build-wasm/
