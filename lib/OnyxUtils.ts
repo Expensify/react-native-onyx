@@ -1055,6 +1055,24 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
     callbackToStateMapping[subscriptionID] = mapping as CallbackToStateMapping<OnyxKey>;
     callbackToStateMapping[subscriptionID].subscriptionID = subscriptionID;
 
+    // If the subscriber is attempting to connect to a collection member whose ID is skippable (e.g. "undefined", "null", etc.)
+    // we suppress wiring the subscription fully to avoid unnecessary callback emissions such as for "report_undefined".
+    // We still return a valid subscriptionID so callers can disconnect safely.
+    try {
+        const skippableIDs = getSkippableCollectionMemberIDs();
+        if (skippableIDs.size) {
+            const [, collectionMemberID] = OnyxKeys.splitCollectionMemberKey(mapping.key);
+            if (skippableIDs.has(collectionMemberID)) {
+                // Clean up the provisional mapping to avoid retaining unused subscribers.
+                cache.addNullishStorageKey(mapping.key);
+                delete callbackToStateMapping[subscriptionID];
+                return subscriptionID;
+            }
+        }
+    } catch (e) {
+        // Not a collection member key, proceed as usual.
+    }
+
     // When keyChanged is called, a key is passed and the method looks through all the Subscribers in callbackToStateMapping for the matching key to get the subscriptionID
     // to avoid having to loop through all the Subscribers all the time (even when just one connection belongs to one key),
     // We create a mapping from key to lists of subscriptionIDs to access the specific list of subscriptionIDs.
@@ -1662,6 +1680,13 @@ function logKeyRemoved(onyxMethod: Extract<OnyxMethod, 'set' | 'merge'>, key: On
 }
 
 /**
+ * Getter - returns the callback to state mapping, useful in test environments.
+ */
+function getCallbackToStateMapping(): Record<number, CallbackToStateMapping<OnyxKey>> {
+    return callbackToStateMapping;
+}
+
+/**
  * Clear internal variables used in this file, useful in test environments.
  */
 function clearOnyxUtilsInternals() {
@@ -1720,6 +1745,7 @@ const OnyxUtils = {
     setWithRetry,
     multiSetWithRetry,
     setCollectionWithRetry,
+    getCallbackToStateMapping,
 };
 
 export type {OnyxMethod};

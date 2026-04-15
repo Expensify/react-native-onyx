@@ -95,6 +95,74 @@ describe('OnyxUtils', () => {
 
     afterEach(() => jest.clearAllMocks());
 
+    describe('skippable member subscriptions', () => {
+        const BASE = ONYXKEYS.COLLECTION.TEST_KEY;
+
+        beforeEach(() => {
+            // Enable skipping of undefined member IDs for these tests
+            OnyxUtils.setSkippableCollectionMemberIDs(new Set(['undefined']));
+        });
+
+        afterEach(() => {
+            // Restore to no skippable IDs to avoid affecting other tests
+            OnyxUtils.setSkippableCollectionMemberIDs(new Set());
+        });
+
+        it('does not emit initial callback for report_undefined member', async () => {
+            const key = `${BASE}undefined`;
+            const callback = jest.fn();
+            Onyx.connect({key, callback});
+
+            // Flush async subscription flow
+            await act(async () => waitForPromisesToResolve());
+
+            // No initial data should be sent for a skippable member
+            expect(callback).not.toHaveBeenCalled();
+        });
+
+        it('still emits for valid member keys', async () => {
+            const key = `${BASE}123`;
+            await Onyx.set(key, {id: 123});
+
+            const callback = jest.fn();
+            Onyx.connect({key, callback});
+            await act(async () => waitForPromisesToResolve());
+            expect(callback).toHaveBeenCalledTimes(1);
+            expect(callback).toHaveBeenCalledWith({id: 123}, key);
+        });
+
+        it('omits skippable members from base collection', async () => {
+            const undefinedKey = `${BASE}undefined`;
+            const validKey = `${BASE}1`;
+
+            await Onyx.set(undefinedKey, {bad: true});
+            await Onyx.set(validKey, {ok: true});
+
+            let received: Record<string, unknown> | undefined;
+            Onyx.connect({
+                key: BASE,
+                waitForCollectionCallback: true,
+                callback: (value) => {
+                    received = value as Record<string, unknown>;
+                },
+            });
+            await act(async () => waitForPromisesToResolve());
+            expect(received).toEqual({[validKey]: {ok: true}});
+            expect(Object.keys(received ?? {})).not.toContain(undefinedKey);
+        });
+
+        it('does not register an active subscription in callbackToStateMapping for a skippable member', async () => {
+            const skippableKey = `${BASE}undefined`;
+            Onyx.connect({key: skippableKey, callback: jest.fn()});
+
+            await act(async () => waitForPromisesToResolve());
+
+            const mappings = OnyxUtils.getCallbackToStateMapping();
+            const hasActiveSubscription = Object.values(mappings).some((m) => m.key === skippableKey);
+            expect(hasActiveSubscription).toBe(false);
+        });
+    });
+
     describe('partialSetCollection', () => {
         beforeEach(() => {
             Onyx.clear();

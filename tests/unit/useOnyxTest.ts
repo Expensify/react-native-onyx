@@ -1110,6 +1110,54 @@ describe('useOnyx', () => {
             expect(result.current[0]).toBeUndefined();
             expect(result.current[1].status).toEqual('loaded');
         });
+
+        it('should return undefined and loaded state when switching from a valid key to a skippable one', async () => {
+            await Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}1`, {id: '1'});
+            // Seed a value directly in storage for the skippable key.
+            // If the subscription is NOT skipped, Onyx would load this and return it.
+            // Asserting undefined below proves the subscription was actually suppressed.
+            await StorageMock.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`, {id: 'skippable'});
+
+            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string});
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual({id: '1'});
+            expect(result.current[1].status).toEqual('loaded');
+
+            await act(async () => {
+                rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`);
+            });
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should transition through loading and return value when switching from a skippable key to a valid one', async () => {
+            // Seed a value for the skippable key — must stay invisible to the hook
+            await StorageMock.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`, {id: 'skippable'});
+            // Seed the target valid key in storage only (not in cache) so the switch goes through loading
+            await StorageMock.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}1`, {id: '1'});
+
+            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id` as string});
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+
+            // Switch to a valid key whose value is in storage but not in cache — should transition through loading
+            rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}1`);
+
+            expect(result.current[1].status).toEqual('loading');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual({id: '1'});
+            expect(result.current[1].status).toEqual('loaded');
+        });
     });
 
     describe('RAM-only keys', () => {

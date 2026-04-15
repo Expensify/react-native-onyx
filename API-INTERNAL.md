@@ -145,6 +145,9 @@ that this internal function allows passing an additional <code>mergeReplaceNullP
 Any existing collection members not included in the new data will not be removed.
 Retries on failure.</p>
 </dd>
+<dt><a href="#getCallbackToStateMapping">getCallbackToStateMapping()</a></dt>
+<dd><p>Getter - returns the callback to state mapping, useful in test environments.</p>
+</dd>
 <dt><a href="#clearOnyxUtilsInternals">clearOnyxUtilsInternals()</a></dt>
 <dd><p>Clear internal variables used in this file, useful in test environments.</p>
 </dd>
@@ -519,6 +522,12 @@ Retries on failure.
 | params.collection | Object collection keyed by individual collection member keys and values |
 | retryAttempt | retry attempt |
 
+<a name="getCallbackToStateMapping"></a>
+
+## getCallbackToStateMapping()
+Getter - returns the callback to state mapping, useful in test environments.
+
+**Kind**: global function  
 <a name="clearOnyxUtilsInternals"></a>
 
 ## clearOnyxUtilsInternals()
