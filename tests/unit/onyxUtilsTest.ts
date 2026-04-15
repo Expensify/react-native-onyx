@@ -416,6 +416,17 @@ describe('OnyxUtils', () => {
             expect(logInfoSpy).toHaveBeenCalledWith(`Storage Quota Check -- bytesUsed: 0 bytesRemaining: Infinity. Original error: ${memoryError}`);
         });
 
+        it('should include the error in logAlert when out of storage and getDatabaseSize fails', async () => {
+            const dbSizeError = new Error('Failed to estimate storage');
+            const logAlertSpy = jest.spyOn(Logger, 'logAlert');
+            StorageMock.setItem = jest.fn().mockRejectedValue(memoryError);
+            StorageMock.getDatabaseSize = jest.fn().mockRejectedValue(dbSizeError);
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+
+            expect(logAlertSpy).toHaveBeenCalledWith(`Unable to get database size. Original error: ${memoryError}. getDatabaseSize error: ${dbSizeError}`);
+        });
+
         it('should not re-add an evicted key to recentlyAccessedKeys after removal', async () => {
             // Re-init with evictable keys so getKeyForEviction() has something to return
             Object.assign(OnyxUtils.getDeferredInitTask(), createDeferredTask());
