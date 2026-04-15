@@ -6,6 +6,7 @@ import utils from '../../lib/utils';
 import type {Collection, OnyxCollection} from '../../lib/types';
 import type GenericCollection from '../utils/GenericCollection';
 import OnyxCache from '../../lib/OnyxCache';
+import * as Logger from '../../lib/Logger';
 import StorageMock from '../../lib/storage';
 import createDeferredTask from '../../lib/createDeferredTask';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
@@ -395,6 +396,26 @@ describe('OnyxUtils', () => {
             expect(retryOperationSpy).toHaveBeenCalledTimes(1);
         });
 
+        it('should include the error in logAlert for IDBObjectStore invalid data errors', async () => {
+            const logAlertSpy = jest.spyOn(Logger, 'logAlert');
+            StorageMock.setItem = jest.fn().mockRejectedValueOnce(invalidDataError);
+
+            await expect(Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'})).rejects.toThrow(invalidDataError);
+
+            expect(logAlertSpy).toHaveBeenCalledWith(`Attempted to set invalid data set in Onyx. Please ensure all data is serializable. Error: ${invalidDataError}`);
+        });
+
+        it('should include the error in logs when out of storage with no evictable keys', async () => {
+            const logAlertSpy = jest.spyOn(Logger, 'logAlert');
+            const logInfoSpy = jest.spyOn(Logger, 'logInfo');
+            StorageMock.setItem = jest.fn().mockRejectedValue(memoryError);
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+
+            expect(logAlertSpy).toHaveBeenCalledWith(`Out of storage. But found no acceptable keys to remove. Error: ${memoryError}`);
+            expect(logInfoSpy).toHaveBeenCalledWith(`Storage Quota Check -- bytesUsed: 0 bytesRemaining: Infinity. Original error: ${memoryError}`);
+        });
+
         it('should not re-add an evicted key to recentlyAccessedKeys after removal', async () => {
             // Re-init with evictable keys so getKeyForEviction() has something to return
             Object.assign(OnyxUtils.getDeferredInitTask(), createDeferredTask());
@@ -422,6 +443,7 @@ describe('OnyxUtils', () => {
         let LocalOnyxUtils: typeof OnyxUtils;
         let LocalOnyxCache: typeof OnyxCache;
         let LocalStorageMock: typeof StorageMock;
+        let LocalLogger: typeof Logger;
 
         // Reset all modules to get fresh singletons (OnyxCache, OnyxUtils, etc.)
         // then re-init Onyx with evictableKeys configured
@@ -432,6 +454,7 @@ describe('OnyxUtils', () => {
             LocalOnyxUtils = require('../../lib/OnyxUtils').default;
             LocalOnyxCache = require('../../lib/OnyxCache').default;
             LocalStorageMock = require('../../lib/storage').default;
+            LocalLogger = require('../../lib/Logger');
 
             LocalOnyx.init({
                 keys: ONYXKEYS,
@@ -536,6 +559,20 @@ describe('OnyxUtils', () => {
             const keyForEviction = LocalOnyxCache.getKeyForEviction();
             expect(keyForEviction).toBeDefined();
             expect(keyForEviction?.startsWith(ONYXKEYS.COLLECTION.TEST_KEY)).toBe(true);
+        });
+
+        it('should include the error in logs when evicting a key', async () => {
+            const logInfoSpy = jest.spyOn(LocalLogger, 'logInfo');
+            const key1 = `${ONYXKEYS.COLLECTION.TEST_KEY}1`;
+
+            await LocalOnyx.set(key1, {id: 1});
+
+            LocalStorageMock.setItem = jest.fn(LocalStorageMock.setItem).mockRejectedValueOnce(diskFullError).mockImplementation(LocalStorageMock.setItem);
+
+            await LocalOnyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+
+            expect(logInfoSpy).toHaveBeenCalledWith(`Out of storage. Evicting least recently accessed key (${key1}) and retrying. Error: ${diskFullError}`);
+            expect(logInfoSpy).toHaveBeenCalledWith(`Storage Quota Check -- bytesUsed: 0 bytesRemaining: Infinity. Original error: ${diskFullError}`);
         });
     });
 
