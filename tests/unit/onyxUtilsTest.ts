@@ -360,7 +360,7 @@ describe('OnyxUtils', () => {
         const retryOperationSpy = jest.spyOn(OnyxUtils, 'retryOperation');
         const genericError = new Error('Generic storage error');
         const invalidDataError = new Error("Failed to execute 'put' on 'IDBObjectStore': invalid data");
-        const memoryError = new Error('out of memory');
+        const diskFullError = new Error('database or disk is full');
 
         it('should retry only one time if the operation is firstly failed and then passed', async () => {
             StorageMock.setItem = jest.fn(StorageMock.setItem).mockRejectedValueOnce(genericError).mockImplementation(StorageMock.setItem);
@@ -387,7 +387,7 @@ describe('OnyxUtils', () => {
         });
 
         it('should not retry in case of storage capacity error and no keys to evict', async () => {
-            StorageMock.setItem = jest.fn().mockRejectedValue(memoryError);
+            StorageMock.setItem = jest.fn().mockRejectedValue(diskFullError);
 
             await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
