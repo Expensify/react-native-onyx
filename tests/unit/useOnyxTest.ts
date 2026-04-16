@@ -272,20 +272,6 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
         });
 
-        it('should initially return `undefined` while loading non-cached key, and then return value and loaded state', async () => {
-            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
-
-            const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
-
-            expect(result.current[0]).toBeUndefined();
-            expect(result.current[1].status).toEqual('loading');
-
-            await act(async () => waitForPromisesToResolve());
-
-            expect(result.current[0]).toEqual('test');
-            expect(result.current[1].status).toEqual('loaded');
-        });
-
         it('should initially return undefined and then return cached value after multiple merge operations', async () => {
             Onyx.merge(ONYXKEYS.TEST_KEY, 'test1');
             Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
@@ -339,11 +325,9 @@ describe('useOnyx', () => {
         });
 
         it('should return updated state when connecting to the same regular key after an Onyx.clear() call', async () => {
-            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'test');
 
             const {result: result1} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
-
-            await act(async () => waitForPromisesToResolve());
 
             expect(result1.current[0]).toEqual('test');
             expect(result1.current[1].status).toEqual('loaded');
@@ -374,11 +358,9 @@ describe('useOnyx', () => {
         });
 
         it('should return updated state when connecting to the same colection member key after an Onyx.clear() call', async () => {
-            await StorageMock.setItem<string>(`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`, 'test');
+            await Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`, 'test');
 
             const {result: result1} = renderHook(() => useOnyx(`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`));
-
-            await act(async () => waitForPromisesToResolve());
 
             expect(result1.current[0]).toEqual('test');
             expect(result1.current[1].status).toEqual('loaded');
@@ -944,38 +926,11 @@ describe('useOnyx', () => {
     });
 
     describe('multiple usage', () => {
-        it('should connect to a key and load the value into cache, and return the value loaded in the next hook call', async () => {
-            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
-
-            const {result: result1} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
-
-            expect(result1.current[0]).toBeUndefined();
-            expect(result1.current[1].status).toEqual('loading');
-
-            await act(async () => waitForPromisesToResolve());
-
-            expect(result1.current[0]).toEqual('test');
-            expect(result1.current[1].status).toEqual('loaded');
-
-            const {result: result2} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
-
-            expect(result2.current[0]).toEqual('test');
-            expect(result2.current[1].status).toEqual('loaded');
-        });
-
-        it('should connect to a key two times while data is loading from the cache, and return the value loaded to both of them', async () => {
-            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
+        it('should connect to a key two times and return the cached value to both of them', async () => {
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'test');
 
             const {result: result1} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
             const {result: result2} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
-
-            expect(result1.current[0]).toBeUndefined();
-            expect(result1.current[1].status).toEqual('loading');
-
-            expect(result2.current[0]).toBeUndefined();
-            expect(result2.current[1].status).toEqual('loading');
-
-            await act(async () => waitForPromisesToResolve());
 
             expect(result1.current[0]).toEqual('test');
             expect(result1.current[1].status).toEqual('loaded');
