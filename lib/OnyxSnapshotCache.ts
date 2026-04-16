@@ -33,7 +33,7 @@ class OnyxSnapshotCache {
 
     constructor() {
         this.snapshotCache = new Map();
-        this.selectorIDMap = new Map();
+        this.selectorIDMap = new WeakMap();
         this.selectorIDCounter = 0;
         this.cacheKeyRefCounts = new Map();
     }
@@ -60,7 +60,7 @@ class OnyxSnapshotCache {
      * - `selector`: Different selectors produce different results, so each selector needs its own cache entry
      * - `initWithStoredValues`: This flag changes the initial loading behavior and affects the returned fetch status
      *
-     * Other options like `canEvict` and `reuseConnection` don't affect the data transformation
+     * Other options like `reuseConnection` don't affect the data transformation
      * or timing behavior of getSnapshot, so they're excluded from the cache key for better cache hit rates.
      */
     registerConsumer<TKey extends OnyxKey, TReturnValue>(options: Pick<UseOnyxOptions<TKey, TReturnValue>, 'selector' | 'initWithStoredValues'>): string {

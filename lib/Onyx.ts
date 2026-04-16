@@ -27,8 +27,6 @@ import OnyxKeys from './OnyxKeys';
 import logMessages from './logMessages';
 import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
-import * as GlobalSettings from './GlobalSettings';
-import decorateWithMetrics from './metrics';
 import OnyxMerge from './OnyxMerge';
 
 /** Initialize the store with actions and listening for storage events */
@@ -36,19 +34,12 @@ function init({
     keys = {},
     initialKeyStates = {},
     evictableKeys = [],
-    maxCachedKeysCount = 1000,
     shouldSyncMultipleInstances = !!global.localStorage,
-    enablePerformanceMetrics = false,
     enableDevTools = true,
     skippableCollectionMemberIDs = [],
     ramOnlyKeys = [],
     snapshotMergeKeys = [],
 }: InitOptions): void {
-    if (enablePerformanceMetrics) {
-        GlobalSettings.setPerformanceMetricsEnabled(true);
-        applyDecorators();
-    }
-
     initDevTools(enableDevTools);
 
     Storage.init();
@@ -77,16 +68,15 @@ function init({
         });
     }
 
-    if (maxCachedKeysCount > 0) {
-        cache.setRecentKeysLimit(maxCachedKeysCount);
-    }
-
     OnyxUtils.initStoreValues(keys, initialKeyStates, evictableKeys);
 
-    // Initialize all of our keys with data provided then give green light to any pending connections
-    Promise.all([cache.addEvictableKeysToRecentlyAccessedList(OnyxKeys.isCollectionKey, OnyxUtils.getAllKeys), OnyxUtils.initializeWithDefaultKeyStates()]).then(
-        OnyxUtils.getDeferredInitTask().resolve,
-    );
+    // Initialize all of our keys with data provided then give green light to any pending connections.
+    // addEvictableKeysToRecentlyAccessedList must run after initializeWithDefaultKeyStates because
+    // eager cache loading populates the key index (cache.setAllKeys) inside initializeWithDefaultKeyStates,
+    // and the evictable keys list depends on that index being populated.
+    OnyxUtils.initializeWithDefaultKeyStates()
+        .then(() => cache.addEvictableKeysToRecentlyAccessedList(OnyxKeys.isCollectionKey, OnyxUtils.getAllKeys))
+        .then(OnyxUtils.getDeferredInitTask().resolve);
 }
 
 /**
@@ -238,7 +228,13 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
 
             try {
                 const validChanges = mergeQueue[key].filter((change) => {
-                    const {isCompatible, existingValueType, newValueType} = utils.checkCompatibilityWithExistingValue(change, existingValue);
+                    const {isCompatible, existingValueType, newValueType, isEmptyArrayCoercion} = utils.checkCompatibilityWithExistingValue(change, existingValue);
+                    if (isEmptyArrayCoercion) {
+                        // Merging an object into an empty array isn't semantically correct, but we allow it
+                        // in case we accidentally encoded an empty object as an empty array in PHP. If you're
+                        // looking at a bugbot from this message, we're probably missing that key in OnyxKeys::KEYS_REQUIRING_EMPTY_OBJECT
+                        Logger.logAlert(`[ENSURE_BUGBOT] Onyx merge called on key "${key}" whose existing value is an empty array. Will coerce to object.`);
+                    }
                     if (!isCompatible) {
                         Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'merge', existingValueType, newValueType));
                     }
@@ -339,7 +335,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                 //      to null would cause unknown behavior)
                 //   2.1 However, if a default key was explicitly set to null, we need to reset it to the default value
                 for (const key of allKeys) {
-                    const isKeyToPreserve = keysToPreserve.includes(key);
+                    const isKeyToPreserve = keysToPreserve.some((preserveKey) => OnyxKeys.isKeyMatch(preserveKey, key));
                     const isDefaultKey = key in defaultKeyStates;
 
                     // If the key is being removed or reset to default:
@@ -377,7 +373,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                 // Exclude RAM-only keys to prevent them from being saved to storage
                 const defaultKeyValuePairs = Object.entries(
                     Object.keys(defaultKeyStates)
-                        .filter((key) => !keysToPreserve.includes(key) && !OnyxKeys.isRamOnlyKey(key))
+                        .filter((key) => !keysToPreserve.some((preserveKey) => OnyxKeys.isKeyMatch(preserveKey, key)) && !OnyxKeys.isRamOnlyKey(key))
                         .reduce((obj: KeyValueMapping, key) => {
                             // eslint-disable-next-line no-param-reassign
                             obj[key] = defaultKeyStates[key];
@@ -591,26 +587,6 @@ const Onyx = {
     init,
     registerLogger: Logger.registerLogger,
 };
-
-function applyDecorators() {
-    // We are reassigning the functions directly so that internal function calls are also decorated
-    // @ts-expect-error Reassign
-    connect = decorateWithMetrics(connect, 'Onyx.connect');
-    // @ts-expect-error Reassign
-    connectWithoutView = decorateWithMetrics(connectWithoutView, 'Onyx.connectWithoutView');
-    // @ts-expect-error Reassign
-    set = decorateWithMetrics(set, 'Onyx.set');
-    // @ts-expect-error Reassign
-    multiSet = decorateWithMetrics(multiSet, 'Onyx.multiSet');
-    // @ts-expect-error Reassign
-    merge = decorateWithMetrics(merge, 'Onyx.merge');
-    // @ts-expect-error Reassign
-    mergeCollection = decorateWithMetrics(mergeCollection, 'Onyx.mergeCollection');
-    // @ts-expect-error Reassign
-    update = decorateWithMetrics(update, 'Onyx.update');
-    // @ts-expect-error Reassign
-    clear = decorateWithMetrics(clear, 'Onyx.clear');
-}
 
 export default Onyx;
 export type {OnyxUpdate, ConnectOptions, SetOptions};

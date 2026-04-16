@@ -3,19 +3,12 @@
  * converting the value to a JSON string
  */
 import type {BatchQueryCommand, NitroSQLiteConnection} from 'react-native-nitro-sqlite';
-import {enableSimpleNullHandling, open} from 'react-native-nitro-sqlite';
+import {open} from 'react-native-nitro-sqlite';
 import {getFreeDiskStorage} from 'react-native-device-info';
 import type {FastMergeReplaceNullPatch} from '../../utils';
 import utils from '../../utils';
 import type StorageProvider from './types';
 import type {StorageKeyList, StorageKeyValuePair} from './types';
-
-// By default, NitroSQLite does not accept nullish values due to current limitations in Nitro Modules.
-// This flag enables a feature in NitroSQLite that allows for nullish values to be passed to operations, such as "execute" or "executeBatch".
-// Simple null handling can potentially add a minor performance overhead,
-// since parameters and results from SQLite queries need to be parsed from and to JavaScript nullish values.
-// https://github.com/margelo/react-native-nitro-sqlite#sending-and-receiving-nullish-values
-enableSimpleNullHandling();
 
 /**
  * The type of the key-value pair stored in the SQLite database
@@ -196,6 +189,17 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             // eslint-disable-next-line no-underscore-dangle
             const result = rows?._array.map((row) => row.record_key);
             return (result ?? []) as StorageKeyList;
+        });
+    },
+    getAll() {
+        if (!provider.store) {
+            throw new Error('Store is not initialized!');
+        }
+
+        return provider.store.executeAsync<OnyxSQLiteKeyValuePair>('SELECT record_key, valueJSON FROM keyvaluepairs;').then(({rows}) => {
+            // eslint-disable-next-line no-underscore-dangle
+            const result = rows?._array.map((row) => [row.record_key, JSON.parse(row.valueJSON)]);
+            return (result ?? []) as StorageKeyValuePair[];
         });
     },
     removeItem(key) {

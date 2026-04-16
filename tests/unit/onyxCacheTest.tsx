@@ -2,10 +2,8 @@ import type OnyxInstance from '../../lib/Onyx';
 import type OnyxCache from '../../lib/OnyxCache';
 import type {CacheTask} from '../../lib/OnyxCache';
 import type OnyxKeysType from '../../lib/OnyxKeys';
-import type {Connection} from '../../lib/OnyxConnectionManager';
 import type MockedStorage from '../../lib/storage/__mocks__';
 import type {InitOptions} from '../../lib/types';
-import generateRange from '../utils/generateRange';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 const MOCK_TASK = 'mockTask' as CacheTask;
@@ -437,7 +435,6 @@ describe('Onyx', () => {
             Onyx.init({
                 keys: ONYX_KEYS,
                 evictableKeys: [ONYX_KEYS.COLLECTION.MOCK_COLLECTION],
-                maxCachedKeysCount: 10,
                 ...overrides,
             });
 
@@ -461,215 +458,258 @@ describe('Onyx', () => {
             OnyxKeys = require('../../lib/OnyxKeys').default;
         });
 
-        it('Should keep recently accessed items in cache', () => {
-            // Given Storage with 10 different keys
-            StorageMock.getItem.mockResolvedValue('"mockValue"');
-            const range = generateRange(0, 10);
-            StorageMock.getAllKeys.mockResolvedValue(range.map((number) => `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}${number}`));
-            let connections: Array<{key: string; connection: Connection}> = [];
+        describe('eager loading during initialisation', () => {
+            beforeEach(() => {
+                StorageMock = require('../../lib/storage').default;
+            });
 
-            // Given Onyx is configured with max 5 keys in cache
-            return initOnyx({maxCachedKeysCount: 5})
-                .then(() => {
-                    // Given 10 connections for different keys
-                    connections = range.map((number) => {
-                        const key = `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}${number}`;
-                        return {
-                            key,
-                            connection: Onyx.connect({key, callback: jest.fn()}),
-                        };
-                    });
-                })
-                .then(waitForPromisesToResolve)
-                .then(() => {
-                    // When a new connection for a safe eviction key happens
-                    Onyx.connect({key: `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}10`, callback: jest.fn()});
-                })
-                .then(waitForPromisesToResolve)
-                .then(() => {
-                    // The newly connected key should remain in cache
-                    expect(cache.hasCacheForKey(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}10`)).toBe(true);
+            it('should load all storage data into cache during init', async () => {
+                await StorageMock.setItem(ONYX_KEYS.TEST_KEY, 'storageValue');
+                await StorageMock.setItem(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1, name: 'Item 1'});
+                await StorageMock.setItem(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}2`, {id: 2, name: 'Item 2'});
+                await initOnyx();
 
-                    // With the updated implementation, all evictable keys are removed except the most recently added one
-                    // Each time we connect to a safe eviction key, we remove all other evictable keys
-                    for (const {key} of connections) {
-                        expect(cache.hasCacheForKey(key)).toBe(false);
-                    }
+                expect(cache.getAllKeys().size).toBe(3);
+                expect(cache.get(ONYX_KEYS.TEST_KEY)).toBe('storageValue');
+                expect(cache.get(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`)).toEqual({id: 1, name: 'Item 1'});
+                expect(cache.get(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}2`)).toEqual({id: 2, name: 'Item 2'});
+            });
+
+            it('should not load RAM-only keys from storage during init', async () => {
+                const testKeys = {
+                    ...ONYX_KEYS,
+                    RAM_ONLY_KEY: 'ramOnlyKey',
+                };
+
+                await StorageMock.setItem(testKeys.RAM_ONLY_KEY, 'staleValue');
+                await StorageMock.setItem(ONYX_KEYS.TEST_KEY, 'normalValue');
+                await initOnyx({keys: testKeys, ramOnlyKeys: [testKeys.RAM_ONLY_KEY]});
+
+                expect(cache.getAllKeys().size).toBe(1);
+                expect(cache.get(testKeys.RAM_ONLY_KEY)).toBeUndefined();
+                expect(cache.get(ONYX_KEYS.TEST_KEY)).toBe('normalValue');
+            });
+
+            it('should merge default key states with storage data during init', async () => {
+                await StorageMock.setItem(ONYX_KEYS.OTHER_TEST, {fromStorage: true});
+                await initOnyx({
+                    initialKeyStates: {
+                        [ONYX_KEYS.OTHER_TEST]: {fromDefault: true},
+                    },
                 });
+
+                // Default key states are merged on top of storage data.
+                expect(cache.get(ONYX_KEYS.OTHER_TEST)).toEqual({fromStorage: true, fromDefault: true});
+            });
+
+            it('should use default key states when storage data is not available for a key', async () => {
+                await StorageMock.clear();
+                await initOnyx({
+                    initialKeyStates: {
+                        [ONYX_KEYS.OTHER_TEST]: 42,
+                    },
+                });
+
+                expect(cache.get(ONYX_KEYS.OTHER_TEST)).toBe(42);
+            });
+
+            it('should gracefully handle Storage.getAll() failure and boot with defaults', async () => {
+                (StorageMock.getAll as jest.Mock).mockImplementationOnce(() => Promise.reject(new Error('Database corrupted')));
+
+                await initOnyx({
+                    initialKeyStates: {
+                        [ONYX_KEYS.OTHER_TEST]: 42,
+                    },
+                });
+
+                expect(cache.getAllKeys().size).toBe(1);
+                expect(cache.get(ONYX_KEYS.OTHER_TEST)).toBe(42);
+            });
+
+            it('should populate cache key index with all storage keys during init', async () => {
+                await StorageMock.setItem(ONYX_KEYS.TEST_KEY, 'value1');
+                await StorageMock.setItem(ONYX_KEYS.OTHER_TEST, 'value2');
+                await StorageMock.setItem(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1});
+                await initOnyx();
+
+                const allKeys = cache.getAllKeys();
+                expect(allKeys.size).toBe(3);
+                expect(allKeys.has(ONYX_KEYS.TEST_KEY)).toBe(true);
+                expect(allKeys.has(ONYX_KEYS.OTHER_TEST)).toBe(true);
+                expect(allKeys.has(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`)).toBe(true);
+            });
         });
 
-        it('Should clean cache when connections to eviction keys happen', () => {
-            // Given storage with some data
-            StorageMock.getItem.mockResolvedValue('"mockValue"');
-            const range = generateRange(0, 10);
-            const keyPrefix = ONYX_KEYS.COLLECTION.MOCK_COLLECTION;
-            StorageMock.getAllKeys.mockResolvedValue(range.map((number) => `${keyPrefix}${number}`));
-            let connections: Array<{key: string; connection: Connection}> = [];
+        describe('getCollectionData', () => {
+            it('should return a frozen object', async () => {
+                await initOnyx();
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1});
 
-            return initOnyx({
-                maxCachedKeysCount: 3,
-            })
-                .then(() => {
-                    connections = range.map((number) => {
-                        const key = `${keyPrefix}${number}`;
-                        return {
-                            key,
-                            connection: Onyx.connect({key, callback: jest.fn()}),
-                        };
-                    });
-                })
-                .then(waitForPromisesToResolve)
-                .then(() => {
-                    Onyx.connect({key: `${keyPrefix}10`, callback: jest.fn()});
-                })
-                .then(waitForPromisesToResolve)
-                .then(() => {
-                    // All previously connected evictable keys are removed
-                    for (const {key} of connections) {
-                        expect(cache.hasCacheForKey(key)).toBe(false);
-                    }
+                const result = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+                expect(result).toBeDefined();
+                expect(Object.isFrozen(result)).toBe(true);
+            });
 
-                    // Only the newly connected key should remain in cache
-                    expect(cache.hasCacheForKey(`${keyPrefix}10`)).toBe(true);
+            it('should return the same reference when nothing changed', async () => {
+                await initOnyx();
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1});
+
+                const first = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+                const second = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+                expect(first).toBe(second);
+            });
+
+            it('should return a new reference after a member is updated', async () => {
+                await initOnyx();
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1});
+
+                const before = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 2});
+                const after = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+
+                expect(before).not.toBe(after);
+                expect(after).toEqual({[`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`]: {id: 2}});
+            });
+
+            it('should return a new reference after a member is added', async () => {
+                await initOnyx();
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1});
+
+                const before = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}2`, {id: 2});
+                const after = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+
+                expect(before).not.toBe(after);
+                expect(after).toEqual({
+                    [`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`]: {id: 1},
+                    [`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}2`]: {id: 2},
                 });
+            });
+
+            it('should return a stable empty reference for empty collections when keys are loaded', async () => {
+                await initOnyx();
+                // Set a key so storageKeys is non-empty, but not a member of MOCK_COLLECTION
+                await Onyx.set(ONYX_KEYS.TEST_KEY, 'value');
+
+                const first = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+                const second = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+
+                expect(first).toBeDefined();
+                expect(first).toBe(second);
+                expect(Object.keys(first!)).toHaveLength(0);
+            });
+
+            it('should return undefined for empty collections when no keys are loaded', async () => {
+                await initOnyx();
+
+                const result = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+                expect(result).toBeUndefined();
+            });
+
+            it('should return a new reference when a member is removed and another added simultaneously', async () => {
+                await initOnyx();
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1});
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}2`, {id: 2});
+
+                const before = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+
+                // Remove member 1 and add member 3 — count stays the same (2) but content changed
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, null);
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}3`, {id: 3});
+                const after = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+
+                expect(before).not.toBe(after);
+                expect(after).toEqual({
+                    [`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}2`]: {id: 2},
+                    [`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}3`]: {id: 3},
+                });
+            });
+
+            it('should preserve unchanged member references when a sibling is updated', async () => {
+                await initOnyx();
+                const member1Value = {id: 1, name: 'unchanged'};
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, member1Value);
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}2`, {id: 2});
+
+                const before = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}2`, {id: 3});
+                const after = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+
+                // Snapshot reference changed (sibling updated)
+                expect(before).not.toBe(after);
+                // But unchanged member keeps the same reference
+                expect(after?.[`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`]).toBe(member1Value);
+            });
         });
 
-        it('Should prioritize eviction of evictableKeys over non-evictable keys when cache limit is reached', () => {
-            const testKeys = {
-                ...ONYX_KEYS,
-                COLLECTION: {
-                    ...ONYX_KEYS.COLLECTION,
-                    SAFE_FOR_EVICTION: 'evictable_',
-                    NOT_SAFE_FOR_EVICTION: 'critical_',
-                },
-            };
+        describe('hasValueChanged', () => {
+            it('should return false for the same reference (fast path)', async () => {
+                await initOnyx();
+                const value = {id: 1, name: 'test'};
+                cache.set('test', value);
 
-            const criticalKey1 = `${testKeys.COLLECTION.NOT_SAFE_FOR_EVICTION}1`;
-            const criticalKey2 = `${testKeys.COLLECTION.NOT_SAFE_FOR_EVICTION}2`;
-            const criticalKey3 = `${testKeys.COLLECTION.NOT_SAFE_FOR_EVICTION}3`;
-            const evictableKey1 = `${testKeys.COLLECTION.SAFE_FOR_EVICTION}1`;
-            const evictableKey2 = `${testKeys.COLLECTION.SAFE_FOR_EVICTION}2`;
-            const evictableKey3 = `${testKeys.COLLECTION.SAFE_FOR_EVICTION}3`;
-            const triggerKey = `${testKeys.COLLECTION.SAFE_FOR_EVICTION}trigger`;
+                expect(cache.hasValueChanged('test', value)).toBe(false);
+            });
 
-            StorageMock.getItem.mockResolvedValue('"mockValue"');
-            const allKeys = [
-                // Keys that should be evictable (these match the SAFE_FOR_EVICTION pattern)
-                evictableKey1,
-                evictableKey2,
-                evictableKey3,
-                triggerKey,
-                // Keys that should NOT be evictable
-                criticalKey1,
-                criticalKey2,
-                criticalKey3,
-            ];
-            StorageMock.getAllKeys.mockResolvedValue(allKeys);
+            it('should return false for deep-equal but different reference', async () => {
+                await initOnyx();
+                cache.set('test', {id: 1, name: 'test'});
 
-            return initOnyx({
-                keys: testKeys,
-                maxCachedKeysCount: 3,
-                evictableKeys: [testKeys.COLLECTION.SAFE_FOR_EVICTION],
-            })
-                .then(() => {
-                    // Verify keys are correctly identified as evictable or not
-                    expect(cache.isEvictableKey?.(evictableKey1)).toBe(true);
-                    expect(cache.isEvictableKey?.(evictableKey2)).toBe(true);
-                    expect(cache.isEvictableKey?.(evictableKey3)).toBe(true);
-                    expect(cache.isEvictableKey?.(triggerKey)).toBe(true);
-                    expect(cache.isEvictableKey?.(criticalKey1)).toBe(false);
+                expect(cache.hasValueChanged('test', {id: 1, name: 'test'})).toBe(false);
+            });
 
-                    // Connect to non-evictable keys first
-                    Onyx.connect({key: criticalKey1, callback: jest.fn()});
-                    Onyx.connect({key: criticalKey2, callback: jest.fn()});
-                    Onyx.connect({key: criticalKey3, callback: jest.fn()});
-                })
-                .then(waitForPromisesToResolve)
-                .then(() => {
-                    // Then connect to evictable keys
-                    Onyx.connect({key: evictableKey1, callback: jest.fn()});
-                    Onyx.connect({key: evictableKey2, callback: jest.fn()});
-                    Onyx.connect({key: evictableKey3, callback: jest.fn()});
-                })
-                .then(waitForPromisesToResolve)
-                .then(() => {
-                    // Trigger an eviction by connecting to a safe eviction key
-                    Onyx.connect({key: triggerKey, callback: jest.fn()});
-                })
-                .then(waitForPromisesToResolve)
-                .then(() => {
-                    // Previously connected evictable keys should be removed
-                    expect(cache.hasCacheForKey(evictableKey1)).toBe(false);
-                    expect(cache.hasCacheForKey(evictableKey2)).toBe(false);
-                    expect(cache.hasCacheForKey(evictableKey3)).toBe(false);
+            it('should return true when value differs', async () => {
+                await initOnyx();
+                cache.set('test', {id: 1});
 
-                    // Non-evictable keys should remain in cache
-                    expect(cache.hasCacheForKey(criticalKey1)).toBe(true);
-                    expect(cache.hasCacheForKey(criticalKey2)).toBe(true);
-                    expect(cache.hasCacheForKey(criticalKey3)).toBe(true);
-
-                    // The trigger key should be in cache as it was just connected
-                    expect(cache.hasCacheForKey(triggerKey)).toBe(true);
-                });
+                expect(cache.hasValueChanged('test', {id: 2})).toBe(true);
+            });
         });
 
-        it('Should not evict non-evictable keys even when cache limit is exceeded', () => {
-            const testKeys = {
-                ...ONYX_KEYS,
-                COLLECTION: {
-                    ...ONYX_KEYS.COLLECTION,
-                    SAFE_FOR_EVICTION: 'evictable_',
-                    NOT_SAFE_FOR_EVICTION: 'critical_',
-                },
-            };
+        describe('merge', () => {
+            it('should not mark collection dirty when merged value is unchanged', async () => {
+                await initOnyx();
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1, name: 'test'});
 
-            const criticalKey1 = `${testKeys.COLLECTION.NOT_SAFE_FOR_EVICTION}1`;
-            const criticalKey2 = `${testKeys.COLLECTION.NOT_SAFE_FOR_EVICTION}2`;
-            const criticalKey3 = `${testKeys.COLLECTION.NOT_SAFE_FOR_EVICTION}3`;
-            const evictableKey1 = `${testKeys.COLLECTION.SAFE_FOR_EVICTION}1`;
-            // Additional trigger key for natural eviction
-            const triggerKey = `${testKeys.COLLECTION.SAFE_FOR_EVICTION}trigger`;
+                const before = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
 
-            StorageMock.getItem.mockResolvedValue('"mockValue"');
-            const allKeys = [
-                evictableKey1,
-                triggerKey,
-                // Keys that should not be evicted
-                criticalKey1,
-                criticalKey2,
-                criticalKey3,
-            ];
-            StorageMock.getAllKeys.mockResolvedValue(allKeys);
+                // Merge with identical values — fastMerge returns same reference, so no-op
+                cache.merge({[`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`]: {id: 1, name: 'test'}});
 
-            return initOnyx({
-                keys: testKeys,
-                maxCachedKeysCount: 2,
-                evictableKeys: [testKeys.COLLECTION.SAFE_FOR_EVICTION],
-            })
-                .then(() => {
-                    Onyx.connect({key: criticalKey1, callback: jest.fn()}); // Should never be evicted
-                    Onyx.connect({key: criticalKey2, callback: jest.fn()}); // Should never be evicted
-                    Onyx.connect({key: criticalKey3, callback: jest.fn()}); // Should never be evicted
-                    Onyx.connect({key: evictableKey1, callback: jest.fn()}); // Should be evicted when we connect to triggerKey
-                })
-                .then(waitForPromisesToResolve)
-                .then(() => {
-                    // Trigger eviction by connecting to another safe eviction key
-                    Onyx.connect({key: triggerKey, callback: jest.fn()});
-                })
-                .then(waitForPromisesToResolve)
-                .then(() => {
-                    // evictableKey1 should be evicted since it's an evictable key
-                    expect(cache.hasCacheForKey(evictableKey1)).toBe(false);
+                const after = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+                expect(before).toBe(after);
+            });
 
-                    // Non-evictable keys should remain in cache
-                    expect(cache.hasCacheForKey(criticalKey1)).toBe(true);
-                    expect(cache.hasCacheForKey(criticalKey2)).toBe(true);
-                    expect(cache.hasCacheForKey(criticalKey3)).toBe(true);
+            it('should mark collection dirty when a member value changes', async () => {
+                await initOnyx();
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1});
 
-                    // The trigger key should be in cache as it was just connected
-                    expect(cache.hasCacheForKey(triggerKey)).toBe(true);
-                });
+                const before = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+
+                cache.merge({[`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`]: {id: 2}});
+
+                const after = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+                expect(before).not.toBe(after);
+                expect(after![`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`]).toEqual({id: 2});
+            });
+
+            it('should handle null values by removing the key from storageMap', async () => {
+                await initOnyx();
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1});
+
+                cache.merge({[`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`]: null});
+
+                expect(cache.get(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`)).toBeUndefined();
+            });
+
+            it('should skip undefined values without modifying storageMap', async () => {
+                await initOnyx();
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1});
+
+                cache.merge({[`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`]: undefined});
+
+                expect(cache.get(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`)).toEqual({id: 1});
+            });
         });
 
         it('should save RAM-only keys', () => {

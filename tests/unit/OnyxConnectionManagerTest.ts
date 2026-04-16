@@ -2,7 +2,6 @@ import {act} from '@testing-library/react-native';
 import Onyx from '../../lib';
 import type {Connection} from '../../lib/OnyxConnectionManager';
 import connectionManager from '../../lib/OnyxConnectionManager';
-import OnyxCache from '../../lib/OnyxCache';
 import StorageMock from '../../lib/storage';
 import type GenericCollection from '../utils/GenericCollection';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
@@ -360,6 +359,53 @@ describe('OnyxConnectionManager', () => {
         });
     });
 
+    describe('unsubscribeFromKey', () => {
+        it('should clean up the correct subscription ID from lastConnectionCallbackData on disconnect', async () => {
+            const deleteSpy = jest.spyOn(Map.prototype, 'delete');
+
+            const connectionA = Onyx.connect({key: ONYXKEYS.TEST_KEY, callback: jest.fn(), reuseConnection: false});
+            Onyx.connect({key: ONYXKEYS.TEST_KEY, callback: jest.fn(), reuseConnection: false});
+            await act(async () => waitForPromisesToResolve());
+
+            const subscriptionIdA = connectionsMap.get(connectionA.id)?.subscriptionID;
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'value1');
+            await act(async () => waitForPromisesToResolve());
+
+            deleteSpy.mockClear();
+            Onyx.disconnect(connectionA);
+
+            const numericDeleteArgs = deleteSpy.mock.calls.map((call) => call[0]).filter((arg): arg is number => typeof arg === 'number');
+            expect(numericDeleteArgs).toContain(subscriptionIdA);
+
+            deleteSpy.mockRestore();
+        });
+
+        it('should remove the subscription ID from onyxKeyToSubscriptionIDs on disconnect', async () => {
+            const setSpy = jest.spyOn(Map.prototype, 'set');
+
+            const connectionA = Onyx.connect({key: ONYXKEYS.TEST_KEY, callback: jest.fn(), reuseConnection: false});
+            const connectionB = Onyx.connect({key: ONYXKEYS.TEST_KEY, callback: jest.fn(), reuseConnection: false});
+            await act(async () => waitForPromisesToResolve());
+
+            const subscriptionIdA = connectionsMap.get(connectionA.id)?.subscriptionID;
+            const subscriptionIdB = connectionsMap.get(connectionB.id)?.subscriptionID;
+
+            setSpy.mockClear();
+            Onyx.disconnect(connectionA);
+
+            const setCallsForKey = setSpy.mock.calls.filter((call) => call[0] === ONYXKEYS.TEST_KEY);
+            expect(setCallsForKey.length).toBeGreaterThan(0);
+
+            const updatedIDs = setCallsForKey[setCallsForKey.length - 1][1] as number[];
+            expect(updatedIDs).not.toContain(subscriptionIdA);
+            expect(updatedIDs).toContain(subscriptionIdB);
+
+            setSpy.mockRestore();
+            Onyx.disconnect(connectionB);
+        });
+    });
+
     describe('disconnectAll', () => {
         it('should disconnect all connections', async () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
@@ -403,66 +449,6 @@ describe('OnyxConnectionManager', () => {
             expect(connectionsMap.size).toEqual(2);
             expect(connectionsMap.has(connection1.id)).toBeTruthy();
             expect(connectionsMap.has(connection2.id)).toBeTruthy();
-        });
-    });
-
-    describe('addToEvictionBlockList / removeFromEvictionBlockList', () => {
-        it('should add and remove connections from the eviction block list correctly', async () => {
-            const evictionBlocklist = OnyxCache.getEvictionBlocklist();
-
-            connectionsMap.set('connectionID1', {subscriptionID: 0, onyxKey: ONYXKEYS.TEST_KEY, callbacks: new Map(), isConnectionMade: true});
-            connectionsMap.get('connectionID1')?.callbacks.set('callbackID1', () => undefined);
-            connectionManager.addToEvictionBlockList({id: 'connectionID1', callbackID: 'callbackID1'});
-            expect(evictionBlocklist[ONYXKEYS.TEST_KEY]).toEqual(['connectionID1_callbackID1']);
-
-            connectionsMap.get('connectionID1')?.callbacks.set('callbackID2', () => undefined);
-            connectionManager.addToEvictionBlockList({id: 'connectionID1', callbackID: 'callbackID2'});
-            expect(evictionBlocklist[ONYXKEYS.TEST_KEY]).toEqual(['connectionID1_callbackID1', 'connectionID1_callbackID2']);
-
-            connectionsMap.set('connectionID2', {subscriptionID: 1, onyxKey: `${ONYXKEYS.COLLECTION.TEST_KEY}entry1`, callbacks: new Map(), isConnectionMade: true});
-            connectionsMap.get('connectionID2')?.callbacks.set('callbackID3', () => undefined);
-            connectionManager.addToEvictionBlockList({id: 'connectionID2', callbackID: 'callbackID3'});
-            expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]).toEqual(['connectionID2_callbackID3']);
-
-            connectionManager.removeFromEvictionBlockList({id: 'connectionID2', callbackID: 'callbackID3'});
-            expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]).toBeUndefined();
-
-            // inexistent callback ID, shouldn't do anything
-            connectionManager.removeFromEvictionBlockList({id: 'connectionID1', callbackID: 'callbackID1000'});
-            expect(evictionBlocklist[ONYXKEYS.TEST_KEY]).toEqual(['connectionID1_callbackID1', 'connectionID1_callbackID2']);
-
-            connectionManager.removeFromEvictionBlockList({id: 'connectionID1', callbackID: 'callbackID2'});
-            expect(evictionBlocklist[ONYXKEYS.TEST_KEY]).toEqual(['connectionID1_callbackID1']);
-
-            connectionManager.removeFromEvictionBlockList({id: 'connectionID1', callbackID: 'callbackID1'});
-            expect(evictionBlocklist[ONYXKEYS.TEST_KEY]).toBeUndefined();
-
-            // inexistent connection ID, shouldn't do anything
-            expect(() => connectionManager.removeFromEvictionBlockList({id: 'connectionID0', callbackID: 'callbackID0'})).not.toThrow();
-        });
-
-        it('should not throw any errors when passing an undefined connection or trying to access an inexistent one inside addToEvictionBlockList()', () => {
-            expect(connectionsMap.size).toEqual(0);
-
-            expect(() => {
-                connectionManager.addToEvictionBlockList(undefined as unknown as Connection);
-            }).not.toThrow();
-
-            expect(() => {
-                connectionManager.addToEvictionBlockList({id: 'connectionID1', callbackID: 'callbackID1'});
-            }).not.toThrow();
-        });
-
-        it('should not throw any errors when passing an undefined connection or trying to access an inexistent one inside removeFromEvictionBlockList()', () => {
-            expect(connectionsMap.size).toEqual(0);
-
-            expect(() => {
-                connectionManager.removeFromEvictionBlockList(undefined as unknown as Connection);
-            }).not.toThrow();
-
-            expect(() => {
-                connectionManager.removeFromEvictionBlockList({id: 'connectionID1', callbackID: 'callbackID1'});
-            }).not.toThrow();
         });
     });
 

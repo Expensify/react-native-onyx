@@ -1,0 +1,26 @@
+name: Validate API Docs
+
+on:
+    pull_request:
+        types: [opened, synchronize]
+        paths: ['lib/**', 'buildDocs.ts', 'API.md', 'API-INTERNAL.md', '.github/workflows/validateDocs.yml', '.github/scripts/verifyDocs.sh']
+
+jobs:
+    verify:
+        runs-on: ubuntu-latest
+        steps:
+            # v5.0.0
+            - uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
+
+            - name: Setup Node
+              # v4.4.0
+              uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e
+              with:
+                  node-version-file: ".nvmrc"
+                  cache: npm
+                  cache-dependency-path: package-lock.json
+
+            - run: npm ci
+
+            - name: Verify API Docs Are Up To Date
+              run: ./.github/scripts/verifyDocs.sh
