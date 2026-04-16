@@ -1,6 +1,6 @@
 {
   "name": "react-native-onyx",
-  "version": "3.0.63",
+  "version": "3.0.67",
   "author": "Expensify, Inc.",
   "homepage": "https://expensify.com",
   "description": "State management for React Native",
@@ -73,7 +73,7 @@
     "@vercel/ncc": "0.38.1",
     "date-fns": "^4.1.0",
     "eslint": "^9.39.2",
-    "eslint-config-expensify": "^2.0.102",
+    "eslint-config-expensify": "2.0.108",
     "eslint-config-prettier": "^9.1.0",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.31.0",

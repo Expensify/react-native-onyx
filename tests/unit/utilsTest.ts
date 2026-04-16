@@ -389,4 +389,36 @@ describe('utils', () => {
             });
         });
     });
+
+    describe('isEmptyObject', () => {
+        it('should return true for an empty object', () => {
+            expect(utils.isEmptyObject({})).toBe(true);
+        });
+
+        it('should return true for null', () => {
+            expect(utils.isEmptyObject(null)).toBe(true);
+        });
+
+        it('should return false for undefined', () => {
+            expect(utils.isEmptyObject(undefined)).toBe(false);
+        });
+
+        it('should return false for an object with properties', () => {
+            expect(utils.isEmptyObject({a: 1})).toBe(false);
+        });
+
+        it('should return false for non-object types', () => {
+            expect(utils.isEmptyObject('hello')).toBe(false);
+            expect(utils.isEmptyObject(42)).toBe(false);
+            expect(utils.isEmptyObject(true)).toBe(false);
+        });
+
+        it('should return true for an empty array', () => {
+            expect(utils.isEmptyObject([])).toBe(true);
+        });
+
+        it('should return false for a non-empty array', () => {
+            expect(utils.isEmptyObject([1, 2])).toBe(false);
+        });
+    });
 });
