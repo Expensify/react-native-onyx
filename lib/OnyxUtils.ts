@@ -798,7 +798,7 @@ function wait(ms: number): Promise<void> {
 function getRetryDelay(attempt: number): number {
     const baseDelay = RETRY_BASE_DELAY_MS * 2 ** attempt;
     const jitter = baseDelay * RETRY_JITTER_FACTOR * (2 * Math.random() - 1);
-    return Math.round(baseDelay + jitter);
+    return Math.max(0, Math.round(baseDelay + jitter));
 }
 
 function reportStorageQuota(error?: Error): Promise<void> {
