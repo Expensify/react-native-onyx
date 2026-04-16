@@ -172,7 +172,19 @@ function mergeObject<TObject extends Record<string, unknown>>(
 
 /** Checks whether the given object is an object and not null/undefined. */
 function isEmptyObject<T>(obj: T | EmptyValue): obj is EmptyValue {
-    return typeof obj === 'object' && Object.keys(obj || {}).length === 0;
+    if (typeof obj !== 'object') {
+        return false;
+    }
+
+    // Use for-in loop to avoid an unnecessary array allocation from Object.keys()
+    // eslint-disable-next-line no-restricted-syntax
+    for (const key in obj) {
+        if (Object.hasOwn(obj, key)) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 /**

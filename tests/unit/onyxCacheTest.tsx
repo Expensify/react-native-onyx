@@ -540,6 +540,178 @@ describe('Onyx', () => {
             });
         });
 
+        describe('getCollectionData', () => {
+            it('should return a frozen object', async () => {
+                await initOnyx();
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1});
+
+                const result = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+                expect(result).toBeDefined();
+                expect(Object.isFrozen(result)).toBe(true);
+            });
+
+            it('should return the same reference when nothing changed', async () => {
+                await initOnyx();
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1});
+
+                const first = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+                const second = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+                expect(first).toBe(second);
+            });
+
+            it('should return a new reference after a member is updated', async () => {
+                await initOnyx();
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1});
+
+                const before = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 2});
+                const after = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+
+                expect(before).not.toBe(after);
+                expect(after).toEqual({[`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`]: {id: 2}});
+            });
+
+            it('should return a new reference after a member is added', async () => {
+                await initOnyx();
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1});
+
+                const before = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}2`, {id: 2});
+                const after = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+
+                expect(before).not.toBe(after);
+                expect(after).toEqual({
+                    [`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`]: {id: 1},
+                    [`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}2`]: {id: 2},
+                });
+            });
+
+            it('should return a stable empty reference for empty collections when keys are loaded', async () => {
+                await initOnyx();
+                // Set a key so storageKeys is non-empty, but not a member of MOCK_COLLECTION
+                await Onyx.set(ONYX_KEYS.TEST_KEY, 'value');
+
+                const first = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+                const second = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+
+                expect(first).toBeDefined();
+                expect(first).toBe(second);
+                expect(Object.keys(first!)).toHaveLength(0);
+            });
+
+            it('should return undefined for empty collections when no keys are loaded', async () => {
+                await initOnyx();
+
+                const result = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+                expect(result).toBeUndefined();
+            });
+
+            it('should return a new reference when a member is removed and another added simultaneously', async () => {
+                await initOnyx();
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1});
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}2`, {id: 2});
+
+                const before = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+
+                // Remove member 1 and add member 3 — count stays the same (2) but content changed
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, null);
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}3`, {id: 3});
+                const after = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+
+                expect(before).not.toBe(after);
+                expect(after).toEqual({
+                    [`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}2`]: {id: 2},
+                    [`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}3`]: {id: 3},
+                });
+            });
+
+            it('should preserve unchanged member references when a sibling is updated', async () => {
+                await initOnyx();
+                const member1Value = {id: 1, name: 'unchanged'};
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, member1Value);
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}2`, {id: 2});
+
+                const before = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}2`, {id: 3});
+                const after = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+
+                // Snapshot reference changed (sibling updated)
+                expect(before).not.toBe(after);
+                // But unchanged member keeps the same reference
+                expect(after?.[`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`]).toBe(member1Value);
+            });
+        });
+
+        describe('hasValueChanged', () => {
+            it('should return false for the same reference (fast path)', async () => {
+                await initOnyx();
+                const value = {id: 1, name: 'test'};
+                cache.set('test', value);
+
+                expect(cache.hasValueChanged('test', value)).toBe(false);
+            });
+
+            it('should return false for deep-equal but different reference', async () => {
+                await initOnyx();
+                cache.set('test', {id: 1, name: 'test'});
+
+                expect(cache.hasValueChanged('test', {id: 1, name: 'test'})).toBe(false);
+            });
+
+            it('should return true when value differs', async () => {
+                await initOnyx();
+                cache.set('test', {id: 1});
+
+                expect(cache.hasValueChanged('test', {id: 2})).toBe(true);
+            });
+        });
+
+        describe('merge', () => {
+            it('should not mark collection dirty when merged value is unchanged', async () => {
+                await initOnyx();
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1, name: 'test'});
+
+                const before = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+
+                // Merge with identical values — fastMerge returns same reference, so no-op
+                cache.merge({[`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`]: {id: 1, name: 'test'}});
+
+                const after = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+                expect(before).toBe(after);
+            });
+
+            it('should mark collection dirty when a member value changes', async () => {
+                await initOnyx();
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1});
+
+                const before = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+
+                cache.merge({[`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`]: {id: 2}});
+
+                const after = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+                expect(before).not.toBe(after);
+                expect(after![`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`]).toEqual({id: 2});
+            });
+
+            it('should handle null values by removing the key from storageMap', async () => {
+                await initOnyx();
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1});
+
+                cache.merge({[`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`]: null});
+
+                expect(cache.get(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`)).toBeUndefined();
+            });
+
+            it('should skip undefined values without modifying storageMap', async () => {
+                await initOnyx();
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1});
+
+                cache.merge({[`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`]: undefined});
+
+                expect(cache.get(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`)).toEqual({id: 1});
+            });
+        });
+
         it('should save RAM-only keys', () => {
             const testKeys = {
                 ...ONYX_KEYS,
