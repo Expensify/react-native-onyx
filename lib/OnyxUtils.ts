@@ -771,7 +771,7 @@ function reportStorageQuota(error?: Error): Promise<void> {
             Logger.logInfo(`Storage Quota Check -- bytesUsed: ${bytesUsed} bytesRemaining: ${bytesRemaining}. Original error: ${error}`);
         })
         .catch((dbSizeError) => {
-            Logger.logAlert(`Unable to get database size. Original error: ${error}. getDatabaseSize error: ${dbSizeError}`);
+            Logger.logAlert(`Unable to get database size. getDatabaseSize error: ${dbSizeError}. Original error: ${error}`);
         });
 }
 

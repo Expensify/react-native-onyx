@@ -424,7 +424,7 @@ describe('OnyxUtils', () => {
 
             await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
-            expect(logAlertSpy).toHaveBeenCalledWith(`Unable to get database size. Original error: ${memoryError}. getDatabaseSize error: ${dbSizeError}`);
+            expect(logAlertSpy).toHaveBeenCalledWith(`Unable to get database size. getDatabaseSize error: ${dbSizeError}. Original error: ${memoryError}`);
         });
 
         it('should not re-add an evicted key to recentlyAccessedKeys after removal', async () => {
