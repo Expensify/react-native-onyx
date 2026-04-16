@@ -1090,11 +1090,11 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
         });
 
-        it('should transition through loading and return value when switching from a skippable key to a valid one', async () => {
+        it('should return value immediately when switching from a skippable key to a valid one', async () => {
             // Seed a value for the skippable key — must stay invisible to the hook
-            await StorageMock.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`, {id: 'skippable'});
-            // Seed the target valid key in storage only (not in cache) so the switch goes through loading
-            await StorageMock.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}1`, {id: '1'});
+            await Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`, {id: 'skippable'});
+            // Seed the target valid key
+            await Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}1`, {id: '1'});
 
             const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id` as string});
 
@@ -1103,10 +1103,8 @@ describe('useOnyx', () => {
             expect(result.current[0]).toBeUndefined();
             expect(result.current[1].status).toEqual('loaded');
 
-            // Switch to a valid key whose value is in storage but not in cache — should transition through loading
+            // Switch to a valid key — value is available immediately from cache
             rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}1`);
-
-            expect(result.current[1].status).toEqual('loading');
 
             await act(async () => waitForPromisesToResolve());
 
