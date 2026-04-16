@@ -64,6 +64,24 @@ const STORAGE_ERRORS = [...IDB_STORAGE_ERRORS, ...SQLITE_STORAGE_ERRORS];
 // Max number of retries for failed storage operations
 const MAX_STORAGE_OPERATION_RETRY_ATTEMPTS = 5;
 
+// Connection/state errors where the DB needs time to recover — backoff helps, eviction does not
+const IDB_CONNECTION_ERRORS = [
+    'internal error opening backing store', // Chrome/Edge: corrupted IDB state
+    'connection to indexed database server lost', // Safari: IDB connection dropped
+    'the database connection is closing', // Cross-browser: DB closing during write
+] as const;
+
+const SQLITE_CONNECTION_ERRORS = [
+    'disk i/o error', // Native: filesystem/device stress
+    'database is locked', // Native: concurrent access contention
+] as const;
+
+const CONNECTION_ERRORS = [...IDB_CONNECTION_ERRORS, ...SQLITE_CONNECTION_ERRORS];
+
+// Retry backoff configuration
+const RETRY_BASE_DELAY_MS = 100;
+const RETRY_JITTER_FACTOR = 0.25;
+
 type OnyxMethod = ValueOf<typeof METHOD>;
 
 // Key/value store of Onyx key and arrays of values to merge
@@ -761,6 +779,26 @@ function remove<TKey extends OnyxKey>(key: TKey, isProcessingCollectionUpdate?: 
     }
 
     return Storage.removeItem(key).then(() => undefined);
+}
+
+/**
+ * Returns a promise that resolves after the given number of milliseconds.
+ */
+function wait(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+        setTimeout(resolve, ms);
+    });
+}
+
+/**
+ * Calculates exponential backoff delay with jitter for a given retry attempt.
+ * Formula: baseDelay * 2^attempt ± jitter
+ * Attempt 0: ~100ms, Attempt 1: ~200ms, ..., Attempt 4: ~1600ms
+ */
+function getRetryDelay(attempt: number): number {
+    const baseDelay = RETRY_BASE_DELAY_MS * 2 ** attempt;
+    const jitter = baseDelay * RETRY_JITTER_FACTOR * (2 * Math.random() - 1);
+    return Math.round(baseDelay + jitter);
 }
 
 function reportStorageQuota(error?: Error): Promise<void> {
