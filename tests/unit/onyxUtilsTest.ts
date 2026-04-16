@@ -408,23 +408,23 @@ describe('OnyxUtils', () => {
         it('should include the error in logs when out of storage with no evictable keys', async () => {
             const logAlertSpy = jest.spyOn(Logger, 'logAlert');
             const logInfoSpy = jest.spyOn(Logger, 'logInfo');
-            StorageMock.setItem = jest.fn().mockRejectedValue(memoryError);
+            StorageMock.setItem = jest.fn().mockRejectedValue(diskFullError);
 
             await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
-            expect(logAlertSpy).toHaveBeenCalledWith(`Out of storage. But found no acceptable keys to remove. Error: ${memoryError}`);
-            expect(logInfoSpy).toHaveBeenCalledWith(`Storage Quota Check -- bytesUsed: 0 bytesRemaining: Infinity. Original error: ${memoryError}`);
+            expect(logAlertSpy).toHaveBeenCalledWith(`Out of storage. But found no acceptable keys to remove. Error: ${diskFullError}`);
+            expect(logInfoSpy).toHaveBeenCalledWith(`Storage Quota Check -- bytesUsed: 0 bytesRemaining: Infinity. Original error: ${diskFullError}`);
         });
 
         it('should include the error in logAlert when out of storage and getDatabaseSize fails', async () => {
             const dbSizeError = new Error('Failed to estimate storage');
             const logAlertSpy = jest.spyOn(Logger, 'logAlert');
-            StorageMock.setItem = jest.fn().mockRejectedValue(memoryError);
+            StorageMock.setItem = jest.fn().mockRejectedValue(diskFullError);
             StorageMock.getDatabaseSize = jest.fn().mockRejectedValue(dbSizeError);
 
             await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
-            expect(logAlertSpy).toHaveBeenCalledWith(`Unable to get database size. getDatabaseSize error: ${dbSizeError}. Original error: ${memoryError}`);
+            expect(logAlertSpy).toHaveBeenCalledWith(`Unable to get database size. getDatabaseSize error: ${dbSizeError}. Original error: ${diskFullError}`);
         });
 
         it('should not re-add an evicted key to recentlyAccessedKeys after removal', async () => {
