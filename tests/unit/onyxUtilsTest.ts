@@ -432,21 +432,35 @@ describe('OnyxUtils', () => {
         const diskFullError = new Error('database or disk is full');
 
         it('should retry only one time if the operation is firstly failed and then passed', async () => {
-            StorageMock.setItem = jest.fn(StorageMock.setItem).mockRejectedValueOnce(genericError).mockImplementation(StorageMock.setItem);
+            jest.useFakeTimers();
+            try {
+                StorageMock.setItem = jest.fn(StorageMock.setItem).mockRejectedValueOnce(genericError).mockImplementation(StorageMock.setItem);
 
-            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+                const setPromise = Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+                await jest.runAllTimersAsync();
+                await setPromise;
 
-            // Should be called once, since Storage.setItem if failed only once
-            expect(retryOperationSpy).toHaveBeenCalledTimes(1);
+                // Should be called once, since Storage.setItem failed only once
+                expect(retryOperationSpy).toHaveBeenCalledTimes(1);
+            } finally {
+                jest.useRealTimers();
+            }
         });
 
         it('should stop retrying after MAX_STORAGE_OPERATION_RETRY_ATTEMPTS retries for failing operation', async () => {
-            StorageMock.setItem = jest.fn().mockRejectedValue(genericError);
+            jest.useFakeTimers();
+            try {
+                StorageMock.setItem = jest.fn().mockRejectedValue(genericError);
 
-            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+                const setPromise = Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+                await jest.runAllTimersAsync();
+                await setPromise;
 
-            // Should be called 6 times: initial attempt + 5 retries (MAX_STORAGE_OPERATION_RETRY_ATTEMPTS)
-            expect(retryOperationSpy).toHaveBeenCalledTimes(6);
+                // Should be called 6 times: initial attempt + 5 retries (MAX_STORAGE_OPERATION_RETRY_ATTEMPTS)
+                expect(retryOperationSpy).toHaveBeenCalledTimes(6);
+            } finally {
+                jest.useRealTimers();
+            }
         });
 
         it("should throw error for if operation failed with \"Failed to execute 'put' on 'IDBObjectStore': invalid data\" error", async () => {
@@ -511,6 +525,72 @@ describe('OnyxUtils', () => {
 
             await OnyxUtils.remove(evictableKey);
             expect(OnyxCache.getKeyForEviction()).toBeUndefined();
+        });
+
+        it('should apply exponential backoff delay for non-capacity errors', async () => {
+            jest.useFakeTimers();
+            try {
+                const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+                StorageMock.setItem = jest.fn().mockRejectedValue(genericError);
+
+                const setPromise = Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+                await jest.runAllTimersAsync();
+                await setPromise;
+
+                // Filter setTimeout calls to only those from our wait() helper (delay > 0)
+                const backoffDelays = setTimeoutSpy.mock.calls
+                    .map((call) => call[1])
+                    .filter((delay): delay is number => typeof delay === 'number' && delay > 0);
+
+                // Should have 5 backoff delays (one before each of the 5 retries, attempts 0-4)
+                // The 6th call to retryOperation (attempt 5) hits the MAX check and resolves without waiting
+                expect(backoffDelays).toHaveLength(5);
+
+                // Verify exponential growth pattern: each delay should be roughly double the previous
+                // With ±25% jitter, delay[n+1] / delay[n] should be between ~1.2 and ~3.3
+                for (let i = 1; i < backoffDelays.length; i++) {
+                    const ratio = backoffDelays[i] / backoffDelays[i - 1];
+                    expect(ratio).toBeGreaterThan(1.0);
+                    expect(ratio).toBeLessThan(4.0);
+                }
+
+                setTimeoutSpy.mockRestore();
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+
+        it('should log connection error with backoff delay info', async () => {
+            jest.useFakeTimers();
+            try {
+                const logInfoSpy = jest.spyOn(Logger, 'logInfo');
+                const connectionError = new Error('Connection to Indexed Database server lost. Refresh the page to try again');
+                StorageMock.setItem = jest.fn(StorageMock.setItem).mockRejectedValueOnce(connectionError).mockImplementation(StorageMock.setItem);
+
+                const setPromise = Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+                await jest.runAllTimersAsync();
+                await setPromise;
+
+                expect(logInfoSpy).toHaveBeenCalledWith(expect.stringContaining('Connection error detected, retrying with backoff'));
+                expect(logInfoSpy).toHaveBeenCalledWith(expect.stringContaining('Connection to Indexed Database server lost'));
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+
+        it('should NOT apply backoff delay for capacity errors (immediate retry with eviction)', async () => {
+            const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+            StorageMock.setItem = jest.fn().mockRejectedValue(diskFullError);
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+
+            // Capacity errors should not trigger any backoff delays (delay > 0)
+            const backoffDelays = setTimeoutSpy.mock.calls
+                .map((call) => call[1])
+                .filter((delay): delay is number => typeof delay === 'number' && delay > 0);
+
+            expect(backoffDelays).toHaveLength(0);
+            setTimeoutSpy.mockRestore();
         });
     });
 
