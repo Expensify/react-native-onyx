@@ -131,9 +131,7 @@ function createWorkerStorageProvider(backend: 'sqlite' | 'idb'): StorageProvider
         },
 
         multiGet(keys) {
-            return postToWorker<StorageKeyValuePair[]>({type: 'multiGet', keys}).then((results) => {
-                return results ?? [];
-            });
+            return postToWorker<StorageKeyValuePair[]>({type: 'multiGet', keys}).then((results) => results ?? []);
         },
 
         setItem(key, value) {
@@ -150,9 +148,7 @@ function createWorkerStorageProvider(backend: 'sqlite' | 'idb'): StorageProvider
 
         multiMerge(pairs) {
             const nonNullishPairs = pairs.filter((pair) => pair[1] !== undefined);
-            const prepared = nonNullishPairs.map(([key, value, replaceNullPatches]) => {
-                return [key, value, replaceNullPatches] as [string, unknown, unknown[] | undefined];
-            });
+            const prepared = nonNullishPairs.map(([key, value, replaceNullPatches]) => [key, value, replaceNullPatches]);
             return postToWorker<void>({type: 'multiMerge', pairs: prepared});
         },
 

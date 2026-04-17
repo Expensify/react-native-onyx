@@ -33,7 +33,11 @@ jest.mock('react-native-worklets-core', () => ({
         createContext: jest.fn(() => ({
             name: 'OnyxFlushWorker',
             addDecorator: jest.fn(),
-            createRunAsync: jest.fn((fn) => (...args) => Promise.resolve(fn(...args))),
+            createRunAsync: jest.fn(
+                (fn) =>
+                    (...args) =>
+                        Promise.resolve(fn(...args)),
+            ),
             runAsync: jest.fn((fn) => Promise.resolve(fn())),
         })),
         createSharedValue: jest.fn((value) => ({value})),
@@ -43,7 +47,11 @@ jest.mock('react-native-worklets-core', () => ({
         defaultContext: {
             name: 'default',
             addDecorator: jest.fn(),
-            createRunAsync: jest.fn((fn) => (...args) => Promise.resolve(fn(...args))),
+            createRunAsync: jest.fn(
+                (fn) =>
+                    (...args) =>
+                        Promise.resolve(fn(...args)),
+            ),
             runAsync: jest.fn((fn) => Promise.resolve(fn())),
         },
         currentContext: undefined,

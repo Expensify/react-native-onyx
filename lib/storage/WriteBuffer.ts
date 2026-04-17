@@ -248,6 +248,7 @@ class WriteBuffer {
      * MERGE entries are removed from the map at flush start. New merges during
      * flush create fresh entries, avoiding double-application of patches.
      */
+    // eslint-disable-next-line @lwc/lwc/no-async-await
     async flushNow(): Promise<void> {
         if (this.isFlushing) {
             // Wait for the current flush to finish, then flush again
@@ -273,7 +274,7 @@ class WriteBuffer {
         try {
             // Separate entries by type
             const setPairs: StorageKeyValuePair[] = [];
-            const setSnapshot: Map<OnyxKey, BufferEntry> = new Map();
+            const setSnapshot = new Map<OnyxKey, BufferEntry>();
             const mergePairs: StorageKeyValuePair[] = [];
             const mergeKeys: OnyxKey[] = [];
 
@@ -332,7 +333,7 @@ class WriteBuffer {
 
         this.flushHandle = this.scheduleFlushFn(() => {
             this.flushHandle = null;
-            void this.flushNow();
+            this.flushNow();
         });
     }
 

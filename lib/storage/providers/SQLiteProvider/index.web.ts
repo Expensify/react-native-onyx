@@ -9,6 +9,7 @@
  * to the StorageProvider interface which returns Promises.
  */
 
+import type {FastMergeReplaceNullPatch} from '../../../utils';
 import utils from '../../../utils';
 import type StorageProvider from '../types';
 import type {StorageKeyList, StorageKeyValuePair} from '../types';
@@ -55,7 +56,7 @@ function objectMarkRemover(key: string, value: unknown) {
  * Transforms replaceNullPatches into [jsonPath, valueJSON, key] tuples for
  * the JSON_REPLACE prepared statement.
  */
-function generateJSONReplaceSQLQueries(key: string, patches: [string[], unknown][]): string[][] {
+function generateJSONReplaceSQLQueries(key: string, patches: FastMergeReplaceNullPatch[]): string[][] {
     return patches.map(([pathArray, value]) => {
         const jsonPath = `$.${pathArray.join('.')}`;
         return [jsonPath, JSON.stringify(value), key];
@@ -140,7 +141,7 @@ const provider: StorageProvider<SQLiteDB | null> = {
                 stmtMergePatch.stepReset();
 
                 // Generate and apply JSON_REPLACE patches if any
-                const patches = (replaceNullPatches ?? []) as [string[], unknown][];
+                const patches = replaceNullPatches ?? [];
                 if (patches.length > 0) {
                     const replaceQueries = generateJSONReplaceSQLQueries(key, patches);
                     for (const [jsonPath, patchValue, replaceKey] of replaceQueries) {
@@ -214,9 +215,9 @@ const provider: StorageProvider<SQLiteDB | null> = {
  * Async initialization for the SQLite WASM database.
  * Must be called (and awaited) before using any other provider methods.
  */
+// eslint-disable-next-line @lwc/lwc/no-async-await
 async function initAsync(): Promise<void> {
     // Dynamic import of the SQLite WASM module
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const sqlite3InitModule = (await import('@sqlite.org/sqlite-wasm')).default;
     const sqlite3 = await sqlite3InitModule();
 
@@ -233,8 +234,7 @@ async function initAsync(): Promise<void> {
     } catch (opfsError) {
         // If opfs-sahpool is not available, fall back to in-memory
         // (the main thread will handle the full IDB fallback)
-        console.warn('opfs-sahpool VFS not available, using in-memory SQLite:', opfsError);
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        console.error('opfs-sahpool VFS not available, using in-memory SQLite:', opfsError);
         db = new sqlite3.oo1.DB(':memory:');
     }
 

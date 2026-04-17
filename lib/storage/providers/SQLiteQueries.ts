@@ -55,7 +55,7 @@ const MERGE_ITEM_PATCH = `INSERT INTO keyvaluepairs (record_key, valueJSON)
 /**
  * Replaces a specific JSON path inside an existing value.
  * Used to apply FastMergeReplaceNullPatch entries after the JSON_PATCH merge.
- * 
+ *
  * NOTE: The JSON() wrapper around the replacement value is required here. Unlike JSON_PATCH (which
  * parses both arguments as JSON internally), JSON_REPLACE treats a plain TEXT binding as a quoted
  * JSON string. Without JSON(), objects would be stored as string values (e.g. "{...}") instead of

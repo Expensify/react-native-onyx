@@ -24,8 +24,8 @@ type InitMessage = {type: 'init'; id: string; backend: 'sqlite' | 'idb'};
 type GetItemMessage = {type: 'getItem'; id: string; key: string};
 type MultiGetMessage = {type: 'multiGet'; id: string; keys: string[]};
 type SetItemMessage = {type: 'setItem'; id: string; key: string; value: unknown};
-type MultiSetMessage = {type: 'multiSet'; id: string; pairs: [string, unknown][]};
-type MultiMergeMessage = {type: 'multiMerge'; id: string; pairs: [string, unknown, unknown[] | undefined][]};
+type MultiSetMessage = {type: 'multiSet'; id: string; pairs: StorageKeyValuePair[]};
+type MultiMergeMessage = {type: 'multiMerge'; id: string; pairs: StorageKeyValuePair[]};
 type GetAllKeysMessage = {type: 'getAllKeys'; id: string};
 type RemoveItemMessage = {type: 'removeItem'; id: string; key: string};
 type RemoveItemsMessage = {type: 'removeItems'; id: string; keys: string[]};
@@ -69,6 +69,7 @@ const BROADCAST_CHANNEL_NAME = 'onyx-sync';
 const messageQueue: WorkerMessage[] = [];
 let processing = false;
 
+// eslint-disable-next-line @lwc/lwc/no-async-await
 async function processQueue(): Promise<void> {
     if (processing) {
         return; // another processQueue loop is already active
@@ -78,6 +79,7 @@ async function processQueue(): Promise<void> {
     while (messageQueue.length > 0) {
         const msg = messageQueue.shift()!;
         try {
+            // eslint-disable-next-line no-await-in-loop
             await handleMessage(msg);
         } catch (error) {
             sendResult(msg.id, undefined, error instanceof Error ? error.message : String(error));
@@ -95,38 +97,46 @@ async function processQueue(): Promise<void> {
  * Broadcast SET operations with full values to other tabs.
  * Receiving tabs can update their caches directly without re-reading from storage.
  */
-function broadcastSet(pairs: [string, unknown][]): void {
-    if (broadcastChannel && pairs.length > 0) {
-        broadcastChannel.postMessage({type: 'set', pairs});
+function broadcastSet(pairs: StorageKeyValuePair[]): void {
+    if (!broadcastChannel || pairs.length === 0) {
+        return;
     }
+
+    broadcastChannel.postMessage({type: 'set', pairs});
 }
 
 /**
  * Broadcast MERGE operations with raw patches to other tabs.
  * Receiving tabs apply fastMerge against their cached values.
  */
-function broadcastMerge(pairs: [string, unknown][]): void {
-    if (broadcastChannel && pairs.length > 0) {
-        broadcastChannel.postMessage({type: 'merge', pairs});
+function broadcastMerge(pairs: StorageKeyValuePair[]): void {
+    if (!broadcastChannel || pairs.length === 0) {
+        return;
     }
+
+    broadcastChannel.postMessage({type: 'merge', pairs});
 }
 
 /**
  * Broadcast REMOVE operations to other tabs.
  */
 function broadcastRemove(keys: string[]): void {
-    if (broadcastChannel && keys.length > 0) {
-        broadcastChannel.postMessage({type: 'remove', keys});
+    if (!broadcastChannel || keys.length === 0) {
+        return;
     }
+
+    broadcastChannel.postMessage({type: 'remove', keys});
 }
 
 /**
  * Broadcast CLEAR operation to other tabs.
  */
 function broadcastClear(): void {
-    if (broadcastChannel) {
-        broadcastChannel.postMessage({type: 'clear'});
+    if (!broadcastChannel) {
+        return;
     }
+
+    broadcastChannel.postMessage({type: 'clear'});
 }
 
 // ---------------------------------------------------------------------------
@@ -141,6 +151,7 @@ function sendResult(id: string, data?: unknown, error?: string): void {
     if (error !== undefined) {
         msg.error = error;
     }
+    // eslint-disable-next-line no-restricted-globals
     self.postMessage(msg);
 }
 
@@ -148,6 +159,7 @@ function sendResult(id: string, data?: unknown, error?: string): void {
 // Message handler (processes a single message; called serially by the queue)
 // ---------------------------------------------------------------------------
 
+// eslint-disable-next-line @lwc/lwc/no-async-await
 async function handleMessage(msg: WorkerMessage): Promise<void> {
     switch (msg.type) {
         case 'init': {
@@ -163,7 +175,7 @@ async function handleMessage(msg: WorkerMessage): Promise<void> {
                     await sqliteModule.initAsync();
                     provider = sqliteProvider;
                 } catch (sqliteError) {
-                    console.warn('SQLite WASM init failed, falling back to IDB:', sqliteError);
+                    console.error('SQLite WASM init failed, falling back to IDB:', sqliteError);
                     const idbModule = await import('./providers/IDBKeyValProvider');
                     provider = idbModule.default;
                     provider.init();
@@ -200,7 +212,7 @@ async function handleMessage(msg: WorkerMessage): Promise<void> {
         }
 
         case 'multiSet': {
-            const pairs = msg.pairs as [string, unknown][];
+            const pairs = msg.pairs;
             await provider!.multiSet(pairs);
             broadcastSet(pairs);
             sendResult(msg.id);
@@ -208,7 +220,7 @@ async function handleMessage(msg: WorkerMessage): Promise<void> {
         }
 
         case 'multiMerge': {
-            const mergePairs = msg.pairs as StorageKeyValuePair[];
+            const mergePairs = msg.pairs;
             await provider!.multiMerge(mergePairs);
             // Broadcast raw patches (key + change value) so receiving tabs can fastMerge
             broadcastMerge(mergePairs.map(([key, value]) => [key, value]));
@@ -258,6 +270,7 @@ async function handleMessage(msg: WorkerMessage): Promise<void> {
 // Entry point: enqueue every incoming message and kick the serial processor
 // ---------------------------------------------------------------------------
 
+// eslint-disable-next-line no-restricted-globals
 self.onmessage = (event: MessageEvent<WorkerMessage>) => {
     messageQueue.push(event.data);
     processQueue();

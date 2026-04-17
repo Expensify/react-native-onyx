@@ -17,6 +17,9 @@
 import type {IWorkletContext, IWorkletNativeApi} from 'react-native-worklets-core';
 import type {BufferEntry} from './WriteBuffer';
 import type BufferStore from './BufferStore/types';
+import type {StorageKeyValuePair} from './providers/types';
+
+type NativeFlushWorker = ReturnType<typeof createNativeFlushWorker>;
 
 /**
  * Flush interval in milliseconds. The worker thread wakes up at this
@@ -41,7 +44,7 @@ function createNativeFlushWorker(bufferStore: BufferStore) {
     let workerContext: IWorkletContext | null = null;
 
     // Import the native SQLite provider lazily to avoid circular deps
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const nativeSQLiteProvider = require('./providers/SQLiteProvider/index.native').default;
 
     /**
@@ -65,8 +68,8 @@ function createNativeFlushWorker(bufferStore: BufferStore) {
         }
 
         // Separate SET and MERGE entries for the provider
-        const setPairs: [string, unknown][] = [];
-        const mergePairs: [string, unknown, unknown][] = [];
+        const setPairs: StorageKeyValuePair[] = [];
+        const mergePairs: StorageKeyValuePair[] = [];
 
         for (const [, entry] of entries) {
             const typedEntry = entry as BufferEntry;
@@ -131,11 +134,11 @@ function createNativeFlushWorker(bufferStore: BufferStore) {
 
             // Create the Worklet context for background flush
             try {
-                // eslint-disable-next-line @typescript-eslint/no-var-requires
+                // eslint-disable-next-line @typescript-eslint/no-require-imports
                 const {Worklets} = require('react-native-worklets-core') as {Worklets: IWorkletNativeApi};
                 workerContext = Worklets.createContext('OnyxFlushWorker');
             } catch {
-                console.warn('[Onyx] react-native-worklets-core not available, flush will run on main thread');
+                console.error('[Onyx] react-native-worklets-core not available, flush will run on main thread');
                 workerContext = null;
             }
 
@@ -180,4 +183,4 @@ function createNativeFlushWorker(bufferStore: BufferStore) {
 }
 
 export default createNativeFlushWorker;
-export type NativeFlushWorker = ReturnType<typeof createNativeFlushWorker>;
+export type {NativeFlushWorker};
