@@ -288,6 +288,12 @@ function get<TKey extends OnyxKey, TValue extends OnyxValue<TKey>>(key: TKey): P
                 }
             }
 
+            // Prefer cache over stale storage if a concurrent write populated it during the read.
+            const cachedValue = cache.get(key) as TValue;
+            if (cachedValue !== undefined) {
+                return cachedValue;
+            }
+
             if (val === undefined) {
                 cache.addNullishStorageKey(key);
                 return undefined;

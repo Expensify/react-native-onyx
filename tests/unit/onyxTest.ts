@@ -3477,3 +3477,56 @@ describe('RAM-only keys should not read from storage', () => {
         Onyx.disconnect(connection);
     });
 });
+
+describe('get() should prefer cache over stale storage', () => {
+    let cache: typeof OnyxCache;
+
+    beforeEach(() => {
+        Object.assign(OnyxUtils.getDeferredInitTask(), createDeferredTask());
+        cache = require('../../lib/OnyxCache').default;
+        Onyx.init({keys: ONYX_KEYS});
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
+        return Onyx.clear();
+    });
+
+    it('should preserve data from Onyx.update when a concurrent Onyx.merge fires before cache is written', async () => {
+        const member1 = `${ONYX_KEYS.COLLECTION.TEST_KEY}1`;
+        const member2 = `${ONYX_KEYS.COLLECTION.TEST_KEY}2`;
+
+        // Delay getItem for member1 to simulate slow Native storage (returns null before the write lands)
+        const getItemMock = StorageMock.getItem as jest.Mock;
+        const originalGetItem = getItemMock.getMockImplementation()!;
+        getItemMock.mockImplementation((key: OnyxKey) => {
+            if (key === member1) {
+                return new Promise<undefined>((resolve) => {
+                    setTimeout(() => resolve(undefined), 50);
+                });
+            }
+            return originalGetItem(key);
+        });
+
+        // 2+ collection keys get batched into mergeCollectionWithPatches (deferred cache write)
+        const updatePromise = Onyx.update([
+            {onyxMethod: Onyx.METHOD.MERGE, key: member1, value: {isOptimistic: true, name: 'first'}},
+            {onyxMethod: Onyx.METHOD.MERGE, key: member2, value: {isOptimistic: true, name: 'second'}},
+        ]);
+
+        // Concurrent merge fires before cache write — its get() hits the delayed storage mock
+        const mergePromise = Onyx.merge(member1, {lastVisitTime: '2025-01-01'});
+
+        await act(async () => {
+            await updatePromise;
+            await mergePromise;
+            await new Promise<void>((resolve) => {
+                setTimeout(resolve, 100);
+            });
+        });
+
+        const value = cache.get(member1);
+        expect(value).toHaveProperty('isOptimistic', true);
+        expect(value).toHaveProperty('lastVisitTime', '2025-01-01');
+    });
+});
