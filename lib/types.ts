@@ -334,7 +334,7 @@ type ExpandOnyxKeys<TKey extends OnyxKey> = TKey extends CollectionKeyBase ? NoI
  * If a new method is added to OnyxUtils.METHOD constant, it must be added to OnyxMethodValueMap type.
  * Otherwise it will show static type errors.
  */
-type OnyxUpdate<TKey extends OnyxKey = OnyxKey> = {
+type OnyxUpdate<TKey extends OnyxKey> = {
     // ⚠️ DO NOT CHANGE THIS TYPE, UNLESS YOU KNOW WHAT YOU ARE DOING. ⚠️
     [K in TKey]:
         | {onyxMethod: typeof OnyxUtils.METHOD.SET; key: ExpandOnyxKeys<K>; value: OnyxSetInput<K>}
@@ -408,12 +408,6 @@ type InitOptions = {
     shouldSyncMultipleInstances?: boolean;
 
     /**
-     * If enabled it will use the performance API to measure the time taken by Onyx operations.
-     * @default false
-     */
-    enablePerformanceMetrics?: boolean;
-
-    /**
      * If enabled, it will connect to Redux DevTools Extension for debugging.
      * This allows you to see all Onyx state changes in the Redux DevTools.
      * @default true
@@ -421,8 +415,9 @@ type InitOptions = {
     enableDevTools?: boolean;
 
     /**
-     * Array of collection member IDs which updates will be ignored when using Onyx methods.
-     * Additionally, any subscribers from these keys to won't receive any data from Onyx.
+     * Array of collection member IDs that Onyx should silently ignore across all operations.
+     * This prevents keys formed from invalid or default IDs (e.g. "-1", "0", "undefined") from
+     * polluting cache or triggering subscriber notifications.
      */
     skippableCollectionMemberIDs?: string[];
 

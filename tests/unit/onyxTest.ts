@@ -1,6 +1,8 @@
 import lodashClone from 'lodash/clone';
 import lodashCloneDeep from 'lodash/cloneDeep';
+import {act} from '@testing-library/react-native';
 import Onyx from '../../lib';
+import * as Logger from '../../lib/Logger';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import OnyxUtils from '../../lib/OnyxUtils';
 import type OnyxCache from '../../lib/OnyxCache';
@@ -9,6 +11,7 @@ import type {OnyxCollection, OnyxKey, OnyxUpdate} from '../../lib/types';
 import type {GenericDeepRecord} from '../types';
 import type GenericCollection from '../utils/GenericCollection';
 import type {Connection} from '../../lib/OnyxConnectionManager';
+import createDeferredTask from '../../lib/createDeferredTask';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
@@ -30,22 +33,23 @@ const ONYX_KEYS = {
     RAM_ONLY_WITH_INITIAL_VALUE: 'ramOnlyWithInitialValue',
 };
 
-Onyx.init({
-    keys: ONYX_KEYS,
-    initialKeyStates: {
-        [ONYX_KEYS.OTHER_TEST]: 42,
-        [ONYX_KEYS.KEY_WITH_UNDERSCORE]: 'default',
-        [ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE]: 'default',
-    },
-    ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
-    skippableCollectionMemberIDs: ['skippable-id'],
-    snapshotMergeKeys: ['pendingAction', 'pendingFields'],
-});
-
 describe('Onyx', () => {
+    beforeAll(() => {
+        Onyx.init({
+            keys: ONYX_KEYS,
+            initialKeyStates: {
+                [ONYX_KEYS.OTHER_TEST]: 42,
+                [ONYX_KEYS.KEY_WITH_UNDERSCORE]: 'default',
+                [ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE]: 'default',
+            },
+            ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
+            skippableCollectionMemberIDs: ['skippable-id'],
+            snapshotMergeKeys: ['pendingAction', 'pendingFields'],
+        });
+    });
+
     let connection: Connection | undefined;
 
-    /** @type OnyxCache */
     let cache: typeof OnyxCache;
 
     beforeEach(() => {
@@ -176,6 +180,76 @@ describe('Onyx', () => {
             .then(() => {
                 expect(testKeyValue).toStrictEqual(['test']);
             });
+    });
+
+    it('should merge an object into an empty array (treating [] as {})', async () => {
+        let testKeyValue: unknown;
+
+        connection = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        await Onyx.set(ONYX_KEYS.TEST_KEY, []);
+        expect(testKeyValue).toStrictEqual([]);
+        await Onyx.merge(ONYX_KEYS.TEST_KEY, {test: 'value'});
+        expect(testKeyValue).toStrictEqual({test: 'value'});
+    });
+
+    it('should still reject merging an object into a non-empty array', async () => {
+        let testKeyValue: unknown;
+
+        connection = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        await Onyx.merge(ONYX_KEYS.TEST_KEY, ['existing']);
+        expect(testKeyValue).toStrictEqual(['existing']);
+        await Onyx.merge(ONYX_KEYS.TEST_KEY, {test: 'value'});
+        expect(testKeyValue).toStrictEqual(['existing']);
+    });
+
+    it('should mergeCollection an object into an empty array (treating [] as {})', async () => {
+        const collectionKey = `${ONYX_KEYS.COLLECTION.TEST_KEY}1`;
+        let testKeyValue: unknown;
+
+        connection = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            initWithStoredValues: false,
+            waitForCollectionCallback: true,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        await Onyx.set(collectionKey, []);
+        expect((testKeyValue as Record<string, unknown>)?.[collectionKey]).toStrictEqual([]);
+        await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {[collectionKey]: {test: 'value'}});
+        expect((testKeyValue as Record<string, unknown>)?.[collectionKey]).toStrictEqual({test: 'value'});
+    });
+
+    it('should set an object over an empty array (treating [] as {})', async () => {
+        let testKeyValue: unknown;
+
+        connection = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            initWithStoredValues: false,
+            callback: (value) => {
+                testKeyValue = value;
+            },
+        });
+
+        await Onyx.set(ONYX_KEYS.TEST_KEY, []);
+        expect(testKeyValue).toStrictEqual([]);
+        await Onyx.set(ONYX_KEYS.TEST_KEY, {test: 'value'});
+        expect(testKeyValue).toStrictEqual({test: 'value'});
     });
 
     it('should notify subscribers when data has been cleared', () => {
@@ -934,43 +1008,6 @@ describe('Onyx', () => {
             });
     });
 
-    it('should throw an error when the data object is incorrect in Onyx.update', () => {
-        // Given the invalid data object with onyxMethod='multiSet'
-        const data: unknown[] = [
-            {onyxMethod: 'set', key: ONYX_KEYS.TEST_KEY, value: 'four'},
-            {onyxMethod: 'murge', key: ONYX_KEYS.OTHER_TEST, value: {test2: 'test2'}},
-        ];
-
-        try {
-            // When we pass it to Onyx.update
-            // @ts-expect-error This is an invalid call to Onyx.update
-            Onyx.update(data);
-        } catch (error) {
-            if (error instanceof Error) {
-                // Then we should expect the error message below
-                expect(error.message).toEqual('Invalid onyxMethod murge in Onyx update.');
-            } else {
-                throw error;
-            }
-        }
-
-        try {
-            // Given the invalid data object with key=true
-            data[1] = {onyxMethod: 'merge', key: true, value: {test2: 'test2'}};
-
-            // When we pass it to Onyx.update
-            // @ts-expect-error This is an invalid call to Onyx.update
-            Onyx.update(data);
-        } catch (error) {
-            if (error instanceof Error) {
-                // Then we should expect the error message below
-                expect(error.message).toEqual('Invalid boolean key provided in Onyx update. Onyx key must be of type string.');
-            } else {
-                throw error;
-            }
-        }
-    });
-
     it('should properly set all keys provided in a multiSet called via update', () => {
         const valuesReceived: Record<string, unknown> = {};
         connection = Onyx.connect({
@@ -1016,32 +1053,6 @@ describe('Onyx', () => {
                     },
                 });
             });
-    });
-
-    it('should reject an improperly formatted multiset operation called via update', () => {
-        try {
-            Onyx.update([
-                {
-                    onyxMethod: 'multiset',
-                    value: [
-                        {
-                            ID: 123,
-                            value: 'one',
-                        },
-                        {
-                            ID: 234,
-                            value: 'two',
-                        },
-                    ],
-                },
-            ] as unknown as Array<OnyxUpdate<OnyxKey>>);
-        } catch (error) {
-            if (error instanceof Error) {
-                expect(error.message).toEqual('Invalid value provided in Onyx multiSet. Onyx multiSet value must be of type object.');
-            } else {
-                throw error;
-            }
-        }
     });
 
     it('should return all collection keys as a single object when waitForCollectionCallback = true', () => {
@@ -1614,6 +1625,17 @@ describe('Onyx', () => {
     });
 
     describe('update', () => {
+        let logInfoFn = jest.fn();
+
+        beforeEach(() => {
+            logInfoFn = jest.fn();
+            jest.spyOn(Logger, 'logInfo').mockImplementation(logInfoFn);
+        });
+
+        afterEach(() => {
+            jest.restoreAllMocks();
+        });
+
         it('should squash all updates of collection-related keys into a single mergeCollection call', () => {
             const connections: Connection[] = [];
 
@@ -2426,6 +2448,53 @@ describe('Onyx', () => {
             expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`)).toBeNull();
             expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`)).toBeNull();
         });
+
+        describe('should log and skip invalid operations', () => {
+            it('invalid method', async () => {
+                await act(async () =>
+                    Onyx.update([
+                        {onyxMethod: 'set', key: ONYX_KEYS.TEST_KEY, value: 'test1'},
+                        // @ts-expect-error invalid method
+                        {onyxMethod: 'invalidMethod', key: ONYX_KEYS.OTHER_TEST, value: 'test2'},
+                    ]),
+                );
+
+                expect(logInfoFn).toHaveBeenNthCalledWith(1, 'Invalid onyxMethod invalidMethod in Onyx update. Skipping this operation.');
+            });
+
+            it('non-object value passed to multiSet', async () => {
+                await act(async () =>
+                    Onyx.update([
+                        // @ts-expect-error non-object value
+                        {onyxMethod: 'multiset', key: ONYX_KEYS.TEST_KEY, value: []},
+                    ]),
+                );
+
+                expect(logInfoFn).toHaveBeenNthCalledWith(1, 'Invalid value provided in Onyx multiSet. Value must be of type object. Skipping this operation.');
+            });
+
+            it('non-string value passed to key', async () => {
+                await act(async () =>
+                    Onyx.update([
+                        // @ts-expect-error invalid key
+                        {onyxMethod: 'set', key: 1000, value: 'test'},
+                    ]),
+                );
+
+                expect(logInfoFn).toHaveBeenNthCalledWith(1, 'Invalid number key provided in Onyx update. Key must be of type string. Skipping this operation.');
+            });
+
+            it('invalid or empty value passed to mergeCollection', async () => {
+                await act(async () =>
+                    Onyx.update([
+                        // @ts-expect-error invalid value
+                        {onyxMethod: 'mergecollection', key: ONYX_KEYS.COLLECTION.TEST_KEY, value: 'test1'},
+                    ]),
+                );
+
+                expect(logInfoFn).toHaveBeenNthCalledWith(1, 'Invalid or empty value provided in Onyx mergeCollection. Skipping this operation.');
+            });
+        });
     });
 
     describe('merge', () => {
@@ -3006,5 +3075,406 @@ describe('Onyx', () => {
             expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeUndefined();
             expect(cache.get(ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE)).toEqual('default');
         });
+    });
+});
+
+// Separate describe block for Onyx.init to control initialization during each test.
+describe('Onyx.init', () => {
+    let cache: typeof OnyxCache;
+
+    beforeEach(() => {
+        // Resets the deferred init task before each test.
+        Object.assign(OnyxUtils.getDeferredInitTask(), createDeferredTask());
+        cache = require('../../lib/OnyxCache').default;
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
+        return Onyx.clear();
+    });
+
+    describe('should only execute Onyx methods after initialization', () => {
+        it('set', async () => {
+            Onyx.set(ONYX_KEYS.TEST_KEY, 'test');
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(ONYX_KEYS.TEST_KEY)).toBeUndefined();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(ONYX_KEYS.TEST_KEY)).toEqual('test');
+        });
+
+        it('multiSet', async () => {
+            Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: 'test_1'});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toBeUndefined();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toEqual('test_1');
+        });
+
+        it('merge', async () => {
+            Onyx.merge(ONYX_KEYS.TEST_KEY, 'test');
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(ONYX_KEYS.TEST_KEY)).toBeUndefined();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(ONYX_KEYS.TEST_KEY)).toEqual('test');
+        });
+
+        it('mergeCollection', async () => {
+            Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {[`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: 'test_1'});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toBeUndefined();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toEqual('test_1');
+        });
+
+        it('clear', async () => {
+            // Spies on a function that is exclusively called during Onyx.clear().
+            const spyClearNullishStorageKeys = jest.spyOn(cache, 'clearNullishStorageKeys');
+
+            Onyx.clear();
+            await act(async () => waitForPromisesToResolve());
+
+            expect(spyClearNullishStorageKeys).not.toHaveBeenCalled();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(spyClearNullishStorageKeys).toHaveBeenCalled();
+        });
+
+        it('update', async () => {
+            Onyx.update([{onyxMethod: 'set', key: ONYX_KEYS.TEST_KEY, value: 'test'}]);
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(ONYX_KEYS.TEST_KEY)).toBeUndefined();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(ONYX_KEYS.TEST_KEY)).toEqual('test');
+        });
+
+        it('setCollection', async () => {
+            Onyx.setCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {[`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: 'test_1'});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toBeUndefined();
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toEqual('test_1');
+        });
+    });
+});
+
+// Separate describe block to control Onyx.init() per-test so we can pre-seed storage before init.
+describe('RAM-only keys should not read from storage', () => {
+    let cache: typeof OnyxCache;
+
+    beforeEach(() => {
+        // Resets the deferred init task before each test.
+        Object.assign(OnyxUtils.getDeferredInitTask(), createDeferredTask());
+        cache = require('../../lib/OnyxCache').default;
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
+        return Onyx.clear();
+    });
+
+    it('should not return stale storage data for a RAM-only key via get', async () => {
+        // Simulate stale data left in storage from before the key was RAM-only
+        await StorageMock.setItem(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'stale_value');
+
+        Onyx.init({
+            keys: ONYX_KEYS,
+            ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        let receivedValue: unknown;
+        const connection = Onyx.connect({
+            key: ONYX_KEYS.RAM_ONLY_TEST_KEY,
+            callback: (value) => {
+                receivedValue = value;
+            },
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        expect(receivedValue).toBeUndefined();
+        expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeUndefined();
+
+        Onyx.disconnect(connection);
+    });
+
+    it('should not return stale storage data for RAM-only collection members via multiGet', async () => {
+        const collectionMember1 = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
+        const collectionMember2 = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}2`;
+
+        // Simulate stale collection members in storage
+        await StorageMock.setItem(collectionMember1, {name: 'stale_1'});
+        await StorageMock.setItem(collectionMember2, {name: 'stale_2'});
+
+        Onyx.init({
+            keys: ONYX_KEYS,
+            ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        let receivedCollection: OnyxCollection<unknown>;
+        const connection = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION,
+            callback: (value) => {
+                receivedCollection = value;
+            },
+            waitForCollectionCallback: true,
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        expect(receivedCollection).toBeUndefined();
+        expect(cache.get(collectionMember1)).toBeUndefined();
+        expect(cache.get(collectionMember2)).toBeUndefined();
+
+        Onyx.disconnect(connection);
+    });
+
+    it('should not include stale RAM-only keys in getAllKeys results', async () => {
+        // Simulate stale data in storage
+        await StorageMock.setItem(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'stale_value');
+        await StorageMock.setItem(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`, {stale: 'member'});
+        await StorageMock.setItem(ONYX_KEYS.OTHER_TEST, 'normal_value');
+
+        Onyx.init({
+            keys: ONYX_KEYS,
+            ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        const keys = await OnyxUtils.getAllKeys();
+
+        expect(keys.has(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBe(false);
+        expect(keys.has(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`)).toBe(false);
+        // Normal keys should still be present
+        expect(keys.has(ONYX_KEYS.OTHER_TEST)).toBe(true);
+    });
+
+    it('should not read stale storage data for RAM-only keys during initializeWithDefaultKeyStates', async () => {
+        // Simulate stale data for a RAM-only key that also has a default key state
+        await StorageMock.setItem(ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE, 'stale_value');
+
+        Onyx.init({
+            keys: ONYX_KEYS,
+            initialKeyStates: {
+                [ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE]: 'default_value',
+            },
+            ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        // The cache should have the default value, not the stale storage value
+        expect(cache.get(ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE)).toEqual('default_value');
+    });
+
+    it('should not use stale storage data as merge base for RAM-only keys', async () => {
+        // Simulate stale data in storage
+        await StorageMock.setItem(ONYX_KEYS.RAM_ONLY_TEST_KEY, {name: 'stale', token: 'old_token'});
+
+        Onyx.init({
+            keys: ONYX_KEYS,
+            ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        // Merge new data — should NOT merge with stale storage value
+        await Onyx.merge(ONYX_KEYS.RAM_ONLY_TEST_KEY, {name: 'new'});
+
+        // The result should only contain the merged value, not the stale token
+        expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toEqual({name: 'new'});
+    });
+
+    it('should not read stale storage data when subscribing to individual RAM-only collection members', async () => {
+        const collectionMember = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
+
+        // Simulate stale data in storage
+        await StorageMock.setItem(collectionMember, {data: 'stale'});
+
+        Onyx.init({
+            keys: ONYX_KEYS,
+            ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        const receivedValues: unknown[] = [];
+        const connection = Onyx.connect({
+            key: collectionMember,
+            callback: (value) => {
+                receivedValues.push(value);
+            },
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        // Should never receive the stale value
+        expect(receivedValues.every((v) => v === undefined || v === null)).toBe(true);
+
+        Onyx.disconnect(connection);
+    });
+
+    it('should still work correctly for normal keys when RAM-only keys have stale storage data', async () => {
+        // Simulate both normal and RAM-only stale data in storage
+        await StorageMock.setItem(ONYX_KEYS.TEST_KEY, 'normal_value');
+        await StorageMock.setItem(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'stale_ram_value');
+
+        Onyx.init({
+            keys: ONYX_KEYS,
+            ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        let normalValue: unknown;
+        let ramOnlyValue: unknown;
+
+        const connection1 = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            callback: (value) => {
+                normalValue = value;
+            },
+        });
+        const connection2 = Onyx.connect({
+            key: ONYX_KEYS.RAM_ONLY_TEST_KEY,
+            callback: (value) => {
+                ramOnlyValue = value;
+            },
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        // Normal key should read from storage as expected
+        expect(normalValue).toEqual('normal_value');
+        // RAM-only key should NOT read stale value from storage
+        expect(ramOnlyValue).toBeUndefined();
+
+        Onyx.disconnect(connection1);
+        Onyx.disconnect(connection2);
+    });
+
+    it('should not sync RAM-only keys from other instances via keepInstancesSync', async () => {
+        Onyx.init({
+            keys: ONYX_KEYS,
+            ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
+            shouldSyncMultipleInstances: true,
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        // Get the callback that was passed to keepInstancesSync
+        const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls[0]?.[0];
+        expect(syncCallback).toBeDefined();
+
+        let receivedValue: unknown;
+        const connection = Onyx.connect({
+            key: ONYX_KEYS.RAM_ONLY_TEST_KEY,
+            callback: (value) => {
+                receivedValue = value;
+            },
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        // Simulate another tab syncing a stale RAM-only key value
+        syncCallback(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'synced_stale_value');
+        await act(async () => waitForPromisesToResolve());
+
+        // The RAM-only key should NOT have been updated from the sync
+        expect(receivedValue).toBeUndefined();
+        expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeUndefined();
+
+        // Verify that normal keys still sync correctly
+        let normalValue: unknown;
+        const connection2 = Onyx.connect({
+            key: ONYX_KEYS.OTHER_TEST,
+            callback: (value) => {
+                normalValue = value;
+            },
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        syncCallback(ONYX_KEYS.OTHER_TEST, 'synced_normal_value');
+        await act(async () => waitForPromisesToResolve());
+
+        expect(normalValue).toEqual('synced_normal_value');
+
+        Onyx.disconnect(connection);
+        Onyx.disconnect(connection2);
+    });
+
+    it('should serve RAM-only keys from cache and normal keys from storage in multiGet', async () => {
+        const ramOnlyMember = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
+        const normalMember = `${ONYX_KEYS.COLLECTION.TEST_KEY}1`;
+
+        // Pre-seed storage with stale data for both normal and RAM-only keys
+        await StorageMock.setItem(normalMember, 'normal_from_storage');
+        await StorageMock.setItem(ramOnlyMember, {data: 'stale_collection_member'});
+
+        Onyx.init({
+            keys: ONYX_KEYS,
+            ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        // Set a RAM-only collection member via Onyx (goes to cache only)
+        await Onyx.set(ramOnlyMember, {data: 'fresh_from_cache'});
+
+        // multiGet receives individual keys (e.g. collection members), not collection base keys
+        const result = await OnyxUtils.multiGet([normalMember, ramOnlyMember]);
+
+        // Normal key should come from storage
+        expect(result.get(normalMember)).toEqual('normal_from_storage');
+        // RAM-only collection member should come from cache, not stale storage
+        expect(result.get(ramOnlyMember)).toEqual({data: 'fresh_from_cache'});
+    });
+
+    it('should return cached value for RAM-only key after set then connect', async () => {
+        await StorageMock.setItem(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'stale_value');
+
+        Onyx.init({
+            keys: ONYX_KEYS,
+            ramOnlyKeys: [ONYX_KEYS.RAM_ONLY_TEST_KEY, ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE],
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        // Write a fresh value to the RAM-only key
+        await Onyx.set(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'fresh_value');
+
+        let receivedValue: unknown;
+        const connection = Onyx.connect({
+            key: ONYX_KEYS.RAM_ONLY_TEST_KEY,
+            callback: (value) => {
+                receivedValue = value;
+            },
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        // Should get the fresh cached value, not the stale storage value
+        expect(receivedValue).toEqual('fresh_value');
+        expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toEqual('fresh_value');
+
+        // Verify storage was NOT written to
+        const storageValue = await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_TEST_KEY);
+        expect(storageValue).toEqual('stale_value');
+
+        Onyx.disconnect(connection);
     });
 });

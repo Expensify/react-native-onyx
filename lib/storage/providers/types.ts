@@ -62,6 +62,12 @@ type StorageProvider<TStore> = {
     getAllKeys: () => Promise<StorageKeyList>;
 
     /**
+     * Returns all key-value pairs from storage in a single batch operation.
+     * More efficient than getAllKeys + multiGet for loading the entire database.
+     */
+    getAll: () => Promise<StorageKeyValuePair[]>;
+
+    /**
      * Removes given key and its value from storage
      */
     removeItem: (key: OnyxKey) => Promise<void>;

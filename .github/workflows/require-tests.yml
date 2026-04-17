@@ -1,0 +1,25 @@
+name: Require Tests
+
+on:
+    pull_request:
+        types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+    pull-requests: read
+
+concurrency:
+    group: require-tests-${{ github.event.pull_request.number }}
+    cancel-in-progress: true
+
+jobs:
+    require-tests:
+        if: github.event.pull_request.draft == false
+        runs-on: ubuntu-latest
+        steps:
+            # v5.0.0
+            - uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
+
+            - name: Check for test file changes
+              uses: ./.github/actions/javascript/requireTests
+              env:
+                  GITHUB_TOKEN: ${{ github.token }}

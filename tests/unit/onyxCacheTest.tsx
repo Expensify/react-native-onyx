@@ -1,6 +1,7 @@
 import type OnyxInstance from '../../lib/Onyx';
 import type OnyxCache from '../../lib/OnyxCache';
 import type {CacheTask} from '../../lib/OnyxCache';
+import type OnyxKeysType from '../../lib/OnyxKeys';
 import type {Connection} from '../../lib/OnyxConnectionManager';
 import type MockedStorage from '../../lib/storage/__mocks__';
 import type {InitOptions} from '../../lib/types';
@@ -419,6 +420,7 @@ describe('Onyx', () => {
     describe('Onyx with Cache', () => {
         let Onyx: typeof OnyxInstance;
         let StorageMock: typeof MockedStorage;
+        let OnyxKeys: typeof OnyxKeysType;
 
         /** @type OnyxCache */
         let cache: typeof OnyxCache;
@@ -455,6 +457,8 @@ describe('Onyx', () => {
             StorageMock = require('../../lib/storage').default;
 
             cache = require('../../lib/OnyxCache').default;
+
+            OnyxKeys = require('../../lib/OnyxKeys').default;
         });
 
         it('Should keep recently accessed items in cache', () => {
@@ -533,17 +537,20 @@ describe('Onyx', () => {
         it('Should prioritize eviction of evictableKeys over non-evictable keys when cache limit is reached', () => {
             const testKeys = {
                 ...ONYX_KEYS,
-                SAFE_FOR_EVICTION: 'evictable_',
-                NOT_SAFE_FOR_EVICTION: 'critical_',
+                COLLECTION: {
+                    ...ONYX_KEYS.COLLECTION,
+                    SAFE_FOR_EVICTION: 'evictable_',
+                    NOT_SAFE_FOR_EVICTION: 'critical_',
+                },
             };
 
-            const criticalKey1 = `${testKeys.NOT_SAFE_FOR_EVICTION}1`;
-            const criticalKey2 = `${testKeys.NOT_SAFE_FOR_EVICTION}2`;
-            const criticalKey3 = `${testKeys.NOT_SAFE_FOR_EVICTION}3`;
-            const evictableKey1 = `${testKeys.SAFE_FOR_EVICTION}1`;
-            const evictableKey2 = `${testKeys.SAFE_FOR_EVICTION}2`;
-            const evictableKey3 = `${testKeys.SAFE_FOR_EVICTION}3`;
-            const triggerKey = `${testKeys.SAFE_FOR_EVICTION}trigger`;
+            const criticalKey1 = `${testKeys.COLLECTION.NOT_SAFE_FOR_EVICTION}1`;
+            const criticalKey2 = `${testKeys.COLLECTION.NOT_SAFE_FOR_EVICTION}2`;
+            const criticalKey3 = `${testKeys.COLLECTION.NOT_SAFE_FOR_EVICTION}3`;
+            const evictableKey1 = `${testKeys.COLLECTION.SAFE_FOR_EVICTION}1`;
+            const evictableKey2 = `${testKeys.COLLECTION.SAFE_FOR_EVICTION}2`;
+            const evictableKey3 = `${testKeys.COLLECTION.SAFE_FOR_EVICTION}3`;
+            const triggerKey = `${testKeys.COLLECTION.SAFE_FOR_EVICTION}trigger`;
 
             StorageMock.getItem.mockResolvedValue('"mockValue"');
             const allKeys = [
@@ -562,7 +569,7 @@ describe('Onyx', () => {
             return initOnyx({
                 keys: testKeys,
                 maxCachedKeysCount: 3,
-                evictableKeys: [testKeys.SAFE_FOR_EVICTION],
+                evictableKeys: [testKeys.COLLECTION.SAFE_FOR_EVICTION],
             })
                 .then(() => {
                     // Verify keys are correctly identified as evictable or not
@@ -609,16 +616,19 @@ describe('Onyx', () => {
         it('Should not evict non-evictable keys even when cache limit is exceeded', () => {
             const testKeys = {
                 ...ONYX_KEYS,
-                SAFE_FOR_EVICTION: 'evictable_',
-                NOT_SAFE_FOR_EVICTION: 'critical_',
+                COLLECTION: {
+                    ...ONYX_KEYS.COLLECTION,
+                    SAFE_FOR_EVICTION: 'evictable_',
+                    NOT_SAFE_FOR_EVICTION: 'critical_',
+                },
             };
 
-            const criticalKey1 = `${testKeys.NOT_SAFE_FOR_EVICTION}1`;
-            const criticalKey2 = `${testKeys.NOT_SAFE_FOR_EVICTION}2`;
-            const criticalKey3 = `${testKeys.NOT_SAFE_FOR_EVICTION}3`;
-            const evictableKey1 = `${testKeys.SAFE_FOR_EVICTION}1`;
+            const criticalKey1 = `${testKeys.COLLECTION.NOT_SAFE_FOR_EVICTION}1`;
+            const criticalKey2 = `${testKeys.COLLECTION.NOT_SAFE_FOR_EVICTION}2`;
+            const criticalKey3 = `${testKeys.COLLECTION.NOT_SAFE_FOR_EVICTION}3`;
+            const evictableKey1 = `${testKeys.COLLECTION.SAFE_FOR_EVICTION}1`;
             // Additional trigger key for natural eviction
-            const triggerKey = `${testKeys.SAFE_FOR_EVICTION}trigger`;
+            const triggerKey = `${testKeys.COLLECTION.SAFE_FOR_EVICTION}trigger`;
 
             StorageMock.getItem.mockResolvedValue('"mockValue"');
             const allKeys = [
@@ -634,7 +644,7 @@ describe('Onyx', () => {
             return initOnyx({
                 keys: testKeys,
                 maxCachedKeysCount: 2,
-                evictableKeys: [testKeys.SAFE_FOR_EVICTION],
+                evictableKeys: [testKeys.COLLECTION.SAFE_FOR_EVICTION],
             })
                 .then(() => {
                     Onyx.connect({key: criticalKey1, callback: jest.fn()}); // Should never be evicted
@@ -662,6 +672,88 @@ describe('Onyx', () => {
                 });
         });
 
+        describe('eager loading during initialisation', () => {
+            beforeEach(() => {
+                StorageMock = require('../../lib/storage').default;
+            });
+
+            it('should load all storage data into cache during init', async () => {
+                await StorageMock.setItem(ONYX_KEYS.TEST_KEY, 'storageValue');
+                await StorageMock.setItem(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1, name: 'Item 1'});
+                await StorageMock.setItem(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}2`, {id: 2, name: 'Item 2'});
+                await initOnyx();
+
+                expect(cache.getAllKeys().size).toBe(3);
+                expect(cache.get(ONYX_KEYS.TEST_KEY)).toBe('storageValue');
+                expect(cache.get(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`)).toEqual({id: 1, name: 'Item 1'});
+                expect(cache.get(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}2`)).toEqual({id: 2, name: 'Item 2'});
+            });
+
+            it('should not load RAM-only keys from storage during init', async () => {
+                const testKeys = {
+                    ...ONYX_KEYS,
+                    RAM_ONLY_KEY: 'ramOnlyKey',
+                };
+
+                await StorageMock.setItem(testKeys.RAM_ONLY_KEY, 'staleValue');
+                await StorageMock.setItem(ONYX_KEYS.TEST_KEY, 'normalValue');
+                await initOnyx({keys: testKeys, ramOnlyKeys: [testKeys.RAM_ONLY_KEY]});
+
+                expect(cache.getAllKeys().size).toBe(1);
+                expect(cache.get(testKeys.RAM_ONLY_KEY)).toBeUndefined();
+                expect(cache.get(ONYX_KEYS.TEST_KEY)).toBe('normalValue');
+            });
+
+            it('should merge default key states with storage data during init', async () => {
+                await StorageMock.setItem(ONYX_KEYS.OTHER_TEST, {fromStorage: true});
+                await initOnyx({
+                    initialKeyStates: {
+                        [ONYX_KEYS.OTHER_TEST]: {fromDefault: true},
+                    },
+                });
+
+                // Default key states are merged on top of storage data.
+                expect(cache.get(ONYX_KEYS.OTHER_TEST)).toEqual({fromStorage: true, fromDefault: true});
+            });
+
+            it('should use default key states when storage data is not available for a key', async () => {
+                await StorageMock.clear();
+                await initOnyx({
+                    initialKeyStates: {
+                        [ONYX_KEYS.OTHER_TEST]: 42,
+                    },
+                });
+
+                expect(cache.get(ONYX_KEYS.OTHER_TEST)).toBe(42);
+            });
+
+            it('should gracefully handle Storage.getAll() failure and boot with defaults', async () => {
+                (StorageMock.getAll as jest.Mock).mockImplementationOnce(() => Promise.reject(new Error('Database corrupted')));
+
+                await initOnyx({
+                    initialKeyStates: {
+                        [ONYX_KEYS.OTHER_TEST]: 42,
+                    },
+                });
+
+                expect(cache.getAllKeys().size).toBe(1);
+                expect(cache.get(ONYX_KEYS.OTHER_TEST)).toBe(42);
+            });
+
+            it('should populate cache key index with all storage keys during init', async () => {
+                await StorageMock.setItem(ONYX_KEYS.TEST_KEY, 'value1');
+                await StorageMock.setItem(ONYX_KEYS.OTHER_TEST, 'value2');
+                await StorageMock.setItem(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1});
+                await initOnyx();
+
+                const allKeys = cache.getAllKeys();
+                expect(allKeys.size).toBe(3);
+                expect(allKeys.has(ONYX_KEYS.TEST_KEY)).toBe(true);
+                expect(allKeys.has(ONYX_KEYS.OTHER_TEST)).toBe(true);
+                expect(allKeys.has(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`)).toBe(true);
+            });
+        });
+
         it('should save RAM-only keys', () => {
             const testKeys = {
                 ...ONYX_KEYS,
@@ -676,9 +768,9 @@ describe('Onyx', () => {
                 keys: testKeys,
                 ramOnlyKeys: [testKeys.COLLECTION.RAM_ONLY_COLLECTION, testKeys.RAM_ONLY_KEY],
             }).then(() => {
-                expect(cache.isRamOnlyKey(testKeys.RAM_ONLY_KEY)).toBeTruthy();
-                expect(cache.isRamOnlyKey(testKeys.COLLECTION.RAM_ONLY_COLLECTION)).toBeTruthy();
-                expect(cache.isRamOnlyKey(testKeys.TEST_KEY)).toBeFalsy();
+                expect(OnyxKeys.isRamOnlyKey(testKeys.RAM_ONLY_KEY)).toBeTruthy();
+                expect(OnyxKeys.isRamOnlyKey(testKeys.COLLECTION.RAM_ONLY_COLLECTION)).toBeTruthy();
+                expect(OnyxKeys.isRamOnlyKey(testKeys.TEST_KEY)).toBeFalsy();
             });
         });
     });

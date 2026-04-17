@@ -25,7 +25,7 @@ const flushWorker = createNativeFlushWorker(bufferStore);
 flushWorker.start();
 
 // The native provider is accessed via the flush worker for read operations
-const nativeProvider = flushWorker.getProvider();
+const nativeProvider = flushWorker.getProvider() as StorageProvider<unknown>;
 
 /**
  * Native storage provider that delegates reads to the SQLite provider
@@ -46,6 +46,7 @@ const NativeStorage: StorageProvider<unknown> = {
     multiMerge: (pairs) => nativeProvider.multiMerge(pairs),
     mergeItem: (key, change, replaceNullPatches) => nativeProvider.mergeItem(key, change, replaceNullPatches),
     getAllKeys: () => nativeProvider.getAllKeys(),
+    getAll: () => nativeProvider.getAll(),
     removeItem: (key) => nativeProvider.removeItem(key),
     removeItems: (keys) => nativeProvider.removeItems(keys),
     clear: () => nativeProvider.clear(),

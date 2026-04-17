@@ -36,7 +36,7 @@ const GET_ALL_KEYS = 'SELECT record_key FROM keyvaluepairs;';
 // ---------------------------------------------------------------------------
 
 const SET_ITEM = 'REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);';
-const MULTI_SET_ITEM = 'REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, json(?));';
+const MULTI_SET_ITEM = 'REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);';
 
 // ---------------------------------------------------------------------------
 // Merge operations
@@ -47,14 +47,19 @@ const MULTI_SET_ITEM = 'REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUE
  * JSON_PATCH to merge the new value into the existing one.
  */
 const MERGE_ITEM_PATCH = `INSERT INTO keyvaluepairs (record_key, valueJSON)
-    VALUES (:key, JSON(:value))
+    VALUES (:key, :value)
     ON CONFLICT DO UPDATE
-    SET valueJSON = JSON_PATCH(valueJSON, JSON(:value));
+    SET valueJSON = JSON_PATCH(valueJSON, :value);
 `;
 
 /**
  * Replaces a specific JSON path inside an existing value.
  * Used to apply FastMergeReplaceNullPatch entries after the JSON_PATCH merge.
+ * 
+ * NOTE: The JSON() wrapper around the replacement value is required here. Unlike JSON_PATCH (which
+ * parses both arguments as JSON internally), JSON_REPLACE treats a plain TEXT binding as a quoted
+ * JSON string. Without JSON(), objects would be stored as string values (e.g. "{...}") instead of
+ * actual JSON objects, corrupting the stored data.
  */
 const MERGE_ITEM_REPLACE = `UPDATE keyvaluepairs
     SET valueJSON = JSON_REPLACE(valueJSON, ?, JSON(?))

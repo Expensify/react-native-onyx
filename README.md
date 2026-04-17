@@ -206,21 +206,6 @@ export default App;
 
 It's also beneficial to use a [selector](https://github.com/Expensify/react-native-onyx/blob/main/API.md#connectmapping--number) with the mapping in case you need to grab a single item in a collection (like a single report action).
 
-### useOnyx()'s `canBeMissing` option
-
-You must pass the `canBeMissing` configuration flag to `useOnyx` if you want the hook to log an alert when data is missing from Onyx store. Regarding usage in `Expensify/App` repo, if the component calling this is the one loading the data by calling an action, then you should set this to `true`. If the component calling this does not load the data then you should set it to `false`, which means that if the data is not there, it will log an alert, as it means we are using data that no one loaded and that's most probably a bug.
-
-```javascript
-const Component = ({reportID}) => {
-    // This hook will log an alert (via `Logger.logAlert()`) if `report` is `undefined`.
-    const [report] = useOnyx(`${ONYXKEYS.COLLECTION.REPORT}${reportID}`, {canBeMissing: false});
-    
-    // rest of the component's code.
-};
-
-export default Component;
-```
-
 ## Collections
 
 Collections allow keys with similar value types to be subscribed together by subscribing to the collection key. To define one, it must be included in the `ONYXKEYS.COLLECTION` object and it must be suffixed with an underscore. Member keys should use a unique identifier or index after the collection key prefix (e.g. `report_42`).
@@ -364,59 +349,6 @@ const ReportActionsView = ({reportID, isActiveReport}) => {
 };
 
 export default ReportActionsView;
-```
-
-# Benchmarks
-
-Provide the `captureMetrics` boolean flag to `Onyx.init` to capture call statistics
-
-```js
-Onyx.init({
-    keys: ONYXKEYS,
-    evictableKeys: [ONYXKEYS.COLLECTION.REPORT_ACTIONS],
-    captureMetrics: Config.BENCHMARK_ONYX,
-});
-```
-
-At any point you can get the collected statistics using `Onyx.getMetrics()`.
-This will return an object containing `totalTime`, `averageTime` and `summaries`.
-`summaries` is a collection of statistics for each method it contains data about:
-  - method name
-  - total, max, min, average times for this method calls
-  - calls - a list of individual calls with each having: start time; end time; call duration; call arguments
-    - start/end times are relative to application launch time - 0.00 being exactly at launch
-
-If you wish to reset the metrics and start over use `Onyx.resetMetrics()`
-
-Finally, there's a `Onyx.printMetrics()` method which prints human statistics information on the dev console. You can use this method during debugging. For example add an `Onyx.printMetrics()` line somewhere in code or call it through the dev console. It supports 3 popular formats *MD* - human friendly markdown, *CSV* and *JSON*. The default is MD if you want to print another format call `Onyx.printMetrics({ format: 'csv' })` or
-`Onyx.printMetrics({ format: 'json' })`.
-
-Sample output of `Onyx.printMetrics()`
-
-```
-### Onyx Benchmark
-  - Total: 1.5min
-  - Last call finished at: 12.55sec
-
-|     method      | total time spent |    max    |   min    |    avg    | time last call completed | calls made |
-|-----------------|-----------------:|----------:|---------:|----------:|-------------------------:|-----------:|
-| Onyx:getAllKeys |           1.2min |   2.16sec |  0.159ms | 782.230ms |                 12.55sec |         90 |
-| Onyx:merge      |          4.73sec |   2.00sec | 74.412ms | 591.642ms |                 10.24sec |          8 |
-| Onyx:set        |          3.90sec | 846.760ms | 43.663ms | 433.056ms |                  7.47sec |          9 |
-| Onyx:get        |          8.87sec |   2.00sec |  0.063ms |  61.998ms |                 10.24sec |        143 |
-
-
-|                           Onyx:set                            |
-|---------------------------------------------------------------|
-| start time | end time  | duration  |           args           |
-|-----------:|----------:|----------:|--------------------------|
-|  291.042ms | 553.079ms | 262.037ms | session, [object Object] |
-|  293.719ms | 553.316ms | 259.597ms | account, [object Object] |
-|  294.541ms | 553.651ms | 259.109ms | network, [object Object] |
-|  365.378ms | 554.246ms | 188.867ms | iou, [object Object]     |
-|    1.08sec |   2.20sec |   1.12sec | network, [object Object] |
-|    1.08sec |   2.20sec |   1.12sec | iou, [object Object]     |
-|    1.17sec |   2.20sec |   1.03sec | currentURL, /            |
 ```
 
 # Debug mode
