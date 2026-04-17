@@ -640,8 +640,6 @@ function keyChanged<TKey extends OnyxKey>(
         }
     }
 
-    const cachedCollections: Record<string, ReturnType<typeof getCachedCollection>> = {};
-
     for (const stateMappingKey of stateMappingKeys) {
         const subscriber = callbackToStateMapping[stateMappingKey];
         if (!subscriber || !OnyxKeys.isKeyMatch(subscriber.key, key) || !canUpdateSubscriber(subscriber)) {
@@ -662,14 +660,9 @@ function keyChanged<TKey extends OnyxKey>(
                     if (isProcessingCollectionUpdate) {
                         continue;
                     }
-                    let cachedCollection = cachedCollections[subscriber.key];
-
-                    if (!cachedCollection) {
-                        cachedCollection = getCachedCollection(subscriber.key);
-                        cachedCollections[subscriber.key] = cachedCollection;
-                    }
-
-                    cachedCollection[key] = value;
+                    // The cache is always updated before keyChanged runs (via broadcastUpdate → cache.set),
+                    // so the frozen snapshot already contains the new value — no patching needed.
+                    const cachedCollection = getCachedCollection(subscriber.key);
                     lastConnectionCallbackData.set(subscriber.subscriptionID, {value: cachedCollection, matchedKey: subscriber.key});
                     subscriber.callback(cachedCollection, subscriber.key, {[key]: value});
                     continue;
