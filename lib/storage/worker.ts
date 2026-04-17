@@ -27,6 +27,7 @@ type SetItemMessage = {type: 'setItem'; id: string; key: string; value: unknown}
 type MultiSetMessage = {type: 'multiSet'; id: string; pairs: StorageKeyValuePair[]};
 type MultiMergeMessage = {type: 'multiMerge'; id: string; pairs: StorageKeyValuePair[]};
 type GetAllKeysMessage = {type: 'getAllKeys'; id: string};
+type GetAllMessage = {type: 'getAll'; id: string};
 type RemoveItemMessage = {type: 'removeItem'; id: string; key: string};
 type RemoveItemsMessage = {type: 'removeItems'; id: string; keys: string[]};
 type ClearMessage = {type: 'clear'; id: string};
@@ -40,6 +41,7 @@ type WorkerMessage =
     | MultiSetMessage
     | MultiMergeMessage
     | GetAllKeysMessage
+    | GetAllMessage
     | RemoveItemMessage
     | RemoveItemsMessage
     | ClearMessage
@@ -231,6 +233,12 @@ async function handleMessage(msg: WorkerMessage): Promise<void> {
         case 'getAllKeys': {
             const keys = await provider!.getAllKeys();
             sendResult(msg.id, keys);
+            break;
+        }
+
+        case 'getAll': {
+            const data = await provider!.getAll();
+            sendResult(msg.id, data);
             break;
         }
 

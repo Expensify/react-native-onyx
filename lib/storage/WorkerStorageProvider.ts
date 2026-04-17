@@ -160,6 +160,10 @@ function createWorkerStorageProvider(backend: 'sqlite' | 'idb'): StorageProvider
             return postToWorker<string[]>({type: 'getAllKeys'}).then((keys) => (keys ?? []) as StorageKeyList);
         },
 
+        getAll() {
+            return postToWorker<StorageKeyValuePair[]>({type: 'getAll'}).then((results) => results ?? []);
+        },
+
         removeItem(key) {
             return postToWorker<void>({type: 'removeItem', key});
         },

@@ -35,6 +35,7 @@ let stmtMergePatch: SQLiteStmt | null = null;
 let stmtMergeReplace: SQLiteStmt | null = null;
 let stmtRemoveItem: SQLiteStmt | null = null;
 let stmtGetAllKeys: SQLiteStmt | null = null;
+let stmtGetAll: SQLiteStmt | null = null;
 let stmtClear: SQLiteStmt | null = null;
 
 /**
@@ -171,6 +172,15 @@ const provider: StorageProvider<SQLiteDB | null> = {
         return Promise.resolve(keys);
     },
 
+    getAll() {
+        const results: StorageKeyValuePair[] = [];
+        while (stmtGetAll.step()) {
+            results.push([stmtGetAll.getString(0) as string, JSON.parse(stmtGetAll.getString(1) as string)]);
+        }
+        stmtGetAll.reset();
+        return Promise.resolve(results);
+    },
+
     removeItem(key) {
         stmtRemoveItem.bind([key]);
         stmtRemoveItem.stepReset();
@@ -252,6 +262,7 @@ async function initAsync(): Promise<void> {
     stmtMergeReplace = db.prepare(Queries.MERGE_ITEM_REPLACE);
     stmtRemoveItem = db.prepare(Queries.REMOVE_ITEM);
     stmtGetAllKeys = db.prepare(Queries.GET_ALL_KEYS);
+    stmtGetAll = db.prepare(Queries.GET_ALL);
     stmtClear = db.prepare(Queries.CLEAR);
 
     provider.store = db;

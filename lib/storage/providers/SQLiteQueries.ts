@@ -31,6 +31,8 @@ function buildMultiGetQuery(count: number): string {
 
 const GET_ALL_KEYS = 'SELECT record_key FROM keyvaluepairs;';
 
+const GET_ALL = 'SELECT record_key, valueJSON FROM keyvaluepairs;';
+
 // ---------------------------------------------------------------------------
 // Write operations
 // ---------------------------------------------------------------------------
@@ -97,6 +99,7 @@ export {
     GET_ITEM,
     buildMultiGetQuery,
     GET_ALL_KEYS,
+    GET_ALL,
     SET_ITEM,
     MULTI_SET_ITEM,
     MERGE_ITEM_PATCH,
