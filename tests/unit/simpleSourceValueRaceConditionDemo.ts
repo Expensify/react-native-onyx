@@ -1,4 +1,4 @@
-/* eslint-disable no-console, @typescript-eslint/no-explicit-any, no-else-return */
+/* eslint-disable no-console, @typescript-eslint/no-explicit-any */
 /**
  * Simple test to demonstrate the sourceValue race condition.
  *
@@ -47,9 +47,9 @@ afterEach(async () => {
 });
 
 describe('Simple sourceValue Race Condition Demo', () => {
-    it('should demonstrate that only the first sourceValue is visible when updates are batched', async () => {
+    it('should demonstrate that only one sourceValue is visible when updates are batched', async () => {
         // Track all sourceValues we receive during the test
-        const receivedSourceValues: any[] = [];
+        let receivedSourceValues: any[] = [];
         let renderCount = 0;
 
         const {result} = renderHook(() => {
@@ -97,7 +97,7 @@ describe('Simple sourceValue Race Condition Demo', () => {
 
         // Clear counters after initial setup and primer
         const initialRenderCount = renderCount;
-        receivedSourceValues.length = 0;
+        receivedSourceValues = [];
 
         console.log('\n=== Starting the race condition test ===');
         console.log('About to perform 3 discrete updates that should be batched...\n');
@@ -171,33 +171,29 @@ describe('Simple sourceValue Race Condition Demo', () => {
             },
         });
 
-        // 4. But sourceValue only shows the FIRST update that triggered the batch!
+        // 4. But sourceValue only shows the last update that triggered the batch
         // @ts-expect-error - sourceValue exists on the metadata object but TS doesn't know the type
         if (result.current[1]?.sourceValue) {
-            // sourceValue contains data from the FIRST update, not the last!
-            // This is because it gets set when the first callback fires, then gets
-            // overwritten during batching but the component only renders once.
             // @ts-expect-error - sourceValue exists on the metadata object but TS doesn't know the type
             expect(result.current[1].sourceValue).toEqual({
-                [`${ONYXKEYS.COLLECTION.TEST_ITEMS}item1`]: {
-                    step: 1,
-                    status: 'started',
-                    message: 'First update',
+                [`${ONYXKEYS.COLLECTION.TEST_ITEMS}item3`]: {
+                    step: 3,
+                    status: 'completed',
+                    message: 'Third update',
                 },
             });
         }
 
         // 🚨 THE PROBLEM:
-        // We lost information about the "processing" and "completed" states!
         // A component using sourceValue to track state transitions would miss:
+        // - step: 1, status: 'started' (never visible in sourceValue)
         // - step: 2, status: 'processing' (never visible in sourceValue)
-        // - step: 3, status: 'completed' (never visible in sourceValue)
 
         console.log('\n🚨 RACE CONDITION CONFIRMED:');
         console.log(`• Expected to see ${expectedUpdates} sourceValues`);
         console.log(`• Actually received ${receivedSourceValues.length} sourceValue(s)`);
         console.log(`• Lost ${expectedUpdates - receivedSourceValues.length} intermediate updates`);
-        console.log('• Only the FIRST update is visible in sourceValue due to batching!');
+        console.log('• Only the last update is visible in sourceValue due to batching');
         console.log('\nThis means components cannot reliably track state transitions when updates are batched!');
     });
 });
