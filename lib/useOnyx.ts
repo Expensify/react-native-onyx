@@ -112,6 +112,10 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     // explicit reset logic — eliminating the race condition where cleanup could clobber a boolean flag.
     const connectedKeyRef = useRef<OnyxKey | null>(null);
 
+    // Tracks whether the hook has completed its initial mount subscription.
+    // Unlike connectedKeyRef (which gets nulled by cleanup), this persists across re-subscriptions.
+    const hasMountedRef = useRef(false);
+
     // Indicates if the hook is connecting to an Onyx key.
     const isConnectingRef = useRef(false);
 
@@ -264,12 +268,15 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         (onStoreChange: () => void) => {
             // Reset internal state so the hook properly transitions through loading
             // for the new key instead of preserving stale state from the previous one.
-            previousValueRef.current = null;
-            newValueRef.current = null;
-            shouldGetCachedValueRef.current = true;
-            sourceValueRef.current = undefined;
-            resultRef.current = [undefined, {status: options?.initWithStoredValues === false ? 'loaded' : 'loading'}];
-
+            // Only reset when the key has actually changed (not on initial mount).
+            if (hasMountedRef.current) {
+                previousValueRef.current = null;
+                newValueRef.current = null;
+                shouldGetCachedValueRef.current = true;
+                sourceValueRef.current = undefined;
+                resultRef.current = [undefined, {status: options?.initWithStoredValues === false ? 'loaded' : 'loading'}];
+            }
+            hasMountedRef.current = true;
             isConnectingRef.current = true;
             onStoreChangeFnRef.current = onStoreChange;
 
