@@ -288,6 +288,12 @@ function get<TKey extends OnyxKey, TValue extends OnyxValue<TKey>>(key: TKey): P
                 }
             }
 
+            // Prefer cache over stale storage if a concurrent write populated it during the read.
+            const cachedValue = cache.get(key) as TValue;
+            if (cachedValue !== undefined) {
+                return cachedValue;
+            }
+
             if (val === undefined) {
                 cache.addNullishStorageKey(key);
                 return undefined;
@@ -742,13 +748,13 @@ function remove<TKey extends OnyxKey>(key: TKey, isProcessingCollectionUpdate?: 
     return Storage.removeItem(key).then(() => undefined);
 }
 
-function reportStorageQuota(): Promise<void> {
+function reportStorageQuota(error?: Error): Promise<void> {
     return Storage.getDatabaseSize()
         .then(({bytesUsed, bytesRemaining}) => {
-            Logger.logInfo(`Storage Quota Check -- bytesUsed: ${bytesUsed} bytesRemaining: ${bytesRemaining}`);
+            Logger.logInfo(`Storage Quota Check -- bytesUsed: ${bytesUsed} bytesRemaining: ${bytesRemaining}. Original error: ${error}`);
         })
         .catch((dbSizeError) => {
-            Logger.logAlert(`Unable to get database size. Error: ${dbSizeError}`);
+            Logger.logAlert(`Unable to get database size. getDatabaseSize error: ${dbSizeError}. Original error: ${error}`);
         });
 }
 
@@ -765,7 +771,7 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, on
     Logger.logInfo(`Failed to save to storage. Error: ${error}. onyxMethod: ${onyxMethod.name}. retryAttempt: ${currentRetryAttempt}/${MAX_STORAGE_OPERATION_RETRY_ATTEMPTS}`);
 
     if (error && Str.startsWith(error.message, "Failed to execute 'put' on 'IDBObjectStore'")) {
-        Logger.logAlert('Attempted to set invalid data set in Onyx. Please ensure all data is serializable.');
+        Logger.logAlert(`Attempted to set invalid data set in Onyx. Please ensure all data is serializable. Error: ${error}`);
         throw error;
     }
 
@@ -789,13 +795,13 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, on
         // If we have no acceptable keys to remove then we are possibly trying to save mission critical data. If this is the case,
         // then we should stop retrying as there is not much the user can do to fix this. Instead of getting them stuck in an infinite loop we
         // will allow this write to be skipped.
-        Logger.logAlert('Out of storage. But found no acceptable keys to remove.');
-        return reportStorageQuota();
+        Logger.logAlert(`Out of storage. But found no acceptable keys to remove. Error: ${error}`);
+        return reportStorageQuota(error);
     }
 
     // Remove the least recently accessed key and retry.
-    Logger.logInfo(`Out of storage. Evicting least recently accessed key (${keyForRemoval}) and retrying.`);
-    reportStorageQuota();
+    Logger.logInfo(`Out of storage. Evicting least recently accessed key (${keyForRemoval}) and retrying. Error: ${error}`);
+    reportStorageQuota(error);
 
     // @ts-expect-error No overload matches this call.
     return remove(keyForRemoval).then(() => onyxMethod(defaultParams, nextRetryAttempt));
