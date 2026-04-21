@@ -218,11 +218,11 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             newFetchStatus = 'loading';
         }
 
-        // Reference equality is sufficient because:
-        // - Memoized selectors return stable references (deep equality is handled internally)
-        // - Non-selector values have stable references from frozen cache snapshots
-        // - Normalize null to undefined to ensure consistent comparison (both represent "no value")
-        const areValuesEqual = (previousValueRef.current ?? undefined) === (newValueRef.current ?? undefined);
+        // shallowEqual checks === first (O(1) for frozen snapshots and stable selector references),
+        // then falls back to comparing top-level properties for individual keys that may have
+        // new references with equivalent content.
+        // Normalize null to undefined to ensure consistent comparison (both represent "no value").
+        const areValuesEqual = shallowEqual(previousValueRef.current ?? undefined, newValueRef.current ?? undefined);
 
         // We update the cached value and the result in the following conditions:
         // We will update the cached value and the result in any of the following situations:
