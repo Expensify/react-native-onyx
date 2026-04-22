@@ -1368,7 +1368,10 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
 
     const keyValuePairsToSet = OnyxUtils.prepareKeyValuePairsForStorage(newData, true);
 
-    // Group keys by collection for batched notification
+    // Group collection members by their parent collection key so each collection can be notified
+    // via a single batched keysChanged() call instead of one keyChanged() per member. For each
+    // collection, `partial` holds the new values being set and `previous` holds the cached values
+    // from before the set, which keysChanged() uses to skip subscribers whose value didn't change.
     const collectionBatches = new Map<string, {partial: Record<string, OnyxValue<OnyxKey>>; previous: Record<string, OnyxValue<OnyxKey>>}>();
     const nonCollectionPairs: Array<[string, OnyxValue<OnyxKey>]> = [];
 
@@ -1381,7 +1384,8 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
 
         const collectionKey = OnyxKeys.getCollectionKey(key);
         if (collectionKey && OnyxKeys.isCollectionMemberKey(collectionKey, key)) {
-            // Capture the previous value before updating cache
+            // Capture the previous cached value BEFORE calling cache.set() so keysChanged()
+            // can diff old vs new per-member.
             const previousValue = cache.get(key);
             cache.set(key, value);
 
@@ -1393,17 +1397,19 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
             batch.partial[key] = value;
             batch.previous[key] = previousValue;
         } else {
+            // Non-collection keys are notified individually — no batching.
             cache.set(key, value);
             nonCollectionPairs.push([key, value]);
         }
     }
 
-    // Notify collection subscribers once per collection (batched)
+    // One keysChanged() per collection — fires each collection-level subscriber once and lets
+    // keysChanged() internally decide which individual member subscribers need notification.
     for (const [collectionKey, batch] of collectionBatches) {
         keysChanged(collectionKey as CollectionKeyBase, batch.partial, batch.previous);
     }
 
-    // Notify non-collection key subscribers individually
+    // Non-collection keys go through the regular per-key notification path.
     for (const [key, value] of nonCollectionPairs) {
         keyChanged(key, value);
     }
