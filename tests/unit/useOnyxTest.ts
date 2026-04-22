@@ -407,6 +407,56 @@ describe('useOnyx', () => {
             expect(result3.current[0]).toEqual('test2');
             expect(result3.current[1].status).toEqual('loaded');
         });
+
+        it('should not update the result when a new object with shallow-equal content is set', async () => {
+            Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name'});
+
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
+            await act(async () => waitForPromisesToResolve());
+
+            const firstResult = result.current;
+
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name'}));
+
+            expect(result.current).toBe(firstResult);
+        });
+
+        it('should preserve unchanged member references across collection updates', async () => {
+            const entry1 = {id: 'entry1_id', name: 'entry1_name'};
+            const entry2 = {id: 'entry2_id', name: 'entry2_name'};
+            Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, {
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: entry1,
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: entry2,
+            } as GenericCollection);
+
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.COLLECTION.TEST_KEY));
+            await act(async () => waitForPromisesToResolve());
+
+            const firstCollection = result.current[0] as OnyxCollection<{id: string; name: string}>;
+            const firstEntry1Ref = firstCollection?.[`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`];
+
+            await act(async () => Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`, {name: 'entry2_updated'}));
+
+            const secondCollection = result.current[0] as OnyxCollection<{id: string; name: string}>;
+
+            expect(secondCollection).not.toBe(firstCollection);
+            expect(secondCollection?.[`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]).toBe(firstEntry1Ref);
+        });
+
+        it('should keep the same collection reference when no members change', async () => {
+            Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, {
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
+            } as GenericCollection);
+
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.COLLECTION.TEST_KEY));
+            await act(async () => waitForPromisesToResolve());
+
+            const firstResult = result.current;
+
+            await act(async () => Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`, {id: 'entry1_id', name: 'entry1_name'}));
+
+            expect(result.current).toBe(firstResult);
+        });
     });
 
     describe('selector', () => {
