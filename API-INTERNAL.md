@@ -293,23 +293,6 @@ If the requested key is a collection, it will return an object with all the coll
 When a collection of keys change, search for any callbacks matching the collection key and trigger those callbacks
 
 **Kind**: global function  
-
-* [keysChanged()](#keysChanged)
-    * [~isSubscribedToCollectionKey](#keysChanged..isSubscribedToCollectionKey)
-    * [~isSubscribedToCollectionMemberKey](#keysChanged..isSubscribedToCollectionMemberKey)
-
-<a name="keysChanged..isSubscribedToCollectionKey"></a>
-
-### keysChanged~isSubscribedToCollectionKey
-e.g. Onyx.connect({key: ONYXKEYS.COLLECTION.REPORT, callback: ...});
-
-**Kind**: inner constant of [<code>keysChanged</code>](#keysChanged)  
-<a name="keysChanged..isSubscribedToCollectionMemberKey"></a>
-
-### keysChanged~isSubscribedToCollectionMemberKey
-e.g. Onyx.connect({key: `${ONYXKEYS.COLLECTION.REPORT}{reportID}`, callback: ...});
-
-**Kind**: inner constant of [<code>keysChanged</code>](#keysChanged)  
 <a name="keyChanged"></a>
 
 ## keyChanged()
