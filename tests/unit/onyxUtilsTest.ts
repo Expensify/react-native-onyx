@@ -349,6 +349,133 @@ describe('OnyxUtils', () => {
 
             await Onyx.disconnect(connection);
         });
+
+        it('should notify collection-level subscribers with waitForCollectionCallback', async () => {
+            const entryKey = `${ONYXKEYS.COLLECTION.TEST_KEY}789`;
+            const entryData = {value: 'data'};
+
+            const collectionCallback = jest.fn();
+            const connection = Onyx.connect({
+                key: ONYXKEYS.COLLECTION.TEST_KEY,
+                callback: collectionCallback,
+                waitForCollectionCallback: true,
+                initWithStoredValues: false,
+            });
+
+            await Onyx.set(entryKey, entryData);
+            collectionCallback.mockClear();
+
+            // Trigger keysChanged directly with a partial collection
+            OnyxUtils.keysChanged(ONYXKEYS.COLLECTION.TEST_KEY, {[entryKey]: entryData}, {});
+
+            expect(collectionCallback).toHaveBeenCalledTimes(1);
+            // Collection subscriber receives the full cached collection, subscriber.key, and partial
+            const [receivedCollection, receivedKey, receivedPartial] = collectionCallback.mock.calls[0];
+            expect(receivedKey).toBe(ONYXKEYS.COLLECTION.TEST_KEY);
+            expect(receivedCollection[entryKey]).toEqual(entryData);
+            expect(receivedPartial).toEqual({[entryKey]: entryData});
+
+            Onyx.disconnect(connection);
+        });
+
+        it('should skip notification when member value has same reference in previous and current collection', async () => {
+            const entryKey = `${ONYXKEYS.COLLECTION.TEST_KEY}same`;
+            const sameValue = {value: 'unchanged'};
+
+            await Onyx.set(entryKey, sameValue);
+
+            const callbackSpy = jest.fn();
+            const connection = Onyx.connect({
+                key: entryKey,
+                callback: callbackSpy,
+                initWithStoredValues: false,
+            });
+            await waitForPromisesToResolve();
+            callbackSpy.mockClear();
+
+            // Simulate keysChanged where the previous and current value are the SAME reference
+            // (which happens with frozen snapshots when nothing changed). === should skip notification.
+            OnyxUtils.keysChanged(ONYXKEYS.COLLECTION.TEST_KEY, {[entryKey]: sameValue}, {[entryKey]: sameValue});
+
+            expect(callbackSpy).not.toHaveBeenCalled();
+
+            Onyx.disconnect(connection);
+        });
+
+        it('should notify member subscribers only for changed keys in a batched update', async () => {
+            const keyA = `${ONYXKEYS.COLLECTION.TEST_KEY}A`;
+            const keyB = `${ONYXKEYS.COLLECTION.TEST_KEY}B`;
+            const keyC = `${ONYXKEYS.COLLECTION.TEST_KEY}C`;
+
+            const dataA = {value: 'A'};
+            const dataB = {value: 'B'};
+            const dataC = {value: 'C'};
+
+            await Onyx.multiSet({[keyA]: dataA, [keyB]: dataB, [keyC]: dataC});
+
+            const spyA = jest.fn();
+            const spyB = jest.fn();
+            const spyC = jest.fn();
+            const connA = Onyx.connect({key: keyA, callback: spyA, initWithStoredValues: false});
+            const connB = Onyx.connect({key: keyB, callback: spyB, initWithStoredValues: false});
+            const connC = Onyx.connect({key: keyC, callback: spyC, initWithStoredValues: false});
+            await waitForPromisesToResolve();
+            spyA.mockClear();
+            spyB.mockClear();
+            spyC.mockClear();
+
+            // Update cache so keysChanged reads the new values via getCachedCollection
+            const newA = {value: 'A-updated'};
+            const newC = {value: 'C-updated'};
+            OnyxCache.set(keyA, newA);
+            OnyxCache.set(keyC, newC);
+            // keyB stays the same reference
+
+            OnyxUtils.keysChanged(ONYXKEYS.COLLECTION.TEST_KEY, {[keyA]: newA, [keyB]: dataB, [keyC]: newC}, {[keyA]: dataA, [keyB]: dataB, [keyC]: dataC});
+
+            expect(spyA).toHaveBeenCalledTimes(1);
+            expect(spyB).not.toHaveBeenCalled();
+            expect(spyC).toHaveBeenCalledTimes(1);
+
+            Onyx.disconnect(connA);
+            Onyx.disconnect(connB);
+            Onyx.disconnect(connC);
+        });
+
+        it('should catch errors thrown by subscriber callbacks and continue notifying others', async () => {
+            const entryKey = `${ONYXKEYS.COLLECTION.TEST_KEY}errorTest`;
+            const entryData = {value: 'data'};
+
+            await Onyx.set(entryKey, entryData);
+
+            const failingCallback = jest.fn(() => {
+                throw new Error('subscriber failure');
+            });
+            const workingCallback = jest.fn();
+
+            const connFailing = Onyx.connect({key: entryKey, callback: failingCallback, initWithStoredValues: false});
+            const connWorking = Onyx.connect({key: entryKey, callback: workingCallback, initWithStoredValues: false});
+            await waitForPromisesToResolve();
+            failingCallback.mockClear();
+            workingCallback.mockClear();
+
+            // Spy on Logger to verify the error is logged
+            const logSpy = jest.spyOn(Logger, 'logAlert').mockImplementation(() => undefined);
+
+            const newData = {value: 'new'};
+            // Update the cache so keysChanged sees the new value as different from previous
+            OnyxCache.set(entryKey, newData);
+            OnyxUtils.keysChanged(ONYXKEYS.COLLECTION.TEST_KEY, {[entryKey]: newData}, {[entryKey]: entryData});
+
+            // Both callbacks should have been attempted; error should be logged
+            expect(failingCallback).toHaveBeenCalled();
+            expect(workingCallback).toHaveBeenCalled();
+            expect(logSpy).toHaveBeenCalled();
+
+            logSpy.mockRestore();
+            Onyx.disconnect(connFailing);
+            Onyx.disconnect(connWorking);
+        });
     });
 
     describe('mergeChanges', () => {
