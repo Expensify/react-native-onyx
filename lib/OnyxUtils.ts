@@ -588,12 +588,20 @@ function keysChanged<TKey extends CollectionKeyBase>(
                 continue;
             }
 
-            // Not using waitForCollectionCallback — notify per changed key
+            // Not using waitForCollectionCallback — notify per changed key.
+            // Re-check the subscription on each iteration because the callback may
+            // synchronously disconnect itself (removing it from callbackToStateMapping),
+            // in which case we must stop firing further callbacks for this subscriber.
             for (const dataKey of changedMemberKeys) {
+                const currentSubscriber = callbackToStateMapping[subID];
+                if (!currentSubscriber || typeof currentSubscriber.callback !== 'function') {
+                    break;
+                }
                 if (cachedCollection[dataKey] === previousCollection[dataKey]) {
                     continue;
                 }
-                subscriber.callback(cachedCollection[dataKey], dataKey);
+                const currentSubscriberCallback = currentSubscriber.callback as DefaultConnectCallback<TKey>;
+                currentSubscriberCallback(cachedCollection[dataKey], dataKey as TKey);
             }
         } catch (error) {
             Logger.logAlert(`[OnyxUtils.keysChanged] Subscriber callback threw an error for key '${collectionKey}': ${error}`);
