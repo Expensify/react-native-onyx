@@ -1271,4 +1271,73 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
         });
     });
+
+    // Regression coverage for Expensify/App#87850 ("[Onyx] Fix extra mount render introduced in useOnyx v3.0.59").
+    // The bug: `subscribe` unconditionally reset `resultRef.current` to a fresh tuple, including on initial mount.
+    // `useSyncExternalStore` then observed a different snapshot reference post-subscribe and scheduled an extra
+    // render per `useOnyx` hook. The fix guards the reset behind `hasMountedRef` so it only runs on re-subscription.
+    describe('initial mount render count', () => {
+        it('should render only once when the key has a value already in Onyx cache', async () => {
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'cached_value');
+
+            let renderCount = 0;
+            const {result} = renderHook(() => {
+                renderCount++;
+                return useOnyx(ONYXKEYS.TEST_KEY);
+            });
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('cached_value');
+            expect(result.current[1].status).toEqual('loaded');
+            // A single render — no extra render caused by subscribe resetting state on initial mount.
+            expect(renderCount).toBe(1);
+        });
+
+        it('should render exactly twice (loading → loaded) when the key is not cached', async () => {
+            let renderCount = 0;
+            const {result} = renderHook(() => {
+                renderCount++;
+                return useOnyx(ONYXKEYS.TEST_KEY);
+            });
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+            // Exactly two renders: initial 'loading' + transition to 'loaded' after the connection callback fires.
+            // If the regression returns, a third render sneaks in from the subscribe-time state reset.
+            expect(renderCount).toBe(2);
+        });
+
+        it('should render exactly twice when the key value is only present in storage', async () => {
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'storage_value');
+
+            let renderCount = 0;
+            const {result} = renderHook(() => {
+                renderCount++;
+                return useOnyx(ONYXKEYS.TEST_KEY);
+            });
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('storage_value');
+            expect(result.current[1].status).toEqual('loaded');
+            expect(renderCount).toBe(2);
+        });
+
+        it('should render exactly twice for a non-cached collection member key', async () => {
+            let renderCount = 0;
+            const {result} = renderHook(() => {
+                renderCount++;
+                return useOnyx(`${ONYXKEYS.COLLECTION.TEST_KEY}1`);
+            });
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+            expect(renderCount).toBe(2);
+        });
+    });
 });
