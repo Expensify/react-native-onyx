@@ -550,6 +550,16 @@ function keysChanged<TKey extends CollectionKeyBase>(
     const previousCollection = partialPreviousCollection ?? {};
     const changedMemberKeys = Object.keys(partialCollection ?? {});
 
+    // Add or remove the keys from the recentlyAccessedKeys list
+    for (const memberKey of changedMemberKeys) {
+        const value = partialCollection?.[memberKey];
+        if (value !== null && value !== undefined) {
+            cache.addLastAccessedKey(memberKey, false);
+        } else {
+            cache.removeLastAccessedKey(memberKey);
+        }
+    }
+
     // Use indexed lookup instead of scanning all subscribers.
     // We need subscribers for: (1) the collection key itself, and (2) individual changed member keys.
     const collectionSubscriberIDs = onyxKeyToSubscriptionIDs.get(collectionKey) ?? [];
