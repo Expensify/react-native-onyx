@@ -1339,5 +1339,76 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
             expect(renderCount).toBe(2);
         });
+
+        // Covers the `if (hasMountedRef.current)` branch — i.e. the reset that runs on key-change re-subscriptions.
+        // The reset is what makes the hook transition through 'loading' for the new key instead of leaking the
+        // previous key's value/status. These tests verify both the render count AND the loading transition,
+        // so removing the reset (regression in the other direction) is also caught.
+        it('should transition through loading and render exactly 4 times when switching from a cached key to an uncached one', async () => {
+            await Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}A`, 'A_value');
+
+            const renders: Array<{value: unknown; status: string}> = [];
+            const {result, rerender} = renderHook(
+                (key: string) => {
+                    const r = useOnyx(key);
+                    renders.push({value: r[0], status: r[1].status});
+                    return r;
+                },
+                {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}A` as string},
+            );
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('A_value');
+            expect(result.current[1].status).toEqual('loaded');
+            const rendersAfterMount = renders.length;
+            expect(rendersAfterMount).toBe(1);
+
+            await act(async () => {
+                rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}B`);
+            });
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+            // 1 mount render + 3 renders for the key switch (transient stale render, post-subscribe 'loading',
+            // callback-driven 'loaded'). The 'loading' render only happens because the subscribe-time reset
+            // clears the previous key's resultRef — removing the reset makes this assertion fail.
+            expect(renders.length).toBe(4);
+            // Verify the reset took effect: a 'loading' frame must appear after the key change.
+            const postSwitchStatuses = renders.slice(rendersAfterMount).map((r) => r.status);
+            expect(postSwitchStatuses).toContain('loading');
+            expect(postSwitchStatuses[postSwitchStatuses.length - 1]).toBe('loaded');
+        });
+
+        it('should transition through loading and render exactly 3 times when switching between two cached keys', async () => {
+            await Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}A`, 'A_value');
+            await Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}B`, 'B_value');
+
+            const renders: Array<{value: unknown; status: string}> = [];
+            const {result, rerender} = renderHook(
+                (key: string) => {
+                    const r = useOnyx(key);
+                    renders.push({value: r[0], status: r[1].status});
+                    return r;
+                },
+                {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}A` as string},
+            );
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('A_value');
+            expect(renders.length).toBe(1);
+
+            await act(async () => {
+                rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}B`);
+            });
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('B_value');
+            expect(result.current[1].status).toEqual('loaded');
+            // 1 mount render + 2 renders for the cached-to-cached switch.
+            expect(renders.length).toBe(3);
+        });
     });
 });
