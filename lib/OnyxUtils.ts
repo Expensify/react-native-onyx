@@ -767,6 +767,51 @@ function reportStorageQuota(error?: Error): Promise<void> {
         });
 }
 
+// Diagnostic context attached to "Failed to save to storage" logs so we can correlate quota errors
+// with the key being written, payload size, and userAgent. The size is the JSON string length
+// (character count, not exact UTF-8 bytes) — close enough as a proxy for write magnitude.
+function getRetryLogContext(defaultParams: unknown): Record<string, unknown> {
+    const context: Record<string, unknown> = {};
+
+    if (typeof navigator !== 'undefined' && navigator.userAgent) {
+        context.userAgent = navigator.userAgent;
+    }
+
+    const approximateSize = (value: unknown): number => {
+        try {
+            return JSON.stringify(value)?.length ?? -1;
+        } catch {
+            return -1;
+        }
+    };
+
+    if (defaultParams && typeof defaultParams === 'object') {
+        const params = defaultParams as Record<string, unknown>;
+
+        // setWithRetry: {key, value, options}
+        if ('key' in params && 'value' in params) {
+            context.key = params.key;
+            context.valueLength = approximateSize(params.value);
+            return context;
+        }
+
+        // setCollectionWithRetry / mergeCollectionWithPatches / partialSetCollection: {collectionKey, collection, ...}
+        if ('collectionKey' in params && 'collection' in params) {
+            const collection = (params.collection ?? {}) as Record<string, unknown>;
+            context.collectionKey = params.collectionKey;
+            context.collectionMemberCount = Object.keys(collection).length;
+            context.collectionLength = approximateSize(collection);
+            return context;
+        }
+
+        // multiSetWithRetry: defaultParams is the data object itself
+        context.keyCount = Object.keys(params).length;
+        context.dataLength = approximateSize(params);
+    }
+
+    return context;
+}
+
 /**
  * Handles storage operation failures based on the error type:
  * - Storage capacity errors: evicts data and retries the operation
@@ -777,7 +822,10 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, on
     const currentRetryAttempt = retryAttempt ?? 0;
     const nextRetryAttempt = currentRetryAttempt + 1;
 
-    Logger.logInfo(`Failed to save to storage. Error: ${error}. onyxMethod: ${onyxMethod.name}. retryAttempt: ${currentRetryAttempt}/${MAX_STORAGE_OPERATION_RETRY_ATTEMPTS}`);
+    Logger.logInfo(
+        `Failed to save to storage. Error: ${error}. onyxMethod: ${onyxMethod.name}. retryAttempt: ${currentRetryAttempt}/${MAX_STORAGE_OPERATION_RETRY_ATTEMPTS}`,
+        getRetryLogContext(defaultParams),
+    );
 
     if (error && Str.startsWith(error.message, "Failed to execute 'put' on 'IDBObjectStore'")) {
         Logger.logAlert(`Attempted to set invalid data set in Onyx. Please ensure all data is serializable. Error: ${error}`);
