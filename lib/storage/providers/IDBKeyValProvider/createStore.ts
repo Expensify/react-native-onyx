@@ -89,8 +89,9 @@ function createStore(dbName: string, storeName: string): UseStore {
         };
 
         dbp = IDB.promisifyRequest(request);
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
-        dbp.then(attachHandlers, () => {});
+        dbp.then(attachHandlers, () => {
+            dbp = undefined;
+        });
         return dbp;
     };
 
