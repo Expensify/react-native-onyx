@@ -1321,4 +1321,144 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
         });
     });
+
+    // Regression coverage for Expensify/App#87850 ("[Onyx] Fix extra mount render introduced in useOnyx v3.0.59").
+    // The bug: `subscribe` unconditionally reset `resultRef.current` to a fresh tuple, including on initial mount.
+    // `useSyncExternalStore` then observed a different snapshot reference post-subscribe and scheduled an extra
+    // render per `useOnyx` hook. The fix guards the reset behind `hasMountedRef` so it only runs on re-subscription.
+    describe('initial mount render count', () => {
+        it('should render only once when the key has a value already in Onyx cache', async () => {
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'cached_value');
+
+            let renderCount = 0;
+            const {result} = renderHook(() => {
+                renderCount++;
+                return useOnyx(ONYXKEYS.TEST_KEY);
+            });
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('cached_value');
+            expect(result.current[1].status).toEqual('loaded');
+            // A single render — no extra render caused by subscribe resetting state on initial mount.
+            expect(renderCount).toBe(1);
+        });
+
+        it('should render exactly twice (loading → loaded) when the key is not cached', async () => {
+            let renderCount = 0;
+            const {result} = renderHook(() => {
+                renderCount++;
+                return useOnyx(ONYXKEYS.TEST_KEY);
+            });
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+            // Exactly two renders: initial 'loading' + transition to 'loaded' after the connection callback fires.
+            // If the regression returns, a third render sneaks in from the subscribe-time state reset.
+            expect(renderCount).toBe(2);
+        });
+
+        it('should render exactly twice when the key value is only present in storage', async () => {
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'storage_value');
+
+            let renderCount = 0;
+            const {result} = renderHook(() => {
+                renderCount++;
+                return useOnyx(ONYXKEYS.TEST_KEY);
+            });
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('storage_value');
+            expect(result.current[1].status).toEqual('loaded');
+            expect(renderCount).toBe(2);
+        });
+
+        it('should render exactly twice for a non-cached collection member key', async () => {
+            let renderCount = 0;
+            const {result} = renderHook(() => {
+                renderCount++;
+                return useOnyx(`${ONYXKEYS.COLLECTION.TEST_KEY}1`);
+            });
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+            expect(renderCount).toBe(2);
+        });
+
+        // Covers the `if (hasMountedRef.current)` branch — i.e. the reset that runs on key-change re-subscriptions.
+        // The reset is what makes the hook transition through 'loading' for the new key instead of leaking the
+        // previous key's value/status. These tests verify both the render count AND the loading transition,
+        // so removing the reset (regression in the other direction) is also caught.
+        it('should transition through loading and render exactly 4 times when switching from a cached key to an uncached one', async () => {
+            await Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}A`, 'A_value');
+
+            const renders: Array<{value: unknown; status: string}> = [];
+            const {result, rerender} = renderHook(
+                (key: string) => {
+                    const r = useOnyx(key);
+                    renders.push({value: r[0], status: r[1].status});
+                    return r;
+                },
+                {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}A` as string},
+            );
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('A_value');
+            expect(result.current[1].status).toEqual('loaded');
+            const rendersAfterMount = renders.length;
+            expect(rendersAfterMount).toBe(1);
+
+            await act(async () => {
+                rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}B`);
+            });
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+            // 1 mount render + 3 renders for the key switch (transient stale render, post-subscribe 'loading',
+            // callback-driven 'loaded'). The 'loading' render only happens because the subscribe-time reset
+            // clears the previous key's resultRef — removing the reset makes this assertion fail.
+            expect(renders.length).toBe(4);
+            // Verify the reset took effect: a 'loading' frame must appear after the key change.
+            const postSwitchStatuses = renders.slice(rendersAfterMount).map((r) => r.status);
+            expect(postSwitchStatuses).toContain('loading');
+            expect(postSwitchStatuses[postSwitchStatuses.length - 1]).toBe('loaded');
+        });
+
+        it('should transition through loading and render exactly 3 times when switching between two cached keys', async () => {
+            await Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}A`, 'A_value');
+            await Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}B`, 'B_value');
+
+            const renders: Array<{value: unknown; status: string}> = [];
+            const {result, rerender} = renderHook(
+                (key: string) => {
+                    const r = useOnyx(key);
+                    renders.push({value: r[0], status: r[1].status});
+                    return r;
+                },
+                {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}A` as string},
+            );
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('A_value');
+            expect(renders.length).toBe(1);
+
+            await act(async () => {
+                rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}B`);
+            });
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('B_value');
+            expect(result.current[1].status).toEqual('loaded');
+            // 1 mount render + 2 renders for the cached-to-cached switch.
+            expect(renders.length).toBe(3);
+        });
+    });
 });
