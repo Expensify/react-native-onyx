@@ -2,6 +2,28 @@ import * as IDB from 'idb-keyval';
 import type {UseStore} from 'idb-keyval';
 import * as Logger from '../../../Logger';
 
+/**
+ * Attempts to heal a corrupted IDB by deleting the database entirely.
+ * On success the next `indexedDB.open()` will recreate it from scratch.
+ */
+function healCorruptedDatabase(dbName: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.deleteDatabase(dbName);
+        request.onsuccess = () => {
+            Logger.logInfo('IDB database deleted successfully, will recreate on next operation', {dbName});
+            resolve();
+        };
+        request.onerror = () => {
+            Logger.logAlert('IDB deleteDatabase failed, corruption is unrecoverable', {dbName});
+            reject(request.error ?? new DOMException('Failed to delete corrupted database', 'UnknownError'));
+        };
+        request.onblocked = () => {
+            Logger.logAlert('IDB deleteDatabase blocked by other connections', {dbName});
+            reject(new DOMException('deleteDatabase blocked', 'UnknownError'));
+        };
+    });
+}
+
 // This is a copy of the createStore function from idb-keyval, we need a custom implementation
 // because we need to create the database manually in order to ensure that the store exists before we use it.
 // If the store does not exist, idb-keyval will throw an error
@@ -36,11 +58,11 @@ function createStore(dbName: string, storeName: string): UseStore {
         request.onupgradeneeded = () => request.result.createObjectStore(storeName);
         dbp = IDB.promisifyRequest(request);
 
-        dbp.then(
-            attachHandlers,
-            // eslint-disable-next-line @typescript-eslint/no-empty-function
-            () => {},
-        );
+        dbp.then(attachHandlers, () => {
+            // Clear the cached rejected promise so the next operation retries
+            // with a fresh indexedDB.open() instead of returning the same rejection.
+            dbp = undefined;
+        });
         return dbp;
     };
 
@@ -67,8 +89,9 @@ function createStore(dbName: string, storeName: string): UseStore {
         };
 
         dbp = IDB.promisifyRequest(request);
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
-        dbp.then(attachHandlers, () => {});
+        dbp.then(attachHandlers, () => {
+            dbp = undefined;
+        });
         return dbp;
     };
 
@@ -80,6 +103,10 @@ function createStore(dbName: string, storeName: string): UseStore {
 
     // If the connection was closed between getDB() resolving and db.transaction() executing,
     // the transaction throws InvalidStateError. We catch it and retry once with a fresh connection.
+    //
+    // If the LevelDB backing store is corrupted (Chromium-specific), we attempt to heal by
+    // deleting the database and retrying. If healing fails, the error propagates up to
+    // tryOrDegradePerformance which falls back to MemoryOnlyProvider.
     return (txMode, callback) =>
         executeTransaction(txMode, callback).catch((error) => {
             if (error instanceof DOMException && error.name === 'InvalidStateError') {
@@ -93,6 +120,17 @@ function createStore(dbName: string, storeName: string): UseStore {
                 // Retry only once — this call is not wrapped, so if it also fails the error propagates normally.
                 return executeTransaction(txMode, callback);
             }
+
+            if (error instanceof DOMException && error.message.includes('Internal error opening backing store')) {
+                Logger.logAlert('IDB backing store corrupted, attempting to heal', {
+                    dbName,
+                    storeName,
+                    errorMessage: error.message,
+                });
+                dbp = undefined;
+                return healCorruptedDatabase(dbName).then(() => executeTransaction(txMode, callback));
+            }
+
             throw error;
         });
 }

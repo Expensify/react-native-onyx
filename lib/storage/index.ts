@@ -26,32 +26,26 @@ function degradePerformance(error: Error) {
 }
 
 /**
- * Runs a piece of code and degrades performance if certain errors are thrown
+ * Runs a piece of code and degrades performance if certain errors are thrown.
+ * Catches both sync throws and async rejections from the storage provider.
  */
 function tryOrDegradePerformance<T>(fn: () => Promise<T> | T, waitForInitialization = true): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-        const promise = waitForInitialization ? initPromise : Promise.resolve();
+    const waitPromise = waitForInitialization ? initPromise : Promise.resolve();
 
-        promise.then(() => {
-            try {
-                resolve(fn());
-            } catch (error) {
-                // Test for known critical errors that the storage provider throws, e.g. when storage is full
-                if (error instanceof Error) {
-                    // IndexedDB error when storage is full (https://github.com/Expensify/App/issues/29403)
-                    if (error.message.includes('Internal error opening backing store for indexedDB.open')) {
-                        degradePerformance(error);
-                    }
-
-                    // catch the error if DB connection can not be established/DB can not be created
-                    if (error.message.includes('IDBKeyVal store could not be created')) {
-                        degradePerformance(error);
-                    }
-                }
-
-                reject(error);
+    return waitPromise.then(() => fn()).catch((error) => {
+        if (error instanceof Error) {
+            // IndexedDB error when backing store is corrupted (https://github.com/Expensify/App/issues/87862)
+            if (error.message.includes('Internal error opening backing store for indexedDB.open')) {
+                degradePerformance(error);
             }
-        });
+
+            // DB connection could not be established / DB could not be created
+            if (error.message.includes('IDBKeyVal store could not be created')) {
+                degradePerformance(error);
+            }
+        }
+
+        throw error;
     });
 }
 
