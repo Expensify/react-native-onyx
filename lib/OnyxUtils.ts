@@ -831,22 +831,32 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, on
     const errorMessage = error?.message?.toLowerCase?.();
     const errorName = error?.name?.toLowerCase?.();
     const isStorageCapacityError = STORAGE_ERRORS.some((storageError) => errorName?.includes(storageError) || errorMessage?.includes(storageError));
+    const isConnectionError = CONNECTION_ERRORS.some((connError) => errorName?.includes(connError) || errorMessage?.includes(connError));
 
     if (nextRetryAttempt > MAX_STORAGE_OPERATION_RETRY_ATTEMPTS) {
-        Logger.logAlert(`Storage operation failed after 5 retries. Error: ${error}. onyxMethod: ${onyxMethod.name}.`);
+        if (isConnectionError) {
+            Logger.logAlert(`Connection error exhausted all retries with backoff. Error: ${error}. onyxMethod: ${onyxMethod.name}.`);
+        } else {
+            Logger.logAlert(`Storage operation failed after 5 retries. Error: ${error}. onyxMethod: ${onyxMethod.name}.`);
+        }
         return Promise.resolve();
     }
 
     if (!isStorageCapacityError) {
         const delay = getRetryDelay(currentRetryAttempt);
-        const isConnectionError = CONNECTION_ERRORS.some((connError) => errorName?.includes(connError) || errorMessage?.includes(connError));
 
         if (isConnectionError) {
             Logger.logInfo(`Connection error detected, retrying with backoff (${delay}ms). Error: ${error}. onyxMethod: ${onyxMethod.name}. retryAttempt: ${nextRetryAttempt}/${MAX_STORAGE_OPERATION_RETRY_ATTEMPTS}`);
         }
 
-        // @ts-expect-error No overload matches this call.
-        return wait(delay).then(() => onyxMethod(defaultParams, nextRetryAttempt));
+        return wait(delay).then(() =>
+            // @ts-expect-error No overload matches this call.
+            onyxMethod(defaultParams, nextRetryAttempt).then(() => {
+                if (isConnectionError) {
+                    Logger.logInfo(`Connection error recovered after backoff on attempt ${nextRetryAttempt}/${MAX_STORAGE_OPERATION_RETRY_ATTEMPTS}. onyxMethod: ${onyxMethod.name}.`);
+                }
+            }),
+        );
     }
 
     // Find the least recently accessed evictable key that we can remove

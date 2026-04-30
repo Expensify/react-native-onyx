@@ -578,6 +578,40 @@ describe('OnyxUtils', () => {
             }
         });
 
+        it('should log recovery when connection error succeeds after backoff', async () => {
+            jest.useFakeTimers();
+            try {
+                const logInfoSpy = jest.spyOn(Logger, 'logInfo');
+                const connectionError = new Error('Connection to Indexed Database server lost. Refresh the page to try again');
+                StorageMock.setItem = jest.fn(StorageMock.setItem).mockRejectedValueOnce(connectionError).mockImplementation(StorageMock.setItem);
+
+                const setPromise = Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+                await jest.runAllTimersAsync();
+                await setPromise;
+
+                expect(logInfoSpy).toHaveBeenCalledWith(expect.stringContaining('Connection error recovered after backoff on attempt'));
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+
+        it('should log connection-specific exhaustion message when all retries fail', async () => {
+            jest.useFakeTimers();
+            try {
+                const logAlertSpy = jest.spyOn(Logger, 'logAlert');
+                const connectionError = new Error('Connection to Indexed Database server lost. Refresh the page to try again');
+                StorageMock.setItem = jest.fn().mockRejectedValue(connectionError);
+
+                const setPromise = Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+                await jest.runAllTimersAsync();
+                await setPromise;
+
+                expect(logAlertSpy).toHaveBeenCalledWith(expect.stringContaining('Connection error exhausted all retries with backoff'));
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+
         it('should NOT apply backoff delay for capacity errors (immediate retry with eviction)', async () => {
             const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
             StorageMock.setItem = jest.fn().mockRejectedValue(diskFullError);
