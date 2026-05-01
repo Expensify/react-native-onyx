@@ -851,8 +851,8 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, on
             );
         }
 
-        // @ts-expect-error No overload matches this call.
         return wait(delay).then(() =>
+            // @ts-expect-error No overload matches this call.
             Promise.resolve(onyxMethod(defaultParams, nextRetryAttempt)).then(() => {
                 if (!isConnectionError) {
                     return;
