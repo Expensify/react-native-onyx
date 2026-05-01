@@ -538,9 +538,7 @@ describe('OnyxUtils', () => {
                 await setPromise;
 
                 // Filter setTimeout calls to only those from our wait() helper (delay > 0)
-                const backoffDelays = setTimeoutSpy.mock.calls
-                    .map((call) => call[1])
-                    .filter((delay): delay is number => typeof delay === 'number' && delay > 0);
+                const backoffDelays = setTimeoutSpy.mock.calls.map((call) => call[1]).filter((delay): delay is number => typeof delay === 'number' && delay > 0);
 
                 // Should have 5 backoff delays (one before each of the 5 retries, attempts 0-4)
                 // The 6th call to retryOperation (attempt 5) hits the MAX check and resolves without waiting
@@ -619,9 +617,7 @@ describe('OnyxUtils', () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
             // Capacity errors should not trigger any backoff delays (delay > 0)
-            const backoffDelays = setTimeoutSpy.mock.calls
-                .map((call) => call[1])
-                .filter((delay): delay is number => typeof delay === 'number' && delay > 0);
+            const backoffDelays = setTimeoutSpy.mock.calls.map((call) => call[1]).filter((delay): delay is number => typeof delay === 'number' && delay > 0);
 
             expect(backoffDelays).toHaveLength(0);
             setTimeoutSpy.mockRestore();
