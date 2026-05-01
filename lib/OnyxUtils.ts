@@ -849,14 +849,13 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, on
             Logger.logInfo(`Connection error detected, retrying with backoff (${delay}ms). Error: ${error}. onyxMethod: ${onyxMethod.name}. retryAttempt: ${nextRetryAttempt}/${MAX_STORAGE_OPERATION_RETRY_ATTEMPTS}`);
         }
 
-        return wait(delay).then(() =>
-            // @ts-expect-error No overload matches this call.
-            onyxMethod(defaultParams, nextRetryAttempt).then(() => {
-                if (isConnectionError) {
-                    Logger.logInfo(`Connection error recovered after backoff on attempt ${nextRetryAttempt}/${MAX_STORAGE_OPERATION_RETRY_ATTEMPTS}. onyxMethod: ${onyxMethod.name}.`);
-                }
-            }),
-        );
+        // @ts-expect-error No overload matches this call.
+        return wait(delay).then(() => Promise.resolve(onyxMethod(defaultParams, nextRetryAttempt)).then(() => {
+            if (!isConnectionError) {
+                return;
+            }
+            Logger.logInfo(`Connection error recovered after backoff on attempt ${nextRetryAttempt}/${MAX_STORAGE_OPERATION_RETRY_ATTEMPTS}. onyxMethod: ${onyxMethod.name}.`);
+        }));
     }
 
     // Find the least recently accessed evictable key that we can remove
