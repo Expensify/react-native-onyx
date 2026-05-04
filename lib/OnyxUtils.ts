@@ -1379,7 +1379,6 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
     // collection, `partial` holds the new values being set and `previous` holds the cached values
     // from before the set, which keysChanged() uses to skip subscribers whose value didn't change.
     const collectionBatches = new Map<string, {partial: Record<string, OnyxValue<OnyxKey>>; previous: Record<string, OnyxValue<OnyxKey>>}>();
-    const nonCollectionPairs: Array<[string, OnyxValue<OnyxKey>]> = [];
 
     for (const [key, value] of keyValuePairsToSet) {
         // When we use multiSet to set a key we want to clear the current delta changes from Onyx.merge that were queued
@@ -1403,9 +1402,11 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
             batch.partial[key] = value;
             batch.previous[key] = previousValue;
         } else {
-            // Non-collection keys are notified individually — no batching.
+            // Non-collection keys are notified inline (cache.set + keyChanged in iteration order)
+            // so re-entrant callbacks (e.g. Onyx.set inside a callback) see consistent cache
+            // and subscriber state, matching the original per-key notification semantics.
             cache.set(key, value);
-            nonCollectionPairs.push([key, value]);
+            keyChanged(key, value);
         }
     }
 
@@ -1413,11 +1414,6 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
     // keysChanged() internally decide which individual member subscribers need notification.
     for (const [collectionKey, batch] of collectionBatches) {
         keysChanged(collectionKey as CollectionKeyBase, batch.partial, batch.previous);
-    }
-
-    // Non-collection keys go through the regular per-key notification path.
-    for (const [key, value] of nonCollectionPairs) {
-        keyChanged(key, value);
     }
 
     const keyValuePairsToStore = keyValuePairsToSet.filter((keyValuePair) => {

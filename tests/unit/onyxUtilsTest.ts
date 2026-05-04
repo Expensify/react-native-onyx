@@ -74,6 +74,7 @@ const testMergeChanges: GenericDeepRecord[] = [
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
+    TEST_KEY_2: 'test2',
     COLLECTION: {
         TEST_KEY: 'test_',
         TEST_LEVEL_KEY: 'test_level_',
@@ -466,6 +467,54 @@ describe('OnyxUtils', () => {
 
             // Despite 3 changed members, callback should fire at most once before disconnect stops it
             expect(callback).toHaveBeenCalledTimes(1);
+        });
+
+        it('should keep cache and subscriber state consistent when a non-collection callback writes to another payload key', async () => {
+            // A subscriber for keyA synchronously calls Onyx.set() on keyB during its callback.
+            // After multiSet completes, the cache must reflect the multiSet's value for keyB
+            // (multiSet wins), and the keyB subscriber's last seen value must equal the cache.
+            await Onyx.multiSet({[ONYXKEYS.TEST_KEY]: 'initialA', [ONYXKEYS.TEST_KEY_2]: 'initialB'});
+
+            const callbackA = jest.fn((value: unknown) => {
+                if (value !== 'newA') {
+                    return;
+                }
+
+                // While processing the new value of keyA, write to keyB.
+                // keyB is later in the same multiSet payload — multiSet should win.
+                Onyx.set(ONYXKEYS.TEST_KEY_2, 'callbackB');
+            });
+            const callbackB = jest.fn();
+
+            const connA = Onyx.connect({
+                key: ONYXKEYS.TEST_KEY,
+                callback: callbackA,
+                initWithStoredValues: false,
+            });
+            const connB = Onyx.connect({
+                key: ONYXKEYS.TEST_KEY_2,
+                callback: callbackB,
+                initWithStoredValues: false,
+            });
+            await waitForPromisesToResolve();
+            callbackA.mockClear();
+            callbackB.mockClear();
+
+            await Onyx.multiSet({
+                [ONYXKEYS.TEST_KEY]: 'newA',
+                [ONYXKEYS.TEST_KEY_2]: 'multiSetB',
+            });
+
+            // Cache reflects multiSet's payload value for keyB (the multiSet's later cache.set wins)
+            expect(OnyxCache.get(ONYXKEYS.TEST_KEY_2)).toBe('multiSetB');
+
+            expect(callbackB.mock.calls.length).toBe(2);
+            expect(callbackB.mock.calls.at(0)?.[0]).toBe('callbackB');
+            // keyB subscriber's last received value matches the cache (no stale callback)
+            expect(callbackB.mock.calls.at(1)?.[0]).toBe('multiSetB');
+
+            Onyx.disconnect(connA);
+            Onyx.disconnect(connB);
         });
     });
 
