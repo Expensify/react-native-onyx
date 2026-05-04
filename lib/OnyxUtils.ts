@@ -613,9 +613,6 @@ function keysChanged<TKey extends CollectionKeyBase>(
 
 /**
  * When a key change happens, search for any callbacks matching the key or collection key and trigger those callbacks
- *
- * @example
- * keyChanged(key, value, subscriber => subscriber.initWithStoredValues === false)
  */
 function keyChanged<TKey extends OnyxKey>(
     key: TKey,
@@ -820,13 +817,11 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, on
  * Notifies subscribers and writes current value to cache
  */
 function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>, hasChanged?: boolean): void {
-    // Update subscribers if the cached value has changed, or when the subscriber specifically requires
-    // all updates regardless of value changes (indicated by initWithStoredValues set to false).
     if (hasChanged) {
         cache.set(key, value);
     }
 
-    keyChanged(key, value, (subscriber) => hasChanged || subscriber?.initWithStoredValues === false);
+    keyChanged(key, value, () => !!hasChanged);
 }
 
 function hasPendingMergeForKey(key: OnyxKey): boolean {
@@ -1069,10 +1064,6 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
     // to avoid having to loop through all the Subscribers all the time (even when just one connection belongs to one key),
     // We create a mapping from key to lists of subscriptionIDs to access the specific list of subscriptionIDs.
     storeKeyBySubscriptions(mapping.key, callbackToStateMapping[subscriptionID].subscriptionID);
-
-    if (mapping.initWithStoredValues === false) {
-        return subscriptionID;
-    }
 
     // Commit connection only after init passes
     deferredInitTask.promise

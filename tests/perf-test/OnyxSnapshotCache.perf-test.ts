@@ -37,12 +37,10 @@ const complexSelector: UseOnyxSelector<OnyxKey, ComplexSelectorResult> = (data) 
 
 const selectorOptions: UseOnyxOptions<string, number | undefined> = {
     selector: simpleSelector,
-    initWithStoredValues: true,
 };
 
 const complexSelectorOptions: UseOnyxOptions<string, ComplexSelectorResult> = {
     selector: complexSelector,
-    initWithStoredValues: true,
 };
 
 // Mock results

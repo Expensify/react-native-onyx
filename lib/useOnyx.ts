@@ -14,12 +14,6 @@ type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (da
 
 type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
     /**
-     * If set to `false`, then no data will be prefilled into the component.
-     * @deprecated This param is going to be removed soon. Use RAM-only keys instead.
-     */
-    initWithStoredValues?: boolean;
-
-    /**
      * If set to `false`, the connection won't be reused between other subscribers that are listening to the same Onyx key
      * with the same connect configurations.
      */
@@ -97,11 +91,10 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
     // Stores the previously result returned by the hook, containing the data from cache and the fetch status.
     // We initialize it to `undefined` and `loading` fetch status to simulate the initial result when the hook is loading from the cache.
-    // However, if `initWithStoredValues` is `false` we set the fetch status to `loaded` since we want to signal that data is ready.
     const resultRef = useRef<UseOnyxResult<TReturnValue>>([
         undefined,
         {
-            status: options?.initWithStoredValues === false ? 'loaded' : 'loading',
+            status: 'loading',
         },
     ]);
 
@@ -133,9 +126,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         () =>
             onyxSnapshotCache.registerConsumer({
                 selector: options?.selector,
-                initWithStoredValues: options?.initWithStoredValues,
             }),
-        [options?.selector, options?.initWithStoredValues],
+        [options?.selector],
     );
 
     useEffect(() => () => onyxSnapshotCache.deregisterConsumer(key, cacheKey), [key, cacheKey]);
@@ -174,24 +166,14 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
     const getSnapshot = useCallback(() => {
         // Check if we have any cache for this Onyx key
-        // Don't use cache for first connection with initWithStoredValues: false
-        // Also don't use cache during active data updates (when shouldGetCachedValueRef is true)
+        // Don't use cache during active data updates (when shouldGetCachedValueRef is true)
         const isFirstConnection = connectedKeyRef.current !== key;
-        if (!(isFirstConnection && options?.initWithStoredValues === false) && !shouldGetCachedValueRef.current) {
+        if (!shouldGetCachedValueRef.current) {
             const cachedResult = onyxSnapshotCache.getCachedResult<UseOnyxResult<TReturnValue>>(key, cacheKey);
             if (cachedResult !== undefined) {
                 resultRef.current = cachedResult;
                 return cachedResult;
             }
-        }
-
-        // We return the initial result right away during the first connection if `initWithStoredValues` is set to `false`.
-        if (isFirstConnection && options?.initWithStoredValues === false) {
-            const result = resultRef.current;
-
-            // Store result in snapshot cache
-            onyxSnapshotCache.setCachedResult<UseOnyxResult<TReturnValue>>(key, cacheKey, result);
-            return result;
         }
 
         // We get the value from cache while the first connection to Onyx is being made or if the key has changed,
@@ -255,7 +237,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         }
 
         return resultRef.current;
-    }, [options?.initWithStoredValues, key, memoizedSelector, cacheKey]);
+    }, [key, memoizedSelector, cacheKey]);
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
@@ -266,7 +248,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                 previousValueRef.current = null;
                 newValueRef.current = null;
                 sourceValueRef.current = undefined;
-                resultRef.current = [undefined, {status: options?.initWithStoredValues === false ? 'loaded' : 'loading'}];
+                resultRef.current = [undefined, {status: 'loading'}];
             }
             // Force a cache re-read on every (re)subscription so any side effects from
             // subscribeToKey (e.g. addNullishStorageKey for skippable collection member ids)
@@ -299,7 +281,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                     // Finally, we signal that the store changed, making `getSnapshot()` be called again.
                     onStoreChange();
                 },
-                initWithStoredValues: options?.initWithStoredValues,
                 waitForCollectionCallback: OnyxKeys.isCollectionKey(key) as true,
                 reuseConnection: options?.reuseConnection,
             });
@@ -315,7 +296,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                 onStoreChangeFnRef.current = null;
             };
         },
-        [key, options?.initWithStoredValues, options?.reuseConnection],
+        [key, options?.reuseConnection],
     );
 
     const result = useSyncExternalStore<UseOnyxResult<TReturnValue>>(subscribe, getSnapshot);

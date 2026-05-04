@@ -38,22 +38,20 @@ describe('OnyxSnapshotCache', () => {
             };
             const optionsWithSelector: UseOnyxOptions<OnyxKey, string> = {
                 selector,
-                initWithStoredValues: true,
             };
-            const optionsWithoutSelector: UseOnyxOptions<OnyxKey, string> = {
-                initWithStoredValues: false,
-            };
+            const optionsWithoutSelector: UseOnyxOptions<OnyxKey, string> = {};
             const keyWithSelector = cache.registerConsumer(optionsWithSelector);
             const keyWithoutSelector = cache.registerConsumer(optionsWithoutSelector);
             const keyWithUndefined = cache.registerConsumer({});
 
             // Different option combinations should produce different cache keys
-            expect(keyWithSelector).toContain('0_'); // Should contain selector ID
+            expect(keyWithSelector).toContain('0'); // Should contain selector ID
             expect(keyWithoutSelector).toContain('no_selector'); // Should indicate no selector
             expect(keyWithUndefined).toContain('no_selector'); // Should indicate no selector
 
-            // All keys should be unique
-            expect(new Set([keyWithSelector, keyWithoutSelector, keyWithUndefined]).size).toBe(3);
+            // Selector key is unique; the two no-selector keys are equal
+            expect(keyWithSelector).not.toEqual(keyWithoutSelector);
+            expect(keyWithoutSelector).toEqual(keyWithUndefined);
         });
 
         it('should store and retrieve cached results', () => {
