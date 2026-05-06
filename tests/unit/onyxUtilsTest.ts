@@ -74,6 +74,7 @@ const testMergeChanges: GenericDeepRecord[] = [
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
+    TEST_KEY_2: 'test2',
     COLLECTION: {
         TEST_KEY: 'test_',
         TEST_LEVEL_KEY: 'test_level_',
@@ -263,6 +264,257 @@ describe('OnyxUtils', () => {
             });
 
             await Onyx.disconnect(connection);
+        });
+    });
+
+    describe('multiSetWithRetry', () => {
+        it('should fire collection-level callback only once per collection even with multiple members', async () => {
+            const collectionCallback = jest.fn();
+            const connection = Onyx.connect({
+                key: ONYXKEYS.COLLECTION.TEST_KEY,
+                callback: collectionCallback,
+                waitForCollectionCallback: true,
+                initWithStoredValues: false,
+            });
+
+            await waitForPromisesToResolve();
+            collectionCallback.mockClear();
+
+            // multiSet with 3 members of the same collection
+            await Onyx.multiSet({
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}1`]: {id: 1},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}2`]: {id: 2},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}3`]: {id: 3},
+            });
+
+            // Should be called only ONCE with the batched collection (not 3 times)
+            expect(collectionCallback).toHaveBeenCalledTimes(1);
+            const [collection] = collectionCallback.mock.calls[0];
+            expect(collection[`${ONYXKEYS.COLLECTION.TEST_KEY}1`]).toEqual({id: 1});
+            expect(collection[`${ONYXKEYS.COLLECTION.TEST_KEY}2`]).toEqual({id: 2});
+            expect(collection[`${ONYXKEYS.COLLECTION.TEST_KEY}3`]).toEqual({id: 3});
+
+            Onyx.disconnect(connection);
+        });
+
+        it('should fire individual member-key subscribers once per key', async () => {
+            const spy1 = jest.fn();
+            const spy2 = jest.fn();
+            const spy3 = jest.fn();
+
+            const conn1 = Onyx.connect({key: `${ONYXKEYS.COLLECTION.TEST_KEY}1`, callback: spy1, initWithStoredValues: false});
+            const conn2 = Onyx.connect({key: `${ONYXKEYS.COLLECTION.TEST_KEY}2`, callback: spy2, initWithStoredValues: false});
+            const conn3 = Onyx.connect({key: `${ONYXKEYS.COLLECTION.TEST_KEY}3`, callback: spy3, initWithStoredValues: false});
+            await waitForPromisesToResolve();
+            spy1.mockClear();
+            spy2.mockClear();
+            spy3.mockClear();
+
+            await Onyx.multiSet({
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}1`]: {id: 1},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}2`]: {id: 2},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}3`]: {id: 3},
+            });
+
+            expect(spy1).toHaveBeenCalledTimes(1);
+            expect(spy1).toHaveBeenCalledWith({id: 1}, `${ONYXKEYS.COLLECTION.TEST_KEY}1`);
+            expect(spy2).toHaveBeenCalledTimes(1);
+            expect(spy2).toHaveBeenCalledWith({id: 2}, `${ONYXKEYS.COLLECTION.TEST_KEY}2`);
+            expect(spy3).toHaveBeenCalledTimes(1);
+            expect(spy3).toHaveBeenCalledWith({id: 3}, `${ONYXKEYS.COLLECTION.TEST_KEY}3`);
+
+            Onyx.disconnect(conn1);
+            Onyx.disconnect(conn2);
+            Onyx.disconnect(conn3);
+        });
+
+        it('should notify non-collection keys individually alongside batched collection updates', async () => {
+            const collectionCallback = jest.fn();
+            const singleKeyCallback = jest.fn();
+
+            const connCollection = Onyx.connect({
+                key: ONYXKEYS.COLLECTION.TEST_KEY,
+                callback: collectionCallback,
+                waitForCollectionCallback: true,
+                initWithStoredValues: false,
+            });
+            const connSingle = Onyx.connect({
+                key: ONYXKEYS.TEST_KEY,
+                callback: singleKeyCallback,
+                initWithStoredValues: false,
+            });
+            await waitForPromisesToResolve();
+            collectionCallback.mockClear();
+            singleKeyCallback.mockClear();
+
+            // Mix of collection members and a non-collection key
+            await Onyx.multiSet({
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}1`]: {id: 1},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}2`]: {id: 2},
+                [ONYXKEYS.TEST_KEY]: 'standalone',
+            });
+
+            // Collection callback fires once (batched)
+            expect(collectionCallback).toHaveBeenCalledTimes(1);
+            // Non-collection key callback fires once
+            expect(singleKeyCallback).toHaveBeenCalledTimes(1);
+            expect(singleKeyCallback).toHaveBeenCalledWith('standalone', ONYXKEYS.TEST_KEY);
+
+            Onyx.disconnect(connCollection);
+            Onyx.disconnect(connSingle);
+        });
+
+        it('should batch notifications per-collection when members span multiple collections', async () => {
+            const testCallback = jest.fn();
+            const routesCallback = jest.fn();
+
+            const connTest = Onyx.connect({
+                key: ONYXKEYS.COLLECTION.TEST_KEY,
+                callback: testCallback,
+                waitForCollectionCallback: true,
+                initWithStoredValues: false,
+            });
+            const connRoutes = Onyx.connect({
+                key: ONYXKEYS.COLLECTION.ROUTES,
+                callback: routesCallback,
+                waitForCollectionCallback: true,
+                initWithStoredValues: false,
+            });
+            await waitForPromisesToResolve();
+            testCallback.mockClear();
+            routesCallback.mockClear();
+
+            // multiSet with members of two different collections
+            await Onyx.multiSet({
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}1`]: {id: 1},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}2`]: {id: 2},
+                [`${ONYXKEYS.COLLECTION.ROUTES}A`]: {name: 'A'},
+                [`${ONYXKEYS.COLLECTION.ROUTES}B`]: {name: 'B'},
+            });
+
+            // Each collection callback fires once
+            expect(testCallback).toHaveBeenCalledTimes(1);
+            expect(routesCallback).toHaveBeenCalledTimes(1);
+
+            Onyx.disconnect(connTest);
+            Onyx.disconnect(connRoutes);
+        });
+
+        it('should pass previous values to keysChanged so unchanged members skip notification', async () => {
+            // Set initial data
+            const initial1 = {id: 1, name: 'A'};
+            const initial2 = {id: 2, name: 'B'};
+            await Onyx.multiSet({
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}1`]: initial1,
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}2`]: initial2,
+            });
+
+            const spy1 = jest.fn();
+            const spy2 = jest.fn();
+            const conn1 = Onyx.connect({key: `${ONYXKEYS.COLLECTION.TEST_KEY}1`, callback: spy1, initWithStoredValues: false});
+            const conn2 = Onyx.connect({key: `${ONYXKEYS.COLLECTION.TEST_KEY}2`, callback: spy2, initWithStoredValues: false});
+            await waitForPromisesToResolve();
+            spy1.mockClear();
+            spy2.mockClear();
+
+            // multiSet: change key 1, keep key 2 with same content (but new reference)
+            await Onyx.multiSet({
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}1`]: {id: 1, name: 'A-updated'},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}2`]: initial2,
+            });
+
+            // Key 1 subscriber fires (value changed)
+            expect(spy1).toHaveBeenCalledTimes(1);
+            expect(spy1).toHaveBeenCalledWith({id: 1, name: 'A-updated'}, `${ONYXKEYS.COLLECTION.TEST_KEY}1`);
+
+            // Key 2 keeps the same reference (passed as-is in multiSet) — subscriber should not fire
+            // because keysChanged sees the same reference as previousCollection[key]
+            expect(spy2).not.toHaveBeenCalled();
+
+            Onyx.disconnect(conn1);
+            Onyx.disconnect(conn2);
+        });
+
+        it('should stop firing callbacks for a collection subscriber that disconnects itself mid-batch', async () => {
+            // A collection subscriber (waitForCollectionCallback=false) disconnects itself when
+            // it receives the first member. Subsequent changed members in the same batch must NOT
+            // trigger further callbacks for this subscriber.
+            const callback = jest.fn();
+            let connection: ReturnType<typeof Onyx.connect>;
+
+            callback.mockImplementation(() => {
+                if (!connection) {
+                    return;
+                }
+
+                Onyx.disconnect(connection);
+            });
+
+            connection = Onyx.connect({
+                key: ONYXKEYS.COLLECTION.TEST_KEY,
+                callback,
+                waitForCollectionCallback: false,
+                initWithStoredValues: false,
+            });
+            await waitForPromisesToResolve();
+            callback.mockClear();
+
+            await Onyx.multiSet({
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}1`]: {id: 1},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}2`]: {id: 2},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}3`]: {id: 3},
+            });
+
+            // Despite 3 changed members, callback should fire at most once before disconnect stops it
+            expect(callback).toHaveBeenCalledTimes(1);
+        });
+
+        it('should keep cache and subscriber state consistent when a non-collection callback writes to another payload key', async () => {
+            // A subscriber for keyA synchronously calls Onyx.set() on keyB during its callback.
+            // After multiSet completes, the cache must reflect the multiSet's value for keyB
+            // (multiSet wins), and the keyB subscriber's last seen value must equal the cache.
+            await Onyx.multiSet({[ONYXKEYS.TEST_KEY]: 'initialA', [ONYXKEYS.TEST_KEY_2]: 'initialB'});
+
+            const callbackA = jest.fn((value: unknown) => {
+                if (value !== 'newA') {
+                    return;
+                }
+
+                // While processing the new value of keyA, write to keyB.
+                // keyB is later in the same multiSet payload — multiSet should win.
+                Onyx.set(ONYXKEYS.TEST_KEY_2, 'callbackB');
+            });
+            const callbackB = jest.fn();
+
+            const connA = Onyx.connect({
+                key: ONYXKEYS.TEST_KEY,
+                callback: callbackA,
+                initWithStoredValues: false,
+            });
+            const connB = Onyx.connect({
+                key: ONYXKEYS.TEST_KEY_2,
+                callback: callbackB,
+                initWithStoredValues: false,
+            });
+            await waitForPromisesToResolve();
+            callbackA.mockClear();
+            callbackB.mockClear();
+
+            await Onyx.multiSet({
+                [ONYXKEYS.TEST_KEY]: 'newA',
+                [ONYXKEYS.TEST_KEY_2]: 'multiSetB',
+            });
+
+            // Cache reflects multiSet's payload value for keyB (the multiSet's later cache.set wins)
+            expect(OnyxCache.get(ONYXKEYS.TEST_KEY_2)).toBe('multiSetB');
+
+            expect(callbackB.mock.calls.length).toBe(2);
+            expect(callbackB.mock.calls.at(0)?.[0]).toBe('callbackB');
+            // keyB subscriber's last received value matches the cache (no stale callback)
+            expect(callbackB.mock.calls.at(1)?.[0]).toBe('multiSetB');
+
+            Onyx.disconnect(connA);
+            Onyx.disconnect(connB);
         });
     });
 

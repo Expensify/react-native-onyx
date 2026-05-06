@@ -550,6 +550,16 @@ function keysChanged<TKey extends CollectionKeyBase>(
     const previousCollection = partialPreviousCollection ?? {};
     const changedMemberKeys = Object.keys(partialCollection ?? {});
 
+    // Add or remove the keys from the recentlyAccessedKeys list
+    for (const memberKey of changedMemberKeys) {
+        const value = partialCollection?.[memberKey];
+        if (value !== null && value !== undefined) {
+            cache.addLastAccessedKey(memberKey, false);
+        } else {
+            cache.removeLastAccessedKey(memberKey);
+        }
+    }
+
     // Use indexed lookup instead of scanning all subscribers.
     // We need subscribers for: (1) the collection key itself, and (2) individual changed member keys.
     const collectionSubscriberIDs = onyxKeyToSubscriptionIDs.get(collectionKey) ?? [];
@@ -578,12 +588,20 @@ function keysChanged<TKey extends CollectionKeyBase>(
                 continue;
             }
 
-            // Not using waitForCollectionCallback — notify per changed key
+            // Not using waitForCollectionCallback — notify per changed key.
+            // Re-check the subscription on each iteration because the callback may
+            // synchronously disconnect itself (removing it from callbackToStateMapping),
+            // in which case we must stop firing further callbacks for this subscriber.
             for (const dataKey of changedMemberKeys) {
+                const currentSubscriber = callbackToStateMapping[subID];
+                if (!currentSubscriber || typeof currentSubscriber.callback !== 'function') {
+                    break;
+                }
                 if (cachedCollection[dataKey] === previousCollection[dataKey]) {
                     continue;
                 }
-                subscriber.callback(cachedCollection[dataKey], dataKey);
+                const currentSubscriberCallback = currentSubscriber.callback as DefaultConnectCallback<TKey>;
+                currentSubscriberCallback(cachedCollection[dataKey], dataKey as TKey);
             }
         } catch (error) {
             Logger.logAlert(`[OnyxUtils.keysChanged] Subscriber callback threw an error for key '${collectionKey}': ${error}`);
@@ -1356,6 +1374,12 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
 
     const keyValuePairsToSet = OnyxUtils.prepareKeyValuePairsForStorage(newData, true);
 
+    // Group collection members by their parent collection key so each collection can be notified
+    // via a single batched keysChanged() call instead of one keyChanged() per member. For each
+    // collection, `partial` holds the new values being set and `previous` holds the cached values
+    // from before the set, which keysChanged() uses to skip subscribers whose value didn't change.
+    const collectionBatches = new Map<string, {partial: Record<string, OnyxValue<OnyxKey>>; previous: Record<string, OnyxValue<OnyxKey>>}>();
+
     for (const [key, value] of keyValuePairsToSet) {
         // When we use multiSet to set a key we want to clear the current delta changes from Onyx.merge that were queued
         // before the value was set. If Onyx.merge is currently reading the old value from storage, it will then not apply the changes.
@@ -1363,9 +1387,33 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
             delete OnyxUtils.getMergeQueue()[key];
         }
 
-        // Update cache and optimistically inform subscribers
-        cache.set(key, value);
-        keyChanged(key, value);
+        const collectionKey = OnyxKeys.getCollectionKey(key);
+        if (collectionKey && OnyxKeys.isCollectionMemberKey(collectionKey, key)) {
+            // Capture the previous cached value BEFORE calling cache.set() so keysChanged()
+            // can diff old vs new per-member.
+            const previousValue = cache.get(key);
+            cache.set(key, value);
+
+            let batch = collectionBatches.get(collectionKey);
+            if (!batch) {
+                batch = {partial: {}, previous: {}};
+                collectionBatches.set(collectionKey, batch);
+            }
+            batch.partial[key] = value;
+            batch.previous[key] = previousValue;
+        } else {
+            // Non-collection keys are notified inline (cache.set + keyChanged in iteration order)
+            // so re-entrant callbacks (e.g. Onyx.set inside a callback) see consistent cache
+            // and subscriber state, matching the original per-key notification semantics.
+            cache.set(key, value);
+            keyChanged(key, value);
+        }
+    }
+
+    // One keysChanged() per collection — fires each collection-level subscriber once and lets
+    // keysChanged() internally decide which individual member subscribers need notification.
+    for (const [collectionKey, batch] of collectionBatches) {
+        keysChanged(collectionKey as CollectionKeyBase, batch.partial, batch.previous);
     }
 
     const keyValuePairsToStore = keyValuePairsToSet.filter((keyValuePair) => {
