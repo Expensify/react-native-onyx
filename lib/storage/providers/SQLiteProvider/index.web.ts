@@ -244,7 +244,7 @@ async function initAsync(): Promise<void> {
     } catch (opfsError) {
         // If opfs-sahpool is not available, fall back to in-memory
         // (the main thread will handle the full IDB fallback)
-        console.error('opfs-sahpool VFS not available, using in-memory SQLite:', opfsError);
+        console.error('[Onyx] opfs-sahpool VFS not available, using in-memory SQLite:', opfsError);
         db = new sqlite3.oo1.DB(':memory:');
     }
 

@@ -111,7 +111,7 @@ function createWorkerStorageProvider(backend: 'sqlite' | 'idb'): StorageProvider
             worker = new Worker(new URL('./worker.js', import.meta.url), {type: 'module'});
             worker.onmessage = handleWorkerMessage;
             worker.onerror = (error) => {
-                console.error('Storage worker error:', error);
+                console.error('[Onyx] Storage worker error:', error);
             };
 
             provider.store = worker;
@@ -119,7 +119,7 @@ function createWorkerStorageProvider(backend: 'sqlite' | 'idb'): StorageProvider
             // Send init message with the chosen backend and return the Promise
             // so that Storage.init() can await worker readiness.
             return postToWorker<void>({type: 'init', backend}).catch((error) => {
-                console.error('Failed to initialize storage worker:', error);
+                console.error('[Onyx] Failed to initialize storage worker:', error);
             });
         },
 

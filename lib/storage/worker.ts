@@ -177,7 +177,7 @@ async function handleMessage(msg: WorkerMessage): Promise<void> {
                     await sqliteModule.initAsync();
                     provider = sqliteProvider;
                 } catch (sqliteError) {
-                    console.error('SQLite WASM init failed, falling back to IDB:', sqliteError);
+                    console.error('[Onyx] SQLite WASM init failed, falling back to IDB:', sqliteError);
                     const idbModule = await import('./providers/IDBKeyValProvider');
                     provider = idbModule.default;
                     provider.init();
