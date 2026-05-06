@@ -72,23 +72,8 @@ If the requested key is a collection, it will return an object with all the coll
 <dt><a href="#sendDataToConnection">sendDataToConnection()</a></dt>
 <dd><p>Sends the data obtained from the keys to the connection.</p>
 </dd>
-<dt><a href="#addKeyToRecentlyAccessedIfNeeded">addKeyToRecentlyAccessedIfNeeded()</a></dt>
-<dd><p>We check to see if this key is flagged as safe for eviction and add it to the recentlyAccessedKeys list so that when we
-run out of storage the least recently accessed key can be removed.</p>
-</dd>
 <dt><a href="#getCollectionDataAndSendAsObject">getCollectionDataAndSendAsObject()</a></dt>
 <dd><p>Gets the data for a given an array of matching keys, combines them into an object, and sends the result back to the subscriber.</p>
-</dd>
-<dt><a href="#prepareSubscriberUpdate">prepareSubscriberUpdate(callback)</a></dt>
-<dd><p>Delays promise resolution until the next macrotask to prevent race condition if the key subscription is in progress.</p>
-</dd>
-<dt><a href="#scheduleSubscriberUpdate">scheduleSubscriberUpdate()</a></dt>
-<dd><p>Schedules an update that will be appended to the macro task queue (so it doesn&#39;t update the subscribers immediately).</p>
-</dd>
-<dt><a href="#scheduleNotifyCollectionSubscribers">scheduleNotifyCollectionSubscribers()</a></dt>
-<dd><p>This method is similar to scheduleSubscriberUpdate but it is built for working specifically with collections
-so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
-subscriber callbacks receive the data in a different format than they normally expect and it breaks code.</p>
 </dd>
 <dt><a href="#remove">remove()</a></dt>
 <dd><p>Remove a key from Onyx and update the subscribers</p>
@@ -159,6 +144,9 @@ that this internal function allows passing an additional <code>mergeReplaceNullP
 <dd><p>Sets keys in a collection by replacing all targeted collection members with new values.
 Any existing collection members not included in the new data will not be removed.
 Retries on failure.</p>
+</dd>
+<dt><a href="#getCallbackToStateMapping">getCallbackToStateMapping()</a></dt>
+<dd><p>Getter - returns the callback to state mapping, useful in test environments.</p>
 </dd>
 <dt><a href="#clearOnyxUtilsInternals">clearOnyxUtilsInternals()</a></dt>
 <dd><p>Clear internal variables used in this file, useful in test environments.</p>
@@ -338,46 +326,10 @@ keyChanged(key, value, subscriber => subscriber.initWithStoredValues === false)
 Sends the data obtained from the keys to the connection.
 
 **Kind**: global function  
-<a name="addKeyToRecentlyAccessedIfNeeded"></a>
-
-## addKeyToRecentlyAccessedIfNeeded()
-We check to see if this key is flagged as safe for eviction and add it to the recentlyAccessedKeys list so that when we
-run out of storage the least recently accessed key can be removed.
-
-**Kind**: global function  
 <a name="getCollectionDataAndSendAsObject"></a>
 
 ## getCollectionDataAndSendAsObject()
 Gets the data for a given an array of matching keys, combines them into an object, and sends the result back to the subscriber.
-
-**Kind**: global function  
-<a name="prepareSubscriberUpdate"></a>
-
-## prepareSubscriberUpdate(callback)
-Delays promise resolution until the next macrotask to prevent race condition if the key subscription is in progress.
-
-**Kind**: global function  
-
-| Param | Description |
-| --- | --- |
-| callback | The keyChanged/keysChanged callback |
-
-<a name="scheduleSubscriberUpdate"></a>
-
-## scheduleSubscriberUpdate()
-Schedules an update that will be appended to the macro task queue (so it doesn't update the subscribers immediately).
-
-**Kind**: global function  
-**Example**  
-```js
-scheduleSubscriberUpdate(key, value, subscriber => subscriber.initWithStoredValues === false)
-```
-<a name="scheduleNotifyCollectionSubscribers"></a>
-
-## scheduleNotifyCollectionSubscribers()
-This method is similar to scheduleSubscriberUpdate but it is built for working specifically with collections
-so that keysChanged() is triggered for the collection and not keyChanged(). If this was not done, then the
-subscriber callbacks receive the data in a different format than they normally expect and it breaks code.
 
 **Kind**: global function  
 <a name="remove"></a>
@@ -570,6 +522,12 @@ Retries on failure.
 | params.collection | Object collection keyed by individual collection member keys and values |
 | retryAttempt | retry attempt |
 
+<a name="getCallbackToStateMapping"></a>
+
+## getCallbackToStateMapping()
+Getter - returns the callback to state mapping, useful in test environments.
+
+**Kind**: global function  
 <a name="clearOnyxUtilsInternals"></a>
 
 ## clearOnyxUtilsInternals()

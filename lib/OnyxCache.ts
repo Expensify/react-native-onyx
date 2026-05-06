@@ -2,8 +2,18 @@ import {deepEqual} from 'fast-equals';
 import bindAll from 'lodash/bindAll';
 import type {ValueOf} from 'type-fest';
 import utils from './utils';
-import type {OnyxKey, OnyxValue} from './types';
+import type {CollectionKeyBase, KeyValueMapping, NonUndefined, OnyxCollection, OnyxKey, OnyxValue} from './types';
 import OnyxKeys from './OnyxKeys';
+
+/** Frozen object containing all collection members — safe to return by reference */
+type CollectionSnapshot = Readonly<NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>>>;
+
+/**
+ * Stable frozen empty object used as the canonical value for empty collections.
+ * Returning the same reference avoids unnecessary re-renders in useSyncExternalStore,
+ * which relies on === equality to detect changes.
+ */
+const FROZEN_EMPTY_COLLECTION: Readonly<NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>>> = Object.freeze({});
 
 // Task constants
 const TASK = {
@@ -25,14 +35,8 @@ class OnyxCache {
     /** A list of keys where a nullish value has been fetched from storage before, but the key still exists in cache */
     private nullishStorageKeys: Set<OnyxKey>;
 
-    /** Unique list of keys maintained in access order (most recent at the end) */
-    private recentKeys: Set<OnyxKey>;
-
     /** A map of cached values */
     private storageMap: Record<OnyxKey, OnyxValue<OnyxKey>>;
-
-    /** Cache of complete collection data objects for O(1) retrieval */
-    private collectionData: Record<OnyxKey, Record<OnyxKey, OnyxValue<OnyxKey>>>;
 
     /**
      * Captured pending tasks for already running storage methods
@@ -40,25 +44,25 @@ class OnyxCache {
      */
     private pendingPromises: Map<string, Promise<OnyxValue<OnyxKey> | OnyxKey[]>>;
 
-    /** Maximum size of the keys store din cache */
-    private maxRecentKeysSize = 0;
-
     /** List of keys that are safe to remove when we reach max storage */
     private evictionAllowList: OnyxKey[] = [];
-
-    /** Map of keys and connection arrays whose keys will never be automatically evicted */
-    private evictionBlocklist: Record<OnyxKey, string[] | undefined> = {};
 
     /** List of keys that have been directly subscribed to or recently modified from least to most recent */
     private recentlyAccessedKeys = new Set<OnyxKey>();
 
+    /** Frozen collection snapshots for structural sharing */
+    private collectionSnapshots: Map<OnyxKey, CollectionSnapshot>;
+
+    /** Collections whose snapshots need rebuilding (lazy — rebuilt on next read) */
+    private dirtyCollections: Set<CollectionKeyBase>;
+
     constructor() {
         this.storageKeys = new Set();
         this.nullishStorageKeys = new Set();
-        this.recentKeys = new Set();
         this.storageMap = {};
-        this.collectionData = {};
         this.pendingPromises = new Map();
+        this.collectionSnapshots = new Map();
+        this.dirtyCollections = new Set();
 
         // bind all public methods to prevent problems with `this`
         bindAll(
@@ -76,20 +80,16 @@ class OnyxCache {
             'hasPendingTask',
             'getTaskPromise',
             'captureTask',
-            'addToAccessedKeys',
-            'removeLeastRecentlyUsedKeys',
-            'setRecentKeysLimit',
             'setAllKeys',
             'setEvictionAllowList',
-            'getEvictionBlocklist',
             'isEvictableKey',
             'removeLastAccessedKey',
             'addLastAccessedKey',
             'addEvictableKeysToRecentlyAccessedList',
             'getKeyForEviction',
             'setCollectionKeys',
-            'getCollectionData',
             'hasValueChanged',
+            'getCollectionData',
         );
     }
 
@@ -144,14 +144,8 @@ class OnyxCache {
         return this.storageMap[key] !== undefined || this.hasNullishStorageKey(key);
     }
 
-    /**
-     * Get a cached value from storage
-     * @param [shouldReindexCache] – This is an LRU cache, and by default accessing a value will make it become last in line to be evicted. This flag can be used to skip that and just access the value directly without side-effects.
-     */
-    get(key: OnyxKey, shouldReindexCache = true): OnyxValue<OnyxKey> {
-        if (shouldReindexCache) {
-            this.addToAccessedKeys(key);
-        }
+    /** Get a cached value from storage */
+    get(key: OnyxKey): OnyxValue<OnyxKey> {
         return this.storageMap[key];
     }
 
@@ -161,31 +155,27 @@ class OnyxCache {
      */
     set(key: OnyxKey, value: OnyxValue<OnyxKey>): OnyxValue<OnyxKey> {
         this.addKey(key);
-        this.addToAccessedKeys(key);
 
         // When a key is explicitly set in cache, we can remove it from the list of nullish keys,
         // since it will either be set to a non nullish value or removed from the cache completely.
         this.nullishStorageKeys.delete(key);
 
         const collectionKey = OnyxKeys.getCollectionKey(key);
+        const oldValue = this.storageMap[key];
+
         if (value === null || value === undefined) {
             delete this.storageMap[key];
 
-            // Remove from collection data cache if it's a collection member
-            if (collectionKey && this.collectionData[collectionKey]) {
-                delete this.collectionData[collectionKey][key];
+            if (collectionKey && oldValue !== undefined) {
+                this.dirtyCollections.add(collectionKey);
             }
             return undefined;
         }
 
         this.storageMap[key] = value;
 
-        // Update collection data cache if this is a collection member
-        if (collectionKey) {
-            if (!this.collectionData[collectionKey]) {
-                this.collectionData[collectionKey] = {};
-            }
-            this.collectionData[collectionKey][key] = value;
+        if (collectionKey && oldValue !== value) {
+            this.dirtyCollections.add(collectionKey);
         }
 
         return value;
@@ -195,19 +185,17 @@ class OnyxCache {
     drop(key: OnyxKey): void {
         delete this.storageMap[key];
 
-        // Remove from collection data cache if this is a collection member
         const collectionKey = OnyxKeys.getCollectionKey(key);
-        if (collectionKey && this.collectionData[collectionKey]) {
-            delete this.collectionData[collectionKey][key];
+        if (collectionKey) {
+            this.dirtyCollections.add(collectionKey);
         }
 
-        // If this is a collection key, clear its data
+        // If this is a collection key, clear its snapshot
         if (OnyxKeys.isCollectionKey(key)) {
-            delete this.collectionData[key];
+            this.collectionSnapshots.delete(key);
         }
 
         this.storageKeys.delete(key);
-        this.recentKeys.delete(key);
         OnyxKeys.deregisterMemberKey(key);
     }
 
@@ -220,37 +208,53 @@ class OnyxCache {
             throw new Error('data passed to cache.merge() must be an Object of onyx key/value pairs');
         }
 
-        this.storageMap = {
-            ...utils.fastMerge(this.storageMap, data, {
-                shouldRemoveNestedNulls: true,
-                objectRemovalMode: 'replace',
-            }).result,
-        };
+        const affectedCollections = new Set<OnyxKey>();
 
         for (const [key, value] of Object.entries(data)) {
             this.addKey(key);
-            this.addToAccessedKeys(key);
 
             const collectionKey = OnyxKeys.getCollectionKey(key);
 
-            if (value === null || value === undefined) {
+            if (value === undefined) {
                 this.addNullishStorageKey(key);
+                // undefined means "no change" — skip storageMap modification
+                continue;
+            }
 
-                // Remove from collection data cache if it's a collection member
-                if (collectionKey && this.collectionData[collectionKey]) {
-                    delete this.collectionData[collectionKey][key];
+            if (value === null) {
+                this.addNullishStorageKey(key);
+                delete this.storageMap[key];
+
+                if (collectionKey) {
+                    affectedCollections.add(collectionKey);
                 }
             } else {
                 this.nullishStorageKeys.delete(key);
 
-                // Update collection data cache if this is a collection member
+                // Per-key merge instead of spreading the entire storageMap
+                const existing = this.storageMap[key];
+                const merged = utils.fastMerge(existing, value, {
+                    shouldRemoveNestedNulls: true,
+                    objectRemovalMode: 'replace',
+                }).result;
+
+                // fastMerge is reference-stable: returns the original target when
+                // nothing changed, so a simple === check detects no-ops.
+                if (merged === existing) {
+                    continue;
+                }
+
+                this.storageMap[key] = merged;
+
                 if (collectionKey) {
-                    if (!this.collectionData[collectionKey]) {
-                        this.collectionData[collectionKey] = {};
-                    }
-                    this.collectionData[collectionKey][key] = this.storageMap[key];
+                    affectedCollections.add(collectionKey);
                 }
             }
+        }
+
+        // Mark affected collections as dirty — snapshots will be lazily rebuilt on next read
+        for (const collectionKey of affectedCollections) {
+            this.dirtyCollections.add(collectionKey);
         }
     }
 
@@ -287,56 +291,12 @@ class OnyxCache {
         return returnPromise;
     }
 
-    /** Adds a key to the top of the recently accessed keys */
-    addToAccessedKeys(key: OnyxKey): void {
-        this.recentKeys.delete(key);
-        this.recentKeys.add(key);
-    }
-
-    /** Remove keys that don't fall into the range of recently used keys */
-    removeLeastRecentlyUsedKeys(): void {
-        const numKeysToRemove = this.recentKeys.size - this.maxRecentKeysSize;
-        if (numKeysToRemove <= 0) {
-            return;
-        }
-
-        const iterator = this.recentKeys.values();
-        const keysToRemove: OnyxKey[] = [];
-
-        const recentKeysArray = Array.from(this.recentKeys);
-        const mostRecentKey = recentKeysArray[recentKeysArray.length - 1];
-
-        let iterResult = iterator.next();
-        while (!iterResult.done) {
-            const key = iterResult.value;
-            // Don't consider the most recently accessed key for eviction
-            // This ensures we don't immediately evict a key we just added
-            if (key !== undefined && key !== mostRecentKey && this.isEvictableKey(key)) {
-                keysToRemove.push(key);
-            }
-            iterResult = iterator.next();
-        }
-
-        for (const key of keysToRemove) {
-            delete this.storageMap[key];
-
-            // Remove from collection data cache if this is a collection member
-            const collectionKey = OnyxKeys.getCollectionKey(key);
-            if (collectionKey && this.collectionData[collectionKey]) {
-                delete this.collectionData[collectionKey][key];
-            }
-            this.recentKeys.delete(key);
-        }
-    }
-
-    /** Set the recent keys list size */
-    setRecentKeysLimit(limit: number): void {
-        this.maxRecentKeysSize = limit;
-    }
-
-    /** Check if the value has changed */
+    /** Check if the value has changed. Uses reference equality as a fast path, falls back to deep equality. */
     hasValueChanged(key: OnyxKey, value: OnyxValue<OnyxKey>): boolean {
-        const currentValue = this.get(key, false);
+        const currentValue = this.storageMap[key];
+        if (currentValue === value) {
+            return false;
+        }
         return !deepEqual(currentValue, value);
     }
 
@@ -346,13 +306,6 @@ class OnyxCache {
      */
     setEvictionAllowList(keys: OnyxKey[]): void {
         this.evictionAllowList = keys;
-    }
-
-    /**
-     * Get the eviction block list that prevents keys from being evicted
-     */
-    getEvictionBlocklist(): Record<OnyxKey, string[] | undefined> {
-        return this.evictionBlocklist;
     }
 
     /**
@@ -408,15 +361,12 @@ class OnyxCache {
     }
 
     /**
-     * Finds a key that can be safely evicted
+     * Finds the least recently accessed key that can be safely evicted from storage.
      */
     getKeyForEviction(): OnyxKey | undefined {
-        for (const key of this.recentlyAccessedKeys) {
-            if (!this.evictionBlocklist[key]) {
-                return key;
-            }
-        }
-        return undefined;
+        // recentlyAccessedKeys is ordered from least to most recently accessed,
+        // so the first element is the best candidate for eviction.
+        return this.recentlyAccessedKeys.values().next().value;
     }
 
     /**
@@ -425,26 +375,103 @@ class OnyxCache {
     setCollectionKeys(collectionKeys: Set<OnyxKey>): void {
         OnyxKeys.setCollectionKeys(collectionKeys);
 
-        // Initialize collection data for existing collection keys
+        // Initialize frozen snapshots for collection keys
         for (const collectionKey of collectionKeys) {
-            if (this.collectionData[collectionKey]) {
-                continue;
+            if (!this.collectionSnapshots.has(collectionKey)) {
+                this.collectionSnapshots.set(collectionKey, Object.freeze({}));
             }
-            this.collectionData[collectionKey] = {};
         }
     }
 
     /**
-     * Get all data for a collection key
+     * Rebuilds the frozen collection snapshot from current storageMap references.
+     * Uses the indexed collection->members map for O(collectionMembers) instead of O(totalKeys).
+     * Returns the previous snapshot reference when all member references are identical,
+     * preventing unnecessary re-renders in useSyncExternalStore.
+     *
+     * @param collectionKey - The collection key to rebuild
+     */
+    private rebuildCollectionSnapshot(collectionKey: OnyxKey): void {
+        const previousSnapshot = this.collectionSnapshots.get(collectionKey);
+
+        const members: NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>> = {};
+        let hasMemberChanges = false;
+
+        // Use the indexed forward lookup for O(collectionMembers) iteration.
+        // Falls back to scanning all storageKeys if the index isn't populated yet.
+        const memberKeys = OnyxKeys.getMembersOfCollection(collectionKey);
+        const keysToScan = memberKeys ?? this.storageKeys;
+        const needsPrefixCheck = !memberKeys;
+
+        for (const key of keysToScan) {
+            // When using the fallback path (scanning all storageKeys instead of the indexed
+            // forward lookup), skip keys that don't belong to this collection.
+            if (needsPrefixCheck && OnyxKeys.getCollectionKey(key) !== collectionKey) {
+                continue;
+            }
+            const val = this.storageMap[key];
+            // Skip null/undefined values — they represent deleted or unset keys
+            // and should not be included in the frozen collection snapshot.
+            if (val !== undefined && val !== null) {
+                members[key] = val;
+
+                // Check if this member's reference changed from the old snapshot
+                if (!hasMemberChanges && (!previousSnapshot || previousSnapshot[key] !== val)) {
+                    hasMemberChanges = true;
+                }
+            }
+        }
+
+        // Check if any members were removed from the previous snapshot.
+        // We can't rely on count comparison alone — if one key is removed and another added,
+        // the counts match but the snapshot content is different.
+        if (!hasMemberChanges && previousSnapshot) {
+            // eslint-disable-next-line no-restricted-syntax
+            for (const key in previousSnapshot) {
+                if (!(key in members)) {
+                    hasMemberChanges = true;
+                    break;
+                }
+            }
+        }
+
+        // If nothing actually changed, reuse the old snapshot reference.
+        // This is critical: useSyncExternalStore uses === to detect changes,
+        // so returning the same reference prevents unnecessary re-renders.
+        if (!hasMemberChanges && previousSnapshot) {
+            return;
+        }
+
+        Object.freeze(members);
+
+        this.collectionSnapshots.set(collectionKey, members);
+    }
+
+    /**
+     * Get all data for a collection key.
+     * Returns a frozen snapshot with structural sharing — safe to return by reference.
+     * Lazily rebuilds the snapshot if the collection was modified since the last read.
      */
     getCollectionData(collectionKey: OnyxKey): Record<OnyxKey, OnyxValue<OnyxKey>> | undefined {
-        const cachedCollection = this.collectionData[collectionKey];
-        if (!cachedCollection || Object.keys(cachedCollection).length === 0) {
+        if (this.dirtyCollections.has(collectionKey)) {
+            this.rebuildCollectionSnapshot(collectionKey);
+            this.dirtyCollections.delete(collectionKey);
+        }
+
+        const snapshot = this.collectionSnapshots.get(collectionKey);
+        if (utils.isEmptyObject(snapshot)) {
+            // We check storageKeys.size (not collection-specific keys) to distinguish
+            // "init complete, this collection is genuinely empty" from "init not done yet."
+            // During init, setAllKeys loads ALL keys at once — so if any key exists,
+            // the full storage picture is loaded and an empty collection is truly empty.
+            // Returning undefined before init prevents subscribers from seeing a false empty state.
+            if (this.storageKeys.size > 0) {
+                return FROZEN_EMPTY_COLLECTION;
+            }
             return undefined;
         }
 
-        // Return a shallow copy to ensure React detects changes when items are added/removed
-        return {...cachedCollection};
+        return snapshot;
     }
 }
 

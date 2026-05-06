@@ -1,7 +1,6 @@
 import {act, renderHook} from '@testing-library/react-native';
 import type {OnyxCollection, OnyxEntry, OnyxKey} from '../../lib';
 import Onyx, {useOnyx} from '../../lib';
-import OnyxCache from '../../lib/OnyxCache';
 import StorageMock from '../../lib/storage';
 import type GenericCollection from '../utils/GenericCollection';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
@@ -14,7 +13,6 @@ const ONYXKEYS = {
     COLLECTION: {
         TEST_KEY: 'test_',
         TEST_KEY_2: 'test2_',
-        EVICTABLE_TEST_KEY: 'evictable_test_',
         RAM_ONLY_COLLECTION: 'ramOnlyCollection_',
     },
     RAM_ONLY_KEY: 'ramOnlyKey',
@@ -23,7 +21,6 @@ const ONYXKEYS = {
 
 Onyx.init({
     keys: ONYXKEYS,
-    evictableKeys: [ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY],
     skippableCollectionMemberIDs: ['skippable-id'],
     ramOnlyKeys: [ONYXKEYS.RAM_ONLY_KEY, ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYXKEYS.RAM_ONLY_WITH_INITIAL_VALUE],
 });
@@ -1113,6 +1110,54 @@ describe('useOnyx', () => {
             expect(result.current[0]).toBeUndefined();
             expect(result.current[1].status).toEqual('loaded');
         });
+
+        it('should return undefined and loaded state when switching from a valid key to a skippable one', async () => {
+            await Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}1`, {id: '1'});
+            // Seed a value directly in storage for the skippable key.
+            // If the subscription is NOT skipped, Onyx would load this and return it.
+            // Asserting undefined below proves the subscription was actually suppressed.
+            await StorageMock.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`, {id: 'skippable'});
+
+            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string});
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual({id: '1'});
+            expect(result.current[1].status).toEqual('loaded');
+
+            await act(async () => {
+                rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`);
+            });
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should transition through loading and return value when switching from a skippable key to a valid one', async () => {
+            // Seed a value for the skippable key — must stay invisible to the hook
+            await StorageMock.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`, {id: 'skippable'});
+            // Seed the target valid key in storage only (not in cache) so the switch goes through loading
+            await StorageMock.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}1`, {id: '1'});
+
+            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id` as string});
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+
+            // Switch to a valid key whose value is in storage but not in cache — should transition through loading
+            rerender(`${ONYXKEYS.COLLECTION.TEST_KEY}1`);
+
+            expect(result.current[1].status).toEqual('loading');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual({id: '1'});
+            expect(result.current[1].status).toEqual('loaded');
+        });
     });
 
     describe('RAM-only keys', () => {
@@ -1224,87 +1269,6 @@ describe('useOnyx', () => {
 
             expect(result.current[0]).toBeUndefined();
             expect(result.current[1].status).toEqual('loaded');
-        });
-    });
-
-    // This test suite must be the last one to avoid problems when running the other tests here.
-    describe('canEvict', () => {
-        const error = (key: string) => `canEvict can't be used on key '${key}'. This key must explicitly be flagged as safe for removal by adding it to Onyx.init({evictableKeys: []}).`;
-
-        beforeEach(() => {
-            jest.spyOn(console, 'error').mockImplementation(jest.fn);
-        });
-
-        afterEach(() => {
-            (console.error as unknown as jest.SpyInstance<void, Parameters<typeof console.error>>).mockRestore();
-        });
-
-        it('should throw an error when trying to set the "canEvict" property for a non-evictable key', async () => {
-            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
-
-            try {
-                renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {canEvict: false}));
-
-                await act(async () => waitForPromisesToResolve());
-
-                fail('Expected to throw an error.');
-            } catch (e) {
-                expect((e as Error).message).toBe(error(ONYXKEYS.TEST_KEY));
-            }
-        });
-
-        it('should add the connection to the blocklist when setting "canEvict" to false', async () => {
-            Onyx.mergeCollection(ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY, {
-                [`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
-            } as GenericCollection);
-
-            renderHook(() => useOnyx(`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`, {canEvict: false}));
-
-            await act(async () => waitForPromisesToResolve());
-
-            const evictionBlocklist = OnyxCache.getEvictionBlocklist();
-            expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]).toHaveLength(1);
-        });
-
-        it('should handle removal/adding the connection to the blocklist properly when changing the evictable key to another', async () => {
-            Onyx.mergeCollection(ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY, {
-                [`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
-                [`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
-            } as GenericCollection);
-
-            const {rerender} = renderHook((key: string) => useOnyx(key, {canEvict: false}), {initialProps: `${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1` as string});
-
-            await act(async () => waitForPromisesToResolve());
-
-            const evictionBlocklist = OnyxCache.getEvictionBlocklist();
-            expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]).toHaveLength(1);
-            expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry2`]).toBeUndefined();
-
-            await act(async () => {
-                rerender(`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry2`);
-            });
-
-            expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]).toBeUndefined();
-            expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry2`]).toHaveLength(1);
-        });
-
-        it('should remove the connection from the blocklist when setting "canEvict" to true', async () => {
-            Onyx.mergeCollection(ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY, {
-                [`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
-            } as GenericCollection);
-
-            const {rerender} = renderHook((canEvict: boolean) => useOnyx(`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`, {canEvict}), {initialProps: false as boolean});
-
-            await act(async () => waitForPromisesToResolve());
-
-            const evictionBlocklist = OnyxCache.getEvictionBlocklist();
-            expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]).toHaveLength(1);
-
-            await act(async () => {
-                rerender(true);
-            });
-
-            expect(evictionBlocklist[`${ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY}entry1`]).toBeUndefined();
         });
     });
 });
