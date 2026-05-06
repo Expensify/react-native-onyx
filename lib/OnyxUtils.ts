@@ -64,6 +64,24 @@ const STORAGE_ERRORS = [...IDB_STORAGE_ERRORS, ...SQLITE_STORAGE_ERRORS];
 // Max number of retries for failed storage operations
 const MAX_STORAGE_OPERATION_RETRY_ATTEMPTS = 5;
 
+// Connection/state errors where the DB needs time to recover — backoff helps, eviction does not
+const IDB_CONNECTION_ERRORS = [
+    'internal error opening backing store', // Chrome/Edge: corrupted IDB state
+    'connection to indexed database server lost', // Safari: IDB connection dropped
+    'the database connection is closing', // Cross-browser: DB closing during write
+] as const;
+
+const SQLITE_CONNECTION_ERRORS = [
+    'disk i/o error', // Native: filesystem/device stress
+    'database is locked', // Native: concurrent access contention
+] as const;
+
+const CONNECTION_ERRORS = [...IDB_CONNECTION_ERRORS, ...SQLITE_CONNECTION_ERRORS];
+
+// Retry backoff configuration
+const RETRY_BASE_DELAY_MS = 100;
+const RETRY_JITTER_FACTOR = 0.25;
+
 type OnyxMethod = ValueOf<typeof METHOD>;
 
 // Key/value store of Onyx key and arrays of values to merge
@@ -775,6 +793,26 @@ function remove<TKey extends OnyxKey>(key: TKey, isProcessingCollectionUpdate?: 
     return Storage.removeItem(key).then(() => undefined);
 }
 
+/**
+ * Returns a promise that resolves after the given number of milliseconds.
+ */
+function wait(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+        setTimeout(resolve, ms);
+    });
+}
+
+/**
+ * Calculates exponential backoff delay with jitter for a given retry attempt.
+ * Formula: baseDelay * 2^attempt ± jitter
+ * Attempt 0: ~100ms, Attempt 1: ~200ms, ..., Attempt 4: ~1600ms
+ */
+function getRetryDelay(attempt: number): number {
+    const baseDelay = RETRY_BASE_DELAY_MS * 2 ** attempt;
+    const jitter = baseDelay * RETRY_JITTER_FACTOR * (2 * Math.random() - 1);
+    return Math.max(0, Math.round(baseDelay + jitter));
+}
+
 function reportStorageQuota(error?: Error): Promise<void> {
     return Storage.getDatabaseSize()
         .then(({bytesUsed, bytesRemaining}) => {
@@ -805,15 +843,35 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, on
     const errorMessage = error?.message?.toLowerCase?.();
     const errorName = error?.name?.toLowerCase?.();
     const isStorageCapacityError = STORAGE_ERRORS.some((storageError) => errorName?.includes(storageError) || errorMessage?.includes(storageError));
+    const isConnectionError = CONNECTION_ERRORS.some((connError) => errorName?.includes(connError) || errorMessage?.includes(connError));
 
     if (nextRetryAttempt > MAX_STORAGE_OPERATION_RETRY_ATTEMPTS) {
-        Logger.logAlert(`Storage operation failed after 5 retries. Error: ${error}. onyxMethod: ${onyxMethod.name}.`);
+        if (isConnectionError) {
+            Logger.logAlert(`Connection error exhausted all retries with backoff. Error: ${error}. onyxMethod: ${onyxMethod.name}.`);
+        } else {
+            Logger.logAlert(`Storage operation failed after 5 retries. Error: ${error}. onyxMethod: ${onyxMethod.name}.`);
+        }
         return Promise.resolve();
     }
 
     if (!isStorageCapacityError) {
-        // @ts-expect-error No overload matches this call.
-        return onyxMethod(defaultParams, nextRetryAttempt);
+        const delay = getRetryDelay(currentRetryAttempt);
+
+        if (isConnectionError) {
+            Logger.logInfo(
+                `Connection error detected, retrying with backoff (${delay}ms). Error: ${error}. onyxMethod: ${onyxMethod.name}. retryAttempt: ${nextRetryAttempt}/${MAX_STORAGE_OPERATION_RETRY_ATTEMPTS}`,
+            );
+        }
+
+        return wait(delay).then(() =>
+            // @ts-expect-error No overload matches this call.
+            Promise.resolve(onyxMethod(defaultParams, nextRetryAttempt)).then(() => {
+                if (!isConnectionError) {
+                    return;
+                }
+                Logger.logInfo(`Connection error recovered after backoff on attempt ${nextRetryAttempt}/${MAX_STORAGE_OPERATION_RETRY_ATTEMPTS}. onyxMethod: ${onyxMethod.name}.`);
+            }),
+        );
     }
 
     // Find the least recently accessed evictable key that we can remove

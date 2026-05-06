@@ -78,6 +78,14 @@ If the requested key is a collection, it will return an object with all the coll
 <dt><a href="#remove">remove()</a></dt>
 <dd><p>Remove a key from Onyx and update the subscribers</p>
 </dd>
+<dt><a href="#wait">wait()</a></dt>
+<dd><p>Returns a promise that resolves after the given number of milliseconds.</p>
+</dd>
+<dt><a href="#getRetryDelay">getRetryDelay()</a></dt>
+<dd><p>Calculates exponential backoff delay with jitter for a given retry attempt.
+Formula: baseDelay * 2^attempt ± jitter
+Attempt 0: ~100ms, Attempt 1: ~200ms, ..., Attempt 4: ~1600ms</p>
+</dd>
 <dt><a href="#retryOperation">retryOperation()</a></dt>
 <dd><p>Handles storage operation failures based on the error type:</p>
 <ul>
@@ -319,6 +327,20 @@ Gets the data for a given an array of matching keys, combines them into an objec
 
 ## remove()
 Remove a key from Onyx and update the subscribers
+
+**Kind**: global function  
+<a name="wait"></a>
+
+## wait()
+Returns a promise that resolves after the given number of milliseconds.
+
+**Kind**: global function  
+<a name="getRetryDelay"></a>
+
+## getRetryDelay()
+Calculates exponential backoff delay with jitter for a given retry attempt.
+Formula: baseDelay * 2^attempt ± jitter
+Attempt 0: ~100ms, Attempt 1: ~200ms, ..., Attempt 4: ~1600ms
 
 **Kind**: global function  
 <a name="retryOperation"></a>
