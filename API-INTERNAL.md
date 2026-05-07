@@ -299,10 +299,6 @@ When a collection of keys change, search for any callbacks matching the collecti
 When a key change happens, search for any callbacks matching the key or collection key and trigger those callbacks
 
 **Kind**: global function  
-**Example**  
-```js
-keyChanged(key, value, subscriber => subscriber.initWithStoredValues === false)
-```
 <a name="sendDataToConnection"></a>
 
 ## sendDataToConnection()

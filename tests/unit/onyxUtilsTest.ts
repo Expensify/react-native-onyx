@@ -182,7 +182,6 @@ describe('OnyxUtils', () => {
 
             const connection = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.ROUTES,
-                initWithStoredValues: false,
                 callback: (value) => (result = value),
                 waitForCollectionCallback: true,
             });
@@ -219,7 +218,6 @@ describe('OnyxUtils', () => {
 
             const connection = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.ROUTES,
-                initWithStoredValues: false,
                 callback: (value) => (result = value),
                 waitForCollectionCallback: true,
             });
@@ -243,7 +241,6 @@ describe('OnyxUtils', () => {
 
             const connection = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.ROUTES,
-                initWithStoredValues: false,
                 callback: (value) => (result = value),
                 waitForCollectionCallback: true,
             });
@@ -533,7 +530,6 @@ describe('OnyxUtils', () => {
             const connection = Onyx.connect({
                 key: entryKey,
                 callback: callbackSpy,
-                initWithStoredValues: false,
             });
 
             const entryData = {value: 'updated_data'};
@@ -565,7 +561,6 @@ describe('OnyxUtils', () => {
             const connection = await Onyx.connect({
                 key: entryKey,
                 callback: callbackSpy,
-                initWithStoredValues: false,
             });
 
             // Create partial collection data that includes our member key
@@ -611,7 +606,6 @@ describe('OnyxUtils', () => {
                 key: ONYXKEYS.COLLECTION.TEST_KEY,
                 callback: collectionCallback,
                 waitForCollectionCallback: true,
-                initWithStoredValues: false,
             });
 
             await Onyx.set(entryKey, entryData);
@@ -640,7 +634,6 @@ describe('OnyxUtils', () => {
             const connection = Onyx.connect({
                 key: entryKey,
                 callback: callbackSpy,
-                initWithStoredValues: false,
             });
             await waitForPromisesToResolve();
             callbackSpy.mockClear();
@@ -668,9 +661,9 @@ describe('OnyxUtils', () => {
             const spyA = jest.fn();
             const spyB = jest.fn();
             const spyC = jest.fn();
-            const connA = Onyx.connect({key: keyA, callback: spyA, initWithStoredValues: false});
-            const connB = Onyx.connect({key: keyB, callback: spyB, initWithStoredValues: false});
-            const connC = Onyx.connect({key: keyC, callback: spyC, initWithStoredValues: false});
+            const connA = Onyx.connect({key: keyA, callback: spyA});
+            const connB = Onyx.connect({key: keyB, callback: spyB});
+            const connC = Onyx.connect({key: keyC, callback: spyC});
             await waitForPromisesToResolve();
             spyA.mockClear();
             spyB.mockClear();
@@ -700,15 +693,16 @@ describe('OnyxUtils', () => {
 
             await Onyx.set(entryKey, entryData);
 
-            const failingCallback = jest.fn(() => {
-                throw new Error('subscriber failure');
-            });
+            const failingCallback = jest.fn();
             const workingCallback = jest.fn();
 
-            const connFailing = Onyx.connect({key: entryKey, callback: failingCallback, initWithStoredValues: false});
-            const connWorking = Onyx.connect({key: entryKey, callback: workingCallback, initWithStoredValues: false});
+            const connFailing = Onyx.connect({key: entryKey, callback: failingCallback, reuseConnection: false});
+            const connWorking = Onyx.connect({key: entryKey, callback: workingCallback, reuseConnection: false});
             await waitForPromisesToResolve();
-            failingCallback.mockClear();
+            failingCallback.mockReset();
+            failingCallback.mockImplementation(() => {
+                throw new Error('subscriber failure');
+            });
             workingCallback.mockClear();
 
             // Spy on Logger to verify the error is logged

@@ -36,7 +36,6 @@ describe('Set data while storage is clearing', () => {
         });
         connection = Onyx.connect({
             key: ONYX_KEYS.DEFAULT_KEY,
-            initWithStoredValues: false,
             callback: (val) => (onyxValue = val),
         });
         return waitForPromisesToResolve();
@@ -90,7 +89,6 @@ describe('Set data while storage is clearing', () => {
         let regularKeyOnyxValue: unknown;
         Onyx.connect({
             key: ONYX_KEYS.REGULAR_KEY,
-            initWithStoredValues: false,
             callback: (val) => (regularKeyOnyxValue = val),
         });
         Onyx.set(ONYX_KEYS.REGULAR_KEY, SET_VALUE).then(() => {

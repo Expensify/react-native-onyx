@@ -92,7 +92,6 @@ describe('Onyx', () => {
 
         connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
             },
@@ -109,7 +108,6 @@ describe('Onyx', () => {
 
         connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
             },
@@ -132,7 +130,6 @@ describe('Onyx', () => {
             key: ONYX_KEYS.TEST_KEY,
             callback: mockCallback,
             // True is the default, just setting it here to be explicit
-            initWithStoredValues: true,
         });
 
         return Onyx.set(ONYX_KEYS.TEST_KEY, 'test').then(() => {
@@ -145,7 +142,6 @@ describe('Onyx', () => {
 
         connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
             },
@@ -166,7 +162,6 @@ describe('Onyx', () => {
 
         connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
             },
@@ -187,7 +182,6 @@ describe('Onyx', () => {
 
         connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
             },
@@ -204,7 +198,6 @@ describe('Onyx', () => {
 
         connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
             },
@@ -222,7 +215,6 @@ describe('Onyx', () => {
 
         connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
-            initWithStoredValues: false,
             waitForCollectionCallback: true,
             callback: (value) => {
                 testKeyValue = value;
@@ -240,7 +232,6 @@ describe('Onyx', () => {
 
         connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
             },
@@ -256,7 +247,6 @@ describe('Onyx', () => {
         let testKeyValue: unknown;
         connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
             },
@@ -324,7 +314,6 @@ describe('Onyx', () => {
         let testKeyValue: unknown;
         connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
             },
@@ -348,7 +337,6 @@ describe('Onyx', () => {
         let testKeyValue: unknown;
         connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
             },
@@ -369,7 +357,6 @@ describe('Onyx', () => {
         let testKeyValue: unknown;
         connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
             },
@@ -385,7 +372,6 @@ describe('Onyx', () => {
         let testKeyValue: unknown;
         connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
             },
@@ -402,7 +388,6 @@ describe('Onyx', () => {
 
         connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
             },
@@ -463,7 +448,6 @@ describe('Onyx', () => {
 
         connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
             },
@@ -511,7 +495,6 @@ describe('Onyx', () => {
         let testKeyValue: unknown;
         connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
             },
@@ -520,7 +503,6 @@ describe('Onyx', () => {
         let otherTestKeyValue: unknown;
         connection = Onyx.connect({
             key: ONYX_KEYS.OTHER_TEST,
-            initWithStoredValues: false,
             callback: (value) => {
                 otherTestKeyValue = value;
             },
@@ -570,7 +552,6 @@ describe('Onyx', () => {
 
         connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
             },
@@ -617,7 +598,6 @@ describe('Onyx', () => {
 
         connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => (result = value),
             waitForCollectionCallback: true,
         });
@@ -652,7 +632,6 @@ describe('Onyx', () => {
         let testKeyValue: unknown;
         connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
             },
@@ -668,7 +647,6 @@ describe('Onyx', () => {
         let testKeyValue: unknown;
         connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
             },
@@ -680,14 +658,17 @@ describe('Onyx', () => {
         });
     });
 
-    it('should properly set and merge when using mergeCollection', () => {
+    it('should properly set and merge when using mergeCollection', async () => {
         const valuesReceived: Record<string, unknown> = {};
-        const mockCallback = jest.fn((data) => (valuesReceived[data.ID] = data.value));
+        const mockCallback = jest.fn();
         connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
-            initWithStoredValues: false,
             callback: mockCallback,
         });
+        await waitForPromisesToResolve();
+
+        mockCallback.mockReset();
+        mockCallback.mockImplementation((data) => (valuesReceived[data.ID] = data.value));
 
         // The first time we call mergeCollection we'll be doing a multiSet internally
         return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
@@ -749,7 +730,6 @@ describe('Onyx', () => {
         const valuesReceived: Record<string, unknown> = {};
         connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
-            initWithStoredValues: false,
             callback: (data, key) => (valuesReceived[key] = data),
         });
 
@@ -762,7 +742,6 @@ describe('Onyx', () => {
         const valuesReceived: Record<string, unknown> = {};
         connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
-            initWithStoredValues: false,
             callback: (data, key) => (valuesReceived[key] = data),
         });
 
@@ -887,7 +866,6 @@ describe('Onyx', () => {
         let testKeyValue: unknown;
         connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
             },
@@ -896,7 +874,6 @@ describe('Onyx', () => {
         let otherTestKeyValue: unknown;
         connection = Onyx.connect({
             key: ONYX_KEYS.OTHER_TEST,
-            initWithStoredValues: false,
             callback: (value) => {
                 otherTestKeyValue = value;
             },
@@ -936,15 +913,17 @@ describe('Onyx', () => {
 
     it('should use update data object to merge a collection of keys', () => {
         const valuesReceived: Record<string, unknown> = {};
-        const mockCallback = jest.fn((data) => (valuesReceived[data.ID] = data.value));
+        const mockCallback = jest.fn();
         connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
-            initWithStoredValues: false,
             callback: mockCallback,
         });
 
         return waitForPromisesToResolve()
             .then(() => {
+                mockCallback.mockReset();
+                mockCallback.mockImplementation((data) => (valuesReceived[data.ID] = data.value));
+
                 // Given the initial Onyx state: {test_1: {existingData: 'test',}, test_2: {existingData: 'test',}}
                 Onyx.multiSet({
                     test_1: {
@@ -1012,7 +991,6 @@ describe('Onyx', () => {
         const valuesReceived: Record<string, unknown> = {};
         connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
-            initWithStoredValues: false,
             callback: (data, key) => (valuesReceived[key] = data),
         });
 
@@ -1228,47 +1206,6 @@ describe('Onyx', () => {
         );
     });
 
-    it('should update subscriber if the value in the cache has not changed at all but initWithStoredValues === false', () => {
-        const mockCallback = jest.fn();
-        const collectionUpdate = {
-            testPolicy_1: {ID: 234, value: 'one'},
-        };
-
-        // Given an Onyx.connect call with waitForCollectionCallback=true
-        connection = Onyx.connect({
-            key: ONYX_KEYS.COLLECTION.TEST_POLICY,
-            waitForCollectionCallback: true,
-            callback: mockCallback,
-            initWithStoredValues: false,
-        });
-        return (
-            waitForPromisesToResolve()
-                // When merge is called with an updated collection
-                .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.testPolicy_1))
-                .then(() => {
-                    // Then we expect the callback to have called once. 0 times the initial connect call + 1 time for the merge()
-                    expect(mockCallback).toHaveBeenCalledTimes(1);
-
-                    // And the value for the second call should be collectionUpdate
-                    expect(mockCallback).toHaveBeenNthCalledWith(1, collectionUpdate, ONYX_KEYS.COLLECTION.TEST_POLICY, {testPolicy_1: collectionUpdate.testPolicy_1});
-                })
-
-                // When merge is called again with the same collection not modified
-                .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, collectionUpdate.testPolicy_1))
-                .then(() => {
-                    // Then we should expect another invocation of the callback because initWithStoredValues = false
-                    expect(mockCallback).toHaveBeenCalledTimes(2);
-                })
-
-                // When merge is called again with an object of equivalent value but not the same reference
-                .then(() => Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`, lodashClone(collectionUpdate.testPolicy_1)))
-                .then(() => {
-                    // Then we should expect another invocation of the callback because initWithStoredValues = false
-                    expect(mockCallback).toHaveBeenCalledTimes(3);
-                })
-        );
-    });
-
     it('should return a promise that completes when all update() operations are done', () => {
         const connections: Connection[] = [];
 
@@ -1308,7 +1245,6 @@ describe('Onyx', () => {
 
         connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
             },
@@ -1339,7 +1275,6 @@ describe('Onyx', () => {
 
         connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
             },
@@ -1366,7 +1301,6 @@ describe('Onyx', () => {
 
         connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
             },
@@ -1392,7 +1326,6 @@ describe('Onyx', () => {
 
         connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
             },
@@ -1418,7 +1351,6 @@ describe('Onyx', () => {
 
         connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
             },
@@ -1444,7 +1376,6 @@ describe('Onyx', () => {
 
         connection = Onyx.connect({
             key: ONYX_KEYS.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => {
                 testKeyValue = value;
             },
@@ -1480,7 +1411,6 @@ describe('Onyx', () => {
 
         connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
-            initWithStoredValues: false,
             callback: (value) => (result = value),
             waitForCollectionCallback: true,
         });
@@ -1837,7 +1767,6 @@ describe('Onyx', () => {
 
             connection = Onyx.connect({
                 key: ONYX_KEYS.TEST_KEY,
-                initWithStoredValues: false,
                 callback: (value) => {
                     testKeyValue = value;
                 },
@@ -2271,7 +2200,6 @@ describe('Onyx', () => {
 
             connection = Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.ROUTES,
-                initWithStoredValues: false,
                 callback: (value) => {
                     routesCollection = value;
                 },
@@ -2311,7 +2239,6 @@ describe('Onyx', () => {
 
             connection = Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.ROUTES,
-                initWithStoredValues: false,
                 callback: (value) => {
                     routesCollection = value;
                 },
@@ -2690,7 +2617,6 @@ describe('Onyx', () => {
 
             connection = Onyx.connect({
                 key: ONYX_KEYS.TEST_KEY,
-                initWithStoredValues: false,
                 callback: (value) => (result = value),
             });
 
@@ -2746,7 +2672,6 @@ describe('Onyx', () => {
 
             connection = Onyx.connect({
                 key: ONYX_KEYS.TEST_KEY,
-                initWithStoredValues: false,
                 callback: (value) => {
                     testKeyValue = value;
                 },
@@ -2810,7 +2735,6 @@ describe('Onyx', () => {
 
             connection = Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.ROUTES,
-                initWithStoredValues: false,
                 callback: (value) => (result = value),
                 waitForCollectionCallback: true,
             });
@@ -2839,12 +2763,18 @@ describe('Onyx', () => {
         it('should replace the collection with empty values', async () => {
             let result: OnyxCollection<unknown>;
             const routeA = `${ONYX_KEYS.COLLECTION.ROUTES}A`;
+            const callback = jest.fn();
 
             connection = Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.ROUTES,
-                initWithStoredValues: false,
-                callback: (value) => (result = value),
+                callback,
                 waitForCollectionCallback: true,
+            });
+            await waitForPromisesToResolve();
+
+            callback.mockReset();
+            callback.mockImplementation((value) => {
+                result = value;
             });
 
             await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
@@ -2863,7 +2793,6 @@ describe('Onyx', () => {
 
             connection = Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.ROUTES,
-                initWithStoredValues: false,
                 callback: (value) => (result = value),
                 waitForCollectionCallback: true,
             });
@@ -2935,7 +2864,6 @@ describe('Onyx', () => {
             let testKeyValue: unknown;
             connection = Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
-                initWithStoredValues: false,
                 waitForCollectionCallback: true,
                 callback: (value) => {
                     testKeyValue = value;
@@ -2954,7 +2882,6 @@ describe('Onyx', () => {
             let testKeyValue: unknown;
             connection = Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
-                initWithStoredValues: false,
                 waitForCollectionCallback: true,
                 callback: (value) => {
                     testKeyValue = value;
@@ -2973,7 +2900,6 @@ describe('Onyx', () => {
             let testKeyValue: unknown;
             connection = Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
-                initWithStoredValues: false,
                 waitForCollectionCallback: true,
                 callback: (value) => {
                     testKeyValue = value;
@@ -2996,7 +2922,6 @@ describe('Onyx', () => {
             let testKeyValue: unknown;
             connection = Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
-                initWithStoredValues: false,
                 waitForCollectionCallback: true,
                 callback: (value) => {
                     testKeyValue = value;
@@ -3019,7 +2944,6 @@ describe('Onyx', () => {
             let testKeyValue: unknown;
             connection = Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
-                initWithStoredValues: false,
                 waitForCollectionCallback: true,
                 callback: (value) => {
                     testKeyValue = value;
