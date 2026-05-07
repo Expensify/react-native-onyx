@@ -44,14 +44,10 @@ describe('OnyxSnapshotCache', () => {
             const keyWithoutSelector = cache.registerConsumer(optionsWithoutSelector);
             const keyWithUndefined = cache.registerConsumer({});
 
-            // Different option combinations should produce different cache keys
-            expect(keyWithSelector).toContain('0'); // Should contain selector ID
-            expect(keyWithoutSelector).toContain('no_selector'); // Should indicate no selector
-            expect(keyWithUndefined).toContain('no_selector'); // Should indicate no selector
-
-            // Selector key is unique; the two no-selector keys are equal
-            expect(keyWithSelector).not.toEqual(keyWithoutSelector);
-            expect(keyWithoutSelector).toEqual(keyWithUndefined);
+            // Selector cache keys are the selector ID as a string; no-selector consumers share the same key
+            expect(keyWithSelector).toBe('0');
+            expect(keyWithoutSelector).toBe('no_selector');
+            expect(keyWithUndefined).toBe('no_selector');
         });
 
         it('should store and retrieve cached results', () => {

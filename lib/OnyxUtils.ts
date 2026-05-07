@@ -817,11 +817,12 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, on
  * Notifies subscribers and writes current value to cache
  */
 function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>, hasChanged?: boolean): void {
-    if (hasChanged) {
-        cache.set(key, value);
+    if (!hasChanged) {
+        return;
     }
 
-    keyChanged(key, value, () => !!hasChanged);
+    cache.set(key, value);
+    keyChanged(key, value);
 }
 
 function hasPendingMergeForKey(key: OnyxKey): boolean {

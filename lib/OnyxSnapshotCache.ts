@@ -64,7 +64,7 @@ class OnyxSnapshotCache {
      */
     registerConsumer<TKey extends OnyxKey, TReturnValue>(options: Pick<UseOnyxOptions<TKey, TReturnValue>, 'selector'>): string {
         const selectorID = options?.selector ? this.getSelectorID(options.selector) : 'no_selector';
-        const cacheKey = `${selectorID}`;
+        const cacheKey = String(selectorID);
 
         // Increment reference count for this cache key
         const currentCount = this.cacheKeyRefCounts.get(cacheKey) || 0;
