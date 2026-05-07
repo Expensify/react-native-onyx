@@ -1,12 +1,13 @@
 import * as Logger from '../Logger';
-
+import type {OnyxKey, OnyxValue} from '../types';
 import PlatformStorage from './platforms';
 import InstanceSync from './InstanceSync';
 import MemoryOnlyProvider from './providers/MemoryOnlyProvider';
 import type StorageProvider from './providers/types';
+import WriteBuffer from './WriteBuffer';
+import createBufferStore from './BufferStore';
 
 let provider = PlatformStorage as StorageProvider<unknown>;
-let shouldKeepInstancesSync = false;
 let finishInitalization: (value?: unknown) => void;
 const initPromise = new Promise((resolve) => {
     finishInitalization = resolve;
@@ -55,6 +56,24 @@ function tryOrDegradePerformance<T>(fn: () => Promise<T> | T, waitForInitializat
     });
 }
 
+/**
+ * The WriteBuffer is a patch-staging layer between Onyx's cache and the storage
+ * provider. It tracks two types of pending entries:
+ * - SET entries (full values) flushed via provider.multiSet()
+ * - MERGE entries (accumulated patches) flushed via provider.multiMerge(),
+ *   preserving JSON_PATCH efficiency on SQLite
+ *
+ * All writes (set, merge) return immediately after staging in the WriteBuffer.
+ * Persistence happens asynchronously in coalesced batches.
+ */
+const writeBuffer = new WriteBuffer({
+    handlers: {
+        multiSet: (pairs) => provider.multiSet(pairs),
+        multiMerge: (pairs) => provider.multiMerge(pairs),
+    },
+    store: createBufferStore(),
+});
+
 const storage: Storage = {
     /**
      * Returns the storage provider currently in use
@@ -65,118 +84,158 @@ const storage: Storage = {
 
     /**
      * Initializes all providers in the list of storage providers
-     * and enables fallback providers if necessary
+     * and enables fallback providers if necessary.
+     *
+     * If the provider's init() returns a Promise (e.g. WorkerStorageProvider
+     * waiting for the web worker to finish setting up its backend), we await
+     * it so that finishInitalization() only fires after the provider is truly
+     * ready for data operations.
      */
     init() {
-        tryOrDegradePerformance(provider.init, false).finally(() => {
+        tryOrDegradePerformance(() => {
+            const result = provider.init();
+            // provider.init() may return void or Promise<void>
+            return result instanceof Promise ? result : Promise.resolve();
+        }, false).finally(() => {
             finishInitalization();
         });
     },
 
     /**
-     * Get the value of a given key or return `null` if it's not available
+     * Get the value of a given key or return `null` if it's not available.
+     *
+     * - If the key has a pending SET entry, it is returned directly from memory.
+     * - If the key has a pending MERGE entry (a patch delta, not a full value),
+     *   the write buffer is flushed first so the provider has the correct merged
+     *   value on disk, then the read proceeds normally.
+     * - Otherwise, the read goes straight to the provider.
      */
-    getItem: (key) => tryOrDegradePerformance(() => provider.getItem(key)),
+    getItem: <TKey extends OnyxKey>(key: TKey) =>
+        tryOrDegradePerformance<OnyxValue<TKey>>(() => {
+            if (writeBuffer.has(key)) {
+                return Promise.resolve(writeBuffer.get(key) as OnyxValue<TKey>);
+            }
+            if (writeBuffer.hasAny(key)) {
+                return writeBuffer.flushNow().then(() => provider.getItem(key));
+            }
+            return provider.getItem(key);
+        }),
 
     /**
-     * Get multiple key-value pairs for the give array of keys in a batch
+     * Get multiple key-value pairs for the give array of keys in a batch.
+     *
+     * Keys with pending SET entries are served from memory. If any remaining
+     * keys have pending MERGE entries, the write buffer is flushed before
+     * reading from the provider so the on-disk values are up to date.
      */
-    multiGet: (keys) => tryOrDegradePerformance(() => provider.multiGet(keys)),
+    multiGet: (keys) =>
+        tryOrDegradePerformance(() => {
+            const bufferedKeys: string[] = [];
+            const cleanKeys: string[] = [];
+            let hasPendingMerges = false;
+
+            for (const key of keys) {
+                if (writeBuffer.has(key)) {
+                    bufferedKeys.push(key);
+                } else {
+                    cleanKeys.push(key);
+                    if (writeBuffer.hasAny(key)) {
+                        hasPendingMerges = true;
+                    }
+                }
+            }
+
+            // If all keys have SET entries, skip the provider call entirely
+            if (cleanKeys.length === 0) {
+                return Promise.resolve(bufferedKeys.map((key) => [key, writeBuffer.get(key)]));
+            }
+
+            // If any clean keys have pending MERGE entries, flush first
+            const readyPromise = hasPendingMerges ? writeBuffer.flushNow() : Promise.resolve();
+
+            return readyPromise.then(() =>
+                provider.multiGet(cleanKeys).then((providerResults) => {
+                    const bufferedResults = bufferedKeys.map((key) => [key, writeBuffer.get(key)] as [string, unknown]);
+                    return [...providerResults, ...bufferedResults];
+                }),
+            );
+        }),
 
     /**
-     * Sets the value for a given key. The only requirement is that the value should be serializable to JSON string
+     * Sets the value for a given key. The value is staged in the write buffer
+     * as a SET entry and flushed to storage asynchronously in a coalesced batch.
+     *
+     * Cross-tab broadcasting is handled by the unified worker after persistence,
+     * so no InstanceSync send calls are needed here.
      */
     setItem: (key, value) =>
         tryOrDegradePerformance(() => {
-            const promise = provider.setItem(key, value);
-
-            if (shouldKeepInstancesSync) {
-                return promise.then(() => InstanceSync.setItem(key));
-            }
-
-            return promise;
+            writeBuffer.set(key, value);
+            return Promise.resolve();
         }),
 
     /**
-     * Stores multiple key-value pairs in a batch
+     * Stores multiple key-value pairs. All values are staged in the write buffer
+     * as SET entries and flushed to storage asynchronously in a coalesced batch.
      */
     multiSet: (pairs) =>
         tryOrDegradePerformance(() => {
-            const promise = provider.multiSet(pairs);
-
-            if (shouldKeepInstancesSync) {
-                return promise.then(() => InstanceSync.multiSet(pairs.map((pair) => pair[0])));
-            }
-
-            return promise;
+            writeBuffer.setMany(pairs);
+            return Promise.resolve();
         }),
 
     /**
-     * Merging an existing value with a new one
+     * Merging an existing value with a new one.
+     * The patch is staged in the write buffer as a MERGE entry. If the key
+     * already has a pending SET, the patch is applied to the full value
+     * in-memory. If it already has a pending MERGE, patches are accumulated.
+     * Returns immediately -- no flushNow() needed.
      */
     mergeItem: (key, change, replaceNullPatches) =>
         tryOrDegradePerformance(() => {
-            const promise = provider.mergeItem(key, change, replaceNullPatches);
-
-            if (shouldKeepInstancesSync) {
-                return promise.then(() => InstanceSync.mergeItem(key));
-            }
-
-            return promise;
+            writeBuffer.merge(key, change, replaceNullPatches);
+            return Promise.resolve();
         }),
 
     /**
-     * Multiple merging of existing and new values in a batch
-     * This function also removes all nested null values from an object.
+     * Multiple merging of existing and new values in a batch.
+     * Each pair's patch is staged in the write buffer as a MERGE entry.
+     * Returns immediately -- no flushNow() needed.
      */
     multiMerge: (pairs) =>
         tryOrDegradePerformance(() => {
-            const promise = provider.multiMerge(pairs);
-
-            if (shouldKeepInstancesSync) {
-                return promise.then(() => InstanceSync.multiMerge(pairs.map((pair) => pair[0])));
+            for (const [key, value, replaceNullPatches] of pairs) {
+                writeBuffer.merge(key, value, replaceNullPatches);
             }
-
-            return promise;
+            return Promise.resolve();
         }),
 
     /**
-     * Removes given key and its value
+     * Removes given key and its value.
+     * Also removes the key from the write buffer if it has a pending write.
      */
     removeItem: (key) =>
         tryOrDegradePerformance(() => {
-            const promise = provider.removeItem(key);
-
-            if (shouldKeepInstancesSync) {
-                return promise.then(() => InstanceSync.removeItem(key));
-            }
-
-            return promise;
+            writeBuffer.remove(key);
+            return provider.removeItem(key);
         }),
 
     /**
-     * Remove given keys and their values
+     * Remove given keys and their values.
+     * Also removes the keys from the write buffer if they have pending writes.
      */
     removeItems: (keys) =>
         tryOrDegradePerformance(() => {
-            const promise = provider.removeItems(keys);
-
-            if (shouldKeepInstancesSync) {
-                return promise.then(() => InstanceSync.removeItems(keys));
-            }
-
-            return promise;
+            writeBuffer.removeMany(keys);
+            return provider.removeItems(keys);
         }),
 
     /**
-     * Clears everything
+     * Clears everything. Clears the write buffer first, then the provider.
      */
     clear: () =>
         tryOrDegradePerformance(() => {
-            if (shouldKeepInstancesSync) {
-                return InstanceSync.clear(() => provider.clear());
-            }
-
+            writeBuffer.clear();
             return provider.clear();
         }),
 
@@ -196,13 +255,17 @@ const storage: Storage = {
     getDatabaseSize: () => tryOrDegradePerformance(() => provider.getDatabaseSize()),
 
     /**
-     * @param onStorageKeyChanged - Storage synchronization mechanism keeping all opened tabs in sync (web only)
+     * Initializes the cross-tab sync receiver. On web, InstanceSync listens on
+     * BroadcastChannel for value-bearing messages from other tabs' workers and
+     * calls onStorageKeyChanged to update the cache. No send-side logic is
+     * needed here -- the unified worker handles broadcasting after persistence.
+     *
+     * @param onStorageKeyChanged - Callback invoked when another tab changes a key
      */
     keepInstancesSync(onStorageKeyChanged) {
         // If InstanceSync shouldn't be used, it means we're on a native platform and we don't need to keep instances in sync
         if (!InstanceSync.shouldBeUsed) return;
 
-        shouldKeepInstancesSync = true;
         InstanceSync.init(onStorageKeyChanged, this);
     },
 };

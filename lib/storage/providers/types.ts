@@ -20,9 +20,10 @@ type StorageProvider<TStore> = {
     name: string;
 
     /**
-     * Initializes the storage provider
+     * Initializes the storage provider.
+     * May return a Promise if initialization is asynchronous (e.g. spawning a worker).
      */
-    init: () => void;
+    init: () => void | Promise<void>;
 
     /**
      * Gets the value of a given key or return `null` if it's not available in storage
