@@ -65,17 +65,15 @@ describe('Onyx', () => {
 
     it('should remove key value from OnyxCache/Storage when set is called with null value', () =>
         Onyx.set(ONYX_KEYS.OTHER_TEST, 42)
-            .then(() => OnyxUtils.getAllKeys())
-            .then((keys) => {
+            .then(() => {
+                const keys = OnyxUtils.getAllKeys();
                 expect(keys.has(ONYX_KEYS.OTHER_TEST)).toBe(true);
                 return Onyx.set(ONYX_KEYS.OTHER_TEST, null);
             })
             // Checks if cache value is removed.
             .then(() => {
                 expect(cache.get(ONYX_KEYS.OTHER_TEST)).toBeUndefined();
-                return OnyxUtils.getAllKeys();
-            })
-            .then((keys) => {
+                const keys = OnyxUtils.getAllKeys();
                 expect(keys.has(ONYX_KEYS.OTHER_TEST)).toBe(false);
             }));
 
@@ -3265,7 +3263,7 @@ describe('RAM-only keys should not read from storage', () => {
         });
         await act(async () => waitForPromisesToResolve());
 
-        const keys = await OnyxUtils.getAllKeys();
+        const keys = OnyxUtils.getAllKeys();
 
         expect(keys.has(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBe(false);
         expect(keys.has(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`)).toBe(false);
@@ -3437,7 +3435,7 @@ describe('RAM-only keys should not read from storage', () => {
         await Onyx.set(ramOnlyMember, {data: 'fresh_from_cache'});
 
         // multiGet receives individual keys (e.g. collection members), not collection base keys
-        const result = await OnyxUtils.multiGet([normalMember, ramOnlyMember]);
+        const result = OnyxUtils.multiGet([normalMember, ramOnlyMember]);
 
         // Normal key should come from storage
         expect(result.get(normalMember)).toEqual('normal_from_storage');

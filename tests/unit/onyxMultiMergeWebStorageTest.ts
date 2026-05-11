@@ -35,57 +35,53 @@ describe('Onyx.mergeCollection() and WebStorage', () => {
 
     afterEach(() => Onyx.clear());
 
-    it('merges two sets of data consecutively', () => {
-        StorageMock.setMockStore(initialData);
+    it('merges two sets of data consecutively', () =>
+        // Given initial data set through Onyx (populates both cache and storage)
+        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, initialData as GenericCollection)
+            .then(() => {
+                expect(OnyxCache.get('test_1')).toEqual(initialTestObject);
+                expect(OnyxCache.get('test_2')).toEqual(initialTestObject);
+                expect(OnyxCache.get('test_3')).toEqual(initialTestObject);
 
-        // Given initial data in storage
-        expect(StorageMock.getMockStore().test_1).toEqual(initialTestObject);
-        expect(StorageMock.getMockStore().test_2).toEqual(initialTestObject);
-        expect(StorageMock.getMockStore().test_3).toEqual(initialTestObject);
+                // When we merge additional data
+                const additionalDataOne = {b: 'b', c: 'c', e: [1, 2]};
+                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                    test_1: additionalDataOne,
+                    test_2: additionalDataOne,
+                    test_3: additionalDataOne,
+                } as GenericCollection);
 
-        // And an empty cache values for the collection keys
-        expect(OnyxCache.get('test_1')).not.toBeDefined();
-        expect(OnyxCache.get('test_2')).not.toBeDefined();
-        expect(OnyxCache.get('test_3')).not.toBeDefined();
+                // And call again consecutively with different data
+                const additionalDataTwo = {d: 'd', e: [2]};
+                Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                    test_1: additionalDataTwo,
+                    test_2: additionalDataTwo,
+                    test_3: additionalDataTwo,
+                } as GenericCollection);
 
-        // When we merge additional data
-        const additionalDataOne = {b: 'b', c: 'c', e: [1, 2]};
-        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
-            test_1: additionalDataOne,
-            test_2: additionalDataOne,
-            test_3: additionalDataOne,
-        } as GenericCollection);
+                return waitForPromisesToResolve();
+            })
+            .then(() => {
+                const finalObject = {
+                    a: 'a',
+                    b: 'b',
+                    c: 'c',
+                    d: 'd',
+                    e: [2],
+                };
 
-        // And call again consecutively with different data
-        const additionalDataTwo = {d: 'd', e: [2]};
-        Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
-            test_1: additionalDataTwo,
-            test_2: additionalDataTwo,
-            test_3: additionalDataTwo,
-        } as GenericCollection);
+                // Then our new data should merge with the existing data in the cache
+                expect(OnyxCache.get('test_1')).toEqual(finalObject);
+                expect(OnyxCache.get('test_2')).toEqual(finalObject);
+                expect(OnyxCache.get('test_3')).toEqual(finalObject);
 
-        return waitForPromisesToResolve().then(() => {
-            const finalObject = {
-                a: 'a',
-                b: 'b',
-                c: 'c',
-                d: 'd',
-                e: [2],
-            };
+                // And the storage should reflect the same state
+                expect(StorageMock.getMockStore().test_1).toEqual(finalObject);
+                expect(StorageMock.getMockStore().test_2).toEqual(finalObject);
+                expect(StorageMock.getMockStore().test_3).toEqual(finalObject);
+            }));
 
-            // Then our new data should merge with the existing data in the cache
-            expect(OnyxCache.get('test_1')).toEqual(finalObject);
-            expect(OnyxCache.get('test_2')).toEqual(finalObject);
-            expect(OnyxCache.get('test_3')).toEqual(finalObject);
-
-            // And the storage should reflect the same state
-            expect(StorageMock.getMockStore().test_1).toEqual(finalObject);
-            expect(StorageMock.getMockStore().test_2).toEqual(finalObject);
-            expect(StorageMock.getMockStore().test_3).toEqual(finalObject);
-        });
-    });
-
-    it('cache updates correctly when accessed again if keys are removed or evicted', () => {
+    it('cache and storage stay in sync after consecutive mergeCollection calls', () => {
         // Given empty storage
         expect(StorageMock.getMockStore().test_1).toBeFalsy();
         expect(StorageMock.getMockStore().test_2).toBeFalsy();
@@ -114,11 +110,7 @@ describe('Onyx.mergeCollection() and WebStorage', () => {
                 expect(StorageMock.getMockStore().test_2).toEqual(data);
                 expect(StorageMock.getMockStore().test_3).toEqual(data);
 
-                // When we drop all the cache keys (but do not modify the underlying storage) and merge another object
-                OnyxCache.drop('test_1');
-                OnyxCache.drop('test_2');
-                OnyxCache.drop('test_3');
-
+                // When we merge another object on top of existing data
                 const additionalData = {c: 'c'};
                 Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                     test_1: additionalData,

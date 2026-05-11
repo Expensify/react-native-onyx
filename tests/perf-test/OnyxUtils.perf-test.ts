@@ -115,7 +115,7 @@ describe('OnyxUtils', () => {
 
     describe('get', () => {
         test('10k calls with heavy objects', async () => {
-            await measureAsyncFunction(() => Promise.all(mockedReportActionsKeys.map((key) => OnyxUtils.get(key))), {
+            await measureFunction(() => mockedReportActionsKeys.map((key) => OnyxUtils.get(key)), {
                 beforeEach: async () => {
                     await StorageMock.multiSet(Object.entries(mockedReportActionsMap).map(([k, v]) => [k, v]));
                 },
@@ -126,7 +126,7 @@ describe('OnyxUtils', () => {
 
     describe('getAllKeys', () => {
         test('one call with 50k heavy objects', async () => {
-            await measureAsyncFunction(() => OnyxUtils.getAllKeys(), {
+            await measureFunction(() => OnyxUtils.getAllKeys(), {
                 beforeEach: async () => {
                     await StorageMock.multiSet(Object.entries(mockedReportActionsMap).map(([k, v]) => [k, v]));
                 },
@@ -256,10 +256,10 @@ describe('OnyxUtils', () => {
             ...getRandomReportActions(ONYXKEYS.COLLECTION.EVICTABLE_TEST_KEY, 1000),
         };
         const fakeMethodParameter = () => false;
-        const fakePromiseMethodParameter = () => Promise.resolve(new Set(Object.keys(data)));
+        const fakeGetAllKeysFn = () => new Set(Object.keys(data));
 
         test('one call adding 1k keys', async () => {
-            await measureAsyncFunction(() => OnyxCache.addEvictableKeysToRecentlyAccessedList(fakeMethodParameter, fakePromiseMethodParameter), {
+            await measureFunction(() => OnyxCache.addEvictableKeysToRecentlyAccessedList(fakeMethodParameter, fakeGetAllKeysFn), {
                 beforeEach: async () => {
                     await Onyx.multiSet(data);
                 },
@@ -545,7 +545,7 @@ describe('OnyxUtils', () => {
 
     describe('multiGet', () => {
         test('one call getting 10k heavy objects from storage', async () => {
-            await measureAsyncFunction(() => OnyxUtils.multiGet(mockedReportActionsKeys), {
+            await measureFunction(() => OnyxUtils.multiGet(mockedReportActionsKeys), {
                 beforeEach: async () => {
                     await StorageMock.multiSet(Object.entries(mockedReportActionsMap).map(([k, v]) => [k, v]));
                 },
@@ -554,7 +554,7 @@ describe('OnyxUtils', () => {
         });
 
         test('one call getting 10k heavy objects from cache', async () => {
-            await measureAsyncFunction(() => OnyxUtils.multiGet(mockedReportActionsKeys), {
+            await measureFunction(() => OnyxUtils.multiGet(mockedReportActionsKeys), {
                 beforeEach: async () => {
                     await Onyx.multiSet(mockedReportActionsMap);
                 },

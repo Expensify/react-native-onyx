@@ -346,18 +346,17 @@ class OnyxCache {
      * @param isCollectionKeyFn - Function to determine if a key is a collection key
      * @param getAllKeysFn - Function to get all keys, defaults to Storage.getAllKeys
      */
-    addEvictableKeysToRecentlyAccessedList(isCollectionKeyFn: (key: OnyxKey) => boolean, getAllKeysFn: () => Promise<Set<OnyxKey>>): Promise<void> {
-        return getAllKeysFn().then((keys: Set<OnyxKey>) => {
-            for (const evictableKey of this.evictionAllowList) {
-                for (const key of keys) {
-                    if (!OnyxKeys.isKeyMatch(evictableKey, key)) {
-                        continue;
-                    }
-
-                    this.addLastAccessedKey(key, isCollectionKeyFn(key));
+    addEvictableKeysToRecentlyAccessedList(isCollectionKeyFn: (key: OnyxKey) => boolean, getAllKeysFn: () => Set<OnyxKey>): void {
+        const keys = getAllKeysFn();
+        for (const evictableKey of this.evictionAllowList) {
+            for (const key of keys) {
+                if (!OnyxKeys.isKeyMatch(evictableKey, key)) {
+                    continue;
                 }
+
+                this.addLastAccessedKey(key, isCollectionKeyFn(key));
             }
-        });
+        }
     }
 
     /**

@@ -220,11 +220,15 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
         }
         mergeQueue[key] = [changes];
 
-        mergeQueuePromise[key] = OnyxUtils.get(key).then((existingValue) => {
+        mergeQueuePromise[key] = Promise.resolve().then(() => {
             // Calls to Onyx.set after a merge will terminate the current merge process and clear the merge queue
             if (mergeQueue[key] == null) {
                 return Promise.resolve();
             }
+
+            // Read the existing value at merge application time (not at queue time) so that
+            // any intervening synchronous cache updates (e.g. from mergeCollection) are picked up.
+            const existingValue = OnyxUtils.get(key);
 
             try {
                 const validChanges = mergeQueue[key].filter((change) => {
@@ -313,92 +317,98 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
         const defaultKeyStates = OnyxUtils.getDefaultKeyStates();
         const initialKeys = Object.keys(defaultKeyStates);
 
-        const promise = OnyxUtils.getAllKeys()
-            .then((cachedKeys) => {
-                cache.clearNullishStorageKeys();
+        const cachedKeys = OnyxUtils.getAllKeys();
+        cache.clearNullishStorageKeys();
 
-                const keysToBeClearedFromStorage: OnyxKey[] = [];
-                const keyValuesToResetIndividually: KeyValueMapping = {};
-                // We need to store old and new values for collection keys to properly notify subscribers when clearing Onyx
-                // because the notification process needs the old values in cache but at that point they will be already removed from it.
-                const keyValuesToResetAsCollection: Record<
-                    OnyxKey,
-                    {oldValues: Record<string, KeyValueMapping[OnyxKey] | undefined>; newValues: Record<string, KeyValueMapping[OnyxKey] | undefined>}
-                > = {};
+        // Clear pending merge queues so that any in-flight Onyx.merge() calls
+        // don't overwrite the default values we're about to set.
+        const mergeQueue = OnyxUtils.getMergeQueue();
+        const mergeQueuePromise = OnyxUtils.getMergeQueuePromise();
+        for (const key of Object.keys(mergeQueue)) {
+            delete mergeQueue[key];
+            delete mergeQueuePromise[key];
+        }
 
-                const allKeys = new Set([...cachedKeys, ...initialKeys]);
+        const keysToBeClearedFromStorage: OnyxKey[] = [];
+        const keyValuesToResetIndividually: KeyValueMapping = {};
+        // We need to store old and new values for collection keys to properly notify subscribers when clearing Onyx
+        // because the notification process needs the old values in cache but at that point they will be already removed from it.
+        const keyValuesToResetAsCollection: Record<
+            OnyxKey,
+            {oldValues: Record<string, KeyValueMapping[OnyxKey] | undefined>; newValues: Record<string, KeyValueMapping[OnyxKey] | undefined>}
+        > = {};
 
-                // The only keys that should not be cleared are:
-                // 1. Anything specifically passed in keysToPreserve (because some keys like language preferences, offline
-                //      status, or activeClients need to remain in Onyx even when signed out)
-                // 2. Any keys with a default state (because they need to remain in Onyx as their default, and setting them
-                //      to null would cause unknown behavior)
-                //   2.1 However, if a default key was explicitly set to null, we need to reset it to the default value
-                for (const key of allKeys) {
-                    const isKeyToPreserve = keysToPreserve.some((preserveKey) => OnyxKeys.isKeyMatch(preserveKey, key));
-                    const isDefaultKey = key in defaultKeyStates;
+        const allKeys = new Set([...cachedKeys, ...initialKeys]);
 
-                    // If the key is being removed or reset to default:
-                    // 1. Update it in the cache
-                    // 2. Figure out whether it is a collection key or not,
-                    //      since collection key subscribers need to be updated differently
-                    if (!isKeyToPreserve) {
-                        const oldValue = cache.get(key);
-                        const newValue = defaultKeyStates[key] ?? null;
-                        if (newValue !== oldValue) {
-                            cache.set(key, newValue);
+        // The only keys that should not be cleared are:
+        // 1. Anything specifically passed in keysToPreserve (because some keys like language preferences, offline
+        //      status, or activeClients need to remain in Onyx even when signed out)
+        // 2. Any keys with a default state (because they need to remain in Onyx as their default, and setting them
+        //      to null would cause unknown behavior)
+        //   2.1 However, if a default key was explicitly set to null, we need to reset it to the default value
+        for (const key of allKeys) {
+            const isKeyToPreserve = keysToPreserve.some((preserveKey) => OnyxKeys.isKeyMatch(preserveKey, key));
+            const isDefaultKey = key in defaultKeyStates;
 
-                            const collectionKey = OnyxKeys.getCollectionKey(key);
+            // If the key is being removed or reset to default:
+            // 1. Update it in the cache
+            // 2. Figure out whether it is a collection key or not,
+            //      since collection key subscribers need to be updated differently
+            if (!isKeyToPreserve) {
+                const oldValue = cache.get(key);
+                const newValue = defaultKeyStates[key] ?? null;
+                if (newValue !== oldValue) {
+                    cache.set(key, newValue);
 
-                            if (collectionKey) {
-                                if (!keyValuesToResetAsCollection[collectionKey]) {
-                                    keyValuesToResetAsCollection[collectionKey] = {oldValues: {}, newValues: {}};
-                                }
-                                keyValuesToResetAsCollection[collectionKey].oldValues[key] = oldValue;
-                                keyValuesToResetAsCollection[collectionKey].newValues[key] = newValue ?? undefined;
-                            } else {
-                                keyValuesToResetIndividually[key] = newValue ?? undefined;
-                            }
+                    const collectionKey = OnyxKeys.getCollectionKey(key);
+
+                    if (collectionKey) {
+                        if (!keyValuesToResetAsCollection[collectionKey]) {
+                            keyValuesToResetAsCollection[collectionKey] = {oldValues: {}, newValues: {}};
                         }
+                        keyValuesToResetAsCollection[collectionKey].oldValues[key] = oldValue;
+                        keyValuesToResetAsCollection[collectionKey].newValues[key] = newValue ?? undefined;
+                    } else {
+                        keyValuesToResetIndividually[key] = newValue ?? undefined;
                     }
-
-                    if (isKeyToPreserve || isDefaultKey) {
-                        continue;
-                    }
-
-                    // If it isn't preserved and doesn't have a default, we'll remove it
-                    keysToBeClearedFromStorage.push(key);
                 }
+            }
 
-                // Exclude RAM-only keys to prevent them from being saved to storage
-                const defaultKeyValuePairs = Object.entries(
-                    Object.keys(defaultKeyStates)
-                        .filter((key) => !keysToPreserve.some((preserveKey) => OnyxKeys.isKeyMatch(preserveKey, key)) && !OnyxKeys.isRamOnlyKey(key))
-                        .reduce((obj: KeyValueMapping, key) => {
-                            // eslint-disable-next-line no-param-reassign
-                            obj[key] = defaultKeyStates[key];
-                            return obj;
-                        }, {}),
-                );
+            if (isKeyToPreserve || isDefaultKey) {
+                continue;
+            }
 
-                // Remove only the items that we want cleared from storage, and reset others to default
-                for (const key of keysToBeClearedFromStorage) cache.drop(key);
-                return Storage.removeItems(keysToBeClearedFromStorage)
-                    .then(() => connectionManager.refreshSessionID())
-                    .then(() => Storage.multiSet(defaultKeyValuePairs))
-                    .then(() => {
-                        DevTools.clearState(keysToPreserve);
+            // If it isn't preserved and doesn't have a default, we'll remove it
+            keysToBeClearedFromStorage.push(key);
+        }
 
-                        // Notify the subscribers for each key/value group so they can receive the new values
-                        for (const [key, value] of Object.entries(keyValuesToResetIndividually)) {
-                            OnyxUtils.keyChanged(key, value);
-                        }
-                        for (const [key, value] of Object.entries(keyValuesToResetAsCollection)) {
-                            OnyxUtils.keysChanged(key, value.newValues, value.oldValues);
-                        }
-                    });
-            })
-            .then(() => undefined);
+        // Exclude RAM-only keys to prevent them from being saved to storage
+        const defaultKeyValuePairs = Object.entries(
+            Object.keys(defaultKeyStates)
+                .filter((key) => !keysToPreserve.some((preserveKey) => OnyxKeys.isKeyMatch(preserveKey, key)) && !OnyxKeys.isRamOnlyKey(key))
+                .reduce((obj: KeyValueMapping, key) => {
+                    // eslint-disable-next-line no-param-reassign
+                    obj[key] = defaultKeyStates[key];
+                    return obj;
+                }, {}),
+        );
+
+        // Remove only the items that we want cleared from storage, and reset others to default
+        for (const key of keysToBeClearedFromStorage) cache.drop(key);
+        const promise = Storage.removeItems(keysToBeClearedFromStorage)
+            .then(() => connectionManager.refreshSessionID())
+            .then(() => Storage.multiSet(defaultKeyValuePairs))
+            .then(() => {
+                DevTools.clearState(keysToPreserve);
+
+                // Notify the subscribers for each key/value group so they can receive the new values
+                for (const [key, value] of Object.entries(keyValuesToResetIndividually)) {
+                    OnyxUtils.keyChanged(key, value);
+                }
+                for (const [key, value] of Object.entries(keyValuesToResetAsCollection)) {
+                    OnyxUtils.keysChanged(key, value.newValues, value.oldValues);
+                }
+            });
 
         return cache.captureTask(TASK.CLEAR, promise) as Promise<void>;
     });
@@ -519,6 +529,11 @@ function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<vo
                 },
             );
 
+            // Set operations must run before merge operations so their cache writes are
+            // visible when mergeCollectionWithPatches reads previous values synchronously.
+            if (!utils.isEmptyObject(batchedCollectionUpdates.set)) {
+                promises.push(() => OnyxUtils.partialSetCollection({collectionKey, collection: batchedCollectionUpdates.set as OnyxSetCollectionInput<OnyxKey>}));
+            }
             if (!utils.isEmptyObject(batchedCollectionUpdates.merge)) {
                 promises.push(() =>
                     OnyxUtils.mergeCollectionWithPatches({
@@ -528,9 +543,6 @@ function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<vo
                         isProcessingCollectionUpdate: true,
                     }),
                 );
-            }
-            if (!utils.isEmptyObject(batchedCollectionUpdates.set)) {
-                promises.push(() => OnyxUtils.partialSetCollection({collectionKey, collection: batchedCollectionUpdates.set as OnyxSetCollectionInput<OnyxKey>}));
             }
         }
 
