@@ -49,9 +49,14 @@ function createStore(dbName: string, storeName: string): UseStore {
         request.onupgradeneeded = () => request.result.createObjectStore(storeName);
         dbp = IDB.promisifyRequest(request);
 
+        const currentPromise = dbp;
         dbp.then(attachHandlers, () => {
             // Clear the cached rejected promise so the next operation retries
             // with a fresh indexedDB.open() instead of returning the same rejection.
+            // Guard: only clear if dbp hasn't been replaced by a concurrent heal/retry.
+            if (dbp !== currentPromise) {
+                return;
+            }
             dbp = undefined;
         });
         return dbp;
@@ -80,7 +85,11 @@ function createStore(dbName: string, storeName: string): UseStore {
         };
 
         dbp = IDB.promisifyRequest(request);
+        const currentPromise = dbp;
         dbp.then(attachHandlers, () => {
+            if (dbp !== currentPromise) {
+                return;
+            }
             dbp = undefined;
         });
         return dbp;
@@ -103,6 +112,9 @@ function createStore(dbName: string, storeName: string): UseStore {
     // 2. Backing store corruption (Chromium UnknownError) — close + reopen the IDB connection.
     //    Bounded by a shared heal budget (3 attempts, reset on success).
     //    Mirrors Dexie's PR1398_maxLoop pattern: https://github.com/dexie/Dexie.js/blob/master/src/functions/temp-transaction.ts
+    // Note: concurrent store() calls share the budget. Under overlapping failures each caller
+    // decrements independently, so the budget may drain faster than one-per-incident. This is
+    // acceptable — same as Dexie's approach — and the budget resets on any success.
     return (txMode, callback) =>
         executeTransaction(txMode, callback)
             .then(resetHealBudget)

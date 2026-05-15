@@ -365,7 +365,8 @@ describe('createStore', () => {
                     spy.mockRestore();
                     return original.apply(this, args);
                 });
-                await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));            }
+                await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
+            }
 
             // Clean success — resets budget to 3
             jest.restoreAllMocks();
@@ -383,7 +384,8 @@ describe('createStore', () => {
                     spy.mockRestore();
                     return original.apply(this, args);
                 });
-                const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));                expect(result).toBe('value');
+                const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
+                expect(result).toBe('value');
             }
         });
 
