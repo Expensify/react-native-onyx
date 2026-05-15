@@ -2,12 +2,25 @@ import * as IDB from 'idb-keyval';
 import type {UseStore} from 'idb-keyval';
 import * as Logger from '../../../Logger';
 
+const HEAL_ATTEMPTS_MAX = 3;
+
+/**
+ * Detects the Chromium-specific IDB backing store corruption error.
+ * Fires when LevelDB files backing IndexedDB are corrupted and Chrome's
+ * internal recovery (RepairDB -> delete -> recreate) also fails.
+ * https://github.com/Expensify/App/issues/87862
+ */
+function isBackingStoreError(error: unknown): boolean {
+    return error instanceof DOMException && error.name === 'UnknownError' && error.message.includes('Internal error opening backing store');
+}
+
 // This is a copy of the createStore function from idb-keyval, we need a custom implementation
 // because we need to create the database manually in order to ensure that the store exists before we use it.
 // If the store does not exist, idb-keyval will throw an error
 // source: https://github.com/jakearchibald/idb-keyval/blob/9d19315b4a83897df1e0193dccdc29f78466a0f3/src/index.ts#L12
 function createStore(dbName: string, storeName: string): UseStore {
     let dbp: Promise<IDBDatabase> | undefined;
+    let healAttemptsRemaining = HEAL_ATTEMPTS_MAX;
 
     const attachHandlers = (db: IDBDatabase) => {
         // Browsers may close idle IDB connections at any time, especially Safari.
@@ -36,11 +49,11 @@ function createStore(dbName: string, storeName: string): UseStore {
         request.onupgradeneeded = () => request.result.createObjectStore(storeName);
         dbp = IDB.promisifyRequest(request);
 
-        dbp.then(
-            attachHandlers,
-            // eslint-disable-next-line @typescript-eslint/no-empty-function
-            () => {},
-        );
+        dbp.then(attachHandlers, () => {
+            // Clear the cached rejected promise so the next operation retries
+            // with a fresh indexedDB.open() instead of returning the same rejection.
+            dbp = undefined;
+        });
         return dbp;
     };
 
@@ -67,8 +80,9 @@ function createStore(dbName: string, storeName: string): UseStore {
         };
 
         dbp = IDB.promisifyRequest(request);
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
-        dbp.then(attachHandlers, () => {});
+        dbp.then(attachHandlers, () => {
+            dbp = undefined;
+        });
         return dbp;
     };
 
@@ -78,23 +92,45 @@ function createStore(dbName: string, storeName: string): UseStore {
             .then((db) => callback(db.transaction(storeName, txMode).objectStore(storeName)));
     }
 
-    // If the connection was closed between getDB() resolving and db.transaction() executing,
-    // the transaction throws InvalidStateError. We catch it and retry once with a fresh connection.
+    function resetHealBudget<T>(result: T): T {
+        healAttemptsRemaining = HEAL_ATTEMPTS_MAX;
+        return result;
+    }
+
+    // Handles two recoverable error classes:
+    // 1. InvalidStateError — connection closed between getDB() resolving and db.transaction().
+    //    Retry once with a fresh connection.
+    // 2. Backing store corruption (Chromium UnknownError) — close + reopen the IDB connection.
+    //    Bounded by a shared heal budget (3 attempts, reset on success).
+    //    Mirrors Dexie's PR1398_maxLoop pattern: https://github.com/dexie/Dexie.js/blob/master/src/functions/temp-transaction.ts
     return (txMode, callback) =>
-        executeTransaction(txMode, callback).catch((error) => {
-            if (error instanceof DOMException && error.name === 'InvalidStateError') {
-                Logger.logAlert('IDB InvalidStateError, retrying with fresh connection', {
-                    dbName,
-                    storeName,
-                    txMode,
-                    errorMessage: error.message,
-                });
-                dbp = undefined;
-                // Retry only once — this call is not wrapped, so if it also fails the error propagates normally.
-                return executeTransaction(txMode, callback);
-            }
-            throw error;
-        });
+        executeTransaction(txMode, callback)
+            .then(resetHealBudget)
+            .catch((error) => {
+                if (error instanceof DOMException && error.name === 'InvalidStateError') {
+                    Logger.logAlert('IDB InvalidStateError, retrying with fresh connection', {
+                        dbName,
+                        storeName,
+                        txMode,
+                        errorMessage: error.message,
+                    });
+                    dbp = undefined;
+                    return executeTransaction(txMode, callback).then(resetHealBudget);
+                }
+
+                if (isBackingStoreError(error) && healAttemptsRemaining > 0) {
+                    healAttemptsRemaining--;
+                    Logger.logInfo('IDB heal: backing store error, attempting close + reopen', {
+                        dbName,
+                        storeName,
+                        healAttemptsRemaining,
+                    });
+                    dbp = undefined;
+                    return executeTransaction(txMode, callback).then(resetHealBudget);
+                }
+
+                throw error;
+            });
 }
 
 export default createStore;
