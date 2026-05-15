@@ -109,7 +109,7 @@ function createStore(dbName: string, storeName: string): UseStore {
     // Handles two recoverable error classes:
     // 1. InvalidStateError — connection closed between getDB() resolving and db.transaction().
     //    Retry once with a fresh connection.
-    // 2. Backing store corruption (Chromium UnknownError) — close + reopen the IDB connection.
+    // 2. Backing store corruption (Chromium UnknownError) — drop cached connection and reopen the IDB connection.
     //    Bounded by a shared heal budget (3 attempts, reset on success).
     //    Mirrors Dexie's PR1398_maxLoop pattern: https://github.com/dexie/Dexie.js/blob/master/src/functions/temp-transaction.ts
     // Note: concurrent store() calls share the budget. Under overlapping failures each caller
@@ -132,7 +132,7 @@ function createStore(dbName: string, storeName: string): UseStore {
 
                 if (isBackingStoreError(error) && healAttemptsRemaining > 0) {
                     healAttemptsRemaining--;
-                    Logger.logInfo('IDB heal: backing store error, attempting close + reopen', {
+                    Logger.logInfo('IDB heal: backing store error, attempting drop cached connection and reopen', {
                         dbName,
                         storeName,
                         healAttemptsRemaining,

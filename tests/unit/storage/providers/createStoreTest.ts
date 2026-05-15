@@ -254,7 +254,7 @@ describe('createStore', () => {
             return new DOMException('Internal error opening backing store for indexedDB.open.', 'UnknownError');
         }
 
-        it('should heal mid-session by closing and reopening the connection', async () => {
+        it('should heal mid-session by dropping cached connection and reopening', async () => {
             const store = createStore(uniqueDBName(), STORE_NAME);
 
             await store('readwrite', (s) => {
@@ -275,7 +275,7 @@ describe('createStore', () => {
             const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
             expect(result).toBe('value');
             expect(callCount).toBe(2);
-            expect(logInfoSpy).toHaveBeenCalledWith('IDB heal: backing store error, attempting close + reopen', expect.objectContaining({healAttemptsRemaining: 2}));
+            expect(logInfoSpy).toHaveBeenCalledWith('IDB heal: backing store error, attempting drop cached connection and reopen', expect.objectContaining({healAttemptsRemaining: 2}));
         });
 
         it('should heal on init when indexedDB.open() rejects with UnknownError', async () => {
