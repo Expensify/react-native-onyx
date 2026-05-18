@@ -788,6 +788,7 @@ describe('OnyxUtils', () => {
         const genericError = new Error('Generic storage error');
         const invalidDataError = new Error("Failed to execute 'put' on 'IDBObjectStore': invalid data");
         const diskFullError = new Error('database or disk is full');
+        const nonRetriableIdbError = Object.assign(new Error('Internal error opening backing store for indexedDB.open.'), {name: 'UnknownError'});
 
         it('should retry only one time if the operation is firstly failed and then passed', async () => {
             StorageMock.setItem = jest.fn(StorageMock.setItem).mockRejectedValueOnce(genericError).mockImplementation(StorageMock.setItem);
@@ -820,6 +821,26 @@ describe('OnyxUtils', () => {
 
             // Should only be called once since there are no evictable keys
             expect(retryOperationSpy).toHaveBeenCalledTimes(1);
+        });
+
+        it('should not retry for non-retriable IndexedDB backing-store errors', async () => {
+            StorageMock.setItem = jest.fn().mockRejectedValue(nonRetriableIdbError);
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+
+            // Called once (initial attempt only) -- no recursion, unlike the 6 calls for generic errors
+            expect(retryOperationSpy).toHaveBeenCalledTimes(1);
+        });
+
+        it('should log a single skip alert for non-retriable errors', async () => {
+            const logAlertSpy = jest.spyOn(Logger, 'logAlert');
+            StorageMock.setItem = jest.fn().mockRejectedValue(nonRetriableIdbError);
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+
+            expect(logAlertSpy).toHaveBeenCalledWith(`Storage operation skipped retry for non-retriable error. Error: ${nonRetriableIdbError}. onyxMethod: setWithRetry.`);
+            // Not paired with the "5 retries exhausted" alert
+            expect(logAlertSpy).toHaveBeenCalledTimes(1);
         });
 
         it('should include the error in logAlert for IDBObjectStore invalid data errors', async () => {
