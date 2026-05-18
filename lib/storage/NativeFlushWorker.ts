@@ -67,14 +67,17 @@ function createNativeFlushWorker(bufferStore: BufferStore) {
             return;
         }
 
-        // Separate SET and MERGE entries for the provider
+        // Separate SET, MERGE, and REMOVE entries for the provider
         const setPairs: StorageKeyValuePair[] = [];
         const mergePairs: StorageKeyValuePair[] = [];
+        const removeKeys: string[] = [];
 
         for (const [, entry] of entries) {
             const typedEntry = entry as BufferEntry;
             if (typedEntry.entryType === 'set') {
                 setPairs.push([typedEntry.key, typedEntry.value]);
+            } else if (typedEntry.entryType === 'remove') {
+                removeKeys.push(typedEntry.key);
             } else {
                 mergePairs.push([typedEntry.key, typedEntry.value, typedEntry.replaceNullPatches]);
             }
@@ -87,6 +90,9 @@ function createNativeFlushWorker(bufferStore: BufferStore) {
             }
             if (mergePairs.length > 0) {
                 nativeSQLiteProvider.multiMerge(mergePairs);
+            }
+            if (removeKeys.length > 0) {
+                nativeSQLiteProvider.removeItems(removeKeys);
             }
         } catch (error) {
             console.error('[Onyx] NativeFlushWorker: flush error:', error);

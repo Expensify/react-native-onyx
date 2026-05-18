@@ -70,6 +70,7 @@ const writeBuffer = new WriteBuffer({
     handlers: {
         multiSet: (pairs) => provider.multiSet(pairs),
         multiMerge: (pairs) => provider.multiMerge(pairs),
+        multiRemove: (keys) => provider.removeItems(keys),
     },
     store: createBufferStore(),
 });
@@ -104,18 +105,23 @@ const storage: Storage = {
     /**
      * Get the value of a given key or return `null` if it's not available.
      *
-     * - If the key has a pending SET entry, it is returned directly from memory.
-     * - If the key has a pending MERGE entry (a patch delta, not a full value),
-     *   the write buffer is flushed first so the provider has the correct merged
-     *   value on disk, then the read proceeds normally.
-     * - Otherwise, the read goes straight to the provider.
+     * - SET entry: served directly from memory.
+     * - REMOVE entry (tombstone): returns null immediately. The on-disk value
+     *   will be gone once the buffer flushes; callers see the post-remove view.
+     * - MERGE entry: the patch is incomplete, so the buffer is flushed first,
+     *   then the merged value is read back from the provider.
+     * - No pending entry: read straight from the provider.
      */
     getItem: <TKey extends OnyxKey>(key: TKey) =>
         tryOrDegradePerformance<OnyxValue<TKey>>(() => {
-            if (writeBuffer.has(key)) {
+            const entryType = writeBuffer.peekEntryType(key);
+            if (entryType === 'set') {
                 return Promise.resolve(writeBuffer.get(key) as OnyxValue<TKey>);
             }
-            if (writeBuffer.hasAny(key)) {
+            if (entryType === 'remove') {
+                return Promise.resolve(null as unknown as OnyxValue<TKey>);
+            }
+            if (entryType === 'merge') {
                 return writeBuffer.flushNow().then(() => provider.getItem(key));
             }
             return provider.getItem(key);
@@ -131,23 +137,30 @@ const storage: Storage = {
     multiGet: (keys) =>
         tryOrDegradePerformance(() => {
             const bufferedKeys: string[] = [];
+            const tombstoneKeys: string[] = [];
             const cleanKeys: string[] = [];
             let hasPendingMerges = false;
 
             for (const key of keys) {
-                if (writeBuffer.has(key)) {
+                const entryType = writeBuffer.peekEntryType(key);
+                if (entryType === 'set') {
                     bufferedKeys.push(key);
+                } else if (entryType === 'remove') {
+                    tombstoneKeys.push(key);
                 } else {
                     cleanKeys.push(key);
-                    if (writeBuffer.hasAny(key)) {
+                    if (entryType === 'merge') {
                         hasPendingMerges = true;
                     }
                 }
             }
 
-            // If all keys have SET entries, skip the provider call entirely
+            const tombstoneResults = tombstoneKeys.map((key) => [key, null] as [string, unknown]);
+
+            // If no key needs the provider, skip the worker round-trip entirely
             if (cleanKeys.length === 0) {
-                return Promise.resolve(bufferedKeys.map((key) => [key, writeBuffer.get(key)]));
+                const bufferedResults = bufferedKeys.map((key) => [key, writeBuffer.get(key)] as [string, unknown]);
+                return Promise.resolve([...bufferedResults, ...tombstoneResults]);
             }
 
             // If any clean keys have pending MERGE entries, flush first
@@ -156,7 +169,7 @@ const storage: Storage = {
             return readyPromise.then(() =>
                 provider.multiGet(cleanKeys).then((providerResults) => {
                     const bufferedResults = bufferedKeys.map((key) => [key, writeBuffer.get(key)] as [string, unknown]);
-                    return [...providerResults, ...bufferedResults];
+                    return [...providerResults, ...bufferedResults, ...tombstoneResults];
                 }),
             );
         }),
@@ -211,23 +224,24 @@ const storage: Storage = {
         }),
 
     /**
-     * Removes given key and its value.
-     * Also removes the key from the write buffer if it has a pending write.
+     * Removes given key and its value. Staged as a REMOVE tombstone in the
+     * write buffer; the actual provider delete happens in the next coalesced
+     * flush via multiRemove, so deletes no longer block reads in the worker.
      */
     removeItem: (key) =>
         tryOrDegradePerformance(() => {
             writeBuffer.remove(key);
-            return provider.removeItem(key);
+            return Promise.resolve();
         }),
 
     /**
-     * Remove given keys and their values.
-     * Also removes the keys from the write buffer if they have pending writes.
+     * Remove given keys and their values. Staged as REMOVE tombstones in the
+     * write buffer; flushed together as a single multiRemove on next flush.
      */
     removeItems: (keys) =>
         tryOrDegradePerformance(() => {
             writeBuffer.removeMany(keys);
-            return provider.removeItems(keys);
+            return Promise.resolve();
         }),
 
     /**

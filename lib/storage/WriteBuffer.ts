@@ -27,7 +27,7 @@ import utils from '../utils';
 import type {StorageKeyValuePair} from './providers/types';
 import type BufferStore from './BufferStore/types';
 
-type EntryType = 'set' | 'merge';
+type EntryType = 'set' | 'merge' | 'remove';
 
 type BufferEntry = {
     key: OnyxKey;
@@ -36,10 +36,11 @@ type BufferEntry = {
     replaceNullPatches?: FastMergeReplaceNullPatch[];
 };
 
-/** Flush handlers for the two entry types. */
+/** Flush handlers for the three entry types. */
 type FlushHandlers = {
     multiSet: (pairs: StorageKeyValuePair[]) => Promise<void>;
     multiMerge: (pairs: StorageKeyValuePair[]) => Promise<void>;
+    multiRemove: (keys: OnyxKey[]) => Promise<void>;
 };
 
 /**
@@ -73,7 +74,9 @@ const FLUSH_TIMEOUT_MS = 200;
 /** Default web flush scheduler using requestIdleCallback with setTimeout fallback. */
 function defaultScheduleFlush(doFlush: () => void): number | null {
     if (typeof requestIdleCallback === 'function') {
-        return requestIdleCallback(doFlush, {timeout: FLUSH_TIMEOUT_MS}) as unknown as number;
+        return requestIdleCallback(doFlush, {
+            timeout: FLUSH_TIMEOUT_MS,
+        }) as unknown as number;
     }
     return setTimeout(doFlush, FLUSH_TIMEOUT_MS) as unknown as number;
 }
@@ -144,20 +147,38 @@ class WriteBuffer {
      * - No existing entry: create a MERGE entry with just the patch
      * - Existing SET entry: apply patch to the full value in-memory, keep as SET
      * - Existing MERGE entry: merge patches together, keep as MERGE
+     * - Existing REMOVE (tombstone): the underlying value will be null after flush,
+     *   so merging into null is just the patch itself -- replace tombstone with SET
      */
     merge(key: OnyxKey, patch: OnyxValue<OnyxKey>, replaceNullPatches?: FastMergeReplaceNullPatch[]): void {
         const existing = this.store.get(key);
 
         if (!existing) {
             // No pending write -- stage as a MERGE entry (just the patch)
-            this.store.set(key, {key, value: patch, entryType: 'merge', replaceNullPatches});
+            this.store.set(key, {
+                key,
+                value: patch,
+                entryType: 'merge',
+                replaceNullPatches,
+            });
+        } else if (existing.entryType === 'remove') {
+            // Pending REMOVE -- merging into null is just the patch itself, replace with SET
+            this.store.set(key, {
+                key,
+                value: patch,
+                entryType: 'set',
+            });
         } else if (existing.entryType === 'set') {
             // Pending SET -- apply patch to the full value, stay as SET
             const {result: merged} = utils.fastMerge(existing.value as Record<string, unknown>, patch as Record<string, unknown>, {
                 shouldRemoveNestedNulls: true,
                 objectRemovalMode: 'replace',
             });
-            this.store.set(key, {key, value: merged as OnyxValue<OnyxKey>, entryType: 'set'});
+            this.store.set(key, {
+                key,
+                value: merged as OnyxValue<OnyxKey>,
+                entryType: 'set',
+            });
         } else {
             // Pending MERGE -- merge patches together, stay as MERGE
             const {result: mergedPatch} = utils.fastMerge(existing.value as Record<string, unknown>, patch as Record<string, unknown>, {
@@ -176,20 +197,32 @@ class WriteBuffer {
     }
 
     /**
-     * Remove a key from the write buffer. This is used when a key is being
-     * removed from storage entirely (not just set to null).
+     * Stage a tombstone for a key (REMOVE entry). A pending SET or MERGE is
+     * discarded; the tombstone wins and is flushed via multiRemove. Scheduling
+     * a flush mirrors set/merge so deletes are batched off the worker hot path.
      */
     remove(key: OnyxKey): void {
-        this.store.delete(key);
+        this.store.set(key, {
+            key,
+            value: null as OnyxValue<OnyxKey>,
+            entryType: 'remove',
+        });
+        this.scheduleFlush();
     }
 
     /**
-     * Remove multiple keys from the write buffer.
+     * Stage tombstones for multiple keys (all REMOVE entries). A single flush
+     * is scheduled regardless of how many keys are removed.
      */
     removeMany(keys: OnyxKey[]): void {
         for (const key of keys) {
-            this.store.delete(key);
+            this.store.set(key, {
+                key,
+                value: null as OnyxValue<OnyxKey>,
+                entryType: 'remove',
+            });
         }
+        this.scheduleFlush();
     }
 
     /**
@@ -217,10 +250,19 @@ class WriteBuffer {
     }
 
     /**
-     * Check whether the key has any pending entry (SET or MERGE).
+     * Check whether the key has any pending entry (SET, MERGE, or REMOVE).
      */
     hasAny(key: OnyxKey): boolean {
         return this.store.has(key);
+    }
+
+    /**
+     * Inspect the pending entry type for a key without touching it. Used by the
+     * storage facade to disambiguate reads: SET serves from buffer, REMOVE
+     * returns null immediately, MERGE forces a flush before reading the provider.
+     */
+    peekEntryType(key: OnyxKey): EntryType | undefined {
+        return this.store.get(key)?.entryType;
     }
 
     /**
@@ -277,11 +319,16 @@ class WriteBuffer {
             const setSnapshot = new Map<OnyxKey, BufferEntry>();
             const mergePairs: StorageKeyValuePair[] = [];
             const mergeKeys: OnyxKey[] = [];
+            const removeKeys: OnyxKey[] = [];
+            const removeSnapshot = new Map<OnyxKey, BufferEntry>();
 
             for (const [key, entry] of this.store.entries()) {
                 if (entry.entryType === 'set') {
                     setPairs.push([entry.key, entry.value]);
                     setSnapshot.set(key, entry);
+                } else if (entry.entryType === 'remove') {
+                    removeKeys.push(entry.key);
+                    removeSnapshot.set(key, entry);
                 } else {
                     mergePairs.push([entry.key, entry.value, entry.replaceNullPatches]);
                     mergeKeys.push(key);
@@ -294,7 +341,7 @@ class WriteBuffer {
                 this.store.delete(key);
             }
 
-            // Flush both types concurrently
+            // Flush all three types concurrently
             const promises: Array<Promise<void>> = [];
             if (setPairs.length > 0) {
                 promises.push(this.handlers.multiSet(setPairs));
@@ -302,12 +349,23 @@ class WriteBuffer {
             if (mergePairs.length > 0) {
                 promises.push(this.handlers.multiMerge(mergePairs));
             }
+            if (removeKeys.length > 0) {
+                promises.push(this.handlers.multiRemove(removeKeys));
+            }
 
             await Promise.all(promises);
 
             // For SET entries: only remove if the reference hasn't changed
             // (i.e., no set or merge was applied to this key during flush)
             for (const [key, flushedEntry] of setSnapshot) {
+                if (this.store.get(key) === flushedEntry) {
+                    this.store.delete(key);
+                }
+            }
+
+            // Same reference-identity check for REMOVE tombstones: a set/merge
+            // arriving during flush replaces the entry and must not be erased.
+            for (const [key, flushedEntry] of removeSnapshot) {
                 if (this.store.get(key) === flushedEntry) {
                     this.store.delete(key);
                 }
