@@ -8,10 +8,9 @@ const HEAL_ATTEMPTS_MAX = 3;
  * Detects the Chromium-specific IDB backing store corruption error.
  * Fires when LevelDB files backing IndexedDB are corrupted and Chrome's
  * internal recovery (RepairDB -> delete -> recreate) also fails.
- * https://github.com/Expensify/App/issues/87862
  */
 function isBackingStoreError(error: unknown): boolean {
-    return error instanceof DOMException && error.name === 'UnknownError' && error.message.includes('Internal error opening backing store');
+    return error instanceof Error && error.message.includes('Internal error opening backing store');
 }
 
 // This is a copy of the createStore function from idb-keyval, we need a custom implementation
@@ -119,7 +118,7 @@ function createStore(dbName: string, storeName: string): UseStore {
         executeTransaction(txMode, callback)
             .then(resetHealBudget)
             .catch((error) => {
-                if (error instanceof DOMException && error.name === 'InvalidStateError') {
+                if (error instanceof Error && error.name === 'InvalidStateError') {
                     Logger.logAlert('IDB InvalidStateError, retrying with fresh connection', {
                         dbName,
                         storeName,
