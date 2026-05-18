@@ -249,12 +249,9 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                 newValueRef.current = null;
                 sourceValueRef.current = undefined;
                 resultRef.current = [undefined, {status: 'loading'}];
+                shouldGetCachedValueRef.current = true;
             }
-            // Force a cache re-read on every (re)subscription so any side effects from
-            // subscribeToKey (e.g. addNullishStorageKey for skippable collection member ids)
-            // are reflected in the next getSnapshot. Resetting this flag does not change
-            // resultRef by itself, so it doesn't cause an extra mount render.
-            shouldGetCachedValueRef.current = true;
+
             hasMountedRef.current = true;
             isConnectingRef.current = true;
             onStoreChangeFnRef.current = onStoreChange;
