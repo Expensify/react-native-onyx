@@ -133,6 +133,23 @@ function subscribeMembers<TKey extends CollectionKeyBase>(collectionKey: TKey, l
 function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Connection {
     const {key, callback, waitForCollectionCallback} = connectOptions;
 
+    // Skippable members (e.g. "report_undefined" when "undefined" is configured as a
+    // skippable member ID) get no subscription wired up — we just mark the key as
+    // nullish in the cache so any reads return undefined cleanly. Returning a no-op
+    // unsubscribe handle keeps callers' disconnect() flows working.
+    try {
+        const skippableIDs = OnyxUtils.getSkippableCollectionMemberIDs();
+        if (skippableIDs.size) {
+            const [, collectionMemberID] = OnyxKeys.splitCollectionMemberKey(key);
+            if (skippableIDs.has(collectionMemberID)) {
+                cache.addNullishStorageKey(key);
+                return {unsubscribe: () => undefined};
+            }
+        }
+    } catch (e) {
+        // Not a collection member key — fall through and subscribe normally.
+    }
+
     let active = true;
     let unsubscribeFn: (() => void) | null = null;
 
@@ -144,50 +161,119 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
         if (OnyxKeys.isCollectionKey(key)) {
             if (waitForCollectionCallback === true) {
                 // Snapshot mode — listener fires with the whole snapshot per collection change.
-                unsubscribeFn = onyxStore.subscribe(key, (value, k) => {
-                    (callback as CollectionConnectCallback<TKey> | undefined)?.(value as NonNullable<OnyxCollection<KeyValueMapping[TKey]>>, k as TKey);
-                });
-                // Initial fire deferred to a microtask so connect() returns first,
-                // matching the old ConnectionManager behavior.
-                Promise.resolve().then(() => {
-                    if (!active || !callback) {
+                //
+                // Legacy contract preservation (the old ConnectionManager + sendDataToConnection
+                // had these quirks; some tests pin them):
+                //   - Callback shape is `(snapshot, key, partial)` where `partial` is a record
+                //     of members whose reference changed since the last delivery. The wrapper
+                //     computes `partial` locally from snapshots, so it can't go stale across
+                //     React renders (the original `sourceValue` staleness from PR #679).
+                //   - Initial fire only: empty collection → `undefined` (legacy `sendDataToConnection`).
+                //     Subsequent fires deliver the actual `{}` so consumers see "now empty".
+                //   - Dedup: skip if the snapshot reference didn't change (e.g. a write raced
+                //     with the initial-fire microtask).
+                const NOT_DELIVERED = Symbol('NOT_DELIVERED');
+                let lastDeliveredSnapshot: unknown = NOT_DELIVERED;
+                const deliverSnapshot = (rawSnapshot: OnyxValue<TKey> | undefined, k: TKey, isInitialFire: boolean) => {
+                    if (Object.is(lastDeliveredSnapshot, rawSnapshot)) {
                         return;
                     }
-                    const initial = onyxStore.getState(key);
-                    (callback as CollectionConnectCallback<TKey>)(initial as NonNullable<OnyxCollection<KeyValueMapping[TKey]>>, key as TKey);
+                    // Compute per-member delta against the last delivered snapshot. Cheap thanks to
+                    // structural sharing — unchanged members keep the same reference.
+                    let partial: Record<string, unknown> | undefined;
+                    const current = rawSnapshot as Record<string, unknown> | undefined;
+                    const previous = (lastDeliveredSnapshot === NOT_DELIVERED ? undefined : lastDeliveredSnapshot) as Record<string, unknown> | undefined;
+                    if (current && previous) {
+                        const changed: Record<string, unknown> = {};
+                        for (const memberKey of Object.keys(current)) {
+                            if (current[memberKey] !== previous[memberKey]) {
+                                changed[memberKey] = current[memberKey];
+                            }
+                        }
+                        for (const memberKey of Object.keys(previous)) {
+                            if (!(memberKey in current)) {
+                                changed[memberKey] = undefined;
+                            }
+                        }
+                        partial = Object.keys(changed).length > 0 ? changed : undefined;
+                    }
+                    lastDeliveredSnapshot = rawSnapshot;
+                    const isEmpty = rawSnapshot !== undefined && rawSnapshot !== null && typeof rawSnapshot === 'object' && Object.keys(rawSnapshot as object).length === 0;
+                    const valueToDeliver = isInitialFire && isEmpty ? undefined : rawSnapshot;
+                    (callback as CollectionConnectCallback<TKey> | undefined)?.(
+                        valueToDeliver as NonNullable<OnyxCollection<KeyValueMapping[TKey]>>,
+                        k,
+                        partial as OnyxValue<TKey> | undefined,
+                    );
+                };
+                unsubscribeFn = onyxStore.subscribe(key, (value, k) => {
+                    deliverSnapshot(value, k as TKey, false);
+                });
+                Promise.resolve().then(() => {
+                    if (!active) {
+                        return;
+                    }
+                    deliverSnapshot(onyxStore.getState(key), key as TKey, true);
                 });
                 return;
             }
 
-            // Per-member mode — one callback per changed member.
-            unsubscribeFn = onyxStore.subscribeMembers(key as CollectionKeyBase, (value, memberKey) => {
+            // Per-member mode — one callback per changed member. Dedup per member key.
+            const memberLastDelivered = new Map<OnyxKey, unknown>();
+            const deliverMember = (value: OnyxValue<OnyxKey>, memberKey: OnyxKey) => {
+                if (memberLastDelivered.has(memberKey) && Object.is(memberLastDelivered.get(memberKey), value)) {
+                    return;
+                }
+                memberLastDelivered.set(memberKey, value);
                 (callback as DefaultConnectCallback<TKey> | undefined)?.(value, memberKey as TKey);
-            });
+            };
+            unsubscribeFn = onyxStore.subscribeMembers(key as CollectionKeyBase, deliverMember);
             Promise.resolve().then(() => {
                 if (!active || !callback) {
                     return;
                 }
                 const initial = onyxStore.getState(key) as OnyxCollection<KeyValueMapping[TKey]> | undefined;
-                if (!initial) {
+                const memberKeys = initial ? Object.keys(initial) : [];
+                if (memberKeys.length === 0) {
+                    // Legacy semantic: when a per-member subscription finds no existing
+                    // members, fire once with (undefined, undefined) so callers can clear
+                    // any prior state and stop showing loading. Matches the old
+                    // `sendDataToConnection(mapping, undefined)` path.
+                    (callback as DefaultConnectCallback<TKey>)(undefined as OnyxValue<TKey>, undefined as unknown as TKey);
                     return;
                 }
-                for (const memberKey of Object.keys(initial)) {
-                    (callback as DefaultConnectCallback<TKey>)(initial[memberKey], memberKey as TKey);
+                for (const memberKey of memberKeys) {
+                    deliverMember(initial?.[memberKey], memberKey);
                 }
             });
             return;
         }
 
-        // Non-collection key — single-value subscription.
-        unsubscribeFn = onyxStore.subscribe(key, (value, k) => {
-            (callback as DefaultConnectCallback<TKey> | undefined)?.(value, k as TKey);
-        });
-        Promise.resolve().then(() => {
-            if (!active || !callback) {
+        // Non-collection key (or a specific collection member) — single-value subscription.
+        // Same dedup pattern.
+        const NOT_DELIVERED = Symbol('NOT_DELIVERED');
+        let lastDelivered: unknown = NOT_DELIVERED;
+        const deliverValue = (value: OnyxValue<TKey>, k: TKey | undefined) => {
+            if (Object.is(lastDelivered, value)) {
                 return;
             }
+            lastDelivered = value;
+            (callback as DefaultConnectCallback<TKey> | undefined)?.(value, k as TKey);
+        };
+        unsubscribeFn = onyxStore.subscribe(key, (value, k) => {
+            deliverValue(value, k as TKey);
+        });
+        Promise.resolve().then(() => {
+            if (!active) {
+                return;
+            }
+            // Legacy semantic: when there's no cached data for the key, fire with
+            // `(undefined, undefined)` as the "no match" signal — matches what the old
+            // `sendDataToConnection(mapping, undefined)` did. When data exists, fire
+            // with `(value, key)`.
+            const hasCache = cache.hasCacheForKey(key);
             const initial = onyxStore.getState(key);
-            (callback as DefaultConnectCallback<TKey>)(initial, key as TKey);
+            deliverValue(initial, hasCache ? (key as TKey) : (undefined as unknown as TKey));
         });
     };
 

@@ -158,11 +158,15 @@ class OnyxStore {
      * Dispatch:
      *   1. keyListeners.get(key) — exact-key subscribers (always fires)
      *   2. If key is a collection member:
-     *      2a. keyListeners.get(collectionKey) — snapshot subscribers
+     *      2a. keyListeners.get(collectionKey) — snapshot subscribers (unless suppressed)
      *      2b. memberListeners.get(collectionKey) — per-member subscribers
      *   3. State listeners whose deps include `key` or its collection key.
+     *
+     * `options.suppressCollectionSnapshot` skips step 2a — used by collection-batch
+     * write paths so each removed/changed member doesn't re-trigger the collection-level
+     * snapshot listeners; the outer `notifyCollection()` fires those once.
      */
-    notifyKey<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>): void {
+    notifyKey<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>, options?: {suppressCollectionSnapshot?: boolean}): void {
         // 1. Exact-key listeners
         const exact = this.keyListeners.get(key);
         if (exact && exact.size > 0) {
@@ -175,11 +179,13 @@ class OnyxStore {
         const collectionKey = OnyxKeys.getCollectionKey(key);
         const isCollectionMemberWrite = collectionKey !== undefined && collectionKey !== key;
         if (isCollectionMemberWrite) {
-            const snapshotListeners = this.keyListeners.get(collectionKey);
-            if (snapshotListeners && snapshotListeners.size > 0) {
-                const snapshot = cache.getCollectionData(collectionKey);
-                for (const listener of snapshotListeners) {
-                    this.safeInvoke(() => listener(snapshot as OnyxValue<OnyxKey>, collectionKey), collectionKey);
+            if (!options?.suppressCollectionSnapshot) {
+                const snapshotListeners = this.keyListeners.get(collectionKey);
+                if (snapshotListeners && snapshotListeners.size > 0) {
+                    const snapshot = cache.getCollectionData(collectionKey);
+                    for (const listener of snapshotListeners) {
+                        this.safeInvoke(() => listener(snapshot as OnyxValue<OnyxKey>, collectionKey), collectionKey);
+                    }
                 }
             }
             const members = this.memberListeners.get(collectionKey);
@@ -221,29 +227,34 @@ class OnyxStore {
         }
         const previous = partialPreviousCollection ?? {};
 
+        // Read the merged snapshot once; reuse for snapshot-mode AND for per-member reads.
+        // `cache.getCollectionData()` returns the post-merge frozen object, which is what
+        // listeners should see (not the raw `partialCollection` input, which is just the
+        // delta and lacks fields preserved from the previous values during merge).
+        const snapshot = cache.getCollectionData(collectionKey);
+
         // 1. Snapshot subscribers fire once with the new snapshot.
         const snapshotListeners = this.keyListeners.get(collectionKey);
         if (snapshotListeners && snapshotListeners.size > 0) {
-            const snapshot = cache.getCollectionData(collectionKey);
             for (const listener of snapshotListeners) {
                 this.safeInvoke(() => listener(snapshot as OnyxValue<OnyxKey>, collectionKey), collectionKey);
             }
         }
 
-        // 2. Per-member subscribers fire once per changed member.
+        // 2. Per-member subscribers fire once per changed member with the merged value.
         const members = this.memberListeners.get(collectionKey);
         if (members && members.size > 0) {
             for (const memberKey of changedKeys) {
-                const value = partialCollection?.[memberKey];
+                const value = snapshot?.[memberKey];
                 for (const listener of members) {
                     this.safeInvoke(() => listener(value as OnyxValue<OnyxKey>, memberKey), memberKey);
                 }
             }
         }
 
-        // 3. Exact-member subscribers fire per changed key (skip if ref unchanged).
+        // 3. Exact-member subscribers fire per changed key (skip if ref unchanged vs previous).
         for (const memberKey of changedKeys) {
-            const value = partialCollection?.[memberKey];
+            const value = snapshot?.[memberKey];
             const prev = previous[memberKey];
             if (value === prev) {
                 continue;

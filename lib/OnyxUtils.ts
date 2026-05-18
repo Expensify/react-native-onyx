@@ -497,14 +497,18 @@ function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey
  * Notify subscribers of a single-key write. Wrapper over `onyxStore.notifyKey()`
  * that also performs LRU bookkeeping for eviction. Write paths call this instead
  * of touching the subscriber registry directly.
+ *
+ * Pass `suppressCollectionSnapshot: true` when notifying within a collection-batch
+ * operation — the outer `notifyCollection()` fires snapshot listeners once, so
+ * each per-key fire shouldn't re-trigger them.
  */
-function notifyKey<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>): void {
+function notifyKey<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>, options?: {suppressCollectionSnapshot?: boolean}): void {
     if (value !== null && value !== undefined) {
         cache.addLastAccessedKey(key, OnyxKeys.isCollectionKey(key));
     } else {
         cache.removeLastAccessedKey(key);
     }
-    onyxStore.notifyKey(key, value);
+    onyxStore.notifyKey(key, value, options);
 }
 
 /**
@@ -530,11 +534,16 @@ function notifyCollection<TKey extends CollectionKeyBase>(
 }
 
 /**
- * Remove a key from Onyx and update the subscribers
+ * Remove a key from Onyx and update the subscribers.
+ *
+ * `suppressCollectionSnapshot` skips the collection-level snapshot fire — used by
+ * `prepareKeyValuePairsForStorage()` when called inside a collection-batch operation
+ * (setCollection/mergeCollection/partialSetCollection/multiSet's collection batch),
+ * because the outer `notifyCollection()` fires snapshot listeners once.
  */
-function remove<TKey extends OnyxKey>(key: TKey): Promise<void> {
+function remove<TKey extends OnyxKey>(key: TKey, options?: {suppressCollectionSnapshot?: boolean}): Promise<void> {
     cache.drop(key);
-    notifyKey(key, undefined as OnyxValue<TKey>);
+    notifyKey(key, undefined as OnyxValue<TKey>, options);
 
     if (OnyxKeys.isRamOnlyKey(key)) {
         return Promise.resolve();
@@ -629,12 +638,16 @@ function prepareKeyValuePairsForStorage(
     data: Record<OnyxKey, OnyxInput<OnyxKey>>,
     shouldRemoveNestedNulls?: boolean,
     replaceNullPatches?: MultiMergeReplaceNullPatches,
+    isProcessingCollectionUpdate?: boolean,
 ): StorageKeyValuePair[] {
     const pairs: StorageKeyValuePair[] = [];
 
     for (const [key, value] of Object.entries(data)) {
         if (value === null) {
-            remove(key);
+            // Within a collection batch, the outer notifyCollection() will fire snapshot
+            // listeners once with the final state — so each per-key remove should not
+            // re-fire the snapshot listener (which would cause N+1 callback invocations).
+            remove(key, {suppressCollectionSnapshot: !!isProcessingCollectionUpdate});
             continue;
         }
 
@@ -1113,7 +1126,7 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
             mutableCollection[key] = null;
         }
 
-        const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(mutableCollection, true, undefined);
+        const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(mutableCollection, true, undefined, true);
         const previousCollection = OnyxUtils.getCachedCollection(collectionKey);
 
         for (const [key, value] of keyValuePairs) cache.set(key, value);
@@ -1186,7 +1199,8 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
             // Split to keys that exist in storage and keys that don't
             const keys = resultCollectionKeys.filter((key) => {
                 if (resultCollection[key] === null) {
-                    remove(key);
+                    // Suppress collection-snapshot fire — outer notifyCollection() handles it.
+                    remove(key, {suppressCollectionSnapshot: true});
                     return false;
                 }
                 return true;
@@ -1229,11 +1243,11 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
             // When (multi-)merging the values with the existing values in storage,
             // we don't want to remove nested null values from the data that we pass to the storage layer,
             // because the storage layer uses them to remove nested keys from storage natively.
-            const keyValuePairsForExistingCollection = prepareKeyValuePairsForStorage(existingKeyCollection, false, mergeReplaceNullPatches);
+            const keyValuePairsForExistingCollection = prepareKeyValuePairsForStorage(existingKeyCollection, false, mergeReplaceNullPatches, true);
 
             // We can safely remove nested null values when using (multi-)set,
             // because we will simply overwrite the existing values in storage.
-            const keyValuePairsForNewCollection = prepareKeyValuePairsForStorage(newCollection, true);
+            const keyValuePairsForNewCollection = prepareKeyValuePairsForStorage(newCollection, true, undefined, true);
 
             const promises = [];
 
@@ -1322,7 +1336,7 @@ function partialSetCollection<TKey extends CollectionKeyBase>({collectionKey, co
         const mutableCollection: OnyxInputKeyValueMapping = {...resultCollection};
         const existingKeys = resultCollectionKeys.filter((key) => persistedKeys.has(key));
         const previousCollection = getCachedCollection(collectionKey, existingKeys);
-        const keyValuePairs = prepareKeyValuePairsForStorage(mutableCollection, true, undefined);
+        const keyValuePairs = prepareKeyValuePairsForStorage(mutableCollection, true, undefined, true);
 
         for (const [key, value] of keyValuePairs) cache.set(key, value);
 

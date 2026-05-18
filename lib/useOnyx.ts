@@ -1,5 +1,7 @@
 import {deepEqual} from 'fast-equals';
 import {useCallback, useMemo, useRef, useSyncExternalStore} from 'react';
+import OnyxCache from './OnyxCache';
+import OnyxKeys from './OnyxKeys';
 import onyxStore from './OnyxStore';
 import OnyxUtils from './OnyxUtils';
 import type {OnyxKey, OnyxValue} from './types';
@@ -60,13 +62,15 @@ function createMemoizedSelector<TKey extends OnyxKey, TReturnValue>(selector: Us
 }
 
 /**
- * Subscribes a React component to an Onyx key. The component re-renders when the
- * value at `key` changes (for collection keys, when any member changes — the
- * returned value is the frozen collection snapshot).
+ * Subscribes a React component to an Onyx key.
  *
- * Returns `[value, {status}]`. `status` is `'loaded'` once init completes and the
- * key has either a value or a confirmed-absent state in cache; `'loading'` before
- * that.
+ * Returns `[value, {status}]`. Status is `'loaded'` when the cache holds an
+ * answer for the key (either a value or a confirmed-absent marker), and
+ * `'loading'` otherwise. For collection keys, `'loaded'` is always true post-init.
+ *
+ * If a key isn't in cache (rare with eager-load, but happens for storage writes
+ * that bypass Onyx), the hook lazy-loads via `OnyxUtils.get()` and transitions
+ * `loading → loaded` once the read settles.
  */
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey, options?: UseOnyxOptions<TKey, TReturnValue>): UseOnyxResult<TReturnValue> {
     const selector = options?.selector;
@@ -76,8 +80,28 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
     // looping when consumers pass inline-allocating selectors.
     const memoizedSelector = useMemo(() => (selector ? createMemoizedSelector(selector) : null), [selector]);
 
+    // Flips to `true` after a callback (real change or lazy-load completion) fires for
+    // the current subscription. Combined with `hasCacheForKey` to decide 'loaded' vs 'loading'.
+    const hasCallbackFiredRef = useRef(false);
+
     const subscribe = useCallback(
-        (onStoreChange: () => void) => onyxStore.subscribe(key, onStoreChange),
+        (onStoreChange: () => void) => {
+            hasCallbackFiredRef.current = false;
+            const unsubscribe = onyxStore.subscribe(key, () => {
+                hasCallbackFiredRef.current = true;
+                onStoreChange();
+            });
+            // Lazy-load from storage if cache doesn't have this key. Collection keys are
+            // treated as always-resolved post-init (an empty collection IS a valid answer).
+            // After the read settles, notify so the hook transitions to 'loaded'.
+            if (!OnyxKeys.isCollectionKey(key) && !OnyxCache.hasCacheForKey(key)) {
+                OnyxUtils.get(key).then(() => {
+                    hasCallbackFiredRef.current = true;
+                    onStoreChange();
+                });
+            }
+            return unsubscribe;
+        },
         [key],
     );
 
@@ -90,11 +114,13 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
         const selected = memoizedSelector ? memoizedSelector(raw as OnyxValue<TKey>) : (raw as TReturnValue | undefined);
         const nextValue = (selected ?? undefined) as NonNullable<TReturnValue> | undefined;
 
-        // Loading until init completes. After init the value is whatever the cache says
-        // (absent keys are simply `undefined`); there's no "still fetching" phase because
-        // eager-load guarantees the cache is populated.
         const initDone = OnyxUtils.getDeferredInitTask().isResolved;
-        const nextStatus: FetchStatus = initDone ? 'loaded' : 'loading';
+        const isCollectionKey = OnyxKeys.isCollectionKey(key);
+        const hasCacheForKey = isCollectionKey || OnyxCache.hasCacheForKey(key);
+        // 'loaded' when init is done AND (cache has answered for this key OR the
+        // subscriber callback has fired since (re)subscribing). The callback path
+        // covers lazy storage reads and writes that race with mount.
+        const nextStatus: FetchStatus = initDone && (hasCacheForKey || hasCallbackFiredRef.current) ? 'loaded' : 'loading';
 
         const [prevValue, prevMeta] = resultRef.current;
         if (prevValue === nextValue && prevMeta.status === nextStatus) {
