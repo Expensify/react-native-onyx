@@ -83,6 +83,7 @@ If the requested key is a collection, it will return an object with all the coll
 <ul>
 <li>Storage capacity errors: evicts data and retries the operation</li>
 <li>Invalid data errors: logs an alert and throws an error</li>
+<li>Non-retriable errors: logs an alert and resolves without retrying</li>
 <li>Other errors: retries the operation</li>
 </ul>
 </dd>
@@ -323,6 +324,7 @@ Remove a key from Onyx and update the subscribers
 Handles storage operation failures based on the error type:
 - Storage capacity errors: evicts data and retries the operation
 - Invalid data errors: logs an alert and throws an error
+- Non-retriable errors: logs an alert and resolves without retrying
 - Other errors: retries the operation
 
 **Kind**: global function  
