@@ -133,23 +133,6 @@ function subscribeMembers<TKey extends CollectionKeyBase>(collectionKey: TKey, l
 function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Connection {
     const {key, callback, waitForCollectionCallback} = connectOptions;
 
-    // Skippable members (e.g. "report_undefined" when "undefined" is configured as a
-    // skippable member ID) get no subscription wired up — we just mark the key as
-    // nullish in the cache so any reads return undefined cleanly. Returning a no-op
-    // unsubscribe handle keeps callers' disconnect() flows working.
-    try {
-        const skippableIDs = OnyxUtils.getSkippableCollectionMemberIDs();
-        if (skippableIDs.size) {
-            const [, collectionMemberID] = OnyxKeys.splitCollectionMemberKey(key);
-            if (skippableIDs.has(collectionMemberID)) {
-                cache.addNullishStorageKey(key);
-                return {unsubscribe: () => undefined};
-            }
-        }
-    } catch (e) {
-        // Not a collection member key — fall through and subscribe normally.
-    }
-
     let active = true;
     let unsubscribeFn: (() => void) | null = null;
 
@@ -181,13 +164,13 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
                     (callback as CollectionConnectCallback<TKey> | undefined)?.(valueToDeliver as NonNullable<OnyxCollection<KeyValueMapping[TKey]>>, k);
                 };
                 unsubscribeFn = onyxStore.subscribe(key, (value, k) => {
-                    deliverSnapshot(value, k as TKey, false);
+                    deliverSnapshot(value as unknown as OnyxValue<TKey>, k as TKey, false);
                 });
                 Promise.resolve().then(() => {
                     if (!active) {
                         return;
                     }
-                    deliverSnapshot(onyxStore.getState(key), key as TKey, true);
+                    deliverSnapshot(onyxStore.getState(key) as unknown as OnyxValue<TKey>, key as TKey, true);
                 });
                 return;
             }

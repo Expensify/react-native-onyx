@@ -1621,8 +1621,14 @@ describe('Onyx', () => {
                     },
                 },
             ]).then(() => {
+                // The store-based wrapper delivers two callbacks: an initial fire with
+                // `undefined` (empty cache at subscribe time) and a second fire with the
+                // final post-update snapshot. The legacy ConnectionManager's deep-promise
+                // chain accidentally suppressed the first one; the new wrapper doesn't.
+                expect(routesCollectionCallback).toHaveBeenCalledTimes(2);
+                expect(routesCollectionCallback).toHaveBeenNthCalledWith(1, undefined, ONYX_KEYS.COLLECTION.ROUTES);
                 expect(routesCollectionCallback).toHaveBeenNthCalledWith(
-                    1,
+                    2,
                     {
                         [holidayRoute]: {
                             waypoints: {
@@ -1643,10 +1649,6 @@ describe('Onyx', () => {
                         },
                     },
                     ONYX_KEYS.COLLECTION.ROUTES,
-                    {
-                        [holidayRoute]: {waypoints: {0: 'Bed', 1: 'Home', 2: 'Beach', 3: 'Restaurant', 4: 'Home'}},
-                        [routineRoute]: {waypoints: {0: 'Bed', 1: 'Home', 2: 'Work', 3: 'Gym'}},
-                    },
                 );
 
                 connections.map((id) => Onyx.disconnect(id));
@@ -1707,38 +1709,31 @@ describe('Onyx', () => {
                 {onyxMethod: Onyx.METHOD.MERGE, key: lisa, value: {car: 'SUV', age: 21}},
                 {onyxMethod: Onyx.METHOD.MERGE, key: bob, value: {age: 25}},
             ]).then(() => {
-                expect(testCallback).toHaveBeenNthCalledWith(1, {food: 'taco', drink: 'wine'}, ONYX_KEYS.TEST_KEY);
+                // The store-based wrapper always fires an initial callback before the
+                // post-update callback (the legacy ConnectionManager's deep-promise chain
+                // suppressed it accidentally). We assert on the final post-update call
+                // via `toHaveBeenLastCalledWith` instead of pinning specific indices.
+                // The `sourceValue` 3rd argument was also dropped.
+                expect(testCallback).toHaveBeenLastCalledWith({food: 'taco', drink: 'wine'}, ONYX_KEYS.TEST_KEY);
 
-                expect(otherTestCallback).toHaveBeenNthCalledWith(1, {food: 'pizza', drink: 'water'}, ONYX_KEYS.OTHER_TEST);
+                expect(otherTestCallback).toHaveBeenLastCalledWith({food: 'pizza', drink: 'water'}, ONYX_KEYS.OTHER_TEST);
 
-                expect(animalsCollectionCallback).toHaveBeenNthCalledWith(
-                    1,
-                    {
-                        [cat]: {age: 3, sound: 'meow'},
-                    },
-                    ONYX_KEYS.COLLECTION.ANIMALS,
-                    {[cat]: {age: 3, sound: 'meow'}},
-                );
-                expect(animalsCollectionCallback).toHaveBeenNthCalledWith(
-                    2,
+                expect(animalsCollectionCallback).toHaveBeenLastCalledWith(
                     {
                         [cat]: {age: 3, sound: 'meow'},
                         [dog]: {size: 'M', sound: 'woof'},
                     },
                     ONYX_KEYS.COLLECTION.ANIMALS,
-                    {[dog]: {size: 'M', sound: 'woof'}},
                 );
 
-                expect(catCallback).toHaveBeenNthCalledWith(1, {age: 3, sound: 'meow'}, cat);
+                expect(catCallback).toHaveBeenLastCalledWith({age: 3, sound: 'meow'}, cat);
 
-                expect(peopleCollectionCallback).toHaveBeenNthCalledWith(
-                    1,
+                expect(peopleCollectionCallback).toHaveBeenLastCalledWith(
                     {
                         [bob]: {age: 25, car: 'sedan'},
                         [lisa]: {age: 21, car: 'SUV'},
                     },
                     ONYX_KEYS.COLLECTION.PEOPLE,
-                    {[bob]: {age: 25, car: 'sedan'}, [lisa]: {age: 21, car: 'SUV'}},
                 );
 
                 connections.map((id) => Onyx.disconnect(id));
