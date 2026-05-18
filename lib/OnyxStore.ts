@@ -175,7 +175,9 @@ class OnyxStore {
             }
         }
 
-        // 2. Collection-level routing if this key is a collection member.
+        // 2. Collection-level routing — only fires when the write is to a member key.
+        // Direct writes to a collection root (e.g. `Onyx.merge(COLLECTION_KEY, ...)`) are
+        // an unsupported anti-pattern — treat them as opaque single-key writes.
         const collectionKey = OnyxKeys.getCollectionKey(key);
         const isCollectionMemberWrite = collectionKey !== undefined && collectionKey !== key;
         if (isCollectionMemberWrite) {

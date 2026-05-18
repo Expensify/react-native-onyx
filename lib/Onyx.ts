@@ -162,49 +162,23 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
             if (waitForCollectionCallback === true) {
                 // Snapshot mode — listener fires with the whole snapshot per collection change.
                 //
-                // Legacy contract preservation (the old ConnectionManager + sendDataToConnection
-                // had these quirks; some tests pin them):
-                //   - Callback shape is `(snapshot, key, partial)` where `partial` is a record
-                //     of members whose reference changed since the last delivery. The wrapper
-                //     computes `partial` locally from snapshots, so it can't go stale across
-                //     React renders (the original `sourceValue` staleness from PR #679).
-                //   - Initial fire only: empty collection → `undefined` (legacy `sendDataToConnection`).
-                //     Subsequent fires deliver the actual `{}` so consumers see "now empty".
-                //   - Dedup: skip if the snapshot reference didn't change (e.g. a write raced
-                //     with the initial-fire microtask).
+                // The `sourceValue` 3rd-arg has been dropped (anti-pattern: leaked stale state
+                // through useOnyx, see PR #679). Callback shape is now `(snapshot, key)`.
+                //
+                // Legacy preserved on initial fire only: empty collection → `undefined`
+                // (matches old `sendDataToConnection`). Subsequent fires deliver the actual `{}`.
+                //
+                // Dedup: skip if the snapshot reference didn't change.
                 const NOT_DELIVERED = Symbol('NOT_DELIVERED');
                 let lastDeliveredSnapshot: unknown = NOT_DELIVERED;
                 const deliverSnapshot = (rawSnapshot: OnyxValue<TKey> | undefined, k: TKey, isInitialFire: boolean) => {
                     if (Object.is(lastDeliveredSnapshot, rawSnapshot)) {
                         return;
                     }
-                    // Compute per-member delta against the last delivered snapshot. Cheap thanks to
-                    // structural sharing — unchanged members keep the same reference.
-                    let partial: Record<string, unknown> | undefined;
-                    const current = rawSnapshot as Record<string, unknown> | undefined;
-                    const previous = (lastDeliveredSnapshot === NOT_DELIVERED ? undefined : lastDeliveredSnapshot) as Record<string, unknown> | undefined;
-                    if (current && previous) {
-                        const changed: Record<string, unknown> = {};
-                        for (const memberKey of Object.keys(current)) {
-                            if (current[memberKey] !== previous[memberKey]) {
-                                changed[memberKey] = current[memberKey];
-                            }
-                        }
-                        for (const memberKey of Object.keys(previous)) {
-                            if (!(memberKey in current)) {
-                                changed[memberKey] = undefined;
-                            }
-                        }
-                        partial = Object.keys(changed).length > 0 ? changed : undefined;
-                    }
                     lastDeliveredSnapshot = rawSnapshot;
                     const isEmpty = rawSnapshot !== undefined && rawSnapshot !== null && typeof rawSnapshot === 'object' && Object.keys(rawSnapshot as object).length === 0;
                     const valueToDeliver = isInitialFire && isEmpty ? undefined : rawSnapshot;
-                    (callback as CollectionConnectCallback<TKey> | undefined)?.(
-                        valueToDeliver as NonNullable<OnyxCollection<KeyValueMapping[TKey]>>,
-                        k,
-                        partial as OnyxValue<TKey> | undefined,
-                    );
+                    (callback as CollectionConnectCallback<TKey> | undefined)?.(valueToDeliver as NonNullable<OnyxCollection<KeyValueMapping[TKey]>>, k);
                 };
                 unsubscribeFn = onyxStore.subscribe(key, (value, k) => {
                     deliverSnapshot(value, k as TKey, false);
@@ -237,8 +211,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
                 if (memberKeys.length === 0) {
                     // Legacy semantic: when a per-member subscription finds no existing
                     // members, fire once with (undefined, undefined) so callers can clear
-                    // any prior state and stop showing loading. Matches the old
-                    // `sendDataToConnection(mapping, undefined)` path.
+                    // any prior state. Matches the old `sendDataToConnection(mapping, undefined)`.
                     (callback as DefaultConnectCallback<TKey>)(undefined as OnyxValue<TKey>, undefined as unknown as TKey);
                     return;
                 }

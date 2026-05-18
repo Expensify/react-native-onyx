@@ -1,9 +1,6 @@
 import {deepEqual} from 'fast-equals';
 import {useCallback, useMemo, useRef, useSyncExternalStore} from 'react';
-import OnyxCache from './OnyxCache';
-import OnyxKeys from './OnyxKeys';
 import onyxStore from './OnyxStore';
-import OnyxUtils from './OnyxUtils';
 import type {OnyxKey, OnyxValue} from './types';
 
 type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (data: OnyxValue<TKey> | undefined) => TReturnValue;
@@ -25,7 +22,12 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
     selector?: UseOnyxSelector<TKey, TReturnValue>;
 };
 
-type FetchStatus = 'loading' | 'loaded';
+/**
+ * Always `'loaded'` in the store-based design. The type is preserved so existing
+ * destructures like `const [val, {status}] = useOnyx(KEY)` keep compiling. Will be
+ * removed in a future cleanup once consumers stop reading it.
+ */
+type FetchStatus = 'loaded';
 
 type ResultMetadata = {
     status: FetchStatus;
@@ -61,16 +63,16 @@ function createMemoizedSelector<TKey extends OnyxKey, TReturnValue>(selector: Us
     };
 }
 
+const LOADED_METADATA: ResultMetadata = {status: 'loaded'};
+
 /**
- * Subscribes a React component to an Onyx key.
+ * Subscribes a React component to an Onyx key. The component re-renders when the value
+ * at `key` changes (for collection keys, when any member changes — the returned value is
+ * the frozen collection snapshot).
  *
- * Returns `[value, {status}]`. Status is `'loaded'` when the cache holds an
- * answer for the key (either a value or a confirmed-absent marker), and
- * `'loading'` otherwise. For collection keys, `'loaded'` is always true post-init.
- *
- * If a key isn't in cache (rare with eager-load, but happens for storage writes
- * that bypass Onyx), the hook lazy-loads via `OnyxUtils.get()` and transitions
- * `loading → loaded` once the read settles.
+ * Returns `[value, {status: 'loaded'}]`. With eager-load + the structural-sharing cache,
+ * there's no loading phase — the cache always has an answer (a value or "absent"). The
+ * `status` field is retained for API compatibility and is always `'loaded'`.
  */
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey, options?: UseOnyxOptions<TKey, TReturnValue>): UseOnyxResult<TReturnValue> {
     const selector = options?.selector;
@@ -80,53 +82,21 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
     // looping when consumers pass inline-allocating selectors.
     const memoizedSelector = useMemo(() => (selector ? createMemoizedSelector(selector) : null), [selector]);
 
-    // Flips to `true` after a callback (real change or lazy-load completion) fires for
-    // the current subscription. Combined with `hasCacheForKey` to decide 'loaded' vs 'loading'.
-    const hasCallbackFiredRef = useRef(false);
+    const subscribe = useCallback((onStoreChange: () => void) => onyxStore.subscribe(key, onStoreChange), [key]);
 
-    const subscribe = useCallback(
-        (onStoreChange: () => void) => {
-            hasCallbackFiredRef.current = false;
-            const unsubscribe = onyxStore.subscribe(key, () => {
-                hasCallbackFiredRef.current = true;
-                onStoreChange();
-            });
-            // Lazy-load from storage if cache doesn't have this key. Collection keys are
-            // treated as always-resolved post-init (an empty collection IS a valid answer).
-            // After the read settles, notify so the hook transitions to 'loaded'.
-            if (!OnyxKeys.isCollectionKey(key) && !OnyxCache.hasCacheForKey(key)) {
-                OnyxUtils.get(key).then(() => {
-                    hasCallbackFiredRef.current = true;
-                    onStoreChange();
-                });
-            }
-            return unsubscribe;
-        },
-        [key],
-    );
-
-    // resultRef holds the last tuple returned to React. We return the same tuple
-    // reference when value and status haven't changed so React skips the re-render.
-    const resultRef = useRef<UseOnyxResult<TReturnValue>>([undefined, {status: 'loading'}]);
+    // resultRef holds the last tuple returned to React. We return the same tuple reference
+    // when value hasn't changed so React skips the re-render.
+    const resultRef = useRef<UseOnyxResult<TReturnValue>>([undefined, LOADED_METADATA]);
 
     const getSnapshot = useCallback((): UseOnyxResult<TReturnValue> => {
         const raw = onyxStore.getState(key);
         const selected = memoizedSelector ? memoizedSelector(raw as OnyxValue<TKey>) : (raw as TReturnValue | undefined);
         const nextValue = (selected ?? undefined) as NonNullable<TReturnValue> | undefined;
 
-        const initDone = OnyxUtils.getDeferredInitTask().isResolved;
-        const isCollectionKey = OnyxKeys.isCollectionKey(key);
-        const hasCacheForKey = isCollectionKey || OnyxCache.hasCacheForKey(key);
-        // 'loaded' when init is done AND (cache has answered for this key OR the
-        // subscriber callback has fired since (re)subscribing). The callback path
-        // covers lazy storage reads and writes that race with mount.
-        const nextStatus: FetchStatus = initDone && (hasCacheForKey || hasCallbackFiredRef.current) ? 'loaded' : 'loading';
-
-        const [prevValue, prevMeta] = resultRef.current;
-        if (prevValue === nextValue && prevMeta.status === nextStatus) {
+        if (resultRef.current[0] === nextValue) {
             return resultRef.current;
         }
-        resultRef.current = [nextValue, {status: nextStatus}];
+        resultRef.current = [nextValue, LOADED_METADATA];
         return resultRef.current;
     }, [key, memoizedSelector]);
 
