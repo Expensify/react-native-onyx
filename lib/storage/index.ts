@@ -30,15 +30,15 @@ function degradePerformance(error: Error) {
  */
 function tryOrDegradePerformance<T>(fn: () => Promise<T> | T, waitForInitialization = true): Promise<T> {
     const initialization = waitForInitialization ? initPromise : Promise.resolve();
-    return initialization.then(() =>
-        Promise.resolve(fn()).catch((error: unknown) => {
+    return initialization
+        .then(() => fn())
+        .catch((error: unknown) => {
             // catch the error if DB connection can not be established/DB can not be created
             if (error instanceof Error && error.message.includes('IDBKeyVal store could not be created')) {
                 degradePerformance(error);
             }
             return Promise.reject(error);
-        }),
-    );
+        });
 }
 
 const storage: Storage = {

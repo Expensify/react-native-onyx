@@ -86,4 +86,43 @@ describe('storage/tryOrDegradePerformance', () => {
         expect(capturedLogs.some((log) => log.level === 'hmmm' && log.message.includes('Falling back to only using cache'))).toBe(false);
         expect(storage.getStorageProvider().name).toBe(originalProviderName);
     });
+
+    it('falls back to MemoryOnlyProvider when a storage op throws synchronously with "IDBKeyVal store could not be created"', async () => {
+        const {storage, Logger} = loadIsolatedStorage();
+        const capturedLogs: CapturedLog[] = [];
+        Logger.registerLogger((data: LogData) => capturedLogs.push({level: data.level, message: data.message}));
+
+        storage.init();
+
+        const originalProvider = storage.getStorageProvider();
+        const targetError = new Error('IDBKeyVal store could not be created');
+        originalProvider.getAllKeys = jest.fn().mockImplementation(() => {
+            throw targetError;
+        });
+
+        await expect(storage.getAllKeys()).rejects.toBe(targetError);
+
+        expect(capturedLogs.some((log) => log.level === 'hmmm' && log.message.includes('Falling back to only using cache'))).toBe(true);
+        expect(storage.getStorageProvider().name).toBe('MemoryOnlyProvider');
+    });
+
+    it('propagates sync throws with unrelated messages without falling back', async () => {
+        const {storage, Logger} = loadIsolatedStorage();
+        const capturedLogs: CapturedLog[] = [];
+        Logger.registerLogger((data: LogData) => capturedLogs.push({level: data.level, message: data.message}));
+
+        storage.init();
+
+        const originalProvider = storage.getStorageProvider();
+        const originalProviderName = originalProvider.name;
+        const unrelatedError = new Error('Some unrelated storage failure');
+        originalProvider.getAllKeys = jest.fn().mockImplementation(() => {
+            throw unrelatedError;
+        });
+
+        await expect(storage.getAllKeys()).rejects.toBe(unrelatedError);
+
+        expect(capturedLogs.some((log) => log.level === 'hmmm' && log.message.includes('Falling back to only using cache'))).toBe(false);
+        expect(storage.getStorageProvider().name).toBe(originalProviderName);
+    });
 });
