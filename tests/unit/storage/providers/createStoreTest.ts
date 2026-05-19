@@ -415,4 +415,134 @@ describe('createStore', () => {
             expect(logInfoSpy).not.toHaveBeenCalledWith(expect.stringContaining('IDB heal'), expect.anything());
         });
     });
+
+    describe('connection lost healing', () => {
+        function connectionLostError() {
+            return new DOMException(
+                'Connection to Indexed Database server lost. Refresh the page to try again',
+                'UnknownError',
+            );
+        }
+
+        it('should heal by dropping cached connection and reopening', async () => {
+            const store = createStore(uniqueDBName(), STORE_NAME);
+
+            await store('readwrite', (s) => {
+                s.put('value', 'key1');
+                return IDB.promisifyRequest(s.transaction);
+            });
+
+            const original = IDBDatabase.prototype.transaction;
+            let callCount = 0;
+            jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
+                callCount++;
+                if (callCount === 1) {
+                    throw connectionLostError();
+                }
+                return original.apply(this, args);
+            });
+
+            const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
+            expect(result).toBe('value');
+            expect(callCount).toBe(2);
+            expect(logInfoSpy).toHaveBeenCalledWith(
+                'IDB heal: connection lost error, attempting drop cached connection and reopen',
+                expect.objectContaining({healAttemptsRemaining: expect.any(Number)}),
+            );
+        });
+
+        it('should stop healing after budget exhausts', async () => {
+            const store = createStore(uniqueDBName(), STORE_NAME);
+
+            // All transaction calls fail permanently with connection lost.
+            // The heal path clears dbp and calls indexedDB.open() again — mock that to
+            // also fail so fake-indexeddb doesn't deadlock waiting for the old connection
+            // to close (same pattern as the backing store budget exhaustion test).
+            jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(() => {
+                throw connectionLostError();
+            });
+            jest.spyOn(indexedDB, 'open').mockImplementation(() => {
+                const req = {} as IDBOpenDBRequest;
+                Promise.resolve().then(() => {
+                    Object.defineProperty(req, 'error', {value: connectionLostError(), configurable: true});
+                    req.onerror?.(new Event('error') as Event & {target: IDBOpenDBRequest});
+                });
+                return req;
+            });
+
+            // Each call drains 1 heal attempt (initial fails, heal retry also fails)
+            await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('k')))).rejects.toThrow('Connection to Indexed Database server lost');
+            await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('k')))).rejects.toThrow('Connection to Indexed Database server lost');
+            await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('k')))).rejects.toThrow('Connection to Indexed Database server lost');
+
+            // Budget exhausted — 4th call should NOT attempt healing
+            logInfoSpy.mockClear();
+            await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('k')))).rejects.toThrow('Connection to Indexed Database server lost');
+            expect(logInfoSpy).not.toHaveBeenCalledWith(expect.stringContaining('IDB heal'), expect.anything());
+        });
+
+        it('should also heal "connection is closing" variant', async () => {
+            const store = createStore(uniqueDBName(), STORE_NAME);
+
+            await store('readwrite', (s) => {
+                s.put('value', 'key1');
+                return IDB.promisifyRequest(s.transaction);
+            });
+
+            const original = IDBDatabase.prototype.transaction;
+            let callCount = 0;
+            jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
+                callCount++;
+                if (callCount === 1) {
+                    throw new DOMException('Connection is closing.', 'UnknownError');
+                }
+                return original.apply(this, args);
+            });
+
+            const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
+            expect(result).toBe('value');
+            expect(callCount).toBe(2);
+        });
+
+        it('should share heal budget with backing store errors', async () => {
+            const store = createStore(uniqueDBName(), STORE_NAME);
+
+            // All transaction calls fail permanently, alternating error types.
+            // The heal path clears dbp and calls indexedDB.open() again — mock that to
+            // also fail so fake-indexeddb doesn't deadlock waiting for the old connection
+            // to close.
+            const txErrors = [
+                new DOMException('Internal error opening backing store for indexedDB.open.', 'UnknownError'),
+                connectionLostError(),
+                new DOMException('Internal error opening backing store for indexedDB.open.', 'UnknownError'),
+            ];
+            let txErrorIndex = 0;
+            jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(() => {
+                const err = txErrors[Math.min(txErrorIndex, txErrors.length - 1)];
+                txErrorIndex++;
+                throw err;
+            });
+            jest.spyOn(indexedDB, 'open').mockImplementation(() => {
+                const req = {} as IDBOpenDBRequest;
+                Promise.resolve().then(() => {
+                    Object.defineProperty(req, 'error', {
+                        value: new DOMException('Internal error opening backing store for indexedDB.open.', 'UnknownError'),
+                        configurable: true,
+                    });
+                    req.onerror?.(new Event('error') as Event & {target: IDBOpenDBRequest});
+                });
+                return req;
+            });
+
+            // 3 calls drain the budget (each call: fail + heal retry fail = 1 budget)
+            await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('k')))).rejects.toThrow();
+            await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('k')))).rejects.toThrow();
+            await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('k')))).rejects.toThrow();
+
+            // Budget exhausted — no more healing for either error type
+            logInfoSpy.mockClear();
+            await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('k')))).rejects.toThrow();
+            expect(logInfoSpy).not.toHaveBeenCalledWith(expect.stringContaining('IDB heal'), expect.anything());
+        });
+    });
 });

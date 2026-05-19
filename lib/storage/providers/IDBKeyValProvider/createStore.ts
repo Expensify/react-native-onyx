@@ -13,6 +13,17 @@ function isBackingStoreError(error: unknown): boolean {
     return error instanceof Error && error.message.includes('Internal error opening backing store');
 }
 
+/**
+ * Detects Safari/WebKit IDB connection termination errors.
+ * Fires when Safari kills the IDB server process for backgrounded tabs.
+ * WebKit bugs: https://bugs.webkit.org/show_bug.cgi?id=197050, https://bugs.webkit.org/show_bug.cgi?id=201483
+ */
+function isConnectionLostError(error: unknown): boolean {
+    if (!(error instanceof Error)) return false;
+    const msg = error.message.toLowerCase();
+    return msg.includes('connection to indexed database server lost') || msg.includes('connection is closing');
+}
+
 // This is a copy of the createStore function from idb-keyval, we need a custom implementation
 // because we need to create the database manually in order to ensure that the store exists before we use it.
 // If the store does not exist, idb-keyval will throw an error
@@ -129,9 +140,10 @@ function createStore(dbName: string, storeName: string): UseStore {
                     return executeTransaction(txMode, callback).then(resetHealBudget);
                 }
 
-                if (isBackingStoreError(error) && healAttemptsRemaining > 0) {
+                if ((isBackingStoreError(error) || isConnectionLostError(error)) && healAttemptsRemaining > 0) {
                     healAttemptsRemaining--;
-                    Logger.logInfo('IDB heal: backing store error, attempting drop cached connection and reopen', {
+                    const errorType = isBackingStoreError(error) ? 'backing store' : 'connection lost';
+                    Logger.logInfo(`IDB heal: ${errorType} error, attempting drop cached connection and reopen`, {
                         dbName,
                         storeName,
                         healAttemptsRemaining,
