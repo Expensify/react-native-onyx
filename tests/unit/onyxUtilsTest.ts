@@ -804,6 +804,49 @@ describe('OnyxUtils', () => {
         });
     });
 
+    describe('mergeCollection cache-first ordering', () => {
+        it('updates cache and notifies subscribers even when Storage.multiMerge rejects', async () => {
+            const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
+            const existingMemberKey = `${collectionKey}1`;
+            const newMemberKey = `${collectionKey}2`;
+
+            // Seed an existing member so the merge path exercises multiMerge (existing) + multiSet (new)
+            await Onyx.set(existingMemberKey, {value: 'initial'});
+
+            const collectionCallback = jest.fn();
+            Onyx.connect({
+                key: collectionKey,
+                waitForCollectionCallback: true,
+                callback: collectionCallback,
+            });
+            await waitForPromisesToResolve();
+            collectionCallback.mockClear();
+
+            // Force Storage.multiMerge to reject with a non-retriable IDB error so the failure
+            // path is taken without burning the full retry budget and without rejecting the
+            // outer Onyx.mergeCollection promise.
+            const nonRetriableIdbError = Object.assign(new Error('Internal error opening backing store for indexedDB.open.'), {name: 'UnknownError'});
+            StorageMock.multiMerge = jest.fn().mockRejectedValue(nonRetriableIdbError);
+
+            await Onyx.mergeCollection(collectionKey, {
+                [existingMemberKey]: {value: 'merged'},
+                [newMemberKey]: {value: 'new'},
+            } as GenericCollection);
+
+            // Cache must reflect the merge regardless of the multiMerge rejection. This is the
+            // cache-first / storage-second invariant that mergeCollectionWithPatches must honor.
+            const cachedCollection = OnyxCache.getCollectionData(collectionKey);
+            expect(cachedCollection?.[existingMemberKey]).toEqual({value: 'merged'});
+            expect(cachedCollection?.[newMemberKey]).toEqual({value: 'new'});
+
+            // Subscribers must have been notified with the merged values.
+            expect(collectionCallback).toHaveBeenCalled();
+            const lastBroadcast = collectionCallback.mock.calls.at(-1)?.[0] as Record<string, unknown> | undefined;
+            expect(lastBroadcast?.[existingMemberKey]).toEqual({value: 'merged'});
+            expect(lastBroadcast?.[newMemberKey]).toEqual({value: 'new'});
+        });
+    });
+
     describe('storage eviction', () => {
         const diskFullError = new Error('database or disk is full');
 
