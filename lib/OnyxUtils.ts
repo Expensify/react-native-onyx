@@ -61,6 +61,14 @@ const SQLITE_STORAGE_ERRORS = [
 
 const STORAGE_ERRORS = [...IDB_STORAGE_ERRORS, ...SQLITE_STORAGE_ERRORS];
 
+// IndexedDB errors where retrying is futile because the underlying connection/store is broken.
+// The healing path (separate from retryOperation) is responsible for recovery.
+const IDB_NON_RETRIABLE_ERRORS = [
+    'internal error opening backing store', // LevelDB backing store is broken at the filesystem level
+] as const;
+
+const NON_RETRIABLE_ERRORS = [...IDB_NON_RETRIABLE_ERRORS];
+
 // Max number of retries for failed storage operations
 const MAX_STORAGE_OPERATION_RETRY_ATTEMPTS = 5;
 
@@ -786,6 +794,7 @@ function reportStorageQuota(error?: Error): Promise<void> {
  * Handles storage operation failures based on the error type:
  * - Storage capacity errors: evicts data and retries the operation
  * - Invalid data errors: logs an alert and throws an error
+ * - Non-retriable errors: logs an alert and resolves without retrying
  * - Other errors: retries the operation
  */
 function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, onyxMethod: TMethod, defaultParams: Parameters<TMethod>[0], retryAttempt: number | undefined): Promise<void> {
@@ -802,6 +811,12 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, on
     const errorMessage = error?.message?.toLowerCase?.();
     const errorName = error?.name?.toLowerCase?.();
     const isStorageCapacityError = STORAGE_ERRORS.some((storageError) => errorName?.includes(storageError) || errorMessage?.includes(storageError));
+    const isNonRetriableError = NON_RETRIABLE_ERRORS.some((nonRetriableError) => errorName?.includes(nonRetriableError) || errorMessage?.includes(nonRetriableError));
+
+    if (isNonRetriableError) {
+        Logger.logAlert(`Storage operation skipped retry for non-retriable error. Error: ${error}. onyxMethod: ${onyxMethod.name}.`);
+        return Promise.resolve();
+    }
 
     if (nextRetryAttempt > MAX_STORAGE_OPERATION_RETRY_ATTEMPTS) {
         Logger.logAlert(`Storage operation failed after 5 retries. Error: ${error}. onyxMethod: ${onyxMethod.name}.`);
