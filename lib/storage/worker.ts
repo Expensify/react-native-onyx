@@ -20,7 +20,12 @@ import type {StorageKeyValuePair} from './providers/types';
 // Message types for main-thread <-> worker communication
 // ---------------------------------------------------------------------------
 
-type InitMessage = {type: 'init'; id: string; backend: 'sqlite' | 'idb'};
+type InitMessage = {
+    type: 'init';
+    id: string;
+    backend: 'sqlite' | 'idb';
+    originId: string;
+};
 type GetItemMessage = {type: 'getItem'; id: string; key: string};
 type MultiGetMessage = {type: 'multiGet'; id: string; keys: string[]};
 type SetItemMessage = {type: 'setItem'; id: string; key: string; value: unknown};
@@ -55,6 +60,7 @@ type ResultMessage = {type: 'result'; id: string; data?: unknown; error?: string
 
 let provider: StorageProvider<unknown> | null = null;
 let broadcastChannel: BroadcastChannel | null = null;
+let originId: string | null = null;
 
 const BROADCAST_CHANNEL_NAME = 'onyx-sync';
 
@@ -104,7 +110,7 @@ function broadcastSet(pairs: StorageKeyValuePair[]): void {
         return;
     }
 
-    broadcastChannel.postMessage({type: 'set', pairs});
+    broadcastChannel.postMessage({type: 'set', pairs, originId});
 }
 
 /**
@@ -116,7 +122,7 @@ function broadcastMerge(pairs: StorageKeyValuePair[]): void {
         return;
     }
 
-    broadcastChannel.postMessage({type: 'merge', pairs});
+    broadcastChannel.postMessage({type: 'merge', pairs, originId});
 }
 
 /**
@@ -127,7 +133,7 @@ function broadcastRemove(keys: string[]): void {
         return;
     }
 
-    broadcastChannel.postMessage({type: 'remove', keys});
+    broadcastChannel.postMessage({type: 'remove', keys, originId});
 }
 
 /**
@@ -138,7 +144,7 @@ function broadcastClear(): void {
         return;
     }
 
-    broadcastChannel.postMessage({type: 'clear'});
+    broadcastChannel.postMessage({type: 'clear', originId});
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +194,11 @@ async function handleMessage(msg: WorkerMessage): Promise<void> {
                 provider.init();
             }
 
-            // Initialize BroadcastChannel for cross-tab sync
+            // Initialize BroadcastChannel for cross-tab sync. Capture the originId
+            // from the main thread so every broadcast can be tagged with it; the
+            // originating tab's InstanceSync filters out messages with this id to
+            // avoid duplicating its own writes back into its cache.
+            originId = msg.originId;
             broadcastChannel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
             sendResult(msg.id);
             break;

@@ -16,6 +16,7 @@
  */
 
 import utils from '../utils';
+import STORAGE_ORIGIN_ID from './originId';
 import type StorageProvider from './providers/types';
 import type {StorageKeyList, StorageKeyValuePair} from './providers/types';
 
@@ -116,9 +117,15 @@ function createWorkerStorageProvider(backend: 'sqlite' | 'idb'): StorageProvider
 
             provider.store = worker;
 
-            // Send init message with the chosen backend and return the Promise
-            // so that Storage.init() can await worker readiness.
-            return postToWorker<void>({type: 'init', backend}).catch((error) => {
+            // Send init message with the chosen backend and the originId for this tab,
+            // so the worker can tag every cross-tab broadcast and the local InstanceSync
+            // can filter out self-echoes. Return the Promise so that Storage.init() can
+            // await worker readiness.
+            return postToWorker<void>({
+                type: 'init',
+                backend,
+                originId: STORAGE_ORIGIN_ID,
+            }).catch((error) => {
                 console.error('[Onyx] Failed to initialize storage worker:', error);
             });
         },

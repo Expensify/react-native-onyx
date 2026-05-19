@@ -17,6 +17,7 @@
 import type {OnyxKey} from '../../types';
 import cache from '../../OnyxCache';
 import utils from '../../utils';
+import STORAGE_ORIGIN_ID from '../originId';
 import NoopProvider from '../providers/NoopProvider';
 import type {StorageKeyList, OnStorageKeyChanged} from '../providers/types';
 import type StorageProvider from '../providers/types';
@@ -80,6 +81,14 @@ const InstanceSync = {
         syncChannel.onmessage = (event: MessageEvent) => {
             const data = event.data;
             if (!data) return;
+
+            // Skip messages originating from this tab's own storage worker.
+            // BroadcastChannel delivers across realms (worker -> same-tab main thread),
+            // so without this filter every local write would echo back as a fresh
+            // structured-cloned value and double the working-set in main heap.
+            if (data.originId && data.originId === STORAGE_ORIGIN_ID) {
+                return;
+            }
 
             if (data.type === 'set' && Array.isArray(data.pairs)) {
                 // SET: full values included, no storage reads needed
