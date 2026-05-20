@@ -594,7 +594,7 @@ describe('createStore', () => {
 
             const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
             expect(result).toBe('value');
-            expect(logInfoSpy).toHaveBeenCalledWith('IDB visibilitychange probe: connection lost, dropping cached connection', expect.objectContaining({dbName: expect.any(String)}));
+            expect(logAlertSpy).toHaveBeenCalledWith(expect.stringContaining('IDB visibilitychange probe: stale connection detected'), expect.objectContaining({dbName: expect.any(String)}));
         });
 
         it('should not probe when no connection exists yet', async () => {
@@ -629,7 +629,9 @@ describe('createStore', () => {
 
             const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
             expect(result).toBe('value');
-            expect(logInfoSpy).not.toHaveBeenCalledWith(expect.stringContaining('visibilitychange probe'), expect.anything());
+            // Probe ran but found healthy connection — no stale connection alert
+            expect(logAlertSpy).not.toHaveBeenCalledWith(expect.stringContaining('stale connection detected'), expect.anything());
+            expect(logInfoSpy).toHaveBeenCalledWith(expect.stringContaining('connection is healthy'), expect.anything());
         });
 
         it('should drop dbp when probe throws InvalidStateError', async () => {
@@ -662,7 +664,7 @@ describe('createStore', () => {
 
             const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
             expect(result).toBe('value');
-            expect(logInfoSpy).toHaveBeenCalledWith('IDB visibilitychange probe: connection lost, dropping cached connection', expect.objectContaining({dbName: expect.any(String)}));
+            expect(logAlertSpy).toHaveBeenCalledWith(expect.stringContaining('IDB visibilitychange probe: stale connection detected'), expect.objectContaining({dbName: expect.any(String)}));
         });
     });
 });

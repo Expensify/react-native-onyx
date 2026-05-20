@@ -140,13 +140,19 @@ function createStore(dbName: string, storeName: string): UseStore {
                 return;
             }
 
+            Logger.logInfo('IDB visibilitychange probe: tab became visible, checking connection health', {dbName, storeName});
+
             const probePromise = dbp;
 
             const dropCacheIfStale = (error: unknown) => {
                 if (dbp !== probePromise || !isStaleConnectionError(error)) {
                     return;
                 }
-                Logger.logInfo('IDB visibilitychange probe: connection lost, dropping cached connection', {dbName, storeName});
+                Logger.logAlert('IDB visibilitychange probe: stale connection detected, dropping cached connection', {
+                    dbName,
+                    storeName,
+                    errorMessage: error instanceof Error ? error.message : String(error),
+                });
                 dbp = undefined;
             };
 
@@ -161,6 +167,7 @@ function createStore(dbName: string, storeName: string): UseStore {
                     req.onerror = () => {
                         dropCacheIfStale(req.error);
                     };
+                    Logger.logInfo('IDB visibilitychange probe: connection is healthy', {dbName, storeName});
                 } catch (error) {
                     dropCacheIfStale(error);
                 }
