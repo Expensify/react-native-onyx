@@ -418,10 +418,7 @@ describe('createStore', () => {
 
     describe('connection lost healing', () => {
         function connectionLostError() {
-            return new DOMException(
-                'Connection to Indexed Database server lost. Refresh the page to try again',
-                'UnknownError',
-            );
+            return new DOMException('Connection to Indexed Database server lost. Refresh the page to try again', 'UnknownError');
         }
 
         it('should heal by dropping cached connection and reopening', async () => {

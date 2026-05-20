@@ -24,6 +24,19 @@ function isConnectionLostError(error: unknown): boolean {
     return msg.includes('connection to indexed database server lost') || msg.includes('connection is closing');
 }
 
+function isInvalidStateError(error: unknown): boolean {
+    return error instanceof Error && error.name === 'InvalidStateError';
+}
+
+/** Errors that trigger a budgeted heal-and-retry in store(). */
+function isBudgetedHealError(error: unknown): boolean {
+    return isBackingStoreError(error) || isConnectionLostError(error);
+}
+
+function getBudgetedHealErrorLabel(error: unknown): 'backing store' | 'connection lost' {
+    return isBackingStoreError(error) ? 'backing store' : 'connection lost';
+}
+
 // This is a copy of the createStore function from idb-keyval, we need a custom implementation
 // because we need to create the database manually in order to ensure that the store exists before we use it.
 // If the store does not exist, idb-keyval will throw an error
@@ -53,23 +66,27 @@ function createStore(dbName: string, storeName: string): UseStore {
         };
     };
 
-    const getDB = () => {
-        if (dbp) return dbp;
-        const request = indexedDB.open(dbName);
-        request.onupgradeneeded = () => request.result.createObjectStore(storeName);
-        dbp = IDB.promisifyRequest(request);
-
-        const currentPromise = dbp;
-        dbp.then(attachHandlers, () => {
-            // Clear the cached rejected promise so the next operation retries
-            // with a fresh indexedDB.open() instead of returning the same rejection.
-            // Guard: only clear if dbp hasn't been replaced by a concurrent heal/retry.
+    // Cache the open promise and attach handlers + rejection cleanup.
+    // On rejection, clears dbp so the next operation retries with a fresh indexedDB.open()
+    // instead of returning the same rejected promise.
+    // Guard: only clear if dbp hasn't been replaced by a concurrent heal/retry.
+    function cacheOpenPromise(openPromise: Promise<IDBDatabase>) {
+        dbp = openPromise;
+        const currentPromise = openPromise;
+        openPromise.then(attachHandlers, () => {
             if (dbp !== currentPromise) {
                 return;
             }
             dbp = undefined;
         });
-        return dbp;
+        return openPromise;
+    }
+
+    const getDB = () => {
+        if (dbp) return dbp;
+        const request = indexedDB.open(dbName);
+        request.onupgradeneeded = () => request.result.createObjectStore(storeName);
+        return cacheOpenPromise(IDB.promisifyRequest(request));
     };
 
     // Ensures the store exists in the DB. If missing, bumps the version to trigger
@@ -94,15 +111,7 @@ function createStore(dbName: string, storeName: string): UseStore {
             updatedDatabase.createObjectStore(storeName);
         };
 
-        dbp = IDB.promisifyRequest(request);
-        const currentPromise = dbp;
-        dbp.then(attachHandlers, () => {
-            if (dbp !== currentPromise) {
-                return;
-            }
-            dbp = undefined;
-        });
-        return dbp;
+        return cacheOpenPromise(IDB.promisifyRequest(request));
     };
 
     function executeTransaction<T>(txMode: IDBTransactionMode, callback: (store: IDBObjectStore) => T | PromiseLike<T>): Promise<T> {
@@ -116,11 +125,12 @@ function createStore(dbName: string, storeName: string): UseStore {
         return result;
     }
 
-    // Handles two recoverable error classes:
+    // Handles three recoverable error classes:
     // 1. InvalidStateError — connection closed between getDB() resolving and db.transaction().
-    //    Retry once with a fresh connection.
-    // 2. Backing store corruption (Chromium UnknownError) — drop cached connection and reopen the IDB connection.
-    //    Bounded by a shared heal budget (3 attempts, reset on success).
+    //    Retry once with a fresh connection. No budget limit (transient, always worth one reopen).
+    // 2. Backing store corruption (Chromium UnknownError) — drop cached connection and reopen.
+    // 3. Connection lost (Safari UnknownError) — IDB server terminated for backgrounded tabs.
+    //    Both 2 and 3 share a heal budget (3 attempts, reset on success).
     //    Mirrors Dexie's PR1398_maxLoop pattern: https://github.com/dexie/Dexie.js/blob/master/src/functions/temp-transaction.ts
     // Note: concurrent store() calls share the budget. Under overlapping failures each caller
     // decrements independently, so the budget may drain faster than one-per-incident. This is
@@ -129,21 +139,20 @@ function createStore(dbName: string, storeName: string): UseStore {
         executeTransaction(txMode, callback)
             .then(resetHealBudget)
             .catch((error) => {
-                if (error instanceof Error && error.name === 'InvalidStateError') {
+                if (isInvalidStateError(error)) {
                     Logger.logAlert('IDB InvalidStateError, retrying with fresh connection', {
                         dbName,
                         storeName,
                         txMode,
-                        errorMessage: error.message,
+                        errorMessage: error instanceof Error ? error.message : String(error),
                     });
                     dbp = undefined;
                     return executeTransaction(txMode, callback).then(resetHealBudget);
                 }
 
-                if ((isBackingStoreError(error) || isConnectionLostError(error)) && healAttemptsRemaining > 0) {
+                if (isBudgetedHealError(error) && healAttemptsRemaining > 0) {
                     healAttemptsRemaining--;
-                    const errorType = isBackingStoreError(error) ? 'backing store' : 'connection lost';
-                    Logger.logInfo(`IDB heal: ${errorType} error, attempting drop cached connection and reopen`, {
+                    Logger.logInfo(`IDB heal: ${getBudgetedHealErrorLabel(error)} error, attempting drop cached connection and reopen`, {
                         dbName,
                         storeName,
                         healAttemptsRemaining,
