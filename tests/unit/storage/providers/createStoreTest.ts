@@ -277,7 +277,10 @@ describe('createStore', () => {
             const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
             expect(result).toBe('value');
             expect(callCount).toBe(2);
-            expect(logAlertSpy).toHaveBeenCalledWith('IDB heal: backing store error detected — dropping cached connection and reopening (2 attempts left)', expect.objectContaining({dbName: expect.any(String)}));
+            expect(logAlertSpy).toHaveBeenCalledWith(
+                'IDB heal: backing store error detected — dropping cached connection and reopening (2 attempts left)',
+                expect.objectContaining({dbName: expect.any(String)}),
+            );
             expect(logInfoSpy).toHaveBeenCalledWith('IDB heal: successfully recovered after backing store error', expect.objectContaining({dbName: expect.any(String)}));
         });
 
@@ -451,10 +454,7 @@ describe('createStore', () => {
                 expect.stringContaining('connection lost error detected — dropping cached connection and reopening'),
                 expect.objectContaining({dbName: expect.any(String)}),
             );
-            expect(logInfoSpy).toHaveBeenCalledWith(
-                'IDB heal: successfully recovered after connection lost error',
-                expect.objectContaining({dbName: expect.any(String)}),
-            );
+            expect(logInfoSpy).toHaveBeenCalledWith('IDB heal: successfully recovered after connection lost error', expect.objectContaining({dbName: expect.any(String)}));
         });
 
         it('should stop healing after budget exhausts', async () => {
