@@ -96,7 +96,8 @@ describe('createStore', () => {
 
             await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('key1')))).rejects.toThrow(DOMException);
             expect(callCount).toBe(1);
-            expect(logAlertSpy).not.toHaveBeenCalled();
+            expect(logAlertSpy).toHaveBeenCalledWith('IDB error is not recoverable, giving up', expect.objectContaining({errorMessage: 'Not found'}));
+            expect(logAlertSpy).not.toHaveBeenCalledWith(expect.stringContaining('dropping cached connection'), expect.anything());
         });
 
         it('should not retry on non-DOMException errors', async () => {
@@ -115,7 +116,8 @@ describe('createStore', () => {
 
             await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('key1')))).rejects.toThrow(TypeError);
             expect(callCount).toBe(1);
-            expect(logAlertSpy).not.toHaveBeenCalled();
+            expect(logAlertSpy).toHaveBeenCalledWith('IDB error is not recoverable, giving up', expect.objectContaining({errorMessage: 'Something went wrong'}));
+            expect(logAlertSpy).not.toHaveBeenCalledWith(expect.stringContaining('dropping cached connection'), expect.anything());
         });
 
         it('should preserve data integrity after a successful retry', async () => {
@@ -174,7 +176,7 @@ describe('createStore', () => {
                 return IDB.promisifyRequest(s.transaction);
             });
 
-            expect(logAlertSpy).toHaveBeenCalledWith('IDB InvalidStateError, retrying with fresh connection', {
+            expect(logAlertSpy).toHaveBeenCalledWith('IDB InvalidStateError — dropping cached connection and retrying', {
                 dbName,
                 storeName: STORE_NAME,
                 txMode: 'readwrite',
@@ -275,7 +277,8 @@ describe('createStore', () => {
             const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
             expect(result).toBe('value');
             expect(callCount).toBe(2);
-            expect(logInfoSpy).toHaveBeenCalledWith('IDB heal: backing store error, attempting drop cached connection and reopen', expect.objectContaining({healAttemptsRemaining: 2}));
+            expect(logAlertSpy).toHaveBeenCalledWith('IDB heal: backing store error detected — dropping cached connection and reopening (2 attempts left)', expect.objectContaining({dbName: expect.any(String)}));
+            expect(logInfoSpy).toHaveBeenCalledWith('IDB heal: successfully recovered after backing store error', expect.objectContaining({dbName: expect.any(String)}));
         });
 
         it('should heal on init when indexedDB.open() rejects with UnknownError', async () => {
@@ -337,10 +340,11 @@ describe('createStore', () => {
             await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('k')))).rejects.toThrow('Internal error opening backing store');
             await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('k')))).rejects.toThrow('Internal error opening backing store');
 
-            // Budget exhausted — 4th call should NOT attempt healing
-            logInfoSpy.mockClear();
+            // Budget exhausted — 4th call should NOT attempt healing, but should log budget exhausted
+            logAlertSpy.mockClear();
             await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('k')))).rejects.toThrow('Internal error opening backing store');
-            expect(logInfoSpy).not.toHaveBeenCalledWith(expect.stringContaining('IDB heal'), expect.anything());
+            expect(logAlertSpy).toHaveBeenCalledWith(expect.stringContaining('heal budget exhausted'), expect.anything());
+            expect(logAlertSpy).not.toHaveBeenCalledWith(expect.stringContaining('dropping cached connection and reopening'), expect.anything());
         });
 
         it('should reset heal budget after a successful operation', async () => {
@@ -404,7 +408,7 @@ describe('createStore', () => {
             await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('key1')))).rejects.toThrow('Some other unknown error');
 
             jest.restoreAllMocks();
-            logInfoSpy = jest.spyOn(Logger, 'logInfo');
+            logAlertSpy = jest.spyOn(Logger, 'logAlert');
 
             // QuotaExceededError
             jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(() => {
@@ -412,7 +416,8 @@ describe('createStore', () => {
             });
             await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('key1')))).rejects.toThrow('Quota exceeded');
 
-            expect(logInfoSpy).not.toHaveBeenCalledWith(expect.stringContaining('IDB heal'), expect.anything());
+            expect(logAlertSpy).not.toHaveBeenCalledWith(expect.stringContaining('dropping cached connection and reopening'), expect.anything());
+            expect(logAlertSpy).toHaveBeenCalledWith('IDB error is not recoverable, giving up', expect.objectContaining({errorMessage: 'Quota exceeded'}));
         });
     });
 
@@ -442,9 +447,13 @@ describe('createStore', () => {
             const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
             expect(result).toBe('value');
             expect(callCount).toBe(2);
+            expect(logAlertSpy).toHaveBeenCalledWith(
+                expect.stringContaining('connection lost error detected — dropping cached connection and reopening'),
+                expect.objectContaining({dbName: expect.any(String)}),
+            );
             expect(logInfoSpy).toHaveBeenCalledWith(
-                'IDB heal: connection lost error, attempting drop cached connection and reopen',
-                expect.objectContaining({healAttemptsRemaining: expect.any(Number)}),
+                'IDB heal: successfully recovered after connection lost error',
+                expect.objectContaining({dbName: expect.any(String)}),
             );
         });
 
@@ -472,10 +481,11 @@ describe('createStore', () => {
             await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('k')))).rejects.toThrow('Connection to Indexed Database server lost');
             await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('k')))).rejects.toThrow('Connection to Indexed Database server lost');
 
-            // Budget exhausted — 4th call should NOT attempt healing
-            logInfoSpy.mockClear();
+            // Budget exhausted — 4th call should NOT attempt healing, but should log budget exhausted
+            logAlertSpy.mockClear();
             await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('k')))).rejects.toThrow('Connection to Indexed Database server lost');
-            expect(logInfoSpy).not.toHaveBeenCalledWith(expect.stringContaining('IDB heal'), expect.anything());
+            expect(logAlertSpy).toHaveBeenCalledWith(expect.stringContaining('heal budget exhausted'), expect.anything());
+            expect(logAlertSpy).not.toHaveBeenCalledWith(expect.stringContaining('dropping cached connection and reopening'), expect.anything());
         });
 
         it('should also heal "connection is closing" variant', async () => {
@@ -537,9 +547,10 @@ describe('createStore', () => {
             await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('k')))).rejects.toThrow();
 
             // Budget exhausted — no more healing for either error type
-            logInfoSpy.mockClear();
+            logAlertSpy.mockClear();
             await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('k')))).rejects.toThrow();
-            expect(logInfoSpy).not.toHaveBeenCalledWith(expect.stringContaining('IDB heal'), expect.anything());
+            expect(logAlertSpy).toHaveBeenCalledWith(expect.stringContaining('heal budget exhausted'), expect.anything());
+            expect(logAlertSpy).not.toHaveBeenCalledWith(expect.stringContaining('dropping cached connection and reopening'), expect.anything());
         });
     });
 });

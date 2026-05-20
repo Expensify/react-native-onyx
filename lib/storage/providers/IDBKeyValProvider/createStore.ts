@@ -140,7 +140,7 @@ function createStore(dbName: string, storeName: string): UseStore {
             .then(resetHealBudget)
             .catch((error) => {
                 if (isInvalidStateError(error)) {
-                    Logger.logAlert('IDB InvalidStateError, retrying with fresh connection', {
+                    Logger.logAlert('IDB InvalidStateError — dropping cached connection and retrying', {
                         dbName,
                         storeName,
                         txMode,
@@ -152,15 +152,30 @@ function createStore(dbName: string, storeName: string): UseStore {
 
                 if (isBudgetedHealError(error) && healAttemptsRemaining > 0) {
                     healAttemptsRemaining--;
-                    Logger.logInfo(`IDB heal: ${getBudgetedHealErrorLabel(error)} error, attempting drop cached connection and reopen`, {
+                    const label = getBudgetedHealErrorLabel(error);
+                    Logger.logAlert(`IDB heal: ${label} error detected — dropping cached connection and reopening (${healAttemptsRemaining} attempts left)`, {
                         dbName,
                         storeName,
-                        healAttemptsRemaining,
                     });
                     dbp = undefined;
-                    return executeTransaction(txMode, callback).then(resetHealBudget);
+                    return executeTransaction(txMode, callback).then((result) => {
+                        Logger.logInfo(`IDB heal: successfully recovered after ${label} error`, {dbName, storeName});
+                        return resetHealBudget(result);
+                    });
                 }
 
+                if (isBudgetedHealError(error)) {
+                    Logger.logAlert(`IDB heal: ${getBudgetedHealErrorLabel(error)} error — heal budget exhausted, giving up`, {
+                        dbName,
+                        storeName,
+                    });
+                } else {
+                    Logger.logAlert('IDB error is not recoverable, giving up', {
+                        dbName,
+                        storeName,
+                        errorMessage: error instanceof Error ? error.message : String(error),
+                    });
+                }
                 throw error;
             });
 }
