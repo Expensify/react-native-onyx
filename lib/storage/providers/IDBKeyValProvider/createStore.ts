@@ -164,10 +164,12 @@ function createStore(dbName: string, storeName: string): UseStore {
                     const tx = db.transaction(storeName, 'readonly');
                     const probeStore = tx.objectStore(storeName);
                     const req = probeStore.count();
+                    req.onsuccess = () => {
+                        Logger.logInfo('IDB visibilitychange probe: connection is healthy', {dbName, storeName});
+                    };
                     req.onerror = () => {
                         dropCacheIfStale(req.error);
                     };
-                    Logger.logInfo('IDB visibilitychange probe: connection is healthy', {dbName, storeName});
                 } catch (error) {
                     dropCacheIfStale(error);
                 }
