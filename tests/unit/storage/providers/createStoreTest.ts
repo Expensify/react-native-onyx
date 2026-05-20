@@ -553,4 +553,116 @@ describe('createStore', () => {
             expect(logAlertSpy).not.toHaveBeenCalledWith(expect.stringContaining('dropping cached connection and reopening'), expect.anything());
         });
     });
+
+    describe('visibilitychange probe', () => {
+        function simulateVisibilityChange(state: string) {
+            Object.defineProperty(document, 'visibilityState', {value: state, writable: true, configurable: true});
+            document.dispatchEvent(new Event('visibilitychange'));
+        }
+
+        afterEach(() => {
+            Object.defineProperty(document, 'visibilityState', {value: 'visible', writable: true, configurable: true});
+        });
+
+        it('should drop stale dbp when probe detects connection lost on foreground', async () => {
+            const store = createStore(uniqueDBName(), STORE_NAME);
+
+            await store('readwrite', (s) => {
+                s.put('value', 'key1');
+                return IDB.promisifyRequest(s.transaction);
+            });
+
+            simulateVisibilityChange('hidden');
+
+            const original = IDBDatabase.prototype.transaction;
+            let probeIntercepted = false;
+            jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
+                if (!probeIntercepted) {
+                    probeIntercepted = true;
+                    throw new DOMException('Connection to Indexed Database server lost. Refresh the page to try again', 'UnknownError');
+                }
+                return original.apply(this, args);
+            });
+
+            simulateVisibilityChange('visible');
+
+            await new Promise((resolve) => {
+                setTimeout(resolve, 0);
+            });
+
+            jest.restoreAllMocks();
+
+            const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
+            expect(result).toBe('value');
+            expect(logInfoSpy).toHaveBeenCalledWith('IDB visibilitychange probe: connection lost, dropping cached connection', expect.objectContaining({dbName: expect.any(String)}));
+        });
+
+        it('should not probe when no connection exists yet', async () => {
+            const dbName = uniqueDBName();
+            createStore(dbName, STORE_NAME);
+
+            simulateVisibilityChange('hidden');
+            simulateVisibilityChange('visible');
+
+            await new Promise((resolve) => {
+                setTimeout(resolve, 0);
+            });
+
+            // No probe log for this specific store (dbp was never set)
+            expect(logInfoSpy).not.toHaveBeenCalledWith(expect.stringContaining('visibilitychange probe'), expect.objectContaining({dbName}));
+        });
+
+        it('should keep connection when probe succeeds', async () => {
+            const store = createStore(uniqueDBName(), STORE_NAME);
+
+            await store('readwrite', (s) => {
+                s.put('value', 'key1');
+                return IDB.promisifyRequest(s.transaction);
+            });
+
+            simulateVisibilityChange('hidden');
+            simulateVisibilityChange('visible');
+
+            await new Promise((resolve) => {
+                setTimeout(resolve, 0);
+            });
+
+            const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
+            expect(result).toBe('value');
+            expect(logInfoSpy).not.toHaveBeenCalledWith(expect.stringContaining('visibilitychange probe'), expect.anything());
+        });
+
+        it('should drop dbp when probe throws InvalidStateError', async () => {
+            const store = createStore(uniqueDBName(), STORE_NAME);
+
+            await store('readwrite', (s) => {
+                s.put('value', 'key1');
+                return IDB.promisifyRequest(s.transaction);
+            });
+
+            simulateVisibilityChange('hidden');
+
+            const original = IDBDatabase.prototype.transaction;
+            let callCount = 0;
+            jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
+                callCount++;
+                if (callCount === 1) {
+                    throw new DOMException('The database connection is closing.', 'InvalidStateError');
+                }
+                return original.apply(this, args);
+            });
+
+            simulateVisibilityChange('visible');
+
+            await new Promise((resolve) => {
+                setTimeout(resolve, 0);
+            });
+
+            jest.restoreAllMocks();
+
+            const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
+            expect(result).toBe('value');
+            expect(logInfoSpy).toHaveBeenCalledWith('IDB visibilitychange probe: connection lost, dropping cached connection', expect.objectContaining({dbName: expect.any(String)}));
+        });
+    });
 });

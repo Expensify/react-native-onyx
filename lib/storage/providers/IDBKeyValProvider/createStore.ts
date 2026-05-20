@@ -37,6 +37,11 @@ function getBudgetedHealErrorLabel(error: unknown): 'backing store' | 'connectio
     return isBackingStoreError(error) ? 'backing store' : 'connection lost';
 }
 
+/** Union of all error types indicating a stale/dead IDB connection. Used by the visibilitychange probe. */
+function isStaleConnectionError(error: unknown): boolean {
+    return isInvalidStateError(error) || isBackingStoreError(error) || isConnectionLostError(error);
+}
+
 // This is a copy of the createStore function from idb-keyval, we need a custom implementation
 // because we need to create the database manually in order to ensure that the store exists before we use it.
 // If the store does not exist, idb-keyval will throw an error
@@ -123,6 +128,44 @@ function createStore(dbName: string, storeName: string): UseStore {
     function resetHealBudget<T>(result: T): T {
         healAttemptsRemaining = HEAL_ATTEMPTS_MAX;
         return result;
+    }
+
+    // Proactive IDB health check when tab returns to foreground.
+    // Safari kills IDB connections for backgrounded tabs. By probing before
+    // the ReconnectApp write storm hits, we drop the stale dbp early so the
+    // first real operation opens a fresh connection instead of failing.
+    if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState !== 'visible' || !dbp) {
+                return;
+            }
+
+            const probePromise = dbp;
+
+            const dropCacheIfStale = (error: unknown) => {
+                if (dbp !== probePromise || !isStaleConnectionError(error)) {
+                    return;
+                }
+                Logger.logInfo('IDB visibilitychange probe: connection lost, dropping cached connection', {dbName, storeName});
+                dbp = undefined;
+            };
+
+            probePromise.then((db) => {
+                if (dbp !== probePromise) {
+                    return;
+                }
+                try {
+                    const tx = db.transaction(storeName, 'readonly');
+                    const probeStore = tx.objectStore(storeName);
+                    const req = probeStore.count();
+                    req.onerror = () => {
+                        dropCacheIfStale(req.error);
+                    };
+                } catch (error) {
+                    dropCacheIfStale(error);
+                }
+            });
+        });
     }
 
     // Handles three recoverable error classes:
