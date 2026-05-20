@@ -310,7 +310,7 @@ describe('OnyxUtils', () => {
                 beforeEach: async () => {
                     await Onyx.multiSet(mockedReportActionsMap);
                     for (const key of mockedReportActionsKeys) {
-                        const id = OnyxUtils.subscribeToKey({key, callback: jest.fn(), initWithStoredValues: false});
+                        const id = OnyxUtils.subscribeToKey({key, callback: jest.fn()});
                         subscriptionMap.set(key, id);
                     }
                 },
@@ -340,7 +340,7 @@ describe('OnyxUtils', () => {
                 beforeEach: async () => {
                     await Onyx.set(key, previousReportAction);
                     for (let i = 0; i < 10000; i++) {
-                        const id = OnyxUtils.subscribeToKey({key, callback: jest.fn(), initWithStoredValues: false});
+                        const id = OnyxUtils.subscribeToKey({key, callback: jest.fn()});
                         subscriptionIDs.add(id);
                     }
                 },
@@ -372,7 +372,7 @@ describe('OnyxUtils', () => {
                 {
                     beforeEach: async () => {
                         await Onyx.multiSet(mockedReportActionsMap);
-                        subscriptionID = OnyxUtils.subscribeToKey({key: collectionKey, callback: jest.fn(), initWithStoredValues: false});
+                        subscriptionID = OnyxUtils.subscribeToKey({key: collectionKey, callback: jest.fn()});
                     },
                     afterEach: async () => {
                         if (subscriptionID) {
@@ -402,7 +402,6 @@ describe('OnyxUtils', () => {
                     subscriptionID = OnyxUtils.subscribeToKey({
                         key: collectionKey,
                         callback: jest.fn(),
-                        initWithStoredValues: false,
                     });
 
                     OnyxUtils.getCollectionDataAndSendAsObject(mockedReportActionsKeys, {
@@ -650,7 +649,6 @@ describe('OnyxUtils', () => {
                 beforeEach: async () => {
                     subscriptionID = OnyxUtils.subscribeToKey({
                         key,
-                        initWithStoredValues: false,
                     });
                 },
                 afterEach: clearOnyxAfterEachMeasure,
@@ -692,7 +690,6 @@ describe('OnyxUtils', () => {
                 beforeEach: async () => {
                     subscriptionID = OnyxUtils.subscribeToKey({
                         key,
-                        initWithStoredValues: false,
                     });
                 },
                 afterEach: async () => {
@@ -713,7 +710,6 @@ describe('OnyxUtils', () => {
                 beforeEach: async () => {
                     subscriptionID = OnyxUtils.subscribeToKey({
                         key,
-                        initWithStoredValues: false,
                     });
                     OnyxUtils.storeKeyBySubscriptions(key, subscriptionID);
                 },

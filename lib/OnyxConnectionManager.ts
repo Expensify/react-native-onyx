@@ -115,7 +115,7 @@ class OnyxConnectionManager {
      * according to their purpose and effect they produce in the Onyx connection.
      */
     private generateConnectionID<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): string {
-        const {key, initWithStoredValues, reuseConnection, waitForCollectionCallback} = connectOptions;
+        const {key, reuseConnection, waitForCollectionCallback} = connectOptions;
 
         // The current session ID is appended to the connection ID so we can have different connections
         // after an `Onyx.clear()` operation.
@@ -123,18 +123,13 @@ class OnyxConnectionManager {
 
         // We will generate a unique ID in any of the following situations:
         // - `reuseConnection` is `false`. That means the subscriber explicitly wants the connection to not be reused.
-        // - `initWithStoredValues` is `false`. This flag changes the subscription flow when set to `false`, so the connection can't be reused.
         // - `key` is a collection key AND `waitForCollectionCallback` is `undefined/false`. This combination needs a new connection at every subscription
         //   in order to send all the collection entries, so the connection can't be reused.
-        if (
-            reuseConnection === false ||
-            initWithStoredValues === false ||
-            (OnyxKeys.isCollectionKey(key) && (waitForCollectionCallback === undefined || waitForCollectionCallback === false))
-        ) {
+        if (reuseConnection === false || (OnyxKeys.isCollectionKey(key) && (waitForCollectionCallback === undefined || waitForCollectionCallback === false))) {
             suffix += `,uniqueID=${Str.guid()}`;
         }
 
-        return `onyxKey=${key},initWithStoredValues=${initWithStoredValues ?? true},waitForCollectionCallback=${waitForCollectionCallback ?? false}${suffix}`;
+        return `onyxKey=${key},waitForCollectionCallback=${waitForCollectionCallback ?? false}${suffix}`;
     }
 
     /**

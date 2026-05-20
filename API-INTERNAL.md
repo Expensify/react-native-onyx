@@ -83,6 +83,7 @@ If the requested key is a collection, it will return an object with all the coll
 <ul>
 <li>Storage capacity errors: evicts data and retries the operation</li>
 <li>Invalid data errors: logs an alert and throws an error</li>
+<li>Non-retriable errors: logs an alert and resolves without retrying</li>
 <li>Other errors: retries the operation</li>
 </ul>
 </dd>
@@ -144,9 +145,6 @@ that this internal function allows passing an additional <code>mergeReplaceNullP
 <dd><p>Sets keys in a collection by replacing all targeted collection members with new values.
 Any existing collection members not included in the new data will not be removed.
 Retries on failure.</p>
-</dd>
-<dt><a href="#getCallbackToStateMapping">getCallbackToStateMapping()</a></dt>
-<dd><p>Getter - returns the callback to state mapping, useful in test environments.</p>
 </dd>
 <dt><a href="#clearOnyxUtilsInternals">clearOnyxUtilsInternals()</a></dt>
 <dd><p>Clear internal variables used in this file, useful in test environments.</p>
@@ -293,33 +291,12 @@ If the requested key is a collection, it will return an object with all the coll
 When a collection of keys change, search for any callbacks matching the collection key and trigger those callbacks
 
 **Kind**: global function  
-
-* [keysChanged()](#keysChanged)
-    * [~isSubscribedToCollectionKey](#keysChanged..isSubscribedToCollectionKey)
-    * [~isSubscribedToCollectionMemberKey](#keysChanged..isSubscribedToCollectionMemberKey)
-
-<a name="keysChanged..isSubscribedToCollectionKey"></a>
-
-### keysChanged~isSubscribedToCollectionKey
-e.g. Onyx.connect({key: ONYXKEYS.COLLECTION.REPORT, callback: ...});
-
-**Kind**: inner constant of [<code>keysChanged</code>](#keysChanged)  
-<a name="keysChanged..isSubscribedToCollectionMemberKey"></a>
-
-### keysChanged~isSubscribedToCollectionMemberKey
-e.g. Onyx.connect({key: `${ONYXKEYS.COLLECTION.REPORT}{reportID}`, callback: ...});
-
-**Kind**: inner constant of [<code>keysChanged</code>](#keysChanged)  
 <a name="keyChanged"></a>
 
 ## keyChanged()
 When a key change happens, search for any callbacks matching the key or collection key and trigger those callbacks
 
 **Kind**: global function  
-**Example**  
-```js
-keyChanged(key, value, subscriber => subscriber.initWithStoredValues === false)
-```
 <a name="sendDataToConnection"></a>
 
 ## sendDataToConnection()
@@ -344,6 +321,7 @@ Remove a key from Onyx and update the subscribers
 Handles storage operation failures based on the error type:
 - Storage capacity errors: evicts data and retries the operation
 - Invalid data errors: logs an alert and throws an error
+- Non-retriable errors: logs an alert and resolves without retrying
 - Other errors: retries the operation
 
 **Kind**: global function  
@@ -522,12 +500,6 @@ Retries on failure.
 | params.collection | Object collection keyed by individual collection member keys and values |
 | retryAttempt | retry attempt |
 
-<a name="getCallbackToStateMapping"></a>
-
-## getCallbackToStateMapping()
-Getter - returns the callback to state mapping, useful in test environments.
-
-**Kind**: global function  
 <a name="clearOnyxUtilsInternals"></a>
 
 ## clearOnyxUtilsInternals()

@@ -30,30 +30,16 @@ function degradePerformance(error: Error) {
  * Runs a piece of code and degrades performance if certain errors are thrown
  */
 function tryOrDegradePerformance<T>(fn: () => Promise<T> | T, waitForInitialization = true): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-        const promise = waitForInitialization ? initPromise : Promise.resolve();
-
-        promise.then(() => {
-            try {
-                resolve(fn());
-            } catch (error) {
-                // Test for known critical errors that the storage provider throws, e.g. when storage is full
-                if (error instanceof Error) {
-                    // IndexedDB error when storage is full (https://github.com/Expensify/App/issues/29403)
-                    if (error.message.includes('Internal error opening backing store for indexedDB.open')) {
-                        degradePerformance(error);
-                    }
-
-                    // catch the error if DB connection can not be established/DB can not be created
-                    if (error.message.includes('IDBKeyVal store could not be created')) {
-                        degradePerformance(error);
-                    }
-                }
-
-                reject(error);
+    const initialization = waitForInitialization ? initPromise : Promise.resolve();
+    return initialization
+        .then(() => fn())
+        .catch((error: unknown) => {
+            // catch the error if DB connection can not be established/DB can not be created
+            if (error instanceof Error && error.message.includes('IDBKeyVal store could not be created')) {
+                degradePerformance(error);
             }
+            return Promise.reject(error);
         });
-    });
 }
 
 /**

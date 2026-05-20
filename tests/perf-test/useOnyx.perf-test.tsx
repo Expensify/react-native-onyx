@@ -196,31 +196,6 @@ describe('useOnyx', () => {
         });
     });
 
-    describe('initWithStoredValues', () => {
-        /**
-         * Expected renders: 1.
-         */
-        test('connecting with initWithStoredValues set to false', async () => {
-            const key = ONYXKEYS.TEST_KEY;
-            await measureRenders(
-                <UseOnyxWrapper
-                    onyxKey={key}
-                    onyxOptions={{initWithStoredValues: false}}
-                />,
-                {
-                    beforeEach: async () => {
-                        await StorageMock.setItem(key, 'test');
-                    },
-                    scenario: async () => {
-                        await screen.findByText(dataMatcher(key, undefined));
-                        await screen.findByText(metadataStatusMatcher(key, 'loaded'));
-                    },
-                    afterEach: clearOnyxAfterEachMeasure,
-                },
-            );
-        });
-    });
-
     describe('multiple calls', () => {
         /**
          * Expected renders: 2.

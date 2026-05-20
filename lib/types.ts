@@ -212,9 +212,6 @@ type Collection<TKey extends CollectionKeyBase, TValue> = Record<`${TKey}${strin
 /** Represents the base options used in `Onyx.connect()` method. */
 // NOTE: Any changes to this type like adding or removing options must be accounted in OnyxConnectionManager's `generateConnectionID()` method!
 type BaseConnectOptions = {
-    /** If set to `false`, then the initial data will be only sent to the callback function if it changes. */
-    initWithStoredValues?: boolean;
-
     /**
      * If set to `false`, the connection won't be reused between other subscribers that are listening to the same Onyx key
      * with the same connect configurations.
