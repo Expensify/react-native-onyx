@@ -227,6 +227,7 @@ const provider: StorageProvider<SQLiteDB | null> = {
  */
 // eslint-disable-next-line @lwc/lwc/no-async-await
 async function initAsync(): Promise<void> {
+    console.log('[Onyx SQLLite] Initialization of SQLLite provider for WEB')
     // Dynamic import of the SQLite WASM module
     const sqlite3InitModule = (await import('@sqlite.org/sqlite-wasm')).default;
     const sqlite3 = await sqlite3InitModule();
