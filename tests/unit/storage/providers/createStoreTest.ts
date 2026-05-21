@@ -77,7 +77,7 @@ describe('createStore', () => {
             });
 
             await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('key1')))).rejects.toThrow(DOMException);
-            expect(logAlertSpy).toHaveBeenCalledTimes(1);
+            expect(logInfoSpy).toHaveBeenCalledWith(expect.stringContaining('IDB InvalidStateError'), expect.anything());
         });
 
         it('should not retry on non-InvalidStateError DOMException', async () => {
@@ -176,7 +176,7 @@ describe('createStore', () => {
                 return IDB.promisifyRequest(s.transaction);
             });
 
-            expect(logAlertSpy).toHaveBeenCalledWith('IDB InvalidStateError — dropping cached connection and retrying', {
+            expect(logInfoSpy).toHaveBeenCalledWith('IDB InvalidStateError — dropping cached connection and retrying', {
                 dbName,
                 storeName: STORE_NAME,
                 txMode: 'readwrite',
@@ -277,7 +277,7 @@ describe('createStore', () => {
             const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
             expect(result).toBe('value');
             expect(callCount).toBe(2);
-            expect(logAlertSpy).toHaveBeenCalledWith(
+            expect(logInfoSpy).toHaveBeenCalledWith(
                 'IDB heal: backing store error detected — dropping cached connection and reopening (2 attempts left)',
                 expect.objectContaining({dbName: expect.any(String)}),
             );
@@ -450,7 +450,7 @@ describe('createStore', () => {
             const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
             expect(result).toBe('value');
             expect(callCount).toBe(2);
-            expect(logAlertSpy).toHaveBeenCalledWith(
+            expect(logInfoSpy).toHaveBeenCalledWith(
                 expect.stringContaining('connection lost error detected — dropping cached connection and reopening'),
                 expect.objectContaining({dbName: expect.any(String)}),
             );

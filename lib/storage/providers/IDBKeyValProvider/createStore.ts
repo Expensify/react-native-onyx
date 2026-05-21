@@ -140,7 +140,7 @@ function createStore(dbName: string, storeName: string): UseStore {
             .then(resetHealBudget)
             .catch((error) => {
                 if (isInvalidStateError(error)) {
-                    Logger.logAlert('IDB InvalidStateError — dropping cached connection and retrying', {
+                    Logger.logInfo('IDB InvalidStateError — dropping cached connection and retrying', {
                         dbName,
                         storeName,
                         txMode,
@@ -153,7 +153,7 @@ function createStore(dbName: string, storeName: string): UseStore {
                 if (isBudgetedHealError(error) && healAttemptsRemaining > 0) {
                     healAttemptsRemaining--;
                     const label = getBudgetedHealErrorLabel(error);
-                    Logger.logAlert(`IDB heal: ${label} error detected — dropping cached connection and reopening (${healAttemptsRemaining} attempts left)`, {
+                    Logger.logInfo(`IDB heal: ${label} error detected — dropping cached connection and reopening (${healAttemptsRemaining} attempts left)`, {
                         dbName,
                         storeName,
                     });
