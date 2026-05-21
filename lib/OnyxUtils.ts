@@ -1597,12 +1597,20 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
             // finalMergedCollection contains all the keys that were merged, without the keys of incompatible updates
             const finalMergedCollection = {...existingKeyCollection, ...newCollection};
 
-            // Pre-warm cache for any existing storage keys that aren't yet in cache. get() is a no-op
-            // (sync-resolved) for cache hits, and on a cache miss it reads from storage and writes the
-            // value back to cache. This is required so the subsequent cache.merge() merges the new delta
-            // into the real previous storage value (rather than starting from `undefined` and dropping
-            // the existing keys).
-            return Promise.all(existingKeys.map((key) => get(key))).then(() => {
+            // Pre-warm cache for any existing storage keys that aren't yet in cache so the subsequent
+            // cache.merge() merges the new delta into the real previous storage value (rather than
+            // starting from `undefined` and dropping the existing keys).
+            //
+            // Fast path: when every existingKey is already in cache, skip the pre-warm entirely. This
+            // preserves the original promise-chain depth and the subscriber-callback timing that
+            // dependent tests rely on.
+            //
+            // Slow path: when at least one existingKey is a cache miss, use multiGet — it batches the
+            // missing keys into a single Storage.multiGet call (vs. N parallel get() invocations) and
+            // writes the storage values back to cache before resolving.
+            const hasColdExistingKey = existingKeys.some((key) => !cache.hasCacheForKey(key));
+            const prewarmPromise = hasColdExistingKey ? multiGet(existingKeys) : Promise.resolve();
+            return prewarmPromise.then(() => {
                 // Snapshot previous values from the (now-warm) cache for keysChanged's diff, then update
                 // cache and notify subscribers synchronously BEFORE issuing storage writes. This matches
                 // the cache-first / storage-second invariant followed by every other Onyx write method
