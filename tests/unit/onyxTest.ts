@@ -1621,14 +1621,13 @@ describe('Onyx', () => {
                     },
                 },
             ]).then(() => {
-                // The store-based wrapper delivers two callbacks: an initial fire with
-                // `undefined` (empty cache at subscribe time) and a second fire with the
-                // final post-update snapshot. The legacy ConnectionManager's deep-promise
-                // chain accidentally suppressed the first one; the new wrapper doesn't.
-                expect(routesCollectionCallback).toHaveBeenCalledTimes(2);
-                expect(routesCollectionCallback).toHaveBeenNthCalledWith(1, undefined, ONYX_KEYS.COLLECTION.ROUTES);
+                // Initial fire is deferred past in-flight writes via `scheduleInitialFire`,
+                // so it reads the post-update snapshot. The write-driven fire already
+                // delivered the same snapshot, so the dedup in `deliverSnapshot` suppresses
+                // the initial fire — matching legacy timing.
+                expect(routesCollectionCallback).toHaveBeenCalledTimes(1);
                 expect(routesCollectionCallback).toHaveBeenNthCalledWith(
-                    2,
+                    1,
                     {
                         [holidayRoute]: {
                             waypoints: {

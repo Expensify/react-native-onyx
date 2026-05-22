@@ -460,12 +460,12 @@ class OnyxCache {
 
         const snapshot = this.collectionSnapshots.get(collectionKey);
         if (utils.isEmptyObject(snapshot)) {
-            // We check storageKeys.size (not collection-specific keys) to distinguish
-            // "init complete, this collection is genuinely empty" from "init not done yet."
-            // During init, setAllKeys loads ALL keys at once — so if any key exists,
-            // the full storage picture is loaded and an empty collection is truly empty.
-            // Returning undefined before init prevents subscribers from seeing a false empty state.
-            if (this.storageKeys.size > 0) {
+            // Distinguish "init complete, collection genuinely empty" from "init not done yet."
+            // `setCollectionKeys()` (called inside `Onyx.init`) seeds every known collection
+            // with a frozen `{}` entry in `collectionSnapshots`, so the presence of the entry
+            // is a reliable post-init signal — and unlike `storageKeys.size > 0`, it doesn't
+            // flip back to "not done" after `Onyx.clear()` wipes the storage-keys index.
+            if (this.collectionSnapshots.has(collectionKey)) {
                 return FROZEN_EMPTY_COLLECTION;
             }
             return undefined;

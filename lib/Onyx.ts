@@ -123,13 +123,36 @@ function subscribeMembers<TKey extends CollectionKeyBase>(collectionKey: TKey, l
 }
 
 /**
- * @deprecated Prefer `Onyx.subscribe()` / `Onyx.subscribeMembers()`. Kept as a
- * compatibility wrapper for existing call sites; routes to the new primitives
+ * Kept as a compatibility wrapper for existing call sites; routes to the new primitives
  * based on the legacy `waitForCollectionCallback` option.
  *
  * Returns synchronously with a `Connection` handle. The underlying subscription
  * wires up after init completes; `disconnect()` works at any point.
  */
+/**
+ * Defer initial-fire of `Onyx.connect` callbacks far enough that any Onyx writes
+ * scheduled in the same synchronous tick have applied before the callback reads cache.
+ *
+ * The legacy `subscribeToKey` chain (`deferredInitTask.then(getAllKeys).then(multiGet)
+ * .then(sendDataToConnection)`) reached this depth incidentally via storage I/O. The
+ * new store-based wrapper has no storage chain, so we have to introduce the depth
+ * explicitly. The three nested `.then()`s match the legacy effective depth — enough
+ * to outpace the longest in-flight write chain: `Onyx.update` -> `clearPromise.then`
+ * -> per-item `Onyx.merge` -> `OnyxUtils.get(key).then(applyMerge)` is two hops to
+ * apply, so the third hop guarantees initial-fire reads the post-write cache.
+ *
+ * Microtask depth (not `setTimeout(0)`) is required because Jest test bodies run
+ * entirely in microtask land via chained `.then()`s; a macrotask-deferred initial
+ * fire would not run until the chain returns to the event loop, which can be after
+ * the test's assertions execute — leaving module-level Onyx subscribers stale.
+ */
+function scheduleInitialFire(fn: () => void): void {
+    Promise.resolve()
+        .then(() => Promise.resolve())
+        .then(() => Promise.resolve())
+        .then(fn);
+}
+
 function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Connection {
     const {key, callback, waitForCollectionCallback} = connectOptions;
 
@@ -144,14 +167,9 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
         if (OnyxKeys.isCollectionKey(key)) {
             if (waitForCollectionCallback === true) {
                 // Snapshot mode — listener fires with the whole snapshot per collection change.
-                //
-                // The `sourceValue` 3rd-arg has been dropped (anti-pattern: leaked stale state
-                // through useOnyx, see PR #679). Callback shape is now `(snapshot, key)`.
-                //
-                // Legacy preserved on initial fire only: empty collection → `undefined`
-                // (matches old `sendDataToConnection`). Subsequent fires deliver the actual `{}`.
-                //
-                // Dedup: skip if the snapshot reference didn't change.
+                // Callback shape is `(snapshot, key)`; `sourceValue` has been dropped.
+                // Legacy semantic preserved on initial fire: empty collection → `undefined`.
+                // Subsequent fires deliver the actual `{}`. Dedup: skip identical snapshot refs.
                 const NOT_DELIVERED = Symbol('NOT_DELIVERED');
                 let lastDeliveredSnapshot: unknown = NOT_DELIVERED;
                 const deliverSnapshot = (rawSnapshot: OnyxValue<TKey> | undefined, k: TKey, isInitialFire: boolean) => {
@@ -166,7 +184,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
                 unsubscribeFn = onyxStore.subscribe(key, (value, k) => {
                     deliverSnapshot(value as unknown as OnyxValue<TKey>, k as TKey, false);
                 });
-                Promise.resolve().then(() => {
+                scheduleInitialFire(() => {
                     if (!active) {
                         return;
                     }
@@ -185,7 +203,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
                 (callback as DefaultConnectCallback<TKey> | undefined)?.(value, memberKey as TKey);
             };
             unsubscribeFn = onyxStore.subscribeMembers(key as CollectionKeyBase, deliverMember);
-            Promise.resolve().then(() => {
+            scheduleInitialFire(() => {
                 if (!active || !callback) {
                     return;
                 }
@@ -206,7 +224,6 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
         }
 
         // Non-collection key (or a specific collection member) — single-value subscription.
-        // Same dedup pattern.
         const NOT_DELIVERED = Symbol('NOT_DELIVERED');
         let lastDelivered: unknown = NOT_DELIVERED;
         const deliverValue = (value: OnyxValue<TKey>, k: TKey | undefined) => {
@@ -219,7 +236,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
         unsubscribeFn = onyxStore.subscribe(key, (value, k) => {
             deliverValue(value, k as TKey);
         });
-        Promise.resolve().then(() => {
+        scheduleInitialFire(() => {
             if (!active) {
                 return;
             }
@@ -253,8 +270,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
 }
 
 /**
- * @deprecated Prefer `Onyx.subscribe()` / `Onyx.subscribeMembers()`. Identical to
- * `connect()` — kept for naming consistency with existing call sites.
+ * Identical to `connect()` — kept for naming consistency with existing call sites.
  */
 function connectWithoutView<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Connection {
     return connect(connectOptions);
