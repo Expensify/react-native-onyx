@@ -70,7 +70,9 @@ function validateChecklist(body: string): ValidationResult {
 
     const linkedEAppPR = getSectionContent(body, 'Linked E/App PR');
     if (!linkedEAppPR) {
-        errors.push('The "Linked E/App PR" section is empty. Every Onyx PR must link to a corresponding Expensify/App PR that pins this PR via git+https and runs the full E/App test suite.');
+        errors.push(
+            'The "Linked E/App PR" section is empty. Every Onyx PR must link to a corresponding Expensify/App PR that pins this PR via git+https and runs the full E/App test suite.',
+        );
     } else if (!E_APP_PR_URL_PATTERN.test(linkedEAppPR)) {
         errors.push(`The "Linked E/App PR" section must contain a single Expensify/App PR URL (e.g. https://github.com/Expensify/App/pull/12345), found: "${linkedEAppPR}".`);
     }
