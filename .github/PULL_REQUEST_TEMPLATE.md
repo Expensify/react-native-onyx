@@ -7,6 +7,18 @@
 <!-- Please replace GH_LINK with the link to the GitHub issue this Pull Request is related to -->
 GH_LINK
 
+### Linked E/App PR
+<!--
+Every Onyx PR must ship with a corresponding Expensify/App PR that pins Onyx to this PR's HEAD via git+https
+(e.g. "react-native-onyx": "git+https://github.com/Expensify/react-native-onyx.git#<commit_sha>").
+That linked PR runs the full E/App test suite signals that the Onyx
+change is safe. After this PR is merged and published to npm, swap the linked E/App PR to the pinned version
+(e.g. "react-native-onyx": "3.0.72") and request a final review — it becomes the bump PR.
+
+Paste the full Expensify/App PR URL below (e.g. https://github.com/Expensify/App/pull/12345):
+-->
+
+
 ### Automated Tests
 <!---
 Most changes to Onyx should have accompanying tests. Describe the tests you added or if no tests were added an explanation about why one was not needed.
@@ -20,6 +32,7 @@ Each set of changes should be tested against the Expensify/App repo on all platf
 ### Author Checklist
 
 - [ ] I linked the correct issue in the `### Related Issues` section above
+- [ ] I linked the corresponding Expensify/App PR in the `### Linked E/App PR` section above, and verified this change against it (E/App CI passed and manual testing completed)
 - [ ] I wrote clear testing steps that cover the changes made in this PR
     - [ ] I added steps for local testing in the `Tests` section
     - [ ] I tested this PR with a [High Traffic account](https://github.com/Expensify/App/blob/main/contributingGuides/CONTRIBUTING.md#high-traffic-accounts) against the staging or production API to ensure there are no regressions (e.g. long loading states that impact usability).
