@@ -43,6 +43,7 @@
     "gh-actions-build": "./.github/scripts/buildActions.sh"
   },
   "dependencies": {
+    "@sqlite.org/sqlite-wasm": "^3.51.2-build6",
     "ascii-table": "0.0.9",
     "fast-equals": "^4.0.3",
     "lodash.bindall": "^4.4.0",
@@ -105,7 +106,8 @@
     "react-native": ">=0.75.0",
     "react-native-device-info": "^10.3.0",
     "react-native-nitro-modules": ">=0.35.0",
-    "react-native-nitro-sqlite": "^9.6.0"
+    "react-native-nitro-sqlite": "^9.6.0",
+    "react-native-worklets-core": "^1.6.2"
   },
   "peerDependenciesMeta": {
     "idb-keyval": {

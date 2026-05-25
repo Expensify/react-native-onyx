@@ -1,7 +1,6 @@
 /* eslint-disable import/first */
 jest.unmock('../../../../lib/storage/platforms/index.native');
 jest.unmock('../../../../lib/storage/platforms/index');
-jest.unmock('../../../../lib/storage/providers/IDBKeyValProvider');
 
 import NativeStorage from '../../../../lib/storage/platforms/index.native';
 import WebStorage from '../../../../lib/storage/platforms/index';

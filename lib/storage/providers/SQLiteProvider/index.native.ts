@@ -1,14 +1,22 @@
 /**
- * The SQLiteStorage provider stores everything in a key/value store by
- * converting the value to a JSON string
+ * Native SQLite Storage Provider
+ *
+ * Implements the StorageProvider interface using react-native-nitro-sqlite.
+ * This module is called from the Worklet Worker Runtime (background JS thread)
+ * managed by NativeFlushWorker, NOT from the main thread.
+ *
+ * Uses synchronous APIs (execute, executeBatch) since the Worklet Worker Runtime
+ * runs on a dedicated background thread where blocking is acceptable and avoids
+ * unnecessary Promise overhead.
  */
 import type {BatchQueryCommand, NitroSQLiteConnection} from 'react-native-nitro-sqlite';
 import {open} from 'react-native-nitro-sqlite';
 import {getFreeDiskStorage} from 'react-native-device-info';
-import type {FastMergeReplaceNullPatch} from '../../utils';
-import utils from '../../utils';
-import type StorageProvider from './types';
-import type {StorageKeyList, StorageKeyValuePair} from './types';
+import type {FastMergeReplaceNullPatch} from '../../../utils';
+import utils from '../../../utils';
+import type StorageProvider from '../types';
+import type {StorageKeyList, StorageKeyValuePair} from '../types';
+import * as Queries from '../SQLiteQueries';
 
 /**
  * The type of the key-value pair stored in the SQLite database
@@ -69,63 +77,59 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
     init() {
         provider.store = open({name: DB_NAME});
 
-        provider.store.execute('CREATE TABLE IF NOT EXISTS keyvaluepairs (record_key TEXT NOT NULL PRIMARY KEY , valueJSON JSON NOT NULL) WITHOUT ROWID;');
+        provider.store.execute(Queries.CREATE_TABLE);
 
         // All of the 3 pragmas below were suggested by SQLite team.
         // You can find more info about them here: https://www.sqlite.org/pragma.html
-        provider.store.execute('PRAGMA CACHE_SIZE=-20000;');
-        provider.store.execute('PRAGMA synchronous=NORMAL;');
-        provider.store.execute('PRAGMA journal_mode=WAL;');
+        provider.store.execute(Queries.PRAGMA_CACHE_SIZE);
+        provider.store.execute(Queries.PRAGMA_SYNCHRONOUS);
+        provider.store.execute(Queries.PRAGMA_JOURNAL_MODE);
     },
     getItem(key) {
         if (!provider.store) {
             throw new Error('Store is not initialized!');
         }
 
-        return provider.store.executeAsync<OnyxSQLiteKeyValuePair>('SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key = ?;', [key]).then(({rows}) => {
-            if (!rows || rows?.length === 0) {
-                return null;
-            }
-            const result = rows?.item(0);
-
-            if (result == null) {
-                return null;
-            }
-
-            return JSON.parse(result.valueJSON);
-        });
+        const {rows} = provider.store.execute<OnyxSQLiteKeyValuePair>(Queries.GET_ITEM, [key]);
+        if (!rows || rows.length === 0) {
+            return Promise.resolve(null);
+        }
+        const result = rows.item(0);
+        if (result == null) {
+            return Promise.resolve(null);
+        }
+        return Promise.resolve(JSON.parse(result.valueJSON));
     },
     multiGet(keys) {
         if (!provider.store) {
             throw new Error('Store is not initialized!');
         }
 
-        const placeholders = keys.map(() => '?').join(',');
-        const command = `SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
-        return provider.store.executeAsync<OnyxSQLiteKeyValuePair>(command, keys).then(({rows}) => {
-            // eslint-disable-next-line no-underscore-dangle
-            const result = rows?._array.map((row) => [row.record_key, JSON.parse(row.valueJSON)]);
-            return (result ?? []) as StorageKeyValuePair[];
-        });
+        const command = Queries.buildMultiGetQuery(keys.length);
+        const {rows} = provider.store.execute<OnyxSQLiteKeyValuePair>(command, keys);
+        // eslint-disable-next-line no-underscore-dangle
+        const result = rows?._array.map((row) => [row.record_key, JSON.parse(row.valueJSON)]);
+        return Promise.resolve((result ?? []) as StorageKeyValuePair[]);
     },
     setItem(key, value) {
         if (!provider.store) {
             throw new Error('Store is not initialized!');
         }
 
-        return provider.store.executeAsync('REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);', [key, JSON.stringify(value)]).then(() => undefined);
+        provider.store.execute(Queries.SET_ITEM, [key, JSON.stringify(value)]);
+        return Promise.resolve();
     },
     multiSet(pairs) {
         if (!provider.store) {
             throw new Error('Store is not initialized!');
         }
 
-        const query = 'REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);';
         const params = pairs.map((pair) => [pair[0], JSON.stringify(pair[1] === undefined ? null : pair[1])]);
         if (utils.isEmptyObject(params)) {
             return Promise.resolve();
         }
-        return provider.store.executeBatchAsync([{query, params}]).then(() => undefined);
+        provider.store.executeBatch([{query: Queries.MULTI_SET_ITEM, params}]);
+        return Promise.resolve();
     },
     multiMerge(pairs) {
         if (!provider.store) {
@@ -134,23 +138,7 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
 
         const commands: BatchQueryCommand[] = [];
 
-        // Query to merge the change into the DB value.
-        const patchQuery = `INSERT INTO keyvaluepairs (record_key, valueJSON)
-            VALUES (:key, :value)
-            ON CONFLICT DO UPDATE
-            SET valueJSON = JSON_PATCH(valueJSON, :value);
-        `;
         const patchQueryArguments: string[][] = [];
-
-        // Query to fully replace the nested objects of the DB value.
-        // NOTE: The JSON() wrapper around the replacement value is required here. Unlike JSON_PATCH (which
-        // parses both arguments as JSON internally), JSON_REPLACE treats a plain TEXT binding as a quoted
-        // JSON string. Without JSON(), objects would be stored as string values (e.g. "{...}") instead of
-        // actual JSON objects, corrupting the stored data.
-        const replaceQuery = `UPDATE keyvaluepairs
-            SET valueJSON = JSON_REPLACE(valueJSON, ?, JSON(?))
-            WHERE record_key = ?;
-        `;
         const replaceQueryArguments: string[][] = [];
 
         const nonNullishPairs = pairs.filter((pair) => pair[1] !== undefined);
@@ -169,12 +157,13 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             }
         }
 
-        commands.push({query: patchQuery, params: patchQueryArguments});
+        commands.push({query: Queries.MERGE_ITEM_PATCH, params: patchQueryArguments});
         if (replaceQueryArguments.length > 0) {
-            commands.push({query: replaceQuery, params: replaceQueryArguments});
+            commands.push({query: Queries.MERGE_ITEM_REPLACE, params: replaceQueryArguments});
         }
 
-        return provider.store.executeBatchAsync(commands).then(() => undefined);
+        provider.store.executeBatch(commands);
+        return Promise.resolve();
     },
     mergeItem(key, change, replaceNullPatches) {
         // Since Onyx already merged the existing value with the changes, we can just set the value directly.
@@ -185,11 +174,10 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             throw new Error('Store is not initialized!');
         }
 
-        return provider.store.executeAsync('SELECT record_key FROM keyvaluepairs;').then(({rows}) => {
-            // eslint-disable-next-line no-underscore-dangle
-            const result = rows?._array.map((row) => row.record_key);
-            return (result ?? []) as StorageKeyList;
-        });
+        const {rows} = provider.store.execute<{record_key: string}>(Queries.GET_ALL_KEYS);
+        // eslint-disable-next-line no-underscore-dangle
+        const result = rows?._array.map((row) => row.record_key);
+        return Promise.resolve((result ?? []) as StorageKeyList);
     },
     getAll() {
         if (!provider.store) {
@@ -207,39 +195,40 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             throw new Error('Store is not initialized!');
         }
 
-        return provider.store.executeAsync('DELETE FROM keyvaluepairs WHERE record_key = ?;', [key]).then(() => undefined);
+        provider.store.execute(Queries.REMOVE_ITEM, [key]);
+        return Promise.resolve();
     },
     removeItems(keys) {
         if (!provider.store) {
             throw new Error('Store is not initialized!');
         }
 
-        const placeholders = keys.map(() => '?').join(',');
-        const query = `DELETE FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
-        return provider.store.executeAsync(query, keys).then(() => undefined);
+        const query = Queries.buildRemoveItemsQuery(keys.length);
+        provider.store.execute(query, keys);
+        return Promise.resolve();
     },
     clear() {
         if (!provider.store) {
             throw new Error('Store is not initialized!');
         }
 
-        return provider.store.executeAsync('DELETE FROM keyvaluepairs;', []).then(() => undefined);
+        provider.store.execute(Queries.CLEAR, []);
+        return Promise.resolve();
     },
     getDatabaseSize() {
         if (!provider.store) {
             throw new Error('Store is not initialized!');
         }
 
-        return Promise.all([provider.store.executeAsync<PageSizeResult>('PRAGMA page_size;'), provider.store.executeAsync<PageCountResult>('PRAGMA page_count;'), getFreeDiskStorage()]).then(
-            ([pageSizeResult, pageCountResult, bytesRemaining]) => {
-                const pageSize = pageSizeResult.rows?.item(0)?.page_size ?? 0;
-                const pageCount = pageCountResult.rows?.item(0)?.page_count ?? 0;
-                return {
-                    bytesUsed: pageSize * pageCount,
-                    bytesRemaining,
-                };
-            },
-        );
+        const pageSizeResult = provider.store.execute<PageSizeResult>(Queries.PRAGMA_PAGE_SIZE);
+        const pageCountResult = provider.store.execute<PageCountResult>(Queries.PRAGMA_PAGE_COUNT);
+        const pageSize = pageSizeResult.rows?.item(0)?.page_size ?? 0;
+        const pageCount = pageCountResult.rows?.item(0)?.page_count ?? 0;
+
+        return getFreeDiskStorage().then((bytesRemaining) => ({
+            bytesUsed: pageSize * pageCount,
+            bytesRemaining,
+        }));
     },
 };
 
