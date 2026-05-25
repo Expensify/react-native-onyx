@@ -62,9 +62,9 @@ class OnyxSnapshotCache {
      * Other options like `reuseConnection` don't affect the data transformation
      * or timing behavior of getSnapshot, so they're excluded from the cache key for better cache hit rates.
      */
-    registerConsumer<TKey extends OnyxKey, TReturnValue>(options: Pick<UseOnyxOptions<TKey, TReturnValue>, 'selector'>): string {
+    registerConsumer<TKey extends OnyxKey, TReturnValue>(key: TKey, options: Pick<UseOnyxOptions<TKey, TReturnValue>, 'selector'>): string {
         const selectorID = options?.selector ? this.getSelectorID(options.selector) : 'no_selector';
-        const cacheKey = String(selectorID);
+        const cacheKey = `${key}_${selectorID}`;
 
         // Increment reference count for this cache key
         const currentCount = this.cacheKeyRefCounts.get(cacheKey) || 0;
