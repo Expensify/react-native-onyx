@@ -347,9 +347,11 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
             continue;
         }
 
-        const cacheValue = cache.get(key) as OnyxValue<TKey>;
-        if (cacheValue) {
-            dataMap.set(key, cacheValue);
+        // Use hasCacheForKey, not a truthy check on the value — otherwise cached falsy values
+        // (0, '', false, null) get treated as cache misses and re-fetched from storage, which
+        // can overwrite the warm cached value with a stale storage value via cache.merge().
+        if (cache.hasCacheForKey(key)) {
+            dataMap.set(key, cache.get(key) as OnyxValue<TKey>);
             continue;
         }
 

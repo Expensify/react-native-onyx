@@ -1091,6 +1091,44 @@ describe('OnyxUtils', () => {
         });
     });
 
+    describe('multiGet cache hit consistency', () => {
+        // Same suite-pollution guard as the pre-warm block above: capture pristine StorageMock
+        // references at file-load time and restore them in beforeEach. The retryOperation
+        // describe block above mutates StorageMock.setItem (and never restores it), so by the
+        // time we run, setItem may be a rejecting mock from a prior test.
+        const pristineSetItem = StorageMock.setItem;
+        const pristineMultiGet = StorageMock.multiGet;
+        const pristineGetItem = StorageMock.getItem;
+
+        beforeEach(() => {
+            StorageMock.setItem = pristineSetItem;
+            StorageMock.multiGet = pristineMultiGet;
+            StorageMock.getItem = pristineGetItem;
+        });
+
+        it('does not re-fetch a cached falsy value from storage', async () => {
+            const falsyKey = ONYXKEYS.TEST_KEY;
+
+            // Seed cache with the falsy value 0 (a number, but the same logic applies to '',
+            // false, and null). Using `Onyx.set` ensures the value lands in cache and storage.
+            await Onyx.set(falsyKey, 0);
+
+            // Spy on Storage methods to confirm multiGet does NOT round-trip to storage for
+            // the cached falsy value.
+            const multiGetSpy = jest.spyOn(StorageMock, 'multiGet');
+            const getItemSpy = jest.spyOn(StorageMock, 'getItem');
+
+            const result = await OnyxUtils.multiGet([falsyKey]);
+
+            // The cached value must be returned without any storage read. Before this fix,
+            // `if (cacheValue)` treated the cached 0 as a miss and triggered Storage.multiGet,
+            // which would then overwrite the warm value via cache.merge().
+            expect(multiGetSpy).not.toHaveBeenCalled();
+            expect(getItemSpy).not.toHaveBeenCalled();
+            expect(result.get(falsyKey)).toBe(0);
+        });
+    });
+
     describe('storage eviction', () => {
         const diskFullError = new Error('database or disk is full');
 
