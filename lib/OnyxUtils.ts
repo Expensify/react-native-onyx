@@ -1611,7 +1611,14 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
             // missing keys into a single Storage.multiGet call (vs. N parallel get() invocations) and
             // writes the storage values back to cache before resolving.
             const hasColdExistingKey = existingKeys.some((key) => !cache.hasCacheForKey(key));
-            const prewarmPromise = hasColdExistingKey ? multiGet(existingKeys) : Promise.resolve();
+            // Swallow pre-warm read failures the same way the previous get()-based pre-warm did
+            // (see get() catch at the bottom of its definition). Without this, a transient
+            // Storage.multiGet rejection would skip cache.merge() + keysChanged() below and
+            // regress the cache-first invariant established in #787 — subscribers would miss
+            // the merge and Onyx.mergeCollection would reject up to the caller.
+            const prewarmPromise = hasColdExistingKey
+                ? multiGet(existingKeys).catch((err) => Logger.logInfo(`mergeCollectionWithPatches pre-warm failed; proceeding with cache-only merge. Error: ${err}`))
+                : Promise.resolve();
             return prewarmPromise.then(() => {
                 // Snapshot previous values from the (now-warm) cache for keysChanged's diff, then update
                 // cache and notify subscribers synchronously BEFORE issuing storage writes. This matches

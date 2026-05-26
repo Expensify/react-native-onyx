@@ -1089,6 +1089,62 @@ describe('OnyxUtils', () => {
             expect(warmResult).toEqual(coldResult);
             expect(coldResult).toEqual({value: 'after', extra: 'kept'});
         });
+        it('preserves cache-first invariant when Storage.multiGet rejects on the slow path', async () => {
+            // Regression for codex review #3302454987 / PR #793. Before the .catch() at the
+            // pre-warm call site, a Storage.multiGet rejection would propagate up and skip
+            // cache.merge() + keysChanged() entirely — subscribers would miss the merge and
+            // Onyx.mergeCollection would reject. The previous get()-based pre-warm swallowed
+            // these errors per-key inside get()'s own .catch(), so the cache-first invariant
+            // from #787 held even on a flaky read.
+            const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
+            const coldMemberKey = `${collectionKey}1`;
+            const newMemberKey = `${collectionKey}2`;
+
+            // Seed an existing member, then evict it from cache so it's "tracked but unloaded" —
+            // the slow path will try to multiGet it.
+            await Onyx.set(coldMemberKey, {value: 'persisted'});
+            evictFromCache(coldMemberKey);
+
+            // Connect the subscriber and flush its initial data load FIRST, before installing
+            // the rejecting mock. Otherwise the connect's getCollectionDataAndSendAsObject path
+            // (whose multiGet call has no .catch) would consume the mockRejectedValueOnce and
+            // leak an unhandled rejection — not the merge pre-warm we're actually exercising.
+            const collectionCallback = jest.fn();
+            Onyx.connect({
+                key: collectionKey,
+                waitForCollectionCallback: true,
+                callback: collectionCallback,
+            });
+            await waitForPromisesToResolve();
+            collectionCallback.mockClear();
+
+            // The subscriber's connect re-populated cache, so re-evict to force the merge into
+            // the slow (cold-key) path. Then reject the next Storage.multiGet so the pre-warm
+            // read fails.
+            evictFromCache(coldMemberKey);
+            const transientError = new Error('Transient IndexedDB read error');
+            StorageMock.multiGet = jest.fn(pristineMultiGet).mockRejectedValueOnce(transientError);
+
+            // Outer promise must resolve, not reject, even when the pre-warm read fails.
+            let outerRejected: unknown = null;
+            const result = await Onyx.mergeCollection(collectionKey, {
+                [coldMemberKey]: {merged: true},
+                [newMemberKey]: {value: 'new'},
+            } as GenericCollection).catch((e: unknown) => {
+                outerRejected = e;
+            });
+            expect(outerRejected).toBeNull();
+            expect(result).toBeUndefined();
+
+            // cache.merge() + keysChanged() must still have fired so subscribers see the merge.
+            // Use toMatchObject for the cold key because a successful concurrent read may have
+            // re-populated the persisted value into cache; what we care about is that the new
+            // {merged: true} delta is applied.
+            expect(collectionCallback).toHaveBeenCalled();
+            const lastBroadcast = collectionCallback.mock.calls.at(-1)?.[0] as Record<string, unknown> | undefined;
+            expect(lastBroadcast?.[coldMemberKey]).toMatchObject({merged: true});
+            expect(lastBroadcast?.[newMemberKey]).toEqual({value: 'new'});
+        });
     });
 
     describe('multiGet cache hit consistency', () => {
