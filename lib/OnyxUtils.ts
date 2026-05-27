@@ -402,6 +402,13 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
                         }
                     }
 
+                    // Prefer cache over stale storage if a concurrent write populated it during
+                    // the read — otherwise cache.merge(temp) below would resurrect dropped fields.
+                    if (cache.hasCacheForKey(key)) {
+                        dataMap.set(key, cache.get(key) as OnyxValue<TKey>);
+                        continue;
+                    }
+
                     dataMap.set(key, value as OnyxValue<TKey>);
                     temp[key] = value as OnyxValue<TKey>;
                 }

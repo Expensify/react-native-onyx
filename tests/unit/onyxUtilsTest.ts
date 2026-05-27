@@ -1174,6 +1174,27 @@ describe('OnyxUtils', () => {
             expect(getItemSpy).not.toHaveBeenCalled();
             expect(result.get(falsyKey)).toBe(0);
         });
+
+        it('prefers cache when a concurrent write lands during the storage read', async () => {
+            // Concurrent write during multiGet's storage read must not be overwritten by the
+            // stale snapshot via cache.merge.
+            const key = `${ONYXKEYS.COLLECTION.TEST_KEY}race`;
+
+            OnyxCache.drop(key);
+            OnyxCache.addKey(key);
+
+            // Set cache inside the mock so it lands before Storage.multiGet's promise resolves —
+            // multiGet's .then() then sees a populated cache and skips writing the stale value.
+            StorageMock.multiGet = jest.fn().mockImplementation(() => {
+                OnyxCache.set(key, {fresh: 'data'});
+                return Promise.resolve([[key, {stale: 'a', alsoStale: 'b'}]]);
+            });
+
+            const result = await OnyxUtils.multiGet([key]);
+
+            expect(OnyxCache.get(key)).toEqual({fresh: 'data'});
+            expect(result.get(key)).toEqual({fresh: 'data'});
+        });
     });
 
     describe('storage eviction', () => {
