@@ -143,28 +143,27 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
 
         if (OnyxKeys.isCollectionKey(key)) {
             // Collection-root snapshot mode — listener fires with the whole snapshot per
-            // collection change. Callback shape is `(snapshot, key)`. Legacy semantic
-            // preserved on initial fire: empty collection → `undefined`. Subsequent fires
-            // deliver the actual `{}`. Dedup: skip identical snapshot refs.
+            // collection change. Callback shape is `(snapshot, key)`. Dedup: skip identical
+            // snapshot refs. Initial fire always delivers the current snapshot (frozen `{}`
+            // for an empty-but-known collection, `undefined` only if the collection key has
+            // not been seen yet).
             const NOT_DELIVERED = Symbol('NOT_DELIVERED');
             let lastDeliveredSnapshot: unknown = NOT_DELIVERED;
-            const deliverSnapshot = (rawSnapshot: OnyxValue<TKey> | undefined, k: TKey, isInitialFire: boolean) => {
+            const deliverSnapshot = (rawSnapshot: OnyxValue<TKey> | undefined, k: TKey) => {
                 if (Object.is(lastDeliveredSnapshot, rawSnapshot)) {
                     return;
                 }
                 lastDeliveredSnapshot = rawSnapshot;
-                const isEmpty = rawSnapshot !== undefined && rawSnapshot !== null && typeof rawSnapshot === 'object' && Object.keys(rawSnapshot as object).length === 0;
-                const valueToDeliver = isInitialFire && isEmpty ? undefined : rawSnapshot;
-                (callback as CollectionConnectCallback<TKey> | undefined)?.(valueToDeliver as NonNullable<OnyxCollection<KeyValueMapping[TKey]>>, k);
+                (callback as CollectionConnectCallback<TKey> | undefined)?.(rawSnapshot as NonNullable<OnyxCollection<KeyValueMapping[TKey]>>, k);
             };
             unsubscribeFn = onyxStore.subscribe(key, (value, k) => {
-                deliverSnapshot(value as unknown as OnyxValue<TKey>, k as TKey, false);
+                deliverSnapshot(value as unknown as OnyxValue<TKey>, k as TKey);
             });
             scheduleInitialFire(() => {
                 if (!active) {
                     return;
                 }
-                deliverSnapshot(onyxStore.getState(key) as unknown as OnyxValue<TKey>, key as TKey, true);
+                deliverSnapshot(onyxStore.getState(key) as unknown as OnyxValue<TKey>, key as TKey);
             });
             return;
         }

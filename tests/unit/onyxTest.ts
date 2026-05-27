@@ -1068,8 +1068,10 @@ describe('Onyx', () => {
                     // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
                     expect(mockCallback).toHaveBeenCalledTimes(2);
 
-                    // AND the value for the first call should be null since the collection was not initialized at that point
-                    expect(mockCallback).toHaveBeenNthCalledWith(1, undefined, ONYX_KEYS.COLLECTION.TEST_POLICY);
+                    // Initial fire delivers the post-init frozen empty collection `{}` (the legacy
+                    // "undefined for empty-on-initial-fire" shim was removed; callers that needed
+                    // that behavior now guard at the consumer level).
+                    expect(mockCallback).toHaveBeenNthCalledWith(1, {}, ONYX_KEYS.COLLECTION.TEST_POLICY);
 
                     // AND the value for the second call should be collectionUpdate since the collection was updated
                     expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate, ONYX_KEYS.COLLECTION.TEST_POLICY);
@@ -1126,8 +1128,8 @@ describe('Onyx', () => {
                     // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
                     expect(mockCallback).toHaveBeenCalledTimes(2);
 
-                    // AND the value for the second call should be collectionUpdate
-                    expect(mockCallback).toHaveBeenNthCalledWith(1, undefined, ONYX_KEYS.COLLECTION.TEST_POLICY);
+                    // Initial fire delivers `{}` (legacy `undefined`-for-empty-initial shim was removed).
+                    expect(mockCallback).toHaveBeenNthCalledWith(1, {}, ONYX_KEYS.COLLECTION.TEST_POLICY);
                     expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate, ONYX_KEYS.COLLECTION.TEST_POLICY);
                 })
         );
@@ -1200,7 +1202,8 @@ describe('Onyx', () => {
                 {onyxMethod: Onyx.METHOD.MERGE_COLLECTION, key: ONYX_KEYS.COLLECTION.TEST_UPDATE, value: {[itemKey]: {a: 'a'}} as GenericCollection},
             ]).then(() => {
                 expect(collectionCallback).toHaveBeenCalledTimes(2);
-                expect(collectionCallback).toHaveBeenNthCalledWith(1, undefined, ONYX_KEYS.COLLECTION.TEST_UPDATE);
+                // Initial fire delivers `{}` (legacy `undefined`-for-empty-initial shim was removed).
+                expect(collectionCallback).toHaveBeenNthCalledWith(1, {}, ONYX_KEYS.COLLECTION.TEST_UPDATE);
                 expect(collectionCallback).toHaveBeenNthCalledWith(2, {[itemKey]: {a: 'a'}}, ONYX_KEYS.COLLECTION.TEST_UPDATE);
 
                 expect(testCallback).toHaveBeenCalledTimes(2);
@@ -3146,7 +3149,11 @@ describe('RAM-only keys should not read from storage', () => {
         });
         await act(async () => waitForPromisesToResolve());
 
-        expect(receivedCollection).toBeUndefined();
+        // Initial fire delivers the post-init frozen `{}` snapshot for a known-but-empty
+        // collection (legacy `undefined`-for-empty-initial shim was removed). What matters
+        // for this test is that the RAM-only members have NOT been hydrated from storage —
+        // the snapshot has no entries, and `cache.get(member)` returns `undefined`.
+        expect(receivedCollection).toEqual({});
         expect(cache.get(collectionMember1)).toBeUndefined();
         expect(cache.get(collectionMember2)).toBeUndefined();
 
