@@ -1089,13 +1089,11 @@ describe('OnyxUtils', () => {
             expect(warmResult).toEqual(coldResult);
             expect(coldResult).toEqual({value: 'after', extra: 'kept'});
         });
+
         it('preserves cache-first invariant when Storage.multiGet rejects on the slow path', async () => {
-            // Regression for codex review #3302454987 / PR #793. Before the .catch() at the
-            // pre-warm call site, a Storage.multiGet rejection would propagate up and skip
-            // cache.merge() + keysChanged() entirely — subscribers would miss the merge and
-            // Onyx.mergeCollection would reject. The previous get()-based pre-warm swallowed
-            // these errors per-key inside get()'s own .catch(), so the cache-first invariant
-            // from #787 held even on a flaky read.
+            // A Storage.multiGet rejection during pre-warm must not skip the cache.merge() +
+            // keysChanged() that follow. Without the .catch() at the pre-warm call site,
+            // subscribers would miss the merge and Onyx.mergeCollection would reject.
             const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
             const coldMemberKey = `${collectionKey}1`;
             const newMemberKey = `${collectionKey}2`;

@@ -347,9 +347,8 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
             continue;
         }
 
-        // Use hasCacheForKey, not a truthy check on the value — otherwise cached falsy values
-        // (0, '', false, null) get treated as cache misses and re-fetched from storage, which
-        // can overwrite the warm cached value with a stale storage value via cache.merge().
+        // hasCacheForKey catches cached falsy values (0, '', false, null) as cache hits, which
+        // a truthy check on the value would miss.
         if (cache.hasCacheForKey(key)) {
             dataMap.set(key, cache.get(key) as OnyxValue<TKey>);
             continue;
@@ -1611,11 +1610,9 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
             // missing keys into a single Storage.multiGet call (vs. N parallel get() invocations) and
             // writes the storage values back to cache before resolving.
             const hasColdExistingKey = existingKeys.some((key) => !cache.hasCacheForKey(key));
-            // Swallow pre-warm read failures the same way the previous get()-based pre-warm did
-            // (see get() catch at the bottom of its definition). Without this, a transient
-            // Storage.multiGet rejection would skip cache.merge() + keysChanged() below and
-            // regress the cache-first invariant established in #787 — subscribers would miss
-            // the merge and Onyx.mergeCollection would reject up to the caller.
+            // Swallow pre-warm read failures so a transient Storage.multiGet rejection doesn't
+            // skip the cache.merge() + keysChanged() below. Subscribers still see the merge even
+            // when storage reads fail.
             const prewarmPromise = hasColdExistingKey
                 ? multiGet(existingKeys).catch((err) => Logger.logInfo(`mergeCollectionWithPatches pre-warm failed; proceeding with cache-only merge. Error: ${err}`))
                 : Promise.resolve();
