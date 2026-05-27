@@ -921,10 +921,9 @@ describe('OnyxUtils', () => {
     });
 
     describe('mergeCollection pre-warm', () => {
-        // The retryOperation describe block above mutates StorageMock.setItem (and never restores it),
-        // so by the time we run, setItem may be a rejecting mock from a prior test. Capture pristine
-        // references at file-load time and restore them in beforeEach so our seeding via Onyx.set
-        // actually reaches the in-memory storage provider.
+        // retryOperation tests above replace StorageMock methods without restoring them, leaving
+        // rejecting mocks behind. Capture pristine refs at file-load time and restore in beforeEach
+        // so our Onyx.set seeding actually reaches the in-memory storage provider.
         const pristineSetItem = StorageMock.setItem;
         const pristineMultiSet = StorageMock.multiSet;
         const pristineMultiGet = StorageMock.multiGet;
@@ -939,11 +938,9 @@ describe('OnyxUtils', () => {
             StorageMock.multiMerge = pristineMultiMerge;
         });
 
-        // Make a key "cold" — value evicted from cache but the key is still tracked as persisted.
-        // OnyxCache.drop also removes the key from `storageKeys`, which would cause getAllKeys() to
-        // miss it (unless the entire storageKeys set is empty, in which case the function falls back
-        // to Storage.getAllKeys). To reliably hit the cold-but-persisted state regardless of how many
-        // other keys remain in cache, we re-register the key as known after dropping its value.
+        // Make a key "cold" — value evicted from cache but still tracked as persisted. OnyxCache.drop
+        // also removes the key from `storageKeys`, so we re-register it afterwards to reliably hit
+        // the cold-but-persisted state regardless of getAllKeys()'s fallback path.
         const evictFromCache = (...keys: string[]) => {
             for (const key of keys) {
                 OnyxCache.drop(key);
@@ -1103,10 +1100,9 @@ describe('OnyxUtils', () => {
             await Onyx.set(coldMemberKey, {value: 'persisted'});
             evictFromCache(coldMemberKey);
 
-            // Connect the subscriber and flush its initial data load FIRST, before installing
-            // the rejecting mock. Otherwise the connect's getCollectionDataAndSendAsObject path
-            // (whose multiGet call has no .catch) would consume the mockRejectedValueOnce and
-            // leak an unhandled rejection — not the merge pre-warm we're actually exercising.
+            // Connect and flush the subscriber's initial load BEFORE installing the rejecting mock —
+            // otherwise the connect's own multiGet (no .catch) consumes the mockRejectedValueOnce and
+            // leaks an unhandled rejection instead of exercising the merge pre-warm path.
             const collectionCallback = jest.fn();
             Onyx.connect({
                 key: collectionKey,
@@ -1134,10 +1130,9 @@ describe('OnyxUtils', () => {
             expect(outerRejected).toBeNull();
             expect(result).toBeUndefined();
 
-            // cache.merge() + keysChanged() must still have fired so subscribers see the merge.
-            // Use toMatchObject for the cold key because a successful concurrent read may have
-            // re-populated the persisted value into cache; what we care about is that the new
-            // {merged: true} delta is applied.
+            // cache.merge() + keysChanged() must still fire so subscribers see the merge. Use
+            // toMatchObject because a concurrent read may have re-populated the persisted value;
+            // what matters is that the new {merged: true} delta is applied on top.
             expect(collectionCallback).toHaveBeenCalled();
             const lastBroadcast = collectionCallback.mock.calls.at(-1)?.[0] as Record<string, unknown> | undefined;
             expect(lastBroadcast?.[coldMemberKey]).toMatchObject({merged: true});
@@ -1146,10 +1141,8 @@ describe('OnyxUtils', () => {
     });
 
     describe('multiGet cache hit consistency', () => {
-        // Same suite-pollution guard as the pre-warm block above: capture pristine StorageMock
-        // references at file-load time and restore them in beforeEach. The retryOperation
-        // describe block above mutates StorageMock.setItem (and never restores it), so by the
-        // time we run, setItem may be a rejecting mock from a prior test.
+        // Same suite-pollution guard as the pre-warm block above — capture pristine StorageMock
+        // refs at file-load time and restore them in beforeEach, since retryOperation tests leak.
         const pristineSetItem = StorageMock.setItem;
         const pristineMultiGet = StorageMock.multiGet;
         const pristineGetItem = StorageMock.getItem;

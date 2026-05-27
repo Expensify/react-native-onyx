@@ -1598,17 +1598,9 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
             // finalMergedCollection contains all the keys that were merged, without the keys of incompatible updates
             const finalMergedCollection = {...existingKeyCollection, ...newCollection};
 
-            // Pre-warm cache for any existing storage keys that aren't yet in cache so the subsequent
-            // cache.merge() merges the new delta into the real previous storage value (rather than
-            // starting from `undefined` and dropping the existing keys).
-            //
-            // Fast path: when every existingKey is already in cache, skip the pre-warm entirely. This
-            // preserves the original promise-chain depth and the subscriber-callback timing that
-            // dependent tests rely on.
-            //
-            // Slow path: when at least one existingKey is a cache miss, use multiGet — it batches the
-            // missing keys into a single Storage.multiGet call (vs. N parallel get() invocations) and
-            // writes the storage values back to cache before resolving.
+            // Pre-warm cache for cache-miss existingKeys so cache.merge() merges the new delta into
+            // the real previous storage value. Fast path (all warm) skips the pre-warm to preserve
+            // promise-chain depth; slow path batches the misses into one Storage.multiGet.
             const hasColdExistingKey = existingKeys.some((key) => !cache.hasCacheForKey(key));
             // Swallow pre-warm read failures so a transient Storage.multiGet rejection doesn't
             // skip the cache.merge() + keysChanged() below. Subscribers still see the merge even
