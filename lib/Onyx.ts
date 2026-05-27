@@ -96,14 +96,6 @@ function getState<TKey extends OnyxKey>(key: TKey): OnyxValue<TKey> {
 }
 
 /**
- * Subscribe to changes for `key`. Collection keys fire the whole snapshot when any member
- * changes; non-collection keys fire when that key changes. Pass `waitForCollectionCallback: false`
- * on a collection key to instead fire per changed member with `(memberValue, memberKey)`.
- *
- * Returns synchronously with a `Connection` handle. The underlying subscription
- * wires up after init completes; `disconnect()` works at any point.
- */
-/**
  * Defer initial-fire of `Onyx.connect` callbacks far enough that any Onyx writes
  * scheduled in the same synchronous tick have applied before the callback reads cache.
  *
@@ -127,8 +119,19 @@ function scheduleInitialFire(fn: () => void): void {
         .then(fn);
 }
 
+/**
+ * Subscribe to changes for `key`.
+ *
+ * For a collection root key, the callback fires with the entire frozen collection
+ * snapshot whenever any member changes; signature `(collection, collectionKey)`.
+ * For any other key, the callback fires with the value at that key; signature
+ * `(value, key)`. Initial fire is deferred via `scheduleInitialFire` so it reads
+ * cache after any same-tick writes have applied.
+ *
+ * Returns synchronously with a `Connection` handle. Disconnecting is idempotent.
+ */
 function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Connection {
-    const {key, callback, waitForCollectionCallback} = connectOptions;
+    const {key, callback} = connectOptions;
 
     let active = true;
     let unsubscribeFn: (() => void) | null = null;
@@ -139,60 +142,29 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
         }
 
         if (OnyxKeys.isCollectionKey(key)) {
-            if (waitForCollectionCallback === true) {
-                // Snapshot mode — listener fires with the whole snapshot per collection change.
-                // Callback shape is `(snapshot, key)`; `sourceValue` has been dropped.
-                // Legacy semantic preserved on initial fire: empty collection → `undefined`.
-                // Subsequent fires deliver the actual `{}`. Dedup: skip identical snapshot refs.
-                const NOT_DELIVERED = Symbol('NOT_DELIVERED');
-                let lastDeliveredSnapshot: unknown = NOT_DELIVERED;
-                const deliverSnapshot = (rawSnapshot: OnyxValue<TKey> | undefined, k: TKey, isInitialFire: boolean) => {
-                    if (Object.is(lastDeliveredSnapshot, rawSnapshot)) {
-                        return;
-                    }
-                    lastDeliveredSnapshot = rawSnapshot;
-                    const isEmpty = rawSnapshot !== undefined && rawSnapshot !== null && typeof rawSnapshot === 'object' && Object.keys(rawSnapshot as object).length === 0;
-                    const valueToDeliver = isInitialFire && isEmpty ? undefined : rawSnapshot;
-                    (callback as CollectionConnectCallback<TKey> | undefined)?.(valueToDeliver as NonNullable<OnyxCollection<KeyValueMapping[TKey]>>, k);
-                };
-                unsubscribeFn = onyxStore.subscribe(key, (value, k) => {
-                    deliverSnapshot(value as unknown as OnyxValue<TKey>, k as TKey, false);
-                });
-                scheduleInitialFire(() => {
-                    if (!active) {
-                        return;
-                    }
-                    deliverSnapshot(onyxStore.getState(key) as unknown as OnyxValue<TKey>, key as TKey, true);
-                });
-                return;
-            }
-
-            // Per-member mode — one callback per changed member. Dedup per member key.
-            const memberLastDelivered = new Map<OnyxKey, unknown>();
-            const deliverMember = (value: OnyxValue<OnyxKey>, memberKey: OnyxKey) => {
-                if (memberLastDelivered.has(memberKey) && Object.is(memberLastDelivered.get(memberKey), value)) {
+            // Collection-root snapshot mode — listener fires with the whole snapshot per
+            // collection change. Callback shape is `(snapshot, key)`. Legacy semantic
+            // preserved on initial fire: empty collection → `undefined`. Subsequent fires
+            // deliver the actual `{}`. Dedup: skip identical snapshot refs.
+            const NOT_DELIVERED = Symbol('NOT_DELIVERED');
+            let lastDeliveredSnapshot: unknown = NOT_DELIVERED;
+            const deliverSnapshot = (rawSnapshot: OnyxValue<TKey> | undefined, k: TKey, isInitialFire: boolean) => {
+                if (Object.is(lastDeliveredSnapshot, rawSnapshot)) {
                     return;
                 }
-                memberLastDelivered.set(memberKey, value);
-                (callback as DefaultConnectCallback<TKey> | undefined)?.(value, memberKey as TKey);
+                lastDeliveredSnapshot = rawSnapshot;
+                const isEmpty = rawSnapshot !== undefined && rawSnapshot !== null && typeof rawSnapshot === 'object' && Object.keys(rawSnapshot as object).length === 0;
+                const valueToDeliver = isInitialFire && isEmpty ? undefined : rawSnapshot;
+                (callback as CollectionConnectCallback<TKey> | undefined)?.(valueToDeliver as NonNullable<OnyxCollection<KeyValueMapping[TKey]>>, k);
             };
-            unsubscribeFn = onyxStore.subscribeMembers(key as CollectionKeyBase, deliverMember);
+            unsubscribeFn = onyxStore.subscribe(key, (value, k) => {
+                deliverSnapshot(value as unknown as OnyxValue<TKey>, k as TKey, false);
+            });
             scheduleInitialFire(() => {
-                if (!active || !callback) {
+                if (!active) {
                     return;
                 }
-                const initial = onyxStore.getState(key) as OnyxCollection<KeyValueMapping[TKey]> | undefined;
-                const memberKeys = initial ? Object.keys(initial) : [];
-                if (memberKeys.length === 0) {
-                    // Legacy semantic: when a per-member subscription finds no existing
-                    // members, fire once with (undefined, undefined) so callers can clear
-                    // any prior state. Matches the old `sendDataToConnection(mapping, undefined)`.
-                    (callback as DefaultConnectCallback<TKey>)(undefined as OnyxValue<TKey>, undefined as unknown as TKey);
-                    return;
-                }
-                for (const memberKey of memberKeys) {
-                    deliverMember(initial?.[memberKey], memberKey);
-                }
+                deliverSnapshot(onyxStore.getState(key) as unknown as OnyxValue<TKey>, key as TKey, true);
             });
             return;
         }
@@ -251,8 +223,7 @@ function connectWithoutView<TKey extends OnyxKey>(connectOptions: ConnectOptions
 }
 
 /**
- * Disconnects a subscription previously returned by `connect()` / `connectWithoutView()`
- * / `subscribe()` / `subscribeMembers()`.
+ * Disconnects a subscription previously returned by `connect()` / `connectWithoutView()`.
  */
 function disconnect(connection: Connection): void {
     if (!connection) {

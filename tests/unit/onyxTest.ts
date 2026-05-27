@@ -644,7 +644,6 @@ describe('Onyx', () => {
     });
 
     it('should properly set and merge when using mergeCollection', async () => {
-        const valuesReceived: Record<string, unknown> = {};
         const mockCallback = jest.fn();
         connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
@@ -653,7 +652,6 @@ describe('Onyx', () => {
         await waitForPromisesToResolve();
 
         mockCallback.mockReset();
-        mockCallback.mockImplementation((data) => (valuesReceived[data.ID] = data.value));
 
         // The first time we call mergeCollection we'll be doing a multiSet internally
         return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
@@ -694,20 +692,25 @@ describe('Onyx', () => {
                 } as GenericCollection),
             )
             .then(() => {
-                // 3 items on the first mergeCollection + 4 items the next mergeCollection
-                expect(mockCallback).toHaveBeenCalledTimes(7);
-                expect(mockCallback).toHaveBeenNthCalledWith(1, {ID: 123, value: 'one'}, 'test_1');
-                expect(mockCallback).toHaveBeenNthCalledWith(2, {ID: 234, value: 'two'}, 'test_2');
-                expect(mockCallback).toHaveBeenNthCalledWith(3, {ID: 345, value: 'three'}, 'test_3');
-                expect(mockCallback).toHaveBeenNthCalledWith(4, {ID: 123, value: 'five'}, 'test_1');
-                expect(mockCallback).toHaveBeenNthCalledWith(5, {ID: 234, value: 'four'}, 'test_2');
-                expect(mockCallback).toHaveBeenNthCalledWith(6, {ID: 456, value: 'two'}, 'test_4');
-                expect(mockCallback).toHaveBeenNthCalledWith(7, {ID: 567, value: 'one'}, 'test_5');
-                expect(valuesReceived[123]).toEqual('five');
-                expect(valuesReceived[234]).toEqual('four');
-                expect(valuesReceived[345]).toEqual('three');
-                expect(valuesReceived[456]).toEqual('two');
-                expect(valuesReceived[567]).toEqual('one');
+                // Snapshot mode: callback fires once per mergeCollection with the full snapshot.
+                expect(mockCallback).toHaveBeenCalledTimes(2);
+                expect(mockCallback).toHaveBeenNthCalledWith(
+                    1,
+                    {test_1: {ID: 123, value: 'one'}, test_2: {ID: 234, value: 'two'}, test_3: {ID: 345, value: 'three'}},
+                    ONYX_KEYS.COLLECTION.TEST_KEY,
+                );
+                expect(mockCallback).toHaveBeenNthCalledWith(
+                    2,
+                    {
+                        test_1: {ID: 123, value: 'five'},
+                        test_2: {ID: 234, value: 'four'},
+                        // test_3 unchanged (incompatible array merge rejected)
+                        test_3: {ID: 345, value: 'three'},
+                        test_4: {ID: 456, value: 'two'},
+                        test_5: {ID: 567, value: 'one'},
+                    },
+                    ONYX_KEYS.COLLECTION.TEST_KEY,
+                );
             });
     });
 
@@ -724,10 +727,10 @@ describe('Onyx', () => {
     });
 
     it('should return full object to callback when calling mergeCollection()', () => {
-        const valuesReceived: Record<string, unknown> = {};
+        let lastSnapshot: unknown;
         connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
-            callback: (data, key) => (valuesReceived[key] = data),
+            callback: (snapshot) => (lastSnapshot = snapshot),
         });
 
         return Onyx.multiSet({
@@ -751,7 +754,7 @@ describe('Onyx', () => {
                 } as GenericCollection),
             )
             .then(() => {
-                expect(valuesReceived).toEqual({
+                expect(lastSnapshot).toEqual({
                     test_1: {
                         ID: 123,
                         value: 'one',
@@ -897,7 +900,6 @@ describe('Onyx', () => {
     });
 
     it('should use update data object to merge a collection of keys', () => {
-        const valuesReceived: Record<string, unknown> = {};
         const mockCallback = jest.fn();
         connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
@@ -907,7 +909,6 @@ describe('Onyx', () => {
         return waitForPromisesToResolve()
             .then(() => {
                 mockCallback.mockReset();
-                mockCallback.mockImplementation((data) => (valuesReceived[data.ID] = data.value));
 
                 // Given the initial Onyx state: {test_1: {existingData: 'test',}, test_2: {existingData: 'test',}}
                 Onyx.multiSet({
@@ -921,8 +922,12 @@ describe('Onyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                expect(mockCallback).toHaveBeenNthCalledWith(1, {existingData: 'test'}, 'test_1');
-                expect(mockCallback).toHaveBeenNthCalledWith(2, {existingData: 'test'}, 'test_2');
+                // Snapshot mode: multiSet fires the collection callback per write.
+                expect(mockCallback).toHaveBeenLastCalledWith(
+                    {test_1: {existingData: 'test'}, test_2: {existingData: 'test'}},
+                    ONYX_KEYS.COLLECTION.TEST_KEY,
+                );
+                mockCallback.mockReset();
 
                 // When we pass a mergeCollection data object to Onyx.update
                 return Onyx.update([
@@ -947,36 +952,24 @@ describe('Onyx', () => {
                 ]);
             })
             .then(() => {
-                /* Then the final Onyx state should be:
+                // mergeCollection fires the collection snapshot once with all 3 merged members.
+                expect(mockCallback).toHaveBeenCalledTimes(1);
+                expect(mockCallback).toHaveBeenCalledWith(
                     {
-                        test_1: {
-                            existingData: 'test'
-                            ID: 123,
-                            value: 'one',
-                        },
-                        test_2: {
-                            existingData: 'test'
-                            ID: 234,
-                            value: 'two',
-                        },
-                        test_3: {
-                            ID: 345,
-                            value: 'three',
-                        },
-                    }
-                */
-
-                expect(mockCallback).toHaveBeenNthCalledWith(3, {ID: 123, value: 'one', existingData: 'test'}, 'test_1');
-                expect(mockCallback).toHaveBeenNthCalledWith(4, {ID: 234, value: 'two', existingData: 'test'}, 'test_2');
-                expect(mockCallback).toHaveBeenNthCalledWith(5, {ID: 345, value: 'three'}, 'test_3');
+                        test_1: {ID: 123, value: 'one', existingData: 'test'},
+                        test_2: {ID: 234, value: 'two', existingData: 'test'},
+                        test_3: {ID: 345, value: 'three'},
+                    },
+                    ONYX_KEYS.COLLECTION.TEST_KEY,
+                );
             });
     });
 
     it('should properly set all keys provided in a multiSet called via update', () => {
-        const valuesReceived: Record<string, unknown> = {};
+        let lastSnapshot: unknown;
         connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
-            callback: (data, key) => (valuesReceived[key] = data),
+            callback: (snapshot) => (lastSnapshot = snapshot),
         });
 
         return Onyx.multiSet({
@@ -1005,7 +998,7 @@ describe('Onyx', () => {
                 ] as unknown as Array<OnyxUpdate<OnyxKey>>),
             )
             .then(() => {
-                expect(valuesReceived).toEqual({
+                expect(lastSnapshot).toEqual({
                     test_1: {
                         ID: 123,
                         value: 'one',
@@ -1500,9 +1493,10 @@ describe('Onyx', () => {
 
         await Onyx.update([{key: cat, value: finalValue, onyxMethod: Onyx.METHOD.MERGE}]);
 
+        // Snapshot mode: callback fires with the whole SNAPSHOT-collection snapshot.
         expect(callback).toBeCalledTimes(2);
-        expect(callback).toHaveBeenNthCalledWith(1, {data: {[cat]: initialValue}}, snapshot1);
-        expect(callback).toHaveBeenNthCalledWith(2, {data: {[cat]: finalValue}}, snapshot1);
+        expect(callback).toHaveBeenNthCalledWith(1, {[snapshot1]: {data: {[cat]: initialValue}}}, ONYX_KEYS.COLLECTION.SNAPSHOT);
+        expect(callback).toHaveBeenNthCalledWith(2, {[snapshot1]: {data: {[cat]: finalValue}}}, ONYX_KEYS.COLLECTION.SNAPSHOT);
     });
 
     it('should merge allowlisted keys into Snapshot even if they were missing', async () => {
@@ -1531,9 +1525,14 @@ describe('Onyx', () => {
 
         await Onyx.update([{key: cat, value: finalValue, onyxMethod: Onyx.METHOD.MERGE}]);
 
+        // Snapshot mode: callback fires with the whole SNAPSHOT-collection snapshot.
         expect(callback).toBeCalledTimes(2);
-        expect(callback).toHaveBeenNthCalledWith(1, {data: {[cat]: initialValue}}, snapshot1);
-        expect(callback).toHaveBeenNthCalledWith(2, {data: {[cat]: {name: 'Kitty', pendingAction: 'delete', pendingFields: {preview: 'delete'}}}}, snapshot1);
+        expect(callback).toHaveBeenNthCalledWith(1, {[snapshot1]: {data: {[cat]: initialValue}}}, ONYX_KEYS.COLLECTION.SNAPSHOT);
+        expect(callback).toHaveBeenNthCalledWith(
+            2,
+            {[snapshot1]: {data: {[cat]: {name: 'Kitty', pendingAction: 'delete', pendingFields: {preview: 'delete'}}}}},
+            ONYX_KEYS.COLLECTION.SNAPSHOT,
+        );
     });
 
     describe('update', () => {
