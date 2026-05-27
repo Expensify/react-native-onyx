@@ -32,7 +32,7 @@ import onyxStore from './OnyxStore';
 import OnyxMerge from './OnyxMerge';
 
 /**
- * Opaque handle returned by `Onyx.connect()` / `Onyx.connectWithoutView()` / `Onyx.subscribe()`.
+ * Opaque handle returned by `Onyx.connect()` / `Onyx.connectWithoutView()`.
  * Pass it to `Onyx.disconnect()` to stop receiving callbacks for this subscription.
  */
 type Connection = {
@@ -96,35 +96,9 @@ function getState<TKey extends OnyxKey>(key: TKey): OnyxValue<TKey> {
 }
 
 /**
- * Subscribe to a single Onyx key, or to a collection key in snapshot mode.
- *
- * For collection keys, the listener fires with the entire frozen collection snapshot
- * every time any member changes. For non-collection keys, the listener fires with the
- * value when that key changes.
- *
- * @returns An unsubscribe function.
- */
-function subscribe<TKey extends OnyxKey>(key: TKey, listener: (value: OnyxValue<TKey>, key: TKey) => void): () => void {
-    return onyxStore.subscribe(key, listener);
-}
-
-/**
- * Subscribe to per-member changes on a collection key. The listener fires once per
- * changed member with `(memberValue, memberKey)`.
- *
- * Use this when you care about which specific member changed (e.g. keeping a local
- * map indexed by member ID up-to-date). For "always deliver the whole collection",
- * use `subscribe()` instead.
- *
- * @returns An unsubscribe function.
- */
-function subscribeMembers<TKey extends CollectionKeyBase>(collectionKey: TKey, listener: (value: OnyxValue<OnyxKey>, memberKey: OnyxKey) => void): () => void {
-    return onyxStore.subscribeMembers(collectionKey, listener);
-}
-
-/**
- * Kept as a compatibility wrapper for existing call sites; routes to the new primitives
- * based on the legacy `waitForCollectionCallback` option.
+ * Subscribe to changes for `key`. Collection keys fire the whole snapshot when any member
+ * changes; non-collection keys fire when that key changes. Pass `waitForCollectionCallback: false`
+ * on a collection key to instead fire per changed member with `(memberValue, memberKey)`.
  *
  * Returns synchronously with a `Connection` handle. The underlying subscription
  * wires up after init completes; `disconnect()` works at any point.
@@ -711,8 +685,6 @@ function setCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, coll
 const Onyx = {
     METHOD: OnyxUtils.METHOD,
     getState,
-    subscribe,
-    subscribeMembers,
     connect,
     connectWithoutView,
     disconnect,
