@@ -19,7 +19,7 @@ type Row = Record<string, unknown>;
 
 type NitroRows<T> = {
     _array: T[];
-    item: (i: number) => T | undefined;
+    item: (index: number) => T | undefined;
     length: number;
 };
 
@@ -43,17 +43,17 @@ const databases = new Map<string, Database>();
  *
  * SQLiteProvider's `multiMerge` uses `:key` and `:value` (with `:value`
  * reused on the ON CONFLICT branch). NitroSQLite binds positional array
- * params to these names by first-occurrence order — we mirror that.
+ * parameters to these names by first-occurrence order — we mirror that.
  */
-function extractNamedParamOrder(sql: string): string[] | null {
+function extractNamedParameterOrder(sql: string): string[] | null {
     const matches = sql.match(/:[A-Za-z_][A-Za-z0-9_]*/g);
     if (!matches) {
         return null;
     }
     const seen = new Set<string>();
     const order: string[] = [];
-    for (const m of matches) {
-        const name = m.slice(1);
+    for (const match of matches) {
+        const name = match.slice(1);
         if (!seen.has(name)) {
             seen.add(name);
             order.push(name);
@@ -65,108 +65,109 @@ function extractNamedParamOrder(sql: string): string[] | null {
 function wrapRows<T extends Row>(rowsArray: T[]): NitroRows<T> {
     return {
         _array: rowsArray,
-        item: (i: number) => rowsArray[i],
+        item: (index: number) => rowsArray[index],
         length: rowsArray.length,
     };
 }
 
-function prepareAndBind(db: Database, sql: string, params: unknown[]) {
-    const namedOrder = extractNamedParamOrder(sql);
+function prepareAndBind(database: Database, sql: string, parameters: unknown[]) {
+    const namedOrder = extractNamedParameterOrder(sql);
     if (namedOrder) {
-        // Map positional params array to named bindings object — NitroSQLite's
+        // Map positional parameters array to named bindings object — NitroSQLite's
         // first-occurrence-order convention.
-        const stmt = db.prepare(sql);
+        const statement = database.prepare(sql);
         const bindings: Record<string, unknown> = {};
-        for (let i = 0; i < namedOrder.length; i++) {
-            bindings[namedOrder[i]] = params[i];
+        for (let index = 0; index < namedOrder.length; index++) {
+            bindings[namedOrder[index]] = parameters[index];
         }
-        return {stmt, args: [bindings] as const};
+
+        return {statement, boundArguments: [bindings] as const};
     }
-    return {stmt: db.prepare(sql), args: params};
+    return {statement: database.prepare(sql), boundArguments: parameters};
 }
 
-function runOne<T extends Row>(db: Database, sql: string, params: unknown[] = []): NitroResult<T> {
+function runOne<T extends Row>(database: Database, sql: string, parameters: unknown[] = []): NitroResult<T> {
     // Multi-statement (CREATE TABLE; SELECT ...; etc.) — better-sqlite3 cannot
     // prepare more than one statement at a time. SQLiteProvider's init() issues
     // each statement separately, so this branch is rarely hit, but keep it
     // defensive.
     const semicolons = (sql.match(/;/g) ?? []).length;
     if (semicolons > 1 || (semicolons === 1 && !sql.trim().endsWith(';'))) {
-        db.exec(sql);
+        database.exec(sql);
         return {rowsAffected: 0};
     }
 
-    const {stmt, args} = prepareAndBind(db, sql, params);
+    const {statement, boundArguments} = prepareAndBind(database, sql, parameters);
 
-    // better-sqlite3 exposes `stmt.reader` = true for statements that produce
+    // better-sqlite3 exposes `statement.reader` = true for statements that produce
     // result columns (SELECT, read-only PRAGMAs). For setter PRAGMAs and DDL
     // it's false. This is the cleanest way to dispatch correctly.
-    if (stmt.reader) {
-        const rows = stmt.all(...(args as unknown[])) as T[];
+    if (statement.reader) {
+        const rows = statement.all(...(boundArguments as unknown[])) as T[];
         return {rows: wrapRows(rows), rowsAffected: 0};
     }
 
-    const info = stmt.run(...(args as unknown[]));
+    const info = statement.run(...(boundArguments as unknown[]));
     return {rowsAffected: info.changes, insertId: Number(info.lastInsertRowid)};
 }
 
 function makeConnection(name: string) {
-    let db = databases.get(name);
-    if (!db) {
-        db = new BetterSqlite3(':memory:');
-        databases.set(name, db);
+    let database = databases.get(name);
+    if (!database) {
+        database = new BetterSqlite3(':memory:');
+        databases.set(name, database);
     }
-    const conn = db;
+    const connection = database;
 
     return {
-        execute<T extends Row = Row>(sql: string, params: unknown[] = []): NitroResult<T> {
-            return runOne<T>(conn, sql, params);
+        execute<T extends Row = Row>(sql: string, parameters: unknown[] = []): NitroResult<T> {
+            return runOne<T>(connection, sql, parameters);
         },
 
-        executeAsync<T extends Row = Row>(sql: string, params: unknown[] = []): Promise<NitroResult<T>> {
+        executeAsync<T extends Row = Row>(sql: string, parameters: unknown[] = []): Promise<NitroResult<T>> {
             try {
-                return Promise.resolve(runOne<T>(conn, sql, params));
-            } catch (e) {
-                return Promise.reject(e);
+                return Promise.resolve(runOne<T>(connection, sql, parameters));
+            } catch (error) {
+                return Promise.reject(error);
             }
         },
 
         executeBatchAsync(commands: BatchQueryCommand[]): Promise<{rowsAffected: number}> {
             try {
                 let total = 0;
-                conn.transaction(() => {
+                connection.transaction(() => {
                     for (const command of commands) {
-                        const namedOrder = extractNamedParamOrder(command.query);
-                        const stmt = conn.prepare(command.query);
-                        const paramRows = command.params ?? [];
-                        if (paramRows.length === 0) {
-                            const info = stmt.run();
+                        const namedOrder = extractNamedParameterOrder(command.query);
+                        const statement = connection.prepare(command.query);
+                        const parameterRows = command.params ?? [];
+                        if (parameterRows.length === 0) {
+                            const info = statement.run();
                             total += info.changes;
                             continue;
                         }
-                        for (const row of paramRows) {
+                        for (const row of parameterRows) {
                             if (namedOrder) {
                                 const bindings: Record<string, unknown> = {};
-                                for (let i = 0; i < namedOrder.length; i++) {
-                                    bindings[namedOrder[i]] = row[i];
+                                for (let index = 0; index < namedOrder.length; index++) {
+                                    bindings[namedOrder[index]] = row[index];
                                 }
-                                const info = stmt.run(bindings);
+                                const info = statement.run(bindings);
                                 total += info.changes;
                             } else {
-                                const info = stmt.run(...row);
+                                const info = statement.run(...row);
                                 total += info.changes;
                             }
                         }
                     }
                 })();
                 return Promise.resolve({rowsAffected: total});
-            } catch (e) {
-                return Promise.reject(e);
+            } catch (error) {
+                return Promise.reject(error);
             }
         },
 
         close() {
-            conn.close();
+            connection.close();
             databases.delete(name);
         },
     };
@@ -184,9 +185,9 @@ function enableSimpleNullHandling() {
  * Test helper — wipe every in-memory DB between tests.
  */
 function resetAllDatabases() {
-    for (const db of databases.values()) {
+    for (const database of databases.values()) {
         try {
-            db.close();
+            database.close();
         } catch {
             /* ignore */
         }
