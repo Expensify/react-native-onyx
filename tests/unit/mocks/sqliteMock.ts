@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Mock for `react-native-nitro-sqlite` backed by `better-sqlite3`, enabling
  * Node-level integration tests against a real SQLite engine.
@@ -78,9 +77,9 @@ function prepareAndBind(db: Database, sql: string, params: unknown[]) {
         // first-occurrence-order convention.
         const stmt = db.prepare(sql);
         const bindings: Record<string, unknown> = {};
-        namedOrder.forEach((name, i) => {
-            bindings[name] = params[i];
-        });
+        for (let i = 0; i < namedOrder.length; i++) {
+            bindings[namedOrder[i]] = params[i];
+        }
         return {stmt, args: [bindings] as const};
     }
     return {stmt: db.prepare(sql), args: params};
@@ -148,9 +147,9 @@ function makeConnection(name: string) {
                         for (const row of paramRows) {
                             if (namedOrder) {
                                 const bindings: Record<string, unknown> = {};
-                                namedOrder.forEach((name, i) => {
-                                    bindings[name] = row[i];
-                                });
+                                for (let i = 0; i < namedOrder.length; i++) {
+                                    bindings[namedOrder[i]] = row[i];
+                                }
                                 const info = stmt.run(bindings);
                                 total += info.changes;
                             } else {
@@ -184,7 +183,7 @@ function enableSimpleNullHandling() {
 /**
  * Test helper — wipe every in-memory DB between tests.
  */
-function __resetAllDatabases() {
+function resetAllDatabases() {
     for (const db of databases.values()) {
         try {
             db.close();
@@ -195,8 +194,4 @@ function __resetAllDatabases() {
     databases.clear();
 }
 
-module.exports = {
-    open,
-    enableSimpleNullHandling,
-    __resetAllDatabases,
-};
+export {open, enableSimpleNullHandling, resetAllDatabases};
