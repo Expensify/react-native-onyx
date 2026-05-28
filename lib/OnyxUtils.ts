@@ -769,9 +769,14 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
 /**
  * Remove a key from Onyx and update the subscribers
  */
-function remove<TKey extends OnyxKey>(key: TKey, isProcessingCollectionUpdate?: boolean): Promise<void> {
+function remove<TKey extends OnyxKey>(key: TKey, isProcessingCollectionUpdate?: boolean, skipNotify?: boolean): Promise<void> {
     cache.drop(key);
-    keyChanged(key, undefined as OnyxValue<TKey>, undefined, isProcessingCollectionUpdate);
+    // skipNotify is used by retryOperation's eviction branch — the imminent retry's cache.set
+    // will re-populate cache, so firing keyChanged(undefined) here would only strand subscribers
+    // in the "removed" state across the retry.
+    if (!skipNotify) {
+        keyChanged(key, undefined as OnyxValue<TKey>, undefined, isProcessingCollectionUpdate);
+    }
 
     if (OnyxKeys.isRamOnlyKey(key)) {
         return Promise.resolve();
@@ -842,8 +847,10 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, on
     Logger.logInfo(`Out of storage. Evicting least recently accessed key (${keyForRemoval}) and retrying. Error: ${error}`);
     reportStorageQuota(error);
 
+    // skipNotify=true: retry's orchestrator skips keysChanged on retryAttempt > 0, so we
+    // must not let remove() fire keyChanged(undefined) — cache.set on retry restores the value.
     // @ts-expect-error No overload matches this call.
-    return remove(keyForRemoval).then(() => onyxMethod(defaultParams, nextRetryAttempt));
+    return remove(keyForRemoval, undefined, true).then(() => onyxMethod(defaultParams, nextRetryAttempt));
 }
 
 /**
@@ -1395,14 +1402,21 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
             // so re-entrant callbacks (e.g. Onyx.set inside a callback) see consistent cache
             // and subscriber state, matching the original per-key notification semantics.
             cache.set(key, value);
-            keyChanged(key, value);
+            // Skip subscriber notification on retry — already notified on attempt 0.
+            // waitForCollectionCallback subscribers re-fire on every keyChanged by contract.
+            if (!retryAttempt) {
+                keyChanged(key, value);
+            }
         }
     }
 
     // One keysChanged() per collection — fires each collection-level subscriber once and lets
     // keysChanged() internally decide which individual member subscribers need notification.
-    for (const [collectionKey, batch] of collectionBatches) {
-        keysChanged(collectionKey as CollectionKeyBase, batch.partial, batch.previous);
+    // Skip on retry — already notified on attempt 0 (see same-reason comment above).
+    if (!retryAttempt) {
+        for (const [collectionKey, batch] of collectionBatches) {
+            keysChanged(collectionKey as CollectionKeyBase, batch.partial, batch.previous);
+        }
     }
 
     const keyValuePairsToStore = keyValuePairsToSet.filter((keyValuePair) => {
@@ -1476,7 +1490,11 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
 
         for (const [key, value] of keyValuePairs) cache.set(key, value);
 
-        keysChanged(collectionKey, mutableCollection, previousCollection);
+        // Skip subscriber notification on retry — already notified on attempt 0.
+        // waitForCollectionCallback subscribers re-fire on every keysChanged by contract.
+        if (!retryAttempt) {
+            keysChanged(collectionKey, mutableCollection, previousCollection);
+        }
 
         // RAM-only keys are not supposed to be saved to storage
         if (OnyxKeys.isRamOnlyKey(collectionKey)) {
@@ -1611,7 +1629,11 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
                 // write fails.
                 const previousCollection = getCachedCollection(collectionKey, existingKeys);
                 cache.merge(finalMergedCollection);
-                keysChanged(collectionKey, finalMergedCollection, previousCollection);
+                // Skip subscriber notification on retry — already notified on attempt 0.
+                // waitForCollectionCallback subscribers re-fire on every keysChanged by contract.
+                if (!retryAttempt) {
+                    keysChanged(collectionKey, finalMergedCollection, previousCollection);
+                }
 
                 const promises = [];
 
@@ -1690,7 +1712,11 @@ function partialSetCollection<TKey extends CollectionKeyBase>({collectionKey, co
 
         for (const [key, value] of keyValuePairs) cache.set(key, value);
 
-        keysChanged(collectionKey, mutableCollection, previousCollection);
+        // Skip subscriber notification on retry — already notified on attempt 0.
+        // waitForCollectionCallback subscribers re-fire on every keysChanged by contract.
+        if (!retryAttempt) {
+            keysChanged(collectionKey, mutableCollection, previousCollection);
+        }
 
         if (OnyxKeys.isRamOnlyKey(collectionKey)) {
             sendActionToDevTools(METHOD.SET_COLLECTION, undefined, mutableCollection);
