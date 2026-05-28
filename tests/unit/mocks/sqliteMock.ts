@@ -1,11 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
- * PoC mock for `react-native-nitro-sqlite` backed by `better-sqlite3`.
+ * Mock for `react-native-nitro-sqlite` backed by `better-sqlite3`, enabling
+ * Node-level integration tests against a real SQLite engine.
  *
- * Goal: prove that a Node-level integration test can stand in for a real
- * device run (Harness) when the bugs we want to catch are SQL-shaped.
- *
- * The mock implements just enough of the NitroSQLite surface used by
+ * Implements the NitroSQLite surface used by
  * `lib/storage/providers/SQLiteProvider.ts`:
  *   - open({name})
  *   - enableSimpleNullHandling()

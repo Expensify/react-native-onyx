@@ -1,12 +1,9 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 /**
- * PoC: integration test for `SQLiteProvider` using a Node-side SQLite engine.
+ * Integration test for `SQLiteProvider` using a Node-side SQLite engine.
  *
  * Pattern mirrors `IDBKeyvalProviderTest.ts` — real provider code + real
  * SQLite engine (via better-sqlite3) standing in for `react-native-nitro-sqlite`.
- *
- * The goal of this PoC is to answer: do we need Harness, or does a Node-level
- * integration test give us the same coverage at zero CI cost?
  */
 // Hoisted by Jest before any imports → overrides the global jestSetup.js mock.
 jest.mock('react-native-nitro-sqlite', () => require('../../mocks/sqliteMock'));
@@ -26,7 +23,7 @@ const ONYXKEYS = {
     },
 };
 
-describe('SQLiteProvider (Node-integration PoC)', () => {
+describe('SQLiteProvider', () => {
     beforeEach(() => {
         mock.__resetAllDatabases();
         SQLiteProvider.init();
