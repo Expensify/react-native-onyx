@@ -171,18 +171,18 @@ describe('SQLiteProvider', () => {
             expect(await SQLiteProvider.getItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id2`)).toEqual(['a', {newKey: 'newValue'}]);
         });
 
-        it('inserts a new record when key does not exist', async () => {
+        it('should insert a new record when key does not exist', async () => {
             await SQLiteProvider.multiMerge([[ONYXKEYS.TEST_KEY_2, {fresh: true}]]);
             expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY_2)).toEqual({fresh: true});
         });
 
-        it('shallow-merges existing record_key value', async () => {
+        it('should shallow-merge existing record_key value', async () => {
             await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY_3, {a: 1, b: 2});
             await SQLiteProvider.multiMerge([[ONYXKEYS.TEST_KEY_3, {b: 99, c: 3}]]);
             expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY_3)).toEqual({a: 1, b: 99, c: 3});
         });
 
-        it('deep-merges nested objects', async () => {
+        it('should deep-merge nested objects', async () => {
             await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY_3, {
                 outer: {a: 1, b: 2, nested: {x: 1, y: 2}},
             });
@@ -219,7 +219,7 @@ describe('SQLiteProvider', () => {
 
         // SQLite-specific: the JSON_REPLACE path is what makes `REPLACE_OBJECT_MARK`
         // actually wipe a nested object (JSON_PATCH alone would only merge into it).
-        it('fully replaces a nested object marked with REPLACE_OBJECT_MARK via JSON_REPLACE', async () => {
+        it('should fully replace a nested object marked with REPLACE_OBJECT_MARK via JSON_REPLACE', async () => {
             await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY_3, {
                 outer: {a: 1, b: 2, nested: {keepMe: false, oldKey: 'gone'}},
             });
@@ -315,7 +315,7 @@ describe('SQLiteProvider', () => {
     // SQLite-specific: the IN-list is parameterised, so a key containing SQL
     // fragments must be treated as a literal record_key.
     describe('SQL-injection safety', () => {
-        it('treats a key containing SQL fragments as a literal record_key', async () => {
+        it('should treat a key containing SQL fragments as a literal record_key', async () => {
             const nastyKey = "'; DROP TABLE keyvaluepairs; --";
             await SQLiteProvider.setItem(nastyKey as string, 'survived');
             expect(await SQLiteProvider.getItem(nastyKey)).toEqual('survived');

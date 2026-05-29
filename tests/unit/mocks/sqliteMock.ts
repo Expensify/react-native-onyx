@@ -5,7 +5,6 @@
  * Implements the NitroSQLite surface used by
  * `lib/storage/providers/SQLiteProvider.ts`:
  *   - open({name})
- *   - enableSimpleNullHandling()
  *   - connection.execute(sql)
  *   - connection.executeAsync<T>(sql, params?)
  *   - connection.executeBatchAsync([{query, params}])
@@ -13,29 +12,11 @@
  * Result rows are shaped to match Nitro: `{rows: {_array, item, length}}`.
  */
 import BetterSqlite3 from 'better-sqlite3';
+import type {Database} from 'better-sqlite3';
+import type {NitroSQLiteConnection, NitroSQLiteQueryResultRows, QueryResult, QueryResultRow, SQLiteQueryParams} from 'react-native-nitro-sqlite';
 
 // `better-sqlite3` is declared as `export = Database` (CommonJS), so the type is
 // derived from the default import's namespace rather than via a named type import.
-type Database = BetterSqlite3.Database;
-
-type Row = Record<string, unknown>;
-
-type NitroRows<T> = {
-    _array: T[];
-    item: (index: number) => T | undefined;
-    length: number;
-};
-
-type NitroResult<T> = {
-    rows?: NitroRows<T>;
-    rowsAffected: number;
-    insertId?: number;
-};
-
-type BatchQueryCommand = {
-    query: string;
-    params?: unknown[][];
-};
 
 const databases = new Map<string, Database>();
 
@@ -65,7 +46,7 @@ function extractNamedParameterOrder(sql: string): string[] | null {
     return order;
 }
 
-function wrapRows<T extends Row>(rowsArray: T[]): NitroRows<T> {
+function wrapRows<TRow extends QueryResultRow>(rowsArray: TRow[]): NitroSQLiteQueryResultRows<TRow> {
     return {
         _array: rowsArray,
         item: (index: number) => rowsArray[index],
@@ -73,7 +54,7 @@ function wrapRows<T extends Row>(rowsArray: T[]): NitroRows<T> {
     };
 }
 
-function prepareAndBind(database: Database, sql: string, parameters: unknown[]) {
+function prepareAndBind(database: Database, sql: string, parameters?: SQLiteQueryParams) {
     const namedOrder = extractNamedParameterOrder(sql);
     if (namedOrder) {
         // Map positional parameters array to named bindings object — NitroSQLite's
@@ -81,15 +62,16 @@ function prepareAndBind(database: Database, sql: string, parameters: unknown[]) 
         const statement = database.prepare(sql);
         const bindings: Record<string, unknown> = {};
         for (let index = 0; index < namedOrder.length; index++) {
-            bindings[namedOrder[index]] = parameters[index];
+            bindings[namedOrder[index]] = parameters?.[index];
         }
-
+        // `arguments` is a reserved identifier in strict-mode modules, so the binding is
+        // named `boundArguments`.
         return {statement, boundArguments: [bindings] as const};
     }
-    return {statement: database.prepare(sql), boundArguments: parameters};
+    return {statement: database.prepare(sql), boundArguments: parameters ?? []};
 }
 
-function runOne<T extends Row>(database: Database, sql: string, parameters: unknown[] = []): NitroResult<T> {
+function runOne<TRow extends QueryResultRow>(database: Database, sql: string, parameters?: SQLiteQueryParams): QueryResult<TRow> {
     // Multi-statement (CREATE TABLE; SELECT ...; etc.) — better-sqlite3 cannot
     // prepare more than one statement at a time. SQLiteProvider's init() issues
     // each statement separately, so this branch is rarely hit, but keep it
@@ -97,7 +79,7 @@ function runOne<T extends Row>(database: Database, sql: string, parameters: unkn
     const semicolons = (sql.match(/;/g) ?? []).length;
     if (semicolons > 1 || (semicolons === 1 && !sql.trim().endsWith(';'))) {
         database.exec(sql);
-        return {rowsAffected: 0};
+        return {rowsAffected: 0} as QueryResult<TRow>;
     }
 
     const {statement, boundArguments} = prepareAndBind(database, sql, parameters);
@@ -106,15 +88,15 @@ function runOne<T extends Row>(database: Database, sql: string, parameters: unkn
     // result columns (SELECT, read-only PRAGMAs). For setter PRAGMAs and DDL
     // it's false. This is the cleanest way to dispatch correctly.
     if (statement.reader) {
-        const rows = statement.all(...(boundArguments as unknown[])) as T[];
-        return {rows: wrapRows(rows), rowsAffected: 0};
+        const rows = statement.all(...(boundArguments as unknown[])) as TRow[];
+        return {rows: wrapRows(rows), rowsAffected: 0} as QueryResult<TRow>;
     }
 
     const info = statement.run(...(boundArguments as unknown[]));
-    return {rowsAffected: info.changes, insertId: Number(info.lastInsertRowid)};
+    return {rowsAffected: info.changes, insertId: Number(info.lastInsertRowid)} as QueryResult<TRow>;
 }
 
-function makeConnection(name: string) {
+function makeConnection(name: string): Pick<NitroSQLiteConnection, 'execute' | 'executeAsync' | 'executeBatchAsync' | 'close'> {
     let database = databases.get(name);
     if (!database) {
         database = new BetterSqlite3(':memory:');
@@ -123,26 +105,26 @@ function makeConnection(name: string) {
     const connection = database;
 
     return {
-        execute<T extends Row = Row>(sql: string, parameters: unknown[] = []): NitroResult<T> {
-            return runOne<T>(connection, sql, parameters);
+        execute(sql, parameters) {
+            return runOne(connection, sql, parameters);
         },
 
-        executeAsync<T extends Row = Row>(sql: string, parameters: unknown[] = []): Promise<NitroResult<T>> {
+        executeAsync(sql, parameters) {
             try {
-                return Promise.resolve(runOne<T>(connection, sql, parameters));
+                return Promise.resolve(runOne(connection, sql, parameters));
             } catch (error) {
                 return Promise.reject(error);
             }
         },
 
-        executeBatchAsync(commands: BatchQueryCommand[]): Promise<{rowsAffected: number}> {
+        executeBatchAsync(commands) {
             try {
                 let total = 0;
                 connection.transaction(() => {
                     for (const command of commands) {
                         const namedOrder = extractNamedParameterOrder(command.query);
                         const statement = connection.prepare(command.query);
-                        const parameterRows = command.params ?? [];
+                        const parameterRows = (command.params ?? []) as SQLiteQueryParams[];
                         if (parameterRows.length === 0) {
                             const info = statement.run();
                             total += info.changes;
@@ -180,10 +162,6 @@ function open({name}: {name: string}) {
     return makeConnection(name);
 }
 
-function enableSimpleNullHandling() {
-    // no-op; better-sqlite3 already handles null naturally.
-}
-
 /**
  * Test helper — wipe every in-memory DB between tests.
  */
@@ -198,4 +176,4 @@ function resetAllDatabases() {
     databases.clear();
 }
 
-export {open, enableSimpleNullHandling, resetAllDatabases};
+export {open, resetAllDatabases};
