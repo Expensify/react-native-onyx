@@ -192,6 +192,31 @@ describe('SQLiteProvider', () => {
             });
         });
 
+        // RFC 7396 (JSON Merge Patch): a `null` value in the patch removes the key
+        // from the target. SQLite's `JSON_PATCH` implements this directly.
+        it('deletes top-level and nested keys when the merge value is null', async () => {
+            await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY_3, {
+                keepMe: 'still here',
+                removeMe: 'gone soon',
+                outer: {keepInner: 1, removeInner: 2, deeper: {keepDeep: 'a', removeDeep: 'b'}},
+            });
+
+            await SQLiteProvider.multiMerge([
+                [
+                    ONYXKEYS.TEST_KEY_3,
+                    {
+                        removeMe: null,
+                        outer: {removeInner: null, deeper: {removeDeep: null}},
+                    },
+                ],
+            ]);
+
+            expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY_3)).toEqual({
+                keepMe: 'still here',
+                outer: {keepInner: 1, deeper: {keepDeep: 'a'}},
+            });
+        });
+
         // SQLite-specific: the JSON_REPLACE path is what makes `REPLACE_OBJECT_MARK`
         // actually wipe a nested object (JSON_PATCH alone would only merge into it).
         it('fully replaces a nested object marked with REPLACE_OBJECT_MARK via JSON_REPLACE', async () => {
@@ -309,12 +334,16 @@ describe('SQLiteProvider', () => {
     });
 
     describe('getDatabaseSize', () => {
-        it('should get the current size of the store', async () => {
-            await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, {payload: 'x'.repeat(1024)});
-            const size = await SQLiteProvider.getDatabaseSize();
-            expect(size.bytesUsed).toBeGreaterThan(0);
+        it('should report a larger bytesUsed after a write', async () => {
+            // SQLite allocates pages on init (table + WAL), so bytesUsed is non-0 from the
+            // start; assert that a write increases it rather than comparing to 0.
+            const before = await SQLiteProvider.getDatabaseSize();
+            await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, {payload: 'x'.repeat(64 * 1024)});
+            const after = await SQLiteProvider.getDatabaseSize();
+
+            expect(after.bytesUsed).toBeGreaterThan(before.bytesUsed);
             // bytesRemaining comes from the mocked getFreeDiskStorage(): 12345
-            expect(size.bytesRemaining).toBe(12345);
+            expect(after.bytesRemaining).toBe(12345);
         });
     });
 });

@@ -13,7 +13,10 @@
  * Result rows are shaped to match Nitro: `{rows: {_array, item, length}}`.
  */
 import BetterSqlite3 from 'better-sqlite3';
-import type {Database} from 'better-sqlite3';
+
+// `better-sqlite3` is declared as `export = Database` (CommonJS), so the type is
+// derived from the default import's namespace rather than via a named type import.
+type Database = BetterSqlite3.Database;
 
 type Row = Record<string, unknown>;
 
