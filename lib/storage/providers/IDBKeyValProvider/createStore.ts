@@ -33,8 +33,10 @@ function isBudgetedHealError(error: unknown): boolean {
     return isBackingStoreError(error) || isConnectionLostError(error);
 }
 
-function getBudgetedHealErrorLabel(error: unknown): 'backing store' | 'connection lost' {
-    return isBackingStoreError(error) ? 'backing store' : 'connection lost';
+function getBudgetedHealErrorLabel(error: unknown): string {
+    if (isBackingStoreError(error)) return 'backing store';
+    if (isConnectionLostError(error)) return 'connection lost';
+    return 'unknown';
 }
 
 /** Union of all error types indicating a stale/dead IDB connection. Used by the visibilitychange probe. */
