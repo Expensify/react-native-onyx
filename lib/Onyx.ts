@@ -185,13 +185,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
             if (!active) {
                 return;
             }
-            // Legacy semantic: when there's no cached data for the key, fire with
-            // `(undefined, undefined)` as the "no match" signal — matches what the old
-            // `sendDataToConnection(mapping, undefined)` did. When data exists, fire
-            // with `(value, key)`.
-            const hasCache = cache.hasCacheForKey(key);
-            const initial = onyxStore.getState(key);
-            deliverValue(initial, hasCache ? (key as TKey) : (undefined as unknown as TKey));
+            deliverValue(onyxStore.getState(key), key);
         });
     };
 
