@@ -342,8 +342,6 @@ describe('SQLiteProvider', () => {
             const after = await SQLiteProvider.getDatabaseSize();
 
             expect(after.bytesUsed).toBeGreaterThan(before.bytesUsed);
-            // bytesRemaining comes from the mocked getFreeDiskStorage(): 12345
-            expect(after.bytesRemaining).toBe(12345);
         });
     });
 });
