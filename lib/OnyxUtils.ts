@@ -1594,47 +1594,52 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
             // because we will simply overwrite the existing values in storage.
             const keyValuePairsForNewCollection = prepareKeyValuePairsForStorage(newCollection, true);
 
-            const promises = [];
-
-            // We need to get the previously existing values so we can compare the new ones
-            // against them, to avoid unnecessary subscriber updates.
-            const previousCollectionPromise = Promise.all(existingKeys.map((key) => get(key).then((value) => [key, value]))).then(Object.fromEntries);
-
-            // New keys will be added via multiSet while existing keys will be updated using multiMerge
-            // This is because setting a key that doesn't exist yet with multiMerge will throw errors
-            // We can skip this step for RAM-only keys as they should never be saved to storage
-            if (!OnyxKeys.isRamOnlyKey(collectionKey) && keyValuePairsForExistingCollection.length > 0) {
-                promises.push(Storage.multiMerge(keyValuePairsForExistingCollection));
-            }
-
-            // We can skip this step for RAM-only keys as they should never be saved to storage
-            if (!OnyxKeys.isRamOnlyKey(collectionKey) && keyValuePairsForNewCollection.length > 0) {
-                promises.push(Storage.multiSet(keyValuePairsForNewCollection));
-            }
-
             // finalMergedCollection contains all the keys that were merged, without the keys of incompatible updates
             const finalMergedCollection = {...existingKeyCollection, ...newCollection};
 
-            // Prefill cache if necessary by calling get() on any existing keys and then merge original data to cache
-            // and update all subscribers
-            const promiseUpdate = previousCollectionPromise.then((previousCollection) => {
+            // Pre-warm cache for any existing storage keys that aren't yet in cache. get() is a no-op
+            // (sync-resolved) for cache hits, and on a cache miss it reads from storage and writes the
+            // value back to cache. This is required so the subsequent cache.merge() merges the new delta
+            // into the real previous storage value (rather than starting from `undefined` and dropping
+            // the existing keys).
+            return Promise.all(existingKeys.map((key) => get(key))).then(() => {
+                // Snapshot previous values from the (now-warm) cache for keysChanged's diff, then update
+                // cache and notify subscribers synchronously BEFORE issuing storage writes. This matches
+                // the cache-first / storage-second invariant followed by every other Onyx write method
+                // (setWithRetry, applyMerge, setCollectionWithRetry, partialSetCollection, clear),
+                // ensuring subscribers still reflect the merged data even if the subsequent storage
+                // write fails.
+                const previousCollection = getCachedCollection(collectionKey, existingKeys);
                 cache.merge(finalMergedCollection);
                 keysChanged(collectionKey, finalMergedCollection, previousCollection);
-            });
 
-            return Promise.all(promises)
-                .catch((error) =>
-                    retryOperation(
-                        error,
-                        mergeCollectionWithPatches,
-                        {collectionKey, collection: resultCollection as OnyxMergeCollectionInput<TKey>, mergeReplaceNullPatches, isProcessingCollectionUpdate},
-                        retryAttempt,
-                    ),
-                )
-                .then(() => {
-                    sendActionToDevTools(METHOD.MERGE_COLLECTION, undefined, resultCollection);
-                    return promiseUpdate;
-                });
+                const promises = [];
+
+                // New keys will be added via multiSet while existing keys will be updated using multiMerge
+                // This is because setting a key that doesn't exist yet with multiMerge will throw errors
+                // We can skip this step for RAM-only keys as they should never be saved to storage
+                if (!OnyxKeys.isRamOnlyKey(collectionKey) && keyValuePairsForExistingCollection.length > 0) {
+                    promises.push(Storage.multiMerge(keyValuePairsForExistingCollection));
+                }
+
+                // We can skip this step for RAM-only keys as they should never be saved to storage
+                if (!OnyxKeys.isRamOnlyKey(collectionKey) && keyValuePairsForNewCollection.length > 0) {
+                    promises.push(Storage.multiSet(keyValuePairsForNewCollection));
+                }
+
+                return Promise.all(promises)
+                    .catch((error) =>
+                        retryOperation(
+                            error,
+                            mergeCollectionWithPatches,
+                            {collectionKey, collection: resultCollection as OnyxMergeCollectionInput<TKey>, mergeReplaceNullPatches, isProcessingCollectionUpdate},
+                            retryAttempt,
+                        ),
+                    )
+                    .then(() => {
+                        sendActionToDevTools(METHOD.MERGE_COLLECTION, undefined, resultCollection);
+                    });
+            });
         })
         .then(() => undefined);
 }

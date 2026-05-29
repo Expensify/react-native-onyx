@@ -825,6 +825,101 @@ describe('OnyxUtils', () => {
         });
     });
 
+    describe('mergeCollection cache-first ordering', () => {
+        // Save originals so we can restore them after each test. The tests below replace
+        // StorageMock.multiMerge / StorageMock.multiSet with rejecting mocks; without
+        // restoring, the mock leaks into later describe blocks (e.g. eviction tests) whose
+        // setup relies on these storage methods working normally.
+        const originalMultiMerge = StorageMock.multiMerge;
+        const originalMultiSet = StorageMock.multiSet;
+
+        afterEach(() => {
+            StorageMock.multiMerge = originalMultiMerge;
+            StorageMock.multiSet = originalMultiSet;
+        });
+
+        it('updates cache and notifies subscribers even when Storage.multiMerge rejects', async () => {
+            const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
+            const existingMemberKey = `${collectionKey}1`;
+            const newMemberKey = `${collectionKey}2`;
+
+            // Seed an existing member so the merge path exercises multiMerge (existing) + multiSet (new)
+            await Onyx.set(existingMemberKey, {value: 'initial'});
+
+            const collectionCallback = jest.fn();
+            Onyx.connect({
+                key: collectionKey,
+                waitForCollectionCallback: true,
+                callback: collectionCallback,
+            });
+            await waitForPromisesToResolve();
+            collectionCallback.mockClear();
+
+            // Force Storage.multiMerge to reject with a non-retriable IDB error so the failure
+            // path is taken without burning the full retry budget and without rejecting the
+            // outer Onyx.mergeCollection promise.
+            const nonRetriableIdbError = Object.assign(new Error('Internal error opening backing store for indexedDB.open.'), {name: 'UnknownError'});
+            StorageMock.multiMerge = jest.fn().mockRejectedValue(nonRetriableIdbError);
+
+            await Onyx.mergeCollection(collectionKey, {
+                [existingMemberKey]: {value: 'merged'},
+                [newMemberKey]: {value: 'new'},
+            } as GenericCollection);
+
+            // Cache must reflect the merge regardless of the multiMerge rejection. This is the
+            // cache-first / storage-second invariant that mergeCollectionWithPatches must honor.
+            const cachedCollection = OnyxCache.getCollectionData(collectionKey);
+            expect(cachedCollection?.[existingMemberKey]).toEqual({value: 'merged'});
+            expect(cachedCollection?.[newMemberKey]).toEqual({value: 'new'});
+
+            // Subscribers must have been notified with the merged values.
+            expect(collectionCallback).toHaveBeenCalled();
+            const lastBroadcast = collectionCallback.mock.calls.at(-1)?.[0] as Record<string, unknown> | undefined;
+            expect(lastBroadcast?.[existingMemberKey]).toEqual({value: 'merged'});
+            expect(lastBroadcast?.[newMemberKey]).toEqual({value: 'new'});
+        });
+
+        it('updates cache and notifies subscribers even when Storage.multiSet rejects', async () => {
+            const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
+            const newMemberKey1 = `${collectionKey}1`;
+            const newMemberKey2 = `${collectionKey}2`;
+
+            // No keys are seeded, so every merged key is a "new" key. This forces the merge path
+            // to use Storage.multiSet (existing keys would go through Storage.multiMerge).
+            const collectionCallback = jest.fn();
+            Onyx.connect({
+                key: collectionKey,
+                waitForCollectionCallback: true,
+                callback: collectionCallback,
+            });
+            await waitForPromisesToResolve();
+            collectionCallback.mockClear();
+
+            // Force Storage.multiSet to reject with a non-retriable IDB error so the failure
+            // path is taken without burning the full retry budget and without rejecting the
+            // outer Onyx.mergeCollection promise.
+            const nonRetriableIdbError = Object.assign(new Error('Internal error opening backing store for indexedDB.open.'), {name: 'UnknownError'});
+            StorageMock.multiSet = jest.fn().mockRejectedValue(nonRetriableIdbError);
+
+            await Onyx.mergeCollection(collectionKey, {
+                [newMemberKey1]: {value: 'first'},
+                [newMemberKey2]: {value: 'second'},
+            } as GenericCollection);
+
+            // Cache must reflect the merge regardless of the multiSet rejection. This is the
+            // cache-first / storage-second invariant that mergeCollectionWithPatches must honor.
+            const cachedCollection = OnyxCache.getCollectionData(collectionKey);
+            expect(cachedCollection?.[newMemberKey1]).toEqual({value: 'first'});
+            expect(cachedCollection?.[newMemberKey2]).toEqual({value: 'second'});
+
+            // Subscribers must have been notified with the merged values.
+            expect(collectionCallback).toHaveBeenCalled();
+            const lastBroadcast = collectionCallback.mock.calls.at(-1)?.[0] as Record<string, unknown> | undefined;
+            expect(lastBroadcast?.[newMemberKey1]).toEqual({value: 'first'});
+            expect(lastBroadcast?.[newMemberKey2]).toEqual({value: 'second'});
+        });
+    });
+
     describe('storage eviction', () => {
         const diskFullError = new Error('database or disk is full');
 
