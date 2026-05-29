@@ -252,7 +252,7 @@ describe('IDBKeyValProvider', () => {
         beforeEach(() => {
             Object.defineProperty(window.navigator, 'storage', {
                 value: {
-                    estimate: jest.fn().mockResolvedValue({quota: 750000, usage: 250000}),
+                    estimate: jest.fn().mockResolvedValue({quota: 750000, usage: 250000, usageDetails: {caches: 100000, fileSystem: 50000, indexedDB: 100000}}),
                 },
                 configurable: true,
             });
@@ -267,6 +267,7 @@ describe('IDBKeyValProvider', () => {
             expect(await IDBKeyValProvider.getDatabaseSize()).toEqual({
                 bytesUsed: 250000,
                 bytesRemaining: 500000,
+                usageDetails: {caches: 100000, fileSystem: 50000, indexedDB: 100000},
             });
         });
     });

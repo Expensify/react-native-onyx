@@ -795,6 +795,19 @@ describe('OnyxUtils', () => {
             expect(logInfoSpy).toHaveBeenCalledWith(`Storage Quota Check -- bytesUsed: 0 bytesRemaining: Infinity. Original error: ${diskFullError}`);
         });
 
+        it('should include usageDetails in the storage quota log when available', async () => {
+            const logInfoSpy = jest.spyOn(Logger, 'logInfo');
+            const usageDetails = {caches: 1500160, fileSystem: 1369398, indexedDB: 10419711};
+            StorageMock.setItem = jest.fn().mockRejectedValue(diskFullError);
+            StorageMock.getDatabaseSize = jest.fn().mockResolvedValue({bytesUsed: 13289269, bytesRemaining: 5000000, usageDetails});
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+
+            expect(logInfoSpy).toHaveBeenCalledWith(
+                `Storage Quota Check -- bytesUsed: 13289269 bytesRemaining: 5000000 usageDetails: ${JSON.stringify(usageDetails)}. Original error: ${diskFullError}`,
+            );
+        });
+
         it('should include the error in logAlert when out of storage and getDatabaseSize fails', async () => {
             const dbSizeError = new Error('Failed to estimate storage');
             const logAlertSpy = jest.spyOn(Logger, 'logAlert');

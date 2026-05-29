@@ -790,8 +790,12 @@ function remove<TKey extends OnyxKey>(key: TKey, isProcessingCollectionUpdate?: 
 
 function reportStorageQuota(error?: Error): Promise<void> {
     return Storage.getDatabaseSize()
-        .then(({bytesUsed, bytesRemaining}) => {
-            Logger.logInfo(`Storage Quota Check -- bytesUsed: ${bytesUsed} bytesRemaining: ${bytesRemaining}. Original error: ${error}`);
+        .then(({bytesUsed, bytesRemaining, usageDetails}) => {
+            Logger.logInfo(
+                `Storage Quota Check -- bytesUsed: ${bytesUsed} bytesRemaining: ${bytesRemaining}${
+                    usageDetails ? ` usageDetails: ${JSON.stringify(usageDetails)}` : ''
+                }. Original error: ${error}`,
+            );
         })
         .catch((dbSizeError) => {
             Logger.logAlert(`Unable to get database size. getDatabaseSize error: ${dbSizeError}. Original error: ${error}`);
