@@ -769,9 +769,14 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
 /**
  * Remove a key from Onyx and update the subscribers
  */
-function remove<TKey extends OnyxKey>(key: TKey, isProcessingCollectionUpdate?: boolean): Promise<void> {
+function remove<TKey extends OnyxKey>(key: TKey, isProcessingCollectionUpdate?: boolean, skipNotify?: boolean): Promise<void> {
     cache.drop(key);
-    keyChanged(key, undefined as OnyxValue<TKey>, undefined, isProcessingCollectionUpdate);
+    // skipNotify is used by retryOperation's eviction branch — the imminent retry's cache.set
+    // will re-populate cache, so firing keyChanged(undefined) here would only strand subscribers
+    // in the "removed" state across the retry.
+    if (!skipNotify) {
+        keyChanged(key, undefined as OnyxValue<TKey>, undefined, isProcessingCollectionUpdate);
+    }
 
     if (OnyxKeys.isRamOnlyKey(key)) {
         return Promise.resolve();
@@ -797,7 +802,13 @@ function reportStorageQuota(error?: Error): Promise<void> {
  * - Non-retriable errors: logs an alert and resolves without retrying
  * - Other errors: retries the operation
  */
-function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, onyxMethod: TMethod, defaultParams: Parameters<TMethod>[0], retryAttempt: number | undefined): Promise<void> {
+function retryOperation<TMethod extends RetriableOnyxOperation>(
+    error: Error,
+    onyxMethod: TMethod,
+    defaultParams: Parameters<TMethod>[0],
+    retryAttempt: number | undefined,
+    inFlightKeys?: Set<OnyxKey>,
+): Promise<void> {
     const currentRetryAttempt = retryAttempt ?? 0;
     const nextRetryAttempt = currentRetryAttempt + 1;
 
@@ -842,8 +853,12 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, on
     Logger.logInfo(`Out of storage. Evicting least recently accessed key (${keyForRemoval}) and retrying. Error: ${error}`);
     reportStorageQuota(error);
 
+    // Only suppress keyChanged(undefined) when the evicted key is part of the in-flight
+    // write — then cache.set on retry will restore it. For unrelated keys, eviction is a
+    // genuine loss and subscribers must see the removed state.
+    const willBeRestored = inFlightKeys?.has(keyForRemoval) ?? false;
     // @ts-expect-error No overload matches this call.
-    return remove(keyForRemoval).then(() => onyxMethod(defaultParams, nextRetryAttempt));
+    return remove(keyForRemoval, undefined, willBeRestored).then(() => onyxMethod(defaultParams, nextRetryAttempt));
 }
 
 /**
@@ -1395,14 +1410,21 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
             // so re-entrant callbacks (e.g. Onyx.set inside a callback) see consistent cache
             // and subscriber state, matching the original per-key notification semantics.
             cache.set(key, value);
-            keyChanged(key, value);
+            // Skip subscriber notification on retry — already notified on attempt 0.
+            // waitForCollectionCallback subscribers re-fire on every keyChanged by contract.
+            if (!retryAttempt) {
+                keyChanged(key, value);
+            }
         }
     }
 
     // One keysChanged() per collection — fires each collection-level subscriber once and lets
     // keysChanged() internally decide which individual member subscribers need notification.
-    for (const [collectionKey, batch] of collectionBatches) {
-        keysChanged(collectionKey as CollectionKeyBase, batch.partial, batch.previous);
+    // Skip on retry — already notified on attempt 0 (see same-reason comment above).
+    if (!retryAttempt) {
+        for (const [collectionKey, batch] of collectionBatches) {
+            keysChanged(collectionKey as CollectionKeyBase, batch.partial, batch.previous);
+        }
     }
 
     const keyValuePairsToStore = keyValuePairsToSet.filter((keyValuePair) => {
@@ -1411,8 +1433,10 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
         return !OnyxKeys.isRamOnlyKey(key);
     });
 
+    const inFlightKeys = new Set<OnyxKey>(keyValuePairsToSet.map(([key]) => key));
+
     return Storage.multiSet(keyValuePairsToStore)
-        .catch((error) => OnyxUtils.retryOperation(error, multiSetWithRetry, newData, retryAttempt))
+        .catch((error) => OnyxUtils.retryOperation(error, multiSetWithRetry, newData, retryAttempt, inFlightKeys))
         .then(() => {
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MULTI_SET, undefined, newData);
         });
@@ -1476,7 +1500,11 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
 
         for (const [key, value] of keyValuePairs) cache.set(key, value);
 
-        keysChanged(collectionKey, mutableCollection, previousCollection);
+        // Skip subscriber notification on retry — already notified on attempt 0.
+        // waitForCollectionCallback subscribers re-fire on every keysChanged by contract.
+        if (!retryAttempt) {
+            keysChanged(collectionKey, mutableCollection, previousCollection);
+        }
 
         // RAM-only keys are not supposed to be saved to storage
         if (OnyxKeys.isRamOnlyKey(collectionKey)) {
@@ -1484,8 +1512,10 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
             return;
         }
 
+        const inFlightKeys = new Set<OnyxKey>(keyValuePairs.map(([key]) => key));
+
         return Storage.multiSet(keyValuePairs)
-            .catch((error) => OnyxUtils.retryOperation(error, setCollectionWithRetry, {collectionKey, collection}, retryAttempt))
+            .catch((error) => OnyxUtils.retryOperation(error, setCollectionWithRetry, {collectionKey, collection}, retryAttempt, inFlightKeys))
             .then(() => {
                 OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET_COLLECTION, undefined, mutableCollection);
             });
@@ -1611,7 +1641,11 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
                 // write fails.
                 const previousCollection = getCachedCollection(collectionKey, existingKeys);
                 cache.merge(finalMergedCollection);
-                keysChanged(collectionKey, finalMergedCollection, previousCollection);
+                // Skip subscriber notification on retry — already notified on attempt 0.
+                // waitForCollectionCallback subscribers re-fire on every keysChanged by contract.
+                if (!retryAttempt) {
+                    keysChanged(collectionKey, finalMergedCollection, previousCollection);
+                }
 
                 const promises = [];
 
@@ -1627,6 +1661,8 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
                     promises.push(Storage.multiSet(keyValuePairsForNewCollection));
                 }
 
+                const inFlightKeys = new Set<OnyxKey>(Object.keys(finalMergedCollection));
+
                 return Promise.all(promises)
                     .catch((error) =>
                         retryOperation(
@@ -1634,6 +1670,7 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
                             mergeCollectionWithPatches,
                             {collectionKey, collection: resultCollection as OnyxMergeCollectionInput<TKey>, mergeReplaceNullPatches, isProcessingCollectionUpdate},
                             retryAttempt,
+                            inFlightKeys,
                         ),
                     )
                     .then(() => {
@@ -1690,15 +1727,21 @@ function partialSetCollection<TKey extends CollectionKeyBase>({collectionKey, co
 
         for (const [key, value] of keyValuePairs) cache.set(key, value);
 
-        keysChanged(collectionKey, mutableCollection, previousCollection);
+        // Skip subscriber notification on retry — already notified on attempt 0.
+        // waitForCollectionCallback subscribers re-fire on every keysChanged by contract.
+        if (!retryAttempt) {
+            keysChanged(collectionKey, mutableCollection, previousCollection);
+        }
 
         if (OnyxKeys.isRamOnlyKey(collectionKey)) {
             sendActionToDevTools(METHOD.SET_COLLECTION, undefined, mutableCollection);
             return;
         }
 
+        const inFlightKeys = new Set<OnyxKey>(keyValuePairs.map(([key]) => key));
+
         return Storage.multiSet(keyValuePairs)
-            .catch((error) => retryOperation(error, partialSetCollection, {collectionKey, collection}, retryAttempt))
+            .catch((error) => retryOperation(error, partialSetCollection, {collectionKey, collection}, retryAttempt, inFlightKeys))
             .then(() => {
                 sendActionToDevTools(METHOD.SET_COLLECTION, undefined, mutableCollection);
             });
