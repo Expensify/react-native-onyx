@@ -1,5 +1,5 @@
-import {deepEqual} from 'fast-equals';
 import {useCallback, useMemo, useRef, useSyncExternalStore} from 'react';
+import createMemoizedSelector from './createMemoizedSelector';
 import onyxStore from './OnyxStore';
 import type {OnyxKey, OnyxValue} from './types';
 
@@ -34,34 +34,6 @@ type ResultMetadata = {
 };
 
 type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata];
-
-/**
- * Wraps a user-provided selector so that:
- * - Calling the wrapper with the same input reference twice short-circuits to the cached output.
- * - Calling with a different input that produces a deep-equal output returns the *previous*
- *   output reference, so React reconciliation can detect equality with `===`.
- *
- * This is the minimum needed for `useSyncExternalStore` to not loop when consumers pass
- * inline selectors that allocate fresh objects on every call.
- */
-function createMemoizedSelector<TKey extends OnyxKey, TReturnValue>(selector: UseOnyxSelector<TKey, TReturnValue>): UseOnyxSelector<TKey, TReturnValue> {
-    let lastInput: OnyxValue<TKey> | undefined;
-    let lastOutput: TReturnValue;
-    let hasComputed = false;
-
-    return (input) => {
-        if (hasComputed && lastInput === input) {
-            return lastOutput;
-        }
-        const next = selector(input);
-        lastInput = input;
-        if (!hasComputed || !deepEqual(lastOutput, next)) {
-            lastOutput = next;
-            hasComputed = true;
-        }
-        return lastOutput;
-    };
-}
 
 const LOADED_METADATA: ResultMetadata = {status: 'loaded'};
 
