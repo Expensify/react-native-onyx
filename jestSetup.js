@@ -5,7 +5,6 @@ jest.mock('./lib/storage/platforms/index', () => require('./lib/storage/__mocks_
 jest.mock('react-native-device-info', () => ({getFreeDiskStorage: () => {}}));
 jest.mock('react-native-nitro-sqlite', () => ({
     open: () => ({execute: () => {}}),
-    enableSimpleNullHandling: () => undefined,
 }));
 
 jest.useRealTimers();
