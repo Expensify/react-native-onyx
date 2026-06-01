@@ -40,6 +40,16 @@ type Connection = {
     unsubscribe: () => void;
 };
 
+/**
+ * Shared sentinel for "nothing delivered yet" in `connect()`'s per-subscription dedup.
+ * A unique Symbol can't collide with any real Onyx value, so the first `Object.is` check
+ * never matches and the initial fire always runs — even for a key whose genuine first
+ * value is `undefined`. It only needs to be distinct from real values, not unique per
+ * subscription, so a single module-level instance is reused by every connection.
+ */
+// eslint-disable-next-line rulesdir/no-negated-variables
+const NOT_DELIVERED = Symbol('NOT_DELIVERED');
+
 /** Initialize the store with actions and listening for storage events */
 function init({
     keys = {},
@@ -147,7 +157,6 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
             // snapshot refs. Initial fire always delivers the current snapshot (frozen `{}`
             // for an empty-but-known collection, `undefined` only if the collection key has
             // not been seen yet).
-            const NOT_DELIVERED = Symbol('NOT_DELIVERED');
             let lastDeliveredSnapshot: unknown = NOT_DELIVERED;
             const deliverSnapshot = (rawSnapshot: OnyxValue<TKey> | undefined, k: TKey) => {
                 if (Object.is(lastDeliveredSnapshot, rawSnapshot)) {
@@ -169,7 +178,6 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
         }
 
         // Non-collection key (or a specific collection member) — single-value subscription.
-        const NOT_DELIVERED = Symbol('NOT_DELIVERED');
         let lastDelivered: unknown = NOT_DELIVERED;
         const deliverValue = (value: OnyxValue<TKey>, k: TKey | undefined) => {
             if (Object.is(lastDelivered, value)) {
