@@ -63,6 +63,61 @@ describe('Onyx', () => {
         return Onyx.clear();
     });
 
+    describe('writing to a collection key directly is blocked', () => {
+        it('should warn and no-op when Onyx.set is called with a collection key', async () => {
+            const logAlertSpy = jest.spyOn(Logger, 'logAlert').mockImplementation(() => {});
+
+            await Onyx.set(ONYX_KEYS.COLLECTION.TEST_KEY, {foo: 'bar'} as unknown as GenericCollection);
+
+            expect(logAlertSpy).toHaveBeenCalledWith(expect.stringContaining(ONYX_KEYS.COLLECTION.TEST_KEY));
+            // Nothing should have been written to the bare collection key.
+            expect(cache.get(ONYX_KEYS.COLLECTION.TEST_KEY)).toBeUndefined();
+            logAlertSpy.mockRestore();
+        });
+
+        it('should warn and no-op when Onyx.merge is called with a collection key', async () => {
+            const logAlertSpy = jest.spyOn(Logger, 'logAlert').mockImplementation(() => {});
+
+            await Onyx.merge(ONYX_KEYS.COLLECTION.TEST_KEY, {foo: 'bar'} as unknown as GenericCollection);
+
+            expect(logAlertSpy).toHaveBeenCalledWith(expect.stringContaining(ONYX_KEYS.COLLECTION.TEST_KEY));
+            expect(cache.get(ONYX_KEYS.COLLECTION.TEST_KEY)).toBeUndefined();
+            logAlertSpy.mockRestore();
+        });
+
+        it('should strip collection keys from Onyx.multiSet while still applying the other keys', async () => {
+            const logAlertSpy = jest.spyOn(Logger, 'logAlert').mockImplementation(() => {});
+
+            await Onyx.multiSet({
+                [ONYX_KEYS.COLLECTION.TEST_KEY]: {} as unknown,
+                [ONYX_KEYS.OTHER_TEST]: 7,
+            } as unknown as Parameters<typeof Onyx.multiSet>[0]);
+
+            expect(logAlertSpy).toHaveBeenCalledWith(expect.stringContaining(ONYX_KEYS.COLLECTION.TEST_KEY));
+            // The collection key is dropped, but the regular key is still written.
+            expect(cache.get(ONYX_KEYS.COLLECTION.TEST_KEY)).toBeUndefined();
+            expect(cache.get(ONYX_KEYS.OTHER_TEST)).toEqual(7);
+            logAlertSpy.mockRestore();
+        });
+
+        it('should not surface a phantom member in the collection snapshot after a blocked write', async () => {
+            const connectionCallback = jest.fn();
+            connection = Onyx.connect({
+                key: ONYX_KEYS.COLLECTION.TEST_KEY,
+                waitForCollectionCallback: true,
+                callback: connectionCallback,
+            });
+            await waitForPromisesToResolve();
+
+            await Onyx.set(ONYX_KEYS.COLLECTION.TEST_KEY, {foo: 'bar'} as unknown as GenericCollection);
+            await waitForPromisesToResolve();
+
+            // The blocked write must not appear as a `{test_: ...}` member.
+            const lastSnapshot = connectionCallback.mock.calls.at(-1)?.[0];
+            expect(lastSnapshot ?? {}).not.toHaveProperty(ONYX_KEYS.COLLECTION.TEST_KEY);
+        });
+    });
+
     it('should remove key value from OnyxCache/Storage when set is called with null value', () =>
         Onyx.set(ONYX_KEYS.OTHER_TEST, 42)
             .then(() => OnyxUtils.getAllKeys())

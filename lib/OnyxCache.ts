@@ -409,6 +409,14 @@ class OnyxCache {
             if (needsPrefixCheck && OnyxKeys.getCollectionKey(key) !== collectionKey) {
                 continue;
             }
+            // Never treat the collection root key itself as a member. A direct write to a
+            // collection key (e.g. `Onyx.set('report_', ...)`, an unsupported anti-pattern)
+            // lands in storageMap under the prefix key, and `getCollectionKey('report_')`
+            // returns `'report_'` — which would otherwise match here and surface a phantom
+            // `{report_: ...}` member. Members live at `report_<id>`, never at the bare prefix.
+            if (key === collectionKey) {
+                continue;
+            }
             const val = this.storageMap[key];
             // Skip null/undefined values — they represent deleted or unset keys
             // and should not be included in the frozen collection snapshot.

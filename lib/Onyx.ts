@@ -241,6 +241,13 @@ function disconnect(connection: Connection): void {
  * @param options optional configuration object
  */
 function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options?: SetOptions): Promise<void> {
+    // A value cannot be written directly to a collection key — members live at `${key}<id>`.
+    // Writing the bare prefix pollutes the collection snapshot (it would surface as a phantom
+    // member). Warn and no-op; use `setCollection()`/a member key instead.
+    if (OnyxKeys.isCollectionKey(key)) {
+        Logger.logAlert(logMessages.collectionKeyWriteAlert(key, 'Onyx.set'));
+        return Promise.resolve();
+    }
     return OnyxUtils.afterInit(() => OnyxUtils.setWithRetry({key, value, options}));
 }
 
@@ -252,7 +259,21 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options
  * @param data object keyed by ONYXKEYS and the values to set
  */
 function multiSet(data: OnyxMultiSetInput): Promise<void> {
-    return OnyxUtils.afterInit(() => OnyxUtils.multiSetWithRetry(data));
+    // Drop any entries targeting a bare collection key (see `set()` — same anti-pattern).
+    // Single pass with no allocation on the common path: only clone (once) when an offending
+    // key is actually present, then delete the offenders from the clone.
+    let sanitizedData: OnyxMultiSetInput | undefined;
+    for (const key of Object.keys(data)) {
+        if (!OnyxKeys.isCollectionKey(key)) {
+            continue;
+        }
+        Logger.logAlert(logMessages.collectionKeyWriteAlert(key, 'Onyx.multiSet'));
+        if (!sanitizedData) {
+            sanitizedData = {...data};
+        }
+        delete sanitizedData[key];
+    }
+    return OnyxUtils.afterInit(() => OnyxUtils.multiSetWithRetry(sanitizedData ?? data));
 }
 
 /**
@@ -272,6 +293,12 @@ function multiSet(data: OnyxMultiSetInput): Promise<void> {
  * Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Workspace'}
  */
 function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): Promise<void> {
+    // A value cannot be merged directly into a collection key — see `set()`. Warn and no-op;
+    // use `mergeCollection()` for collections, or target an individual member key.
+    if (OnyxKeys.isCollectionKey(key)) {
+        Logger.logAlert(logMessages.collectionKeyWriteAlert(key, 'Onyx.merge'));
+        return Promise.resolve();
+    }
     return OnyxUtils.afterInit(() => {
         const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
         if (skippableCollectionMemberIDs.size) {

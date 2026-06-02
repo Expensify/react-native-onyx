@@ -172,10 +172,28 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
         return acc;
     }, new Set<OnyxKey>());
 
-    // Set our default key states to use when initializing and clearing Onyx data
-    defaultKeyStates = initialKeyStates;
+    // Reject any initial state targeting a bare collection key (e.g. `initialKeyStates: {[COLLECTION.X]: ...}`).
+    // It's the same anti-pattern as `Onyx.set/merge` on a collection key — a value written to the bare prefix
+    // pollutes the collection snapshot as a phantom member. Warn and strip it; member defaults belong on
+    // `${COLLECTION.X}<id>` keys. Filtered against the locally-computed collection key set (no dependency on
+    // OnyxKeys init ordering), single pass, cloning only when an offending key is actually present.
+    let sanitizedInitialKeyStates: Partial<KeyValueMapping> | undefined;
+    for (const key of Object.keys(initialKeyStates)) {
+        if (!collectionKeySet.has(key)) {
+            continue;
+        }
+        Logger.logAlert(logMessages.collectionKeyWriteAlert(key, 'Onyx.init initialKeyStates'));
+        if (!sanitizedInitialKeyStates) {
+            sanitizedInitialKeyStates = {...initialKeyStates};
+        }
+        delete sanitizedInitialKeyStates[key];
+    }
+    const resolvedInitialKeyStates = sanitizedInitialKeyStates ?? initialKeyStates;
 
-    DevTools.initState(initialKeyStates);
+    // Set our default key states to use when initializing and clearing Onyx data
+    defaultKeyStates = resolvedInitialKeyStates;
+
+    DevTools.initState(resolvedInitialKeyStates);
 
     // Let Onyx know about which keys are safe to evict
     cache.setEvictionAllowList(evictableKeys);
