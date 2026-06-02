@@ -7,6 +7,7 @@ type StorageKeyList = OnyxKey[];
 type DatabaseSize = {
     bytesUsed: number;
     bytesRemaining: number;
+    usageDetails?: Record<string, number>;
 };
 
 type OnStorageKeyChanged = <TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>) => void;
