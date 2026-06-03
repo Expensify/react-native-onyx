@@ -10,7 +10,7 @@ const HEAL_ATTEMPTS_MAX = 3;
  * internal recovery (RepairDB -> delete -> recreate) also fails.
  */
 function isBackingStoreError(error: unknown): boolean {
-    return error instanceof Error && error.message.includes('Internal error opening backing store');
+    return (error instanceof Error || error instanceof DOMException) && (error as Error).message.includes('Internal error opening backing store');
 }
 
 /**
@@ -19,13 +19,13 @@ function isBackingStoreError(error: unknown): boolean {
  * WebKit bugs: https://bugs.webkit.org/show_bug.cgi?id=197050, https://bugs.webkit.org/show_bug.cgi?id=201483
  */
 function isConnectionLostError(error: unknown): boolean {
-    if (!(error instanceof Error)) return false;
-    const msg = error.message.toLowerCase();
+    if (!(error instanceof Error || error instanceof DOMException)) return false;
+    const msg = (error as Error).message.toLowerCase();
     return msg.includes('connection to indexed database server lost') || msg.includes('connection is closing');
 }
 
 function isInvalidStateError(error: unknown): boolean {
-    return error instanceof Error && error.name === 'InvalidStateError';
+    return (error instanceof Error || error instanceof DOMException) && (error as Error).name === 'InvalidStateError';
 }
 
 /** Errors that trigger a budgeted heal-and-retry in store(). */
@@ -33,8 +33,10 @@ function isBudgetedHealError(error: unknown): boolean {
     return isBackingStoreError(error) || isConnectionLostError(error);
 }
 
-function getBudgetedHealErrorLabel(error: unknown): 'backing store' | 'connection lost' {
-    return isBackingStoreError(error) ? 'backing store' : 'connection lost';
+function getBudgetedHealErrorLabel(error: unknown): string {
+    if (isBackingStoreError(error)) return 'backing store';
+    if (isConnectionLostError(error)) return 'connection lost';
+    return 'unknown';
 }
 
 /** Union of all error types indicating a stale/dead IDB connection. Used by the visibilitychange probe. */

@@ -156,6 +156,7 @@ const provider: StorageProvider<UseStore | undefined> = {
             .then((value) => ({
                 bytesUsed: value.usage ?? 0,
                 bytesRemaining: (value.quota ?? 0) - (value.usage ?? 0),
+                usageDetails: (value as StorageEstimate & {usageDetails?: Record<string, number>}).usageDetails,
             }))
             .catch((error) => {
                 throw new Error(`Unable to estimate web storage quota. Original error: ${error}`);

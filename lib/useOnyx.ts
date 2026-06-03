@@ -124,10 +124,10 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     // Cache the options key to avoid regenerating it every getSnapshot call
     const cacheKey = useMemo(
         () =>
-            onyxSnapshotCache.registerConsumer({
+            onyxSnapshotCache.registerConsumer(key, {
                 selector: options?.selector,
             }),
-        [options?.selector],
+        [key, options?.selector],
     );
 
     useEffect(() => () => onyxSnapshotCache.deregisterConsumer(key, cacheKey), [key, cacheKey]);
