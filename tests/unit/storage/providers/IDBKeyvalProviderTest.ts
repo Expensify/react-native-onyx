@@ -174,6 +174,52 @@ describe('IDBKeyValProvider', () => {
         });
     });
 
+    describe('write-error normalization (aborted transactions)', () => {
+        // A write transaction aborted by something other than its own request (connection close,
+        // versionchange, a sibling transaction) leaves `transaction.error === null`. idb-keyval
+        // rejects with that null, which is unclassifiable: it slips past createStore's heal guards
+        // (they require an Error/DOMException) and renders as the production log line
+        // "[Onyx] Failed to save to storage. Error: null". Every write path must instead reject
+        // with a real Error so the failure can be classified and retried sanely.
+        function abortTransactionOnPut() {
+            const originalPut = IDBObjectStore.prototype.put;
+            jest.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function put(this: IDBObjectStore, ...args: Parameters<IDBObjectStore['put']>) {
+                const request = originalPut.apply(this, args);
+                this.transaction.abort();
+                return request;
+            });
+        }
+
+        function expectAbortError(error: unknown) {
+            expect(error).not.toBeNull();
+            expect(error).toBeInstanceOf(DOMException);
+            expect((error as DOMException).name).toBe('AbortError');
+            expect((error as DOMException).message.length).toBeGreaterThan(0);
+        }
+
+        afterEach(() => {
+            jest.restoreAllMocks();
+        });
+
+        it('setItem rejects with a tagged AbortError, never null', async () => {
+            abortTransactionOnPut();
+            const error = await IDBKeyValProvider.setItem(ONYXKEYS.TEST_KEY, 'value').catch((e: unknown) => e);
+            expectAbortError(error);
+        });
+
+        it('multiSet rejects with a tagged AbortError, never null', async () => {
+            abortTransactionOnPut();
+            const error = await IDBKeyValProvider.multiSet([[ONYXKEYS.TEST_KEY, 'value']]).catch((e: unknown) => e);
+            expectAbortError(error);
+        });
+
+        it('multiMerge rejects with a tagged AbortError, never null', async () => {
+            abortTransactionOnPut();
+            const error = await IDBKeyValProvider.multiMerge([[ONYXKEYS.TEST_KEY, 'value']]).catch((e: unknown) => e);
+            expectAbortError(error);
+        });
+    });
+
     describe('mergeItem', () => {
         it('should merge all the supported kinds of data correctly', async () => {
             await IDB.set(ONYXKEYS.TEST_KEY, 'value', IDBKeyValProvider.store);
