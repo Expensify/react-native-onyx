@@ -172,6 +172,11 @@ describe('IDBKeyValProvider', () => {
                 ),
             ).toEqual(expectedEntries.map((e) => (e[1] === null ? undefined : e[1])));
         });
+
+        it('should insert a new record when key does not exist', async () => {
+            await IDBKeyValProvider.multiMerge([[ONYXKEYS.TEST_KEY_2, {fresh: true}]]);
+            expect(await IDBKeyValProvider.getItem(ONYXKEYS.TEST_KEY_2)).toEqual({fresh: true});
+        });
     });
 
     describe('mergeItem', () => {

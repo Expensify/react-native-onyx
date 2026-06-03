@@ -1566,12 +1566,65 @@ describe('OnyxUtils', () => {
 
             await LocalOnyx.multiSet({[memberKey]: {value: 'updated'}});
 
-            // The in-flight key was evicted then restored by the retry's cache.set. Subscriber's
-            // last value must be the new value, never a transient undefined from the eviction.
+            // The in-flight key is excluded from eviction, so its cache value (the merge base) is
+            // never dropped. Subscriber's last value is the new value, never a transient undefined.
             expect(LocalOnyxCache.get(memberKey)).toEqual({value: 'updated'});
             expect(subscriberCalls.at(-1)).toEqual({value: 'updated'});
             // Subscriber should never have seen undefined in the middle of the eviction-retry cycle.
             expect(subscriberCalls).not.toContain(undefined);
+        });
+
+        it('mergeCollection — evicts an unrelated key, not the in-flight key, so its fields survive', async () => {
+            const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
+            const memberKey = `${collectionKey}1`;
+            const unrelatedKey = `${collectionKey}2`;
+
+            // Seed the in-flight member with extra fields, plus a separate evictable key. The merge
+            // only touches memberKey; the unrelated key is the genuine eviction target.
+            await LocalOnyx.set(memberKey, {id: 1, value: 'orig'});
+            await LocalOnyx.set(unrelatedKey, {value: 'evict-me'});
+
+            const memberCalls: unknown[] = [];
+            LocalOnyx.connect({key: memberKey, callback: (value) => memberCalls.push(value)});
+            await waitForPromisesToResolve();
+            memberCalls.length = 0;
+
+            // Storage.multiMerge rejects once with disk-full, then succeeds on retry.
+            LocalStorageMock.multiMerge = jest.fn(LocalStorageMock.multiMerge).mockRejectedValueOnce(diskFullError).mockImplementation(LocalStorageMock.multiMerge);
+
+            await LocalOnyx.mergeCollection(collectionKey, {[memberKey]: {value: 'merged'}} as GenericCollection);
+
+            // The old code evicted the in-flight key and re-ran the merge against an empty cache,
+            // collapsing {id: 1, value: 'orig'} + {value: 'merged'} to just {value: 'merged'}. Now
+            // the in-flight key is protected, so its pre-existing {id: 1} survives.
+            expect(LocalOnyxCache.get(memberKey)).toEqual({id: 1, value: 'merged'});
+            expect(memberCalls.at(-1)).toEqual({id: 1, value: 'merged'});
+            expect(memberCalls).not.toContain(undefined);
+            // The unrelated key was the genuine eviction target.
+            expect(LocalOnyxCache.hasCacheForKey(unrelatedKey)).toBe(false);
+        });
+
+        it('mergeCollection — does not truncate the in-flight key when it is the only evictable key', async () => {
+            const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
+            const memberKey = `${collectionKey}1`;
+
+            await LocalOnyx.set(memberKey, {id: 1, value: 'orig'});
+            expect(LocalOnyxCache.getKeyForEviction()).toBe(memberKey);
+
+            const memberCalls: unknown[] = [];
+            LocalOnyx.connect({key: memberKey, callback: (value) => memberCalls.push(value)});
+            await waitForPromisesToResolve();
+            memberCalls.length = 0;
+
+            // The only evictable key is the in-flight one, which is now excluded — so retryOperation
+            // finds no acceptable key and reports the quota instead of dropping (and truncating) it.
+            LocalStorageMock.multiMerge = jest.fn(LocalStorageMock.multiMerge).mockRejectedValue(diskFullError);
+
+            await LocalOnyx.mergeCollection(collectionKey, {[memberKey]: {value: 'merged'}} as GenericCollection);
+
+            expect(LocalOnyxCache.get(memberKey)).toEqual({id: 1, value: 'merged'});
+            expect(memberCalls.at(-1)).toEqual({id: 1, value: 'merged'});
+            expect(memberCalls).not.toContain(undefined);
         });
     });
 

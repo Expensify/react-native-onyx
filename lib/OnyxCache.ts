@@ -362,11 +362,18 @@ class OnyxCache {
 
     /**
      * Finds the least recently accessed key that can be safely evicted from storage.
+     * `excludeKeys` skips keys that must not be evicted (e.g. the in-flight write's own keys,
+     * whose cache value is the merge base the retry depends on).
      */
-    getKeyForEviction(): OnyxKey | undefined {
+    getKeyForEviction(excludeKeys?: Set<OnyxKey>): OnyxKey | undefined {
         // recentlyAccessedKeys is ordered from least to most recently accessed,
-        // so the first element is the best candidate for eviction.
-        return this.recentlyAccessedKeys.values().next().value;
+        // so the first non-excluded key is the best candidate for eviction.
+        for (const key of this.recentlyAccessedKeys) {
+            if (!excludeKeys?.has(key)) {
+                return key;
+            }
+        }
+        return undefined;
     }
 
     /**

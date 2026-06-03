@@ -777,14 +777,9 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
 /**
  * Remove a key from Onyx and update the subscribers
  */
-function remove<TKey extends OnyxKey>(key: TKey, isProcessingCollectionUpdate?: boolean, skipNotify?: boolean): Promise<void> {
+function remove<TKey extends OnyxKey>(key: TKey, isProcessingCollectionUpdate?: boolean): Promise<void> {
     cache.drop(key);
-    // skipNotify is used by retryOperation's eviction branch — the imminent retry's cache.set
-    // will re-populate cache, so firing keyChanged(undefined) here would only strand subscribers
-    // in the "removed" state across the retry.
-    if (!skipNotify) {
-        keyChanged(key, undefined as OnyxValue<TKey>, undefined, isProcessingCollectionUpdate);
-    }
+    keyChanged(key, undefined as OnyxValue<TKey>, undefined, isProcessingCollectionUpdate);
 
     if (OnyxKeys.isRamOnlyKey(key)) {
         return Promise.resolve();
@@ -851,8 +846,10 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(
         return onyxMethod(defaultParams, nextRetryAttempt);
     }
 
-    // Find the least recently accessed evictable key that we can remove
-    const keyForRemoval = cache.getKeyForEviction();
+    // Find the least recently accessed evictable key that we can remove. Never evict an in-flight
+    // key — its cache value is the merge base this retry depends on, so dropping it would truncate
+    // the write to just the delta and diverge cache from storage.
+    const keyForRemoval = cache.getKeyForEviction(inFlightKeys);
     if (!keyForRemoval) {
         // If we have no acceptable keys to remove then we are possibly trying to save mission critical data. If this is the case,
         // then we should stop retrying as there is not much the user can do to fix this. Instead of getting them stuck in an infinite loop we
@@ -865,12 +862,10 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(
     Logger.logInfo(`Out of storage. Evicting least recently accessed key (${keyForRemoval}) and retrying. Error: ${error}`);
     reportStorageQuota(error);
 
-    // Only suppress keyChanged(undefined) when the evicted key is part of the in-flight
-    // write — then cache.set on retry will restore it. For unrelated keys, eviction is a
-    // genuine loss and subscribers must see the removed state.
-    const willBeRestored = inFlightKeys?.has(keyForRemoval) ?? false;
+    // The evicted key is never in-flight (excluded above), so this is a genuine removal —
+    // subscribers must see the removed state.
     // @ts-expect-error No overload matches this call.
-    return remove(keyForRemoval, undefined, willBeRestored).then(() => onyxMethod(defaultParams, nextRetryAttempt));
+    return remove(keyForRemoval).then(() => onyxMethod(defaultParams, nextRetryAttempt));
 }
 
 /**
@@ -1666,8 +1661,9 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
 
                 const promises = [];
 
-                // New keys will be added via multiSet while existing keys will be updated using multiMerge
-                // This is because setting a key that doesn't exist yet with multiMerge will throw errors
+                // New keys go through multiSet and existing keys through multiMerge. multiMerge on a
+                // missing key stores the value just like multiSet across all backends; splitting them lets
+                // multiSet strip nested nulls (the merge layer keeps them to delete nested storage keys).
                 // We can skip this step for RAM-only keys as they should never be saved to storage
                 if (!OnyxKeys.isRamOnlyKey(collectionKey) && keyValuePairsForExistingCollection.length > 0) {
                     promises.push(Storage.multiMerge(keyValuePairsForExistingCollection));
