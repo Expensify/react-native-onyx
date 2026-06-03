@@ -6,8 +6,8 @@ import * as Logger from './Logger';
 import type Onyx from './Onyx';
 import cache, {TASK} from './OnyxCache';
 import OnyxKeys from './OnyxKeys';
-import * as Str from './Str';
 import Storage from './storage';
+import {StorageErrorClass, classifyStorageError} from './storage/errors';
 import type {
     CollectionKeyBase,
     ConnectOptions,
@@ -48,26 +48,6 @@ const METHOD = {
     MULTI_SET: 'multiset',
     CLEAR: 'clear',
 } as const;
-
-// IndexedDB errors that indicate storage capacity issues where eviction can help
-const IDB_STORAGE_ERRORS = [
-    'quotaexceedederror', // Browser storage quota exceeded
-] as const;
-
-// SQLite errors that indicate storage capacity issues where eviction can help
-const SQLITE_STORAGE_ERRORS = [
-    'database or disk is full', // Device storage is full
-] as const;
-
-const STORAGE_ERRORS = [...IDB_STORAGE_ERRORS, ...SQLITE_STORAGE_ERRORS];
-
-// IndexedDB errors where retrying is futile because the underlying connection/store is broken.
-// The healing path (separate from retryOperation) is responsible for recovery.
-const IDB_NON_RETRIABLE_ERRORS = [
-    'internal error opening backing store', // LevelDB backing store is broken at the filesystem level
-] as const;
-
-const NON_RETRIABLE_ERRORS = [...IDB_NON_RETRIABLE_ERRORS];
 
 // Max number of retries for failed storage operations
 const MAX_STORAGE_OPERATION_RETRY_ATTEMPTS = 5;
@@ -791,8 +771,11 @@ function remove<TKey extends OnyxKey>(key: TKey, isProcessingCollectionUpdate?: 
 function reportStorageQuota(error?: Error): Promise<void> {
     return Storage.getDatabaseSize()
         .then(({bytesUsed, bytesRemaining, usageDetails}) => {
+            // `bytesRemaining` comes from navigator.storage.estimate() and is an ORIGIN-WIDE estimate,
+            // not headroom for this database. The browser allocates IndexedDB storage dynamically, so a
+            // QuotaExceededError can legitimately occur even when this number still looks large.
             Logger.logInfo(
-                `Storage Quota Check -- bytesUsed: ${bytesUsed} bytesRemaining: ${bytesRemaining}${
+                `Storage Quota Check -- bytesUsed: ${bytesUsed} originWideBytesRemaining (estimate, not per-DB headroom): ${bytesRemaining}${
                     usageDetails ? ` usageDetails: ${JSON.stringify(usageDetails)}` : ''
                 }. Original error: ${error}`,
             );
@@ -803,39 +786,39 @@ function reportStorageQuota(error?: Error): Promise<void> {
 }
 
 /**
- * Handles storage operation failures based on the error type:
- * - Storage capacity errors: evicts data and retries the operation
- * - Invalid data errors: logs an alert and throws an error
- * - Non-retriable errors: logs an alert and resolves without retrying
- * - Other errors: retries the operation
+ * Handles storage operation failures based on the error class (see lib/storage/errors.ts).
+ * The connection layer (createStore) owns connection/transport recovery; this operation layer owns
+ * capacity recovery (eviction) so that a given failure is retried by exactly one layer:
+ * - INVALID_DATA: logs an alert and throws (the same data will always fail).
+ * - TRANSIENT / FATAL: the connection layer already retried (transient) or exhausted its heal budget
+ *   and alerted (fatal). Retrying here would only re-amplify, so we skip the write quietly.
+ * - CAPACITY: evicts the least recently accessed evictable key and retries.
+ * - UNKNOWN: bounded retry.
  */
 function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, onyxMethod: TMethod, defaultParams: Parameters<TMethod>[0], retryAttempt: number | undefined): Promise<void> {
     const currentRetryAttempt = retryAttempt ?? 0;
     const nextRetryAttempt = currentRetryAttempt + 1;
+    const errorClass = classifyStorageError(error);
 
-    Logger.logInfo(`Failed to save to storage. Error: ${error}. onyxMethod: ${onyxMethod.name}. retryAttempt: ${currentRetryAttempt}/${MAX_STORAGE_OPERATION_RETRY_ATTEMPTS}`);
+    Logger.logInfo(`Failed to save to storage. Error: ${error}. class: ${errorClass}. onyxMethod: ${onyxMethod.name}. retryAttempt: ${currentRetryAttempt}/${MAX_STORAGE_OPERATION_RETRY_ATTEMPTS}`);
 
-    if (error && Str.startsWith(error.message, "Failed to execute 'put' on 'IDBObjectStore'")) {
+    if (errorClass === StorageErrorClass.INVALID_DATA) {
         Logger.logAlert(`Attempted to set invalid data set in Onyx. Please ensure all data is serializable. Error: ${error}`);
         throw error;
     }
 
-    const errorMessage = error?.message?.toLowerCase?.();
-    const errorName = error?.name?.toLowerCase?.();
-    const isStorageCapacityError = STORAGE_ERRORS.some((storageError) => errorName?.includes(storageError) || errorMessage?.includes(storageError));
-    const isNonRetriableError = NON_RETRIABLE_ERRORS.some((nonRetriableError) => errorName?.includes(nonRetriableError) || errorMessage?.includes(nonRetriableError));
-
-    if (isNonRetriableError) {
-        Logger.logAlert(`Storage operation skipped retry for non-retriable error. Error: ${error}. onyxMethod: ${onyxMethod.name}.`);
+    if (errorClass === StorageErrorClass.TRANSIENT || errorClass === StorageErrorClass.FATAL) {
+        Logger.logInfo(`Storage operation skipped retry; ${errorClass} errors are handled by the connection layer. Error: ${error}. onyxMethod: ${onyxMethod.name}.`);
         return Promise.resolve();
     }
 
     if (nextRetryAttempt > MAX_STORAGE_OPERATION_RETRY_ATTEMPTS) {
-        Logger.logAlert(`Storage operation failed after 5 retries. Error: ${error}. onyxMethod: ${onyxMethod.name}.`);
+        Logger.logAlert(`Storage operation failed after ${MAX_STORAGE_OPERATION_RETRY_ATTEMPTS} retries. Error: ${error}. onyxMethod: ${onyxMethod.name}.`);
         return Promise.resolve();
     }
 
-    if (!isStorageCapacityError) {
+    if (errorClass !== StorageErrorClass.CAPACITY) {
+        // UNKNOWN error — bounded retry without eviction.
         // @ts-expect-error No overload matches this call.
         return onyxMethod(defaultParams, nextRetryAttempt);
     }
