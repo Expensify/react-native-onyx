@@ -666,5 +666,50 @@ describe('createStore', () => {
             expect(result).toBe('value');
             expect(logAlertSpy).toHaveBeenCalledWith(expect.stringContaining('IDB visibilitychange probe: stale connection detected'), expect.objectContaining({dbName: expect.any(String)}));
         });
+
+        it('should not surface an unhandled rejection when the probe runs while the open promise rejects', async () => {
+            const store = createStore(uniqueDBName(), STORE_NAME);
+
+            // Keep the initial open pending until we reject it manually, so the probe attaches to a pending dbp.
+            let rejectOpen: () => void = () => {
+                /* assigned inside the indexedDB.open mock below */
+            };
+            jest.spyOn(indexedDB, 'open').mockImplementation(() => {
+                const req = {} as IDBOpenDBRequest;
+                rejectOpen = () => {
+                    Object.defineProperty(req, 'error', {value: new DOMException('probe open failed', 'AbortError'), configurable: true});
+                    req.onerror?.(new Event('error') as Event & {target: IDBOpenDBRequest});
+                };
+                return req;
+            });
+
+            const unhandled = jest.fn();
+            process.on('unhandledRejection', unhandled);
+
+            try {
+                // Start an op so dbp becomes a pending open promise; keep its rejection handled.
+                const opAssertion = expect(store('readonly', (s) => IDB.promisifyRequest(s.get('key1')))).rejects.toThrow('probe open failed');
+
+                // Tab becomes visible while the open is still pending — probe attaches to the pending dbp.
+                simulateVisibilityChange('hidden');
+                simulateVisibilityChange('visible');
+
+                // Now the open rejects — both the op chain and the probe chain see it.
+                rejectOpen();
+
+                await opAssertion;
+                // Give the probe's separate branch a couple of ticks to (not) surface an unhandled rejection.
+                await new Promise((resolve) => {
+                    setTimeout(resolve, 0);
+                });
+                await new Promise((resolve) => {
+                    setTimeout(resolve, 0);
+                });
+
+                expect(unhandled).not.toHaveBeenCalled();
+            } finally {
+                process.off('unhandledRejection', unhandled);
+            }
+        });
     });
 });

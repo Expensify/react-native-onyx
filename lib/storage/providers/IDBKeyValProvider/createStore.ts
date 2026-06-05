@@ -157,24 +157,29 @@ function createStore(dbName: string, storeName: string): UseStore {
             dbp = undefined;
         };
 
-        probePromise.then((db) => {
-            if (dbp !== probePromise) {
-                return;
-            }
-            try {
-                const tx = db.transaction(storeName, 'readonly');
-                const probeStore = tx.objectStore(storeName);
-                const req = probeStore.count();
-                req.onsuccess = () => {
-                    Logger.logInfo('IDB visibilitychange probe: connection is healthy', {dbName, storeName});
-                };
-                req.onerror = () => {
-                    dropCacheIfStale(req.error);
-                };
-            } catch (error) {
-                dropCacheIfStale(error);
-            }
-        });
+        probePromise
+            .then((db) => {
+                if (dbp !== probePromise) {
+                    return;
+                }
+                try {
+                    const tx = db.transaction(storeName, 'readonly');
+                    const probeStore = tx.objectStore(storeName);
+                    const req = probeStore.count();
+                    req.onsuccess = () => {
+                        Logger.logInfo('IDB visibilitychange probe: connection is healthy', {dbName, storeName});
+                    };
+                    req.onerror = () => {
+                        dropCacheIfStale(req.error);
+                    };
+                } catch (error) {
+                    dropCacheIfStale(error);
+                }
+            })
+            .catch(() => {
+                // The cached open promise rejected; cacheOpenPromise already cleared dbp on its own
+                // branch. Swallow here so the probe's separate branch doesn't surface an unhandled rejection.
+            });
     });
 
     // Handles three recoverable error classes:
