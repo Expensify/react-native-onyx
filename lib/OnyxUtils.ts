@@ -862,8 +862,6 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(
     Logger.logInfo(`Out of storage. Evicting least recently accessed key (${keyForRemoval}) and retrying. Error: ${error}`);
     reportStorageQuota(error);
 
-    // The evicted key is never in-flight (excluded above), so this is a genuine removal —
-    // subscribers must see the removed state.
     // @ts-expect-error No overload matches this call.
     return remove(keyForRemoval).then(() => onyxMethod(defaultParams, nextRetryAttempt));
 }
