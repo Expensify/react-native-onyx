@@ -8,6 +8,7 @@ import type GenericCollection from '../utils/GenericCollection';
 import OnyxCache from '../../lib/OnyxCache';
 import * as Logger from '../../lib/Logger';
 import StorageMock from '../../lib/storage';
+import StorageCircuitBreaker from '../../lib/StorageCircuitBreaker';
 import createDeferredTask from '../../lib/createDeferredTask';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
@@ -722,6 +723,9 @@ describe('OnyxUtils', () => {
         const diskFullError = new Error('database or disk is full');
         const nonRetriableIdbError = Object.assign(new Error('Internal error opening backing store for indexedDB.open.'), {name: 'UnknownError'});
 
+        // The circuit breaker is process-scoped, so reset it between tests to avoid state leaking.
+        beforeEach(() => StorageCircuitBreaker.reset());
+
         it('should retry only one time if the operation is firstly failed and then passed', async () => {
             StorageMock.setItem = jest.fn(StorageMock.setItem).mockRejectedValueOnce(genericError).mockImplementation(StorageMock.setItem);
 
@@ -819,6 +823,43 @@ describe('OnyxUtils', () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
             expect(logAlertSpy).toHaveBeenCalledWith(`Unable to get database size. getDatabaseSize error: ${dbSizeError}. Original error: ${diskFullError}`);
+        });
+
+        it('should trip the circuit breaker and alert once after sustained capacity failures', async () => {
+            const logAlertSpy = jest.spyOn(Logger, 'logAlert');
+            StorageMock.setItem = jest.fn().mockRejectedValue(diskFullError);
+
+            // No evictable keys are configured, so each failing write records exactly one capacity
+            // failure with the breaker (it cannot evict). Enough of them within one window trips it.
+            for (let i = 0; i <= StorageCircuitBreaker.FAILURE_THRESHOLD; i++) {
+                await Onyx.set(ONYXKEYS.TEST_KEY, {test: i});
+            }
+            await waitForPromisesToResolve();
+
+            expect(StorageCircuitBreaker.isTripped()).toBe(true);
+            expect(logAlertSpy).toHaveBeenCalledWith(expect.stringContaining('Storage circuit breaker tripped'));
+        });
+
+        it('should drop capacity writes silently while the circuit breaker is open', async () => {
+            // Trip the breaker deterministically so every capacity failure below is observed while open.
+            for (let i = 0; i <= StorageCircuitBreaker.FAILURE_THRESHOLD; i++) {
+                StorageCircuitBreaker.recordCapacityFailure();
+            }
+            expect(StorageCircuitBreaker.isTripped()).toBe(true);
+
+            // Clear so we only observe logging caused by the write below, not the trip alert above.
+            const logInfoSpy = jest.spyOn(Logger, 'logInfo').mockClear();
+            const logAlertSpy = jest.spyOn(Logger, 'logAlert').mockClear();
+            StorageMock.setItem = jest.fn().mockRejectedValue(diskFullError);
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+            await waitForPromisesToResolve();
+
+            // The write and any cascading derived writes are dropped without per-write log spam, and
+            // without re-alerting — the single trip alert is the only signal while open.
+            expect(StorageCircuitBreaker.isTripped()).toBe(true);
+            expect(logInfoSpy).not.toHaveBeenCalledWith(expect.stringContaining('Failed to save to storage'));
+            expect(logAlertSpy).not.toHaveBeenCalled();
         });
 
         it('should not re-add an evicted key to recentlyAccessedKeys after removal', async () => {

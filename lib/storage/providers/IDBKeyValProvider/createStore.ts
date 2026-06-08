@@ -141,8 +141,11 @@ function createStore(dbName: string, storeName: string): UseStore {
                         dbName,
                         storeName,
                     });
-                } else {
-                    // CAPACITY / UNKNOWN — let the operation layer decide (evict or bounded retry).
+                } else if (errorClass === StorageErrorClass.UNKNOWN) {
+                    // UNKNOWN — unexpected at this layer; record it so it's visible. CAPACITY is the
+                    // expected propagation path (the operation layer owns its logging, and suppresses it
+                    // entirely once the circuit breaker is open), so we do NOT log it here — doing so was a
+                    // per-failed-write line that dominated the storm.
                     Logger.logInfo('IDB error not recoverable at the connection layer, propagating', {
                         dbName,
                         storeName,

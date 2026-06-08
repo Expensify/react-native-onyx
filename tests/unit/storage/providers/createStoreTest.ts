@@ -421,17 +421,15 @@ describe('createStore', () => {
             logInfoSpy = jest.spyOn(Logger, 'logInfo');
 
             // QuotaExceededError — a CAPACITY error the connection layer does not own; it propagates
-            // to the operation layer (OnyxUtils.retryOperation) which handles eviction.
+            // to the operation layer (OnyxUtils.retryOperation) which handles eviction. The connection
+            // layer stays quiet for capacity (it's the expected path) so it can't spam the storm log.
             jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(() => {
                 throw new DOMException('Quota exceeded', 'QuotaExceededError');
             });
             await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('key1')))).rejects.toThrow('Quota exceeded');
 
             expect(logAlertSpy).not.toHaveBeenCalled();
-            expect(logInfoSpy).toHaveBeenCalledWith(
-                'IDB error not recoverable at the connection layer, propagating',
-                expect.objectContaining({errorMessage: 'Quota exceeded', errorClass: 'capacity'}),
-            );
+            expect(logInfoSpy).not.toHaveBeenCalledWith('IDB error not recoverable at the connection layer, propagating', expect.objectContaining({errorClass: 'capacity'}));
         });
     });
 

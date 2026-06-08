@@ -64,6 +64,7 @@ function classifyStorageError(error: unknown): StorageErrorClassValue {
         name.includes('aborterror') ||
         message.includes('connection to indexed database server lost') ||
         message.includes('connection is closing') ||
+        // This is related to https://github.com/Expensify/react-native-onyx/pull/796 — remove this comment when #796 is merged.
         message.includes('idb write transaction aborted without an error')
     ) {
         return StorageErrorClass.TRANSIENT;

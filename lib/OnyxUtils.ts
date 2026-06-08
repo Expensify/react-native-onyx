@@ -6,6 +6,7 @@ import * as Logger from './Logger';
 import type Onyx from './Onyx';
 import cache, {TASK} from './OnyxCache';
 import OnyxKeys from './OnyxKeys';
+import StorageCircuitBreaker from './StorageCircuitBreaker';
 import Storage from './storage';
 import {StorageErrorClass, classifyStorageError} from './storage/errors';
 import type {
@@ -792,13 +793,22 @@ function reportStorageQuota(error?: Error): Promise<void> {
  * - INVALID_DATA: logs an alert and throws (the same data will always fail).
  * - TRANSIENT / FATAL: the connection layer already retried (transient) or exhausted its heal budget
  *   and alerted (fatal). Retrying here would only re-amplify, so we skip the write quietly.
- * - CAPACITY: evicts the least recently accessed evictable key and retries.
+ * - CAPACITY: evicts the least recently accessed evictable key and retries, under a session-level
+ *   circuit breaker (see lib/StorageCircuitBreaker.ts) that halts the loop once eviction stops making
+ *   progress or failures storm — the per-operation budget alone cannot stop a session-wide storm.
  * - UNKNOWN: bounded retry.
  */
 function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, onyxMethod: TMethod, defaultParams: Parameters<TMethod>[0], retryAttempt: number | undefined): Promise<void> {
     const currentRetryAttempt = retryAttempt ?? 0;
     const nextRetryAttempt = currentRetryAttempt + 1;
     const errorClass = classifyStorageError(error);
+
+    // Once the breaker is open, every capacity write is going to fail the same way. Drop it silently —
+    // the breaker already emitted its single alert, and logging per failed write is exactly the storm
+    // we are suppressing. (We return before the log line below on purpose.)
+    if (errorClass === StorageErrorClass.CAPACITY && StorageCircuitBreaker.isTripped()) {
+        return Promise.resolve();
+    }
 
     Logger.logInfo(`Failed to save to storage. Error: ${error}. class: ${errorClass}. onyxMethod: ${onyxMethod.name}. retryAttempt: ${currentRetryAttempt}/${MAX_STORAGE_OPERATION_RETRY_ATTEMPTS}`);
 
@@ -823,6 +833,16 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, on
         return onyxMethod(defaultParams, nextRetryAttempt);
     }
 
+    // CAPACITY: feed the session-level circuit breaker before evicting. The per-operation budget above
+    // cannot stop a session-wide storm — each evicted key triggers an OnyxDerived recompute that spawns
+    // a fresh write with its own budget — so the breaker is what actually halts the meltdown. (The
+    // already-open case returned silently at the top of this function.)
+    StorageCircuitBreaker.recordCapacityFailure();
+    if (StorageCircuitBreaker.isTripped()) {
+        // This failure tripped the breaker; it already emitted its single alert. Stop here.
+        return Promise.resolve();
+    }
+
     // Find the least recently accessed evictable key that we can remove
     const keyForRemoval = cache.getKeyForEviction();
     if (!keyForRemoval) {
@@ -833,9 +853,11 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, on
         return reportStorageQuota(error);
     }
 
-    // Remove the least recently accessed key and retry.
+    // Remove the least recently accessed key and retry. Tell the breaker we evicted so that, if the
+    // retry comes back as another capacity failure, it counts as a no-progress cycle.
     Logger.logInfo(`Out of storage. Evicting least recently accessed key (${keyForRemoval}) and retrying. Error: ${error}`);
     reportStorageQuota(error);
+    StorageCircuitBreaker.recordEviction();
 
     // @ts-expect-error No overload matches this call.
     return remove(keyForRemoval).then(() => onyxMethod(defaultParams, nextRetryAttempt));
