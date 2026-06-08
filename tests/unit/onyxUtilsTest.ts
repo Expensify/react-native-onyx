@@ -777,7 +777,9 @@ describe('OnyxUtils', () => {
 
             // The connection layer (createStore) owns and alerts on fatal errors; the operation layer
             // just skips the retry at info level. No alert here, and no "5 retries exhausted" alert.
-            expect(logInfoSpy).toHaveBeenCalledWith(`Storage operation skipped retry; fatal errors are handled by the connection layer. Error: ${nonRetriableIdbError}. onyxMethod: setWithRetry.`);
+            expect(logInfoSpy).toHaveBeenCalledWith(
+                `Storage operation skipped retry; fatal errors are handled by the connection layer. Error: ${nonRetriableIdbError}. onyxMethod: setWithRetry.`,
+            );
             expect(logAlertSpy).not.toHaveBeenCalled();
         });
 
@@ -798,7 +800,9 @@ describe('OnyxUtils', () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
             expect(logAlertSpy).toHaveBeenCalledWith(`Out of storage. But found no acceptable keys to remove. Error: ${diskFullError}`);
-            expect(logInfoSpy).toHaveBeenCalledWith(`Storage Quota Check -- bytesUsed: 0 originWideBytesRemaining (estimate, not per-DB headroom): Infinity. Original error: ${diskFullError}`);
+            expect(logInfoSpy).toHaveBeenCalledWith(
+                `Storage Quota Check -- bytesUsed: 0 originWideBytesRemaining (estimate, not per-DB headroom): Infinity. Original error: ${diskFullError}`,
+            );
         });
 
         it('should include usageDetails in the storage quota log when available', async () => {
@@ -810,7 +814,9 @@ describe('OnyxUtils', () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
             expect(logInfoSpy).toHaveBeenCalledWith(
-                `Storage Quota Check -- bytesUsed: 13289269 originWideBytesRemaining (estimate, not per-DB headroom): 5000000 usageDetails: ${JSON.stringify(usageDetails)}. Original error: ${diskFullError}`,
+                `Storage Quota Check -- bytesUsed: 13289269 originWideBytesRemaining (estimate, not per-DB headroom): 5000000 usageDetails: ${JSON.stringify(
+                    usageDetails,
+                )}. Original error: ${diskFullError}`,
             );
         });
 
@@ -1390,7 +1396,9 @@ describe('OnyxUtils', () => {
             await LocalOnyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
             expect(logInfoSpy).toHaveBeenCalledWith(`Out of storage. Evicting least recently accessed key (${key1}) and retrying. Error: ${diskFullError}`);
-            expect(logInfoSpy).toHaveBeenCalledWith(`Storage Quota Check -- bytesUsed: 0 originWideBytesRemaining (estimate, not per-DB headroom): Infinity. Original error: ${diskFullError}`);
+            expect(logInfoSpy).toHaveBeenCalledWith(
+                `Storage Quota Check -- bytesUsed: 0 originWideBytesRemaining (estimate, not per-DB headroom): Infinity. Original error: ${diskFullError}`,
+            );
         });
     });
 

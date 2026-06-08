@@ -810,7 +810,9 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(error: Error, on
         return Promise.resolve();
     }
 
-    Logger.logInfo(`Failed to save to storage. Error: ${error}. class: ${errorClass}. onyxMethod: ${onyxMethod.name}. retryAttempt: ${currentRetryAttempt}/${MAX_STORAGE_OPERATION_RETRY_ATTEMPTS}`);
+    Logger.logInfo(
+        `Failed to save to storage. Error: ${error}. class: ${errorClass}. onyxMethod: ${onyxMethod.name}. retryAttempt: ${currentRetryAttempt}/${MAX_STORAGE_OPERATION_RETRY_ATTEMPTS}`,
+    );
 
     if (errorClass === StorageErrorClass.INVALID_DATA) {
         Logger.logAlert(`Attempted to set invalid data set in Onyx. Please ensure all data is serializable. Error: ${error}`);

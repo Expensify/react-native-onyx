@@ -459,10 +459,7 @@ describe('createStore', () => {
             const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
             expect(result).toBe('value');
             expect(callCount).toBe(2);
-            expect(logInfoSpy).toHaveBeenCalledWith(
-                'IDB transient error — dropping cached connection and retrying once',
-                expect.objectContaining({dbName: expect.any(String)}),
-            );
+            expect(logInfoSpy).toHaveBeenCalledWith('IDB transient error — dropping cached connection and retrying once', expect.objectContaining({dbName: expect.any(String)}));
         });
 
         it('should not be budgeted — reopens on every call without ever exhausting a budget', async () => {
