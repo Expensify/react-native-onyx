@@ -201,19 +201,19 @@ describe('IDBKeyValProvider', () => {
             jest.restoreAllMocks();
         });
 
-        it('setItem rejects with a tagged AbortError, never null', async () => {
+        it('should reject setItem with a tagged AbortError, never null', async () => {
             abortTransactionOnPut();
             const error = await IDBKeyValProvider.setItem(ONYXKEYS.TEST_KEY, 'value').catch((e: unknown) => e);
             expectAbortError(error);
         });
 
-        it('multiSet rejects with a tagged AbortError, never null', async () => {
+        it('should reject multiSet with a tagged AbortError, never null', async () => {
             abortTransactionOnPut();
             const error = await IDBKeyValProvider.multiSet([[ONYXKEYS.TEST_KEY, 'value']]).catch((e: unknown) => e);
             expectAbortError(error);
         });
 
-        it('multiMerge rejects with a tagged AbortError, never null', async () => {
+        it('should reject multiMerge with a tagged AbortError, never null', async () => {
             abortTransactionOnPut();
             const error = await IDBKeyValProvider.multiMerge([[ONYXKEYS.TEST_KEY, 'value']]).catch((e: unknown) => e);
             expectAbortError(error);
