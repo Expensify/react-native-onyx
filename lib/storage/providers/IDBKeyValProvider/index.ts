@@ -13,9 +13,7 @@ const STORE_NAME = 'keyvaluepairs';
  * Awaits an IndexedDB write transaction. idb-keyval's promisifyRequest rejects with
  * `transaction.error`, which is `null` for an abort not caused by its own request
  * (connection close / versionchange / a sibling transaction aborting). Normalize that
- * `null` into a tagged AbortError so storage writes never reject with the unclassifiable
- * "Error: null" — it otherwise slips past createStore's heal guards (they require an
- * Error/DOMException) and renders as `Error: null` in OnyxUtils.retryOperation.
+ * `null` into a tagged AbortError.
  */
 function promisifyWriteTransaction(transaction: IDBTransaction): Promise<void> {
     return IDB.promisifyRequest(transaction).catch((error) => {
