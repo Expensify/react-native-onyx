@@ -79,12 +79,17 @@ If the requested key is a collection, it will return an object with all the coll
 <dd><p>Remove a key from Onyx and update the subscribers</p>
 </dd>
 <dt><a href="#retryOperation">retryOperation()</a></dt>
-<dd><p>Handles storage operation failures based on the error type:</p>
+<dd><p>Handles storage operation failures based on the error class (see lib/storage/errors.ts).
+The connection layer (createStore) owns connection/transport recovery; this operation layer owns
+capacity recovery (eviction) so that a given failure is retried by exactly one layer:</p>
 <ul>
-<li>Storage capacity errors: evicts data and retries the operation</li>
-<li>Invalid data errors: logs an alert and throws an error</li>
-<li>Non-retriable errors: logs an alert and resolves without retrying</li>
-<li>Other errors: retries the operation</li>
+<li>INVALID_DATA: logs an alert and throws (the same data will always fail).</li>
+<li>TRANSIENT / FATAL: the connection layer already retried (transient) or exhausted its heal budget
+and alerted (fatal). Retrying here would only re-amplify, so we skip the write quietly.</li>
+<li>CAPACITY: evicts the least recently accessed evictable key and retries, under a session-level
+circuit breaker (see lib/StorageCircuitBreaker.ts) that halts the loop once eviction stops making
+progress or failures storm — the per-operation budget alone cannot stop a session-wide storm.</li>
+<li>UNKNOWN: bounded retry.</li>
 </ul>
 </dd>
 <dt><a href="#broadcastUpdate">broadcastUpdate()</a></dt>
@@ -318,11 +323,16 @@ Remove a key from Onyx and update the subscribers
 <a name="retryOperation"></a>
 
 ## retryOperation()
-Handles storage operation failures based on the error type:
-- Storage capacity errors: evicts data and retries the operation
-- Invalid data errors: logs an alert and throws an error
-- Non-retriable errors: logs an alert and resolves without retrying
-- Other errors: retries the operation
+Handles storage operation failures based on the error class (see lib/storage/errors.ts).
+The connection layer (createStore) owns connection/transport recovery; this operation layer owns
+capacity recovery (eviction) so that a given failure is retried by exactly one layer:
+- INVALID_DATA: logs an alert and throws (the same data will always fail).
+- TRANSIENT / FATAL: the connection layer already retried (transient) or exhausted its heal budget
+  and alerted (fatal). Retrying here would only re-amplify, so we skip the write quietly.
+- CAPACITY: evicts the least recently accessed evictable key and retries, under a session-level
+  circuit breaker (see lib/StorageCircuitBreaker.ts) that halts the loop once eviction stops making
+  progress or failures storm — the per-operation budget alone cannot stop a session-wide storm.
+- UNKNOWN: bounded retry.
 
 **Kind**: global function  
 <a name="broadcastUpdate"></a>
