@@ -153,14 +153,22 @@ const provider: StorageProvider<UseStore | undefined> = {
             throw new Error('Store not initialized!');
         }
 
-        return IDB.del(key, provider.store);
+        return provider.store('readwrite', (store) => {
+            store.delete(key);
+            return promisifyWriteTransaction(store.transaction);
+        });
     },
     removeItems(keysParam) {
         if (!provider.store) {
             throw new Error('Store not initialized!');
         }
 
-        return IDB.delMany(keysParam, provider.store);
+        return provider.store('readwrite', (store) => {
+            for (const key of keysParam) {
+                store.delete(key);
+            }
+            return promisifyWriteTransaction(store.transaction);
+        });
     },
     getDatabaseSize() {
         if (!provider.store) {
