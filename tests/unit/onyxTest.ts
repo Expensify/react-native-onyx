@@ -1523,8 +1523,12 @@ describe('Onyx', () => {
                 // Cat hasn't changed from its original value, expect only the initial connect callback
                 expect(catCallback).toHaveBeenCalledTimes(1);
 
-                // Dog was modified, expect the initial connect callback and the mergeCollection callback
-                expect(dogCallback).toHaveBeenCalledTimes(2);
+                // Dog was created by the merge. Onyx writes cache-first/storage-second, so the
+                // mergeCollection notification reaches the subscriber before the initial connect
+                // fire; the initial fire then reads the already-merged value and is deduped. The
+                // subscriber therefore receives the final value once, never the transient undefined.
+                expect(dogCallback).toHaveBeenCalledTimes(1);
+                expect(dogCallback).toHaveBeenLastCalledWith({name: 'Rex'}, dog);
 
                 connections.map((id) => Onyx.disconnect(id));
             });
