@@ -38,10 +38,7 @@ describe('useOnyxState', () => {
             const {result} = renderHook(() => useOnyxState((state) => state[ONYXKEYS.TEST_KEY], {dependencies: [ONYXKEYS.TEST_KEY]}));
             await act(async () => waitForPromisesToResolve());
 
-            await act(async () => {
-                Onyx.set(ONYXKEYS.TEST_KEY, 'updated');
-                return waitForPromisesToResolve();
-            });
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'updated'));
 
             expect(result.current).toEqual('updated');
         });
@@ -56,10 +53,7 @@ describe('useOnyxState', () => {
 
             const renderCountAfterMount = renderCount;
 
-            await act(async () => {
-                Onyx.set(ONYXKEYS.OTHER_TEST, 'irrelevant');
-                return waitForPromisesToResolve();
-            });
+            await act(async () => Onyx.set(ONYXKEYS.OTHER_TEST, 'irrelevant'));
 
             expect(renderCount).toEqual(renderCountAfterMount);
             expect(result.current).toBeUndefined();
@@ -71,16 +65,10 @@ describe('useOnyxState', () => {
             );
             await act(async () => waitForPromisesToResolve());
 
-            await act(async () => {
-                Onyx.set(ONYXKEYS.TEST_KEY, 'a');
-                return waitForPromisesToResolve();
-            });
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'a'));
             expect(result.current).toEqual('a-');
 
-            await act(async () => {
-                Onyx.set(ONYXKEYS.OTHER_TEST, 'b');
-                return waitForPromisesToResolve();
-            });
+            await act(async () => Onyx.set(ONYXKEYS.OTHER_TEST, 'b'));
             expect(result.current).toEqual('a-b');
         });
     });
@@ -92,16 +80,10 @@ describe('useOnyxState', () => {
 
             expect(result.current).toEqual(0);
 
-            await act(async () => {
-                Onyx.merge(MEMBER_1, {id: 1});
-                return waitForPromisesToResolve();
-            });
+            await act(async () => Onyx.merge(MEMBER_1, {id: 1}));
             expect(result.current).toEqual(1);
 
-            await act(async () => {
-                Onyx.merge(MEMBER_2, {id: 2});
-                return waitForPromisesToResolve();
-            });
+            await act(async () => Onyx.merge(MEMBER_2, {id: 2}));
             expect(result.current).toEqual(2);
         });
 
@@ -109,10 +91,7 @@ describe('useOnyxState', () => {
             const {result} = renderHook(() => useOnyxState((state) => Object.keys(state[COLLECTION] ?? {}).length, {dependencies: [COLLECTION]}));
             await act(async () => waitForPromisesToResolve());
 
-            await act(async () => {
-                Onyx.mergeCollection(COLLECTION, {[MEMBER_1]: {id: 1}, [MEMBER_2]: {id: 2}} as GenericCollection);
-                return waitForPromisesToResolve();
-            });
+            await act(async () => Onyx.mergeCollection(COLLECTION, {[MEMBER_1]: {id: 1}, [MEMBER_2]: {id: 2}} as GenericCollection));
 
             expect(result.current).toEqual(2);
         });
@@ -140,7 +119,7 @@ describe('useOnyxState', () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, 'a');
 
             let sawCurrentBWithPreviousA = false;
-            const {rerender} = renderHook(() =>
+            renderHook(() =>
                 useOnyxState(
                     (state, previousState) => {
                         if (state[ONYXKEYS.TEST_KEY] === 'b' && previousState?.[ONYXKEYS.TEST_KEY] === 'a') {
@@ -153,11 +132,7 @@ describe('useOnyxState', () => {
             );
             await act(async () => waitForPromisesToResolve());
 
-            await act(async () => {
-                Onyx.set(ONYXKEYS.TEST_KEY, 'b');
-                return waitForPromisesToResolve();
-            });
-            rerender(undefined);
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'b'));
 
             expect(sawCurrentBWithPreviousA).toBeTruthy();
         });
@@ -185,10 +160,7 @@ describe('useOnyxState', () => {
             await act(async () => waitForPromisesToResolve());
 
             // Change only MEMBER_2 — the delta should contain exactly MEMBER_2.
-            await act(async () => {
-                Onyx.merge(MEMBER_2, {v: 2});
-                return waitForPromisesToResolve();
-            });
+            await act(async () => Onyx.merge(MEMBER_2, {v: 2}));
 
             expect(result.current).toEqual([MEMBER_2]);
         });
@@ -210,18 +182,12 @@ describe('useOnyxState', () => {
             );
             await act(async () => waitForPromisesToResolve());
 
-            await act(async () => {
-                Onyx.merge(MEMBER_1, {v: 9});
-                return waitForPromisesToResolve();
-            });
+            await act(async () => Onyx.merge(MEMBER_1, {v: 9}));
             expect(result.current).toEqual([MEMBER_1]);
 
             // A second, independent change must report only MEMBER_2 — proving `previousState`
             // advanced to the post-first-change snapshot rather than staying at the original.
-            await act(async () => {
-                Onyx.merge(MEMBER_2, {v: 9});
-                return waitForPromisesToResolve();
-            });
+            await act(async () => Onyx.merge(MEMBER_2, {v: 9}));
             expect(result.current).toEqual([MEMBER_2]);
         });
     });
@@ -231,18 +197,12 @@ describe('useOnyxState', () => {
             const {result} = renderHook(() => useOnyxState((state) => ({length: ((state[ONYXKEYS.TEST_KEY] as string) ?? '').length}), {dependencies: [ONYXKEYS.TEST_KEY]}));
             await act(async () => waitForPromisesToResolve());
 
-            await act(async () => {
-                Onyx.set(ONYXKEYS.TEST_KEY, 'aa');
-                return waitForPromisesToResolve();
-            });
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'aa'));
             const referenceAfterFirstChange = result.current;
             expect(referenceAfterFirstChange).toEqual({length: 2});
 
             // New input, same-length string → deep-equal output → the previous reference is kept.
-            await act(async () => {
-                Onyx.set(ONYXKEYS.TEST_KEY, 'bb');
-                return waitForPromisesToResolve();
-            });
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'bb'));
 
             expect(result.current).toBe(referenceAfterFirstChange);
         });
@@ -258,10 +218,7 @@ describe('useOnyxState', () => {
 
             expect(result.current).toEqual('none');
 
-            await act(async () => {
-                Onyx.set(ONYXKEYS.TEST_KEY, 'changed');
-                return waitForPromisesToResolve();
-            });
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'changed'));
 
             // Custom equality reports "unchanged", so the React update is skipped.
             expect(result.current).toEqual('none');
@@ -276,10 +233,7 @@ describe('useOnyxState', () => {
             );
             await act(async () => waitForPromisesToResolve());
 
-            await act(async () => {
-                Onyx.set(ONYXKEYS.TEST_KEY, 'changed');
-                return waitForPromisesToResolve();
-            });
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'changed'));
 
             expect(result.current).toEqual('changed');
         });
