@@ -91,5 +91,4 @@ describe('Collection hydration with connect() followed by immediate set()', () =
         expect(lastCall[`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]).toEqual({id: 2, title: 'Test Two'});
         expect(lastCall[`${ONYX_KEYS.COLLECTION.TEST_KEY}3`]).toEqual({id: 3, title: 'Test Three'});
     });
-
 });

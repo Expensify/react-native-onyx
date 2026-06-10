@@ -978,10 +978,7 @@ describe('Onyx', () => {
             })
             .then(() => {
                 // Snapshot mode: multiSet fires the collection callback per write.
-                expect(mockCallback).toHaveBeenLastCalledWith(
-                    {test_1: {existingData: 'test'}, test_2: {existingData: 'test'}},
-                    ONYX_KEYS.COLLECTION.TEST_KEY,
-                );
+                expect(mockCallback).toHaveBeenLastCalledWith({test_1: {existingData: 'test'}, test_2: {existingData: 'test'}}, ONYX_KEYS.COLLECTION.TEST_KEY);
                 mockCallback.mockReset();
 
                 // When we pass a mergeCollection data object to Onyx.update

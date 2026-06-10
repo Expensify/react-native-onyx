@@ -118,10 +118,7 @@ function useOnyxState<T>(selector: UseOnyxStateSelector<T>, options: UseOnyxStat
     // Only `subscribe` must be referentially stable for `useSyncExternalStore` (it controls
     // re-subscription). `getSnapshot` may change identity freely — React just re-reads it —
     // so it closes over the latest `selector`/`selectorEquality` directly instead of via refs.
-    const subscribe = useCallback(
-        (onStoreChange: () => void) => onyxStore.subscribeState(onStoreChange, depsArray),
-        [depsArray],
-    );
+    const subscribe = useCallback((onStoreChange: () => void) => onyxStore.subscribeState(onStoreChange, depsArray), [depsArray]);
 
     // `previousViewRef` is a Proxy over the dep values captured at the last committed
     // render. It is ONLY mutated in the effect below (post-commit), never in getSnapshot,

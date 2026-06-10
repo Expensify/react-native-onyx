@@ -238,7 +238,6 @@ describe('useOnyx', () => {
             expect(result2.current[1].status).toEqual('loaded');
         });
 
-
         it('should not update the result when a new object with shallow-equal content is set', async () => {
             Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name'});
 
@@ -715,7 +714,6 @@ describe('useOnyx', () => {
             expect(selectorCallCount).toBe(2);
         });
     });
-
 
     describe('dependencies', () => {
         it('should return the updated selected value when a external value passed to the dependencies list changes', async () => {
