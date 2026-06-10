@@ -10,7 +10,7 @@ import StorageMock from '../../lib/storage';
 import type {OnyxCollection, OnyxKey, OnyxUpdate} from '../../lib/types';
 import type {GenericDeepRecord} from '../types';
 import type GenericCollection from '../utils/GenericCollection';
-import type {Connection} from '../../lib/OnyxConnectionManager';
+import type {Connection} from '../../lib/Onyx';
 import createDeferredTask from '../../lib/createDeferredTask';
 
 const ONYX_KEYS = {
@@ -104,7 +104,6 @@ describe('Onyx', () => {
             const connectionCallback = jest.fn();
             connection = Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
-                waitForCollectionCallback: true,
                 callback: connectionCallback,
             });
             await waitForPromisesToResolve();
@@ -270,7 +269,6 @@ describe('Onyx', () => {
 
         connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
-            waitForCollectionCallback: true,
             callback: (value) => {
                 testKeyValue = value;
             },
@@ -654,7 +652,6 @@ describe('Onyx', () => {
         connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
             callback: (value) => (result = value),
-            waitForCollectionCallback: true,
         });
 
         return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
@@ -832,7 +829,6 @@ describe('Onyx', () => {
 
         connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
-            waitForCollectionCallback: true,
             callback: mockCallback,
         });
 
@@ -876,7 +872,6 @@ describe('Onyx', () => {
 
         connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
-            waitForCollectionCallback: true,
             callback: mockCallback,
         });
 
@@ -1087,7 +1082,6 @@ describe('Onyx', () => {
                 // When we connect to that collection with waitForCollectionCallback = true
                 connection = Onyx.connect({
                     key: ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION,
-                    waitForCollectionCallback: true,
                     callback: mockCallback,
                 });
                 return waitForPromisesToResolve();
@@ -1109,7 +1103,6 @@ describe('Onyx', () => {
         // Given an Onyx.connect call with waitForCollectionCallback=true
         connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_POLICY,
-            waitForCollectionCallback: true,
             callback: mockCallback,
         });
         return (
@@ -1171,7 +1164,6 @@ describe('Onyx', () => {
         // Given an Onyx.connect call with waitForCollectionCallback=true
         connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_POLICY,
-            waitForCollectionCallback: true,
             callback: mockCallback,
         });
         return (
@@ -1207,7 +1199,6 @@ describe('Onyx', () => {
         // Given an Onyx.connect call with waitForCollectionCallback=true
         connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_POLICY,
-            waitForCollectionCallback: true,
             callback: mockCallback,
         });
         return (
@@ -1248,7 +1239,7 @@ describe('Onyx', () => {
 
         connections.push(Onyx.connect({key: ONYX_KEYS.TEST_KEY, callback: testCallback}));
         connections.push(Onyx.connect({key: ONYX_KEYS.OTHER_TEST, callback: otherTestCallback}));
-        connections.push(Onyx.connect({key: ONYX_KEYS.COLLECTION.TEST_UPDATE, callback: collectionCallback, waitForCollectionCallback: true}));
+        connections.push(Onyx.connect({key: ONYX_KEYS.COLLECTION.TEST_UPDATE, callback: collectionCallback}));
         return waitForPromisesToResolve().then(() =>
             Onyx.update([
                 {onyxMethod: Onyx.METHOD.SET, key: ONYX_KEYS.TEST_KEY, value: 'taco'},
@@ -1446,7 +1437,6 @@ describe('Onyx', () => {
         connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
             callback: (value) => (result = value),
-            waitForCollectionCallback: true,
         });
 
         return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
@@ -1497,7 +1487,6 @@ describe('Onyx', () => {
             Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.ANIMALS,
                 callback: collectionCallback,
-                waitForCollectionCallback: true,
             }),
         );
         connections.push(Onyx.connect({key: cat, callback: catCallback}));
@@ -1620,7 +1609,6 @@ describe('Onyx', () => {
                 Onyx.connect({
                     key: ONYX_KEYS.COLLECTION.ROUTES,
                     callback: routesCollectionCallback,
-                    waitForCollectionCallback: true,
                 }),
             );
 
@@ -1736,14 +1724,12 @@ describe('Onyx', () => {
                 Onyx.connect({
                     key: ONYX_KEYS.COLLECTION.ANIMALS,
                     callback: animalsCollectionCallback,
-                    waitForCollectionCallback: true,
                 }),
             );
             connections.push(
                 Onyx.connect({
                     key: ONYX_KEYS.COLLECTION.PEOPLE,
                     callback: peopleCollectionCallback,
-                    waitForCollectionCallback: true,
                 }),
             );
             connections.push(Onyx.connect({key: cat, callback: catCallback}));
@@ -1836,7 +1822,6 @@ describe('Onyx', () => {
             let result: unknown;
             connection = Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.TEST_UPDATE,
-                waitForCollectionCallback: true,
                 callback: (value) => {
                     result = value;
                 },
@@ -1879,7 +1864,6 @@ describe('Onyx', () => {
             beforeEach(() => {
                 connection = Onyx.connect({
                     key: ONYX_KEYS.COLLECTION.TEST_UPDATE,
-                    waitForCollectionCallback: true,
                     callback: (value) => {
                         result = value;
                     },
@@ -2241,7 +2225,6 @@ describe('Onyx', () => {
                 callback: (value) => {
                     routesCollection = value;
                 },
-                waitForCollectionCallback: true,
             });
 
             return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
@@ -2280,7 +2263,6 @@ describe('Onyx', () => {
                 callback: (value) => {
                     routesCollection = value;
                 },
-                waitForCollectionCallback: true,
             });
 
             let testKeyValue: unknown;
@@ -2334,7 +2316,6 @@ describe('Onyx', () => {
 
             connection = Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
-                waitForCollectionCallback: true,
                 callback: collectionCallback,
             });
 
@@ -2466,7 +2447,6 @@ describe('Onyx', () => {
             let result: unknown;
             connection = Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.TEST_UPDATE,
-                waitForCollectionCallback: true,
                 callback: (value) => {
                     result = value;
                 },
@@ -2500,7 +2480,6 @@ describe('Onyx', () => {
             beforeEach(() => {
                 connection = Onyx.connect({
                     key: ONYX_KEYS.COLLECTION.TEST_UPDATE,
-                    waitForCollectionCallback: true,
                     callback: (value) => {
                         result = value;
                     },
@@ -2774,7 +2753,6 @@ describe('Onyx', () => {
             connection = Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.ROUTES,
                 callback: (value) => (result = value),
-                waitForCollectionCallback: true,
             });
 
             // Set initial collection state
@@ -2806,7 +2784,6 @@ describe('Onyx', () => {
             connection = Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.ROUTES,
                 callback,
-                waitForCollectionCallback: true,
             });
             await waitForPromisesToResolve();
 
@@ -2832,7 +2809,6 @@ describe('Onyx', () => {
             connection = Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.ROUTES,
                 callback: (value) => (result = value),
-                waitForCollectionCallback: true,
             });
 
             await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
@@ -2856,7 +2832,6 @@ describe('Onyx', () => {
 
             connection = Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.ROUTES,
-                waitForCollectionCallback: true,
                 callback: mockCallback,
             });
 
@@ -2902,7 +2877,6 @@ describe('Onyx', () => {
             let testKeyValue: unknown;
             connection = Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
-                waitForCollectionCallback: true,
                 callback: (value) => {
                     testKeyValue = value;
                 },
@@ -2920,7 +2894,6 @@ describe('Onyx', () => {
             let testKeyValue: unknown;
             connection = Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
-                waitForCollectionCallback: true,
                 callback: (value) => {
                     testKeyValue = value;
                 },
@@ -2938,7 +2911,6 @@ describe('Onyx', () => {
             let testKeyValue: unknown;
             connection = Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
-                waitForCollectionCallback: true,
                 callback: (value) => {
                     testKeyValue = value;
                 },
@@ -2960,7 +2932,6 @@ describe('Onyx', () => {
             let testKeyValue: unknown;
             connection = Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
-                waitForCollectionCallback: true,
                 callback: (value) => {
                     testKeyValue = value;
                 },
@@ -2982,7 +2953,6 @@ describe('Onyx', () => {
             let testKeyValue: unknown;
             connection = Onyx.connect({
                 key: ONYX_KEYS.COLLECTION.TEST_KEY,
-                waitForCollectionCallback: true,
                 callback: (value) => {
                     testKeyValue = value;
                 },
@@ -3204,7 +3174,6 @@ describe('RAM-only keys should not read from storage', () => {
             callback: (value) => {
                 receivedCollection = value;
             },
-            waitForCollectionCallback: true,
         });
         await act(async () => waitForPromisesToResolve());
 

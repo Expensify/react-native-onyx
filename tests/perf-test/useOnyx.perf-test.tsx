@@ -19,7 +19,7 @@ const metadataStatusMatcher = (onyxKey: OnyxKey, expected: FetchStatus) => `meta
 type UseOnyxMatcherProps = {
     onyxKey: OnyxKey;
     data: OnyxValue<OnyxKey>;
-    metadata: ResultMetadata<OnyxValue<OnyxKey>>;
+    metadata: ResultMetadata;
 };
 
 function UseOnyxMatcher({onyxKey, data, metadata}: UseOnyxMatcherProps) {

@@ -115,7 +115,6 @@ describe('OnyxUtils', () => {
             const connection = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.ROUTES,
                 callback: (value) => (result = value),
-                waitForCollectionCallback: true,
             });
 
             // Set initial collection state
@@ -151,7 +150,6 @@ describe('OnyxUtils', () => {
             const connection = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.ROUTES,
                 callback: (value) => (result = value),
-                waitForCollectionCallback: true,
             });
 
             await Onyx.mergeCollection(ONYXKEYS.COLLECTION.ROUTES, {
@@ -174,7 +172,6 @@ describe('OnyxUtils', () => {
             const connection = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.ROUTES,
                 callback: (value) => (result = value),
-                waitForCollectionCallback: true,
             });
 
             await Onyx.mergeCollection(ONYXKEYS.COLLECTION.ROUTES, {
@@ -202,7 +199,6 @@ describe('OnyxUtils', () => {
             const connection = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.TEST_KEY,
                 callback: collectionCallback,
-                waitForCollectionCallback: true,
             });
 
             await waitForPromisesToResolve();
@@ -263,7 +259,6 @@ describe('OnyxUtils', () => {
             const connCollection = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.TEST_KEY,
                 callback: collectionCallback,
-                waitForCollectionCallback: true,
             });
             const connSingle = Onyx.connect({
                 key: ONYXKEYS.TEST_KEY,
@@ -297,12 +292,10 @@ describe('OnyxUtils', () => {
             const connTest = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.TEST_KEY,
                 callback: testCallback,
-                waitForCollectionCallback: true,
             });
             const connRoutes = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.ROUTES,
                 callback: routesCallback,
-                waitForCollectionCallback: true,
             });
             await waitForPromisesToResolve();
             testCallback.mockClear();
@@ -367,7 +360,6 @@ describe('OnyxUtils', () => {
             const connection = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.TEST_KEY,
                 callback,
-                waitForCollectionCallback: false,
             });
             await waitForPromisesToResolve();
             callback.mockReset();
@@ -640,7 +632,6 @@ describe('OnyxUtils', () => {
             const collectionCallback = jest.fn();
             Onyx.connect({
                 key: collectionKey,
-                waitForCollectionCallback: true,
                 callback: collectionCallback,
             });
             await waitForPromisesToResolve();
@@ -680,7 +671,6 @@ describe('OnyxUtils', () => {
             const collectionCallback = jest.fn();
             Onyx.connect({
                 key: collectionKey,
-                waitForCollectionCallback: true,
                 callback: collectionCallback,
             });
             await waitForPromisesToResolve();

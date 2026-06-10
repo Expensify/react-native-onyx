@@ -557,16 +557,12 @@ describe('useOnyx', () => {
             let selectorCallCount = 0;
 
             const {result, rerender} = renderHook(() =>
-                useOnyx(
-                    ONYXKEYS.COLLECTION.TEST_KEY,
-                    {
-                        selector: (collection) => {
-                            selectorCallCount++;
-                            return filterIds.map((id) => (collection as OnyxCollection<GenericCollection>)?.[`${ONYXKEYS.COLLECTION.TEST_KEY}${id}`]).filter(Boolean);
-                        },
+                useOnyx(ONYXKEYS.COLLECTION.TEST_KEY, {
+                    selector: (collection) => {
+                        selectorCallCount++;
+                        return filterIds.map((id) => (collection as OnyxCollection<GenericCollection>)?.[`${ONYXKEYS.COLLECTION.TEST_KEY}${id}`]).filter(Boolean);
                     },
-                    [filterIds],
-                ),
+                }),
             );
 
             await act(async () => waitForPromisesToResolve());
@@ -623,20 +619,16 @@ describe('useOnyx', () => {
             let sortAscending = true;
 
             const {result, rerender} = renderHook(() =>
-                useOnyx(
-                    ONYXKEYS.COLLECTION.TEST_KEY,
-                    {
-                        selector: (collection) => {
-                            const typedCollection = collection as OnyxCollection<TestItem>;
-                            if (!typedCollection) return [];
+                useOnyx(ONYXKEYS.COLLECTION.TEST_KEY, {
+                    selector: (collection) => {
+                        const typedCollection = collection as OnyxCollection<TestItem>;
+                        if (!typedCollection) return [];
 
-                            const filtered = Object.values(typedCollection).filter((item) => item?.category === categoryFilter);
+                        const filtered = Object.values(typedCollection).filter((item) => item?.category === categoryFilter);
 
-                            return filtered.sort((a, b) => (sortAscending ? (a?.priority ?? 0) - (b?.priority ?? 0) : (b?.priority ?? 0) - (a?.priority ?? 0)));
-                        },
+                        return filtered.sort((a, b) => (sortAscending ? (a?.priority ?? 0) - (b?.priority ?? 0) : (b?.priority ?? 0) - (a?.priority ?? 0)));
                     },
-                    [categoryFilter, sortAscending],
-                ),
+                }),
             );
 
             await act(async () => waitForPromisesToResolve());
@@ -683,13 +675,9 @@ describe('useOnyx', () => {
             }) as UseOnyxSelector<OnyxKey, string>;
 
             const {result, rerender} = renderHook(() =>
-                useOnyx(
-                    ONYXKEYS.TEST_KEY,
-                    {
-                        selector,
-                    },
-                    dependencies,
-                ),
+                useOnyx(ONYXKEYS.TEST_KEY, {
+                    selector,
+                }),
             );
 
             await act(async () => waitForPromisesToResolve());
@@ -726,17 +714,13 @@ describe('useOnyx', () => {
             let externalValue = 'ex1';
 
             const {result, rerender} = renderHook(() =>
-                useOnyx(
-                    ONYXKEYS.COLLECTION.TEST_KEY,
-                    {
-                        selector: ((entries: OnyxCollection<{id: string; name: string}>) =>
-                            Object.entries(entries ?? {}).reduce<NonNullable<OnyxCollection<string>>>((acc, [key, value]) => {
-                                acc[key] = `${value?.id}_${externalValue}`;
-                                return acc;
-                            }, {})) as UseOnyxSelector<OnyxKey, NonNullable<OnyxCollection<string>>>,
-                    },
-                    [externalValue],
-                ),
+                useOnyx(ONYXKEYS.COLLECTION.TEST_KEY, {
+                    selector: ((entries: OnyxCollection<{id: string; name: string}>) =>
+                        Object.entries(entries ?? {}).reduce<NonNullable<OnyxCollection<string>>>((acc, [key, value]) => {
+                            acc[key] = `${value?.id}_${externalValue}`;
+                            return acc;
+                        }, {})) as UseOnyxSelector<OnyxKey, NonNullable<OnyxCollection<string>>>,
+                }),
             );
 
             await act(async () => waitForPromisesToResolve());

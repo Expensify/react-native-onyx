@@ -3,7 +3,7 @@ import StorageMock from '../../lib/storage';
 import Onyx from '../../lib/Onyx';
 import type OnyxCache from '../../lib/OnyxCache';
 import type GenericCollection from '../utils/GenericCollection';
-import type {Connection} from '../../lib/OnyxConnectionManager';
+import type {Connection} from '../../lib/Onyx';
 
 const ONYX_KEYS = {
     DEFAULT_KEY: 'defaultKey',
@@ -213,7 +213,6 @@ describe('Set data while storage is clearing', () => {
         const collectionCallback = jest.fn();
         const testConnection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST,
-            waitForCollectionCallback: true,
             callback: collectionCallback,
         });
         return (

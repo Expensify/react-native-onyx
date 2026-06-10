@@ -32,7 +32,6 @@ describe('Collection hydration with connect() followed by immediate set()', () =
         // A component connects to the collection (starts async hydration via multiGet).
         Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
-            waitForCollectionCallback: true,
             callback: mockCallback,
         });
 
@@ -74,7 +73,6 @@ describe('Collection hydration with connect() followed by immediate set()', () =
 
         Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
-            waitForCollectionCallback: true,
             callback: mockCallback,
         });
 
