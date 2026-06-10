@@ -65,7 +65,7 @@ describe('Onyx', () => {
 
     describe('writing to a collection key directly is blocked', () => {
         it('should warn and no-op when Onyx.set is called with a collection key', async () => {
-            const logAlertSpy = jest.spyOn(Logger, 'logAlert').mockImplementation(() => {});
+            const logAlertSpy = jest.spyOn(Logger, 'logAlert').mockImplementation(() => undefined);
 
             await Onyx.set(ONYX_KEYS.COLLECTION.TEST_KEY, {foo: 'bar'} as unknown as GenericCollection);
 
@@ -76,7 +76,7 @@ describe('Onyx', () => {
         });
 
         it('should warn and no-op when Onyx.merge is called with a collection key', async () => {
-            const logAlertSpy = jest.spyOn(Logger, 'logAlert').mockImplementation(() => {});
+            const logAlertSpy = jest.spyOn(Logger, 'logAlert').mockImplementation(() => undefined);
 
             await Onyx.merge(ONYX_KEYS.COLLECTION.TEST_KEY, {foo: 'bar'} as unknown as GenericCollection);
 
@@ -86,7 +86,7 @@ describe('Onyx', () => {
         });
 
         it('should strip collection keys from Onyx.multiSet while still applying the other keys', async () => {
-            const logAlertSpy = jest.spyOn(Logger, 'logAlert').mockImplementation(() => {});
+            const logAlertSpy = jest.spyOn(Logger, 'logAlert').mockImplementation(() => undefined);
 
             await Onyx.multiSet({
                 [ONYX_KEYS.COLLECTION.TEST_KEY]: {} as unknown,

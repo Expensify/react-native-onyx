@@ -3,7 +3,7 @@ import Onyx from '../../lib';
 import OnyxUtils from '../../lib/OnyxUtils';
 import type {GenericDeepRecord} from '../types';
 import utils from '../../lib/utils';
-import type {Collection, OnyxCollection} from '../../lib/types';
+import type {OnyxCollection} from '../../lib/types';
 import type GenericCollection from '../utils/GenericCollection';
 import OnyxCache from '../../lib/OnyxCache';
 import * as Logger from '../../lib/Logger';

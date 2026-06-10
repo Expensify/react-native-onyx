@@ -459,9 +459,8 @@ describe('Onyx', () => {
         });
 
         it('should warn and skip a bare collection key passed in initialKeyStates', async () => {
-            // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
             const Logger = require('../../lib/Logger');
-            const logAlertSpy = jest.spyOn(Logger, 'logAlert').mockImplementation(() => {});
+            const logAlertSpy = jest.spyOn(Logger, 'logAlert').mockImplementation(() => undefined);
 
             Onyx.init({
                 keys: ONYX_KEYS,
