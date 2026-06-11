@@ -9,6 +9,18 @@ import type {StorageKeyValuePair} from '../types';
 const DB_NAME = 'OnyxDB';
 const STORE_NAME = 'keyvaluepairs';
 
+/**
+ * Awaits an IndexedDB write transaction. idb-keyval's promisifyRequest rejects with
+ * `transaction.error`, which is `null` for an abort not caused by its own request
+ * (connection close / versionchange / a sibling transaction aborting). Normalize that
+ * `null` into a tagged AbortError.
+ */
+function promisifyWriteTransaction(transaction: IDBTransaction): Promise<void> {
+    return IDB.promisifyRequest(transaction).catch((error) => {
+        throw error ?? new DOMException('IDB write transaction aborted without an error', 'AbortError');
+    });
+}
+
 const provider: StorageProvider<UseStore | undefined> = {
     // We don't want to initialize the store while the JS bundle loads as idb-keyval will try to use global.indexedDB
     // which might not be available in certain environments that load the bundle (e.g. electron main process).
@@ -38,7 +50,13 @@ const provider: StorageProvider<UseStore | undefined> = {
             return provider.removeItem(key);
         }
 
-        return IDB.set(key, value, provider.store);
+        // Drive the write through the manual store transaction so promisifyWriteTransaction can
+        // normalize a null abort error — idb-keyval's IDB.set() awaits the raw transaction and
+        // would propagate the unclassifiable "Error: null".
+        return provider.store('readwrite', (store) => {
+            store.put(value, key);
+            return promisifyWriteTransaction(store.transaction);
+        });
     },
     multiGet(keysParam) {
         if (!provider.store) {
@@ -71,7 +89,7 @@ const provider: StorageProvider<UseStore | undefined> = {
                     }
                 }
 
-                return IDB.promisifyRequest(store.transaction);
+                return promisifyWriteTransaction(store.transaction);
             });
         });
     },
@@ -93,7 +111,7 @@ const provider: StorageProvider<UseStore | undefined> = {
                 }
             }
 
-            return IDB.promisifyRequest(store.transaction);
+            return promisifyWriteTransaction(store.transaction);
         });
     },
     clear() {
@@ -133,14 +151,22 @@ const provider: StorageProvider<UseStore | undefined> = {
             throw new Error('Store not initialized!');
         }
 
-        return IDB.del(key, provider.store);
+        return provider.store('readwrite', (store) => {
+            store.delete(key);
+            return promisifyWriteTransaction(store.transaction);
+        });
     },
     removeItems(keysParam) {
         if (!provider.store) {
             throw new Error('Store not initialized!');
         }
 
-        return IDB.delMany(keysParam, provider.store);
+        return provider.store('readwrite', (store) => {
+            for (const key of keysParam) {
+                store.delete(key);
+            }
+            return promisifyWriteTransaction(store.transaction);
+        });
     },
     getDatabaseSize() {
         if (!provider.store) {
@@ -156,6 +182,7 @@ const provider: StorageProvider<UseStore | undefined> = {
             .then((value) => ({
                 bytesUsed: value.usage ?? 0,
                 bytesRemaining: (value.quota ?? 0) - (value.usage ?? 0),
+                usageDetails: (value as StorageEstimate & {usageDetails?: Record<string, number>}).usageDetails,
             }))
             .catch((error) => {
                 throw new Error(`Unable to estimate web storage quota. Original error: ${error}`);

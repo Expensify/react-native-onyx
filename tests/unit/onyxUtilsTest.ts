@@ -156,7 +156,10 @@ describe('OnyxUtils', () => {
                 [routeA]: {name: 'Route A'},
             } as GenericCollection);
 
-            await OnyxUtils.partialSetCollection({collectionKey: ONYXKEYS.COLLECTION.ROUTES, collection: {} as GenericCollection});
+            await OnyxUtils.partialSetCollection({
+                collectionKey: ONYXKEYS.COLLECTION.ROUTES,
+                collection: {} as GenericCollection,
+            });
 
             expect(result).toEqual({
                 [routeA]: {name: 'Route A'},
@@ -226,9 +229,18 @@ describe('OnyxUtils', () => {
             const spy2 = jest.fn();
             const spy3 = jest.fn();
 
-            const conn1 = Onyx.connect({key: `${ONYXKEYS.COLLECTION.TEST_KEY}1`, callback: spy1});
-            const conn2 = Onyx.connect({key: `${ONYXKEYS.COLLECTION.TEST_KEY}2`, callback: spy2});
-            const conn3 = Onyx.connect({key: `${ONYXKEYS.COLLECTION.TEST_KEY}3`, callback: spy3});
+            const conn1 = Onyx.connect({
+                key: `${ONYXKEYS.COLLECTION.TEST_KEY}1`,
+                callback: spy1,
+            });
+            const conn2 = Onyx.connect({
+                key: `${ONYXKEYS.COLLECTION.TEST_KEY}2`,
+                callback: spy2,
+            });
+            const conn3 = Onyx.connect({
+                key: `${ONYXKEYS.COLLECTION.TEST_KEY}3`,
+                callback: spy3,
+            });
             await waitForPromisesToResolve();
             spy1.mockClear();
             spy2.mockClear();
@@ -328,8 +340,14 @@ describe('OnyxUtils', () => {
 
             const spy1 = jest.fn();
             const spy2 = jest.fn();
-            const conn1 = Onyx.connect({key: `${ONYXKEYS.COLLECTION.TEST_KEY}1`, callback: spy1});
-            const conn2 = Onyx.connect({key: `${ONYXKEYS.COLLECTION.TEST_KEY}2`, callback: spy2});
+            const conn1 = Onyx.connect({
+                key: `${ONYXKEYS.COLLECTION.TEST_KEY}1`,
+                callback: spy1,
+            });
+            const conn2 = Onyx.connect({
+                key: `${ONYXKEYS.COLLECTION.TEST_KEY}2`,
+                callback: spy2,
+            });
             await waitForPromisesToResolve();
             spy1.mockClear();
             spy2.mockClear();
@@ -381,7 +399,10 @@ describe('OnyxUtils', () => {
             // A subscriber for keyA synchronously calls Onyx.set() on keyB during its callback.
             // After multiSet completes, the cache must reflect the multiSet's value for keyB
             // (multiSet wins), and the keyB subscriber's last seen value must equal the cache.
-            await Onyx.multiSet({[ONYXKEYS.TEST_KEY]: 'initialA', [ONYXKEYS.TEST_KEY_2]: 'initialB'});
+            await Onyx.multiSet({
+                [ONYXKEYS.TEST_KEY]: 'initialA',
+                [ONYXKEYS.TEST_KEY_2]: 'initialB',
+            });
 
             const callbackA = jest.fn((value: unknown) => {
                 if (value !== 'newA') {
@@ -578,6 +599,27 @@ describe('OnyxUtils', () => {
             expect(logInfoSpy).toHaveBeenCalledWith(`Storage Quota Check -- bytesUsed: 0 bytesRemaining: Infinity. Original error: ${diskFullError}`);
         });
 
+        it('should include usageDetails in the storage quota log when available', async () => {
+            const logInfoSpy = jest.spyOn(Logger, 'logInfo');
+            const usageDetails = {
+                caches: 1500160,
+                fileSystem: 1369398,
+                indexedDB: 10419711,
+            };
+            StorageMock.setItem = jest.fn().mockRejectedValue(diskFullError);
+            StorageMock.getDatabaseSize = jest.fn().mockResolvedValue({
+                bytesUsed: 13289269,
+                bytesRemaining: 5000000,
+                usageDetails,
+            });
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+
+            expect(logInfoSpy).toHaveBeenCalledWith(
+                `Storage Quota Check -- bytesUsed: 13289269 bytesRemaining: 5000000 usageDetails: ${JSON.stringify(usageDetails)}. Original error: ${diskFullError}`,
+            );
+        });
+
         it('should include the error in logAlert when out of storage and getDatabaseSize fails', async () => {
             const dbSizeError = new Error('Failed to estimate storage');
             const logAlertSpy = jest.spyOn(Logger, 'logAlert');
@@ -651,7 +693,9 @@ describe('OnyxUtils', () => {
             // Cache must reflect the merge regardless of the multiMerge rejection. This is the
             // cache-first / storage-second invariant that mergeCollectionWithPatches must honor.
             const cachedCollection = OnyxCache.getCollectionData(collectionKey);
-            expect(cachedCollection?.[existingMemberKey]).toEqual({value: 'merged'});
+            expect(cachedCollection?.[existingMemberKey]).toEqual({
+                value: 'merged',
+            });
             expect(cachedCollection?.[newMemberKey]).toEqual({value: 'new'});
 
             // Subscribers must have been notified with the merged values.
@@ -698,6 +742,399 @@ describe('OnyxUtils', () => {
             const lastBroadcast = collectionCallback.mock.calls.at(-1)?.[0] as Record<string, unknown> | undefined;
             expect(lastBroadcast?.[newMemberKey1]).toEqual({value: 'first'});
             expect(lastBroadcast?.[newMemberKey2]).toEqual({value: 'second'});
+        });
+    });
+
+    describe('retry side-effect idempotency', () => {
+        // Save originals so each test can replace StorageMock.multiMerge / StorageMock.multiSet
+        // with a one-shot rejecting mock that triggers retryOperation's transient-error path.
+        // Restoring keeps mocks from leaking into the storage-eviction describe block below.
+        const originalMultiMerge = StorageMock.multiMerge;
+        const originalMultiSet = StorageMock.multiSet;
+
+        afterEach(() => {
+            StorageMock.multiMerge = originalMultiMerge;
+            StorageMock.multiSet = originalMultiSet;
+        });
+
+        // A retriable error: not in NON_RETRIABLE_ERRORS, not in STORAGE_ERRORS, so retryOperation
+        // re-enters the failing method on the next attempt.
+        const transientError = new Error('Transient storage error');
+
+        it('mergeCollection — waitForCollectionCallback subscriber fires once across retries', async () => {
+            const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
+            const existingMemberKey = `${collectionKey}1`;
+            const newMemberKey = `${collectionKey}2`;
+
+            await Onyx.set(existingMemberKey, {value: 'initial'});
+
+            const collectionCallback = jest.fn();
+            Onyx.connect({
+                key: collectionKey,
+                callback: collectionCallback,
+            });
+            await waitForPromisesToResolve();
+            collectionCallback.mockClear();
+
+            StorageMock.multiMerge = jest.fn(originalMultiMerge).mockRejectedValueOnce(transientError);
+
+            await Onyx.mergeCollection(collectionKey, {
+                [existingMemberKey]: {value: 'merged'},
+                [newMemberKey]: {value: 'new'},
+            } as GenericCollection);
+
+            // Before this fix, every retry attempt re-fired keysChanged() — and
+            // waitForCollectionCallback subscribers fire on every keysChanged() call by contract.
+            // After the fix, retries skip the keysChanged re-fire, so subscribers are notified
+            // exactly once per logical operation.
+            expect(collectionCallback).toHaveBeenCalledTimes(1);
+        });
+
+        it('Onyx.multiSet — collection subscriber fires once across retries', async () => {
+            const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
+            const memberKey1 = `${collectionKey}1`;
+            const memberKey2 = `${collectionKey}2`;
+
+            const collectionCallback = jest.fn();
+            Onyx.connect({
+                key: collectionKey,
+                callback: collectionCallback,
+            });
+            await waitForPromisesToResolve();
+            collectionCallback.mockClear();
+
+            StorageMock.multiSet = jest.fn(originalMultiSet).mockRejectedValueOnce(transientError);
+
+            await Onyx.multiSet({
+                [memberKey1]: {value: 'first'},
+                [memberKey2]: {value: 'second'},
+            });
+
+            expect(collectionCallback).toHaveBeenCalledTimes(1);
+        });
+
+        it('Onyx.setCollection — collection subscriber fires once across retries', async () => {
+            const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
+            const memberKey1 = `${collectionKey}1`;
+            const memberKey2 = `${collectionKey}2`;
+
+            const collectionCallback = jest.fn();
+            Onyx.connect({
+                key: collectionKey,
+                callback: collectionCallback,
+            });
+            await waitForPromisesToResolve();
+            collectionCallback.mockClear();
+
+            StorageMock.multiSet = jest.fn(originalMultiSet).mockRejectedValueOnce(transientError);
+
+            await Onyx.setCollection(collectionKey, {
+                [memberKey1]: {value: 'first'},
+                [memberKey2]: {value: 'second'},
+            } as GenericCollection);
+
+            expect(collectionCallback).toHaveBeenCalledTimes(1);
+        });
+
+        it('OnyxUtils.partialSetCollection — collection subscriber fires once across retries', async () => {
+            const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
+            const memberKey1 = `${collectionKey}1`;
+            const memberKey2 = `${collectionKey}2`;
+
+            const collectionCallback = jest.fn();
+            Onyx.connect({
+                key: collectionKey,
+                callback: collectionCallback,
+            });
+            await waitForPromisesToResolve();
+            collectionCallback.mockClear();
+
+            StorageMock.multiSet = jest.fn(originalMultiSet).mockRejectedValueOnce(transientError);
+
+            await OnyxUtils.partialSetCollection({
+                collectionKey,
+                collection: {
+                    [memberKey1]: {value: 'first'},
+                    [memberKey2]: {value: 'second'},
+                } as GenericCollection,
+            });
+
+            expect(collectionCallback).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('mergeCollection pre-warm', () => {
+        // retryOperation tests above replace StorageMock methods without restoring them, leaving
+        // rejecting mocks behind. Capture pristine refs at file-load time and restore in beforeEach
+        // so our Onyx.set seeding actually reaches the in-memory storage provider.
+        const pristineSetItem = StorageMock.setItem;
+        const pristineMultiSet = StorageMock.multiSet;
+        const pristineMultiGet = StorageMock.multiGet;
+        const pristineGetItem = StorageMock.getItem;
+        const pristineMultiMerge = StorageMock.multiMerge;
+
+        beforeEach(() => {
+            StorageMock.setItem = pristineSetItem;
+            StorageMock.multiSet = pristineMultiSet;
+            StorageMock.multiGet = pristineMultiGet;
+            StorageMock.getItem = pristineGetItem;
+            StorageMock.multiMerge = pristineMultiMerge;
+        });
+
+        // Make a key "cold" — value evicted from cache but still tracked as persisted. OnyxCache.drop
+        // also removes the key from `storageKeys`, so we re-register it afterwards to reliably hit
+        // the cold-but-persisted state regardless of getAllKeys()'s fallback path.
+        const evictFromCache = (...keys: string[]) => {
+            for (const key of keys) {
+                OnyxCache.drop(key);
+                OnyxCache.addKey(key);
+            }
+        };
+
+        it('fast path: skips storage reads entirely when every existing key is warm in cache', async () => {
+            const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
+            const existingKey1 = `${collectionKey}1`;
+            const existingKey2 = `${collectionKey}2`;
+
+            // Seed both members so they are both warm in cache and present in storage.
+            await Onyx.set(existingKey1, {value: 'initial-1'});
+            await Onyx.set(existingKey2, {value: 'initial-2'});
+
+            const multiGetSpy = jest.spyOn(StorageMock, 'multiGet');
+            const getItemSpy = jest.spyOn(StorageMock, 'getItem');
+
+            await Onyx.mergeCollection(collectionKey, {
+                [existingKey1]: {value: 'merged-1'},
+                [existingKey2]: {value: 'merged-2'},
+            } as GenericCollection);
+
+            // With every existingKey warm, the diff swaps Promise.all(get) for Promise.resolve(),
+            // so no storage reads should happen during the pre-warm.
+            expect(multiGetSpy).not.toHaveBeenCalled();
+            expect(getItemSpy).not.toHaveBeenCalled();
+
+            // Cache still reflects the merge.
+            const cached = OnyxCache.getCollectionData(collectionKey);
+            expect(cached?.[existingKey1]).toEqual({value: 'merged-1'});
+            expect(cached?.[existingKey2]).toEqual({value: 'merged-2'});
+        });
+
+        it('slow path: batches cold existing keys into a single Storage.multiGet, with no individual getItem calls', async () => {
+            const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
+            const coldKey1 = `${collectionKey}1`;
+            const coldKey2 = `${collectionKey}2`;
+            const warmKey = `${collectionKey}3`;
+
+            // Seed all three in storage, then evict two from cache so they are cold-but-persisted.
+            await Onyx.set(coldKey1, {value: 'persisted-1'});
+            await Onyx.set(coldKey2, {value: 'persisted-2'});
+            await Onyx.set(warmKey, {value: 'persisted-3'});
+            evictFromCache(coldKey1, coldKey2);
+
+            // Reset spies AFTER seeding so we only count calls made during mergeCollection itself.
+            const multiGetSpy = jest.spyOn(StorageMock, 'multiGet').mockClear();
+            const getItemSpy = jest.spyOn(StorageMock, 'getItem').mockClear();
+
+            await Onyx.mergeCollection(collectionKey, {
+                [coldKey1]: {value: 'merged-1'},
+                [coldKey2]: {value: 'merged-2'},
+                [warmKey]: {value: 'merged-3'},
+            } as GenericCollection);
+
+            // OnyxUtils.multiGet filters to cache-missing keys before issuing Storage.multiGet, so we
+            // expect exactly one batched read containing only the cold keys (the warm key is skipped).
+            expect(multiGetSpy).toHaveBeenCalledTimes(1);
+            const requestedKeys = multiGetSpy.mock.calls[0][0] as string[];
+            expect(requestedKeys.sort()).toEqual([coldKey1, coldKey2].sort());
+
+            // No individual Storage.getItem calls during pre-warm. Old code path would have fired one
+            // get() per existing key, each potentially landing in Storage.getItem on cache miss.
+            expect(getItemSpy).not.toHaveBeenCalled();
+        });
+
+        it('slow path: cold-cache merge layers the new delta on top of existing storage data (no field drops)', async () => {
+            const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
+            const coldKey = `${collectionKey}1`;
+
+            // Seed an object with multiple fields in storage, then evict from cache so the merge base
+            // must come from a storage read — not from `undefined`.
+            await Onyx.set(coldKey, {a: 1, b: 2});
+            evictFromCache(coldKey);
+
+            await Onyx.mergeCollection(collectionKey, {
+                [coldKey]: {c: 3},
+            } as GenericCollection);
+
+            // If the pre-warm did NOT populate the cache from storage, fastMerge would treat the
+            // previous value as undefined and the result would drop {a:1, b:2}. With the pre-warm
+            // running multiGet on the cold key, the merge layers {c:3} on top of {a:1, b:2}.
+            const cached = OnyxCache.getCollectionData(collectionKey);
+            expect(cached?.[coldKey]).toEqual({a: 1, b: 2, c: 3});
+        });
+
+        it('warm cache: subscriber receives a single merged broadcast for an Onyx.update batch (no transient undefined)', async () => {
+            const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
+            const existingKey = `${collectionKey}1`;
+
+            await Onyx.set(existingKey, {value: 'initial'});
+
+            const collectionCallback = jest.fn();
+            Onyx.connect({
+                key: collectionKey,
+                callback: collectionCallback,
+            });
+            await waitForPromisesToResolve();
+            collectionCallback.mockClear();
+
+            await Onyx.update([
+                {
+                    onyxMethod: Onyx.METHOD.MERGE_COLLECTION,
+                    key: collectionKey,
+                    value: {
+                        [existingKey]: {value: 'merged'},
+                    } as GenericCollection,
+                },
+            ]);
+
+            // The fast path resolves the pre-warm synchronously (Promise.resolve()), preserving the
+            // original promise-chain depth. The Onyx.update batch must therefore broadcast exactly
+            // one merged value — not undefined first and the merged value on a later microtask.
+            const broadcasts = collectionCallback.mock.calls.map((c) => c[0]);
+            expect(broadcasts).toHaveLength(1);
+            expect(broadcasts[0]?.[existingKey]).toEqual({value: 'merged'});
+        });
+
+        it('equivalence: warm-path and cold-path produce the same final cache state for the same merge', async () => {
+            const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
+            const memberKey = `${collectionKey}1`;
+            const delta = {value: 'after'} as const;
+
+            // Warm-path run.
+            await Onyx.set(memberKey, {value: 'before', extra: 'kept'});
+            await Onyx.mergeCollection(collectionKey, {
+                [memberKey]: delta,
+            } as GenericCollection);
+            const warmResult = OnyxCache.getCollectionData(collectionKey)?.[memberKey];
+
+            // Reset and replay with a cold cache before the merge.
+            await Onyx.clear();
+            await Onyx.set(memberKey, {value: 'before', extra: 'kept'});
+            evictFromCache(memberKey);
+            await Onyx.mergeCollection(collectionKey, {
+                [memberKey]: delta,
+            } as GenericCollection);
+            const coldResult = OnyxCache.getCollectionData(collectionKey)?.[memberKey];
+
+            expect(warmResult).toEqual(coldResult);
+            expect(coldResult).toEqual({value: 'after', extra: 'kept'});
+        });
+
+        it('preserves cache-first invariant when Storage.multiGet rejects on the slow path', async () => {
+            // A Storage.multiGet rejection during pre-warm must not skip the cache.merge() +
+            // keysChanged() that follow. Without the .catch() at the pre-warm call site,
+            // subscribers would miss the merge and Onyx.mergeCollection would reject.
+            const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
+            const coldMemberKey = `${collectionKey}1`;
+            const newMemberKey = `${collectionKey}2`;
+
+            // Seed an existing member, then evict it from cache so it's "tracked but unloaded" —
+            // the slow path will try to multiGet it.
+            await Onyx.set(coldMemberKey, {value: 'persisted'});
+            evictFromCache(coldMemberKey);
+
+            // Connect and flush the subscriber's initial load BEFORE installing the rejecting mock —
+            // otherwise the connect's own multiGet (no .catch) consumes the mockRejectedValueOnce and
+            // leaks an unhandled rejection instead of exercising the merge pre-warm path.
+            const collectionCallback = jest.fn();
+            Onyx.connect({
+                key: collectionKey,
+                callback: collectionCallback,
+            });
+            await waitForPromisesToResolve();
+            collectionCallback.mockClear();
+
+            // The subscriber's connect re-populated cache, so re-evict to force the merge into
+            // the slow (cold-key) path. Then reject the next Storage.multiGet so the pre-warm
+            // read fails.
+            evictFromCache(coldMemberKey);
+            const transientError = new Error('Transient IndexedDB read error');
+            StorageMock.multiGet = jest.fn(pristineMultiGet).mockRejectedValueOnce(transientError);
+
+            // Outer promise must resolve, not reject, even when the pre-warm read fails.
+            let outerRejected: unknown = null;
+            const result = await Onyx.mergeCollection(collectionKey, {
+                [coldMemberKey]: {merged: true},
+                [newMemberKey]: {value: 'new'},
+            } as GenericCollection).catch((e: unknown) => {
+                outerRejected = e;
+            });
+            expect(outerRejected).toBeNull();
+            expect(result).toBeUndefined();
+
+            // cache.merge() + keysChanged() must still fire so subscribers see the merge. Use
+            // toMatchObject because a concurrent read may have re-populated the persisted value;
+            // what matters is that the new {merged: true} delta is applied on top.
+            expect(collectionCallback).toHaveBeenCalled();
+            const lastBroadcast = collectionCallback.mock.calls.at(-1)?.[0] as Record<string, unknown> | undefined;
+            expect(lastBroadcast?.[coldMemberKey]).toMatchObject({merged: true});
+            expect(lastBroadcast?.[newMemberKey]).toEqual({value: 'new'});
+        });
+    });
+
+    describe('multiGet cache hit consistency', () => {
+        // Same suite-pollution guard as the pre-warm block above — capture pristine StorageMock
+        // refs at file-load time and restore them in beforeEach, since retryOperation tests leak.
+        const pristineSetItem = StorageMock.setItem;
+        const pristineMultiGet = StorageMock.multiGet;
+        const pristineGetItem = StorageMock.getItem;
+
+        beforeEach(() => {
+            StorageMock.setItem = pristineSetItem;
+            StorageMock.multiGet = pristineMultiGet;
+            StorageMock.getItem = pristineGetItem;
+        });
+
+        it('does not re-fetch a cached falsy value from storage', async () => {
+            const falsyKey = ONYXKEYS.TEST_KEY;
+
+            // Seed cache with the falsy value 0 (a number, but the same logic applies to '',
+            // false, and null). Using `Onyx.set` ensures the value lands in cache and storage.
+            await Onyx.set(falsyKey, 0);
+
+            // Spy on Storage methods to confirm multiGet does NOT round-trip to storage for
+            // the cached falsy value.
+            const multiGetSpy = jest.spyOn(StorageMock, 'multiGet');
+            const getItemSpy = jest.spyOn(StorageMock, 'getItem');
+
+            const result = await OnyxUtils.multiGet([falsyKey]);
+
+            // The cached value must be returned without any storage read. Before this fix,
+            // `if (cacheValue)` treated the cached 0 as a miss and triggered Storage.multiGet,
+            // which would then overwrite the warm value via cache.merge().
+            expect(multiGetSpy).not.toHaveBeenCalled();
+            expect(getItemSpy).not.toHaveBeenCalled();
+            expect(result.get(falsyKey)).toBe(0);
+        });
+
+        it('prefers cache when a concurrent write lands during the storage read', async () => {
+            // Concurrent write during multiGet's storage read must not be overwritten by the
+            // stale snapshot via cache.merge.
+            const key = `${ONYXKEYS.COLLECTION.TEST_KEY}race`;
+
+            OnyxCache.drop(key);
+            OnyxCache.addKey(key);
+
+            // Set cache inside the mock so it lands before Storage.multiGet's promise resolves —
+            // multiGet's .then() then sees a populated cache and skips writing the stale value.
+            StorageMock.multiGet = jest.fn().mockImplementation(() => {
+                OnyxCache.set(key, {fresh: 'data'});
+                return Promise.resolve([[key, {stale: 'a', alsoStale: 'b'}]]);
+            });
+
+            const result = await OnyxUtils.multiGet([key]);
+
+            expect(OnyxCache.get(key)).toEqual({fresh: 'data'});
+            expect(result.get(key)).toEqual({fresh: 'data'});
         });
     });
 
@@ -785,7 +1222,9 @@ describe('OnyxUtils', () => {
             // No more evictable candidates
             expect(LocalOnyxCache.getKeyForEviction()).toBeUndefined();
             // Non-evictable key should still be in cache
-            expect(LocalOnyxCache.get(ONYXKEYS.TEST_KEY)).toEqual({test: 'not evictable'});
+            expect(LocalOnyxCache.get(ONYXKEYS.TEST_KEY)).toEqual({
+                test: 'not evictable',
+            });
         });
 
         it('should not add collection keys to eviction candidates, only their members', async () => {
@@ -811,8 +1250,12 @@ describe('OnyxUtils', () => {
             LocalOnyxCache = require('../../lib/OnyxCache').default;
             const storage = require('../../lib/storage').default;
 
-            await storage.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}pre1`, {id: 'pre1'});
-            await storage.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}pre2`, {id: 'pre2'});
+            await storage.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}pre1`, {
+                id: 'pre1',
+            });
+            await storage.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}pre2`, {
+                id: 'pre2',
+            });
 
             // Init — addEvictableKeysToRecentlyAccessedList should seed them
             LocalOnyx.init({
@@ -839,6 +1282,116 @@ describe('OnyxUtils', () => {
 
             expect(logInfoSpy).toHaveBeenCalledWith(`Out of storage. Evicting least recently accessed key (${key1}) and retrying. Error: ${diskFullError}`);
             expect(logInfoSpy).toHaveBeenCalledWith(`Storage Quota Check -- bytesUsed: 0 bytesRemaining: Infinity. Original error: ${diskFullError}`);
+        });
+
+        it('multiSet — eviction of an UNRELATED key still notifies its subscribers (codex regression guard)', async () => {
+            const evictableKey = `${ONYXKEYS.COLLECTION.TEST_KEY}1`;
+            const writeKey = `${ONYXKEYS.COLLECTION.TEST_KEY}2`;
+
+            // Seed the evictable key first so it becomes the LRU evictable. The subsequent multiSet
+            // writes a DIFFERENT key, so the evicted key is unrelated to the in-flight write.
+            await LocalOnyx.set(evictableKey, {value: 'will-be-evicted'});
+            expect(LocalOnyxCache.getKeyForEviction()).toBe(evictableKey);
+
+            const subscriberCalls: unknown[] = [];
+            LocalOnyx.connect({
+                key: evictableKey,
+                callback: (value) => subscriberCalls.push(value),
+            });
+            await waitForPromisesToResolve();
+            subscriberCalls.length = 0;
+
+            // Storage.multiSet rejects once with disk-full, then succeeds on retry.
+            LocalStorageMock.multiSet = jest.fn(LocalStorageMock.multiSet).mockRejectedValueOnce(diskFullError).mockImplementation(LocalStorageMock.multiSet);
+
+            await LocalOnyx.multiSet({[writeKey]: {value: 'new'}});
+
+            // evictableKey was the LRU evictable, so retryOperation evicted it. It's not in the
+            // in-flight write's keys, so the retry's cache.set won't restore it — subscribers MUST
+            // see keyChanged(undefined) so they reflect the genuine removal (not stale value).
+            expect(LocalOnyxCache.hasCacheForKey(evictableKey)).toBe(false);
+            expect(subscriberCalls.at(-1)).toBeUndefined();
+        });
+
+        it('multiSet — eviction of an IN-FLIGHT key does not strand its subscriber', async () => {
+            const memberKey = `${ONYXKEYS.COLLECTION.TEST_KEY}1`;
+
+            // Seed memberKey so it becomes the LRU evictable. The multiSet below writes to the SAME
+            // key, so eviction picks an in-flight key.
+            await LocalOnyx.set(memberKey, {value: 'original'});
+            expect(LocalOnyxCache.getKeyForEviction()).toBe(memberKey);
+
+            const subscriberCalls: unknown[] = [];
+            LocalOnyx.connect({
+                key: memberKey,
+                callback: (value) => subscriberCalls.push(value),
+            });
+            await waitForPromisesToResolve();
+            subscriberCalls.length = 0;
+
+            LocalStorageMock.multiSet = jest.fn(LocalStorageMock.multiSet).mockRejectedValueOnce(diskFullError).mockImplementation(LocalStorageMock.multiSet);
+
+            await LocalOnyx.multiSet({[memberKey]: {value: 'updated'}});
+
+            // The in-flight key is excluded from eviction, so its cache value (the merge base) is
+            // never dropped. Subscriber's last value is the new value, never a transient undefined.
+            expect(LocalOnyxCache.get(memberKey)).toEqual({value: 'updated'});
+            expect(subscriberCalls.at(-1)).toEqual({value: 'updated'});
+            // Subscriber should never have seen undefined in the middle of the eviction-retry cycle.
+            expect(subscriberCalls).not.toContain(undefined);
+        });
+
+        it('mergeCollection — evicts an unrelated key, not the in-flight key, so its fields survive', async () => {
+            const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
+            const memberKey = `${collectionKey}1`;
+            const unrelatedKey = `${collectionKey}2`;
+
+            // Seed the in-flight member with extra fields, plus a separate evictable key. The merge
+            // only touches memberKey; the unrelated key is the genuine eviction target.
+            await LocalOnyx.set(memberKey, {id: 1, value: 'orig'});
+            await LocalOnyx.set(unrelatedKey, {value: 'evict-me'});
+
+            const memberCalls: unknown[] = [];
+            LocalOnyx.connect({key: memberKey, callback: (value) => memberCalls.push(value)});
+            await waitForPromisesToResolve();
+            memberCalls.length = 0;
+
+            // Storage.multiMerge rejects once with disk-full, then succeeds on retry.
+            LocalStorageMock.multiMerge = jest.fn(LocalStorageMock.multiMerge).mockRejectedValueOnce(diskFullError).mockImplementation(LocalStorageMock.multiMerge);
+
+            await LocalOnyx.mergeCollection(collectionKey, {[memberKey]: {value: 'merged'}} as GenericCollection);
+
+            // The old code evicted the in-flight key and re-ran the merge against an empty cache,
+            // collapsing {id: 1, value: 'orig'} + {value: 'merged'} to just {value: 'merged'}. Now
+            // the in-flight key is protected, so its pre-existing {id: 1} survives.
+            expect(LocalOnyxCache.get(memberKey)).toEqual({id: 1, value: 'merged'});
+            expect(memberCalls.at(-1)).toEqual({id: 1, value: 'merged'});
+            expect(memberCalls).not.toContain(undefined);
+            // The unrelated key was the genuine eviction target.
+            expect(LocalOnyxCache.hasCacheForKey(unrelatedKey)).toBe(false);
+        });
+
+        it('mergeCollection — does not truncate the in-flight key when it is the only evictable key', async () => {
+            const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
+            const memberKey = `${collectionKey}1`;
+
+            await LocalOnyx.set(memberKey, {id: 1, value: 'orig'});
+            expect(LocalOnyxCache.getKeyForEviction()).toBe(memberKey);
+
+            const memberCalls: unknown[] = [];
+            LocalOnyx.connect({key: memberKey, callback: (value) => memberCalls.push(value)});
+            await waitForPromisesToResolve();
+            memberCalls.length = 0;
+
+            // The only evictable key is the in-flight one, which is now excluded — so retryOperation
+            // finds no acceptable key and reports the quota instead of dropping (and truncating) it.
+            LocalStorageMock.multiMerge = jest.fn(LocalStorageMock.multiMerge).mockRejectedValue(diskFullError);
+
+            await LocalOnyx.mergeCollection(collectionKey, {[memberKey]: {value: 'merged'}} as GenericCollection);
+
+            expect(LocalOnyxCache.get(memberKey)).toEqual({id: 1, value: 'merged'});
+            expect(memberCalls.at(-1)).toEqual({id: 1, value: 'merged'});
+            expect(memberCalls).not.toContain(undefined);
         });
     });
 
