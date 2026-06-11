@@ -1,6 +1,6 @@
-import {deepEqual, shallowEqual} from 'fast-equals';
+import {shallowEqual} from 'fast-equals';
 import {useCallback, useEffect, useMemo, useRef, useSyncExternalStore} from 'react';
-import type {DependencyList} from 'react';
+import createMemoizedSelector from './createMemoizedSelector';
 import OnyxCache, {TASK} from './OnyxCache';
 import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
@@ -8,7 +8,6 @@ import OnyxUtils from './OnyxUtils';
 import OnyxKeys from './OnyxKeys';
 import type {CollectionKeyBase, OnyxKey, OnyxValue} from './types';
 import onyxSnapshotCache from './OnyxSnapshotCache';
-import useLiveRef from './useLiveRef';
 
 type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (data: OnyxValue<TKey> | undefined) => TReturnValue;
 
@@ -38,49 +37,19 @@ type ResultMetadata<TValue> = {
 
 type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata<TValue>];
 
-function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
-    key: TKey,
-    options?: UseOnyxOptions<TKey, TReturnValue>,
-    dependencies: DependencyList = [],
-): UseOnyxResult<TReturnValue> {
+function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey, options?: UseOnyxOptions<TKey, TReturnValue>): UseOnyxResult<TReturnValue> {
     const connectionRef = useRef<Connection | null>(null);
-    const currentDependenciesRef = useLiveRef(dependencies);
     const selector = options?.selector;
 
-    // Create memoized version of selector for performance
+    // Create memoized version of selector for performance. It caches by input reference
+    // with a deepEqual fallback on the output to keep the returned reference stable.
     const memoizedSelector = useMemo((): UseOnyxSelector<TKey, TReturnValue> | null => {
         if (!selector) {
             return null;
         }
 
-        let lastInput: OnyxValue<TKey> | undefined;
-        let lastOutput: TReturnValue;
-        let lastDependencies: DependencyList = [];
-        let hasComputed = false;
-
-        return (input: OnyxValue<TKey> | undefined): TReturnValue => {
-            const currentDependencies = currentDependenciesRef.current;
-
-            // Recompute if input changed, dependencies changed, or first time
-            const dependenciesChanged = !shallowEqual(lastDependencies, currentDependencies);
-            if (!hasComputed || lastInput !== input || dependenciesChanged) {
-                const newOutput = selector(input);
-
-                // Always track the current input to avoid re-running the selector
-                // when the same input is seen again (even if the output didn't change).
-                lastInput = input;
-
-                // Only update the output reference if it actually changed
-                if (!hasComputed || !deepEqual(lastOutput, newOutput) || dependenciesChanged) {
-                    lastOutput = newOutput;
-                    lastDependencies = [...currentDependencies];
-                    hasComputed = true;
-                }
-            }
-
-            return lastOutput;
-        };
-    }, [currentDependenciesRef, selector]);
+        return createMemoizedSelector(selector);
+    }, [selector]);
 
     // Stores the previous cached value as it's necessary to compare with the new value in `getSnapshot()`.
     // We initialize it to `null` to simulate that we don't have any value from cache yet.
@@ -131,33 +100,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     );
 
     useEffect(() => () => onyxSnapshotCache.deregisterConsumer(key, cacheKey), [key, cacheKey]);
-
-    // Track previous dependencies to prevent infinite loops
-    const previousDependenciesRef = useRef<DependencyList>([]);
-
-    useEffect(() => {
-        // This effect will only run if the `dependencies` array changes. If it changes it will force the hook
-        // to trigger a `getSnapshot()` update by calling the stored `onStoreChange()` function reference, thus
-        // re-running the hook and returning the latest value to the consumer.
-
-        // Deep equality check to prevent infinite loops when dependencies array reference changes
-        // but content remains the same
-        if (shallowEqual(previousDependenciesRef.current, dependencies)) {
-            return;
-        }
-
-        previousDependenciesRef.current = dependencies;
-
-        if (connectionRef.current === null || isConnectingRef.current || connectedKeyRef.current !== key || !onStoreChangeFnRef.current) {
-            return;
-        }
-
-        // Invalidate cache when dependencies change so selector runs with new closure values
-        onyxSnapshotCache.invalidateForKey(key);
-        shouldGetCachedValueRef.current = true;
-        onStoreChangeFnRef.current();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [...dependencies]);
 
     // Tracks the last memoizedSelector reference that getSnapshot() has computed with.
     // When the selector changes, this mismatch forces getSnapshot() to re-evaluate
