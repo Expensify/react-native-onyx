@@ -213,7 +213,6 @@ describe('Set data while storage is clearing', () => {
         const collectionCallback = jest.fn();
         const testConnection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST,
-            waitForCollectionCallback: true,
             callback: collectionCallback,
         });
         return (
