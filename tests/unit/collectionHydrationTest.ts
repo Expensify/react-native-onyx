@@ -26,7 +26,7 @@ describe('Collection hydration with connect() followed by immediate set()', () =
 
     afterEach(() => Onyx.clear());
 
-    test('collection connect should deliver full collection from storage', async () => {
+    test('waitForCollectionCallback=true should deliver full collection from storage', async () => {
         const mockCallback = jest.fn();
 
         // A component connects to the collection (starts async hydration via multiGet).

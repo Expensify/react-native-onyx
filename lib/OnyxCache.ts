@@ -477,18 +477,16 @@ class OnyxCache {
 
         const snapshot = this.collectionSnapshots.get(collectionKey);
 
-        // We never stored anything for this collection key.
+        // No entry for this collection key means init hasn't seeded it yet (pre-load), so there's
+        // genuinely nothing to return. `setCollectionKeys()` (called inside `Onyx.init`) seeds every
+        // known collection with a frozen empty entry, so the presence of an entry is the reliable
+        // post-init "loaded" signal — and unlike `storageKeys.size > 0`, it doesn't flip back to
+        // "not loaded" after `Onyx.clear()` wipes the storage-keys index. An empty collection is
+        // stored as the shared `FROZEN_EMPTY_COLLECTION` reference (see `rebuildCollectionSnapshot`),
+        // so returning `snapshot` directly hands back that frozen empty object with a quick `===`
+        // check and no per-read `isEmptyObject` scan.
         if (snapshot === undefined) {
             return undefined;
-        }
-
-        // The collection is empty (it holds our shared empty object). But "empty" is ambiguous
-        // during startup: we can't tell an actually-empty collection apart from one whose data
-        // hasn't loaded yet. Once any key exists, we know setAllKeys has run and loaded everything,
-        // so an empty collection really is empty. Before that, return undefined so subscribers
-        // don't briefly see a collection as empty when it just hasn't loaded.
-        if (snapshot === FROZEN_EMPTY_COLLECTION) {
-            return this.storageKeys.size > 0 ? FROZEN_EMPTY_COLLECTION : undefined;
         }
 
         return snapshot;
