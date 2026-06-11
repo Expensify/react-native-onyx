@@ -139,7 +139,7 @@ describe('OnyxConnectionManager', () => {
             expect(callback1).toHaveBeenNthCalledWith(2, obj2, `${ONYXKEYS.COLLECTION.TEST_KEY}entry2`);
 
             expect(callback2).toHaveBeenCalledTimes(1);
-            expect(callback2).toHaveBeenCalledWith(collection, ONYXKEYS.COLLECTION.TEST_KEY, undefined);
+            expect(callback2).toHaveBeenCalledWith(collection, ONYXKEYS.COLLECTION.TEST_KEY);
 
             connectionManager.disconnect(connection1);
             connectionManager.disconnect(connection2);
@@ -412,8 +412,8 @@ describe('OnyxConnectionManager', () => {
         });
     });
 
-    describe('sourceValue parameter', () => {
-        it('should pass the sourceValue parameter to collection callbacks when waitForCollectionCallback is true', async () => {
+    describe('collection callback arguments', () => {
+        it('should call collection callbacks with only value and key when waitForCollectionCallback is true', async () => {
             const obj1 = {id: 'entry1_id', name: 'entry1_name'};
             const obj2 = {id: 'entry2_id', name: 'entry2_name'};
 
@@ -428,7 +428,7 @@ describe('OnyxConnectionManager', () => {
 
             // Initial callback with undefined values
             expect(callback).toHaveBeenCalledTimes(1);
-            expect(callback).toHaveBeenCalledWith(undefined, ONYXKEYS.COLLECTION.TEST_KEY, undefined);
+            expect(callback).toHaveBeenCalledWith(undefined, ONYXKEYS.COLLECTION.TEST_KEY);
 
             // Reset mock to test the next update
             callback.mockReset();
@@ -437,7 +437,7 @@ describe('OnyxConnectionManager', () => {
             await Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`, obj1);
 
             expect(callback).toHaveBeenCalledTimes(1);
-            expect(callback).toHaveBeenCalledWith({[`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: obj1}, ONYXKEYS.COLLECTION.TEST_KEY, {[`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: obj1});
+            expect(callback).toHaveBeenCalledWith({[`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: obj1}, ONYXKEYS.COLLECTION.TEST_KEY);
 
             // Reset mock to test the next update
             callback.mockReset();
@@ -452,13 +452,12 @@ describe('OnyxConnectionManager', () => {
                     [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: obj2,
                 },
                 ONYXKEYS.COLLECTION.TEST_KEY,
-                {[`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: obj2},
             );
 
             connectionManager.disconnect(connection);
         });
 
-        it('should not pass sourceValue to regular callbacks when waitForCollectionCallback is false', async () => {
+        it('should call regular callbacks with only value and key when waitForCollectionCallback is false', async () => {
             const obj1 = {id: 'entry1_id', name: 'entry1_name'};
 
             const callback = jest.fn();

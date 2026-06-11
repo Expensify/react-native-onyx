@@ -45,11 +45,6 @@ type ConnectionMetadata = {
     cachedCallbackKey?: OnyxKey;
 
     /**
-     * The value that triggered the last update
-     */
-    sourceValue?: OnyxValue<OnyxKey>;
-
-    /**
      * Whether the subscriber is waiting for the collection callback to be fired.
      */
     waitForCollectionCallback?: boolean;
@@ -143,7 +138,7 @@ class OnyxConnectionManager {
 
         for (const callback of connection.callbacks.values()) {
             if (connection.waitForCollectionCallback) {
-                (callback as CollectionConnectCallback<OnyxKey>)(connection.cachedCallbackValue as Record<string, unknown>, connection.cachedCallbackKey as OnyxKey, connection.sourceValue);
+                (callback as CollectionConnectCallback<OnyxKey>)(connection.cachedCallbackValue as Record<string, unknown>, connection.cachedCallbackKey as OnyxKey);
             } else {
                 (callback as DefaultConnectCallback<OnyxKey>)(connection.cachedCallbackValue, connection.cachedCallbackKey as OnyxKey);
             }
@@ -165,7 +160,7 @@ class OnyxConnectionManager {
 
         // If there is no connection yet for that connection ID, we create a new one.
         if (!connectionMetadata) {
-            const callback: ConnectCallback = (value, key, sourceValue) => {
+            const callback: ConnectCallback = (value: OnyxValue<OnyxKey>, key: OnyxKey) => {
                 const createdConnection = this.connectionsMap.get(connectionID);
                 if (createdConnection) {
                     // We signal that the first connection was made and now any new subscribers
@@ -173,7 +168,6 @@ class OnyxConnectionManager {
                     createdConnection.isConnectionMade = true;
                     createdConnection.cachedCallbackValue = value;
                     createdConnection.cachedCallbackKey = key;
-                    createdConnection.sourceValue = sourceValue;
                     this.fireCallbacks(connectionID);
                 }
             };

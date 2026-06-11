@@ -553,11 +553,10 @@ describe('OnyxUtils', () => {
             OnyxUtils.keysChanged(ONYXKEYS.COLLECTION.TEST_KEY, {[entryKey]: entryData}, {});
 
             expect(collectionCallback).toHaveBeenCalledTimes(1);
-            // Collection subscriber receives the full cached collection, subscriber.key, and partial
-            const [receivedCollection, receivedKey, receivedPartial] = collectionCallback.mock.calls[0];
+            // Collection subscriber receives the full cached collection and subscriber.key
+            const [receivedCollection, receivedKey] = collectionCallback.mock.calls[0];
             expect(receivedKey).toBe(ONYXKEYS.COLLECTION.TEST_KEY);
             expect(receivedCollection[entryKey]).toEqual(entryData);
-            expect(receivedPartial).toEqual({[entryKey]: entryData});
 
             Onyx.disconnect(connection);
         });

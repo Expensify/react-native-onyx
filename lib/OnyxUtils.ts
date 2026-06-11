@@ -600,7 +600,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
             lastConnectionCallbackData.set(subscriber.subscriptionID, {value: cachedCollection, matchedKey: subscriber.key});
 
             if (subscriber.waitForCollectionCallback) {
-                subscriber.callback(cachedCollection, subscriber.key, partialCollection);
+                subscriber.callback(cachedCollection, subscriber.key);
                 continue;
             }
 
@@ -710,7 +710,7 @@ function keyChanged<TKey extends OnyxKey>(
                         cachedCollections[subscriber.key] = cachedCollection;
                     }
                     lastConnectionCallbackData.set(subscriber.subscriptionID, {value: cachedCollection, matchedKey: subscriber.key});
-                    subscriber.callback(cachedCollection, subscriber.key, {[key]: value});
+                    subscriber.callback(cachedCollection, subscriber.key);
                     continue;
                 }
 
