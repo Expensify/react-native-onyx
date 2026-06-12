@@ -458,6 +458,30 @@ describe('Onyx', () => {
             OnyxKeys = require('../../lib/OnyxKeys').default;
         });
 
+        it('should warn and skip a bare collection key passed in initialKeyStates', async () => {
+            const Logger = require('../../lib/Logger');
+            const logAlertSpy = jest.spyOn(Logger, 'logAlert').mockImplementation(() => undefined);
+
+            Onyx.init({
+                keys: ONYX_KEYS,
+                initialKeyStates: {
+                    [ONYX_KEYS.TEST_KEY]: 'defaultValue',
+                    // Anti-pattern: a default targeting the bare collection key.
+                    [ONYX_KEYS.COLLECTION.MOCK_COLLECTION]: {id: 1},
+                } as Record<string, unknown>,
+            });
+            await waitForPromisesToResolve();
+
+            expect(logAlertSpy).toHaveBeenCalledWith(expect.stringContaining(ONYX_KEYS.COLLECTION.MOCK_COLLECTION));
+            // The regular-key default still applies...
+            expect(cache.get(ONYX_KEYS.TEST_KEY)).toEqual('defaultValue');
+            // ...but the bare collection key default is dropped — no phantom member.
+            expect(cache.get(ONYX_KEYS.COLLECTION.MOCK_COLLECTION)).toBeUndefined();
+            expect(cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION)).not.toHaveProperty(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+
+            logAlertSpy.mockRestore();
+        });
+
         describe('eager loading during initialisation', () => {
             beforeEach(() => {
                 StorageMock = require('../../lib/storage').default;
@@ -599,11 +623,33 @@ describe('Onyx', () => {
                 expect(Object.keys(first!)).toHaveLength(0);
             });
 
-            it('should return undefined for empty collections when no keys are loaded', async () => {
+            it('should return the frozen-empty snapshot for empty collections once init has registered the collection key', async () => {
                 await initOnyx();
 
+                // Post-init, a known collection key with no members resolves to the frozen
+                // empty snapshot — not `undefined`. Returning `{}` reliably across init,
+                // writes, and `Onyx.clear()` keeps `Onyx.connect({waitForCollectionCallback: true})`
+                // subscribers seeing a consistent "collection is empty" signal instead of
+                // mistakenly skipping the update.
                 const result = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
-                expect(result).toBeUndefined();
+                expect(result).toEqual({});
+            });
+
+            it('should not surface a direct write to the collection root key as a member', async () => {
+                await initOnyx();
+
+                // Anti-pattern: a value written directly to the bare collection key lands in the
+                // cache under the prefix key. `getCollectionKey('mockCollection_')` returns
+                // `'mockCollection_'`, so without the read guard it would be scanned as a member of
+                // itself and surface as a phantom `{mockCollection_: ...}` entry. We write via the
+                // cache directly (bypassing the public `set()` write-guard) and with NO real
+                // members present, which forces the storageKeys fallback scan where the bug lived.
+                cache.set(ONYX_KEYS.COLLECTION.MOCK_COLLECTION, {});
+
+                const result = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+
+                expect(result).not.toHaveProperty(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+                expect(result).toEqual({});
             });
 
             it('should return a new reference when a member is removed and another added simultaneously', async () => {

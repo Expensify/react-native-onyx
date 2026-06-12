@@ -7,9 +7,9 @@ import StorageMock from '../../lib/storage';
 import OnyxCache from '../../lib/OnyxCache';
 import OnyxKeys from '../../lib/OnyxKeys';
 import OnyxUtils, {clearOnyxUtilsInternals} from '../../lib/OnyxUtils';
+import onyxStore from '../../lib/OnyxStore';
 import type GenericCollection from '../utils/GenericCollection';
 import type {OnyxUpdate} from '../../lib/Onyx';
-import createDeferredTask from '../../lib/createDeferredTask';
 import type {OnyxEntry, OnyxInputKeyValueMapping, OnyxKey, RetriableOnyxOperation} from '../../lib/types';
 
 const ONYXKEYS = {
@@ -298,134 +298,61 @@ describe('OnyxUtils', () => {
         });
     });
 
-    describe('keysChanged', () => {
+    describe('notifyCollection', () => {
         test('one call with 10k heavy objects to update 10k subscribers', async () => {
-            const subscriptionMap = new Map<string, number>();
+            const unsubscribes: Array<() => void> = [];
 
             const changedReportActions = Object.fromEntries(
                 Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const),
             ) as GenericCollection;
 
-            await measureFunction(() => OnyxUtils.keysChanged(collectionKey, changedReportActions, mockedReportActionsMap), {
+            await measureFunction(() => OnyxUtils.notifyCollection(collectionKey, changedReportActions, mockedReportActionsMap), {
                 beforeEach: async () => {
                     await Onyx.multiSet(mockedReportActionsMap);
                     for (const key of mockedReportActionsKeys) {
-                        const id = OnyxUtils.subscribeToKey({key, callback: jest.fn()});
-                        subscriptionMap.set(key, id);
+                        unsubscribes.push(onyxStore.subscribe(key, jest.fn()));
                     }
                 },
                 afterEach: async () => {
-                    for (const key of mockedReportActionsKeys) {
-                        const id = subscriptionMap.get(key);
-                        if (id) {
-                            OnyxUtils.unsubscribeFromKey(id);
-                        }
+                    for (const unsubscribe of unsubscribes) {
+                        unsubscribe();
                     }
-                    subscriptionMap.clear();
+                    unsubscribes.length = 0;
                     await clearOnyxAfterEachMeasure();
                 },
             });
         });
     });
 
-    describe('keyChanged', () => {
+    describe('notifyKey', () => {
         test('one call with one heavy object to update 10k subscribers', async () => {
-            const subscriptionIDs = new Set<number>();
+            const unsubscribes: Array<() => void> = [];
 
             const key = `${collectionKey}0`;
             const previousReportAction = mockedReportActionsMap[`${collectionKey}0`];
             const changedReportAction = createRandomReportAction(Number(previousReportAction.reportActionID));
 
-            await measureFunction(() => OnyxUtils.keyChanged(key, changedReportAction), {
+            await measureFunction(() => OnyxUtils.notifyKey(key, changedReportAction), {
                 beforeEach: async () => {
                     await Onyx.set(key, previousReportAction);
                     for (let i = 0; i < 10000; i++) {
-                        const id = OnyxUtils.subscribeToKey({key, callback: jest.fn()});
-                        subscriptionIDs.add(id);
+                        unsubscribes.push(onyxStore.subscribe(key, jest.fn()));
                     }
                 },
                 afterEach: async () => {
-                    for (const id of subscriptionIDs) {
-                        OnyxUtils.unsubscribeFromKey(id);
+                    for (const unsubscribe of unsubscribes) {
+                        unsubscribe();
                     }
-                    subscriptionIDs.clear();
+                    unsubscribes.length = 0;
                     await clearOnyxAfterEachMeasure();
                 },
             });
-        });
-    });
-
-    describe('sendDataToConnection', () => {
-        test('one call with 10k heavy objects', async () => {
-            let subscriptionID = -1;
-
-            await measureFunction(
-                () =>
-                    OnyxUtils.sendDataToConnection(
-                        {
-                            key: collectionKey,
-                            subscriptionID,
-                            callback: jest.fn(),
-                        },
-                        undefined,
-                    ),
-                {
-                    beforeEach: async () => {
-                        await Onyx.multiSet(mockedReportActionsMap);
-                        subscriptionID = OnyxUtils.subscribeToKey({key: collectionKey, callback: jest.fn()});
-                    },
-                    afterEach: async () => {
-                        if (subscriptionID) {
-                            OnyxUtils.unsubscribeFromKey(subscriptionID);
-                        }
-                        await clearOnyxAfterEachMeasure();
-                    },
-                },
-            );
         });
     });
 
     describe('getCollectionKey', () => {
         test('one call', async () => {
             await measureFunction(() => OnyxKeys.getCollectionKey(`${ONYXKEYS.COLLECTION.TEST_NESTED_NESTED_KEY}entry1`));
-        });
-    });
-
-    describe('getCollectionDataAndSendAsObject', () => {
-        test('one call with 10k heavy objects', async () => {
-            let subscriptionID = -1;
-
-            await measureAsyncFunction(
-                async () => {
-                    const callback = createDeferredTask();
-
-                    subscriptionID = OnyxUtils.subscribeToKey({
-                        key: collectionKey,
-                        callback: jest.fn(),
-                    });
-
-                    OnyxUtils.getCollectionDataAndSendAsObject(mockedReportActionsKeys, {
-                        key: collectionKey,
-                        subscriptionID,
-                        callback: () => {
-                            callback.resolve?.();
-                        },
-                    });
-
-                    return callback.promise;
-                },
-                {
-                    beforeEach: async () => {
-                        await Onyx.multiSet(mockedReportActionsMap);
-                    },
-                    afterEach: async () => {
-                        if (subscriptionID) {
-                            OnyxUtils.unsubscribeFromKey(subscriptionID);
-                        }
-                        await clearOnyxAfterEachMeasure();
-                    },
-                },
-            );
         });
     });
 
@@ -585,27 +512,20 @@ describe('OnyxUtils', () => {
         });
     });
 
-    describe('subscribeToKey', () => {
+    describe('onyxStore.subscribe', () => {
         test('one call subscribing to a single key', async () => {
-            let subscriptionID = -1;
+            let unsubscribe: (() => void) | undefined;
 
-            await measureAsyncFunction(
-                async () => {
-                    const callback = createDeferredTask();
-                    subscriptionID = OnyxUtils.subscribeToKey({
-                        key: `${collectionKey}0`,
-                        callback: () => {
-                            callback.resolve?.();
-                        },
-                    });
-                    return callback.promise;
+            await measureFunction(
+                () => {
+                    unsubscribe = onyxStore.subscribe(`${collectionKey}0`, jest.fn());
                 },
                 {
                     beforeEach: async () => {
                         await StorageMock.multiSet(Object.entries(mockedReportActionsMap).map(([k, v]) => [k, v]));
                     },
                     afterEach: async () => {
-                        OnyxUtils.unsubscribeFromKey(subscriptionID);
+                        unsubscribe?.();
                         await clearOnyxAfterEachMeasure();
                     },
                 },
@@ -613,26 +533,18 @@ describe('OnyxUtils', () => {
         });
 
         test('one call subscribing to a whole collection of 10k heavy objects', async () => {
-            let subscriptionID = -1;
+            let unsubscribe: (() => void) | undefined;
 
-            await measureAsyncFunction(
-                async () => {
-                    const callback = createDeferredTask();
-                    subscriptionID = OnyxUtils.subscribeToKey({
-                        key: collectionKey,
-                        callback: () => {
-                            callback.resolve?.();
-                        },
-                        waitForCollectionCallback: true,
-                    });
-                    return callback.promise;
+            await measureFunction(
+                () => {
+                    unsubscribe = onyxStore.subscribe(collectionKey, jest.fn());
                 },
                 {
                     beforeEach: async () => {
                         await StorageMock.multiSet(Object.entries(mockedReportActionsMap).map(([k, v]) => [k, v]));
                     },
                     afterEach: async () => {
-                        OnyxUtils.unsubscribeFromKey(subscriptionID);
+                        unsubscribe?.();
                         await clearOnyxAfterEachMeasure();
                     },
                 },
@@ -640,16 +552,14 @@ describe('OnyxUtils', () => {
         });
     });
 
-    describe('unsubscribeFromKey', () => {
+    describe('onyxStore.subscribe unsubscribe', () => {
         test('one call', async () => {
             const key = `${collectionKey}0`;
-            let subscriptionID = -1;
+            let unsubscribe: (() => void) | undefined;
 
-            await measureFunction(() => OnyxUtils.unsubscribeFromKey(subscriptionID), {
+            await measureFunction(() => unsubscribe?.(), {
                 beforeEach: async () => {
-                    subscriptionID = OnyxUtils.subscribeToKey({
-                        key,
-                    });
+                    unsubscribe = onyxStore.subscribe(key, jest.fn());
                 },
                 afterEach: clearOnyxAfterEachMeasure,
             });
@@ -676,46 +586,6 @@ describe('OnyxUtils', () => {
             await measureFunction(() => OnyxUtils.setSkippableCollectionMemberIDs(new Set([collectionKey, ONYXKEYS.COLLECTION.TEST_KEY_2])), {
                 afterEach: async () => {
                     OnyxUtils.setSkippableCollectionMemberIDs(skippableCollectionMemberIDs);
-                },
-            });
-        });
-    });
-
-    describe('storeKeyBySubscriptions', () => {
-        test('one call', async () => {
-            const key = `${collectionKey}0`;
-            let subscriptionID = -1;
-
-            await measureFunction(() => OnyxUtils.storeKeyBySubscriptions(key, subscriptionID), {
-                beforeEach: async () => {
-                    subscriptionID = OnyxUtils.subscribeToKey({
-                        key,
-                    });
-                },
-                afterEach: async () => {
-                    OnyxUtils.deleteKeyBySubscriptions(subscriptionID);
-                    OnyxUtils.unsubscribeFromKey(subscriptionID);
-                    await clearOnyxAfterEachMeasure();
-                },
-            });
-        });
-    });
-
-    describe('deleteKeyBySubscriptions', () => {
-        test('one call', async () => {
-            const key = `${collectionKey}0`;
-            let subscriptionID = -1;
-
-            await measureFunction(() => OnyxUtils.deleteKeyBySubscriptions(subscriptionID), {
-                beforeEach: async () => {
-                    subscriptionID = OnyxUtils.subscribeToKey({
-                        key,
-                    });
-                    OnyxUtils.storeKeyBySubscriptions(key, subscriptionID);
-                },
-                afterEach: async () => {
-                    OnyxUtils.unsubscribeFromKey(subscriptionID);
-                    await clearOnyxAfterEachMeasure();
                 },
             });
         });

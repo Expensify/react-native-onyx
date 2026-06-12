@@ -416,6 +416,14 @@ class OnyxCache {
             if (needsPrefixCheck && OnyxKeys.getCollectionKey(key) !== collectionKey) {
                 continue;
             }
+            // Never treat the collection root key itself as a member. A direct write to a
+            // collection key (e.g. `Onyx.set('report_', ...)`, an unsupported anti-pattern)
+            // lands in storageMap under the prefix key, and `getCollectionKey('report_')`
+            // returns `'report_'` — which would otherwise match here and surface a phantom
+            // `{report_: ...}` member. Members live at `report_<id>`, never at the bare prefix.
+            if (key === collectionKey) {
+                continue;
+            }
             const val = this.storageMap[key];
             // Skip null/undefined values — they represent deleted or unset keys
             // and should not be included in the frozen collection snapshot.
@@ -467,12 +475,12 @@ class OnyxCache {
 
         const snapshot = this.collectionSnapshots.get(collectionKey);
         if (utils.isEmptyObject(snapshot)) {
-            // We check storageKeys.size (not collection-specific keys) to distinguish
-            // "init complete, this collection is genuinely empty" from "init not done yet."
-            // During init, setAllKeys loads ALL keys at once — so if any key exists,
-            // the full storage picture is loaded and an empty collection is truly empty.
-            // Returning undefined before init prevents subscribers from seeing a false empty state.
-            if (this.storageKeys.size > 0) {
+            // Distinguish "init complete, collection genuinely empty" from "init not done yet."
+            // `setCollectionKeys()` (called inside `Onyx.init`) seeds every known collection
+            // with a frozen `{}` entry in `collectionSnapshots`, so the presence of the entry
+            // is a reliable post-init signal — and unlike `storageKeys.size > 0`, it doesn't
+            // flip back to "not done" after `Onyx.clear()` wipes the storage-keys index.
+            if (this.collectionSnapshots.has(collectionKey)) {
                 return FROZEN_EMPTY_COLLECTION;
             }
             return undefined;

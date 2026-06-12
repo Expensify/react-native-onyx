@@ -1,304 +1,78 @@
-import {deepEqual, shallowEqual} from 'fast-equals';
-import {useCallback, useEffect, useMemo, useRef, useSyncExternalStore} from 'react';
-import type {DependencyList} from 'react';
-import OnyxCache, {TASK} from './OnyxCache';
-import type {Connection} from './OnyxConnectionManager';
-import connectionManager from './OnyxConnectionManager';
-import OnyxUtils from './OnyxUtils';
-import OnyxKeys from './OnyxKeys';
-import type {CollectionKeyBase, OnyxKey, OnyxValue} from './types';
-import onyxSnapshotCache from './OnyxSnapshotCache';
-import useLiveRef from './useLiveRef';
+import {useCallback, useMemo, useRef, useSyncExternalStore} from 'react';
+import createMemoizedSelector from './createMemoizedSelector';
+import onyxStore from './OnyxStore';
+import type {OnyxKey, OnyxValue} from './types';
 
 type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (data: OnyxValue<TKey> | undefined) => TReturnValue;
 
 type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
     /**
-     * If set to `false`, the connection won't be reused between other subscribers that are listening to the same Onyx key
-     * with the same connect configurations.
+     * If set to `false`, the underlying subscription is not pooled with other consumers
+     * of the same key. Largely a no-op in the store-based design (subscriptions are cheap)
+     * but kept for API compatibility.
      */
     reuseConnection?: boolean;
 
     /**
-     * This will be used to subscribe to a subset of an Onyx key's data.
-     * Using this setting on `useOnyx` can have very positive performance benefits because the component will only re-render
-     * when the subset of data changes. Otherwise, any change of data on any property would normally
-     * cause the component to re-render (and that can be expensive from a performance standpoint).
-     * @see `useOnyx` cannot return `null` and so selector will replace `null` with `undefined` to maintain compatibility.
+     * Subscribe to a subset of an Onyx key's data. The component re-renders only when
+     * the selector's output reference changes; selectors that allocate fresh objects
+     * (e.g. `(e) => ({id: e?.id})`) are handled by an internal input-cache + deepEqual
+     * fallback so they don't cause `useSyncExternalStore` to loop.
      */
     selector?: UseOnyxSelector<TKey, TReturnValue>;
 };
 
-type FetchStatus = 'loading' | 'loaded';
+/**
+ * Always `'loaded'` in the store-based design. The type is preserved so existing
+ * destructures like `const [val, {status}] = useOnyx(KEY)` keep compiling. Will be
+ * removed in a future cleanup once consumers stop reading it.
+ */
+type FetchStatus = 'loaded';
 
-type ResultMetadata<TValue> = {
+type ResultMetadata = {
     status: FetchStatus;
-    sourceValue?: NonNullable<TValue> | undefined;
 };
 
-type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata<TValue>];
+type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata];
 
-function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
-    key: TKey,
-    options?: UseOnyxOptions<TKey, TReturnValue>,
-    dependencies: DependencyList = [],
-): UseOnyxResult<TReturnValue> {
-    const connectionRef = useRef<Connection | null>(null);
-    const currentDependenciesRef = useLiveRef(dependencies);
+const LOADED_METADATA: ResultMetadata = {status: 'loaded'};
+
+/**
+ * Subscribes a React component to an Onyx key. The component re-renders when the value
+ * at `key` changes (for collection keys, when any member changes — the returned value is
+ * the frozen collection snapshot).
+ *
+ * Returns `[value, {status: 'loaded'}]`. With eager-load + the structural-sharing cache,
+ * there's no loading phase — the cache always has an answer (a value or "absent"). The
+ * `status` field is retained for API compatibility and is always `'loaded'`.
+ */
+function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey, options?: UseOnyxOptions<TKey, TReturnValue>): UseOnyxResult<TReturnValue> {
     const selector = options?.selector;
 
-    // Create memoized version of selector for performance
-    const memoizedSelector = useMemo((): UseOnyxSelector<TKey, TReturnValue> | null => {
-        if (!selector) {
-            return null;
+    // The memoized selector is recreated only when the selector function identity changes.
+    // Inside, it caches by input reference; that's what keeps useSyncExternalStore from
+    // looping when consumers pass inline-allocating selectors.
+    const memoizedSelector = useMemo(() => (selector ? createMemoizedSelector(selector) : null), [selector]);
+
+    const subscribe = useCallback((onStoreChange: () => void) => onyxStore.subscribe(key, onStoreChange), [key]);
+
+    // resultRef holds the last tuple returned to React. We return the same tuple reference
+    // when value hasn't changed so React skips the re-render.
+    const resultRef = useRef<UseOnyxResult<TReturnValue>>([undefined, LOADED_METADATA]);
+
+    const getSnapshot = useCallback((): UseOnyxResult<TReturnValue> => {
+        const raw = onyxStore.getState(key);
+        const selected = memoizedSelector ? memoizedSelector(raw as OnyxValue<TKey>) : (raw as TReturnValue | undefined);
+        const nextValue = (selected ?? undefined) as NonNullable<TReturnValue> | undefined;
+
+        if (resultRef.current[0] === nextValue) {
+            return resultRef.current;
         }
-
-        let lastInput: OnyxValue<TKey> | undefined;
-        let lastOutput: TReturnValue;
-        let lastDependencies: DependencyList = [];
-        let hasComputed = false;
-
-        return (input: OnyxValue<TKey> | undefined): TReturnValue => {
-            const currentDependencies = currentDependenciesRef.current;
-
-            // Recompute if input changed, dependencies changed, or first time
-            const dependenciesChanged = !shallowEqual(lastDependencies, currentDependencies);
-            if (!hasComputed || lastInput !== input || dependenciesChanged) {
-                const newOutput = selector(input);
-
-                // Always track the current input to avoid re-running the selector
-                // when the same input is seen again (even if the output didn't change).
-                lastInput = input;
-
-                // Only update the output reference if it actually changed
-                if (!hasComputed || !deepEqual(lastOutput, newOutput) || dependenciesChanged) {
-                    lastOutput = newOutput;
-                    lastDependencies = [...currentDependencies];
-                    hasComputed = true;
-                }
-            }
-
-            return lastOutput;
-        };
-    }, [currentDependenciesRef, selector]);
-
-    // Stores the previous cached value as it's necessary to compare with the new value in `getSnapshot()`.
-    // We initialize it to `null` to simulate that we don't have any value from cache yet.
-    const previousValueRef = useRef<TReturnValue | undefined | null>(null);
-
-    // Stores the newest cached value in order to compare with the previous one and optimize `getSnapshot()` execution.
-    const newValueRef = useRef<TReturnValue | undefined | null>(null);
-
-    // Stores the previously result returned by the hook, containing the data from cache and the fetch status.
-    // We initialize it to `undefined` and `loading` fetch status to simulate the initial result when the hook is loading from the cache.
-    const resultRef = useRef<UseOnyxResult<TReturnValue>>([
-        undefined,
-        {
-            status: 'loading',
-        },
-    ]);
-
-    // Tracks which key has completed its first Onyx connection callback. When this doesn't match the
-    // current key, getSnapshot() treats the hook as being in its "first connection" state for that key.
-    // This is key-aware by design: when the key changes, connectedKeyRef still holds the old key (or null
-    // after cleanup), so the hook automatically enters first-connection mode for the new key without any
-    // explicit reset logic — eliminating the race condition where cleanup could clobber a boolean flag.
-    const connectedKeyRef = useRef<OnyxKey | null>(null);
-
-    // Tracks whether the hook has completed its initial mount subscription.
-    // Unlike connectedKeyRef (which gets nulled by cleanup), this persists across re-subscriptions.
-    const hasMountedRef = useRef(false);
-
-    // Indicates if the hook is connecting to an Onyx key.
-    const isConnectingRef = useRef(false);
-
-    // Stores the `onStoreChange()` function, which can be used to trigger a `getSnapshot()` update when desired.
-    const onStoreChangeFnRef = useRef<(() => void) | null>(null);
-
-    // Indicates if we should get the newest cached value from Onyx during `getSnapshot()` execution.
-    const shouldGetCachedValueRef = useRef(true);
-
-    // Inside useOnyx.ts, we need to track the sourceValue separately
-    const sourceValueRef = useRef<NonNullable<TReturnValue> | undefined>(undefined);
-
-    // Cache the options key to avoid regenerating it every getSnapshot call
-    const cacheKey = useMemo(
-        () =>
-            onyxSnapshotCache.registerConsumer(key, {
-                selector: options?.selector,
-            }),
-        [key, options?.selector],
-    );
-
-    useEffect(() => () => onyxSnapshotCache.deregisterConsumer(key, cacheKey), [key, cacheKey]);
-
-    // Track previous dependencies to prevent infinite loops
-    const previousDependenciesRef = useRef<DependencyList>([]);
-
-    useEffect(() => {
-        // This effect will only run if the `dependencies` array changes. If it changes it will force the hook
-        // to trigger a `getSnapshot()` update by calling the stored `onStoreChange()` function reference, thus
-        // re-running the hook and returning the latest value to the consumer.
-
-        // Deep equality check to prevent infinite loops when dependencies array reference changes
-        // but content remains the same
-        if (shallowEqual(previousDependenciesRef.current, dependencies)) {
-            return;
-        }
-
-        previousDependenciesRef.current = dependencies;
-
-        if (connectionRef.current === null || isConnectingRef.current || connectedKeyRef.current !== key || !onStoreChangeFnRef.current) {
-            return;
-        }
-
-        // Invalidate cache when dependencies change so selector runs with new closure values
-        onyxSnapshotCache.invalidateForKey(key);
-        shouldGetCachedValueRef.current = true;
-        onStoreChangeFnRef.current();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [...dependencies]);
-
-    // Tracks the last memoizedSelector reference that getSnapshot() has computed with.
-    // When the selector changes, this mismatch forces getSnapshot() to re-evaluate
-    // even if all other conditions (isFirstConnection, shouldGetCachedValue, key) are false.
-    const lastComputedSelectorRef = useRef(memoizedSelector);
-
-    const getSnapshot = useCallback(() => {
-        // Check if we have any cache for this Onyx key
-        // Don't use cache during active data updates (when shouldGetCachedValueRef is true)
-        const isFirstConnection = connectedKeyRef.current !== key;
-        if (!shouldGetCachedValueRef.current) {
-            const cachedResult = onyxSnapshotCache.getCachedResult<UseOnyxResult<TReturnValue>>(key, cacheKey);
-            if (cachedResult !== undefined) {
-                resultRef.current = cachedResult;
-                return cachedResult;
-            }
-        }
-
-        // We get the value from cache while the first connection to Onyx is being made or if the key has changed,
-        // so we can return any cached value right away. For the case where the key has changed, If we don't return the cached value right away, then the UI will show the incorrect (previous) value for a brief period which looks like a UI glitch to the user. After the connection is made, we only
-        // update `newValueRef` when `Onyx.connect()` callback is fired.
-        const hasSelectorChanged = lastComputedSelectorRef.current !== memoizedSelector;
-        if (isFirstConnection || shouldGetCachedValueRef.current || hasSelectorChanged) {
-            // Gets the value from cache and maps it with selector. It changes `null` to `undefined` for `useOnyx` compatibility.
-            const value = OnyxUtils.tryGetCachedValue(key) as OnyxValue<TKey>;
-            const selectedValue = memoizedSelector ? memoizedSelector(value) : value;
-            lastComputedSelectorRef.current = memoizedSelector;
-            newValueRef.current = (selectedValue ?? undefined) as TReturnValue | undefined;
-
-            // We set this flag to `false` again since we don't want to get the newest cached value every time `getSnapshot()` is executed,
-            // and only when `Onyx.connect()` callback is fired.
-            shouldGetCachedValueRef.current = false;
-        }
-
-        const hasCacheForKey = OnyxCache.hasCacheForKey(key);
-
-        // Since the fetch status can be different given the use cases below, we define the variable right away.
-        let newFetchStatus: FetchStatus | undefined;
-
-        // If we have pending merge operations for the key during the first connection, we set the new value to `undefined`
-        // and fetch status to `loading` to simulate that it is still being loaded until we have the most updated data.
-        if (isFirstConnection && OnyxUtils.hasPendingMergeForKey(key)) {
-            newValueRef.current = undefined;
-            newFetchStatus = 'loading';
-        }
-
-        // shallowEqual checks === first (O(1) for frozen snapshots and stable selector references),
-        // then falls back to comparing top-level properties for individual keys that may have
-        // new references with equivalent content.
-        // Normalize null to undefined to ensure consistent comparison (both represent "no value").
-        const areValuesEqual = shallowEqual(previousValueRef.current ?? undefined, newValueRef.current ?? undefined);
-
-        // We update the cached value and the result in the following conditions:
-        // We will update the cached value and the result in any of the following situations:
-        // - The previously cached value is different from the new value.
-        // - The previously cached value is `null` (not set from cache yet) and we have cache for this key
-        //   OR we have a pending `Onyx.clear()` task (if `Onyx.clear()` is running cache might not be available anymore
-        //   OR the subscriber is triggered (the value is gotten from the storage)
-        //   so we update the cached value/result right away in order to prevent infinite loading state issues).
-        const shouldUpdateResult = !areValuesEqual || (previousValueRef.current === null && (hasCacheForKey || OnyxCache.hasPendingTask(TASK.CLEAR) || !isFirstConnection));
-        if (shouldUpdateResult) {
-            previousValueRef.current = newValueRef.current;
-
-            // If the new value is `null` we default it to `undefined` to ensure the consumer gets a consistent result from the hook.
-            newFetchStatus = newFetchStatus ?? 'loaded';
-            resultRef.current = [
-                previousValueRef.current ?? undefined,
-                {
-                    status: newFetchStatus,
-                    sourceValue: sourceValueRef.current,
-                },
-            ];
-        }
-
-        if (newFetchStatus !== 'loading') {
-            onyxSnapshotCache.setCachedResult<UseOnyxResult<TReturnValue>>(key, cacheKey, resultRef.current);
-        }
-
+        resultRef.current = [nextValue, LOADED_METADATA];
         return resultRef.current;
-    }, [key, memoizedSelector, cacheKey]);
+    }, [key, memoizedSelector]);
 
-    const subscribe = useCallback(
-        (onStoreChange: () => void) => {
-            // Reset internal state so the hook properly transitions through loading
-            // for the new key instead of preserving stale state from the previous one.
-            // Only reset when the key has actually changed (not on initial mount).
-            if (hasMountedRef.current) {
-                previousValueRef.current = null;
-                newValueRef.current = null;
-                sourceValueRef.current = undefined;
-                resultRef.current = [undefined, {status: 'loading'}];
-                shouldGetCachedValueRef.current = true;
-            }
-
-            hasMountedRef.current = true;
-            isConnectingRef.current = true;
-            onStoreChangeFnRef.current = onStoreChange;
-
-            connectionRef.current = connectionManager.connect<CollectionKeyBase>({
-                key,
-                callback: (value, callbackKey, sourceValue) => {
-                    isConnectingRef.current = false;
-                    onStoreChangeFnRef.current = onStoreChange;
-
-                    // Signals that the first connection was made for this key, so some logics
-                    // in `getSnapshot()` won't be executed anymore.
-                    connectedKeyRef.current = key;
-
-                    // Signals that we want to get the newest cached value again in `getSnapshot()`.
-                    shouldGetCachedValueRef.current = true;
-
-                    // sourceValue is unknown type, so we need to cast it to the correct type.
-                    sourceValueRef.current = sourceValue as NonNullable<TReturnValue>;
-
-                    // Invalidate snapshot cache for this key when data changes
-                    onyxSnapshotCache.invalidateForKey(key);
-
-                    // Finally, we signal that the store changed, making `getSnapshot()` be called again.
-                    onStoreChange();
-                },
-                waitForCollectionCallback: OnyxKeys.isCollectionKey(key) as true,
-                reuseConnection: options?.reuseConnection,
-            });
-
-            return () => {
-                if (!connectionRef.current) {
-                    return;
-                }
-
-                connectionManager.disconnect(connectionRef.current);
-                connectedKeyRef.current = null;
-                isConnectingRef.current = false;
-                onStoreChangeFnRef.current = null;
-            };
-        },
-        [key, options?.reuseConnection],
-    );
-
-    const result = useSyncExternalStore<UseOnyxResult<TReturnValue>>(subscribe, getSnapshot);
-
-    return result;
+    return useSyncExternalStore(subscribe, getSnapshot);
 }
 
 export default useOnyx;
