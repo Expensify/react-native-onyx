@@ -28,7 +28,10 @@ function createStore(dbName: string, storeName: string): UseStore {
         // https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/versionchange_event
         // eslint-disable-next-line no-param-reassign
         db.onversionchange = () => {
-            Logger.logInfo('IDB connection closing due to version change', {dbName, storeName});
+            Logger.logInfo('IDB connection closing due to version change', {
+                dbName,
+                storeName,
+            });
             db.close();
             dbp = undefined;
         };
@@ -92,6 +95,60 @@ function createStore(dbName: string, storeName: string): UseStore {
         healAttemptsRemaining = HEAL_ATTEMPTS_MAX;
         return result;
     }
+
+    // Proactive IDB health check when tab returns to foreground.
+    // Safari kills IDB connections for backgrounded tabs. By probing as soon as
+    // the tab becomes visible, we drop the stale dbp early so the first real
+    // operation opens a fresh connection instead of failing.
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState !== 'visible' || !dbp) {
+            return;
+        }
+
+        Logger.logInfo('IDB visibilitychange probe: tab became visible, checking connection health', {dbName, storeName});
+
+        const probePromise = dbp;
+
+        const dropCacheIfStale = (error: unknown) => {
+            // A stale/dead connection surfaces as TRANSIENT (InvalidStateError, Safari connection lost)
+            // or FATAL (Chromium backing-store corruption) per the shared taxonomy (lib/storage/errors.ts).
+            const errorClass = classifyStorageError(error);
+            const isStaleConnection = errorClass === StorageErrorClass.TRANSIENT || errorClass === StorageErrorClass.FATAL;
+            if (dbp !== probePromise || !isStaleConnection) {
+                return;
+            }
+            Logger.logAlert('IDB visibilitychange probe: stale connection detected, dropping cached connection', {
+                dbName,
+                storeName,
+                errorMessage: error instanceof Error ? error.message : String(error),
+            });
+            dbp = undefined;
+        };
+
+        probePromise
+            .then((db) => {
+                if (dbp !== probePromise) {
+                    return;
+                }
+                try {
+                    const tx = db.transaction(storeName, 'readonly');
+                    const probeStore = tx.objectStore(storeName);
+                    const req = probeStore.count();
+                    req.onsuccess = () => {
+                        Logger.logInfo('IDB visibilitychange probe: connection is healthy', {dbName, storeName});
+                    };
+                    req.onerror = () => {
+                        dropCacheIfStale(req.error);
+                    };
+                } catch (error) {
+                    dropCacheIfStale(error);
+                }
+            })
+            .catch(() => {
+                // The cached open promise rejected; cacheOpenPromise already cleared dbp on its own
+                // branch. Swallow here so the probe's separate branch doesn't surface an unhandled rejection.
+            });
+    });
 
     // The connection layer owns recovery for connection/transport failures. It reacts per the shared
     // error taxonomy (see lib/storage/errors.ts):

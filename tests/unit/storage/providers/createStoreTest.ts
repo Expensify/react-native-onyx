@@ -98,7 +98,10 @@ describe('createStore', () => {
             expect(callCount).toBe(1);
             expect(logInfoSpy).toHaveBeenCalledWith(
                 'IDB error not recoverable at the connection layer, propagating',
-                expect.objectContaining({errorMessage: 'Not found', errorClass: 'unknown'}),
+                expect.objectContaining({
+                    errorMessage: 'Not found',
+                    errorClass: 'unknown',
+                }),
             );
             expect(logAlertSpy).not.toHaveBeenCalled();
         });
@@ -121,7 +124,10 @@ describe('createStore', () => {
             expect(callCount).toBe(1);
             expect(logInfoSpy).toHaveBeenCalledWith(
                 'IDB error not recoverable at the connection layer, propagating',
-                expect.objectContaining({errorMessage: 'Something went wrong', errorClass: 'unknown'}),
+                expect.objectContaining({
+                    errorMessage: 'Something went wrong',
+                    errorClass: 'unknown',
+                }),
             );
             expect(logAlertSpy).not.toHaveBeenCalled();
         });
@@ -314,7 +320,10 @@ describe('createStore', () => {
                 if (openCallCount <= 2) {
                     const req = {} as IDBOpenDBRequest;
                     Promise.resolve().then(() => {
-                        Object.defineProperty(req, 'error', {value: backingStoreError(), configurable: true});
+                        Object.defineProperty(req, 'error', {
+                            value: backingStoreError(),
+                            configurable: true,
+                        });
                         req.onerror?.(new Event('error') as Event & {target: IDBOpenDBRequest});
                     });
                     return req;
@@ -338,7 +347,10 @@ describe('createStore', () => {
             jest.spyOn(indexedDB, 'open').mockImplementation(() => {
                 const req = {} as IDBOpenDBRequest;
                 Promise.resolve().then(() => {
-                    Object.defineProperty(req, 'error', {value: backingStoreError(), configurable: true});
+                    Object.defineProperty(req, 'error', {
+                        value: backingStoreError(),
+                        configurable: true,
+                    });
                     req.onerror?.(new Event('error') as Event & {target: IDBOpenDBRequest});
                 });
                 return req;
@@ -474,7 +486,10 @@ describe('createStore', () => {
             jest.spyOn(indexedDB, 'open').mockImplementation(() => {
                 const req = {} as IDBOpenDBRequest;
                 Promise.resolve().then(() => {
-                    Object.defineProperty(req, 'error', {value: connectionLostError(), configurable: true});
+                    Object.defineProperty(req, 'error', {
+                        value: connectionLostError(),
+                        configurable: true,
+                    });
                     req.onerror?.(new Event('error') as Event & {target: IDBOpenDBRequest});
                 });
                 return req;
@@ -582,6 +597,179 @@ describe('createStore', () => {
             expect(callCount).toBe(2);
             expect(logInfoSpy).toHaveBeenCalledWith('IDB transient error — dropping cached connection and retrying once', expect.objectContaining({dbName: expect.any(String)}));
             expect(logAlertSpy).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('visibilitychange probe', () => {
+        function simulateVisibilityChange(state: string) {
+            Object.defineProperty(document, 'visibilityState', {
+                value: state,
+                writable: true,
+                configurable: true,
+            });
+            document.dispatchEvent(new Event('visibilitychange'));
+        }
+
+        afterEach(() => {
+            Object.defineProperty(document, 'visibilityState', {
+                value: 'visible',
+                writable: true,
+                configurable: true,
+            });
+        });
+
+        it('should drop stale dbp when probe detects connection lost on foreground', async () => {
+            const store = createStore(uniqueDBName(), STORE_NAME);
+
+            await store('readwrite', (s) => {
+                s.put('value', 'key1');
+                return IDB.promisifyRequest(s.transaction);
+            });
+
+            simulateVisibilityChange('hidden');
+
+            const original = IDBDatabase.prototype.transaction;
+            let probeIntercepted = false;
+            jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
+                if (!probeIntercepted) {
+                    probeIntercepted = true;
+                    throw new DOMException('Connection to Indexed Database server lost. Refresh the page to try again', 'UnknownError');
+                }
+                return original.apply(this, args);
+            });
+
+            simulateVisibilityChange('visible');
+
+            await new Promise((resolve) => {
+                setTimeout(resolve, 0);
+            });
+
+            jest.restoreAllMocks();
+
+            const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
+            expect(result).toBe('value');
+            expect(logAlertSpy).toHaveBeenCalledWith(expect.stringContaining('IDB visibilitychange probe: stale connection detected'), expect.objectContaining({dbName: expect.any(String)}));
+        });
+
+        it('should not probe when no connection exists yet', async () => {
+            const dbName = uniqueDBName();
+            createStore(dbName, STORE_NAME);
+
+            simulateVisibilityChange('hidden');
+            simulateVisibilityChange('visible');
+
+            await new Promise((resolve) => {
+                setTimeout(resolve, 0);
+            });
+
+            // No probe log for this specific store (dbp was never set)
+            expect(logInfoSpy).not.toHaveBeenCalledWith(expect.stringContaining('visibilitychange probe'), expect.objectContaining({dbName}));
+        });
+
+        it('should keep connection when probe succeeds', async () => {
+            const store = createStore(uniqueDBName(), STORE_NAME);
+
+            await store('readwrite', (s) => {
+                s.put('value', 'key1');
+                return IDB.promisifyRequest(s.transaction);
+            });
+
+            simulateVisibilityChange('hidden');
+            simulateVisibilityChange('visible');
+
+            await new Promise((resolve) => {
+                setTimeout(resolve, 0);
+            });
+
+            const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
+            expect(result).toBe('value');
+            // Probe ran but found healthy connection — no stale connection alert
+            expect(logAlertSpy).not.toHaveBeenCalledWith(expect.stringContaining('stale connection detected'), expect.anything());
+            expect(logInfoSpy).toHaveBeenCalledWith(expect.stringContaining('connection is healthy'), expect.anything());
+        });
+
+        it('should drop dbp when probe throws InvalidStateError', async () => {
+            const store = createStore(uniqueDBName(), STORE_NAME);
+
+            await store('readwrite', (s) => {
+                s.put('value', 'key1');
+                return IDB.promisifyRequest(s.transaction);
+            });
+
+            simulateVisibilityChange('hidden');
+
+            const original = IDBDatabase.prototype.transaction;
+            let callCount = 0;
+            jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
+                callCount++;
+                if (callCount === 1) {
+                    throw new DOMException('The database connection is closing.', 'InvalidStateError');
+                }
+                return original.apply(this, args);
+            });
+
+            simulateVisibilityChange('visible');
+
+            await new Promise((resolve) => {
+                setTimeout(resolve, 0);
+            });
+
+            jest.restoreAllMocks();
+
+            const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
+            expect(result).toBe('value');
+            expect(logAlertSpy).toHaveBeenCalledWith(expect.stringContaining('IDB visibilitychange probe: stale connection detected'), expect.objectContaining({dbName: expect.any(String)}));
+        });
+
+        it('should not surface an unhandled rejection when the probe runs while the open promise rejects', async () => {
+            const store = createStore(uniqueDBName(), STORE_NAME);
+
+            // Keep the initial open pending until we reject it manually, so the probe attaches to a pending dbp.
+            let rejectOpen: () => void = () => {
+                /* assigned inside the indexedDB.open mock below */
+            };
+            jest.spyOn(indexedDB, 'open').mockImplementation(() => {
+                const req = {} as IDBOpenDBRequest;
+                rejectOpen = () => {
+                    // Use an UNKNOWN-classified error so the connection layer propagates it (AbortError is now
+                    // classified TRANSIENT and would be retried — see lib/storage/errors.ts). The point of this
+                    // test is the probe branch not surfacing an unhandled rejection, not the specific error type.
+                    Object.defineProperty(req, 'error', {
+                        value: new DOMException('probe open failed', 'UnknownError'),
+                        configurable: true,
+                    });
+                    req.onerror?.(new Event('error') as Event & {target: IDBOpenDBRequest});
+                };
+                return req;
+            });
+
+            const unhandled = jest.fn();
+            process.on('unhandledRejection', unhandled);
+
+            try {
+                // Start an op so dbp becomes a pending open promise; keep its rejection handled.
+                const opAssertion = expect(store('readonly', (s) => IDB.promisifyRequest(s.get('key1')))).rejects.toThrow('probe open failed');
+
+                // Tab becomes visible while the open is still pending — probe attaches to the pending dbp.
+                simulateVisibilityChange('hidden');
+                simulateVisibilityChange('visible');
+
+                // Now the open rejects — both the op chain and the probe chain see it.
+                rejectOpen();
+
+                await opAssertion;
+                // Give the probe's separate branch a couple of ticks to (not) surface an unhandled rejection.
+                await new Promise((resolve) => {
+                    setTimeout(resolve, 0);
+                });
+                await new Promise((resolve) => {
+                    setTimeout(resolve, 0);
+                });
+
+                expect(unhandled).not.toHaveBeenCalled();
+            } finally {
+                process.off('unhandledRejection', unhandled);
+            }
         });
     });
 });

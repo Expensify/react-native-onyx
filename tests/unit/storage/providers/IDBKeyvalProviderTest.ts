@@ -172,6 +172,82 @@ describe('IDBKeyValProvider', () => {
                 ),
             ).toEqual(expectedEntries.map((e) => (e[1] === null ? undefined : e[1])));
         });
+
+        it('should insert a new record when key does not exist', async () => {
+            await IDBKeyValProvider.multiMerge([[ONYXKEYS.TEST_KEY_2, {fresh: true}]]);
+            expect(await IDBKeyValProvider.getItem(ONYXKEYS.TEST_KEY_2)).toEqual({fresh: true});
+        });
+    });
+
+    describe('write-error normalization (aborted transactions)', () => {
+        // A write transaction aborted by something other than its own request (connection close,
+        // versionchange, a sibling transaction) leaves `transaction.error === null`, which idb-keyval
+        // rejects with as-is. Every write path must instead reject with a real Error so the failure
+        // can be classified and retried.
+        function abortTransactionOnPut() {
+            const originalPut = IDBObjectStore.prototype.put;
+            jest.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function put(this: IDBObjectStore, ...args: Parameters<IDBObjectStore['put']>) {
+                const request = originalPut.apply(this, args);
+                this.transaction.abort();
+                return request;
+            });
+        }
+
+        function abortTransactionOnDelete() {
+            const originalDelete = IDBObjectStore.prototype.delete;
+            jest.spyOn(IDBObjectStore.prototype, 'delete').mockImplementation(function del(this: IDBObjectStore, ...args: Parameters<IDBObjectStore['delete']>) {
+                const request = originalDelete.apply(this, args);
+                this.transaction.abort();
+                return request;
+            });
+        }
+
+        function expectAbortError(error: unknown) {
+            expect(error).not.toBeNull();
+            expect(error).toBeInstanceOf(DOMException);
+            expect((error as DOMException).name).toBe('AbortError');
+            expect((error as DOMException).message.length).toBeGreaterThan(0);
+        }
+
+        afterEach(() => {
+            jest.restoreAllMocks();
+        });
+
+        it('should reject setItem with a tagged AbortError, never null', async () => {
+            abortTransactionOnPut();
+            const error = await IDBKeyValProvider.setItem(ONYXKEYS.TEST_KEY, 'value').catch((e: unknown) => e);
+            expectAbortError(error);
+        });
+
+        it('should reject multiSet with a tagged AbortError, never null', async () => {
+            abortTransactionOnPut();
+            const error = await IDBKeyValProvider.multiSet([[ONYXKEYS.TEST_KEY, 'value']]).catch((e: unknown) => e);
+            expectAbortError(error);
+        });
+
+        it('should reject multiMerge with a tagged AbortError, never null', async () => {
+            abortTransactionOnPut();
+            const error = await IDBKeyValProvider.multiMerge([[ONYXKEYS.TEST_KEY, 'value']]).catch((e: unknown) => e);
+            expectAbortError(error);
+        });
+
+        it('should reject setItem(null) with a tagged AbortError, never null', async () => {
+            abortTransactionOnDelete();
+            const error = await IDBKeyValProvider.setItem(ONYXKEYS.TEST_KEY, null).catch((e: unknown) => e);
+            expectAbortError(error);
+        });
+
+        it('should reject removeItem with a tagged AbortError, never null', async () => {
+            abortTransactionOnDelete();
+            const error = await IDBKeyValProvider.removeItem(ONYXKEYS.TEST_KEY).catch((e: unknown) => e);
+            expectAbortError(error);
+        });
+
+        it('should reject removeItems with a tagged AbortError, never null', async () => {
+            abortTransactionOnDelete();
+            const error = await IDBKeyValProvider.removeItems([ONYXKEYS.TEST_KEY]).catch((e: unknown) => e);
+            expectAbortError(error);
+        });
     });
 
     describe('mergeItem', () => {
