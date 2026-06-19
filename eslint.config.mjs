@@ -48,8 +48,6 @@ export default defineConfig([
         },
         rules: {
             'class-methods-use-this': 'off',
-            'es/no-nullish-coalescing-operators': 'off',
-            'es/no-optional-chaining': 'off',
             'react/prop-types': 'off',
             'react/require-default-props': 'off',
             'react/jsx-props-no-spreading': 'off',
