@@ -859,9 +859,7 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(
         // recurring cases into TRANSIENT/CAPACITY/FATAL. Logged on the first attempt only to avoid the
         // per-retry amplification this mechanism is trying to kill. Then bounded retry without eviction.
         if (currentRetryAttempt === 0) {
-            Logger.logAlert(
-                `Unclassified storage error. provider: ${Storage.getStorageProvider().name}. name: ${error?.name}. message: ${error?.message}. onyxMethod: ${onyxMethod.name}.`,
-            );
+            Logger.logAlert(`Unclassified storage error. provider: ${Storage.getStorageProvider().name}. name: ${error?.name}. message: ${error?.message}. onyxMethod: ${onyxMethod.name}.`);
         }
         // @ts-expect-error No overload matches this call.
         return onyxMethod(defaultParams, nextRetryAttempt);
