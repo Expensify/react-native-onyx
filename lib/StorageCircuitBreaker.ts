@@ -101,6 +101,20 @@ function recordEviction(): void {
     evictionAwaitingResult = true;
 }
 
-const StorageCircuitBreaker = {recordCapacityFailure, recordEviction, isTripped, reset, ROLLING_WINDOW_MS, FAILURE_THRESHOLD, NO_PROGRESS_CAP};
+/**
+ * Record that a storage write SUCCEEDED. If an eviction was awaiting its verdict, the eviction freed
+ * usable space — so it must NOT later be miscounted as a no-progress cycle by the next capacity
+ * failure. Clear the pending flag and reset the consecutive no-progress streak (a success breaks the
+ * streak). No-op when no eviction is pending (the common case), so it's cheap to call on every write.
+ */
+function recordWriteSuccess(): void {
+    if (!evictionAwaitingResult) {
+        return;
+    }
+    evictionAwaitingResult = false;
+    consecutiveNoProgressEvictions = 0;
+}
+
+const StorageCircuitBreaker = {recordCapacityFailure, recordEviction, recordWriteSuccess, isTripped, reset, ROLLING_WINDOW_MS, FAILURE_THRESHOLD, NO_PROGRESS_CAP};
 
 export default StorageCircuitBreaker;

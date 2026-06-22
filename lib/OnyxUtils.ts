@@ -1383,6 +1383,7 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
     }
 
     return Storage.setItem(key, valueWithoutNestedNullValues)
+        .then(() => StorageCircuitBreaker.recordWriteSuccess())
         .catch((error) => OnyxUtils.retryOperation(error, setWithRetry, {key, value: valueWithoutNestedNullValues, options}, retryAttempt))
         .then(() => {
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
@@ -1483,6 +1484,7 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
     const inFlightKeys = new Set<OnyxKey>(keyValuePairsToSet.map(([key]) => key));
 
     return Storage.multiSet(keyValuePairsToStore)
+        .then(() => StorageCircuitBreaker.recordWriteSuccess())
         .catch((error) => OnyxUtils.retryOperation(error, multiSetWithRetry, newData, retryAttempt, inFlightKeys))
         .then(() => {
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MULTI_SET, undefined, newData);
@@ -1562,6 +1564,7 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
         const inFlightKeys = new Set<OnyxKey>(keyValuePairs.map(([key]) => key));
 
         return Storage.multiSet(keyValuePairs)
+            .then(() => StorageCircuitBreaker.recordWriteSuccess())
             .catch((error) => OnyxUtils.retryOperation(error, setCollectionWithRetry, {collectionKey, collection}, retryAttempt, inFlightKeys))
             .then(() => {
                 OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET_COLLECTION, undefined, mutableCollection);
@@ -1720,6 +1723,7 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
                 const inFlightKeys = new Set<OnyxKey>(Object.keys(finalMergedCollection));
 
                 return Promise.all(promises)
+                    .then(() => StorageCircuitBreaker.recordWriteSuccess())
                     .catch((error) =>
                         retryOperation(
                             error,
@@ -1802,6 +1806,7 @@ function partialSetCollection<TKey extends CollectionKeyBase>({collectionKey, co
         const inFlightKeys = new Set<OnyxKey>(keyValuePairs.map(([key]) => key));
 
         return Storage.multiSet(keyValuePairs)
+            .then(() => StorageCircuitBreaker.recordWriteSuccess())
             .catch((error) => retryOperation(error, partialSetCollection, {collectionKey, collection}, retryAttempt, inFlightKeys))
             .then(() => {
                 sendActionToDevTools(METHOD.SET_COLLECTION, undefined, mutableCollection);

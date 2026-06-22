@@ -58,6 +58,40 @@ describe('StorageCircuitBreaker', () => {
         expect(StorageCircuitBreaker.isTripped()).toBe(true);
     });
 
+    it('should not trip when each eviction makes progress (retry succeeds)', () => {
+        // Intermittent quota pressure: every cycle is a capacity failure → eviction → SUCCESSFUL retry.
+        // A successful retry means the eviction freed usable space, so it must never be counted as a
+        // no-progress cycle by the next failure. Without recordWriteSuccess the stale pending flag made
+        // each subsequent failure look like no-progress and tripped the breaker after NO_PROGRESS_CAP cycles.
+        for (let i = 0; i < StorageCircuitBreaker.NO_PROGRESS_CAP + 3; i++) {
+            StorageCircuitBreaker.recordCapacityFailure();
+            StorageCircuitBreaker.recordEviction();
+            StorageCircuitBreaker.recordWriteSuccess();
+        }
+
+        expect(StorageCircuitBreaker.isTripped()).toBe(false);
+    });
+
+    it('should reset the no-progress streak when an eviction finally makes progress', () => {
+        // A few no-progress evictions build the streak up, but short of the cap.
+        for (let i = 0; i < StorageCircuitBreaker.NO_PROGRESS_CAP - 1; i++) {
+            StorageCircuitBreaker.recordCapacityFailure();
+            StorageCircuitBreaker.recordEviction();
+        }
+
+        // This eviction succeeds, breaking the consecutive streak.
+        StorageCircuitBreaker.recordCapacityFailure();
+        StorageCircuitBreaker.recordEviction();
+        StorageCircuitBreaker.recordWriteSuccess();
+
+        // Two more no-progress cycles must not trip, because the streak was reset by the success above.
+        StorageCircuitBreaker.recordCapacityFailure();
+        StorageCircuitBreaker.recordEviction();
+        StorageCircuitBreaker.recordCapacityFailure();
+
+        expect(StorageCircuitBreaker.isTripped()).toBe(false);
+    });
+
     it('should not count a failure as no-progress when no eviction preceded it', () => {
         // Capacity failures with no interleaved evictions must not accumulate no-progress cycles.
         for (let i = 0; i < StorageCircuitBreaker.NO_PROGRESS_CAP + 2; i++) {
