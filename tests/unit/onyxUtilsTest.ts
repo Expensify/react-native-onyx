@@ -773,6 +773,21 @@ describe('OnyxUtils', () => {
             expect(retryOperationSpy).toHaveBeenCalledTimes(6);
         });
 
+        it('should log the full shape of an unclassified (UNKNOWN) error once per operation', async () => {
+            const logAlertSpy = jest.spyOn(Logger, 'logAlert');
+            StorageMock.setItem = jest.fn().mockRejectedValue(genericError);
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+
+            // UNKNOWN is instrumented so we can see what to promote into a real class. The shape (provider
+            // + name + message) is logged exactly once even though the operation retries 6 times.
+            const unclassifiedCalls = logAlertSpy.mock.calls.filter((call) => typeof call[0] === 'string' && call[0].startsWith('Unclassified storage error.'));
+            expect(unclassifiedCalls).toHaveLength(1);
+            expect(unclassifiedCalls[0][0]).toBe(
+                `Unclassified storage error. provider: MemoryOnlyProvider. name: ${genericError.name}. message: ${genericError.message}. onyxMethod: setWithRetry.`,
+            );
+        });
+
         it("should throw error for if operation failed with \"Failed to execute 'put' on 'IDBObjectStore': invalid data\" error", async () => {
             StorageMock.setItem = jest.fn().mockRejectedValueOnce(invalidDataError);
 

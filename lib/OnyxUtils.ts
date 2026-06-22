@@ -8,7 +8,7 @@ import cache, {TASK} from './OnyxCache';
 import OnyxKeys from './OnyxKeys';
 import StorageCircuitBreaker from './StorageCircuitBreaker';
 import Storage from './storage';
-import {StorageErrorClass, classifyStorageError} from './storage/errors';
+import {StorageErrorClass} from './storage/errors';
 import type {
     CollectionKeyBase,
     ConnectOptions,
@@ -812,7 +812,8 @@ function reportStorageQuota(error?: Error): Promise<void> {
  * - CAPACITY: evicts the least recently accessed evictable key and retries, under a session-level
  *   circuit breaker (see lib/StorageCircuitBreaker.ts) that halts the loop once eviction stops making
  *   progress or failures storm — the per-operation budget alone cannot stop a session-wide storm.
- * - UNKNOWN: bounded retry.
+ * - UNKNOWN: the provider couldn't classify it — log the full error shape (name + message +
+ *   provider) once so it's visible, then bounded retry without eviction.
  */
 function retryOperation<TMethod extends RetriableOnyxOperation>(
     error: Error,
@@ -823,7 +824,7 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(
 ): Promise<void> {
     const currentRetryAttempt = retryAttempt ?? 0;
     const nextRetryAttempt = currentRetryAttempt + 1;
-    const errorClass = classifyStorageError(error);
+    const errorClass = Storage.classifyError(error);
 
     // Once the breaker is open, every capacity write is going to fail the same way. Drop it silently —
     // the breaker already emitted its single alert, and logging per failed write is exactly the storm
@@ -851,8 +852,17 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(
         return Promise.resolve();
     }
 
-    if (errorClass !== StorageErrorClass.CAPACITY) {
-        // UNKNOWN error — bounded retry without eviction.
+    if (errorClass === StorageErrorClass.UNKNOWN) {
+        // UNKNOWN is the blind spot: the active provider's classifier did not recognize this error, so
+        // we cannot route it to a real recovery strategy. Log the full error shape (name + message +
+        // provider) once per operation so telemetry can reveal what lives in UNKNOWN, letting us promote
+        // recurring cases into TRANSIENT/CAPACITY/FATAL. Logged on the first attempt only to avoid the
+        // per-retry amplification this mechanism is trying to kill. Then bounded retry without eviction.
+        if (currentRetryAttempt === 0) {
+            Logger.logAlert(
+                `Unclassified storage error. provider: ${Storage.getStorageProvider().name}. name: ${error?.name}. message: ${error?.message}. onyxMethod: ${onyxMethod.name}.`,
+            );
+        }
         // @ts-expect-error No overload matches this call.
         return onyxMethod(defaultParams, nextRetryAttempt);
     }

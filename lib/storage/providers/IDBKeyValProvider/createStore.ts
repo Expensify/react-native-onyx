@@ -1,7 +1,8 @@
 import * as IDB from 'idb-keyval';
 import type {UseStore} from 'idb-keyval';
 import * as Logger from '../../../Logger';
-import {StorageErrorClass, classifyStorageError} from '../../errors';
+import {StorageErrorClass} from '../../errors';
+import classifyIDBError from './classifyError';
 
 const HEAL_ATTEMPTS_MAX = 3;
 
@@ -112,7 +113,7 @@ function createStore(dbName: string, storeName: string): UseStore {
         const dropCacheIfStale = (error: unknown) => {
             // A stale/dead connection surfaces as TRANSIENT (InvalidStateError, Safari connection lost)
             // or FATAL (Chromium backing-store corruption) per the shared taxonomy (lib/storage/errors.ts).
-            const errorClass = classifyStorageError(error);
+            const errorClass = classifyIDBError(error);
             const isStaleConnection = errorClass === StorageErrorClass.TRANSIENT || errorClass === StorageErrorClass.FATAL;
             if (dbp !== probePromise || !isStaleConnection) {
                 return;
@@ -167,7 +168,7 @@ function createStore(dbName: string, storeName: string): UseStore {
         executeTransaction(txMode, callback)
             .then(resetHealBudget)
             .catch((error) => {
-                const errorClass = classifyStorageError(error);
+                const errorClass = classifyIDBError(error);
 
                 if (errorClass === StorageErrorClass.TRANSIENT) {
                     Logger.logInfo('IDB transient error — dropping cached connection and retrying once', {

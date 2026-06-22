@@ -9,6 +9,7 @@ import type {FastMergeReplaceNullPatch} from '../../utils';
 import utils from '../../utils';
 import type StorageProvider from './types';
 import type {StorageKeyList, StorageKeyValuePair} from './types';
+import classifySQLiteError from './classifySQLiteError';
 
 /**
  * The type of the key-value pair stored in the SQLite database
@@ -63,6 +64,10 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
      * The name of the provider that can be printed to the logs
      */
     name: 'SQLiteProvider',
+    /**
+     * Classifies a SQLite write failure into the shared storage taxonomy.
+     */
+    classifyError: classifySQLiteError,
     /**
      * Initializes the storage provider
      */

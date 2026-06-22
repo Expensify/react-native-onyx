@@ -1,5 +1,6 @@
 import type {OnyxKey, OnyxValue} from '../../types';
 import type {FastMergeReplaceNullPatch} from '../../utils';
+import type {StorageErrorClassValue} from '../errors';
 
 type StorageKeyValuePair = [key: OnyxKey, value: OnyxValue<OnyxKey>, replaceNullPatches?: FastMergeReplaceNullPatch[]];
 type StorageKeyList = OnyxKey[];
@@ -86,6 +87,13 @@ type StorageProvider<TStore> = {
      * Gets the total bytes of the database file
      */
     getDatabaseSize: () => Promise<DatabaseSize>;
+
+    /**
+     * Classifies a write error from THIS engine into the shared {@link StorageErrorClassValue} taxonomy.
+     * Each provider owns its own matchers (IndexedDB DOMExceptions, SQLite messages, …) so the central
+     * taxonomy stays engine-agnostic. Anything the provider doesn't recognize must return UNKNOWN.
+     */
+    classifyError: (error: unknown) => StorageErrorClassValue;
 
     /**
      * @param onStorageKeyChanged Storage synchronization mechanism keeping all opened tabs in sync
