@@ -89,7 +89,8 @@ and alerted (fatal). Retrying here would only re-amplify, so we skip the write q
 <li>CAPACITY: evicts the least recently accessed evictable key and retries, under a session-level
 circuit breaker (see lib/StorageCircuitBreaker.ts) that halts the loop once eviction stops making
 progress or failures storm — the per-operation budget alone cannot stop a session-wide storm.</li>
-<li>UNKNOWN: bounded retry.</li>
+<li>UNKNOWN: the provider couldn&#39;t classify it — log the full error shape (name + message +
+provider) once so it&#39;s visible, then bounded retry without eviction.</li>
 </ul>
 </dd>
 <dt><a href="#broadcastUpdate">broadcastUpdate()</a></dt>
@@ -332,7 +333,8 @@ capacity recovery (eviction) so that a given failure is retried by exactly one l
 - CAPACITY: evicts the least recently accessed evictable key and retries, under a session-level
   circuit breaker (see lib/StorageCircuitBreaker.ts) that halts the loop once eviction stops making
   progress or failures storm — the per-operation budget alone cannot stop a session-wide storm.
-- UNKNOWN: bounded retry.
+- UNKNOWN: the provider couldn't classify it — log the full error shape (name + message +
+  provider) once so it's visible, then bounded retry without eviction.
 
 **Kind**: global function  
 <a name="broadcastUpdate"></a>
