@@ -1,5 +1,6 @@
-import {useCallback, useMemo, useRef, useSyncExternalStore} from 'react';
-import createMemoizedSelector from './createMemoizedSelector';
+import {useCallback, useMemo} from 'react';
+import {deepEqual} from 'fast-equals';
+import {useSyncExternalStoreWithSelector} from 'use-sync-external-store/with-selector';
 import onyxStore from './OnyxStore';
 import type {OnyxKey, OnyxValue} from './types';
 
@@ -7,10 +8,11 @@ type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (da
 
 type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
     /**
-     * Subscribe to a subset of an Onyx key's data. The component re-renders only when
-     * the selector's output reference changes; selectors that allocate fresh objects
-     * (e.g. `(e) => ({id: e?.id})`) are handled by an internal input-cache + deepEqual
-     * fallback so they don't cause `useSyncExternalStore` to loop.
+     * Subscribe to a subset of an Onyx key's data. The component re-renders only when the
+     * selector's output *changes by deep equality* — a selector that allocates a fresh object
+     * (e.g. `(e) => ({id: e?.id})`) or one whose identity churns every render (an inline
+     * selector closing over a fresh array) is collapsed to a stable reference internally, so it
+     * never causes `useSyncExternalStore` to loop and never forces a redundant re-render.
      */
     selector?: UseOnyxSelector<TKey, TReturnValue>;
 };
@@ -38,34 +40,34 @@ const LOADED_METADATA: ResultMetadata = {status: 'loaded'};
  * Returns `[value, {status: 'loaded'}]`. With eager-load + the structural-sharing cache,
  * there's no loading phase — the cache always has an answer (a value or "absent"). The
  * `status` field is retained for API compatibility and is always `'loaded'`.
+ *
+ * Selector stability is delegated to React's `useSyncExternalStoreWithSelector`: the selection
+ * is deduped against the last value committed to React (by deep equality when a selector is
+ * present), and that dedup survives the selector function's *identity* changing every render.
+ * So consumers can pass inline selectors that close over freshly allocated arrays/objects
+ * without stabilizing the inputs themselves. Subscriptions without a selector read the raw,
+ * already reference-stable cache value and rely on the default `Object.is` comparison (no
+ * deep-equal cost).
  */
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey, options?: UseOnyxOptions<TKey, TReturnValue>): UseOnyxResult<TReturnValue> {
     const selector = options?.selector;
 
-    // The memoized selector is recreated only when the selector function identity changes.
-    // Inside, it caches by input reference; that's what keeps useSyncExternalStore from
-    // looping when consumers pass inline-allocating selectors.
-    const memoizedSelector = useMemo(() => (selector ? createMemoizedSelector(selector) : null), [selector]);
-
     const subscribe = useCallback((onStoreChange: () => void) => onyxStore.subscribe(key, onStoreChange), [key]);
+    const getSnapshot = useCallback(() => onyxStore.getState(key) as OnyxValue<TKey> | undefined, [key]);
 
-    // resultRef holds the last tuple returned to React. We return the same tuple reference
-    // when value hasn't changed so React skips the re-render.
-    const resultRef = useRef<UseOnyxResult<TReturnValue>>([undefined, LOADED_METADATA]);
+    // Normalizes `null` -> `undefined` and applies the consumer's selector (or passes the raw value
+    // through). Re-created only when the selector's identity changes; the committed-value dedup inside
+    // `useSyncExternalStoreWithSelector` is what makes a churning identity harmless.
+    const select = useCallback((data: OnyxValue<TKey> | undefined): TReturnValue | undefined => (selector ? selector(data) : (data as TReturnValue | undefined)) ?? undefined, [selector]);
 
-    const getSnapshot = useCallback((): UseOnyxResult<TReturnValue> => {
-        const raw = onyxStore.getState(key);
-        const selected = memoizedSelector ? memoizedSelector(raw as OnyxValue<TKey>) : (raw as TReturnValue | undefined);
-        const nextValue = (selected ?? undefined) as NonNullable<TReturnValue> | undefined;
+    // With a selector, dedupe the (possibly freshly allocated) output by deep equality. Without one,
+    // the raw cache value is already reference-stable, so the default `Object.is` is enough.
+    const isEqual = selector ? deepEqual : undefined;
 
-        if (resultRef.current[0] === nextValue) {
-            return resultRef.current;
-        }
-        resultRef.current = [nextValue, LOADED_METADATA];
-        return resultRef.current;
-    }, [key, memoizedSelector]);
+    const value = useSyncExternalStoreWithSelector<OnyxValue<TKey> | undefined, TReturnValue | undefined>(subscribe, getSnapshot, undefined, select, isEqual);
 
-    return useSyncExternalStore(subscribe, getSnapshot);
+    // Stable result tuple: re-allocated only when the (already deduped) `value` reference changes.
+    return useMemo<UseOnyxResult<TReturnValue>>(() => [value as NonNullable<TReturnValue> | undefined, LOADED_METADATA], [value]);
 }
 
 export default useOnyx;
