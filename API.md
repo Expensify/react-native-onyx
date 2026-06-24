@@ -80,7 +80,6 @@ This method will be deprecated soon. Please use `Onyx.connectWithoutView()` inst
 | connectOptions | The options object that will define the behavior of the connection. |
 | connectOptions.key | The Onyx key to subscribe to. |
 | connectOptions.callback | A function that will be called when the Onyx data we are subscribed changes. |
-| connectOptions.waitForCollectionCallback | If set to `true`, it will return the entire collection to the callback as a single object. |
 | connectOptions.selector | This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook.**        Using this setting on `useOnyx()` can have very positive performance benefits because the component will only re-render        when the subset of data changes. Otherwise, any change of data on any property would normally        cause the component to re-render (and that can be expensive from a performance standpoint). |
 
 **Example**  
@@ -103,7 +102,6 @@ Connects to an Onyx key given the options passed and listens to its changes.
 | connectOptions | The options object that will define the behavior of the connection. |
 | connectOptions.key | The Onyx key to subscribe to. |
 | connectOptions.callback | A function that will be called when the Onyx data we are subscribed changes. |
-| connectOptions.waitForCollectionCallback | If set to `true`, it will return the entire collection to the callback as a single object. |
 | connectOptions.selector | This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook.**        Using this setting on `useOnyx()` can have very positive performance benefits because the component will only re-render        when the subset of data changes. Otherwise, any change of data on any property would normally        cause the component to re-render (and that can be expensive from a performance standpoint). |
 
 **Example**  
