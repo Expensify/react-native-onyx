@@ -39,6 +39,11 @@ function getBudgetedHealErrorLabel(error: unknown): string {
     return 'unknown';
 }
 
+/** Union of all error types indicating a stale/dead IDB connection. Used by the visibilitychange probe. */
+function isStaleConnectionError(error: unknown): boolean {
+    return isInvalidStateError(error) || isBackingStoreError(error) || isConnectionLostError(error);
+}
+
 // This is a copy of the createStore function from idb-keyval, we need a custom implementation
 // because we need to create the database manually in order to ensure that the store exists before we use it.
 // If the store does not exist, idb-keyval will throw an error
@@ -126,6 +131,56 @@ function createStore(dbName: string, storeName: string): UseStore {
         healAttemptsRemaining = HEAL_ATTEMPTS_MAX;
         return result;
     }
+
+    // Proactive IDB health check when tab returns to foreground.
+    // Safari kills IDB connections for backgrounded tabs. By probing as soon as
+    // the tab becomes visible, we drop the stale dbp early so the first real
+    // operation opens a fresh connection instead of failing.
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState !== 'visible' || !dbp) {
+            return;
+        }
+
+        Logger.logInfo('IDB visibilitychange probe: tab became visible, checking connection health', {dbName, storeName});
+
+        const probePromise = dbp;
+
+        const dropCacheIfStale = (error: unknown) => {
+            if (dbp !== probePromise || !isStaleConnectionError(error)) {
+                return;
+            }
+            Logger.logAlert('IDB visibilitychange probe: stale connection detected, dropping cached connection', {
+                dbName,
+                storeName,
+                errorMessage: error instanceof Error ? error.message : String(error),
+            });
+            dbp = undefined;
+        };
+
+        probePromise
+            .then((db) => {
+                if (dbp !== probePromise) {
+                    return;
+                }
+                try {
+                    const tx = db.transaction(storeName, 'readonly');
+                    const probeStore = tx.objectStore(storeName);
+                    const req = probeStore.count();
+                    req.onsuccess = () => {
+                        Logger.logInfo('IDB visibilitychange probe: connection is healthy', {dbName, storeName});
+                    };
+                    req.onerror = () => {
+                        dropCacheIfStale(req.error);
+                    };
+                } catch (error) {
+                    dropCacheIfStale(error);
+                }
+            })
+            .catch(() => {
+                // The cached open promise rejected; cacheOpenPromise already cleared dbp on its own
+                // branch. Swallow here so the probe's separate branch doesn't surface an unhandled rejection.
+            });
+    });
 
     // Handles three recoverable error classes:
     // 1. InvalidStateError — connection closed between getDB() resolving and db.transaction().
