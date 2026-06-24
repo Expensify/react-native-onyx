@@ -371,8 +371,8 @@ describe('OnyxUtils', () => {
         });
 
         it('should not fire again for a collection subscriber that disconnects itself in its callback', async () => {
-            // A collection-root subscriber (snapshot mode) disconnects itself when it receives a
-            // collection snapshot. A subsequent collection change must NOT trigger another callback.
+            // A collection-root subscriber disconnects itself when it receives a
+            // collection object. A subsequent collection change must NOT trigger another callback.
             const callback = jest.fn();
             const connection = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.TEST_KEY,
@@ -384,7 +384,7 @@ describe('OnyxUtils', () => {
                 Onyx.disconnect(connection);
             });
 
-            // First batch fires the snapshot callback once, which disconnects the subscriber.
+            // First batch fires the collection callback once, which disconnects the subscriber.
             await Onyx.multiSet({
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}1`]: {id: 1},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}2`]: {id: 2},
@@ -531,7 +531,7 @@ describe('OnyxUtils', () => {
             await Onyx.disconnect(connection);
         });
 
-        it('should notify collection-level subscribers with the whole collection snapshot', async () => {
+        it('should notify collection-level subscribers with the whole collection object', async () => {
             const entryKey = `${ONYXKEYS.COLLECTION.TEST_KEY}789`;
             const entryData = {value: 'data'};
 

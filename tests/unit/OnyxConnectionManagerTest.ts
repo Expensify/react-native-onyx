@@ -109,7 +109,7 @@ describe('OnyxConnectionManager', () => {
             expect(connectionsMap.size).toEqual(0);
         });
 
-        it('should connect two times to the same collection key, reuse the connection, and fire both callbacks with the whole collection snapshot', async () => {
+        it('should connect two times to the same collection key, reuse the connection, and fire both callbacks with the whole collection object', async () => {
             const obj1 = {id: 'entry1_id', name: 'entry1_name'};
             const obj2 = {id: 'entry2_id', name: 'entry2_name'};
             const collection = {
@@ -134,7 +134,7 @@ describe('OnyxConnectionManager', () => {
 
             await act(async () => waitForPromisesToResolve());
 
-            // Both subscribers share the connection and receive the whole collection snapshot.
+            // Both subscribers share the connection and receive the whole collection object.
             expect(callback1).toHaveBeenCalledWith(collection, ONYXKEYS.COLLECTION.TEST_KEY, undefined);
             expect(callback2).toHaveBeenCalledWith(collection, ONYXKEYS.COLLECTION.TEST_KEY, undefined);
 
@@ -216,7 +216,7 @@ describe('OnyxConnectionManager', () => {
             expect(connectionsMap.has(connection2.id)).toBeTruthy();
         });
 
-        it('should reuse the connection to the same collection key and deliver the whole collection snapshot to all subscribers', async () => {
+        it('should reuse the connection to the same collection key and deliver the whole collection object to all subscribers', async () => {
             const collection = {
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
@@ -237,15 +237,12 @@ describe('OnyxConnectionManager', () => {
             const callback2 = jest.fn();
             const connection2 = connectionManager.connect({key: ONYXKEYS.COLLECTION.TEST_KEY, callback: callback2});
 
-            // Collection-root connections are now always snapshot mode and are reused.
             expect(connection1.id).toEqual(connection2.id);
             expect(connectionsMap.size).toEqual(1);
             expect(connectionsMap.has(connection1.id)).toBeTruthy();
 
             await act(async () => waitForPromisesToResolve());
 
-            // The second subscriber reuses the connection and fires immediately with the cached
-            // snapshot (no sourceValue is forwarded on the immediate fire).
             expect(callback2).toHaveBeenCalledWith(collection, ONYXKEYS.COLLECTION.TEST_KEY);
         });
 

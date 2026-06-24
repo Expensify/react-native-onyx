@@ -597,7 +597,6 @@ function keysChanged<TKey extends CollectionKeyBase>(
         }
 
         try {
-            // Collection-root subscribers always receive the whole collection snapshot.
             lastConnectionCallbackData.set(subscriber.subscriptionID, {value: cachedCollection, matchedKey: subscriber.key});
             subscriber.callback(cachedCollection, subscriber.key, partialCollection);
         } catch (error) {
@@ -678,7 +677,6 @@ function keyChanged<TKey extends OnyxKey>(
                 }
 
                 if (OnyxKeys.isCollectionKey(subscriber.key)) {
-                    // Collection-root subscribers always receive the whole collection snapshot.
                     // Skip individual key changes during collection updates to prevent duplicate
                     // callbacks - the collection update will handle this properly.
                     if (isProcessingCollectionUpdate) {
@@ -723,7 +721,7 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: CallbackToStateMapp
     }
 
     // Always read the latest value from cache to avoid stale or duplicate data.
-    // For collection-root subscribers, read the full collection (snapshot mode).
+    // For collection-root subscribers, read the full collection.
     // For individual key subscribers, read just that key's value.
     let value: OnyxValue<TKey> | undefined;
     if (OnyxKeys.isCollectionKey(mapping.key)) {
@@ -1134,7 +1132,7 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
             }
 
             // When using a callback subscriber, a subscription to a collection key combines all matching
-            // member values into a single object and makes one call with the whole collection snapshot.
+            // member values into a single object and makes one call with the whole collection object.
             if (typeof mapping.callback === 'function') {
                 if (OnyxKeys.isCollectionKey(mapping.key)) {
                     getCollectionDataAndSendAsObject(matchingKeys, mapping);
