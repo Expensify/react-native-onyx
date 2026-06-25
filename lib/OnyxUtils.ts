@@ -891,13 +891,13 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(
     Logger.logInfo(`Out of storage. Evicting least recently accessed key (${keyForRemoval}) and retrying. Error: ${error}`);
     reportStorageQuota(error);
 
-    // @ts-expect-error No overload matches this call.
     return remove(keyForRemoval).then(() => {
         // Mark the eviction only once the deletion has actually completed, immediately before the
         // retry it pairs with. Recording earlier lets a concurrent write's capacity failure consume
         // the marker as a no-progress cycle while this deletion is still pending and may yet free
         // space — so the verdict belongs to the retry that follows the deletion, not the eviction call.
         StorageCircuitBreaker.recordEviction();
+        // @ts-expect-error No overload matches this call.
         return onyxMethod(defaultParams, nextRetryAttempt);
     });
 }

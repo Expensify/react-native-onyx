@@ -1,12 +1,12 @@
+import type {ValueOf} from 'type-fest';
 import {StorageErrorClass, getErrorParts} from '../../errors';
-import type {StorageErrorClassValue} from '../../errors';
 
 /**
  * Classifies an IndexedDB write failure into the shared storage taxonomy (lib/storage/errors.ts).
  * Matching is done on the lowercased error name and message. This is the IndexedDB engine's own
  * dialect — it is NOT shared with other engines.
  */
-function classifyIDBError(error: unknown): StorageErrorClassValue {
+function classifyIDBError(error: unknown): ValueOf<typeof StorageErrorClass> {
     const {name, message} = getErrorParts(error);
 
     // Non-serializable data passed to IDBObjectStore.put — retrying is futile.

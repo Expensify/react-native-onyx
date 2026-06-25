@@ -1,5 +1,5 @@
+import type {ValueOf} from 'type-fest';
 import {StorageErrorClass, getErrorParts} from '../errors';
-import type {StorageErrorClassValue} from '../errors';
 
 /**
  * Classifies a SQLite write failure into the shared storage taxonomy (lib/storage/errors.ts).
@@ -10,7 +10,7 @@ import type {StorageErrorClassValue} from '../errors';
  * SQLite surfaces fewer distinct write-failure shapes than IndexedDB. As telemetry from the UNKNOWN
  * bucket (see OnyxUtils.retryOperation) reveals recurring native errors, add matchers here.
  */
-function classifySQLiteError(error: unknown): StorageErrorClassValue {
+function classifySQLiteError(error: unknown): ValueOf<typeof StorageErrorClass> {
     const {message} = getErrorParts(error);
 
     // Device disk full.

@@ -1,5 +1,3 @@
-import type {ValueOf} from 'type-fest';
-
 /**
  * Shared vocabulary for storage write failures. The *classes* are engine-agnostic; the *matching*
  * is not — each storage provider knows its own error dialect and owns its classifier (see each
@@ -26,8 +24,6 @@ const StorageErrorClass = {
     UNKNOWN: 'unknown',
 } as const;
 
-type StorageErrorClassValue = ValueOf<typeof StorageErrorClass>;
-
 /**
  * Normalizes any thrown value into a lowercased `{name, message}` pair for matching. Shared by every
  * provider's classifier so they all extract the error the same way.
@@ -40,4 +36,3 @@ function getErrorParts(error: unknown): {name: string; message: string} {
 }
 
 export {StorageErrorClass, getErrorParts};
-export type {StorageErrorClassValue};
