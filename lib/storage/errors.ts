@@ -29,7 +29,7 @@ const StorageErrorClass = {
  * provider's classifier so they all extract the error the same way.
  */
 function getErrorParts(error: unknown): {name: string; message: string} {
-    if (error instanceof Error || error instanceof DOMException) {
+    if (error instanceof Error || (typeof DOMException !== 'undefined' && error instanceof DOMException)) {
         return {name: (error.name ?? '').toLowerCase(), message: (error.message ?? '').toLowerCase()};
     }
     return {name: '', message: String(error ?? '').toLowerCase()};
