@@ -826,10 +826,12 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(
     const nextRetryAttempt = currentRetryAttempt + 1;
     const errorClass = Storage.classifyError(error);
 
-    // Once the breaker is open, every capacity write is going to fail the same way. Drop it silently —
+    // While open (or while a half-open probe is already in flight), drop capacity retries silently —
     // the breaker already emitted its single alert, and logging per failed write is exactly the storm
-    // we are suppressing. (We return before the log line below on purpose.)
-    if (errorClass === StorageErrorClass.CAPACITY && StorageCircuitBreaker.isTripped()) {
+    // we are suppressing. A rejected half-open caller is the in-flight probe failing; record that so
+    // the circuit reopens for another window. (We return before the log line below on purpose.)
+    if (errorClass === StorageErrorClass.CAPACITY && !StorageCircuitBreaker.isAllowed()) {
+        StorageCircuitBreaker.recordProbeFailure();
         return Promise.resolve();
     }
 
@@ -869,8 +871,7 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(
     // cannot stop a session-wide storm — each evicted key triggers an OnyxDerived recompute that spawns
     // a fresh write with its own budget — so the breaker is what actually halts the meltdown. (The
     // already-open case returned silently at the top of this function.)
-    StorageCircuitBreaker.recordCapacityFailure();
-    if (StorageCircuitBreaker.isTripped()) {
+    if (StorageCircuitBreaker.recordCapacityFailure()) {
         // This failure tripped the breaker; it already emitted its single alert. Stop here.
         return Promise.resolve();
     }

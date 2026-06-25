@@ -747,6 +747,8 @@ describe('OnyxUtils', () => {
 
     describe('retryOperation', () => {
         const retryOperationSpy = jest.spyOn(OnyxUtils, 'retryOperation');
+        /** Mirrors StorageCircuitBreaker rolling-window trip threshold. */
+        const STORAGE_FAILURE_THRESHOLD = 50;
         const genericError = new Error('Generic storage error');
         const invalidDataError = new Error("Failed to execute 'put' on 'IDBObjectStore': invalid data");
         const diskFullError = new Error('database or disk is full');
@@ -889,21 +891,21 @@ describe('OnyxUtils', () => {
 
             // No evictable keys are configured, so each failing write records exactly one capacity
             // failure with the breaker (it cannot evict). Enough of them within one window trips it.
-            for (let i = 0; i <= StorageCircuitBreaker.FAILURE_THRESHOLD; i++) {
+            for (let i = 0; i <= STORAGE_FAILURE_THRESHOLD; i++) {
                 await Onyx.set(ONYXKEYS.TEST_KEY, {test: i});
             }
             await waitForPromisesToResolve();
 
-            expect(StorageCircuitBreaker.isTripped()).toBe(true);
+            expect(StorageCircuitBreaker.isAllowed()).toBe(false);
             expect(logAlertSpy).toHaveBeenCalledWith(expect.stringContaining('Storage circuit breaker tripped'));
         });
 
         it('should drop capacity writes silently while the circuit breaker is open', async () => {
             // Trip the breaker deterministically so every capacity failure below is observed while open.
-            for (let i = 0; i <= StorageCircuitBreaker.FAILURE_THRESHOLD; i++) {
+            for (let i = 0; i <= STORAGE_FAILURE_THRESHOLD; i++) {
                 StorageCircuitBreaker.recordCapacityFailure();
             }
-            expect(StorageCircuitBreaker.isTripped()).toBe(true);
+            expect(StorageCircuitBreaker.isAllowed()).toBe(false);
 
             // Clear so we only observe logging caused by the write below, not the trip alert above.
             const logInfoSpy = jest.spyOn(Logger, 'logInfo').mockClear();
@@ -915,7 +917,7 @@ describe('OnyxUtils', () => {
 
             // The write and any cascading derived writes are dropped without per-write log spam, and
             // without re-alerting — the single trip alert is the only signal while open.
-            expect(StorageCircuitBreaker.isTripped()).toBe(true);
+            expect(StorageCircuitBreaker.isAllowed()).toBe(false);
             expect(logInfoSpy).not.toHaveBeenCalledWith(expect.stringContaining('Failed to save to storage'));
             expect(logAlertSpy).not.toHaveBeenCalled();
         });
@@ -1483,6 +1485,42 @@ describe('OnyxUtils', () => {
             expect(LocalOnyxCache.hasCacheForKey(key2)).toBe(true);
             // The write that triggered the error should have succeeded on retry
             expect(LocalOnyxCache.get(ONYXKEYS.TEST_KEY)).toEqual({test: 'data'});
+        });
+
+        it('should recover via a half-open eviction+retry probe after the open window clears', async () => {
+            // Regression for the bug where the capacity failure that triggers the half-open probe
+            // re-tripped the breaker before the eviction+retry could run — permanently disabling
+            // eviction-based recovery after the first trip. Drive the whole probe through retryOperation.
+            const ROLLING_WINDOW_MS = 60_000;
+            const FAILURE_THRESHOLD = 50;
+            const LocalStorageCircuitBreaker = require('../../lib/StorageCircuitBreaker').default as typeof StorageCircuitBreaker;
+
+            let currentTime = 1_000_000;
+            const nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => currentTime);
+
+            // Seed an evictable key so the probe has something to evict, then trip the breaker open.
+            const evictableKey = `${ONYXKEYS.COLLECTION.TEST_KEY}1`;
+            await LocalOnyx.set(evictableKey, {id: 1});
+            for (let i = 0; i <= FAILURE_THRESHOLD; i++) {
+                LocalStorageCircuitBreaker.recordCapacityFailure();
+            }
+            expect(LocalStorageCircuitBreaker.isAllowed()).toBe(false);
+
+            // Let the open window clear so the next capacity write is admitted as the half-open probe.
+            currentTime += ROLLING_WINDOW_MS;
+
+            // The probe write fails once with capacity (triggering the probe), then its post-eviction retry succeeds.
+            LocalStorageMock.setItem = jest.fn(LocalStorageMock.setItem).mockRejectedValueOnce(diskFullError).mockImplementation(LocalStorageMock.setItem);
+            await LocalOnyx.set(ONYXKEYS.TEST_KEY, {test: 'recovered'});
+            await waitForPromisesToResolve();
+
+            // The probe ran: the evictable key was evicted, the write landed, and the successful retry closed the circuit.
+            expect(LocalOnyxCache.hasCacheForKey(evictableKey)).toBe(false);
+            expect(LocalOnyxCache.get(ONYXKEYS.TEST_KEY)).toEqual({test: 'recovered'});
+            expect(LocalStorageCircuitBreaker.isAllowed()).toBe(true);
+            expect(LocalStorageCircuitBreaker.isAllowed()).toBe(true);
+
+            nowSpy.mockRestore();
         });
 
         it('should evict the least recently accessed key first (LRU order)', async () => {
