@@ -5,24 +5,48 @@
  */
 import type {OnyxKey} from '../../types';
 import NoopProvider from '../providers/NoopProvider';
-import type {StorageKeyList, OnStorageKeyChanged} from '../providers/types';
+import type {StorageKeyList, OnStorageKeysChanged} from '../providers/types';
 import type StorageProvider from '../providers/types';
 
 const SYNC_ONYX = 'SYNC_ONYX';
 
 /**
- * Raise an event through `localStorage` to let other tabs know a value changed
- * @param {String} onyxKey
+ * Parses the SYNC_ONYX storage event value.
+ * The payload is a JSON array of the changed keys (a batch). I fall backs to treating the raw
+ * value as a single key for backwards compatibility with the previous one-key-per-event format.
  */
-function raiseStorageSyncEvent(onyxKey: OnyxKey) {
-    global.localStorage.setItem(SYNC_ONYX, onyxKey);
+function parseSyncOnyxStorageEventValue(value: string): StorageKeyList {
+    let onyxKeys: StorageKeyList;
+    try {
+        const parsed = JSON.parse(value) as StorageKeyList | string;
+        onyxKeys = Array.isArray(parsed) ? parsed : [value];
+    } catch {
+        onyxKeys = [value];
+    }
+
+    return onyxKeys;
+}
+
+/**
+ * Raise a single cross-tab event for a batch of changed keys. Sending them together (instead of one
+ * event per key) preserves the write's batch boundary across tabs, so the receiving tab can notify
+ * collection subscribers once for the whole batch — matching the local mergeCollection behavior —
+ * instead of re-delivering the whole collection once per member (which is O(N^2) and can crash the tab).
+ */
+function raiseStorageSyncManyKeysEvent(onyxKeys: StorageKeyList) {
+    if (onyxKeys.length === 0) {
+        return;
+    }
+    global.localStorage.setItem(SYNC_ONYX, JSON.stringify(onyxKeys));
     global.localStorage.removeItem(SYNC_ONYX);
 }
 
-function raiseStorageSyncManyKeysEvent(onyxKeys: StorageKeyList) {
-    for (const onyxKey of onyxKeys) {
-        raiseStorageSyncEvent(onyxKey);
-    }
+/**
+ * Raise an event through `localStorage` to let other tabs know a value changed.
+ * @param {String} onyxKey
+ */
+function raiseStorageSyncEvent(onyxKey: OnyxKey) {
+    raiseStorageSyncManyKeysEvent([onyxKey]);
 }
 
 let storage = NoopProvider;
@@ -30,9 +54,9 @@ let storage = NoopProvider;
 const InstanceSync = {
     shouldBeUsed: true,
     /**
-     * @param {Function} onStorageKeyChanged Storage synchronization mechanism keeping all opened tabs in sync
+     * @param {Function} onStorageKeysChanged Storage synchronization mechanism keeping all opened tabs in sync
      */
-    init: (onStorageKeyChanged: OnStorageKeyChanged, store: StorageProvider<unknown>) => {
+    init: (onStorageKeysChanged: OnStorageKeysChanged, store: StorageProvider<unknown>) => {
         storage = store;
 
         // This listener will only be triggered by events coming from other tabs
@@ -42,9 +66,9 @@ const InstanceSync = {
                 return;
             }
 
-            const onyxKey = event.newValue;
+            const onyxKeys = parseSyncOnyxStorageEventValue(event.newValue);
 
-            storage.getItem(onyxKey).then((value) => onStorageKeyChanged(onyxKey, value));
+            storage.multiGet(onyxKeys).then((pairs) => onStorageKeysChanged(pairs));
         });
     },
     setItem: raiseStorageSyncEvent,
