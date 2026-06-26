@@ -49,23 +49,12 @@ export default defineConfig([
         rules: {
             'react/prop-types': 'off',
             'react/require-default-props': 'off',
-            'react/jsx-props-no-spreading': 'off',
-
-            // Onyx is this package; multiple instances are intentional in tests and mocks.
-            'rulesdir/no-multiple-onyx-in-file': 'off',
         },
     },
     {
         files: ['tests/**/*', 'jestSetup.js', 'lib/**/__mocks__/**/*'],
         rules: {
             'import/extensions': 'off',
-            'no-restricted-syntax': ['error', 'ForInStatement', 'LabeledStatement', 'WithStatement'],
-        },
-    },
-    {
-        files: ['**/*.native.ts', '**/*.native.tsx'],
-        rules: {
-            '@typescript-eslint/no-require-imports': 'off',
         },
     },
     {

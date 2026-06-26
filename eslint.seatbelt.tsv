@@ -151,9 +151,9 @@
 "tests/unit/storage/providers/SQLiteProviderTest.ts"	"@typescript-eslint/no-unsafe-type-assertion"	5
 "tests/unit/storage/providers/SQLiteProviderTest.ts"	"rulesdir/prefer-at"	4
 "tests/unit/storage/providers/createStoreTest.ts"	"@typescript-eslint/no-non-null-assertion"	1
-"tests/unit/storage/providers/createStoreTest.ts"	"@typescript-eslint/no-unnecessary-type-assertion"	5
+"tests/unit/storage/providers/createStoreTest.ts"	"@typescript-eslint/no-unnecessary-type-assertion"	4
 "tests/unit/storage/providers/createStoreTest.ts"	"@typescript-eslint/no-unsafe-assignment"	18
-"tests/unit/storage/providers/createStoreTest.ts"	"@typescript-eslint/no-unsafe-type-assertion"	10
+"tests/unit/storage/providers/createStoreTest.ts"	"@typescript-eslint/no-unsafe-type-assertion"	8
 "tests/unit/storage/providers/createStoreTest.ts"	"@typescript-eslint/unbound-method"	10
 "tests/unit/storage/tryOrDegradePerformanceTest.ts"	"@typescript-eslint/no-unsafe-assignment"	2
 "tests/unit/storage/tryOrDegradePerformanceTest.ts"	"@typescript-eslint/no-unsafe-member-access"	1
