@@ -136,10 +136,18 @@ class OnyxConnectionManager {
         }
 
         for (const callback of connection.callbacks.values()) {
-            if (OnyxKeys.isCollectionKey(connection.onyxKey)) {
-                (callback as CollectionConnectCallback<OnyxKey>)(connection.cachedCallbackValue as Record<string, unknown>, connection.cachedCallbackKey as OnyxKey, connection.sourceValue);
-            } else {
-                (callback as DefaultConnectCallback<OnyxKey>)(connection.cachedCallbackValue, connection.cachedCallbackKey as OnyxKey);
+            try {
+                if (OnyxKeys.isCollectionKey(connection.onyxKey)) {
+                    (callback as CollectionConnectCallback<OnyxKey>)(
+                        connection.cachedCallbackValue as Record<string, unknown>,
+                        connection.cachedCallbackKey as OnyxKey,
+                        connection.sourceValue,
+                    );
+                } else {
+                    (callback as DefaultConnectCallback<OnyxKey>)(connection.cachedCallbackValue, connection.cachedCallbackKey as OnyxKey);
+                }
+            } catch (error) {
+                Logger.logAlert(`[ConnectionManager] Subscriber callback threw an error for key '${connection.onyxKey}': ${error}`);
             }
         }
     }
