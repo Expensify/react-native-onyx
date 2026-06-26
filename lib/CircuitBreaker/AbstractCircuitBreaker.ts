@@ -7,12 +7,10 @@ import type {CircuitBreakerOptions, CircuitBreakerState} from './types';
  *
  * - **closed**: requests are allowed; failures are counted.
  * - **open**: requests are rejected until {@link resetTimeoutMs} elapses.
- * - **half-open**: the recovery-probe state. After the open timeout the breaker does NOT jump straight
- *   back to closed (that would re-admit full load onto a still-broken dependency and immediately
- *   re-trip — flapping). Instead it admits exactly ONE probe request: success means the dependency
- *   recovered, so the circuit closes; failure means it's still down, so the circuit reopens for
- *   another window. Admitting a single probe (see {@link isAllowed}) — rather than reopening the
- *   floodgates — is also what avoids the "thundering herd" of every caller retrying at once.
+ * - **half-open**: the recovery-probe state. After the open timeout, the breaker admits exactly ONE
+ *   probe request: success means the dependency recovered, so the circuit closes. Failure means it's
+ *   still down, so the circuit reopens. This single-request probe prevents a "thundering herd" where
+ *   every caller fails loudly when the service hasn't recovered yet.
  *
  * Subclasses implement the failure-counting policy by overriding {@link recordFailureInClosed} (and
  * friends) — e.g. counting consecutive failures, or failures within a rolling time window, or any
