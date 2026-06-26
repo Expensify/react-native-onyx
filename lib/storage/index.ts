@@ -50,6 +50,12 @@ const storage: Storage = {
     },
 
     /**
+     * Classifies a write error using the active provider's own classifier. Synchronous and pure —
+     * never wrapped in tryOrDegradePerformance.
+     */
+    classifyError: (error) => provider.classifyError(error),
+
+    /**
      * Initializes all providers in the list of storage providers
      * and enables fallback providers if necessary
      */
