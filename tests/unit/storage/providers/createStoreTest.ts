@@ -324,7 +324,7 @@ describe('createStore', () => {
                             value: backingStoreError(),
                             configurable: true,
                         });
-                        req.onerror?.(new Event('error') as Event & {target: IDBOpenDBRequest});
+                        req.onerror?.(new Event('error'));
                     });
                     return req;
                 }
@@ -351,7 +351,7 @@ describe('createStore', () => {
                         value: backingStoreError(),
                         configurable: true,
                     });
-                    req.onerror?.(new Event('error') as Event & {target: IDBOpenDBRequest});
+                    req.onerror?.(new Event('error'));
                 });
                 return req;
             });
@@ -490,7 +490,7 @@ describe('createStore', () => {
                         value: connectionLostError(),
                         configurable: true,
                     });
-                    req.onerror?.(new Event('error') as Event & {target: IDBOpenDBRequest});
+                    req.onerror?.(new Event('error'));
                 });
                 return req;
             });
@@ -738,7 +738,7 @@ describe('createStore', () => {
                         value: new DOMException('probe open failed', 'UnknownError'),
                         configurable: true,
                     });
-                    req.onerror?.(new Event('error') as Event & {target: IDBOpenDBRequest});
+                    req.onerror?.(new Event('error'));
                 };
                 return req;
             });

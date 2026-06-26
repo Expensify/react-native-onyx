@@ -183,7 +183,7 @@ describe('OnyxSnapshotCache', () => {
                         // Pre-populate cache with 1000 entries
                         for (let i = 0; i < 1000; i++) {
                             const key = `test_key_${i}`;
-                            const result = mockResults[i];
+                            const result = mockResults.at(i);
                             cache.setCachedResult(key, `cache_key_${i}`, result);
                         }
                         // Set our target entry

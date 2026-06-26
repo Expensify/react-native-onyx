@@ -42,7 +42,7 @@ describe('Collection hydration with connect() followed by immediate set()', () =
 
         // The subscriber should eventually receive ALL collection members.
         // The async hydration reads test_2 and test_3 from storage.
-        const lastCall = mockCallback.mock.calls[mockCallback.mock.calls.length - 1][0];
+        const lastCall = mockCallback.mock.calls.at(mockCallback.mock.calls.length - 1)[0];
         expect(lastCall).toHaveProperty(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`);
         expect(lastCall).toHaveProperty(`${ONYX_KEYS.COLLECTION.TEST_KEY}2`);
         expect(lastCall).toHaveProperty(`${ONYX_KEYS.COLLECTION.TEST_KEY}3`);
@@ -102,7 +102,7 @@ describe('Collection hydration with connect() followed by immediate set()', () =
         await waitForPromisesToResolve();
 
         // The LAST value delivered to the subscriber must be the fresh one, not the stale storage value
-        const lastValue = mockCallback.mock.calls[mockCallback.mock.calls.length - 1][0];
+        const lastValue = mockCallback.mock.calls.at(mockCallback.mock.calls.length - 1)[0];
         expect(lastValue).toEqual({title: 'new'});
     });
 
@@ -120,7 +120,7 @@ describe('Collection hydration with connect() followed by immediate set()', () =
 
         await waitForPromisesToResolve();
 
-        const lastCall = mockCallback.mock.calls[mockCallback.mock.calls.length - 1][0];
+        const lastCall = mockCallback.mock.calls.at(mockCallback.mock.calls.length - 1)[0];
 
         // The final collection snapshot must have the fresh value, not the stale storage one
         expect(lastCall[`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]).toEqual({id: 1, title: 'Freshly Updated'});
@@ -159,7 +159,7 @@ describe('Collection hydration with connect() followed by immediate set()', () =
 
         // Verify the updated value is present (not stale) by finding the last call for key 1
         const key1Calls = mockCallback.mock.calls.filter((call) => call[1] === `${ONYX_KEYS.COLLECTION.TEST_KEY}1`);
-        const lastKey1Value = key1Calls[key1Calls.length - 1][0];
+        const lastKey1Value = key1Calls.at(key1Calls.length - 1)[0];
         expect(lastKey1Value).toEqual({id: 1, title: 'Updated Test One'});
     });
 });

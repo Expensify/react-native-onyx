@@ -42,7 +42,7 @@ describe('useOnyx', () => {
         });
 
         it('should not throw any errors when changing from a collection member key to another one', async () => {
-            const {rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string});
+            const {rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1`});
 
             try {
                 await act(async () => {
@@ -54,7 +54,7 @@ describe('useOnyx', () => {
         });
 
         it('should transition through loading when switching between collection member keys that both resolve to undefined', async () => {
-            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string});
+            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1`});
 
             // Wait for initial key to fully load
             await act(async () => waitForPromisesToResolve());
@@ -77,7 +77,7 @@ describe('useOnyx', () => {
         it('should return cached value immediately with loaded status when switching to a key that has data', async () => {
             Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}2`, 'test_value');
 
-            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string});
+            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1`});
 
             await act(async () => waitForPromisesToResolve());
 
@@ -100,7 +100,7 @@ describe('useOnyx', () => {
         it('should clear previous data and transition through loading when switching from a key with data to one without', async () => {
             Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}1`, 'initial_value');
 
-            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string});
+            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1`});
 
             await act(async () => waitForPromisesToResolve());
 
@@ -123,7 +123,7 @@ describe('useOnyx', () => {
             Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}1`, 'value_one');
             Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}2`, 'value_two');
 
-            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string});
+            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1`});
 
             await act(async () => waitForPromisesToResolve());
 
@@ -145,7 +145,7 @@ describe('useOnyx', () => {
 
             const selector = ((entry: OnyxEntry<{id: string; name: string}>) => entry?.name) as UseOnyxSelector<OnyxKey, string | undefined>;
 
-            const {result, rerender} = renderHook((key: string) => useOnyx(key, {selector}), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string});
+            const {result, rerender} = renderHook((key: string) => useOnyx(key, {selector}), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1`});
 
             await act(async () => waitForPromisesToResolve());
 
@@ -166,7 +166,7 @@ describe('useOnyx', () => {
             Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}2`, 'value_two');
             Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}3`, 'value_three');
 
-            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string});
+            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1`});
 
             await act(async () => waitForPromisesToResolve());
 
@@ -186,7 +186,7 @@ describe('useOnyx', () => {
             Onyx.set(ONYXKEYS.TEST_KEY, 'value_one');
             Onyx.set(ONYXKEYS.TEST_KEY_2, 'value_two');
 
-            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: ONYXKEYS.TEST_KEY as string});
+            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: ONYXKEYS.TEST_KEY});
 
             await act(async () => waitForPromisesToResolve());
 
@@ -209,7 +209,7 @@ describe('useOnyx', () => {
             Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}1`, 'value_one');
             Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}2`, 'value_two');
 
-            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1` as string});
+            const {result, rerender} = renderHook((key: string) => useOnyx(key), {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}1`});
 
             await act(async () => waitForPromisesToResolve());
 
@@ -427,7 +427,7 @@ describe('useOnyx', () => {
             Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, {
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: entry1,
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: entry2,
-            } as GenericCollection);
+            });
 
             const {result} = renderHook(() => useOnyx(ONYXKEYS.COLLECTION.TEST_KEY));
             await act(async () => waitForPromisesToResolve());
@@ -446,7 +446,7 @@ describe('useOnyx', () => {
         it('should keep the same collection reference when no members change', async () => {
             Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, {
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
-            } as GenericCollection);
+            });
 
             const {result} = renderHook(() => useOnyx(ONYXKEYS.COLLECTION.TEST_KEY));
             await act(async () => waitForPromisesToResolve());
@@ -483,7 +483,7 @@ describe('useOnyx', () => {
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry3`]: {id: 'entry3_id', name: 'entry3_name'},
-            } as GenericCollection);
+            });
 
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.COLLECTION.TEST_KEY, {
@@ -556,7 +556,7 @@ describe('useOnyx', () => {
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry3`]: {id: 'entry3_id', name: 'entry3_name'},
-            } as GenericCollection);
+            });
 
             const {result} = renderHook(() =>
                 useOnyx(ONYXKEYS.COLLECTION.TEST_KEY, {
@@ -721,7 +721,7 @@ describe('useOnyx', () => {
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}3`]: {id: '3', value: 'item3'},
             };
 
-            await act(async () => Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, testCollection as GenericCollection));
+            await act(async () => Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, testCollection));
 
             let filterIds = ['1'];
             let selectorCallCount = 0;
@@ -787,7 +787,7 @@ describe('useOnyx', () => {
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}item4`]: {id: 'item4', category: 'B', priority: 4},
             };
 
-            await act(async () => Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, testData as GenericCollection));
+            await act(async () => Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, testData));
 
             let categoryFilter = 'A';
             let sortAscending = true;
@@ -975,7 +975,7 @@ describe('useOnyx', () => {
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry3`]: {id: 'entry3_id', name: 'entry3_name'},
-            } as GenericCollection);
+            });
 
             let externalValue = 'ex1';
 
@@ -1023,7 +1023,7 @@ describe('useOnyx', () => {
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`]: {id: 'skippable-id_id', name: 'skippable-id_name'},
-            } as GenericCollection);
+            });
 
             const {result} = renderHook(() => useOnyx(ONYXKEYS.COLLECTION.TEST_KEY));
 
@@ -1040,7 +1040,7 @@ describe('useOnyx', () => {
                     [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name_changed'},
                     [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name_changed'},
                     [`${ONYXKEYS.COLLECTION.TEST_KEY}skippable-id`]: {id: 'skippable-id_id', name: 'skippable-id_name_changed'},
-                } as GenericCollection),
+                }),
             );
 
             expect(result.current[0]).toEqual({
@@ -1114,7 +1114,7 @@ describe('useOnyx', () => {
                 Onyx.mergeCollection(ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION, {
                     [`${ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION}entry1`]: {id: '1'},
                     [`${ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION}entry2`]: {id: '2'},
-                } as GenericCollection),
+                }),
             );
 
             const {result} = renderHook(() => useOnyx(ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION));
@@ -1261,7 +1261,7 @@ describe('useOnyx', () => {
                     renders.push({value: r[0], status: r[1].status});
                     return r;
                 },
-                {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}A` as string},
+                {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}A`},
             );
 
             await act(async () => waitForPromisesToResolve());
@@ -1285,7 +1285,7 @@ describe('useOnyx', () => {
             // Verify the reset took effect: a 'loading' frame must appear after the key change.
             const postSwitchStatuses = renders.slice(rendersAfterMount).map((r) => r.status);
             expect(postSwitchStatuses).toContain('loading');
-            expect(postSwitchStatuses[postSwitchStatuses.length - 1]).toBe('loaded');
+            expect(postSwitchStatuses.at(postSwitchStatuses.length - 1)).toBe('loaded');
         });
 
         it('should transition through loading and render exactly 3 times when switching between two cached keys', async () => {
@@ -1299,7 +1299,7 @@ describe('useOnyx', () => {
                     renders.push({value: r[0], status: r[1].status});
                     return r;
                 },
-                {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}A` as string},
+                {initialProps: `${ONYXKEYS.COLLECTION.TEST_KEY}A`},
             );
 
             await act(async () => waitForPromisesToResolve());

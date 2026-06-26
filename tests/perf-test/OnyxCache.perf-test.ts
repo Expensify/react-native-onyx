@@ -1,7 +1,6 @@
 import {measureAsyncFunction, measureFunction} from 'reassure';
 import type OnyxCache from '../../lib/OnyxCache';
 import createRandomReportAction, {getRandomReportActions} from '../utils/collections/reportActions';
-import type GenericCollection from '../utils/GenericCollection';
 import {TASK} from '../../lib/OnyxCache';
 
 const ONYXKEYS = {
@@ -55,7 +54,7 @@ describe('OnyxCache', () => {
 
     describe('addKey', () => {
         test('one call adding one key', async () => {
-            await measureFunction(() => cache.addKey(mockedReportActionsKeys[0]), {
+            await measureFunction(() => cache.addKey(mockedReportActionsKeys.at(0)), {
                 beforeEach: resetCacheBeforeEachMeasure,
             });
         });
@@ -63,7 +62,7 @@ describe('OnyxCache', () => {
 
     describe('addNullishStorageKey', () => {
         test('one call adding one key', async () => {
-            await measureFunction(() => cache.addNullishStorageKey(mockedReportActionsKeys[0]), {
+            await measureFunction(() => cache.addNullishStorageKey(mockedReportActionsKeys.at(0)), {
                 beforeEach: resetCacheBeforeEachMeasure,
             });
         });
@@ -71,7 +70,7 @@ describe('OnyxCache', () => {
 
     describe('hasNullishStorageKey', () => {
         test('one call checking one key among 10k ones', async () => {
-            await measureFunction(() => cache.hasNullishStorageKey(mockedReportActionsKeys[0]), {
+            await measureFunction(() => cache.hasNullishStorageKey(mockedReportActionsKeys.at(0)), {
                 beforeEach: async () => {
                     resetCacheBeforeEachMeasure();
                     cache.setAllKeys(mockedReportActionsKeys);
@@ -93,7 +92,7 @@ describe('OnyxCache', () => {
 
     describe('hasCacheForKey', () => {
         test('one call checking one key among 10k ones', async () => {
-            await measureFunction(() => cache.hasCacheForKey(mockedReportActionsKeys[0]), {
+            await measureFunction(() => cache.hasCacheForKey(mockedReportActionsKeys.at(0)), {
                 beforeEach: async () => {
                     resetCacheBeforeEachMeasure();
                     cache.setAllKeys(mockedReportActionsKeys);
@@ -104,7 +103,7 @@ describe('OnyxCache', () => {
 
     describe('get', () => {
         test('one call getting one key among 10k ones', async () => {
-            await measureFunction(() => cache.get(mockedReportActionsKeys[0]), {
+            await measureFunction(() => cache.get(mockedReportActionsKeys.at(0)), {
                 beforeEach: async () => {
                     resetCacheBeforeEachMeasure();
                     for (const [k, v] of Object.entries(mockedReportActionsMap)) cache.set(k, v);
@@ -116,7 +115,7 @@ describe('OnyxCache', () => {
     describe('set', () => {
         test('one call setting one key', async () => {
             const value = mockedReportActionsMap[mockedReportActionsKeys[0]];
-            await measureFunction(() => cache.set(mockedReportActionsKeys[0], value), {
+            await measureFunction(() => cache.set(mockedReportActionsKeys.at(0), value), {
                 beforeEach: resetCacheBeforeEachMeasure,
             });
         });
@@ -124,7 +123,7 @@ describe('OnyxCache', () => {
 
     describe('drop', () => {
         test('one call dropping one key among 10k ones', async () => {
-            await measureFunction(() => cache.drop(mockedReportActionsKeys[1000]), {
+            await measureFunction(() => cache.drop(mockedReportActionsKeys.at(1000)), {
                 beforeEach: async () => {
                     resetCacheBeforeEachMeasure();
                     for (const [k, v] of Object.entries(mockedReportActionsMap)) cache.set(k, v);
@@ -135,9 +134,7 @@ describe('OnyxCache', () => {
 
     describe('merge', () => {
         test('one call merging 10k keys', async () => {
-            const changedReportActions = Object.fromEntries(
-                Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const),
-            ) as GenericCollection;
+            const changedReportActions = Object.fromEntries(Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const));
 
             await measureFunction(() => cache.merge(changedReportActions), {
                 beforeEach: async () => {
@@ -150,10 +147,10 @@ describe('OnyxCache', () => {
 
     describe('hasPendingTask', () => {
         test('one call checking one task', async () => {
-            await measureFunction(() => cache.hasPendingTask(`${TASK.GET}:${mockedReportActionsKeys[0]}`), {
+            await measureFunction(() => cache.hasPendingTask(`${TASK.GET}:${mockedReportActionsKeys.at(0)}`), {
                 beforeEach: async () => {
                     resetCacheBeforeEachMeasure();
-                    cache.captureTask(`${TASK.GET}:${mockedReportActionsKeys[0]}`, Promise.resolve());
+                    cache.captureTask(`${TASK.GET}:${mockedReportActionsKeys.at(0)}`, Promise.resolve());
                 },
             });
         });
@@ -161,10 +158,10 @@ describe('OnyxCache', () => {
 
     describe('getTaskPromise', () => {
         test('one call checking one task', async () => {
-            await measureAsyncFunction(() => cache.getTaskPromise(`${TASK.GET}:${mockedReportActionsKeys[0]}`) as Promise<unknown>, {
+            await measureAsyncFunction(() => cache.getTaskPromise(`${TASK.GET}:${mockedReportActionsKeys.at(0)}`)!, {
                 beforeEach: async () => {
                     resetCacheBeforeEachMeasure();
-                    cache.captureTask(`${TASK.GET}:${mockedReportActionsKeys[0]}`, Promise.resolve());
+                    cache.captureTask(`${TASK.GET}:${mockedReportActionsKeys.at(0)}`, Promise.resolve());
                 },
             });
         });
@@ -172,14 +169,14 @@ describe('OnyxCache', () => {
 
     describe('captureTask', () => {
         test('one call capturing one task', async () => {
-            await measureAsyncFunction(() => cache.captureTask(`${TASK.GET}:${mockedReportActionsKeys[0]}`, Promise.resolve()), {
+            await measureAsyncFunction(() => cache.captureTask(`${TASK.GET}:${mockedReportActionsKeys.at(0)}`, Promise.resolve()), {
                 beforeEach: resetCacheBeforeEachMeasure,
             });
         });
     });
 
     describe('hasValueChanged', () => {
-        const key = mockedReportActionsKeys[0];
+        const key = mockedReportActionsKeys.at(0);
         const reportAction = mockedReportActionsMap[key];
         const changedReportAction = createRandomReportAction(Number(reportAction.reportActionID));
 

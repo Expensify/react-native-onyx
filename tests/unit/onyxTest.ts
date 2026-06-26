@@ -614,7 +614,7 @@ describe('Onyx', () => {
                 waypoints: undefined,
             },
             [workRoute]: undefined,
-        } as GenericCollection).then(() => {
+        }).then(() => {
             expect(result).toEqual({
                 [routineRoute]: {
                     waypoints: {
@@ -684,7 +684,7 @@ describe('Onyx', () => {
                 ID: 345,
                 value: 'three',
             },
-        } as GenericCollection)
+        })
             .then(() =>
                 // 2 key values to update and 2 new keys to add.
                 // MergeCollection will perform a mix of multiSet and multiMerge
@@ -706,7 +706,7 @@ describe('Onyx', () => {
                         ID: 567,
                         value: 'one',
                     },
-                } as GenericCollection),
+                }),
             )
             .then(() => {
                 // 3 items on the first mergeCollection + 4 items the next mergeCollection
@@ -733,7 +733,7 @@ describe('Onyx', () => {
             callback: (data, key) => (valuesReceived[key] = data),
         });
 
-        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, notMyTest: {beep: 'boop'}} as GenericCollection).then(() => {
+        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, notMyTest: {beep: 'boop'}}).then(() => {
             expect(valuesReceived).toEqual({});
         });
     });
@@ -763,7 +763,7 @@ describe('Onyx', () => {
                         ID: 234,
                         value: 'two',
                     },
-                } as GenericCollection),
+                }),
             )
             .then(() => {
                 expect(valuesReceived).toEqual({
@@ -802,13 +802,13 @@ describe('Onyx', () => {
             [key1]: {id: '1', name: 'Item 1'},
             [key2]: {id: '2', name: 'Item 2'},
             [key3]: {id: '3', name: 'Item 3'},
-        } as GenericCollection);
+        });
 
         // Should only be called once
         expect(mockCallback).toHaveBeenCalledTimes(1);
 
         // Should receive the entire merged collection
-        const receivedData = mockCallback.mock.calls[0][0];
+        const receivedData = mockCallback.mock.calls.at(0)[0];
         expect(receivedData).toEqual(
             expect.objectContaining({
                 [key1]: {id: '1', name: 'Item 1'},
@@ -829,7 +829,7 @@ describe('Onyx', () => {
             [key1]: {id: '1', name: 'Item 1'},
             [key2]: {id: '2', name: 'Item 2'},
             [key3]: {id: '3', name: 'Item 3'},
-        } as GenericCollection);
+        });
 
         connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
@@ -846,13 +846,13 @@ describe('Onyx', () => {
             [key1]: null,
             [key2]: {id: '2', name: 'Updated Item 2'},
             [key3]: null,
-        } as GenericCollection);
+        });
 
         // Should only be called once
         expect(mockCallback).toHaveBeenCalledTimes(1);
 
         // Should receive filtered collection
-        const receivedData = mockCallback.mock.calls[0][0];
+        const receivedData = mockCallback.mock.calls.at(0)[0];
         expect(receivedData).toEqual({
             [key2]: {id: '2', name: 'Updated Item 2'},
         });
@@ -957,7 +957,7 @@ describe('Onyx', () => {
                                 ID: 345,
                                 value: 'three',
                             },
-                        } as GenericCollection,
+                        },
                     },
                 ]);
             })
@@ -1221,7 +1221,7 @@ describe('Onyx', () => {
             Onyx.update([
                 {onyxMethod: Onyx.METHOD.SET, key: ONYX_KEYS.TEST_KEY, value: 'taco'},
                 {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.OTHER_TEST, value: 'pizza'},
-                {onyxMethod: Onyx.METHOD.MERGE_COLLECTION, key: ONYX_KEYS.COLLECTION.TEST_UPDATE, value: {[itemKey]: {a: 'a'}} as GenericCollection},
+                {onyxMethod: Onyx.METHOD.MERGE_COLLECTION, key: ONYX_KEYS.COLLECTION.TEST_UPDATE, value: {[itemKey]: {a: 'a'}}},
             ]).then(() => {
                 expect(collectionCallback).toHaveBeenCalledTimes(2);
                 expect(collectionCallback).toHaveBeenNthCalledWith(1, undefined, ONYX_KEYS.COLLECTION.TEST_UPDATE, undefined);
@@ -1430,7 +1430,7 @@ describe('Onyx', () => {
                     3: null,
                 },
             },
-        } as GenericCollection).then(() => {
+        }).then(() => {
             expect(result).toEqual({
                 [routineRoute]: {
                     waypoints: {
@@ -1617,7 +1617,7 @@ describe('Onyx', () => {
                                 0: 'Bed',
                             },
                         },
-                    } as GenericCollection,
+                    },
                 },
                 {
                     onyxMethod: Onyx.METHOD.MERGE,
@@ -1716,7 +1716,7 @@ describe('Onyx', () => {
                     value: {
                         [cat]: {age: 5, size: 'S'},
                         [dog]: {size: 'M'},
-                    } as GenericCollection,
+                    },
                 },
                 {onyxMethod: Onyx.METHOD.SET, key: cat, value: {age: 3}},
                 {onyxMethod: Onyx.METHOD.MERGE, key: cat, value: {sound: 'meow'}},
@@ -2210,7 +2210,7 @@ describe('Onyx', () => {
                 [routeA]: {name: 'Route A'},
                 [routeB]: {name: 'Route B'},
                 [routeC]: {name: 'Route C'},
-            } as GenericCollection)
+            })
                 .then(() =>
                     Onyx.update([
                         {
@@ -2219,7 +2219,7 @@ describe('Onyx', () => {
                             value: {
                                 [routeA]: {name: 'New Route A'},
                                 [routeB]: {name: 'New Route B'},
-                            } as GenericCollection,
+                            },
                         },
                     ]),
                 )
@@ -2256,7 +2256,7 @@ describe('Onyx', () => {
             return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
                 [routeA]: {name: 'Route A'},
                 [routeB]: {name: 'Route B'},
-            } as GenericCollection)
+            })
                 .then(() =>
                     Onyx.update([
                         {
@@ -2269,7 +2269,7 @@ describe('Onyx', () => {
                             key: ONYX_KEYS.COLLECTION.ROUTES,
                             value: {
                                 [routeA]: {name: 'Final Route A'},
-                            } as GenericCollection,
+                            },
                         },
                         {
                             onyxMethod: Onyx.METHOD.MERGE,
@@ -2323,7 +2323,7 @@ describe('Onyx', () => {
                     value: {
                         [key1]: {id: '1', name: 'Updated Item 1'},
                         [key2]: {id: '2', name: 'Updated Item 2'},
-                    } as GenericCollection,
+                    },
                 },
             ]);
 
@@ -2744,14 +2744,14 @@ describe('Onyx', () => {
                 [routeA]: {name: 'Route A'},
                 [routeB1]: {name: 'Route B1'},
                 [routeC]: {name: 'Route C'},
-            } as GenericCollection);
+            });
 
             // Replace with new collection data
             await Onyx.setCollection(ONYX_KEYS.COLLECTION.ROUTES, {
                 [routeA]: {name: 'New Route A'},
                 [routeB]: {name: 'New Route B'},
                 [routeC]: {name: 'New Route C'},
-            } as GenericCollection);
+            });
 
             expect(result).toEqual({
                 [routeA]: {name: 'New Route A'},
@@ -2779,9 +2779,9 @@ describe('Onyx', () => {
 
             await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
                 [routeA]: {name: 'Route A'},
-            } as GenericCollection);
+            });
 
-            await Onyx.setCollection(ONYX_KEYS.COLLECTION.ROUTES, {} as GenericCollection);
+            await Onyx.setCollection(ONYX_KEYS.COLLECTION.ROUTES, {});
 
             expect(result).toEqual({});
         });
@@ -2799,7 +2799,7 @@ describe('Onyx', () => {
 
             await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
                 [routeA]: {name: 'Route A'},
-            } as GenericCollection);
+            });
 
             await Onyx.setCollection(ONYX_KEYS.COLLECTION.ROUTES, {
                 [invalidRoute]: {name: 'Invalid Route'},
@@ -2831,13 +2831,13 @@ describe('Onyx', () => {
                 [routeA]: null,
                 [routeB]: {name: 'Route B'},
                 [routeC]: null,
-            } as GenericCollection);
+            });
 
             // Should only be called once
             expect(mockCallback).toHaveBeenCalledTimes(1);
 
             // Should receive filtered collection (only non-null values)
-            const receivedData = mockCallback.mock.calls[0][0];
+            const receivedData = mockCallback.mock.calls.at(0)[0];
             expect(receivedData).toEqual({
                 [routeB]: {name: 'Route B'},
             });
@@ -2910,7 +2910,7 @@ describe('Onyx', () => {
                 [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
                 [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
                 [`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`]: {id: 'skippable-id_id', name: 'skippable-id_name'},
-            } as GenericCollection);
+            });
 
             expect(testKeyValue).toEqual({
                 [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
@@ -2932,7 +2932,7 @@ describe('Onyx', () => {
                 [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
                 [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
                 [`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`]: {id: 'skippable-id_id', name: 'skippable-id_name'},
-            } as GenericCollection);
+            });
 
             expect(testKeyValue).toEqual({
                 [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
@@ -2954,7 +2954,7 @@ describe('Onyx', () => {
                 [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
                 [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
                 [`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`]: {id: 'skippable-id_id', name: 'skippable-id_name'},
-            } as GenericCollection);
+            });
 
             expect(testKeyValue).toEqual({
                 [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
@@ -3304,7 +3304,7 @@ describe('RAM-only keys should not read from storage', () => {
         await act(async () => waitForPromisesToResolve());
 
         // Get the callback that was passed to keepInstancesSync
-        const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls[0]?.[0];
+        const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls.at(0)?.[0];
         expect(syncCallback).toBeDefined();
 
         let receivedValue: unknown;

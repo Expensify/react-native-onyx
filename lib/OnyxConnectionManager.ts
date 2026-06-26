@@ -143,9 +143,9 @@ class OnyxConnectionManager {
 
         for (const callback of connection.callbacks.values()) {
             if (connection.waitForCollectionCallback) {
-                (callback as CollectionConnectCallback<OnyxKey>)(connection.cachedCallbackValue as Record<string, unknown>, connection.cachedCallbackKey as OnyxKey, connection.sourceValue);
+                (callback as CollectionConnectCallback<OnyxKey>)(connection.cachedCallbackValue as Record<string, unknown>, connection.cachedCallbackKey!, connection.sourceValue);
             } else {
-                (callback as DefaultConnectCallback<OnyxKey>)(connection.cachedCallbackValue, connection.cachedCallbackKey as OnyxKey);
+                (callback as DefaultConnectCallback<OnyxKey>)(connection.cachedCallbackValue, connection.cachedCallbackKey!);
             }
         }
     }
@@ -204,7 +204,7 @@ class OnyxConnectionManager {
             // Defer the callback execution to the next tick of the event loop.
             // This ensures that the current execution flow completes and the result connection object is available when the callback fires.
             Promise.resolve().then(() => {
-                (connectOptions as DefaultConnectOptions<OnyxKey>).callback?.(connectionMetadata.cachedCallbackValue, connectionMetadata.cachedCallbackKey as OnyxKey);
+                (connectOptions as DefaultConnectOptions<OnyxKey>).callback?.(connectionMetadata.cachedCallbackValue, connectionMetadata.cachedCallbackKey!);
             });
         }
 

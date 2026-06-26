@@ -18,7 +18,6 @@ import type {
     OnyxSetInput,
     OnyxUpdate,
     OnyxValue,
-    OnyxInput,
     OnyxMethodMap,
     SetOptions,
 } from './types';
@@ -64,7 +63,7 @@ function init({
             // Setting isProcessingCollectionUpdate=true prevents triggering collection callbacks for each individual update
             const isKeyCollectionMember = OnyxKeys.isCollectionMember(key);
 
-            OnyxUtils.keyChanged(key, value as OnyxValue<typeof key>, undefined, isKeyCollectionMember);
+            OnyxUtils.keyChanged(key, value, undefined, isKeyCollectionMember);
         });
     }
 
@@ -239,7 +238,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
                         Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'merge', existingValueType, newValueType));
                     }
                     return isCompatible;
-                }) as Array<OnyxInput<TKey>>;
+                });
 
                 // Clean up the write queue, so we don't apply these changes again.
                 delete mergeQueue[key];
@@ -284,7 +283,13 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
  * @param collection Object collection keyed by individual collection member keys and values
  */
 function mergeCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey>): Promise<void> {
-    return OnyxUtils.afterInit(() => OnyxUtils.mergeCollectionWithPatches({collectionKey, collection, isProcessingCollectionUpdate: true}));
+    return OnyxUtils.afterInit(() =>
+        OnyxUtils.mergeCollectionWithPatches({
+            collectionKey,
+            collection,
+            isProcessingCollectionUpdate: true,
+        }),
+    );
 }
 
 /**
@@ -323,7 +328,10 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                 // because the notification process needs the old values in cache but at that point they will be already removed from it.
                 const keyValuesToResetAsCollection: Record<
                     OnyxKey,
-                    {oldValues: Record<string, KeyValueMapping[OnyxKey] | undefined>; newValues: Record<string, KeyValueMapping[OnyxKey] | undefined>}
+                    {
+                        oldValues: Record<string, KeyValueMapping[OnyxKey] | undefined>;
+                        newValues: Record<string, KeyValueMapping[OnyxKey] | undefined>;
+                    }
                 > = {};
 
                 const allKeys = new Set([...cachedKeys, ...initialKeys]);
@@ -352,7 +360,10 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
 
                             if (collectionKey) {
                                 if (!keyValuesToResetAsCollection[collectionKey]) {
-                                    keyValuesToResetAsCollection[collectionKey] = {oldValues: {}, newValues: {}};
+                                    keyValuesToResetAsCollection[collectionKey] = {
+                                        oldValues: {},
+                                        newValues: {},
+                                    };
                                 }
                                 keyValuesToResetAsCollection[collectionKey].oldValues[key] = oldValue;
                                 keyValuesToResetAsCollection[collectionKey].newValues[key] = newValue ?? undefined;
@@ -499,7 +510,7 @@ function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<vo
                     delete updateQueue[key];
 
                     const batchedChanges = OnyxUtils.mergeAndMarkChanges(operations);
-                    if (operations[0] === null) {
+                    if (operations.at(0) === null) {
                         // eslint-disable-next-line no-param-reassign
                         queue.set[key] = batchedChanges.result;
                     } else {
@@ -530,12 +541,17 @@ function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<vo
                 );
             }
             if (!utils.isEmptyObject(batchedCollectionUpdates.set)) {
-                promises.push(() => OnyxUtils.partialSetCollection({collectionKey, collection: batchedCollectionUpdates.set as OnyxSetCollectionInput<OnyxKey>}));
+                promises.push(() =>
+                    OnyxUtils.partialSetCollection({
+                        collectionKey,
+                        collection: batchedCollectionUpdates.set,
+                    }),
+                );
             }
         }
 
         for (const [key, operations] of Object.entries(updateQueue)) {
-            if (operations[0] === null) {
+            if (operations.at(0) === null) {
                 const batchedChanges = OnyxUtils.mergeChanges(operations).result;
                 promises.push(() => set(key, batchedChanges));
                 continue;

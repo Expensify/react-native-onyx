@@ -3,14 +3,13 @@ import Onyx from '../../lib';
 import type {Connection} from '../../lib/OnyxConnectionManager';
 import connectionManager from '../../lib/OnyxConnectionManager';
 import StorageMock from '../../lib/storage';
-import type GenericCollection from '../utils/GenericCollection';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 // We need access to some internal properties of `connectionManager` during the tests but they are private,
 // so this workaround allows us to have access to them.
-const connectionsMap = connectionManager['connectionsMap'];
-const generateConnectionID = connectionManager['generateConnectionID'];
-const getSessionID = () => connectionManager['sessionID'];
+const connectionsMap = connectionManager.connectionsMap;
+const generateConnectionID = connectionManager.generateConnectionID;
+const getSessionID = () => connectionManager.sessionID;
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -130,7 +129,7 @@ describe('OnyxConnectionManager', () => {
             const collection = {
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: obj1,
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: obj2,
-            } as GenericCollection;
+            };
             await StorageMock.multiSet([
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`, obj1],
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`, obj2],
@@ -279,7 +278,7 @@ describe('OnyxConnectionManager', () => {
                 },
             };
 
-            Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, collection as GenericCollection);
+            Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, collection);
 
             await act(async () => waitForPromisesToResolve());
 
@@ -446,7 +445,7 @@ describe('OnyxConnectionManager', () => {
             const setCallsForKey = setSpy.mock.calls.filter((call) => call[0] === ONYXKEYS.TEST_KEY);
             expect(setCallsForKey.length).toBeGreaterThan(0);
 
-            const updatedIDs = setCallsForKey[setCallsForKey.length - 1][1] as number[];
+            const updatedIDs = setCallsForKey.at(setCallsForKey.length - 1)[1] as number[];
             expect(updatedIDs).not.toContain(subscriptionIdA);
             expect(updatedIDs).toContain(subscriptionIdB);
 

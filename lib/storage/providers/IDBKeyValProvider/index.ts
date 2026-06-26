@@ -68,7 +68,7 @@ const provider: StorageProvider<UseStore | undefined> = {
             throw new Error('Store not initialized!');
         }
 
-        return IDB.getMany(keysParam, provider.store).then((values) => values.map((value, index) => [keysParam[index], value]));
+        return IDB.getMany(keysParam, provider.store).then((values) => values.map((value, index) => [keysParam.at(index), value]));
     },
     multiMerge(pairs) {
         if (!provider.store) {
@@ -85,7 +85,7 @@ const provider: StorageProvider<UseStore | undefined> = {
                     if (value === null) {
                         store.delete(key);
                     } else {
-                        const newValue = utils.fastMerge(values[index] as Record<string, unknown>, value as Record<string, unknown>, {
+                        const newValue = utils.fastMerge(values.at(index) as Record<string, unknown>, value as Record<string, unknown>, {
                             shouldRemoveNestedNulls: true,
                             objectRemovalMode: 'replace',
                         }).result;

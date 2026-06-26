@@ -349,7 +349,7 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
             // Wait for all the pending tasks to resolve and then add the data to the data map.
             .then((values) => {
                 for (const [index, value] of values.entries()) {
-                    dataMap.set(pendingKeys[index], value);
+                    dataMap.set(pendingKeys.at(index), value);
                 }
 
                 return Promise.resolve();
@@ -391,7 +391,7 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
                     }
 
                     dataMap.set(key, value as OnyxValue<TKey>);
-                    temp[key] = value as OnyxValue<TKey>;
+                    temp[key] = value;
                 }
                 cache.merge(temp);
                 return dataMap;
@@ -759,7 +759,7 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: CallbackToStateMapp
         return;
     }
 
-    (mapping as DefaultConnectOptions<TKey>).callback?.(value, matchedKey as TKey);
+    (mapping as DefaultConnectOptions<TKey>).callback?.(value, matchedKey!);
 }
 
 /**
@@ -1014,7 +1014,7 @@ function mergeInternal<TValue extends OnyxInput<OnyxKey> | undefined, TChange ex
 
     // If we have anything else we can't merge it so we'll
     // simply return the last value that was queued
-    return {result: lastChange as TChange, replaceNullPatches: []};
+    return {result: lastChange!, replaceNullPatches: []};
 }
 
 /**
@@ -1475,7 +1475,7 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
     // Skip on retry — already notified on attempt 0 (see same-reason comment above).
     if (!retryAttempt) {
         for (const [collectionKey, batch] of collectionBatches) {
-            keysChanged(collectionKey as CollectionKeyBase, batch.partial, batch.previous);
+            keysChanged(collectionKey, batch.partial, batch.previous);
         }
     }
 

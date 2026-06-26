@@ -2,7 +2,6 @@ import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 import StorageMock from '../../lib/storage';
 import Onyx from '../../lib/Onyx';
 import type OnyxCache from '../../lib/OnyxCache';
-import type GenericCollection from '../utils/GenericCollection';
 import type {Connection} from '../../lib/OnyxConnectionManager';
 
 const ONYX_KEYS = {
@@ -136,7 +135,7 @@ describe('Set data while storage is clearing', () => {
             Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST, {
                 [collectionItemKey1]: {id: 1, name: 'first'},
                 [collectionItemKey2]: {id: 2, name: 'second'},
-            } as GenericCollection)
+            })
                 // When clear is called with the collection prefix as a key to preserve
                 .then(() => Onyx.clear([ONYX_KEYS.COLLECTION.TEST]))
                 .then(() => waitForPromisesToResolve())
@@ -165,7 +164,7 @@ describe('Set data while storage is clearing', () => {
 
         // Given that Onyx has both a collection item and a regular key set
         return (
-            Promise.all([Onyx.set(ONYX_KEYS.REGULAR_KEY, SET_VALUE), Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST, {[collectionItemKey1]: 'value'} as GenericCollection)])
+            Promise.all([Onyx.set(ONYX_KEYS.REGULAR_KEY, SET_VALUE), Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST, {[collectionItemKey1]: 'value'})])
                 // When clear is called preserving only the collection
                 .then(() => Onyx.clear([ONYX_KEYS.COLLECTION.TEST]))
                 .then(() => waitForPromisesToResolve())
@@ -189,7 +188,7 @@ describe('Set data while storage is clearing', () => {
 
         // Given that Onyx has a collection item and a regular key set
         return (
-            Promise.all([Onyx.set(ONYX_KEYS.REGULAR_KEY, SET_VALUE), Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST, {[collectionItemKey1]: 'value'} as GenericCollection)])
+            Promise.all([Onyx.set(ONYX_KEYS.REGULAR_KEY, SET_VALUE), Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST, {[collectionItemKey1]: 'value'})])
                 // When clear is called preserving both the collection and the regular key
                 .then(() => Onyx.clear([ONYX_KEYS.COLLECTION.TEST, ONYX_KEYS.REGULAR_KEY]))
                 .then(() => waitForPromisesToResolve())
@@ -224,7 +223,7 @@ describe('Set data while storage is clearing', () => {
                         [`${ONYX_KEYS.COLLECTION.TEST}2`]: 2,
                         [`${ONYX_KEYS.COLLECTION.TEST}3`]: 3,
                         [`${ONYX_KEYS.COLLECTION.TEST}4`]: 4,
-                    } as GenericCollection),
+                    }),
                 )
 
                 // When onyx is cleared

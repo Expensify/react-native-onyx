@@ -2,7 +2,6 @@ import {measureAsyncFunction} from 'reassure';
 import type {OnyxKey, OnyxUpdate} from '../../lib';
 import Onyx from '../../lib';
 import createRandomReportAction, {getRandomReportActions} from '../utils/collections/reportActions';
-import type GenericCollection from '../utils/GenericCollection';
 import OnyxUtils from '../../lib/OnyxUtils';
 import createDeferredTask from '../../lib/createDeferredTask';
 import alternateLists from '../utils/alternateLists';
@@ -72,9 +71,7 @@ describe('Onyx', () => {
 
     describe('mergeCollection', () => {
         test('one call with 10k heavy objects', async () => {
-            const changedReportActions = Object.fromEntries(
-                Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const),
-            ) as GenericCollection;
+            const changedReportActions = Object.fromEntries(Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const));
             await measureAsyncFunction(() => Onyx.mergeCollection(collectionKey, changedReportActions), {
                 beforeEach: async () => {
                     await Onyx.multiSet(mockedReportActionsMap);
@@ -86,9 +83,7 @@ describe('Onyx', () => {
 
     describe('setCollection', () => {
         test('one call with 10k heavy objects', async () => {
-            const changedReportActions = Object.fromEntries(
-                Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const),
-            ) as GenericCollection;
+            const changedReportActions = Object.fromEntries(Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const));
             await measureAsyncFunction(() => Onyx.setCollection(collectionKey, changedReportActions), {
                 beforeEach: async () => {
                     await Onyx.multiSet(mockedReportActionsMap);

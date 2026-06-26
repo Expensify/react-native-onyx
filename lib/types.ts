@@ -88,7 +88,7 @@ type TypeOptions = Merge<
  * }
  * ```
  */
-interface CustomTypeOptions {}
+type CustomTypeOptions = {};
 
 /**
  * Represents a string union of all Onyx normal keys.

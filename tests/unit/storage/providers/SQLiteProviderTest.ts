@@ -69,9 +69,9 @@ describe('SQLiteProvider', () => {
         // (rows come back in primary-key order). IDB's getMany() does. So this
         // test mirrors the IDB one but asserts membership rather than order.
         it('should return the tuples for the keys supplied in a batch', async () => {
-            await SQLiteProvider.multiSet(testEntries as Array<[string, unknown]>);
+            await SQLiteProvider.multiSet(testEntries);
             const out = await SQLiteProvider.multiGet([`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, ONYXKEYS.TEST_KEY, ONYXKEYS.TEST_KEY_2]);
-            expect(out).toEqual(expect.arrayContaining([testEntries[3], testEntries[0], testEntries[1]]));
+            expect(out).toEqual(expect.arrayContaining([testEntries.at(3), testEntries.at(0), testEntries.at(1)]));
             expect(out).toHaveLength(3);
         });
     });
@@ -127,7 +127,7 @@ describe('SQLiteProvider', () => {
         // before serializing, otherwise JSON.stringify(undefined) === undefined
         // and the row would store a literal "undefined" string.
         it('treats undefined as null', async () => {
-            await SQLiteProvider.multiSet([[ONYXKEYS.TEST_KEY, undefined as unknown as null]]);
+            await SQLiteProvider.multiSet([[ONYXKEYS.TEST_KEY, undefined]]);
             expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY)).toBeNull();
         });
     });
@@ -157,7 +157,7 @@ describe('SQLiteProvider', () => {
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}id2`, ['a', {newKey: 'newValue'}]],
             ];
 
-            const expectedTestKey3Value = structuredClone(testEntries[2])[1] as GenericDeepRecord;
+            const expectedTestKey3Value = structuredClone(testEntries.at(2))[1] as GenericDeepRecord;
             expectedTestKey3Value.key = 'value_changed';
             expectedTestKey3Value.property.nestedProperty = {nestedKey2: 'nestedValue2_changed'};
             expectedTestKey3Value.property.newKey = 'newValue';
@@ -256,8 +256,8 @@ describe('SQLiteProvider', () => {
             await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, 'value');
             await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY_2, 1000);
             await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY_3, {key: 'value', property: {propertyKey: 'propertyValue'}});
-            await SQLiteProvider.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id1` as string, true);
-            await SQLiteProvider.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id2` as string, ['a', {key: 'value'}, 1, true]);
+            await SQLiteProvider.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, true);
+            await SQLiteProvider.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id2`, ['a', {key: 'value'}, 1, true]);
 
             await SQLiteProvider.mergeItem(ONYXKEYS.TEST_KEY, 'value_changed');
             await SQLiteProvider.mergeItem(ONYXKEYS.TEST_KEY_2, 1001);
@@ -272,8 +272,8 @@ describe('SQLiteProvider', () => {
                 },
                 [[['property'], {newKey: 'newValue'}]],
             );
-            await SQLiteProvider.mergeItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id1` as string, false);
-            await SQLiteProvider.mergeItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id2` as string, ['a', {newKey: 'newValue'}]);
+            await SQLiteProvider.mergeItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, false);
+            await SQLiteProvider.mergeItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id2`, ['a', {newKey: 'newValue'}]);
 
             expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY)).toEqual('value_changed');
             expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY_2)).toEqual(1001);
@@ -317,7 +317,7 @@ describe('SQLiteProvider', () => {
     describe('SQL-injection safety', () => {
         it('should treat a key containing SQL fragments as a literal record_key', async () => {
             const nastyKey = "'; DROP TABLE keyvaluepairs; --";
-            await SQLiteProvider.setItem(nastyKey as string, 'survived');
+            await SQLiteProvider.setItem(nastyKey, 'survived');
             expect(await SQLiteProvider.getItem(nastyKey)).toEqual('survived');
             expect(await SQLiteProvider.getAllKeys()).toEqual([nastyKey]);
         });
