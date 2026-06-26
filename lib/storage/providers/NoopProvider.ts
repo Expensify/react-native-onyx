@@ -1,4 +1,4 @@
-import type {OnyxValue} from '../../types';
+import type {OnyxKey, OnyxValue} from '../../types';
 import {StorageErrorClass} from '../errors';
 import type StorageProvider from './types';
 
@@ -25,8 +25,9 @@ const provider: StorageProvider<unknown> = {
     /**
      * Get the value of a given key or return `null` if it's not available in memory
      */
-    getItem(_key) {
-        return Promise.resolve(null as OnyxValue<typeof _key>);
+    getItem<TKey extends OnyxKey>(key: TKey) {
+        void key;
+        return Promise.resolve(null as OnyxValue<TKey>);
     },
 
     /**
@@ -105,7 +106,10 @@ const provider: StorageProvider<unknown> = {
      * `bytesRemaining` will always be `Number.POSITIVE_INFINITY` since we don't have a hard limit on memory.
      */
     getDatabaseSize() {
-        return Promise.resolve({bytesRemaining: Number.POSITIVE_INFINITY, bytesUsed: 0});
+        return Promise.resolve({
+            bytesRemaining: Number.POSITIVE_INFINITY,
+            bytesUsed: 0,
+        });
     },
 };
 
