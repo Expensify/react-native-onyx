@@ -145,7 +145,7 @@ describe('SQLiteProvider', () => {
                         property: {
                             nestedProperty: {
                                 nestedKey2: 'nestedValue2_changed',
-                                [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                                [utils.ONYX_INTERNALS_REPLACE_OBJECT_MARK]: true,
                             },
                             newKey: 'newValue',
                         },
@@ -232,7 +232,7 @@ describe('SQLiteProvider', () => {
                     nested: {
                         // The mark is filtered out by SQLiteProvider's `objectMarkRemover`
                         // before the value is stringified.
-                        [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                        [utils.ONYX_INTERNALS_REPLACE_OBJECT_MARK]: true,
                         newKey: 'newValue',
                     },
                 },
@@ -266,7 +266,7 @@ describe('SQLiteProvider', () => {
                 {
                     key: 'value_changed',
                     property: {
-                        [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                        [utils.ONYX_INTERNALS_REPLACE_OBJECT_MARK]: true,
                         newKey: 'newValue',
                     },
                 },

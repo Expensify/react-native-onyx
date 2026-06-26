@@ -55,6 +55,10 @@ const MAX_STORAGE_OPERATION_RETRY_ATTEMPTS = 5;
 
 type OnyxMethod = ValueOf<typeof METHOD>;
 
+function formatCaughtError(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
+}
+
 // Key/value store of Onyx key and arrays of values to merge
 let mergeQueue: Record<OnyxKey, Array<OnyxValue<OnyxKey>>> = {};
 let mergeQueuePromise: Record<OnyxKey, Promise<void>> = {};
@@ -213,13 +217,8 @@ function sendActionToDevTools(
     value: OnyxEntry<KeyValueMapping[OnyxKey]>,
     mergedValue?: OnyxEntry<KeyValueMapping[OnyxKey]>,
 ): void;
-function sendActionToDevTools(
-    method: OnyxMethod,
-    key: OnyxKey | undefined,
-    value: OnyxCollection<KeyValueMapping[OnyxKey]> | OnyxEntry<KeyValueMapping[OnyxKey]>,
-    mergedValue: OnyxEntry<KeyValueMapping[OnyxKey]> = undefined,
-): void {
-    DevTools.registerAction(utils.formatActionName(method, key), value, key ? {[key]: mergedValue || value} : (value as OnyxCollection<KeyValueMapping[OnyxKey]>));
+function sendActionToDevTools(method: OnyxMethod, key: OnyxKey | undefined, value: unknown, mergedValue: OnyxEntry<KeyValueMapping[OnyxKey]> = undefined): void {
+    DevTools.registerAction(utils.formatActionName(method, key), value, key ? {[key]: mergedValue !== undefined ? mergedValue : value} : (value as OnyxCollection<KeyValueMapping[OnyxKey]>));
 }
 
 /**
@@ -494,7 +493,7 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey): OnyxValue<OnyxKey> 
 function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collectionMemberKeys?: string[]): NonNullable<OnyxCollection<KeyValueMapping[TKey]>> {
     // Use optimized collection data retrieval when cache is populated
     const collectionData = cache.getCollectionData(collectionKey);
-    const allKeys = collectionMemberKeys || cache.getAllKeys();
+    const allKeys = collectionMemberKeys ?? cache.getAllKeys();
     if (collectionData !== undefined && (Array.isArray(allKeys) ? allKeys.length > 0 : allKeys.size > 0)) {
         // If we have specific member keys, filter the collection
         if (collectionMemberKeys) {
@@ -606,7 +605,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
                 currentSubscriberCallback(cachedCollection[dataKey], dataKey as TKey);
             }
         } catch (error) {
-            Logger.logAlert(`[OnyxUtils.keysChanged] Subscriber callback threw an error for key '${collectionKey}': ${error}`);
+            Logger.logAlert(`[OnyxUtils.keysChanged] Subscriber callback threw an error for key '${collectionKey}': ${formatCaughtError(error)}`);
         }
     }
 
@@ -629,7 +628,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
                 matchedKey: subscriber.key,
             });
         } catch (error) {
-            Logger.logAlert(`[OnyxUtils.keysChanged] Subscriber callback threw an error for key '${collectionKey}': ${error}`);
+            Logger.logAlert(`[OnyxUtils.keysChanged] Subscriber callback threw an error for key '${collectionKey}': ${formatCaughtError(error)}`);
         }
     }
 }
@@ -717,7 +716,7 @@ function keyChanged<TKey extends OnyxKey>(
                 });
                 continue;
             } catch (error) {
-                Logger.logAlert(`[OnyxUtils.keyChanged] Subscriber callback threw an error for key '${key}': ${error}`);
+                Logger.logAlert(`[OnyxUtils.keyChanged] Subscriber callback threw an error for key '${key}': ${formatCaughtError(error)}`);
             }
 
             continue;
@@ -759,7 +758,8 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: CallbackToStateMapp
         return;
     }
 
-    (mapping as DefaultConnectOptions<TKey>).callback?.(value, matchedKey!);
+    const callbackKey = matchedKey ?? mapping.key;
+    (mapping as DefaultConnectOptions<TKey>).callback?.(value, callbackKey);
 }
 
 /**
@@ -956,7 +956,7 @@ function prepareKeyValuePairsForStorage(
  * @param changes Array of changes that should be merged
  * @param existingValue The existing value that should be merged with the changes
  */
-function mergeChanges<TValue extends OnyxInput<OnyxKey> | undefined, TChange extends OnyxInput<OnyxKey> | undefined>(changes: TChange[], existingValue?: TValue): FastMergeResult<TChange> {
+function mergeChanges<TValue extends OnyxInput<OnyxKey>, TChange extends OnyxInput<OnyxKey>>(changes: TChange[], existingValue?: TValue): FastMergeResult<TChange> {
     return mergeInternal('merge', changes, existingValue);
 }
 
@@ -967,10 +967,7 @@ function mergeChanges<TValue extends OnyxInput<OnyxKey> | undefined, TChange ext
  * @param changes Array of changes that should be merged
  * @param existingValue The existing value that should be merged with the changes
  */
-function mergeAndMarkChanges<TValue extends OnyxInput<OnyxKey> | undefined, TChange extends OnyxInput<OnyxKey> | undefined>(
-    changes: TChange[],
-    existingValue?: TValue,
-): FastMergeResult<TChange> {
+function mergeAndMarkChanges<TValue extends OnyxInput<OnyxKey>, TChange extends OnyxInput<OnyxKey>>(changes: TChange[], existingValue?: TValue): FastMergeResult<TChange> {
     return mergeInternal('mark', changes, existingValue);
 }
 
@@ -980,11 +977,7 @@ function mergeAndMarkChanges<TValue extends OnyxInput<OnyxKey> | undefined, TCha
  * @param changes Array of changes that should be merged
  * @param existingValue The existing value that should be merged with the changes
  */
-function mergeInternal<TValue extends OnyxInput<OnyxKey> | undefined, TChange extends OnyxInput<OnyxKey> | undefined>(
-    mode: 'merge' | 'mark',
-    changes: TChange[],
-    existingValue?: TValue,
-): FastMergeResult<TChange> {
+function mergeInternal<TValue extends OnyxInput<OnyxKey>, TChange extends OnyxInput<OnyxKey>>(mode: 'merge' | 'mark', changes: TChange[], existingValue?: TValue): FastMergeResult<TChange> {
     const lastChange = changes?.at(-1);
 
     if (Array.isArray(lastChange)) {
@@ -1014,7 +1007,10 @@ function mergeInternal<TValue extends OnyxInput<OnyxKey> | undefined, TChange ex
 
     // If we have anything else we can't merge it so we'll
     // simply return the last value that was queued
-    return {result: lastChange!, replaceNullPatches: []};
+    if (lastChange === undefined) {
+        return {result: (existingValue ?? {}) as TChange, replaceNullPatches: []};
+    }
+    return {result: lastChange, replaceNullPatches: []};
 }
 
 /**
@@ -1266,7 +1262,7 @@ function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, me
             }
 
             if (Array.isArray(value) || Array.isArray(snapshotData[key])) {
-                updatedData[key] = value || [];
+                updatedData[key] = value ?? [];
                 continue;
             }
 
@@ -1275,7 +1271,7 @@ function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, me
                 continue;
             }
 
-            const oldValue = updatedData[key] || {};
+            const oldValue = updatedData[key] ?? {};
 
             // Snapshot entries are stored as a "shape" of the last known data per key, so by default we only
             // merge fields that already exist in the snapshot to avoid unintentionally bloating snapshot data.

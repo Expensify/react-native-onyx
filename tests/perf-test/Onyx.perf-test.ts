@@ -42,7 +42,7 @@ describe('Onyx', () => {
     describe('set', () => {
         test('10k calls with heavy objects', async () => {
             await measureAsyncFunction(
-                () => Promise.all(Object.values(mockedReportActionsMap).map((reportAction) => Onyx.set(`${collectionKey}${reportAction.reportActionID}`, reportAction))),
+                () => Promise.all(Object.values(mockedReportActionsMap).map((reportAction) => Onyx.set(`${collectionKey}${String(reportAction.reportActionID)}`, reportAction))),
                 {afterEach: clearOnyxAfterEachMeasure},
             );
         });
@@ -50,7 +50,9 @@ describe('Onyx', () => {
 
     describe('multiSet', () => {
         test('one call with 10k heavy objects', async () => {
-            await measureAsyncFunction(() => Onyx.multiSet(mockedReportActionsMap), {afterEach: clearOnyxAfterEachMeasure});
+            await measureAsyncFunction(() => Onyx.multiSet(mockedReportActionsMap), {
+                afterEach: clearOnyxAfterEachMeasure,
+            });
         });
     });
 
@@ -99,11 +101,23 @@ describe('Onyx', () => {
 
             const sets = Object.entries(changedReportActions)
                 .filter(([, v]) => Number(v.reportActionID) % 2 === 0)
-                .map(([k, v]): OnyxUpdate<OnyxKey> => ({key: k, onyxMethod: Onyx.METHOD.SET, value: v}));
+                .map(
+                    ([k, v]): OnyxUpdate<OnyxKey> => ({
+                        key: k,
+                        onyxMethod: Onyx.METHOD.SET,
+                        value: v,
+                    }),
+                );
 
             const merges = Object.entries(changedReportActions)
                 .filter(([, v]) => Number(v.reportActionID) % 2 !== 0)
-                .map(([k, v]): OnyxUpdate<OnyxKey> => ({key: k, onyxMethod: Onyx.METHOD.MERGE, value: v}));
+                .map(
+                    ([k, v]): OnyxUpdate<OnyxKey> => ({
+                        key: k,
+                        onyxMethod: Onyx.METHOD.MERGE,
+                        value: v,
+                    }),
+                );
 
             const updates = alternateLists(sets, merges) as Array<OnyxUpdate<OnyxKey>>;
 

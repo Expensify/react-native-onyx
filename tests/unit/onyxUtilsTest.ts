@@ -689,11 +689,11 @@ describe('OnyxUtils', () => {
                     d: {
                         i: 'i',
                         j: 'j',
-                        [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                        [utils.ONYX_INTERNALS_REPLACE_OBJECT_MARK]: true,
                     },
                     h: 'h',
                     g: {
-                        [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                        [utils.ONYX_INTERNALS_REPLACE_OBJECT_MARK]: true,
                         k: 'k',
                     },
                 },
@@ -727,11 +727,11 @@ describe('OnyxUtils', () => {
                     d: {
                         i: 'i',
                         j: 'j',
-                        [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                        [utils.ONYX_INTERNALS_REPLACE_OBJECT_MARK]: true,
                     },
                     h: 'h',
                     g: {
-                        [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                        [utils.ONYX_INTERNALS_REPLACE_OBJECT_MARK]: true,
                         k: 'k',
                     },
                 },

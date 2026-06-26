@@ -8,7 +8,7 @@ import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 // We need access to some internal properties of `connectionManager` during the tests but they are private,
 // so this workaround allows us to have access to them.
 const connectionsMap = connectionManager.connectionsMap;
-const generateConnectionID = connectionManager.generateConnectionID;
+const generateConnectionID = connectionManager.generateConnectionID.bind(connectionManager);
 const getSessionID = () => connectionManager.sessionID;
 
 const ONYXKEYS = {

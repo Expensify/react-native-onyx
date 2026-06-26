@@ -121,7 +121,7 @@ describe('IDBKeyValProvider', () => {
                         property: {
                             nestedProperty: {
                                 nestedKey2: 'nestedValue2_changed',
-                                [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                                [utils.ONYX_INTERNALS_REPLACE_OBJECT_MARK]: true,
                             },
                             newKey: 'newValue',
                         },
@@ -134,7 +134,9 @@ describe('IDBKeyValProvider', () => {
             const expectedEntries = structuredClone(changedEntries);
             const expectedTestKey3Value = structuredClone(testEntries.at(2))[1] as GenericDeepRecord;
             expectedTestKey3Value.key = 'value_changed';
-            expectedTestKey3Value.property.nestedProperty = {nestedKey2: 'nestedValue2_changed'};
+            expectedTestKey3Value.property.nestedProperty = {
+                nestedKey2: 'nestedValue2_changed',
+            };
             expectedTestKey3Value.property.newKey = 'newValue';
             expectedEntries.at(2)[1] = expectedTestKey3Value;
 
@@ -175,7 +177,9 @@ describe('IDBKeyValProvider', () => {
 
         it('should insert a new record when key does not exist', async () => {
             await IDBKeyValProvider.multiMerge([[ONYXKEYS.TEST_KEY_2, {fresh: true}]]);
-            expect(await IDBKeyValProvider.getItem(ONYXKEYS.TEST_KEY_2)).toEqual({fresh: true});
+            expect(await IDBKeyValProvider.getItem(ONYXKEYS.TEST_KEY_2)).toEqual({
+                fresh: true,
+            });
         });
     });
 
@@ -185,18 +189,18 @@ describe('IDBKeyValProvider', () => {
         // rejects with as-is. Every write path must instead reject with a real Error so the failure
         // can be classified and retried.
         function abortTransactionOnPut() {
-            const originalPut = IDBObjectStore.prototype.put;
-            jest.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function put(this: IDBObjectStore, ...args: Parameters<IDBObjectStore['put']>) {
-                const request = originalPut.apply(this, args);
+            const spy = jest.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function put(this: IDBObjectStore, ...args: Parameters<IDBObjectStore['put']>) {
+                spy.mockRestore();
+                const request = this.put(...args);
                 this.transaction.abort();
                 return request;
             });
         }
 
         function abortTransactionOnDelete() {
-            const originalDelete = IDBObjectStore.prototype.delete;
-            jest.spyOn(IDBObjectStore.prototype, 'delete').mockImplementation(function del(this: IDBObjectStore, ...args: Parameters<IDBObjectStore['delete']>) {
-                const request = originalDelete.apply(this, args);
+            const spy = jest.spyOn(IDBObjectStore.prototype, 'delete').mockImplementation(function del(this: IDBObjectStore, ...args: Parameters<IDBObjectStore['delete']>) {
+                spy.mockRestore();
+                const request = this.delete(...args);
                 this.transaction.abort();
                 return request;
             });
@@ -263,7 +267,7 @@ describe('IDBKeyValProvider', () => {
             await IDBKeyValProvider.mergeItem(ONYXKEYS.TEST_KEY_3, {
                 key: 'value_changed',
                 property: {
-                    [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                    [utils.ONYX_INTERNALS_REPLACE_OBJECT_MARK]: true,
                     newKey: 'newValue',
                 },
             });
@@ -328,7 +332,15 @@ describe('IDBKeyValProvider', () => {
         beforeEach(() => {
             Object.defineProperty(window.navigator, 'storage', {
                 value: {
-                    estimate: jest.fn().mockResolvedValue({quota: 750000, usage: 250000, usageDetails: {caches: 100000, fileSystem: 50000, indexedDB: 100000}}),
+                    estimate: jest.fn().mockResolvedValue({
+                        quota: 750000,
+                        usage: 250000,
+                        usageDetails: {
+                            caches: 100000,
+                            fileSystem: 50000,
+                            indexedDB: 100000,
+                        },
+                    }),
                 },
                 configurable: true,
             });

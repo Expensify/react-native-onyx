@@ -5,11 +5,7 @@ import Storage from '../storage';
 import type {OnyxInput, OnyxKey, OnyxValue} from '../types';
 import type {ApplyMerge} from './types';
 
-const applyMerge: ApplyMerge = <TKey extends OnyxKey, TValue extends OnyxInput<TKey> | undefined, TChange extends OnyxInput<TKey> | undefined>(
-    key: TKey,
-    existingValue: TValue,
-    validChanges: TChange[],
-) => {
+const applyMerge: ApplyMerge = <TKey extends OnyxKey, TValue extends OnyxInput<TKey>, TChange extends OnyxInput<TKey>>(key: TKey, existingValue: TValue, validChanges: TChange[]) => {
     const {result: mergedValue} = OnyxUtils.mergeChanges(validChanges, existingValue);
 
     // In cache, we don't want to remove the key if it's null to improve performance and speed up the next merge.

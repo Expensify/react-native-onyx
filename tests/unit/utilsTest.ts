@@ -146,7 +146,7 @@ describe('utils', () => {
                     b: {
                         d: {
                             h: 'h',
-                            [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                            [utils.ONYX_INTERNALS_REPLACE_OBJECT_MARK]: true,
                         },
                         h: 'h',
                     },
@@ -161,7 +161,7 @@ describe('utils', () => {
                         b: {
                             d: {
                                 h: 'h',
-                                [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                                [utils.ONYX_INTERNALS_REPLACE_OBJECT_MARK]: true,
                             },
                             h: 'h',
                         },

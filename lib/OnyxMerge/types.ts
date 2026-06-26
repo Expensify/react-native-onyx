@@ -4,7 +4,7 @@ type ApplyMergeResult<TValue> = {
     mergedValue: TValue;
 };
 
-type ApplyMerge = <TKey extends OnyxKey, TValue extends OnyxInput<OnyxKey> | undefined, TChange extends OnyxInput<OnyxKey> | null>(
+type ApplyMerge = <TKey extends OnyxKey, TValue extends OnyxInput<TKey>, TChange extends OnyxInput<TKey>>(
     key: TKey,
     existingValue: TValue,
     validChanges: TChange[],

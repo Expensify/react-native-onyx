@@ -29,8 +29,8 @@ const mockedReportActionsKeys = Object.keys(mockedReportActionsMap);
 
 // We need access to some internal properties of `connectionManager` during the tests but they are private,
 // so this workaround allows us to have access to them.
-const generateConnectionID = connectionManager.generateConnectionID;
-const fireCallbacks = connectionManager.fireCallbacks;
+const generateConnectionID = connectionManager.generateConnectionID.bind(connectionManager);
+const fireCallbacks = connectionManager.fireCallbacks.bind(connectionManager);
 
 const resetConectionManagerAfterEachMeasure = () => {
     connectionManager.disconnectAll();

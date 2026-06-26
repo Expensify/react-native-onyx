@@ -20,7 +20,8 @@ type Storage = {
  * Degrade performance by removing the storage provider and only using cache
  */
 function degradePerformance(error: Error) {
-    Logger.logHmmm(`Error while using ${provider.name}. Falling back to only using cache and dropping storage.\n Error: ${error.message}\n Stack: ${error.stack}\n Cause: ${error.cause}`);
+    const causeMessage = error.cause instanceof Error ? error.cause.message : typeof error.cause === 'string' ? error.cause : '';
+    Logger.logHmmm(`Error while using ${provider.name}. Falling back to only using cache and dropping storage.\n Error: ${error.message}\n Stack: ${error.stack}\n Cause: ${causeMessage}`);
     console.error(error);
     provider = MemoryOnlyProvider;
 }

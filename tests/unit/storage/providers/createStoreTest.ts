@@ -16,11 +16,10 @@ function uniqueDBName() {
  */
 async function captureDB(store: ReturnType<typeof createStore>): Promise<IDBDatabase | undefined> {
     const captured: {db?: IDBDatabase} = {};
-    const original = IDBDatabase.prototype.transaction;
     const spy = jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
         captured.db = this;
         spy.mockRestore();
-        return original.apply(this, args);
+        return this.transaction(...args);
     });
     await store('readonly', (s) => IDB.promisifyRequest(s.getAllKeys()));
     return captured.db;
@@ -48,14 +47,14 @@ describe('createStore', () => {
                 return IDB.promisifyRequest(s.transaction);
             });
 
-            const original = IDBDatabase.prototype.transaction;
             let callCount = 0;
-            jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
+            const spy = jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
                 callCount += 1;
                 if (callCount === 1) {
                     throw new DOMException('The database connection is closing.', 'InvalidStateError');
                 }
-                return original.apply(this, args);
+                spy.mockRestore();
+                return this.transaction(...args);
             });
 
             const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
@@ -140,14 +139,14 @@ describe('createStore', () => {
                 return IDB.promisifyRequest(s.transaction);
             });
 
-            const original = IDBDatabase.prototype.transaction;
             let callCount = 0;
-            jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
+            const spy = jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
                 callCount += 1;
                 if (callCount === 1) {
                     throw new DOMException('The database connection is closing.', 'InvalidStateError');
                 }
-                return original.apply(this, args);
+                spy.mockRestore();
+                return this.transaction(...args);
             });
 
             await store('readwrite', (s) => {
@@ -173,14 +172,14 @@ describe('createStore', () => {
                 return IDB.promisifyRequest(s.transaction);
             });
 
-            const original = IDBDatabase.prototype.transaction;
             let callCount = 0;
-            jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
+            const spy = jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
                 callCount += 1;
                 if (callCount === 1) {
                     throw new DOMException('The database connection is closing.', 'InvalidStateError');
                 }
-                return original.apply(this, args);
+                spy.mockRestore();
+                return this.transaction(...args);
             });
 
             await store('readwrite', (s) => {
@@ -232,8 +231,10 @@ describe('createStore', () => {
             const store = createStore(dbName, STORE_NAME);
 
             const db = await captureDB(store);
-            expect(db).toBeDefined();
-            const closeSpy = jest.spyOn(db!, 'close');
+            if (!db) {
+                throw new Error('Expected db to be captured');
+            }
+            const closeSpy = jest.spyOn(db, 'close');
 
             // @ts-expect-error -- our handler ignores the event argument
             db?.onversionchange?.call(db, new Event('versionchange'));
@@ -276,14 +277,14 @@ describe('createStore', () => {
                 return IDB.promisifyRequest(s.transaction);
             });
 
-            const original = IDBDatabase.prototype.transaction;
             let callCount = 0;
-            jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
+            const spy = jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
                 callCount++;
                 if (callCount === 1) {
                     throw backingStoreError();
                 }
-                return original.apply(this, args);
+                spy.mockRestore();
+                return this.transaction(...args);
             });
 
             const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
@@ -377,8 +378,6 @@ describe('createStore', () => {
                 return IDB.promisifyRequest(s.transaction);
             });
 
-            const original = IDBDatabase.prototype.transaction;
-
             // Drain budget to 1 remaining: fail twice, each heals successfully
             for (let i = 0; i < 2; i++) {
                 let callCount = 0;
@@ -388,7 +387,7 @@ describe('createStore', () => {
                         throw backingStoreError();
                     }
                     spy.mockRestore();
-                    return original.apply(this, args);
+                    return this.transaction(...args);
                 });
                 await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
             }
@@ -407,7 +406,7 @@ describe('createStore', () => {
                         throw backingStoreError();
                     }
                     spy.mockRestore();
-                    return original.apply(this, args);
+                    return this.transaction(...args);
                 });
                 const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
                 expect(result).toBe('value');
@@ -458,14 +457,14 @@ describe('createStore', () => {
                 return IDB.promisifyRequest(s.transaction);
             });
 
-            const original = IDBDatabase.prototype.transaction;
             let callCount = 0;
-            jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
+            const spy = jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
                 callCount++;
                 if (callCount === 1) {
                     throw connectionLostError();
                 }
-                return original.apply(this, args);
+                spy.mockRestore();
+                return this.transaction(...args);
             });
 
             const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
@@ -511,14 +510,14 @@ describe('createStore', () => {
                 return IDB.promisifyRequest(s.transaction);
             });
 
-            const original = IDBDatabase.prototype.transaction;
             let callCount = 0;
-            jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
+            const spy = jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
                 callCount++;
                 if (callCount === 1) {
                     throw new DOMException('Connection is closing.', 'UnknownError');
                 }
-                return original.apply(this, args);
+                spy.mockRestore();
+                return this.transaction(...args);
             });
 
             const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
@@ -534,7 +533,6 @@ describe('createStore', () => {
                 return IDB.promisifyRequest(s.transaction);
             });
 
-            const original = IDBDatabase.prototype.transaction;
             const backingStoreError = () => new DOMException('Internal error opening backing store for indexedDB.open.', 'UnknownError');
 
             // Connection-lost errors are transient and must NOT decrement the backing-store budget.
@@ -549,7 +547,7 @@ describe('createStore', () => {
                         throw connectionLostError();
                     }
                     spy.mockRestore();
-                    return original.apply(this, args);
+                    return this.transaction(...args);
                 });
                 await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
             }
@@ -562,7 +560,7 @@ describe('createStore', () => {
                     throw backingStoreError();
                 }
                 backingSpy.mockRestore();
-                return original.apply(this, args);
+                return this.transaction(...args);
             });
             const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
             expect(result).toBe('value');
@@ -582,14 +580,14 @@ describe('createStore', () => {
                 return IDB.promisifyRequest(s.transaction);
             });
 
-            const original = IDBDatabase.prototype.transaction;
             let callCount = 0;
-            jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
+            const spy = jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
                 callCount++;
                 if (callCount === 1) {
                     throw new DOMException('IDB write transaction aborted without an error', 'AbortError');
                 }
-                return original.apply(this, args);
+                spy.mockRestore();
+                return this.transaction(...args);
             });
 
             const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
@@ -628,14 +626,14 @@ describe('createStore', () => {
 
             simulateVisibilityChange('hidden');
 
-            const original = IDBDatabase.prototype.transaction;
             let probeIntercepted = false;
-            jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
+            const spy = jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
                 if (!probeIntercepted) {
                     probeIntercepted = true;
                     throw new DOMException('Connection to Indexed Database server lost. Refresh the page to try again', 'UnknownError');
                 }
-                return original.apply(this, args);
+                spy.mockRestore();
+                return this.transaction(...args);
             });
 
             simulateVisibilityChange('visible');
@@ -698,14 +696,14 @@ describe('createStore', () => {
 
             simulateVisibilityChange('hidden');
 
-            const original = IDBDatabase.prototype.transaction;
             let callCount = 0;
-            jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
+            const spy = jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
                 callCount++;
                 if (callCount === 1) {
                     throw new DOMException('The database connection is closing.', 'InvalidStateError');
                 }
-                return original.apply(this, args);
+                spy.mockRestore();
+                return this.transaction(...args);
             });
 
             simulateVisibilityChange('visible');
