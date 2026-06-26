@@ -1,4 +1,4 @@
-import NOOP from 'lodash/noop';
+const NOOP = () => {};
 
 /**
  *  This is used to keep multiple browser tabs in sync, therefore only needed on web

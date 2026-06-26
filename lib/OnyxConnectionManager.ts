@@ -1,4 +1,4 @@
-import bindAll from 'lodash/bindAll';
+import bindAll from 'lodash.bindall';
 import * as Logger from './Logger';
 import type {ConnectOptions} from './Onyx';
 import OnyxUtils from './OnyxUtils';
@@ -142,10 +142,14 @@ class OnyxConnectionManager {
         }
 
         for (const callback of connection.callbacks.values()) {
+            const callbackKey = connection.cachedCallbackKey;
+            if (callbackKey === undefined) {
+                continue;
+            }
             if (connection.waitForCollectionCallback) {
-                (callback as CollectionConnectCallback<OnyxKey>)(connection.cachedCallbackValue as Record<string, unknown>, connection.cachedCallbackKey!, connection.sourceValue);
+                (callback as CollectionConnectCallback<OnyxKey>)(connection.cachedCallbackValue as Record<string, unknown>, callbackKey, connection.sourceValue);
             } else {
-                (callback as DefaultConnectCallback<OnyxKey>)(connection.cachedCallbackValue, connection.cachedCallbackKey!);
+                (callback as DefaultConnectCallback<OnyxKey>)(connection.cachedCallbackValue, callbackKey);
             }
         }
     }
@@ -204,7 +208,11 @@ class OnyxConnectionManager {
             // Defer the callback execution to the next tick of the event loop.
             // This ensures that the current execution flow completes and the result connection object is available when the callback fires.
             Promise.resolve().then(() => {
-                (connectOptions as DefaultConnectOptions<OnyxKey>).callback?.(connectionMetadata.cachedCallbackValue, connectionMetadata.cachedCallbackKey!);
+                const callbackKey = connectionMetadata.cachedCallbackKey;
+                if (callbackKey === undefined) {
+                    return;
+                }
+                (connectOptions as DefaultConnectOptions<OnyxKey>).callback?.(connectionMetadata.cachedCallbackValue, callbackKey);
             });
         }
 
