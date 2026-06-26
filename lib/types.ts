@@ -229,32 +229,20 @@ type CollectionConnectCallback<TKey extends OnyxKey> = (value: NonUndefined<Onyx
  * Represents the options used in `Onyx.connect()` method.
  *
  * For a collection root key (e.g. `ONYXKEYS.COLLECTION.REPORT`), the callback fires
- * with the entire collection snapshot whenever any member changes (signature
- * `(collection, key)`). For any other key, the callback fires with the value at
+ * with the entire collection object whenever any member changes (signature
+ * `(collection, key, sourceValue)`). For any other key, the callback fires with the value at
  * that key (signature `(value, key)`).
- *
- * The legacy `waitForCollectionCallback` flag has been removed — collection-root
- * subscriptions always deliver snapshots. Per-member dispatch (the old default
- * for collection-root subscribers) is no longer supported; consumers that need
- * per-member processing should subscribe to a single collection member key.
  */
 // NOTE: Any changes to this type like adding or removing options must be accounted in OnyxConnectionManager's `generateConnectionID()` method!
 type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions & {
     /** The Onyx key to subscribe to. */
     key: TKey;
 
-    /**
-     * A function that will be called when the Onyx data we are subscribed changes.
-     *
-     * The value is a conditional *parameter* (collection snapshot vs. entry) inside a single
-     * function type — rather than a union of two distinct callback types — so that callers using a
-     * generic or union `TKey` still get an assignable, non-`any` callback. Collection snapshots stay
-     * `NonUndefined`.
-     */
+    /** A function that will be called when the Onyx data we are subscribed changes. */
     callback?: (
         value: TKey extends CollectionKeyBase ? NonUndefined<OnyxCollection<KeyValueMapping[TKey]>> : OnyxEntry<KeyValueMapping[TKey]>,
         key: TKey,
-        sourceValue?: OnyxValue<TKey>,
+        sourceValue?: TKey extends CollectionKeyBase ? NonUndefined<OnyxCollection<KeyValueMapping[TKey]>> : never,
     ) => void;
 };
 
