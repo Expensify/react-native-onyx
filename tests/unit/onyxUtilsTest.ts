@@ -8,6 +8,7 @@ import type GenericCollection from '../utils/GenericCollection';
 import OnyxCache from '../../lib/OnyxCache';
 import * as Logger from '../../lib/Logger';
 import StorageMock from '../../lib/storage';
+import StorageCircuitBreaker from '../../lib/StorageCircuitBreaker';
 import createDeferredTask from '../../lib/createDeferredTask';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
@@ -746,10 +747,15 @@ describe('OnyxUtils', () => {
 
     describe('retryOperation', () => {
         const retryOperationSpy = jest.spyOn(OnyxUtils, 'retryOperation');
+        /** Mirrors StorageCircuitBreaker rolling-window trip threshold. */
+        const STORAGE_FAILURE_THRESHOLD = 50;
         const genericError = new Error('Generic storage error');
         const invalidDataError = new Error("Failed to execute 'put' on 'IDBObjectStore': invalid data");
         const diskFullError = new Error('database or disk is full');
         const nonRetriableIdbError = Object.assign(new Error('Internal error opening backing store for indexedDB.open.'), {name: 'UnknownError'});
+
+        // The circuit breaker is process-scoped, so reset it between tests to avoid state leaking.
+        beforeEach(() => StorageCircuitBreaker.reset());
 
         it('should retry only one time if the operation is firstly failed and then passed', async () => {
             StorageMock.setItem = jest.fn(StorageMock.setItem).mockRejectedValueOnce(genericError).mockImplementation(StorageMock.setItem);
@@ -767,6 +773,21 @@ describe('OnyxUtils', () => {
 
             // Should be called 6 times: initial attempt + 5 retries (MAX_STORAGE_OPERATION_RETRY_ATTEMPTS)
             expect(retryOperationSpy).toHaveBeenCalledTimes(6);
+        });
+
+        it('should log the full shape of an unclassified (UNKNOWN) error once per operation', async () => {
+            const logAlertSpy = jest.spyOn(Logger, 'logAlert');
+            StorageMock.setItem = jest.fn().mockRejectedValue(genericError);
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+
+            // UNKNOWN is instrumented so we can see what to promote into a real class. The shape (provider
+            // + name + message) is logged exactly once even though the operation retries 6 times.
+            const unclassifiedCalls = logAlertSpy.mock.calls.filter((call) => typeof call[0] === 'string' && call[0].startsWith('Unclassified storage error.'));
+            expect(unclassifiedCalls).toHaveLength(1);
+            expect(unclassifiedCalls[0][0]).toBe(
+                `Unclassified storage error. provider: MemoryOnlyProvider. name: ${genericError.name}. message: ${genericError.message}. onyxMethod: setWithRetry.`,
+            );
         });
 
         it("should throw error for if operation failed with \"Failed to execute 'put' on 'IDBObjectStore': invalid data\" error", async () => {
@@ -793,15 +814,19 @@ describe('OnyxUtils', () => {
             expect(retryOperationSpy).toHaveBeenCalledTimes(1);
         });
 
-        it('should log a single skip alert for non-retriable errors', async () => {
+        it('should skip retry quietly (info, not alert) for fatal connection-layer errors', async () => {
             const logAlertSpy = jest.spyOn(Logger, 'logAlert');
+            const logInfoSpy = jest.spyOn(Logger, 'logInfo');
             StorageMock.setItem = jest.fn().mockRejectedValue(nonRetriableIdbError);
 
             await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
-            expect(logAlertSpy).toHaveBeenCalledWith(`Storage operation skipped retry for non-retriable error. Error: ${nonRetriableIdbError}. onyxMethod: setWithRetry.`);
-            // Not paired with the "5 retries exhausted" alert
-            expect(logAlertSpy).toHaveBeenCalledTimes(1);
+            // The connection layer (createStore) owns and alerts on fatal errors; the operation layer
+            // just skips the retry at info level. No alert here, and no "5 retries exhausted" alert.
+            expect(logInfoSpy).toHaveBeenCalledWith(
+                `Storage operation skipped retry; fatal errors are handled by the connection layer. Error: ${nonRetriableIdbError}. onyxMethod: setWithRetry.`,
+            );
+            expect(logAlertSpy).not.toHaveBeenCalled();
         });
 
         it('should include the error in logAlert for IDBObjectStore invalid data errors', async () => {
@@ -821,7 +846,9 @@ describe('OnyxUtils', () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
             expect(logAlertSpy).toHaveBeenCalledWith(`Out of storage. But found no acceptable keys to remove. Error: ${diskFullError}`);
-            expect(logInfoSpy).toHaveBeenCalledWith(`Storage Quota Check -- bytesUsed: 0 bytesRemaining: Infinity. Original error: ${diskFullError}`);
+            expect(logInfoSpy).toHaveBeenCalledWith(
+                `Storage Quota Check -- bytesUsed: 0 originWideBytesRemaining (estimate, not per-DB headroom): Infinity. Original error: ${diskFullError}`,
+            );
         });
 
         it('should include usageDetails in the storage quota log when available', async () => {
@@ -841,7 +868,9 @@ describe('OnyxUtils', () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
             expect(logInfoSpy).toHaveBeenCalledWith(
-                `Storage Quota Check -- bytesUsed: 13289269 bytesRemaining: 5000000 usageDetails: ${JSON.stringify(usageDetails)}. Original error: ${diskFullError}`,
+                `Storage Quota Check -- bytesUsed: 13289269 originWideBytesRemaining (estimate, not per-DB headroom): 5000000 usageDetails: ${JSON.stringify(
+                    usageDetails,
+                )}. Original error: ${diskFullError}`,
             );
         });
 
@@ -854,6 +883,43 @@ describe('OnyxUtils', () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
             expect(logAlertSpy).toHaveBeenCalledWith(`Unable to get database size. getDatabaseSize error: ${dbSizeError}. Original error: ${diskFullError}`);
+        });
+
+        it('should trip the circuit breaker and alert once after sustained capacity failures', async () => {
+            const logAlertSpy = jest.spyOn(Logger, 'logAlert');
+            StorageMock.setItem = jest.fn().mockRejectedValue(diskFullError);
+
+            // No evictable keys are configured, so each failing write records exactly one capacity
+            // failure with the breaker (it cannot evict). Enough of them within one window trips it.
+            for (let i = 0; i <= STORAGE_FAILURE_THRESHOLD; i++) {
+                await Onyx.set(ONYXKEYS.TEST_KEY, {test: i});
+            }
+            await waitForPromisesToResolve();
+
+            expect(StorageCircuitBreaker.isAllowed()).toBe(false);
+            expect(logAlertSpy).toHaveBeenCalledWith(expect.stringContaining('Storage circuit breaker tripped'));
+        });
+
+        it('should drop capacity writes silently while the circuit breaker is open', async () => {
+            // Trip the breaker deterministically so every capacity failure below is observed while open.
+            for (let i = 0; i <= STORAGE_FAILURE_THRESHOLD; i++) {
+                StorageCircuitBreaker.recordCapacityFailure();
+            }
+            expect(StorageCircuitBreaker.isAllowed()).toBe(false);
+
+            // Clear so we only observe logging caused by the write below, not the trip alert above.
+            const logInfoSpy = jest.spyOn(Logger, 'logInfo').mockClear();
+            const logAlertSpy = jest.spyOn(Logger, 'logAlert').mockClear();
+            StorageMock.setItem = jest.fn().mockRejectedValue(diskFullError);
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+            await waitForPromisesToResolve();
+
+            // The write and any cascading derived writes are dropped without per-write log spam, and
+            // without re-alerting — the single trip alert is the only signal while open.
+            expect(StorageCircuitBreaker.isAllowed()).toBe(false);
+            expect(logInfoSpy).not.toHaveBeenCalledWith(expect.stringContaining('Failed to save to storage'));
+            expect(logAlertSpy).not.toHaveBeenCalled();
         });
 
         it('should not re-add an evicted key to recentlyAccessedKeys after removal', async () => {
@@ -1421,6 +1487,42 @@ describe('OnyxUtils', () => {
             expect(LocalOnyxCache.get(ONYXKEYS.TEST_KEY)).toEqual({test: 'data'});
         });
 
+        it('should recover via a half-open eviction+retry probe after the open window clears', async () => {
+            // Regression for the bug where the capacity failure that triggers the half-open probe
+            // re-tripped the breaker before the eviction+retry could run — permanently disabling
+            // eviction-based recovery after the first trip. Drive the whole probe through retryOperation.
+            const ROLLING_WINDOW_MS = 60_000;
+            const FAILURE_THRESHOLD = 50;
+            const LocalStorageCircuitBreaker = require('../../lib/StorageCircuitBreaker').default as typeof StorageCircuitBreaker;
+
+            let currentTime = 1_000_000;
+            const nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => currentTime);
+
+            // Seed an evictable key so the probe has something to evict, then trip the breaker open.
+            const evictableKey = `${ONYXKEYS.COLLECTION.TEST_KEY}1`;
+            await LocalOnyx.set(evictableKey, {id: 1});
+            for (let i = 0; i <= FAILURE_THRESHOLD; i++) {
+                LocalStorageCircuitBreaker.recordCapacityFailure();
+            }
+            expect(LocalStorageCircuitBreaker.isAllowed()).toBe(false);
+
+            // Let the open window clear so the next capacity write is admitted as the half-open probe.
+            currentTime += ROLLING_WINDOW_MS;
+
+            // The probe write fails once with capacity (triggering the probe), then its post-eviction retry succeeds.
+            LocalStorageMock.setItem = jest.fn(LocalStorageMock.setItem).mockRejectedValueOnce(diskFullError).mockImplementation(LocalStorageMock.setItem);
+            await LocalOnyx.set(ONYXKEYS.TEST_KEY, {test: 'recovered'});
+            await waitForPromisesToResolve();
+
+            // The probe ran: the evictable key was evicted, the write landed, and the successful retry closed the circuit.
+            expect(LocalOnyxCache.hasCacheForKey(evictableKey)).toBe(false);
+            expect(LocalOnyxCache.get(ONYXKEYS.TEST_KEY)).toEqual({test: 'recovered'});
+            expect(LocalStorageCircuitBreaker.isAllowed()).toBe(true);
+            expect(LocalStorageCircuitBreaker.isAllowed()).toBe(true);
+
+            nowSpy.mockRestore();
+        });
+
         it('should evict the least recently accessed key first (LRU order)', async () => {
             const key1 = `${ONYXKEYS.COLLECTION.TEST_KEY}1`;
             const key2 = `${ONYXKEYS.COLLECTION.TEST_KEY}2`;
@@ -1514,7 +1616,9 @@ describe('OnyxUtils', () => {
             await LocalOnyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
             expect(logInfoSpy).toHaveBeenCalledWith(`Out of storage. Evicting least recently accessed key (${key1}) and retrying. Error: ${diskFullError}`);
-            expect(logInfoSpy).toHaveBeenCalledWith(`Storage Quota Check -- bytesUsed: 0 bytesRemaining: Infinity. Original error: ${diskFullError}`);
+            expect(logInfoSpy).toHaveBeenCalledWith(
+                `Storage Quota Check -- bytesUsed: 0 originWideBytesRemaining (estimate, not per-DB headroom): Infinity. Original error: ${diskFullError}`,
+            );
         });
 
         it('multiSet — eviction of an UNRELATED key still notifies its subscribers (codex regression guard)', async () => {
