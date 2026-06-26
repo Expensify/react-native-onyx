@@ -52,9 +52,86 @@ export default defineConfig([
         },
     },
     {
+        files: ['.prettierrc.cjs', 'jest-sequencer.js', 'jestSetup.js', 'jest-test-environment.ts', 'buildDocs.ts'],
+        languageOptions: {
+            globals: globals.node,
+        },
+    },
+    {
+        files: ['lib/OnyxUtils.ts'],
+        rules: {
+            '@typescript-eslint/no-use-before-define': 'off',
+        },
+    },
+    {
+        files: ['tests/**/*'],
+        rules: {
+            '@typescript-eslint/naming-convention': [
+                'error',
+                {
+                    selector: ['variable', 'property'],
+                    format: null,
+                    filter: {
+                        regex: '^__esModule$',
+                        match: true,
+                    },
+                },
+                {
+                    selector: ['variable', 'property'],
+                    format: ['camelCase', 'UPPER_CASE', 'PascalCase'],
+                    filter: {
+                        regex: '^private_[a-z][a-zA-Z0-9]*$',
+                        match: false,
+                    },
+                },
+                {
+                    selector: 'objectLiteralProperty',
+                    format: null,
+                    filter: {
+                        regex: '_',
+                        match: true,
+                    },
+                },
+                {
+                    selector: 'objectLiteralProperty',
+                    format: null,
+                    filter: {
+                        regex: '^[0-9]+$',
+                        match: true,
+                    },
+                },
+                {
+                    selector: 'function',
+                    format: ['camelCase', 'PascalCase'],
+                },
+                {
+                    selector: ['typeLike', 'enumMember'],
+                    format: ['PascalCase'],
+                },
+                {
+                    selector: ['parameter', 'method'],
+                    format: ['camelCase', 'PascalCase'],
+                    leadingUnderscore: 'allow',
+                },
+            ],
+        },
+    },
+    {
         files: ['tests/**/*', 'jestSetup.js', 'lib/**/__mocks__/**/*'],
         rules: {
             'import/extensions': 'off',
+        },
+    },
+    {
+        files: ['lib/storage/providers/SQLiteProvider.ts'],
+        rules: {
+            '@typescript-eslint/naming-convention': [
+                'error',
+                {
+                    selector: 'typeProperty',
+                    format: ['camelCase', 'snake_case'],
+                },
+            ],
         },
     },
     {
