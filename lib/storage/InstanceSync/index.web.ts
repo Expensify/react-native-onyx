@@ -42,11 +42,16 @@ function raiseStorageSyncManyKeysEvent(onyxKeys: StorageKeyList) {
 }
 
 /**
- * Raise an event through `localStorage` to let other tabs know a value changed.
- * @param {String} onyxKey
+ * Raise an event through `localStorage` to let other tabs know a single key changed.
+ *
+ * This intentionally emits the raw key (the legacy, pre-batching format) rather than a JSON array, so a
+ * tab still running the previous bundle during a deploy keeps receiving single-key updates (a new message,
+ * a pin, a rename, etc.). Only multi-key writes use the batched JSON-array format; the receiver here
+ * understands both. The mixed-version gap is therefore limited to bulk collection writes, which resolve on reload.
  */
 function raiseStorageSyncEvent(onyxKey: OnyxKey) {
-    raiseStorageSyncManyKeysEvent([onyxKey]);
+    global.localStorage.setItem(SYNC_ONYX, onyxKey);
+    global.localStorage.removeItem(SYNC_ONYX);
 }
 
 let storage = NoopProvider;
