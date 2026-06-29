@@ -4,6 +4,7 @@ import utils from '../../../utils';
 import type StorageProvider from '../types';
 import type {OnyxKey, OnyxValue} from '../../../types';
 import createStore from './createStore';
+import classifyIDBError from './classifyError';
 import type {StorageKeyValuePair} from '../types';
 
 const DB_NAME = 'OnyxDB';
@@ -29,6 +30,10 @@ const provider: StorageProvider<UseStore | undefined> = {
      * The name of the provider that can be printed to the logs
      */
     name: 'IDBKeyValProvider',
+    /**
+     * Classifies an IndexedDB write failure into the shared storage taxonomy.
+     */
+    classifyError: classifyIDBError,
     /**
      * Initializes the storage provider
      */
