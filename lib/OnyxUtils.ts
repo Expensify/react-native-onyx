@@ -14,7 +14,6 @@ import type {
     ConnectOptions,
     DeepRecord,
     DefaultConnectCallback,
-    DefaultConnectOptions,
     KeyValueMapping,
     CallbackToStateMapping,
     MultiMergeReplaceNullPatches,
@@ -580,31 +579,8 @@ function keysChanged<TKey extends CollectionKeyBase>(
         }
 
         try {
-            lastConnectionCallbackData.set(subscriber.subscriptionID, {
-                value: cachedCollection,
-                matchedKey: subscriber.key,
-            });
-
-            if (subscriber.waitForCollectionCallback) {
-                subscriber.callback(cachedCollection, subscriber.key);
-                continue;
-            }
-
-            // Not using waitForCollectionCallback — notify per changed key.
-            // Re-check the subscription on each iteration because the callback may
-            // synchronously disconnect itself (removing it from callbackToStateMapping),
-            // in which case we must stop firing further callbacks for this subscriber.
-            for (const dataKey of changedMemberKeys) {
-                const currentSubscriber = callbackToStateMapping[subID];
-                if (!currentSubscriber || typeof currentSubscriber.callback !== 'function') {
-                    break;
-                }
-                if (cachedCollection[dataKey] === previousCollection[dataKey]) {
-                    continue;
-                }
-                const currentSubscriberCallback = currentSubscriber.callback as DefaultConnectCallback<TKey>;
-                currentSubscriberCallback(cachedCollection[dataKey], dataKey as TKey);
-            }
+            lastConnectionCallbackData.set(subscriber.subscriptionID, {value: cachedCollection, matchedKey: subscriber.key});
+            subscriber.callback(cachedCollection, subscriber.key);
         } catch (error) {
             Logger.logAlert(`[OnyxUtils.keysChanged] Subscriber callback threw an error for key '${collectionKey}': ${error}`);
         }
@@ -685,9 +661,9 @@ function keyChanged<TKey extends OnyxKey>(
                     continue;
                 }
 
-                if (OnyxKeys.isCollectionKey(subscriber.key) && subscriber.waitForCollectionCallback) {
-                    // Skip individual key changes for collection callbacks during collection updates
-                    // to prevent duplicate callbacks - the collection update will handle this properly
+                if (OnyxKeys.isCollectionKey(subscriber.key)) {
+                    // Skip individual key changes during collection updates to prevent duplicate
+                    // callbacks - the collection update will handle this properly.
                     if (isProcessingCollectionUpdate) {
                         continue;
                     }
@@ -733,10 +709,10 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: CallbackToStateMapp
     }
 
     // Always read the latest value from cache to avoid stale or duplicate data.
-    // For collection subscribers with waitForCollectionCallback, read the full collection.
+    // For collection-root subscribers, read the full collection.
     // For individual key subscribers, read just that key's value.
     let value: OnyxValue<TKey> | undefined;
-    if (OnyxKeys.isCollectionKey(mapping.key) && mapping.waitForCollectionCallback) {
+    if (OnyxKeys.isCollectionKey(mapping.key)) {
         const collection = getCachedCollection(mapping.key);
         value = Object.keys(collection).length > 0 ? (collection as OnyxValue<TKey>) : undefined;
     } else {
@@ -754,7 +730,7 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: CallbackToStateMapp
         return;
     }
 
-    (mapping as DefaultConnectOptions<TKey>).callback?.(value, matchedKey as TKey);
+    (mapping.callback as DefaultConnectCallback<TKey> | undefined)?.(value, matchedKey as TKey);
 }
 
 /**
@@ -1175,7 +1151,7 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
                     cache.addNullishStorageKey(mapping.key);
                 }
 
-                const matchedKey = OnyxKeys.isCollectionKey(mapping.key) && mapping.waitForCollectionCallback ? mapping.key : undefined;
+                const matchedKey = OnyxKeys.isCollectionKey(mapping.key) ? mapping.key : undefined;
 
                 // Here we cannot use batching because the nullish value is expected to be set immediately for default props
                 // or they will be undefined.
@@ -1183,22 +1159,11 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
                 return;
             }
 
-            // When using a callback subscriber we will either trigger the provided callback for each key we find or combine all values
-            // into an object and just make a single call. The latter behavior is enabled by providing a waitForCollectionCallback key
-            // combined with a subscription to a collection key.
+            // When using a callback subscriber, a subscription to a collection key combines all matching
+            // member values into a single object and makes one call with the whole collection object.
             if (typeof mapping.callback === 'function') {
                 if (OnyxKeys.isCollectionKey(mapping.key)) {
-                    if (mapping.waitForCollectionCallback) {
-                        getCollectionDataAndSendAsObject(matchingKeys, mapping);
-                        return;
-                    }
-
-                    // We did not opt into using waitForCollectionCallback mode so the callback is called for every matching key.
-                    multiGet(matchingKeys).then(() => {
-                        for (const key of matchingKeys) {
-                            sendDataToConnection(mapping, key as TKey);
-                        }
-                    });
+                    getCollectionDataAndSendAsObject(matchingKeys, mapping);
                     return;
                 }
 
@@ -1458,7 +1423,7 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
             // and subscriber state, matching the original per-key notification semantics.
             cache.set(key, value);
             // Skip subscriber notification on retry — already notified on attempt 0.
-            // waitForCollectionCallback subscribers re-fire on every keyChanged by contract.
+            // Collection-root subscribers re-fire on every keyChanged by contract.
             if (!retryAttempt) {
                 keyChanged(key, value);
             }
@@ -1549,7 +1514,7 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
         for (const [key, value] of keyValuePairs) cache.set(key, value);
 
         // Skip subscriber notification on retry — already notified on attempt 0.
-        // waitForCollectionCallback subscribers re-fire on every keysChanged by contract.
+        // Collection-root subscribers re-fire on every keysChanged by contract.
         if (!retryAttempt) {
             keysChanged(collectionKey, mutableCollection, previousCollection);
         }
@@ -1699,7 +1664,7 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
                 const previousCollection = getCachedCollection(collectionKey, existingKeys);
                 cache.merge(finalMergedCollection);
                 // Skip subscriber notification on retry — already notified on attempt 0.
-                // waitForCollectionCallback subscribers re-fire on every keysChanged by contract.
+                // Collection-root subscribers re-fire on every keysChanged by contract.
                 if (!retryAttempt) {
                     keysChanged(collectionKey, finalMergedCollection, previousCollection);
                 }
@@ -1792,7 +1757,7 @@ function partialSetCollection<TKey extends CollectionKeyBase>({collectionKey, co
         for (const [key, value] of keyValuePairs) cache.set(key, value);
 
         // Skip subscriber notification on retry — already notified on attempt 0.
-        // waitForCollectionCallback subscribers re-fire on every keysChanged by contract.
+        // Collection-root subscribers re-fire on every keysChanged by contract.
         if (!retryAttempt) {
             keysChanged(collectionKey, mutableCollection, previousCollection);
         }

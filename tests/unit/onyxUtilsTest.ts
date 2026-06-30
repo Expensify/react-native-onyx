@@ -116,7 +116,6 @@ describe('OnyxUtils', () => {
             const connection = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.ROUTES,
                 callback: (value) => (result = value),
-                waitForCollectionCallback: true,
             });
 
             // Set initial collection state
@@ -152,7 +151,6 @@ describe('OnyxUtils', () => {
             const connection = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.ROUTES,
                 callback: (value) => (result = value),
-                waitForCollectionCallback: true,
             });
 
             await Onyx.mergeCollection(ONYXKEYS.COLLECTION.ROUTES, {
@@ -178,7 +176,6 @@ describe('OnyxUtils', () => {
             const connection = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.ROUTES,
                 callback: (value) => (result = value),
-                waitForCollectionCallback: true,
             });
 
             await Onyx.mergeCollection(ONYXKEYS.COLLECTION.ROUTES, {
@@ -206,7 +203,6 @@ describe('OnyxUtils', () => {
             const connection = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.TEST_KEY,
                 callback: collectionCallback,
-                waitForCollectionCallback: true,
             });
 
             await waitForPromisesToResolve();
@@ -276,7 +272,6 @@ describe('OnyxUtils', () => {
             const connCollection = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.TEST_KEY,
                 callback: collectionCallback,
-                waitForCollectionCallback: true,
             });
             const connSingle = Onyx.connect({
                 key: ONYXKEYS.TEST_KEY,
@@ -310,12 +305,10 @@ describe('OnyxUtils', () => {
             const connTest = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.TEST_KEY,
                 callback: testCallback,
-                waitForCollectionCallback: true,
             });
             const connRoutes = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.ROUTES,
                 callback: routesCallback,
-                waitForCollectionCallback: true,
             });
             await waitForPromisesToResolve();
             testCallback.mockClear();
@@ -378,15 +371,13 @@ describe('OnyxUtils', () => {
             Onyx.disconnect(conn2);
         });
 
-        it('should stop firing callbacks for a collection subscriber that disconnects itself mid-batch', async () => {
-            // A collection subscriber (waitForCollectionCallback=false) disconnects itself when
-            // it receives the first member. Subsequent changed members in the same batch must NOT
-            // trigger further callbacks for this subscriber.
+        it('should not fire again for a collection subscriber that disconnects itself in its callback', async () => {
+            // A collection-root subscriber disconnects itself when it receives a
+            // collection object. A subsequent collection change must NOT trigger another callback.
             const callback = jest.fn();
             const connection = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.TEST_KEY,
                 callback,
-                waitForCollectionCallback: false,
             });
             await waitForPromisesToResolve();
             callback.mockReset();
@@ -394,13 +385,18 @@ describe('OnyxUtils', () => {
                 Onyx.disconnect(connection);
             });
 
+            // First batch fires the collection callback once, which disconnects the subscriber.
             await Onyx.multiSet({
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}1`]: {id: 1},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}2`]: {id: 2},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}3`]: {id: 3},
             });
 
-            // Despite 3 changed members, callback should fire at most once before disconnect stops it
+            expect(callback).toHaveBeenCalledTimes(1);
+
+            // A subsequent change must not fire the now-disconnected subscriber again.
+            await Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}1`, {id: 11});
+
             expect(callback).toHaveBeenCalledTimes(1);
         });
 
@@ -536,7 +532,7 @@ describe('OnyxUtils', () => {
             await Onyx.disconnect(connection);
         });
 
-        it('should notify collection-level subscribers with waitForCollectionCallback', async () => {
+        it('should notify collection-level subscribers with the whole collection object', async () => {
             const entryKey = `${ONYXKEYS.COLLECTION.TEST_KEY}789`;
             const entryData = {value: 'data'};
 
@@ -544,7 +540,6 @@ describe('OnyxUtils', () => {
             const connection = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.TEST_KEY,
                 callback: collectionCallback,
-                waitForCollectionCallback: true,
             });
 
             await Onyx.set(entryKey, entryData);
@@ -964,7 +959,6 @@ describe('OnyxUtils', () => {
             const collectionCallback = jest.fn();
             Onyx.connect({
                 key: collectionKey,
-                waitForCollectionCallback: true,
                 callback: collectionCallback,
             });
             await waitForPromisesToResolve();
@@ -1006,7 +1000,6 @@ describe('OnyxUtils', () => {
             const collectionCallback = jest.fn();
             Onyx.connect({
                 key: collectionKey,
-                waitForCollectionCallback: true,
                 callback: collectionCallback,
             });
             await waitForPromisesToResolve();
@@ -1053,7 +1046,7 @@ describe('OnyxUtils', () => {
         // re-enters the failing method on the next attempt.
         const transientError = new Error('Transient storage error');
 
-        it('mergeCollection — waitForCollectionCallback subscriber fires once across retries', async () => {
+        it('mergeCollection — collection-root subscriber fires once across retries', async () => {
             const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
             const existingMemberKey = `${collectionKey}1`;
             const newMemberKey = `${collectionKey}2`;
@@ -1063,7 +1056,6 @@ describe('OnyxUtils', () => {
             const collectionCallback = jest.fn();
             Onyx.connect({
                 key: collectionKey,
-                waitForCollectionCallback: true,
                 callback: collectionCallback,
             });
             await waitForPromisesToResolve();
@@ -1077,7 +1069,7 @@ describe('OnyxUtils', () => {
             } as GenericCollection);
 
             // Before this fix, every retry attempt re-fired keysChanged() — and
-            // waitForCollectionCallback subscribers fire on every keysChanged() call by contract.
+            // Collection-root subscribers fire on every keysChanged() call by contract.
             // After the fix, retries skip the keysChanged re-fire, so subscribers are notified
             // exactly once per logical operation.
             expect(collectionCallback).toHaveBeenCalledTimes(1);
@@ -1091,7 +1083,6 @@ describe('OnyxUtils', () => {
             const collectionCallback = jest.fn();
             Onyx.connect({
                 key: collectionKey,
-                waitForCollectionCallback: true,
                 callback: collectionCallback,
             });
             await waitForPromisesToResolve();
@@ -1115,7 +1106,6 @@ describe('OnyxUtils', () => {
             const collectionCallback = jest.fn();
             Onyx.connect({
                 key: collectionKey,
-                waitForCollectionCallback: true,
                 callback: collectionCallback,
             });
             await waitForPromisesToResolve();
@@ -1139,7 +1129,6 @@ describe('OnyxUtils', () => {
             const collectionCallback = jest.fn();
             Onyx.connect({
                 key: collectionKey,
-                waitForCollectionCallback: true,
                 callback: collectionCallback,
             });
             await waitForPromisesToResolve();
@@ -1277,7 +1266,6 @@ describe('OnyxUtils', () => {
             const collectionCallback = jest.fn();
             Onyx.connect({
                 key: collectionKey,
-                waitForCollectionCallback: true,
                 callback: collectionCallback,
             });
             await waitForPromisesToResolve();
@@ -1345,7 +1333,6 @@ describe('OnyxUtils', () => {
             const collectionCallback = jest.fn();
             Onyx.connect({
                 key: collectionKey,
-                waitForCollectionCallback: true,
                 callback: collectionCallback,
             });
             await waitForPromisesToResolve();
