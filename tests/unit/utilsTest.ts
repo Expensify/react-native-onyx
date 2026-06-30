@@ -390,6 +390,53 @@ describe('utils', () => {
         });
     });
 
+    describe('chunkArray', () => {
+        it('should return an empty array when given an empty array', () => {
+            expect(utils.chunkArray([], 3)).toEqual([]);
+        });
+
+        it('should return a single chunk when the array length is less than maxChunkSize', () => {
+            const items = [1, 2];
+            const result = utils.chunkArray(items, 3);
+
+            expect(result).toEqual([[1, 2]]);
+            expect(result[0]).toBe(items);
+        });
+
+        it('should return a single chunk when the array length equals maxChunkSize', () => {
+            const items = [1, 2, 3];
+            const result = utils.chunkArray(items, 3);
+
+            expect(result).toEqual([[1, 2, 3]]);
+            expect(result[0]).toBe(items);
+        });
+
+        it('should split the array into evenly sized chunks', () => {
+            expect(utils.chunkArray([1, 2, 3, 4, 5, 6], 3)).toEqual([
+                [1, 2, 3],
+                [4, 5, 6],
+            ]);
+        });
+
+        it('should include a smaller final chunk when the array length is not divisible by maxChunkSize', () => {
+            expect(utils.chunkArray([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
+        });
+
+        it('should create one item per chunk when maxChunkSize is 1', () => {
+            expect(utils.chunkArray(['a', 'b', 'c'], 1)).toEqual([['a'], ['b'], ['c']]);
+        });
+
+        it('should work with readonly arrays and preserve element types', () => {
+            const items = Object.freeze(['x', 'y', 'z', 'w']) as readonly string[];
+            const result = utils.chunkArray(items, 2);
+
+            expect(result).toEqual([
+                ['x', 'y'],
+                ['z', 'w'],
+            ]);
+        });
+    });
+
     describe('isEmptyObject', () => {
         it('should return true for an empty object', () => {
             expect(utils.isEmptyObject({})).toBe(true);
