@@ -293,7 +293,7 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
 
         const commands: BatchQueryCommand[] = keyChunks.map((keyChunk) => ({
             query: buildDeleteQuery(keyChunk),
-            params: [keyChunk],
+            params: keyChunk,
         }));
 
         return provider.store.executeBatchAsync(commands).then(() => undefined);
