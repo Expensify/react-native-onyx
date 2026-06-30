@@ -10,7 +10,6 @@ import StorageCircuitBreaker from './StorageCircuitBreaker';
 import Storage from './storage';
 import {StorageErrorClass} from './storage/errors';
 import type {
-    CollectionConnectCallback,
     CollectionKeyBase,
     ConnectOptions,
     DeepRecord,
@@ -581,7 +580,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
 
         try {
             lastConnectionCallbackData.set(subscriber.subscriptionID, {value: cachedCollection, matchedKey: subscriber.key});
-            subscriber.callback(cachedCollection, subscriber.key, partialCollection);
+            subscriber.callback(cachedCollection, subscriber.key);
         } catch (error) {
             Logger.logAlert(`[OnyxUtils.keysChanged] Subscriber callback threw an error for key '${collectionKey}': ${error}`);
         }
@@ -676,7 +675,7 @@ function keyChanged<TKey extends OnyxKey>(
                         cachedCollections[subscriber.key] = cachedCollection;
                     }
                     lastConnectionCallbackData.set(subscriber.subscriptionID, {value: cachedCollection, matchedKey: subscriber.key});
-                    (subscriber.callback as CollectionConnectCallback<OnyxKey>)(cachedCollection, subscriber.key, {[key]: value});
+                    subscriber.callback(cachedCollection, subscriber.key);
                     continue;
                 }
 

@@ -223,14 +223,14 @@ type BaseConnectOptions = {
 type DefaultConnectCallback<TKey extends OnyxKey> = (value: OnyxEntry<KeyValueMapping[TKey]>, key: TKey) => void;
 
 /** Represents the callback function used in `Onyx.connect()` method with a collection key. */
-type CollectionConnectCallback<TKey extends OnyxKey> = (value: NonUndefined<OnyxCollection<KeyValueMapping[TKey]>>, key: TKey, sourceValue?: OnyxValue<TKey>) => void;
+type CollectionConnectCallback<TKey extends OnyxKey> = (value: NonUndefined<OnyxCollection<KeyValueMapping[TKey]>>, key: TKey) => void;
 
 /**
  * Represents the options used in `Onyx.connect()` method.
  *
  * For a collection root key (e.g. `ONYXKEYS.COLLECTION.REPORT`), the callback fires
  * with the entire collection object whenever any member changes (signature
- * `(collection, key, sourceValue)`). For any other key, the callback fires with the value at
+ * `(collection, key)`). For any other key, the callback fires with the value at
  * that key (signature `(value, key)`).
  */
 // NOTE: Any changes to this type like adding or removing options must be accounted in OnyxConnectionManager's `generateConnectionID()` method!
@@ -239,11 +239,7 @@ type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions & {
     key: TKey;
 
     /** A function that will be called when the Onyx data we are subscribed changes. */
-    callback?: (
-        value: TKey extends CollectionKeyBase ? NonUndefined<OnyxCollection<KeyValueMapping[TKey]>> : OnyxEntry<KeyValueMapping[TKey]>,
-        key: TKey,
-        sourceValue?: TKey extends CollectionKeyBase ? NonUndefined<OnyxCollection<KeyValueMapping[TKey]>> : never,
-    ) => void;
+    callback?: (value: TKey extends CollectionKeyBase ? NonUndefined<OnyxCollection<KeyValueMapping[TKey]>> : OnyxEntry<KeyValueMapping[TKey]>, key: TKey) => void;
 };
 
 type CallbackToStateMapping<TKey extends OnyxKey> = ConnectOptions<TKey> & {
