@@ -3283,7 +3283,7 @@ describe('RAM-only keys should not read from storage', () => {
         await act(async () => waitForPromisesToResolve());
 
         // Simulate another tab syncing a stale RAM-only key value
-        syncCallback(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'synced_stale_value');
+        syncCallback([[ONYX_KEYS.RAM_ONLY_TEST_KEY, 'synced_stale_value']]);
         await act(async () => waitForPromisesToResolve());
 
         // The RAM-only key should NOT have been updated from the sync
@@ -3300,13 +3300,104 @@ describe('RAM-only keys should not read from storage', () => {
         });
         await act(async () => waitForPromisesToResolve());
 
-        syncCallback(ONYX_KEYS.OTHER_TEST, 'synced_normal_value');
+        syncCallback([[ONYX_KEYS.OTHER_TEST, 'synced_normal_value']]);
         await act(async () => waitForPromisesToResolve());
 
         expect(normalValue).toEqual('synced_normal_value');
 
         Onyx.disconnect(connection);
         Onyx.disconnect(connection2);
+    });
+
+    it('should notify collection-root and collection member subscribers when a collection member syncs from another instance', async () => {
+        Onyx.init({
+            keys: ONYX_KEYS,
+            shouldSyncMultipleInstances: true,
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls.at(-1)?.[0];
+        expect(syncCallback).toBeDefined();
+
+        await Onyx.setCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {name: 'entry 1'},
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {name: 'entry 2'},
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}3`]: {name: 'entry 3'},
+        } as GenericCollection);
+
+        let collection: GenericCollection = {};
+        const collectionConn = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            waitForCollectionCallback: true,
+            callback: (value) => {
+                collection = value as GenericCollection;
+            },
+        });
+
+        let collectionMember2: unknown;
+        const collectionMember2Conn = Onyx.connect({
+            key: `${ONYX_KEYS.COLLECTION.TEST_KEY}2`,
+            callback: (value) => {
+                collectionMember2 = value;
+            },
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        // Another tab writes a collection member; the storage-sync batch must notify the collection-root subscriber.
+        syncCallback([[`${ONYX_KEYS.COLLECTION.TEST_KEY}2`, {name: 'entry 2 changed'}]]);
+        await act(async () => waitForPromisesToResolve());
+
+        // The collection-root subscriber must receive the whole collection including the synced member.
+        expect(Object.keys(collection).length).toBe(3);
+        expect(collection[`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]).toEqual({name: 'entry 2 changed'});
+
+        // The collection member subscriber must receive the synced data.
+        expect(collectionMember2).toEqual({name: 'entry 2 changed'});
+
+        Onyx.disconnect(collectionConn);
+        Onyx.disconnect(collectionMember2Conn);
+    });
+
+    it('should notify a collection-root subscriber once when multiple members sync from another instance', async () => {
+        Onyx.init({
+            keys: ONYX_KEYS,
+            shouldSyncMultipleInstances: true,
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls.at(-1)?.[0];
+        expect(syncCallback).toBeDefined();
+
+        await Onyx.setCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {name: 'entry 1'},
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {name: 'entry 2'},
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}3`]: {name: 'entry 3'},
+        } as GenericCollection);
+
+        const collectionCallback = jest.fn();
+        const connection = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            waitForCollectionCallback: true,
+            callback: collectionCallback,
+        });
+        await act(async () => waitForPromisesToResolve());
+        collectionCallback.mockClear();
+
+        // Another tab writes two members; storage sync delivers them as one batch.
+        syncCallback([
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`, {name: 'entry 1 changed'}],
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}3`, {name: 'entry 3 changed'}],
+        ]);
+        await waitForPromisesToResolve();
+
+        // The batch produces a single collection-root notification carrying all members.
+        expect(collectionCallback).toHaveBeenCalledTimes(1);
+        const collection = collectionCallback.mock.calls[0][0] as Record<string, unknown>;
+        expect(collection[`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]).toEqual({name: 'entry 1 changed'});
+        expect(collection[`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]).toEqual({name: 'entry 2'});
+        expect(collection[`${ONYX_KEYS.COLLECTION.TEST_KEY}3`]).toEqual({name: 'entry 3 changed'});
+
+        Onyx.disconnect(connection);
     });
 
     it('should serve RAM-only keys from cache and normal keys from storage in multiGet', async () => {
