@@ -5,7 +5,6 @@ import OnyxCache, {TASK} from './OnyxCache';
 import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
 import OnyxUtils from './OnyxUtils';
-import OnyxKeys from './OnyxKeys';
 import type {CollectionKeyBase, OnyxKey, OnyxValue} from './types';
 import onyxSnapshotCache from './OnyxSnapshotCache';
 import useLiveRef from './useLiveRef';
@@ -278,7 +277,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                     // Finally, we signal that the store changed, making `getSnapshot()` be called again.
                     onStoreChange();
                 },
-                waitForCollectionCallback: OnyxKeys.isCollectionKey(key) as true,
                 reuseConnection: options?.reuseConnection,
             });
 
