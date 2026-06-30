@@ -312,6 +312,99 @@ describe('SQLiteProvider', () => {
         });
     });
 
+    describe('query splitting', () => {
+        const CHUNK_SIZE = 2;
+        const originalChunkArray = utils.chunkArray;
+
+        const createKeyValueEntries = (count: number): Array<[string, unknown]> => Array.from({length: count}, (_, index) => [`chunk_key_${index}`, index]);
+
+        beforeEach(() => {
+            resetAllDatabases();
+            SQLiteProvider.init();
+
+            jest.spyOn(utils, 'chunkArray').mockImplementation((items, _maxChunkSize) => originalChunkArray(items, CHUNK_SIZE));
+        });
+
+        afterEach(() => {
+            jest.restoreAllMocks();
+        });
+
+        describe('multiGet', () => {
+            it('should return all values when keys exceed MAX_VARIABLE_NUMBER', async () => {
+                const entries = createKeyValueEntries(5);
+                await SQLiteProvider.multiSet(entries);
+
+                const keys = entries.map(([key]) => key);
+                const result = await SQLiteProvider.multiGet(keys);
+
+                expect(result).toEqual(expect.arrayContaining(entries));
+                expect(result).toHaveLength(entries.length);
+            });
+
+            it('should issue one IN query per chunk', async () => {
+                const entries = createKeyValueEntries(5);
+                await SQLiteProvider.multiSet(entries);
+
+                const executeAsyncSpy = jest.spyOn(SQLiteProvider.store!, 'executeAsync');
+                executeAsyncSpy.mockClear();
+
+                const keys = entries.map(([key]) => key);
+                await SQLiteProvider.multiGet(keys);
+
+                const inQueries = executeAsyncSpy.mock.calls.filter(([sql]) => typeof sql === 'string' && sql.includes('WHERE record_key IN'));
+                expect(inQueries).toHaveLength(3);
+            });
+        });
+
+        describe('removeItems', () => {
+            it('should remove all keys when keys exceed MAX_VARIABLE_NUMBER', async () => {
+                const entries = createKeyValueEntries(5);
+                await SQLiteProvider.multiSet(entries);
+
+                const keys = entries.map(([key]) => key);
+                await SQLiteProvider.removeItems(keys);
+
+                expect(await SQLiteProvider.getAllKeys()).toEqual([]);
+            });
+
+            it('should use executeAsync when keys fit in a single chunk', async () => {
+                const entries = createKeyValueEntries(2);
+                await SQLiteProvider.multiSet(entries);
+
+                const executeAsyncSpy = jest.spyOn(SQLiteProvider.store!, 'executeAsync');
+                const executeBatchAsyncSpy = jest.spyOn(SQLiteProvider.store!, 'executeBatchAsync');
+                executeAsyncSpy.mockClear();
+                executeBatchAsyncSpy.mockClear();
+
+                const keys = entries.map(([key]) => key);
+                await SQLiteProvider.removeItems(keys);
+
+                expect(executeAsyncSpy).toHaveBeenCalledTimes(1);
+                expect(executeBatchAsyncSpy).not.toHaveBeenCalled();
+            });
+
+            it('should use executeBatchAsync when keys span multiple chunks', async () => {
+                const entries = createKeyValueEntries(5);
+                await SQLiteProvider.multiSet(entries);
+
+                const executeAsyncSpy = jest.spyOn(SQLiteProvider.store!, 'executeAsync');
+                const executeBatchAsyncSpy = jest.spyOn(SQLiteProvider.store!, 'executeBatchAsync');
+                executeAsyncSpy.mockClear();
+                executeBatchAsyncSpy.mockClear();
+
+                const keys = entries.map(([key]) => key);
+                await SQLiteProvider.removeItems(keys);
+
+                expect(executeAsyncSpy).not.toHaveBeenCalled();
+                expect(executeBatchAsyncSpy).toHaveBeenCalledTimes(1);
+
+                const batchCommands = executeBatchAsyncSpy.mock.calls[0][0];
+                expect(batchCommands).toHaveLength(3);
+                expect(batchCommands.every((command) => command.query.includes('DELETE FROM keyvaluepairs WHERE record_key IN'))).toBe(true);
+            });
+        });
+    });
+
     // SQLite-specific: the IN-list is parameterised, so a key containing SQL
     // fragments must be treated as a literal record_key.
     describe('SQL-injection safety', () => {
