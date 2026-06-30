@@ -1,6 +1,7 @@
 import _ from 'underscore';
 import type {OnyxKey, OnyxValue} from '../../types';
 import utils from '../../utils';
+import {StorageErrorClass} from '../errors';
 import type StorageProvider from './types';
 import type {StorageKeyValuePair} from './types';
 
@@ -23,6 +24,11 @@ const provider: StorageProvider<Store> = {
      * The name of the provider that can be printed to the logs
      */
     name: 'MemoryOnlyProvider',
+
+    /**
+     * In-memory storage has no quota/connection failure modes, so nothing is classifiable.
+     */
+    classifyError: () => StorageErrorClass.UNKNOWN,
 
     /**
      * Initializes the storage provider
