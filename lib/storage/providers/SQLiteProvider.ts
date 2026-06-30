@@ -156,9 +156,13 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
 
         return Promise.all(
             keyChunks.map((keyChunk) => {
+                if (!provider.store) {
+                    throw new Error('Store is not initialized!');
+                }
+
                 const placeholders = keyChunk.map(() => '?').join(',');
                 const command = `SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
-                return provider.store!.executeAsync<OnyxSQLiteKeyValuePair>(command, keyChunk);
+                return provider.store.executeAsync<OnyxSQLiteKeyValuePair>(command, keyChunk);
             }),
         ).then((results) => {
             const result = results.flatMap(
