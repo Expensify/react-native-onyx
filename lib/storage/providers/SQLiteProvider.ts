@@ -10,6 +10,8 @@ import utils from '../../utils';
 import type StorageProvider from './types';
 import type {StorageKeyList, StorageKeyValuePair} from './types';
 
+const SQLITE_MAX_VARIABLE_NUMBER = 32766;
+
 /**
  * The type of the key-value pair stored in the SQLite database
  * @property record_key - the key of the record
@@ -100,12 +102,24 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             throw new Error('Store is not initialized!');
         }
 
-        const placeholders = keys.map(() => '?').join(',');
-        const command = `SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
-        return provider.store.executeAsync<OnyxSQLiteKeyValuePair>(command, keys).then(({rows}) => {
-            // eslint-disable-next-line no-underscore-dangle
-            const result = rows?._array.map((row) => [row.record_key, JSON.parse(row.valueJSON)]);
-            return (result ?? []) as StorageKeyValuePair[];
+        if (keys.length === 0) {
+            return Promise.resolve([]);
+        }
+
+        const keyChunks = utils.chunkArray(keys, SQLITE_MAX_VARIABLE_NUMBER);
+
+        return Promise.all(
+            keyChunks.map((keyChunk) => {
+                const placeholders = keyChunk.map(() => '?').join(',');
+                const command = `SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
+                return provider.store!.executeAsync<OnyxSQLiteKeyValuePair>(command, keyChunk);
+            }),
+        ).then((results) => {
+            const result = results.flatMap(({rows}) =>
+                // eslint-disable-next-line no-underscore-dangle
+                rows?._array.map((row) => [row.record_key, JSON.parse(row.valueJSON)]) ?? [],
+            );
+            return result as StorageKeyValuePair[];
         });
     },
     setItem(key, value) {
@@ -214,9 +228,19 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             throw new Error('Store is not initialized!');
         }
 
-        const placeholders = keys.map(() => '?').join(',');
-        const query = `DELETE FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
-        return provider.store.executeAsync(query, keys).then(() => undefined);
+        if (keys.length === 0) {
+            return Promise.resolve();
+        }
+
+        const keyChunks = utils.chunkArray(keys, SQLITE_MAX_VARIABLE_NUMBER);
+
+        return Promise.all(
+            keyChunks.map((keyChunk) => {
+                const placeholders = keyChunk.map(() => '?').join(',');
+                const query = `DELETE FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
+                return provider.store!.executeAsync(query, keyChunk);
+            }),
+        ).then(() => undefined);
     },
     clear() {
         if (!provider.store) {

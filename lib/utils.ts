@@ -322,6 +322,25 @@ function omit<TValue>(obj: Record<string, TValue>, condition: string | string[] 
     return filterObject(obj, condition, false);
 }
 
+/**
+ * Splits an array into chunks no larger than maxChunkSize.
+ */
+function chunkArray<T>(items: readonly T[], maxChunkSize: number): T[][] {
+    if (items.length === 0) {
+        return [];
+    }
+
+    if (items.length <= maxChunkSize) {
+        return [items as T[]];
+    }
+
+    const chunks: T[][] = [];
+    for (let i = 0; i < items.length; i += maxChunkSize) {
+        chunks.push(items.slice(i, i + maxChunkSize));
+    }
+    return chunks;
+}
+
 export default {
     fastMerge,
     isEmptyObject,
@@ -330,6 +349,7 @@ export default {
     checkCompatibilityWithExistingValue,
     pick,
     omit,
+    chunkArray,
     ONYX_INTERNALS__REPLACE_OBJECT_MARK,
 };
 export type {FastMergeResult, FastMergeReplaceNullPatch, FastMergeOptions};
