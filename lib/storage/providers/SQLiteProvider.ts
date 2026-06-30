@@ -186,7 +186,7 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
         }
 
         const query = 'REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);';
-        const params = pairs.map((pair) => [pair[0], JSON.stringify(pair[1] === undefined ? null : pair[1])]);
+        const params = pairs.map(([key, value]) => [key, JSON.stringify(value === undefined ? null : value)]);
         if (utils.isEmptyObject(params)) {
             return Promise.resolve();
         }
