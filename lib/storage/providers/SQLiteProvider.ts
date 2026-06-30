@@ -281,13 +281,22 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
 
         const keyChunks = utils.chunkArray(keys, sqliteMaxVariableNumber);
 
-        return Promise.all(
-            keyChunks.map((keyChunk) => {
-                const placeholders = keyChunk.map(() => '?').join(',');
-                const query = `DELETE FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
-                return provider.store!.executeAsync(query, keyChunk);
-            }),
-        ).then(() => undefined);
+        const buildDeleteQuery = (keyChunk: readonly string[]) => {
+            const placeholders = keyChunk.map(() => '?').join(',');
+            return `DELETE FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
+        };
+
+        if (keyChunks.length === 1) {
+            const keyChunk = keyChunks[0];
+            return provider.store.executeAsync(buildDeleteQuery(keyChunk), keyChunk).then(() => undefined);
+        }
+
+        const commands: BatchQueryCommand[] = keyChunks.map((keyChunk) => ({
+            query: buildDeleteQuery(keyChunk),
+            params: [keyChunk],
+        }));
+
+        return provider.store.executeBatchAsync(commands).then(() => undefined);
     },
     clear() {
         if (!provider.store) {
