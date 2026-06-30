@@ -10,7 +10,12 @@ import utils from '../../utils';
 import type StorageProvider from './types';
 import type {StorageKeyList, StorageKeyValuePair} from './types';
 
-const SQLITE_MAX_VARIABLE_NUMBER = 32766;
+/**
+ * The result of the `PRAGMA compile_options`, which lists SQLite compile-time options
+ */
+type CompileOptionsResult = {
+    compile_options: string;
+};
 
 /**
  * The type of the key-value pair stored in the SQLite database
@@ -37,6 +42,33 @@ type PageCountResult = {
 };
 
 const DB_NAME = 'OnyxDB';
+const SQLITE_MAX_VARIABLE_NUMBER = 32766;
+
+/** SQLite's maximum number of bound parameters per statement, read once from PRAGMA compile_options in init(). */
+let sqliteMaxVariableNumber = SQLITE_MAX_VARIABLE_NUMBER;
+
+/**
+ * Parses MAX_VARIABLE_NUMBER from the rows returned by `PRAGMA compile_options`.
+ */
+function parseMaxVariableNumber(compileOptionsResult: {rows?: {length: number; item: (index: number) => CompileOptionsResult | undefined}}): number {
+    const rowCount = compileOptionsResult.rows?.length ?? 0;
+
+    for (let index = 0; index < rowCount; index++) {
+        const compileOption = compileOptionsResult.rows?.item(index)?.compile_options;
+
+        if (!compileOption?.startsWith('MAX_VARIABLE_NUMBER=')) {
+            continue;
+        }
+
+        const maxVariableNumber = Number(compileOption.split('=')[1]);
+
+        if (maxVariableNumber > 0) {
+            return maxVariableNumber;
+        }
+    }
+
+    return SQLITE_MAX_VARIABLE_NUMBER;
+}
 
 /**
  * Prevents the stringifying of the object markers.
@@ -73,6 +105,9 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
 
         provider.store.execute('CREATE TABLE IF NOT EXISTS keyvaluepairs (record_key TEXT NOT NULL PRIMARY KEY , valueJSON JSON NOT NULL) WITHOUT ROWID;');
 
+        const compileOptionsResult = provider.store.execute<CompileOptionsResult>('PRAGMA compile_options;');
+        sqliteMaxVariableNumber = parseMaxVariableNumber(compileOptionsResult);
+
         // All of the 3 pragmas below were suggested by SQLite team.
         // You can find more info about them here: https://www.sqlite.org/pragma.html
         provider.store.execute('PRAGMA CACHE_SIZE=-20000;');
@@ -106,7 +141,7 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             return Promise.resolve([]);
         }
 
-        const keyChunks = utils.chunkArray(keys, SQLITE_MAX_VARIABLE_NUMBER);
+        const keyChunks = utils.chunkArray(keys, sqliteMaxVariableNumber);
 
         return Promise.all(
             keyChunks.map((keyChunk) => {
@@ -232,7 +267,7 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             return Promise.resolve();
         }
 
-        const keyChunks = utils.chunkArray(keys, SQLITE_MAX_VARIABLE_NUMBER);
+        const keyChunks = utils.chunkArray(keys, sqliteMaxVariableNumber);
 
         return Promise.all(
             keyChunks.map((keyChunk) => {
