@@ -2,7 +2,7 @@
  * The SQLiteStorage provider stores everything in a key/value store by
  * converting the value to a JSON string
  */
-import type {BatchQueryCommand, NitroSQLiteConnection} from 'react-native-nitro-sqlite';
+import type {BatchQueryCommand, NitroSQLiteConnection, QueryResult} from 'react-native-nitro-sqlite';
 import {open} from 'react-native-nitro-sqlite';
 import {getFreeDiskStorage} from 'react-native-device-info';
 import type {FastMergeReplaceNullPatch} from '../../utils';
@@ -43,31 +43,38 @@ type PageCountResult = {
 
 const DB_NAME = 'OnyxDB';
 const SQLITE_MAX_VARIABLE_NUMBER = 32766;
+const COMPILE_OPTIONS = {
+    MAX_VARIABLE_NUMBER: 'MAX_VARIABLE_NUMBER',
+} as const;
 
 /** SQLite's maximum number of bound parameters per statement, read once from PRAGMA compile_options in init(). */
 let sqliteMaxVariableNumber = SQLITE_MAX_VARIABLE_NUMBER;
 
 /**
- * Parses MAX_VARIABLE_NUMBER from the rows returned by `PRAGMA compile_options`.
+ * Returns the value of a compile option from the rows returned by `PRAGMA compile_options`.
+ * For flag-only options (e.g. `ENABLE_FTS3`), returns an empty string when the option is present.
  */
-function parseMaxVariableNumber(compileOptionsResult: {rows?: {length: number; item: (index: number) => CompileOptionsResult | undefined}}): number {
+function getCompileOptionValue(compileOptionsResult: QueryResult<CompileOptionsResult>, optionName: string): string | undefined {
+    const optionPrefix = `${optionName}=`;
     const rowCount = compileOptionsResult.rows?.length ?? 0;
 
     for (let index = 0; index < rowCount; index++) {
         const compileOption = compileOptionsResult.rows?.item(index)?.compile_options;
 
-        if (!compileOption?.startsWith('MAX_VARIABLE_NUMBER=')) {
+        if (!compileOption) {
             continue;
         }
 
-        const maxVariableNumber = Number(compileOption.split('=')[1]);
+        if (compileOption === optionName) {
+            return '';
+        }
 
-        if (maxVariableNumber > 0) {
-            return maxVariableNumber;
+        if (compileOption.startsWith(optionPrefix)) {
+            return compileOption.slice(optionPrefix.length);
         }
     }
 
-    return SQLITE_MAX_VARIABLE_NUMBER;
+    return undefined;
 }
 
 /**
@@ -105,14 +112,18 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
 
         provider.store.execute('CREATE TABLE IF NOT EXISTS keyvaluepairs (record_key TEXT NOT NULL PRIMARY KEY , valueJSON JSON NOT NULL) WITHOUT ROWID;');
 
-        const compileOptionsResult = provider.store.execute<CompileOptionsResult>('PRAGMA compile_options;');
-        sqliteMaxVariableNumber = parseMaxVariableNumber(compileOptionsResult);
-
         // All of the 3 pragmas below were suggested by SQLite team.
         // You can find more info about them here: https://www.sqlite.org/pragma.html
         provider.store.execute('PRAGMA CACHE_SIZE=-20000;');
         provider.store.execute('PRAGMA synchronous=NORMAL;');
         provider.store.execute('PRAGMA journal_mode=WAL;');
+
+        const compileOptionsResult = provider.store.execute<CompileOptionsResult>('PRAGMA compile_options;');
+
+        // Get the value of MAX_VARIABLE_NUMBER from the compile options and
+        // stores it in a global variable, that is going to be used during runtime.
+        const maxVariableNumber = Number(getCompileOptionValue(compileOptionsResult, COMPILE_OPTIONS.MAX_VARIABLE_NUMBER));
+        sqliteMaxVariableNumber = maxVariableNumber > 0 ? maxVariableNumber : SQLITE_MAX_VARIABLE_NUMBER;
     },
     getItem(key) {
         if (!provider.store) {
@@ -150,9 +161,10 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
                 return provider.store!.executeAsync<OnyxSQLiteKeyValuePair>(command, keyChunk);
             }),
         ).then((results) => {
-            const result = results.flatMap(({rows}) =>
-                // eslint-disable-next-line no-underscore-dangle
-                rows?._array.map((row) => [row.record_key, JSON.parse(row.valueJSON)]) ?? [],
+            const result = results.flatMap(
+                ({rows}) =>
+                    // eslint-disable-next-line no-underscore-dangle
+                    rows?._array.map((row) => [row.record_key, JSON.parse(row.valueJSON)]) ?? [],
             );
             return result as StorageKeyValuePair[];
         });
