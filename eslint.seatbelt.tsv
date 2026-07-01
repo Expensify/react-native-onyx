@@ -12,13 +12,11 @@
 "lib/OnyxMerge/index.native.ts"	"@typescript-eslint/no-unsafe-type-assertion"	3
 "lib/OnyxMerge/index.ts"	"@typescript-eslint/no-unsafe-type-assertion"	2
 "lib/OnyxSnapshotCache.ts"	"@typescript-eslint/no-unsafe-type-assertion"	2
-"lib/OnyxUtils.ts"	"@typescript-eslint/no-unsafe-argument"	6
 "lib/OnyxUtils.ts"	"@typescript-eslint/no-unsafe-assignment"	6
 "lib/OnyxUtils.ts"	"@typescript-eslint/no-unsafe-call"	2
 "lib/OnyxUtils.ts"	"@typescript-eslint/no-unsafe-member-access"	6
 "lib/OnyxUtils.ts"	"@typescript-eslint/no-unsafe-type-assertion"	32
 "lib/Str.ts"	"@typescript-eslint/no-unsafe-type-assertion"	1
-"lib/storage/__mocks__/index.ts"	"@typescript-eslint/no-unsafe-argument"	1
 "lib/storage/providers/IDBKeyValProvider/index.ts"	"@typescript-eslint/no-unsafe-return"	1
 "lib/storage/providers/IDBKeyValProvider/index.ts"	"@typescript-eslint/no-unsafe-type-assertion"	3
 "lib/storage/providers/MemoryOnlyProvider.ts"	"@typescript-eslint/no-unsafe-type-assertion"	5
@@ -43,7 +41,6 @@
 "tests/unit/OnyxConnectionManagerTest.ts"	"@typescript-eslint/no-unsafe-return"	1
 "tests/unit/OnyxConnectionManagerTest.ts"	"@typescript-eslint/no-unsafe-type-assertion"	2
 "tests/unit/OnyxSnapshotCacheTest.ts"	"@typescript-eslint/no-unsafe-type-assertion"	7
-"tests/unit/collectionHydrationTest.ts"	"@typescript-eslint/no-unsafe-argument"	2
 "tests/unit/collectionHydrationTest.ts"	"@typescript-eslint/no-unsafe-assignment"	6
 "tests/unit/collectionHydrationTest.ts"	"@typescript-eslint/no-unsafe-member-access"	9
 "tests/unit/mocks/sqliteMock.ts"	"@typescript-eslint/no-unsafe-type-assertion"	7

@@ -1,304 +1,262 @@
-import bindAll from "lodash.bindall";
-import * as Logger from "./Logger";
-import type { ConnectOptions } from "./Onyx";
-import OnyxUtils from "./OnyxUtils";
-import OnyxKeys from "./OnyxKeys";
-import * as Str from "./Str";
-import type {
-  CollectionConnectCallback,
-  DefaultConnectCallback,
-  OnyxKey,
-  OnyxValue,
-} from "./types";
-import onyxSnapshotCache from "./OnyxSnapshotCache";
+import bindAll from 'lodash.bindall';
+import * as Logger from './Logger';
+import type {ConnectOptions} from './Onyx';
+import OnyxUtils from './OnyxUtils';
+import OnyxKeys from './OnyxKeys';
+import * as Str from './Str';
+import type {CollectionConnectCallback, DefaultConnectCallback, OnyxKey, OnyxValue} from './types';
+import onyxSnapshotCache from './OnyxSnapshotCache';
 
-type ConnectCallback =
-  | DefaultConnectCallback<OnyxKey>
-  | CollectionConnectCallback<OnyxKey>;
+type ConnectCallback = DefaultConnectCallback<OnyxKey> | CollectionConnectCallback<OnyxKey>;
 
 /**
  * Represents the connection's metadata that contains the necessary properties
  * to handle that connection.
  */
 type ConnectionMetadata = {
-  /**
-   * The subscription ID returned by `OnyxUtils.subscribeToKey()` that is associated to this connection.
-   */
-  subscriptionID: number;
+    /**
+     * The subscription ID returned by `OnyxUtils.subscribeToKey()` that is associated to this connection.
+     */
+    subscriptionID: number;
 
-  /**
-   * The Onyx key associated to this connection.
-   */
-  onyxKey: OnyxKey;
+    /**
+     * The Onyx key associated to this connection.
+     */
+    onyxKey: OnyxKey;
 
-  /**
-   * Whether the first connection's callback was fired or not.
-   */
-  isConnectionMade: boolean;
+    /**
+     * Whether the first connection's callback was fired or not.
+     */
+    isConnectionMade: boolean;
 
-  /**
-   * A map of the subscriber's callbacks associated to this connection.
-   */
-  callbacks: Map<string, ConnectCallback>;
+    /**
+     * A map of the subscriber's callbacks associated to this connection.
+     */
+    callbacks: Map<string, ConnectCallback>;
 
-  /**
-   * The last callback value returned by `OnyxUtils.subscribeToKey()`'s callback.
-   */
-  cachedCallbackValue?: OnyxValue<OnyxKey>;
+    /**
+     * The last callback value returned by `OnyxUtils.subscribeToKey()`'s callback.
+     */
+    cachedCallbackValue?: OnyxValue<OnyxKey>;
 
-  /**
-   * The last callback key returned by `OnyxUtils.subscribeToKey()`'s callback.
-   */
-  cachedCallbackKey?: OnyxKey;
+    /**
+     * The last callback key returned by `OnyxUtils.subscribeToKey()`'s callback.
+     */
+    cachedCallbackKey?: OnyxKey;
 };
 
 /**
  * Represents the connection object returned by `Onyx.connect()`.
  */
 type Connection = {
-  /**
-   * The ID used to identify this particular connection.
-   */
-  id: string;
+    /**
+     * The ID used to identify this particular connection.
+     */
+    id: string;
 
-  /**
-   * The ID of the subscriber's callback that is associated to this connection.
-   */
-  callbackID: string;
+    /**
+     * The ID of the subscriber's callback that is associated to this connection.
+     */
+    callbackID: string;
 };
 
 /**
  * Manages Onyx connections of `Onyx.connect()` and `useOnyx()` subscribers.
  */
 class OnyxConnectionManager {
-  /**
-   * A map where the key is the connection ID generated inside `connect()` and the value is the metadata of that connection.
-   */
-  private connectionsMap: Map<string, ConnectionMetadata>;
+    /**
+     * A map where the key is the connection ID generated inside `connect()` and the value is the metadata of that connection.
+     */
+    private connectionsMap: Map<string, ConnectionMetadata>;
 
-  /**
-   * Stores the last generated callback ID which will be incremented when making a new connection.
-   */
-  private lastCallbackID: number;
+    /**
+     * Stores the last generated callback ID which will be incremented when making a new connection.
+     */
+    private lastCallbackID: number;
 
-  /**
-   * Stores the last generated session ID for the connection manager. The current session ID
-   * is appended to the connection IDs and it's used to create new different connections for the same key
-   * when `refreshSessionID()` is called.
-   *
-   * When calling `Onyx.clear()` after a logout operation some connections might remain active as they
-   * aren't tied to the React's lifecycle e.g. `Onyx.connect()` usage, causing infinite loading state issues to new `useOnyx()` subscribers
-   * that are connecting to the same key as we didn't populate the cache again because we are still reusing such connections.
-   *
-   * To elimitate this problem, the session ID must be refreshed during the `Onyx.clear()` call (by using `refreshSessionID()`)
-   * in order to create fresh connections when new subscribers connect to the same keys again, allowing them
-   * to use the cache system correctly and avoid the mentioned issues in `useOnyx()`.
-   */
-  private sessionID: string;
+    /**
+     * Stores the last generated session ID for the connection manager. The current session ID
+     * is appended to the connection IDs and it's used to create new different connections for the same key
+     * when `refreshSessionID()` is called.
+     *
+     * When calling `Onyx.clear()` after a logout operation some connections might remain active as they
+     * aren't tied to the React's lifecycle e.g. `Onyx.connect()` usage, causing infinite loading state issues to new `useOnyx()` subscribers
+     * that are connecting to the same key as we didn't populate the cache again because we are still reusing such connections.
+     *
+     * To elimitate this problem, the session ID must be refreshed during the `Onyx.clear()` call (by using `refreshSessionID()`)
+     * in order to create fresh connections when new subscribers connect to the same keys again, allowing them
+     * to use the cache system correctly and avoid the mentioned issues in `useOnyx()`.
+     */
+    private sessionID: string;
 
-  constructor() {
-    this.connectionsMap = new Map();
-    this.lastCallbackID = 0;
-    this.sessionID = Str.guid();
+    constructor() {
+        this.connectionsMap = new Map();
+        this.lastCallbackID = 0;
+        this.sessionID = Str.guid();
 
-    // Binds all public methods to prevent problems with `this`.
-    bindAll(
-      this,
-      "generateConnectionID",
-      "fireCallbacks",
-      "connect",
-      "disconnect",
-      "disconnectAll",
-      "refreshSessionID",
-    );
-  }
-
-  /**
-   * Generates a connection ID based on the `connectOptions` object passed to the function.
-   *
-   * The properties used to generate the ID are handpicked for performance reasons and
-   * according to their purpose and effect they produce in the Onyx connection.
-   */
-  private generateConnectionID<TKey extends OnyxKey>(
-    connectOptions: ConnectOptions<TKey>,
-  ): string {
-    const { key, reuseConnection } = connectOptions;
-
-    // The current session ID is appended to the connection ID so we can have different connections
-    // after an `Onyx.clear()` operation.
-    let suffix = `,sessionID=${this.sessionID}`;
-
-    // We will generate a unique ID when `reuseConnection` is `false`, which means the subscriber
-    // explicitly wants the connection to not be reused. Collection-root subscriptions are now always
-    // snapshot mode, so they can be reused like any other connection.
-    if (reuseConnection === false) {
-      suffix += `,uniqueID=${Str.guid()}`;
+        // Binds all public methods to prevent problems with `this`.
+        bindAll(this, 'generateConnectionID', 'fireCallbacks', 'connect', 'disconnect', 'disconnectAll', 'refreshSessionID');
     }
 
-    return `onyxKey=${key}${suffix}`;
-  }
+    /**
+     * Generates a connection ID based on the `connectOptions` object passed to the function.
+     *
+     * The properties used to generate the ID are handpicked for performance reasons and
+     * according to their purpose and effect they produce in the Onyx connection.
+     */
+    private generateConnectionID<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): string {
+        const {key, reuseConnection} = connectOptions;
 
-  /**
-   * Fires all the subscribers callbacks associated with that connection ID.
-   */
-  private fireCallbacks(connectionID: string): void {
-    const connection = this.connectionsMap.get(connectionID);
-    if (!connection) {
-      return;
-    }
+        // The current session ID is appended to the connection ID so we can have different connections
+        // after an `Onyx.clear()` operation.
+        let suffix = `,sessionID=${this.sessionID}`;
 
-    for (const callback of connection.callbacks.values()) {
-      try {
-        if (OnyxKeys.isCollectionKey(connection.onyxKey)) {
-          (callback as CollectionConnectCallback<OnyxKey>)(
-            connection.cachedCallbackValue as Record<string, unknown>,
-            connection.cachedCallbackKey as OnyxKey,
-          );
-        } else {
-          (callback as DefaultConnectCallback<OnyxKey>)(
-            connection.cachedCallbackValue,
-            connection.cachedCallbackKey as OnyxKey,
-          );
+        // We will generate a unique ID when `reuseConnection` is `false`, which means the subscriber
+        // explicitly wants the connection to not be reused. Collection-root subscriptions are now always
+        // snapshot mode, so they can be reused like any other connection.
+        if (reuseConnection === false) {
+            suffix += `,uniqueID=${Str.guid()}`;
         }
-      } catch (error) {
-        Logger.logAlert(
-          `[ConnectionManager] Subscriber callback threw an error for key '${connection.onyxKey}': ${error}`,
-        );
-      }
+
+        return `onyxKey=${key}${suffix}`;
     }
-  }
 
-  /**
-   * Connects to an Onyx key given the options passed and listens to its changes.
-   *
-   * @param connectOptions The options object that will define the behavior of the connection.
-   * @returns The connection object to use when calling `disconnect()`.
-   */
-  connect<TKey extends OnyxKey>(
-    connectOptions: ConnectOptions<TKey>,
-  ): Connection {
-    const connectionID = this.generateConnectionID(connectOptions);
-    let connectionMetadata = this.connectionsMap.get(connectionID);
-    let subscriptionID: number | undefined;
-
-    const callbackID = String(this.lastCallbackID++);
-
-    // If there is no connection yet for that connection ID, we create a new one.
-    if (!connectionMetadata) {
-      const callback: ConnectCallback = (
-        value: OnyxValue<OnyxKey>,
-        key: OnyxKey,
-      ) => {
-        const createdConnection = this.connectionsMap.get(connectionID);
-        if (createdConnection) {
-          // We signal that the first connection was made and now any new subscribers
-          // can fire their callbacks immediately with the cached value when connecting.
-          createdConnection.isConnectionMade = true;
-          createdConnection.cachedCallbackValue = value;
-          createdConnection.cachedCallbackKey = key;
-          this.fireCallbacks(connectionID);
+    /**
+     * Fires all the subscribers callbacks associated with that connection ID.
+     */
+    private fireCallbacks(connectionID: string): void {
+        const connection = this.connectionsMap.get(connectionID);
+        if (!connection) {
+            return;
         }
-      };
 
-      subscriptionID = OnyxUtils.subscribeToKey({
-        ...connectOptions,
-        callback,
-      } as ConnectOptions<TKey>);
-
-      connectionMetadata = {
-        subscriptionID,
-        onyxKey: connectOptions.key,
-        isConnectionMade: false,
-        callbacks: new Map(),
-      };
-
-      this.connectionsMap.set(connectionID, connectionMetadata);
+        for (const callback of connection.callbacks.values()) {
+            try {
+                if (OnyxKeys.isCollectionKey(connection.onyxKey)) {
+                    (callback as CollectionConnectCallback<OnyxKey>)(connection.cachedCallbackValue as Record<string, unknown>, connection.cachedCallbackKey as OnyxKey);
+                } else {
+                    (callback as DefaultConnectCallback<OnyxKey>)(connection.cachedCallbackValue, connection.cachedCallbackKey as OnyxKey);
+                }
+            } catch (error) {
+                Logger.logAlert(`[ConnectionManager] Subscriber callback threw an error for key '${connection.onyxKey}': ${error}`);
+            }
+        }
     }
 
-    // We add the subscriber's callback to the list of callbacks associated with this connection.
-    if (connectOptions.callback) {
-      connectionMetadata.callbacks.set(
-        callbackID,
-        connectOptions.callback as ConnectCallback,
-      );
+    /**
+     * Connects to an Onyx key given the options passed and listens to its changes.
+     *
+     * @param connectOptions The options object that will define the behavior of the connection.
+     * @returns The connection object to use when calling `disconnect()`.
+     */
+    connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Connection {
+        const connectionID = this.generateConnectionID(connectOptions);
+        let connectionMetadata = this.connectionsMap.get(connectionID);
+        let subscriptionID: number | undefined;
+
+        const callbackID = String(this.lastCallbackID++);
+
+        // If there is no connection yet for that connection ID, we create a new one.
+        if (!connectionMetadata) {
+            const callback: ConnectCallback = (value: OnyxValue<OnyxKey>, key: OnyxKey) => {
+                const createdConnection = this.connectionsMap.get(connectionID);
+                if (createdConnection) {
+                    // We signal that the first connection was made and now any new subscribers
+                    // can fire their callbacks immediately with the cached value when connecting.
+                    createdConnection.isConnectionMade = true;
+                    createdConnection.cachedCallbackValue = value;
+                    createdConnection.cachedCallbackKey = key;
+                    this.fireCallbacks(connectionID);
+                }
+            };
+
+            subscriptionID = OnyxUtils.subscribeToKey({
+                ...connectOptions,
+                callback,
+            } as ConnectOptions<TKey>);
+
+            connectionMetadata = {
+                subscriptionID,
+                onyxKey: connectOptions.key,
+                isConnectionMade: false,
+                callbacks: new Map(),
+            };
+
+            this.connectionsMap.set(connectionID, connectionMetadata);
+        }
+
+        // We add the subscriber's callback to the list of callbacks associated with this connection.
+        if (connectOptions.callback) {
+            connectionMetadata.callbacks.set(callbackID, connectOptions.callback as ConnectCallback);
+        }
+
+        // If the first connection is already made we want any new subscribers to receive the cached callback value immediately.
+        if (connectionMetadata.isConnectionMade) {
+            // Defer the callback execution to the next tick of the event loop.
+            // This ensures that the current execution flow completes and the result connection object is available when the callback fires.
+            Promise.resolve().then(() => {
+                (connectOptions.callback as DefaultConnectCallback<OnyxKey> | undefined)?.(connectionMetadata.cachedCallbackValue, connectionMetadata.cachedCallbackKey as OnyxKey);
+            });
+        }
+
+        return {id: connectionID, callbackID};
     }
 
-    // If the first connection is already made we want any new subscribers to receive the cached callback value immediately.
-    if (connectionMetadata.isConnectionMade) {
-      // Defer the callback execution to the next tick of the event loop.
-      // This ensures that the current execution flow completes and the result connection object is available when the callback fires.
-      Promise.resolve().then(() => {
-        (
-          connectOptions.callback as DefaultConnectCallback<OnyxKey> | undefined
-        )?.(
-          connectionMetadata.cachedCallbackValue,
-          connectionMetadata.cachedCallbackKey as OnyxKey,
-        );
-      });
+    /**
+     * Disconnects and removes the listener from the Onyx key.
+     *
+     * @param connection Connection object returned by calling `connect()`.
+     */
+    disconnect(connection: Connection): void {
+        if (!connection) {
+            Logger.logInfo(`[ConnectionManager] Attempted to disconnect passing an undefined connection object.`);
+            return;
+        }
+
+        const connectionMetadata = this.connectionsMap.get(connection.id);
+        if (!connectionMetadata) {
+            Logger.logInfo(`[ConnectionManager] Attempted to disconnect but no connection was found.`);
+            return;
+        }
+
+        // Removes the callback from the connection's callbacks map.
+        connectionMetadata.callbacks.delete(connection.callbackID);
+
+        // If the connection's callbacks map is empty we can safely unsubscribe from the Onyx key.
+        if (connectionMetadata.callbacks.size === 0) {
+            OnyxUtils.unsubscribeFromKey(connectionMetadata.subscriptionID);
+
+            this.connectionsMap.delete(connection.id);
+        }
     }
 
-    return { id: connectionID, callbackID };
-  }
+    /**
+     * Disconnect all subscribers from Onyx.
+     */
+    disconnectAll(): void {
+        for (const connectionMetadata of this.connectionsMap.values()) {
+            OnyxUtils.unsubscribeFromKey(connectionMetadata.subscriptionID);
+        }
 
-  /**
-   * Disconnects and removes the listener from the Onyx key.
-   *
-   * @param connection Connection object returned by calling `connect()`.
-   */
-  disconnect(connection: Connection): void {
-    if (!connection) {
-      Logger.logInfo(
-        `[ConnectionManager] Attempted to disconnect passing an undefined connection object.`,
-      );
-      return;
+        this.connectionsMap.clear();
+
+        // Clear snapshot cache when all connections are disconnected
+        onyxSnapshotCache.clear();
     }
 
-    const connectionMetadata = this.connectionsMap.get(connection.id);
-    if (!connectionMetadata) {
-      Logger.logInfo(
-        `[ConnectionManager] Attempted to disconnect but no connection was found.`,
-      );
-      return;
+    /**
+     * Refreshes the connection manager's session ID.
+     */
+    refreshSessionID(): void {
+        this.sessionID = Str.guid();
+
+        // Clear snapshot cache when session refreshes to avoid stale cache issues
+        onyxSnapshotCache.clear();
     }
-
-    // Removes the callback from the connection's callbacks map.
-    connectionMetadata.callbacks.delete(connection.callbackID);
-
-    // If the connection's callbacks map is empty we can safely unsubscribe from the Onyx key.
-    if (connectionMetadata.callbacks.size === 0) {
-      OnyxUtils.unsubscribeFromKey(connectionMetadata.subscriptionID);
-
-      this.connectionsMap.delete(connection.id);
-    }
-  }
-
-  /**
-   * Disconnect all subscribers from Onyx.
-   */
-  disconnectAll(): void {
-    for (const connectionMetadata of this.connectionsMap.values()) {
-      OnyxUtils.unsubscribeFromKey(connectionMetadata.subscriptionID);
-    }
-
-    this.connectionsMap.clear();
-
-    // Clear snapshot cache when all connections are disconnected
-    onyxSnapshotCache.clear();
-  }
-
-  /**
-   * Refreshes the connection manager's session ID.
-   */
-  refreshSessionID(): void {
-    this.sessionID = Str.guid();
-
-    // Clear snapshot cache when session refreshes to avoid stale cache issues
-    onyxSnapshotCache.clear();
-  }
 }
 
 const connectionManager = new OnyxConnectionManager();
 
 export default connectionManager;
 
-export type { Connection };
+export type {Connection};

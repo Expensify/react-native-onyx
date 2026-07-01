@@ -189,18 +189,18 @@ describe('IDBKeyValProvider', () => {
         // rejects with as-is. Every write path must instead reject with a real Error so the failure
         // can be classified and retried.
         function abortTransactionOnPut() {
-            const spy = jest.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function put(this: IDBObjectStore, ...args: Parameters<IDBObjectStore['put']>) {
-                spy.mockRestore();
-                const request = this.put(...args);
+            const originalPut = IDBObjectStore.prototype.put;
+            jest.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function put(this: IDBObjectStore, ...args: Parameters<IDBObjectStore['put']>) {
+                const request = originalPut.apply(this, args);
                 this.transaction.abort();
                 return request;
             });
         }
 
         function abortTransactionOnDelete() {
-            const spy = jest.spyOn(IDBObjectStore.prototype, 'delete').mockImplementation(function del(this: IDBObjectStore, ...args: Parameters<IDBObjectStore['delete']>) {
-                spy.mockRestore();
-                const request = this.delete(...args);
+            const originalDelete = IDBObjectStore.prototype.delete;
+            jest.spyOn(IDBObjectStore.prototype, 'delete').mockImplementation(function del(this: IDBObjectStore, ...args: Parameters<IDBObjectStore['delete']>) {
+                const request = originalDelete.apply(this, args);
                 this.transaction.abort();
                 return request;
             });
