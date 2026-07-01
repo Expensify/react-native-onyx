@@ -88,7 +88,7 @@ type TypeOptions = Merge<
  * }
  * ```
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- must remain an interface so consumers can augment via declare module
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/consistent-type-definitions -- must remain an interface so consumers can augment via declare module
 interface CustomTypeOptions {}
 
 /**

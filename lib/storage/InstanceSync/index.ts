@@ -1,4 +1,4 @@
-const NOOP = (..._args: unknown[]) => {};
+const NOOP = (() => {}) as (...args: unknown[]) => void;
 
 /**
  *  This is used to keep multiple browser tabs in sync, therefore only needed on web

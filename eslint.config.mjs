@@ -143,6 +143,12 @@ export default defineConfig([
         },
     },
     {
+        files: ['tests/**/*Test.ts', 'tests/perf-test/**/*'],
+        rules: {
+            '@typescript-eslint/dot-notation': 'off',
+        },
+    },
+    {
         files: ['tests/perf-test/**/*'],
         rules: {
             'rulesdir/prefer-at': 'off',
