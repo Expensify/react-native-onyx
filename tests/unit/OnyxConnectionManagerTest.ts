@@ -7,11 +7,8 @@ import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 // We need access to some internal properties of `connectionManager` during the tests but they are private,
 // so this workaround allows us to have access to them.
-// eslint-disable-next-line dot-notation
 const connectionsMap = connectionManager['connectionsMap'];
-// eslint-disable-next-line dot-notation
 const generateConnectionID = connectionManager['generateConnectionID'].bind(connectionManager);
-// eslint-disable-next-line dot-notation
 const getSessionID = () => connectionManager['sessionID'];
 
 const ONYXKEYS = {

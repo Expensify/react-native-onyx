@@ -29,9 +29,7 @@ const mockedReportActionsKeys = Object.keys(mockedReportActionsMap);
 
 // We need access to some internal properties of `connectionManager` during the tests but they are private,
 // so this workaround allows us to have access to them.
-// eslint-disable-next-line dot-notation
 const generateConnectionID = connectionManager['generateConnectionID'].bind(connectionManager);
-// eslint-disable-next-line dot-notation
 const fireCallbacks = connectionManager['fireCallbacks'].bind(connectionManager);
 
 const resetConectionManagerAfterEachMeasure = () => {
