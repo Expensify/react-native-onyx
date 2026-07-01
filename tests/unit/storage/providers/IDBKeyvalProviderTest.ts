@@ -132,13 +132,13 @@ describe('IDBKeyValProvider', () => {
             ];
 
             const expectedEntries = structuredClone(changedEntries);
-            const expectedTestKey3Value = structuredClone(testEntries.at(2))[1] as GenericDeepRecord;
+            const expectedTestKey3Value = structuredClone(testEntries[2])[1] as GenericDeepRecord;
             expectedTestKey3Value.key = 'value_changed';
             expectedTestKey3Value.property.nestedProperty = {
                 nestedKey2: 'nestedValue2_changed',
             };
             expectedTestKey3Value.property.newKey = 'newValue';
-            expectedEntries.at(2)[1] = expectedTestKey3Value;
+            expectedEntries[2][1] = expectedTestKey3Value;
 
             await IDBKeyValProvider.multiMerge(changedEntries);
             expect(
@@ -160,9 +160,9 @@ describe('IDBKeyValProvider', () => {
             ];
 
             const expectedEntries = structuredClone(changedEntries);
-            const expectedTestKey3Value = structuredClone(testEntries.at(2))[1] as GenericDeepRecord;
+            const expectedTestKey3Value = structuredClone(testEntries[2])[1] as GenericDeepRecord;
             expectedTestKey3Value.key = 'value_changed';
-            expectedEntries.at(2)[1] = expectedTestKey3Value;
+            expectedEntries[2][1] = expectedTestKey3Value;
 
             await IDBKeyValProvider.multiMerge(changedEntries);
             // ONYXKEYS.TEST_KEY_3 and `${ONYXKEYS.COLLECTION.TEST_KEY}id2`.
@@ -271,8 +271,8 @@ describe('IDBKeyValProvider', () => {
                     newKey: 'newValue',
                 },
             });
-            await IDBKeyValProvider.mergeItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, false);
-            await IDBKeyValProvider.mergeItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id2`, ['a', {newKey: 'newValue'}]);
+            await IDBKeyValProvider.mergeItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id1` as string, false);
+            await IDBKeyValProvider.mergeItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id2` as string, ['a', {newKey: 'newValue'}]);
 
             expect(await IDB.get(ONYXKEYS.TEST_KEY, IDBKeyValProvider.store)).toEqual('value_changed');
             expect(await IDB.get(ONYXKEYS.TEST_KEY_2, IDBKeyValProvider.store)).toEqual(1001);

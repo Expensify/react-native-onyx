@@ -2450,8 +2450,8 @@ describe('Onyx', () => {
                 await act(async () =>
                     Onyx.update([
                         {onyxMethod: 'set', key: ONYX_KEYS.TEST_KEY, value: 'test1'},
-                        // @ts-expect-error invalid method
                         {
+                            // @ts-expect-error invalid method
                             onyxMethod: 'invalidMethod',
                             key: ONYX_KEYS.OTHER_TEST,
                             value: 'test2',

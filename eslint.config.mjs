@@ -142,5 +142,11 @@ export default defineConfig([
             },
         },
     },
+    {
+        files: ['tests/perf-test/**/*'],
+        rules: {
+            'rulesdir/prefer-at': 'off',
+        },
+    },
     prettierConfig,
 ]);

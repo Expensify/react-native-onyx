@@ -1,7 +1,7 @@
-import type { Merge } from "type-fest";
-import type OnyxUtils from "./OnyxUtils";
-import type { OnyxMethod } from "./OnyxUtils";
-import type { FastMergeReplaceNullPatch } from "./utils";
+import type {Merge} from 'type-fest';
+import type OnyxUtils from './OnyxUtils';
+import type {OnyxMethod} from './OnyxUtils';
+import type {FastMergeReplaceNullPatch} from './utils';
 
 /**
  * Utility type that excludes `null` from the type `TValue`.
@@ -18,7 +18,7 @@ type NonUndefined<TValue> = TValue extends undefined ? never : TValue;
  * and those values can either be of type `TValue` or further nested `DeepRecord` instances.
  */
 type DeepRecord<TKey extends string | number | symbol, TValue> = {
-  [key: string]: TValue | DeepRecord<TKey, TValue>;
+    [key: string]: TValue | DeepRecord<TKey, TValue>;
 };
 
 /**
@@ -34,12 +34,12 @@ type DeepRecord<TKey extends string | number | symbol, TValue> = {
  * In case of conflicting properties, the ones from CustomTypeOptions are prioritized.
  */
 type TypeOptions = Merge<
-  {
-    keys: string;
-    collectionKeys: string;
-    values: Record<string, unknown>;
-  },
-  CustomTypeOptions
+    {
+        keys: string;
+        collectionKeys: string;
+        values: Record<string, unknown>;
+    },
+    CustomTypeOptions
 >;
 
 /**
@@ -94,12 +94,12 @@ interface CustomTypeOptions {}
 /**
  * Represents a string union of all Onyx normal keys.
  */
-type Key = TypeOptions["keys"];
+type Key = TypeOptions['keys'];
 
 /**
  * Represents a string union of all Onyx collection keys.
  */
-type CollectionKeyBase = TypeOptions["collectionKeys"];
+type CollectionKeyBase = TypeOptions['collectionKeys'];
 
 /**
  * Represents a literal string union of all Onyx collection keys.
@@ -121,9 +121,7 @@ type OnyxKey = Key | CollectionKey;
  * The type `TKey` extends `OnyxKey` and it is the key used to access a value in `KeyValueMapping`.
  * `TReturnType` is the type of the returned value from the selector function.
  */
-type Selector<TKey extends OnyxKey, TReturnType> = (
-  value: OnyxEntry<KeyValueMapping[TKey]>,
-) => TReturnType;
+type Selector<TKey extends OnyxKey, TReturnType> = (value: OnyxEntry<KeyValueMapping[TKey]>) => TReturnType;
 
 /**
  * Represents a single Onyx entry, that can be either `TOnyxValue` or `undefined` if it doesn't exist.
@@ -135,9 +133,7 @@ type OnyxEntry<TOnyxValue> = TOnyxValue | undefined;
  * Represents an Onyx collection of entries, that can be either a record of `TOnyxValue`s or `undefined` if it is empty or doesn't exist.
  * It can be used to specify collection data retrieved from Onyx.
  */
-type OnyxCollection<TOnyxValue> = OnyxEntry<
-  Record<string, TOnyxValue | undefined>
->;
+type OnyxCollection<TOnyxValue> = OnyxEntry<Record<string, TOnyxValue | undefined>>;
 
 /**
  * Represents a mapping of Onyx keys to values, where keys are either normal or collection Onyx keys
@@ -149,38 +145,31 @@ type OnyxCollection<TOnyxValue> = OnyxEntry<
  * The mapping is derived from the `values` property of the `TypeOptions` type.
  */
 type KeyValueMapping = {
-  [TKey in keyof TypeOptions["values"] as TKey extends CollectionKeyBase
-    ? `${TKey}${string}`
-    : TKey]: TypeOptions["values"][TKey];
+    [TKey in keyof TypeOptions['values'] as TKey extends CollectionKeyBase ? `${TKey}${string}` : TKey]: TypeOptions['values'][TKey];
 };
 
 /**
  * Represents a Onyx value that can be either a single entry or a collection of entries, depending on the `TKey` provided.
  */
-type OnyxValue<TKey extends OnyxKey> = string extends TKey
-  ? unknown
-  : TKey extends CollectionKeyBase
-    ? OnyxCollection<KeyValueMapping[TKey]>
-    : OnyxEntry<KeyValueMapping[TKey]>;
+type OnyxValue<TKey extends OnyxKey> = string extends TKey ? unknown : TKey extends CollectionKeyBase ? OnyxCollection<KeyValueMapping[TKey]> : OnyxEntry<KeyValueMapping[TKey]>;
 
 /** Utility type to extract `TOnyxValue` from `OnyxCollection<TOnyxValue>` */
-type ExtractOnyxCollectionValue<TOnyxCollection> =
-  TOnyxCollection extends NonNullable<OnyxCollection<infer U>> ? U : never;
+type ExtractOnyxCollectionValue<TOnyxCollection> = TOnyxCollection extends NonNullable<OnyxCollection<infer U>> ? U : never;
 
 type Primitive = null | undefined | string | number | boolean | symbol | bigint;
 
 type BuiltIns = Primitive | void | Date | RegExp;
 
 type NonTransformableTypes =
-  | BuiltIns
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  | ((...args: any[]) => unknown)
-  | Map<unknown, unknown>
-  | Set<unknown>
-  | ReadonlyMap<unknown, unknown>
-  | ReadonlySet<unknown>
-  | unknown[]
-  | readonly unknown[];
+    | BuiltIns
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    | ((...args: any[]) => unknown)
+    | Map<unknown, unknown>
+    | Set<unknown>
+    | ReadonlyMap<unknown, unknown>
+    | ReadonlySet<unknown>
+    | unknown[]
+    | readonly unknown[];
 
 /**
  * Create a type from another type with all keys and nested keys set to optional or null.
@@ -201,17 +190,13 @@ type NonTransformableTypes =
  *
  * settings = applySavedSettings({textEditor: {fontWeight: 500, fontColor: null}});
  */
-type NullishDeep<T> = T extends NonTransformableTypes
-  ? T
-  : T extends Record<string, unknown>
-    ? NullishObjectDeep<T>
-    : T;
+type NullishDeep<T> = T extends NonTransformableTypes ? T : T extends Record<string, unknown> ? NullishObjectDeep<T> : T;
 
 /**
  * Same as `NullishDeep`, but accepts only records as inputs. Internal helper for `NullishDeep`.
  */
 type NullishObjectDeep<ObjectType extends Record<string, unknown>> = {
-  [KeyType in keyof ObjectType]?: NullishDeep<ObjectType[KeyType]> | null;
+    [KeyType in keyof ObjectType]?: NullishDeep<ObjectType[KeyType]> | null;
 };
 
 /**
@@ -223,32 +208,23 @@ type NullishObjectDeep<ObjectType extends Record<string, unknown>> = {
  * Also, the `TMap` type is inferred automatically in `mergeCollection()` method and represents
  * the object of collection keys/values specified in the second parameter of the method.
  */
-type Collection<TKey extends CollectionKeyBase, TValue> = Record<
-  `${TKey}${string}`,
-  TValue
->;
+type Collection<TKey extends CollectionKeyBase, TValue> = Record<`${TKey}${string}`, TValue>;
 
 /** Represents the base options used in `Onyx.connect()` method. */
 // NOTE: Any changes to this type like adding or removing options must be accounted in OnyxConnectionManager's `generateConnectionID()` method!
 type BaseConnectOptions = {
-  /**
-   * If set to `false`, the connection won't be reused between other subscribers that are listening to the same Onyx key
-   * with the same connect configurations.
-   */
-  reuseConnection?: boolean;
+    /**
+     * If set to `false`, the connection won't be reused between other subscribers that are listening to the same Onyx key
+     * with the same connect configurations.
+     */
+    reuseConnection?: boolean;
 };
 
 /** Represents the callback function used in `Onyx.connect()` method with a regular key. */
-type DefaultConnectCallback<TKey extends OnyxKey> = (
-  value: OnyxEntry<KeyValueMapping[TKey]>,
-  key: TKey,
-) => void;
+type DefaultConnectCallback<TKey extends OnyxKey> = (value: OnyxEntry<KeyValueMapping[TKey]>, key: TKey) => void;
 
 /** Represents the callback function used in `Onyx.connect()` method with a collection key. */
-type CollectionConnectCallback<TKey extends OnyxKey> = (
-  value: NonUndefined<OnyxCollection<KeyValueMapping[TKey]>>,
-  key: TKey,
-) => void;
+type CollectionConnectCallback<TKey extends OnyxKey> = (value: NonUndefined<OnyxCollection<KeyValueMapping[TKey]>>, key: TKey) => void;
 
 /**
  * Represents the options used in `Onyx.connect()` method.
@@ -260,20 +236,15 @@ type CollectionConnectCallback<TKey extends OnyxKey> = (
  */
 // NOTE: Any changes to this type like adding or removing options must be accounted in OnyxConnectionManager's `generateConnectionID()` method!
 type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions & {
-  /** The Onyx key to subscribe to. */
-  key: TKey;
+    /** The Onyx key to subscribe to. */
+    key: TKey;
 
-  /** A function that will be called when the Onyx data we are subscribed changes. */
-  callback?: (
-    value: TKey extends CollectionKeyBase
-      ? NonUndefined<OnyxCollection<KeyValueMapping[TKey]>>
-      : OnyxEntry<KeyValueMapping[TKey]>,
-    key: TKey,
-  ) => void;
+    /** A function that will be called when the Onyx data we are subscribed changes. */
+    callback?: (value: TKey extends CollectionKeyBase ? NonUndefined<OnyxCollection<KeyValueMapping[TKey]>> : OnyxEntry<KeyValueMapping[TKey]>, key: TKey) => void;
 };
 
 type CallbackToStateMapping<TKey extends OnyxKey> = ConnectOptions<TKey> & {
-  subscriptionID: number;
+    subscriptionID: number;
 };
 
 /**
@@ -285,18 +256,14 @@ type OnyxInputValue<TOnyxValue> = TOnyxValue | null;
 /**
  * Represents an Onyx collection input, that can be either a record of `TOnyxValue`s or `null` if the key should be deleted.
  */
-type OnyxCollectionInputValue<TOnyxValue> = OnyxInputValue<
-  Record<string, TOnyxValue | null>
->;
+type OnyxCollectionInputValue<TOnyxValue> = OnyxInputValue<Record<string, TOnyxValue | null>>;
 
 /**
  * Represents an input value that can be passed to Onyx methods, that can be either `TOnyxValue` or `null`.
  * Setting a key to `null` will remove the key from the store.
  * `undefined` is not allowed for setting values, because it will have no effect on the data.
  */
-type OnyxInput<TKey extends OnyxKey> = OnyxInputValue<
-  NullishDeep<KeyValueMapping[TKey]>
->;
+type OnyxInput<TKey extends OnyxKey> = OnyxInputValue<NullishDeep<KeyValueMapping[TKey]>>;
 
 /**
  * Represents a mapping object where each `OnyxKey` maps to either a value of its corresponding type in `KeyValueMapping` or `null`.
@@ -305,7 +272,7 @@ type OnyxInput<TKey extends OnyxKey> = OnyxInputValue<
  * (set, merge, mergeCollection) and therefore accepts using `null` to remove a key from Onyx.
  */
 type OnyxInputKeyValueMapping = {
-  [TKey in OnyxKey]: OnyxInput<TKey>;
+    [TKey in OnyxKey]: OnyxInput<TKey>;
 };
 
 /**
@@ -326,24 +293,16 @@ type OnyxMergeInput<TKey extends OnyxKey> = OnyxInput<TKey>;
 /**
  * This represents the value that can be passed to `Onyx.merge` and to `Onyx.update` with the method "MERGE"
  */
-type OnyxMergeCollectionInput<TKey extends OnyxKey> = Collection<
-  TKey,
-  NonNullable<OnyxInput<TKey>>
->;
+type OnyxMergeCollectionInput<TKey extends OnyxKey> = Collection<TKey, NonNullable<OnyxInput<TKey>>>;
 
 /**
  * This represents the value that can be passed to `Onyx.setCollection` and to `Onyx.update` with the method "SET_COLLECTION"
  */
-type OnyxSetCollectionInput<TKey extends OnyxKey> = Collection<
-  TKey,
-  OnyxInput<TKey>
->;
+type OnyxSetCollectionInput<TKey extends OnyxKey> = Collection<TKey, OnyxInput<TKey>>;
 
 type OnyxMethodMap = typeof OnyxUtils.METHOD;
 
-type ExpandOnyxKeys<TKey extends OnyxKey> = TKey extends CollectionKeyBase
-  ? NoInfer<`${TKey}${string}`>
-  : TKey;
+type ExpandOnyxKeys<TKey extends OnyxKey> = TKey extends CollectionKeyBase ? NoInfer<`${TKey}${string}`> : TKey;
 
 /**
  * OnyxUpdate type includes all onyx methods used in OnyxMethodValueMap.
@@ -351,122 +310,122 @@ type ExpandOnyxKeys<TKey extends OnyxKey> = TKey extends CollectionKeyBase
  * Otherwise it will show static type errors.
  */
 type OnyxUpdate<TKey extends OnyxKey> = {
-  // ⚠️ DO NOT CHANGE THIS TYPE, UNLESS YOU KNOW WHAT YOU ARE DOING. ⚠️
-  [K in TKey]:
-    | {
-        onyxMethod: typeof OnyxUtils.METHOD.SET;
-        key: ExpandOnyxKeys<K>;
-        value: OnyxSetInput<K>;
-      }
-    | {
-        onyxMethod: typeof OnyxUtils.METHOD.MULTI_SET;
-        key: ExpandOnyxKeys<K>;
-        value: OnyxMultiSetInput;
-      }
-    | {
-        onyxMethod: typeof OnyxUtils.METHOD.MERGE;
-        key: ExpandOnyxKeys<K>;
-        value: OnyxMergeInput<K>;
-      }
-    | {
-        onyxMethod: typeof OnyxUtils.METHOD.CLEAR;
-        key: ExpandOnyxKeys<K>;
-        value?: never;
-      }
-    | {
-        onyxMethod: typeof OnyxUtils.METHOD.MERGE_COLLECTION;
-        key: K;
-        value: OnyxMergeCollectionInput<K>;
-      }
-    | {
-        onyxMethod: typeof OnyxUtils.METHOD.SET_COLLECTION;
-        key: K;
-        value: OnyxSetCollectionInput<K>;
-      };
+    // ⚠️ DO NOT CHANGE THIS TYPE, UNLESS YOU KNOW WHAT YOU ARE DOING. ⚠️
+    [K in TKey]:
+        | {
+              onyxMethod: typeof OnyxUtils.METHOD.SET;
+              key: ExpandOnyxKeys<K>;
+              value: OnyxSetInput<K>;
+          }
+        | {
+              onyxMethod: typeof OnyxUtils.METHOD.MULTI_SET;
+              key: ExpandOnyxKeys<K>;
+              value: OnyxMultiSetInput;
+          }
+        | {
+              onyxMethod: typeof OnyxUtils.METHOD.MERGE;
+              key: ExpandOnyxKeys<K>;
+              value: OnyxMergeInput<K>;
+          }
+        | {
+              onyxMethod: typeof OnyxUtils.METHOD.CLEAR;
+              key: ExpandOnyxKeys<K>;
+              value?: never;
+          }
+        | {
+              onyxMethod: typeof OnyxUtils.METHOD.MERGE_COLLECTION;
+              key: K;
+              value: OnyxMergeCollectionInput<K>;
+          }
+        | {
+              onyxMethod: typeof OnyxUtils.METHOD.SET_COLLECTION;
+              key: K;
+              value: OnyxSetCollectionInput<K>;
+          };
 }[TKey];
 
 /**
  * Represents the options used in `Onyx.set()` method.
  */
 type SetOptions = {
-  /** Skip the deep equality check against the cached value. Improves performance for large objects. */
-  skipCacheCheck?: boolean;
+    /** Skip the deep equality check against the cached value. Improves performance for large objects. */
+    skipCacheCheck?: boolean;
 };
 
 type SetParams<TKey extends OnyxKey> = {
-  key: TKey;
-  value: OnyxSetInput<TKey>;
-  options?: SetOptions;
+    key: TKey;
+    value: OnyxSetInput<TKey>;
+    options?: SetOptions;
 };
 
 type SetCollectionParams<TKey extends CollectionKeyBase> = {
-  collectionKey: TKey;
-  collection: OnyxSetCollectionInput<TKey>;
+    collectionKey: TKey;
+    collection: OnyxSetCollectionInput<TKey>;
 };
 
 type MergeCollectionWithPatchesParams<TKey extends CollectionKeyBase> = {
-  collectionKey: TKey;
-  collection: OnyxMergeCollectionInput<TKey>;
-  mergeReplaceNullPatches?: MultiMergeReplaceNullPatches;
-  isProcessingCollectionUpdate?: boolean;
+    collectionKey: TKey;
+    collection: OnyxMergeCollectionInput<TKey>;
+    mergeReplaceNullPatches?: MultiMergeReplaceNullPatches;
+    isProcessingCollectionUpdate?: boolean;
 };
 
 type RetriableOnyxOperation =
-  | typeof OnyxUtils.setWithRetry
-  | typeof OnyxUtils.multiSetWithRetry
-  | typeof OnyxUtils.setCollectionWithRetry
-  | typeof OnyxUtils.mergeCollectionWithPatches
-  | typeof OnyxUtils.partialSetCollection;
+    | typeof OnyxUtils.setWithRetry
+    | typeof OnyxUtils.multiSetWithRetry
+    | typeof OnyxUtils.setCollectionWithRetry
+    | typeof OnyxUtils.mergeCollectionWithPatches
+    | typeof OnyxUtils.partialSetCollection;
 
 /**
  * Represents the options used in `Onyx.init()` method.
  */
 type InitOptions = {
-  /** `ONYXKEYS` constants object */
-  keys?: DeepRecord<string, OnyxKey>;
+    /** `ONYXKEYS` constants object */
+    keys?: DeepRecord<string, OnyxKey>;
 
-  /** initial data to set when `init()` and `clear()` is called */
-  initialKeyStates?: Partial<OnyxInputKeyValueMapping>;
+    /** initial data to set when `init()` and `clear()` is called */
+    initialKeyStates?: Partial<OnyxInputKeyValueMapping>;
 
-  /**
-   * This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged
-   * as "safe" for removal.
-   */
-  evictableKeys?: OnyxKey[];
+    /**
+     * This is an array of keys (individual or collection patterns) that when provided to Onyx are flagged
+     * as "safe" for removal.
+     */
+    evictableKeys?: OnyxKey[];
 
-  /**
-   * Auto synchronize storage events between multiple instances
-   * of Onyx running in different tabs/windows. Defaults to true for platforms that support local storage (web/desktop)
-   */
-  shouldSyncMultipleInstances?: boolean;
+    /**
+     * Auto synchronize storage events between multiple instances
+     * of Onyx running in different tabs/windows. Defaults to true for platforms that support local storage (web/desktop)
+     */
+    shouldSyncMultipleInstances?: boolean;
 
-  /**
-   * If enabled, it will connect to Redux DevTools Extension for debugging.
-   * This allows you to see all Onyx state changes in the Redux DevTools.
-   * @default true
-   */
-  enableDevTools?: boolean;
+    /**
+     * If enabled, it will connect to Redux DevTools Extension for debugging.
+     * This allows you to see all Onyx state changes in the Redux DevTools.
+     * @default true
+     */
+    enableDevTools?: boolean;
 
-  /**
-   * Array of collection member IDs that Onyx should silently ignore across all operations.
-   * This prevents keys formed from invalid or default IDs (e.g. "-1", "0", "undefined") from
-   * polluting cache or triggering subscriber notifications.
-   */
-  skippableCollectionMemberIDs?: string[];
+    /**
+     * Array of collection member IDs that Onyx should silently ignore across all operations.
+     * This prevents keys formed from invalid or default IDs (e.g. "-1", "0", "undefined") from
+     * polluting cache or triggering subscriber notifications.
+     */
+    skippableCollectionMemberIDs?: string[];
 
-  /**
-   * Array of keys that when provided to Onyx are flagged as RAM-only keys, and thus are not saved to disk.
-   */
-  ramOnlyKeys?: OnyxKey[];
+    /**
+     * Array of keys that when provided to Onyx are flagged as RAM-only keys, and thus are not saved to disk.
+     */
+    ramOnlyKeys?: OnyxKey[];
 
-  /**
-   * A list of field names that should always be merged into snapshot entries even if those fields are
-   * missing in the snapshot. Snapshots are saved "views" of a key's data used to populate read-only
-   * or cached lists, and by default Onyx only merges fields that already exist in that saved view.
-   * Use this to opt-in to additional fields that must appear in snapshots (for example, pending flags)
-   * without hardcoding app-specific logic inside Onyx.
-   */
-  snapshotMergeKeys?: string[];
+    /**
+     * A list of field names that should always be merged into snapshot entries even if those fields are
+     * missing in the snapshot. Snapshots are saved "views" of a key's data used to populate read-only
+     * or cached lists, and by default Onyx only merges fields that already exist in that saved view.
+     * Use this to opt-in to additional fields that must appear in snapshots (for example, pending flags)
+     * without hardcoding app-specific logic inside Onyx.
+     */
+    snapshotMergeKeys?: string[];
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -476,61 +435,58 @@ type GenericFunction = (...args: any[]) => any;
  * Represents a record where the key is a collection member key and the value is a list of
  * tuples that we'll use to replace the nested objects of that collection member record with something else.
  */
-type MultiMergeReplaceNullPatches = Record<
-  OnyxKey,
-  FastMergeReplaceNullPatch[]
->;
+type MultiMergeReplaceNullPatches = Record<OnyxKey, FastMergeReplaceNullPatch[]>;
 
 /**
  * Represents a combination of Merge and Set operations that should be executed in Onyx
  */
 type MixedOperationsQueue = {
-  merge: OnyxInputKeyValueMapping;
-  mergeReplaceNullPatches: MultiMergeReplaceNullPatches;
-  set: OnyxInputKeyValueMapping;
+    merge: OnyxInputKeyValueMapping;
+    mergeReplaceNullPatches: MultiMergeReplaceNullPatches;
+    set: OnyxInputKeyValueMapping;
 };
 
 export type {
-  BaseConnectOptions,
-  Collection,
-  CollectionConnectCallback,
-  CollectionKey,
-  CollectionKeyBase,
-  ConnectOptions,
-  CustomTypeOptions,
-  DeepRecord,
-  DefaultConnectCallback,
-  ExtractOnyxCollectionValue,
-  GenericFunction,
-  InitOptions,
-  Key,
-  KeyValueMapping,
-  CallbackToStateMapping,
-  NonNull,
-  NonUndefined,
-  OnyxInputKeyValueMapping,
-  NullishDeep,
-  OnyxCollection,
-  OnyxEntry,
-  OnyxKey,
-  OnyxInputValue,
-  OnyxCollectionInputValue,
-  OnyxInput,
-  OnyxSetInput,
-  OnyxMultiSetInput,
-  OnyxMergeInput,
-  OnyxMergeCollectionInput,
-  OnyxSetCollectionInput,
-  OnyxMethod,
-  OnyxMethodMap,
-  OnyxUpdate,
-  OnyxValue,
-  Selector,
-  SetOptions,
-  SetParams,
-  SetCollectionParams,
-  MergeCollectionWithPatchesParams,
-  MultiMergeReplaceNullPatches,
-  MixedOperationsQueue,
-  RetriableOnyxOperation,
+    BaseConnectOptions,
+    Collection,
+    CollectionConnectCallback,
+    CollectionKey,
+    CollectionKeyBase,
+    ConnectOptions,
+    CustomTypeOptions,
+    DeepRecord,
+    DefaultConnectCallback,
+    ExtractOnyxCollectionValue,
+    GenericFunction,
+    InitOptions,
+    Key,
+    KeyValueMapping,
+    CallbackToStateMapping,
+    NonNull,
+    NonUndefined,
+    OnyxInputKeyValueMapping,
+    NullishDeep,
+    OnyxCollection,
+    OnyxEntry,
+    OnyxKey,
+    OnyxInputValue,
+    OnyxCollectionInputValue,
+    OnyxInput,
+    OnyxSetInput,
+    OnyxMultiSetInput,
+    OnyxMergeInput,
+    OnyxMergeCollectionInput,
+    OnyxSetCollectionInput,
+    OnyxMethod,
+    OnyxMethodMap,
+    OnyxUpdate,
+    OnyxValue,
+    Selector,
+    SetOptions,
+    SetParams,
+    SetCollectionParams,
+    MergeCollectionWithPatchesParams,
+    MultiMergeReplaceNullPatches,
+    MixedOperationsQueue,
+    RetriableOnyxOperation,
 };

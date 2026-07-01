@@ -778,7 +778,7 @@ describe('OnyxUtils', () => {
             // + name + message) is logged exactly once even though the operation retries 6 times.
             const unclassifiedCalls = logAlertSpy.mock.calls.filter((call) => typeof call[0] === 'string' && call[0].startsWith('Unclassified storage error.'));
             expect(unclassifiedCalls).toHaveLength(1);
-            expect(unclassifiedCalls.at(0)[0]).toBe(
+            expect(unclassifiedCalls.at(0)![0]).toBe(
                 `Unclassified storage error. provider: MemoryOnlyProvider. name: ${genericError.name}. message: ${genericError.message}. onyxMethod: setWithRetry.`,
             );
         });
@@ -1228,7 +1228,7 @@ describe('OnyxUtils', () => {
             // OnyxUtils.multiGet filters to cache-missing keys before issuing Storage.multiGet, so we
             // expect exactly one batched read containing only the cold keys (the warm key is skipped).
             expect(multiGetSpy).toHaveBeenCalledTimes(1);
-            const requestedKeys = multiGetSpy.mock.calls.at(0)[0];
+            const requestedKeys = multiGetSpy.mock.calls.at(0)![0];
             expect(requestedKeys.sort()).toEqual([coldKey1, coldKey2].sort());
 
             // No individual Storage.getItem calls during pre-warm. Old code path would have fired one

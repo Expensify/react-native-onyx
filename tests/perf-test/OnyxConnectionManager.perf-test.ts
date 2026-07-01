@@ -29,8 +29,10 @@ const mockedReportActionsKeys = Object.keys(mockedReportActionsMap);
 
 // We need access to some internal properties of `connectionManager` during the tests but they are private,
 // so this workaround allows us to have access to them.
-const generateConnectionID = connectionManager.generateConnectionID.bind(connectionManager);
-const fireCallbacks = connectionManager.fireCallbacks.bind(connectionManager);
+// eslint-disable-next-line dot-notation
+const generateConnectionID = connectionManager['generateConnectionID'].bind(connectionManager);
+// eslint-disable-next-line dot-notation
+const fireCallbacks = connectionManager['fireCallbacks'].bind(connectionManager);
 
 const resetConectionManagerAfterEachMeasure = () => {
     connectionManager.disconnectAll();
@@ -52,7 +54,7 @@ describe('OnyxConnectionManager', () => {
 
     describe('generateConnectionID', () => {
         test('one call', async () => {
-            await measureFunction(() => generateConnectionID({key: mockedReportActionsKeys.at(0)}), {
+            await measureFunction(() => generateConnectionID({key: mockedReportActionsKeys[0]}), {
                 afterEach: resetConectionManagerAfterEachMeasure,
             });
         });
@@ -65,12 +67,12 @@ describe('OnyxConnectionManager', () => {
             await measureFunction(() => fireCallbacks(connectionID), {
                 beforeEach: async () => {
                     connectionID = connectionManager.connect({
-                        key: mockedReportActionsKeys.at(0),
+                        key: mockedReportActionsKeys[0],
                         callback: jest.fn(),
                     }).id;
                     for (let i = 0; i < 9999; i++) {
                         connectionManager.connect({
-                            key: mockedReportActionsKeys.at(0),
+                            key: mockedReportActionsKeys[0],
                             callback: jest.fn(),
                         });
                     }
@@ -89,7 +91,7 @@ describe('OnyxConnectionManager', () => {
                 async () => {
                     const callback = createDeferredTask();
                     connectionManager.connect({
-                        key: mockedReportActionsKeys.at(0),
+                        key: mockedReportActionsKeys[0],
                         callback: () => {
                             callback.resolve?.();
                         },
@@ -117,7 +119,7 @@ describe('OnyxConnectionManager', () => {
                 {
                     beforeEach: async () => {
                         connection = connectionManager.connect({
-                            key: mockedReportActionsKeys.at(0),
+                            key: mockedReportActionsKeys[0],
                             callback: jest.fn(),
                         });
                     },
@@ -136,7 +138,7 @@ describe('OnyxConnectionManager', () => {
                 beforeEach: async () => {
                     for (let i = 0; i < 10000; i++) {
                         connectionManager.connect({
-                            key: mockedReportActionsKeys.at(0),
+                            key: mockedReportActionsKeys[0],
                             callback: jest.fn(),
                         });
                     }

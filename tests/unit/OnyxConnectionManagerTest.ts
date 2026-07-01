@@ -434,7 +434,7 @@ describe('OnyxConnectionManager', () => {
             const setCallsForKey = setSpy.mock.calls.filter((call) => call[0] === ONYXKEYS.TEST_KEY);
             expect(setCallsForKey.length).toBeGreaterThan(0);
 
-            const updatedIDs = setCallsForKey.at(setCallsForKey.length - 1)[1] as number[];
+            const updatedIDs = setCallsForKey.at(setCallsForKey.length - 1)![1] as number[];
             expect(updatedIDs).not.toContain(subscriptionIdA);
             expect(updatedIDs).toContain(subscriptionIdB);
 

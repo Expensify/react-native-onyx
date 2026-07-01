@@ -12,7 +12,9 @@ import {resetAllDatabases} from '../../mocks/sqliteMock';
 // `jest.mock` is hoisted by Jest above the imports — register the SQLite mock
 // (overriding the global jestSetup.js mock) and a tiny device-info stub.
 jest.mock('react-native-nitro-sqlite', () => require('../../mocks/sqliteMock'));
-jest.mock('react-native-device-info', () => ({getFreeDiskStorage: () => 12345}));
+jest.mock('react-native-device-info', () => ({
+    getFreeDiskStorage: () => 12345,
+}));
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -157,9 +159,11 @@ describe('SQLiteProvider', () => {
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}id2`, ['a', {newKey: 'newValue'}]],
             ];
 
-            const expectedTestKey3Value = structuredClone(testEntries.at(2))[1] as GenericDeepRecord;
+            const expectedTestKey3Value = structuredClone(testEntries[2])[1] as GenericDeepRecord;
             expectedTestKey3Value.key = 'value_changed';
-            expectedTestKey3Value.property.nestedProperty = {nestedKey2: 'nestedValue2_changed'};
+            expectedTestKey3Value.property.nestedProperty = {
+                nestedKey2: 'nestedValue2_changed',
+            };
             expectedTestKey3Value.property.newKey = 'newValue';
 
             await SQLiteProvider.multiMerge(changedEntries);
@@ -173,13 +177,19 @@ describe('SQLiteProvider', () => {
 
         it('should insert a new record when key does not exist', async () => {
             await SQLiteProvider.multiMerge([[ONYXKEYS.TEST_KEY_2, {fresh: true}]]);
-            expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY_2)).toEqual({fresh: true});
+            expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY_2)).toEqual({
+                fresh: true,
+            });
         });
 
         it('should shallow-merge existing record_key value', async () => {
             await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY_3, {a: 1, b: 2});
             await SQLiteProvider.multiMerge([[ONYXKEYS.TEST_KEY_3, {b: 99, c: 3}]]);
-            expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY_3)).toEqual({a: 1, b: 99, c: 3});
+            expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY_3)).toEqual({
+                a: 1,
+                b: 99,
+                c: 3,
+            });
         });
 
         it('should deep-merge nested objects', async () => {
@@ -198,7 +208,11 @@ describe('SQLiteProvider', () => {
             await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY_3, {
                 keepMe: 'still here',
                 removeMe: 'gone soon',
-                outer: {keepInner: 1, removeInner: 2, deeper: {keepDeep: 'a', removeDeep: 'b'}},
+                outer: {
+                    keepInner: 1,
+                    removeInner: 2,
+                    deeper: {keepDeep: 'a', removeDeep: 'b'},
+                },
             });
 
             await SQLiteProvider.multiMerge([
@@ -255,9 +269,12 @@ describe('SQLiteProvider', () => {
         it('should merge all the supported kinds of data correctly', async () => {
             await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, 'value');
             await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY_2, 1000);
-            await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY_3, {key: 'value', property: {propertyKey: 'propertyValue'}});
-            await SQLiteProvider.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, true);
-            await SQLiteProvider.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id2`, ['a', {key: 'value'}, 1, true]);
+            await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY_3, {
+                key: 'value',
+                property: {propertyKey: 'propertyValue'},
+            });
+            await SQLiteProvider.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id1` as string, true);
+            await SQLiteProvider.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id2` as string, ['a', {key: 'value'}, 1, true]);
 
             await SQLiteProvider.mergeItem(ONYXKEYS.TEST_KEY, 'value_changed');
             await SQLiteProvider.mergeItem(ONYXKEYS.TEST_KEY_2, 1001);
@@ -272,12 +289,15 @@ describe('SQLiteProvider', () => {
                 },
                 [[['property'], {newKey: 'newValue'}]],
             );
-            await SQLiteProvider.mergeItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, false);
-            await SQLiteProvider.mergeItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id2`, ['a', {newKey: 'newValue'}]);
+            await SQLiteProvider.mergeItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id1` as string, false);
+            await SQLiteProvider.mergeItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id2` as string, ['a', {newKey: 'newValue'}]);
 
             expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY)).toEqual('value_changed');
             expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY_2)).toEqual(1001);
-            expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY_3)).toEqual({key: 'value_changed', property: {newKey: 'newValue'}});
+            expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY_3)).toEqual({
+                key: 'value_changed',
+                property: {newKey: 'newValue'},
+            });
             expect(await SQLiteProvider.getItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id1`)).toEqual(false);
             expect(await SQLiteProvider.getItem(`${ONYXKEYS.COLLECTION.TEST_KEY}id2`)).toEqual(['a', {newKey: 'newValue'}]);
         });
@@ -317,7 +337,7 @@ describe('SQLiteProvider', () => {
     describe('SQL-injection safety', () => {
         it('should treat a key containing SQL fragments as a literal record_key', async () => {
             const nastyKey = "'; DROP TABLE keyvaluepairs; --";
-            await SQLiteProvider.setItem(nastyKey, 'survived');
+            await SQLiteProvider.setItem(nastyKey as string, 'survived');
             expect(await SQLiteProvider.getItem(nastyKey)).toEqual('survived');
             expect(await SQLiteProvider.getAllKeys()).toEqual([nastyKey]);
         });
@@ -338,7 +358,9 @@ describe('SQLiteProvider', () => {
             // SQLite allocates pages on init (table + WAL), so bytesUsed is non-0 from the
             // start; assert that a write increases it rather than comparing to 0.
             const before = await SQLiteProvider.getDatabaseSize();
-            await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, {payload: 'x'.repeat(64 * 1024)});
+            await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, {
+                payload: 'x'.repeat(64 * 1024),
+            });
             const after = await SQLiteProvider.getDatabaseSize();
 
             expect(after.bytesUsed).toBeGreaterThan(before.bytesUsed);
