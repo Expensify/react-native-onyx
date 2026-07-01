@@ -223,47 +223,24 @@ type BaseConnectOptions = {
 type DefaultConnectCallback<TKey extends OnyxKey> = (value: OnyxEntry<KeyValueMapping[TKey]>, key: TKey) => void;
 
 /** Represents the callback function used in `Onyx.connect()` method with a collection key. */
-type CollectionConnectCallback<TKey extends OnyxKey> = (value: NonUndefined<OnyxCollection<KeyValueMapping[TKey]>>, key: TKey, sourceValue?: OnyxValue<TKey>) => void;
+type CollectionConnectCallback<TKey extends OnyxKey> = (value: NonUndefined<OnyxCollection<KeyValueMapping[TKey]>>, key: TKey) => void;
 
-/** Represents the options used in `Onyx.connect()` method with a regular key. */
+/**
+ * Represents the options used in `Onyx.connect()` method.
+ *
+ * For a collection root key (e.g. `ONYXKEYS.COLLECTION.REPORT`), the callback fires
+ * with the entire collection object whenever any member changes (signature
+ * `(collection, key)`). For any other key, the callback fires with the value at
+ * that key (signature `(value, key)`).
+ */
 // NOTE: Any changes to this type like adding or removing options must be accounted in OnyxConnectionManager's `generateConnectionID()` method!
-type DefaultConnectOptions<TKey extends OnyxKey> = BaseConnectOptions & {
+type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions & {
     /** The Onyx key to subscribe to. */
     key: TKey;
 
     /** A function that will be called when the Onyx data we are subscribed changes. */
-    callback?: DefaultConnectCallback<TKey>;
-
-    /** If set to `true`, it will return the entire collection to the callback as a single object. */
-    waitForCollectionCallback?: false;
+    callback?: (value: TKey extends CollectionKeyBase ? NonUndefined<OnyxCollection<KeyValueMapping[TKey]>> : OnyxEntry<KeyValueMapping[TKey]>, key: TKey) => void;
 };
-
-/** Represents the options used in `Onyx.connect()` method with a collection key. */
-// NOTE: Any changes to this type like adding or removing options must be accounted in OnyxConnectionManager's `generateConnectionID()` method!
-type CollectionConnectOptions<TKey extends OnyxKey> = BaseConnectOptions & {
-    /** The Onyx key to subscribe to. */
-    key: TKey extends CollectionKeyBase ? TKey : never;
-
-    /** A function that will be called when the Onyx data we are subscribed changes. */
-    callback?: CollectionConnectCallback<TKey>;
-
-    /** If set to `true`, it will return the entire collection to the callback as a single object. */
-    waitForCollectionCallback: true;
-};
-
-/**
- * Represents the options used in `Onyx.connect()` method.
- * The type is built from `DefaultConnectOptions`/`CollectionConnectOptions` depending on the `waitForCollectionCallback` property.
- * It includes two different forms, depending on whether we are waiting for a collection callback or not.
- *
- * If `waitForCollectionCallback` is `true`, it expects `key` to be a Onyx collection key and `callback` will be triggered with the whole collection
- * and will pass `value` as an `OnyxCollection`.
- *
- * If `waitForCollectionCallback` is `false` or not specified, the `key` can be any Onyx key and `callback` will be triggered with updates of each collection item
- * and will pass `value` as an `OnyxEntry`.
- */
-// NOTE: Any changes to this type like adding or removing options must be accounted in OnyxConnectionManager's `generateConnectionID()` method!
-type ConnectOptions<TKey extends OnyxKey> = DefaultConnectOptions<TKey> | CollectionConnectOptions<TKey>;
 
 type CallbackToStateMapping<TKey extends OnyxKey> = ConnectOptions<TKey> & {
     subscriptionID: number;
@@ -472,14 +449,12 @@ export type {
     BaseConnectOptions,
     Collection,
     CollectionConnectCallback,
-    CollectionConnectOptions,
     CollectionKey,
     CollectionKeyBase,
     ConnectOptions,
     CustomTypeOptions,
     DeepRecord,
     DefaultConnectCallback,
-    DefaultConnectOptions,
     ExtractOnyxCollectionValue,
     GenericFunction,
     InitOptions,

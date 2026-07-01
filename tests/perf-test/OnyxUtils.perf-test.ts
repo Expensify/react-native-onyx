@@ -618,7 +618,6 @@ describe('OnyxUtils', () => {
                         callback: () => {
                             callback.resolve?.();
                         },
-                        waitForCollectionCallback: true,
                     });
                     return callback.promise;
                 },

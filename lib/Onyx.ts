@@ -93,7 +93,6 @@ function init({
  * @param connectOptions The options object that will define the behavior of the connection.
  * @param connectOptions.key The Onyx key to subscribe to.
  * @param connectOptions.callback A function that will be called when the Onyx data we are subscribed changes.
- * @param connectOptions.waitForCollectionCallback If set to `true`, it will return the entire collection to the callback as a single object.
  * @param connectOptions.selector This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook.**
  *        Using this setting on `useOnyx()` can have very positive performance benefits because the component will only re-render
  *        when the subset of data changes. Otherwise, any change of data on any property would normally
@@ -118,7 +117,6 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
  * @param connectOptions The options object that will define the behavior of the connection.
  * @param connectOptions.key The Onyx key to subscribe to.
  * @param connectOptions.callback A function that will be called when the Onyx data we are subscribed changes.
- * @param connectOptions.waitForCollectionCallback If set to `true`, it will return the entire collection to the callback as a single object.
  * @param connectOptions.selector This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook.**
  *        Using this setting on `useOnyx()` can have very positive performance benefits because the component will only re-render
  *        when the subset of data changes. Otherwise, any change of data on any property would normally
