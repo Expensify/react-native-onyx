@@ -68,7 +68,7 @@ const provider: StorageProvider<UseStore | undefined> = {
             throw new Error('Store not initialized!');
         }
 
-        return IDB.getMany(keysParam, provider.store).then((values) => values.map((value, index) => [keysParam.at(index), value]));
+        return IDB.getMany(keysParam, provider.store).then((values) => values.map((value, index) => [keysParam[index], value]));
     },
     multiMerge(pairs) {
         if (!provider.store) {

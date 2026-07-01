@@ -392,7 +392,10 @@ function multiGet<TKey extends OnyxKey>(
       // Wait for all the pending tasks to resolve and then add the data to the data map.
       .then((values) => {
         for (const [index, value] of values.entries()) {
-          dataMap.set(pendingKeys.at(index), value);
+          const pendingKey = pendingKeys[index];
+          if (pendingKey !== undefined) {
+            dataMap.set(pendingKey, value);
+          }
         }
 
         return Promise.resolve();

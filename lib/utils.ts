@@ -82,7 +82,7 @@ function fastMerge<TValue>(target: TValue, source: TValue, options?: FastMergeOp
  * @returns - The merged object.
  */
 function mergeObject<TObject extends Record<string, unknown>>(
-    target: TObject | null | undefined,
+    target: TObject | unknown | null | undefined,
     source: TObject,
     options: FastMergeOptions,
     metadata: FastMergeMetadata,
