@@ -4,7 +4,6 @@ import OnyxUtils from '../../lib/OnyxUtils';
 import type {GenericDeepRecord} from '../types';
 import utils from '../../lib/utils';
 import type {Collection, OnyxCollection} from '../../lib/types';
-import type GenericCollection from '../utils/GenericCollection';
 import OnyxCache from '../../lib/OnyxCache';
 import * as Logger from '../../lib/Logger';
 import StorageMock from '../../lib/storage';
@@ -123,7 +122,7 @@ describe('OnyxUtils', () => {
                 [routeA]: {name: 'Route A'},
                 [routeB1]: {name: 'Route B1'},
                 [routeC]: {name: 'Route C'},
-            } as GenericCollection);
+            });
 
             // Replace with new collection data
             await OnyxUtils.partialSetCollection({
@@ -132,7 +131,7 @@ describe('OnyxUtils', () => {
                     [routeA]: {name: 'New Route A'},
                     [routeB]: {name: 'New Route B'},
                     [routeC]: {name: 'New Route C'},
-                } as GenericCollection,
+                },
             });
 
             expect(result).toEqual({
@@ -155,11 +154,11 @@ describe('OnyxUtils', () => {
 
             await Onyx.mergeCollection(ONYXKEYS.COLLECTION.ROUTES, {
                 [routeA]: {name: 'Route A'},
-            } as GenericCollection);
+            });
 
             await OnyxUtils.partialSetCollection({
                 collectionKey: ONYXKEYS.COLLECTION.ROUTES,
-                collection: {} as GenericCollection,
+                collection: {},
             });
 
             expect(result).toEqual({
@@ -180,13 +179,13 @@ describe('OnyxUtils', () => {
 
             await Onyx.mergeCollection(ONYXKEYS.COLLECTION.ROUTES, {
                 [routeA]: {name: 'Route A'},
-            } as GenericCollection);
+            });
 
             await OnyxUtils.partialSetCollection({
                 collectionKey: ONYXKEYS.COLLECTION.ROUTES,
                 collection: {
                     [invalidRoute]: {name: 'Invalid Route'},
-                } as GenericCollection,
+                },
             });
 
             expect(result).toEqual({
@@ -217,7 +216,7 @@ describe('OnyxUtils', () => {
 
             // Should be called only ONCE with the batched collection (not 3 times)
             expect(collectionCallback).toHaveBeenCalledTimes(1);
-            const [collection] = collectionCallback.mock.calls[0];
+            const [collection] = collectionCallback.mock.calls.at(0);
             expect(collection[`${ONYXKEYS.COLLECTION.TEST_KEY}1`]).toEqual({id: 1});
             expect(collection[`${ONYXKEYS.COLLECTION.TEST_KEY}2`]).toEqual({id: 2});
             expect(collection[`${ONYXKEYS.COLLECTION.TEST_KEY}3`]).toEqual({id: 3});
@@ -550,7 +549,7 @@ describe('OnyxUtils', () => {
 
             expect(collectionCallback).toHaveBeenCalledTimes(1);
             // Collection subscriber receives the full cached collection and subscriber.key
-            const [receivedCollection, receivedKey] = collectionCallback.mock.calls[0];
+            const [receivedCollection, receivedKey] = collectionCallback.mock.calls.at(0);
             expect(receivedKey).toBe(ONYXKEYS.COLLECTION.TEST_KEY);
             expect(receivedCollection[entryKey]).toEqual(entryData);
 
@@ -684,11 +683,11 @@ describe('OnyxUtils', () => {
                     d: {
                         i: 'i',
                         j: 'j',
-                        [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                        [utils.ONYX_INTERNALS_REPLACE_OBJECT_MARK]: true,
                     },
                     h: 'h',
                     g: {
-                        [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                        [utils.ONYX_INTERNALS_REPLACE_OBJECT_MARK]: true,
                         k: 'k',
                     },
                 },
@@ -722,11 +721,11 @@ describe('OnyxUtils', () => {
                     d: {
                         i: 'i',
                         j: 'j',
-                        [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                        [utils.ONYX_INTERNALS_REPLACE_OBJECT_MARK]: true,
                     },
                     h: 'h',
                     g: {
-                        [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                        [utils.ONYX_INTERNALS_REPLACE_OBJECT_MARK]: true,
                         k: 'k',
                     },
                 },
@@ -779,7 +778,7 @@ describe('OnyxUtils', () => {
             // + name + message) is logged exactly once even though the operation retries 6 times.
             const unclassifiedCalls = logAlertSpy.mock.calls.filter((call) => typeof call[0] === 'string' && call[0].startsWith('Unclassified storage error.'));
             expect(unclassifiedCalls).toHaveLength(1);
-            expect(unclassifiedCalls[0][0]).toBe(
+            expect(unclassifiedCalls.at(0)![0]).toBe(
                 `Unclassified storage error. provider: MemoryOnlyProvider. name: ${genericError.name}. message: ${genericError.message}. onyxMethod: setWithRetry.`,
             );
         });
@@ -973,7 +972,7 @@ describe('OnyxUtils', () => {
             await Onyx.mergeCollection(collectionKey, {
                 [existingMemberKey]: {value: 'merged'},
                 [newMemberKey]: {value: 'new'},
-            } as GenericCollection);
+            });
 
             // Cache must reflect the merge regardless of the multiMerge rejection. This is the
             // cache-first / storage-second invariant that mergeCollectionWithPatches must honor.
@@ -1014,7 +1013,7 @@ describe('OnyxUtils', () => {
             await Onyx.mergeCollection(collectionKey, {
                 [newMemberKey1]: {value: 'first'},
                 [newMemberKey2]: {value: 'second'},
-            } as GenericCollection);
+            });
 
             // Cache must reflect the merge regardless of the multiSet rejection. This is the
             // cache-first / storage-second invariant that mergeCollectionWithPatches must honor.
@@ -1066,7 +1065,7 @@ describe('OnyxUtils', () => {
             await Onyx.mergeCollection(collectionKey, {
                 [existingMemberKey]: {value: 'merged'},
                 [newMemberKey]: {value: 'new'},
-            } as GenericCollection);
+            });
 
             // Before this fix, every retry attempt re-fired keysChanged() — and
             // Collection-root subscribers fire on every keysChanged() call by contract.
@@ -1116,7 +1115,7 @@ describe('OnyxUtils', () => {
             await Onyx.setCollection(collectionKey, {
                 [memberKey1]: {value: 'first'},
                 [memberKey2]: {value: 'second'},
-            } as GenericCollection);
+            });
 
             expect(collectionCallback).toHaveBeenCalledTimes(1);
         });
@@ -1141,7 +1140,7 @@ describe('OnyxUtils', () => {
                 collection: {
                     [memberKey1]: {value: 'first'},
                     [memberKey2]: {value: 'second'},
-                } as GenericCollection,
+                },
             });
 
             expect(collectionCallback).toHaveBeenCalledTimes(1);
@@ -1191,7 +1190,7 @@ describe('OnyxUtils', () => {
             await Onyx.mergeCollection(collectionKey, {
                 [existingKey1]: {value: 'merged-1'},
                 [existingKey2]: {value: 'merged-2'},
-            } as GenericCollection);
+            });
 
             // With every existingKey warm, the diff swaps Promise.all(get) for Promise.resolve(),
             // so no storage reads should happen during the pre-warm.
@@ -1224,12 +1223,12 @@ describe('OnyxUtils', () => {
                 [coldKey1]: {value: 'merged-1'},
                 [coldKey2]: {value: 'merged-2'},
                 [warmKey]: {value: 'merged-3'},
-            } as GenericCollection);
+            });
 
             // OnyxUtils.multiGet filters to cache-missing keys before issuing Storage.multiGet, so we
             // expect exactly one batched read containing only the cold keys (the warm key is skipped).
             expect(multiGetSpy).toHaveBeenCalledTimes(1);
-            const requestedKeys = multiGetSpy.mock.calls[0][0] as string[];
+            const requestedKeys = multiGetSpy.mock.calls.at(0)![0];
             expect(requestedKeys.sort()).toEqual([coldKey1, coldKey2].sort());
 
             // No individual Storage.getItem calls during pre-warm. Old code path would have fired one
@@ -1248,7 +1247,7 @@ describe('OnyxUtils', () => {
 
             await Onyx.mergeCollection(collectionKey, {
                 [coldKey]: {c: 3},
-            } as GenericCollection);
+            });
 
             // If the pre-warm did NOT populate the cache from storage, fastMerge would treat the
             // previous value as undefined and the result would drop {a:1, b:2}. With the pre-warm
@@ -1277,7 +1276,7 @@ describe('OnyxUtils', () => {
                     key: collectionKey,
                     value: {
                         [existingKey]: {value: 'merged'},
-                    } as GenericCollection,
+                    },
                 },
             ]);
 
@@ -1286,7 +1285,7 @@ describe('OnyxUtils', () => {
             // one merged value — not undefined first and the merged value on a later microtask.
             const broadcasts = collectionCallback.mock.calls.map((c) => c[0]);
             expect(broadcasts).toHaveLength(1);
-            expect(broadcasts[0]?.[existingKey]).toEqual({value: 'merged'});
+            expect(broadcasts.at(0)?.[existingKey]).toEqual({value: 'merged'});
         });
 
         it('equivalence: warm-path and cold-path produce the same final cache state for the same merge', async () => {
@@ -1298,7 +1297,7 @@ describe('OnyxUtils', () => {
             await Onyx.set(memberKey, {value: 'before', extra: 'kept'});
             await Onyx.mergeCollection(collectionKey, {
                 [memberKey]: delta,
-            } as GenericCollection);
+            });
             const warmResult = OnyxCache.getCollectionData(collectionKey)?.[memberKey];
 
             // Reset and replay with a cold cache before the merge.
@@ -1307,7 +1306,7 @@ describe('OnyxUtils', () => {
             evictFromCache(memberKey);
             await Onyx.mergeCollection(collectionKey, {
                 [memberKey]: delta,
-            } as GenericCollection);
+            });
             const coldResult = OnyxCache.getCollectionData(collectionKey)?.[memberKey];
 
             expect(warmResult).toEqual(coldResult);
@@ -1350,7 +1349,7 @@ describe('OnyxUtils', () => {
             const result = await Onyx.mergeCollection(collectionKey, {
                 [coldMemberKey]: {merged: true},
                 [newMemberKey]: {value: 'new'},
-            } as GenericCollection).catch((e: unknown) => {
+            }).catch((e: unknown) => {
                 outerRejected = e;
             });
             expect(outerRejected).toBeNull();
@@ -1502,7 +1501,9 @@ describe('OnyxUtils', () => {
 
             // The probe ran: the evictable key was evicted, the write landed, and the successful retry closed the circuit.
             expect(LocalOnyxCache.hasCacheForKey(evictableKey)).toBe(false);
-            expect(LocalOnyxCache.get(ONYXKEYS.TEST_KEY)).toEqual({test: 'recovered'});
+            expect(LocalOnyxCache.get(ONYXKEYS.TEST_KEY)).toEqual({
+                test: 'recovered',
+            });
             expect(LocalStorageCircuitBreaker.isAllowed()).toBe(true);
             expect(LocalStorageCircuitBreaker.isAllowed()).toBe(true);
 
@@ -1675,14 +1676,19 @@ describe('OnyxUtils', () => {
             await LocalOnyx.set(unrelatedKey, {value: 'evict-me'});
 
             const memberCalls: unknown[] = [];
-            LocalOnyx.connect({key: memberKey, callback: (value) => memberCalls.push(value)});
+            LocalOnyx.connect({
+                key: memberKey,
+                callback: (value) => memberCalls.push(value),
+            });
             await waitForPromisesToResolve();
             memberCalls.length = 0;
 
             // Storage.multiMerge rejects once with disk-full, then succeeds on retry.
             LocalStorageMock.multiMerge = jest.fn(LocalStorageMock.multiMerge).mockRejectedValueOnce(diskFullError).mockImplementation(LocalStorageMock.multiMerge);
 
-            await LocalOnyx.mergeCollection(collectionKey, {[memberKey]: {value: 'merged'}} as GenericCollection);
+            await LocalOnyx.mergeCollection(collectionKey, {
+                [memberKey]: {value: 'merged'},
+            });
 
             // The old code evicted the in-flight key and re-ran the merge against an empty cache,
             // collapsing {id: 1, value: 'orig'} + {value: 'merged'} to just {value: 'merged'}. Now
@@ -1702,7 +1708,10 @@ describe('OnyxUtils', () => {
             expect(LocalOnyxCache.getKeyForEviction()).toBe(memberKey);
 
             const memberCalls: unknown[] = [];
-            LocalOnyx.connect({key: memberKey, callback: (value) => memberCalls.push(value)});
+            LocalOnyx.connect({
+                key: memberKey,
+                callback: (value) => memberCalls.push(value),
+            });
             await waitForPromisesToResolve();
             memberCalls.length = 0;
 
@@ -1710,7 +1719,9 @@ describe('OnyxUtils', () => {
             // finds no acceptable key and reports the quota instead of dropping (and truncating) it.
             LocalStorageMock.multiMerge = jest.fn(LocalStorageMock.multiMerge).mockRejectedValue(diskFullError);
 
-            await LocalOnyx.mergeCollection(collectionKey, {[memberKey]: {value: 'merged'}} as GenericCollection);
+            await LocalOnyx.mergeCollection(collectionKey, {
+                [memberKey]: {value: 'merged'},
+            });
 
             expect(LocalOnyxCache.get(memberKey)).toEqual({id: 1, value: 'merged'});
             expect(memberCalls.at(-1)).toEqual({id: 1, value: 'merged'});

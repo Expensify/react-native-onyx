@@ -49,7 +49,7 @@ function extractNamedParameterOrder(sql: string): string[] | null {
 function wrapRows<TRow extends QueryResultRow>(rowsArray: TRow[]): NitroSQLiteQueryResultRows<TRow> {
     return {
         _array: rowsArray,
-        item: (index: number) => rowsArray[index],
+        item: (index: number) => rowsArray.at(index),
         length: rowsArray.length,
     };
 }
@@ -134,7 +134,7 @@ function makeConnection(name: string): Pick<NitroSQLiteConnection, 'execute' | '
                             if (namedOrder) {
                                 const bindings: Record<string, unknown> = {};
                                 for (let index = 0; index < namedOrder.length; index++) {
-                                    bindings[namedOrder[index]] = row[index];
+                                    bindings[namedOrder[index]] = row.at(index);
                                 }
                                 const info = statement.run(bindings);
                                 total += info.changes;

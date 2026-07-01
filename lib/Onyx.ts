@@ -18,7 +18,6 @@ import type {
     OnyxSetInput,
     OnyxUpdate,
     OnyxValue,
-    OnyxInput,
     OnyxMethodMap,
     SetOptions,
 } from './types';
@@ -64,7 +63,7 @@ function init({
             // Setting isProcessingCollectionUpdate=true prevents triggering collection callbacks for each individual update
             const isKeyCollectionMember = OnyxKeys.isCollectionMember(key);
 
-            OnyxUtils.keyChanged(key, value as OnyxValue<typeof key>, undefined, isKeyCollectionMember);
+            OnyxUtils.keyChanged(key, value, undefined, isKeyCollectionMember);
         });
     }
 
@@ -237,7 +236,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
                         Logger.logAlert(logMessages.incompatibleUpdateAlert(key, 'merge', existingValueType, newValueType));
                     }
                     return isCompatible;
-                }) as Array<OnyxInput<TKey>>;
+                });
 
                 // Clean up the write queue, so we don't apply these changes again.
                 delete mergeQueue[key];
@@ -259,7 +258,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
                     OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, changes, mergedValue);
                 });
             } catch (error) {
-                Logger.logAlert(`An error occurred while applying merge for key: ${key}, Error: ${error}`);
+                Logger.logAlert(`An error occurred while applying merge for key: ${key}, Error: ${error instanceof Error ? error.message : String(error)}`);
                 return Promise.resolve();
             }
         });
@@ -282,7 +281,13 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
  * @param collection Object collection keyed by individual collection member keys and values
  */
 function mergeCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey>): Promise<void> {
-    return OnyxUtils.afterInit(() => OnyxUtils.mergeCollectionWithPatches({collectionKey, collection, isProcessingCollectionUpdate: true}));
+    return OnyxUtils.afterInit(() =>
+        OnyxUtils.mergeCollectionWithPatches({
+            collectionKey,
+            collection,
+            isProcessingCollectionUpdate: true,
+        }),
+    );
 }
 
 /**
@@ -321,7 +326,10 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                 // because the notification process needs the old values in cache but at that point they will be already removed from it.
                 const keyValuesToResetAsCollection: Record<
                     OnyxKey,
-                    {oldValues: Record<string, KeyValueMapping[OnyxKey] | undefined>; newValues: Record<string, KeyValueMapping[OnyxKey] | undefined>}
+                    {
+                        oldValues: Record<string, unknown>;
+                        newValues: Record<string, unknown>;
+                    }
                 > = {};
 
                 const allKeys = new Set([...cachedKeys, ...initialKeys]);
@@ -350,7 +358,10 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
 
                             if (collectionKey) {
                                 if (!keyValuesToResetAsCollection[collectionKey]) {
-                                    keyValuesToResetAsCollection[collectionKey] = {oldValues: {}, newValues: {}};
+                                    keyValuesToResetAsCollection[collectionKey] = {
+                                        oldValues: {},
+                                        newValues: {},
+                                    };
                                 }
                                 keyValuesToResetAsCollection[collectionKey].oldValues[key] = oldValue;
                                 keyValuesToResetAsCollection[collectionKey].newValues[key] = newValue ?? undefined;
@@ -434,6 +445,37 @@ function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<vo
         let clearPromise: Promise<void> = Promise.resolve();
 
         const onyxMethods = Object.values(OnyxUtils.METHOD);
+        const handlers: Record<OnyxMethodMap[keyof OnyxMethodMap], (k: OnyxKey, v: OnyxValue<OnyxKey>) => void> = {
+            [OnyxUtils.METHOD.SET]: enqueueSetOperation,
+            [OnyxUtils.METHOD.MERGE]: enqueueMergeOperation,
+            [OnyxUtils.METHOD.MERGE_COLLECTION]: (k, v) => {
+                const collection = v as OnyxMergeCollectionInput<OnyxKey>;
+                if (!OnyxUtils.isValidNonEmptyCollectionForMerge(collection)) {
+                    Logger.logInfo('Invalid or empty value provided in Onyx mergeCollection. Skipping this operation.');
+                    return;
+                }
+
+                // Confirm all the collection keys belong to the same parent
+                const collectionKeys = Object.keys(collection);
+                if (OnyxUtils.doAllCollectionItemsBelongToSameParent(k, collectionKeys)) {
+                    const mergedCollection: OnyxInputKeyValueMapping = collection;
+                    for (const collectionKey of collectionKeys) enqueueMergeOperation(collectionKey, mergedCollection[collectionKey]);
+                }
+            },
+            [OnyxUtils.METHOD.SET_COLLECTION]: (k, v) => promises.push(() => setCollection(k as TKey, v as OnyxSetCollectionInput<TKey>)),
+            [OnyxUtils.METHOD.MULTI_SET]: (k, v) => {
+                if (typeof v !== 'object' || Array.isArray(v) || typeof v === 'function') {
+                    Logger.logInfo(`Invalid value provided in Onyx multiSet. Value must be of type object. Skipping this operation.`);
+                    return;
+                }
+
+                for (const [entryKey, entryValue] of Object.entries(v as Partial<OnyxInputKeyValueMapping>)) enqueueSetOperation(entryKey, entryValue);
+            },
+            [OnyxUtils.METHOD.CLEAR]: () => {
+                clearPromise = clear();
+            },
+        };
+
         for (const {onyxMethod, key, value} of data) {
             if (!onyxMethods.includes(onyxMethod)) {
                 Logger.logInfo(`Invalid onyxMethod ${onyxMethod} in Onyx update. Skipping this operation.`);
@@ -443,37 +485,6 @@ function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<vo
                 Logger.logInfo(`Invalid ${typeof key} key provided in Onyx update. Key must be of type string. Skipping this operation.`);
                 continue;
             }
-
-            const handlers: Record<OnyxMethodMap[keyof OnyxMethodMap], (k: typeof key, v: typeof value) => void> = {
-                [OnyxUtils.METHOD.SET]: enqueueSetOperation,
-                [OnyxUtils.METHOD.MERGE]: enqueueMergeOperation,
-                [OnyxUtils.METHOD.MERGE_COLLECTION]: () => {
-                    const collection = value as OnyxMergeCollectionInput<OnyxKey>;
-                    if (!OnyxUtils.isValidNonEmptyCollectionForMerge(collection)) {
-                        Logger.logInfo('Invalid or empty value provided in Onyx mergeCollection. Skipping this operation.');
-                        return;
-                    }
-
-                    // Confirm all the collection keys belong to the same parent
-                    const collectionKeys = Object.keys(collection);
-                    if (OnyxUtils.doAllCollectionItemsBelongToSameParent(key, collectionKeys)) {
-                        const mergedCollection: OnyxInputKeyValueMapping = collection;
-                        for (const collectionKey of collectionKeys) enqueueMergeOperation(collectionKey, mergedCollection[collectionKey]);
-                    }
-                },
-                [OnyxUtils.METHOD.SET_COLLECTION]: (k, v) => promises.push(() => setCollection(k as TKey, v as OnyxSetCollectionInput<TKey>)),
-                [OnyxUtils.METHOD.MULTI_SET]: (k, v) => {
-                    if (typeof value !== 'object' || Array.isArray(value) || typeof value === 'function') {
-                        Logger.logInfo(`Invalid value provided in Onyx multiSet. Value must be of type object. Skipping this operation.`);
-                        return;
-                    }
-
-                    for (const [entryKey, entryValue] of Object.entries(v as Partial<OnyxInputKeyValueMapping>)) enqueueSetOperation(entryKey, entryValue);
-                },
-                [OnyxUtils.METHOD.CLEAR]: () => {
-                    clearPromise = clear();
-                },
-            };
 
             handlers[onyxMethod](key, value);
         }
@@ -497,7 +508,7 @@ function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<vo
                     delete updateQueue[key];
 
                     const batchedChanges = OnyxUtils.mergeAndMarkChanges(operations);
-                    if (operations[0] === null) {
+                    if (operations.at(0) === null) {
                         // eslint-disable-next-line no-param-reassign
                         queue.set[key] = batchedChanges.result;
                     } else {
@@ -528,12 +539,17 @@ function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<vo
                 );
             }
             if (!utils.isEmptyObject(batchedCollectionUpdates.set)) {
-                promises.push(() => OnyxUtils.partialSetCollection({collectionKey, collection: batchedCollectionUpdates.set as OnyxSetCollectionInput<OnyxKey>}));
+                promises.push(() =>
+                    OnyxUtils.partialSetCollection({
+                        collectionKey,
+                        collection: batchedCollectionUpdates.set,
+                    }),
+                );
             }
         }
 
         for (const [key, operations] of Object.entries(updateQueue)) {
-            if (operations[0] === null) {
+            if (operations.at(0) === null) {
                 const batchedChanges = OnyxUtils.mergeChanges(operations).result;
                 promises.push(() => set(key, batchedChanges));
                 continue;

@@ -12,7 +12,7 @@ const SYNC_ONYX = 'SYNC_ONYX';
 
 /**
  * Raise an event through `localStorage` to let other tabs know a value changed
- * @param {String} onyxKey
+ * @param onyxKey
  */
 function raiseStorageSyncEvent(onyxKey: OnyxKey) {
     global.localStorage.setItem(SYNC_ONYX, onyxKey);
@@ -30,7 +30,7 @@ let storage = NoopProvider;
 const InstanceSync = {
     shouldBeUsed: true,
     /**
-     * @param {Function} onStorageKeyChanged Storage synchronization mechanism keeping all opened tabs in sync
+     * @param onStorageKeyChanged Storage synchronization mechanism keeping all opened tabs in sync
      */
     init: (onStorageKeyChanged: OnStorageKeyChanged, store: StorageProvider<unknown>) => {
         storage = store;

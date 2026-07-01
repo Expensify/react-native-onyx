@@ -7,7 +7,6 @@ import StorageMock from '../../lib/storage';
 import OnyxCache from '../../lib/OnyxCache';
 import OnyxKeys from '../../lib/OnyxKeys';
 import OnyxUtils, {clearOnyxUtilsInternals} from '../../lib/OnyxUtils';
-import type GenericCollection from '../utils/GenericCollection';
 import type {OnyxUpdate} from '../../lib/Onyx';
 import createDeferredTask from '../../lib/createDeferredTask';
 import type {OnyxEntry, OnyxInputKeyValueMapping, OnyxKey, RetriableOnyxOperation} from '../../lib/types';
@@ -288,10 +287,10 @@ describe('OnyxUtils', () => {
         test('one call with 10k heavy objects', async () => {
             const changedReportActions = Object.fromEntries(
                 Object.entries(mockedReportActionsMap).map(([k, v]) => [k, randBoolean() ? v : createRandomReportAction(Number(v.reportActionID))] as const),
-            ) as GenericCollection;
+            );
             await measureAsyncFunction(() => OnyxUtils.partialSetCollection({collectionKey, collection: changedReportActions}), {
                 beforeEach: async () => {
-                    await Onyx.setCollection(collectionKey, mockedReportActionsMap as GenericCollection);
+                    await Onyx.setCollection(collectionKey, mockedReportActionsMap);
                 },
                 afterEach: clearOnyxAfterEachMeasure,
             });
@@ -302,9 +301,7 @@ describe('OnyxUtils', () => {
         test('one call with 10k heavy objects to update 10k subscribers', async () => {
             const subscriptionMap = new Map<string, number>();
 
-            const changedReportActions = Object.fromEntries(
-                Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const),
-            ) as GenericCollection;
+            const changedReportActions = Object.fromEntries(Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const));
 
             await measureFunction(() => OnyxUtils.keysChanged(collectionKey, changedReportActions, mockedReportActionsMap), {
                 beforeEach: async () => {
@@ -519,9 +516,7 @@ describe('OnyxUtils', () => {
 
     describe('initializeWithDefaultKeyStates', () => {
         test('one call initializing 10k heavy objects', async () => {
-            const changedReportActions = Object.fromEntries(
-                Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const),
-            ) as GenericCollection;
+            const changedReportActions = Object.fromEntries(Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const));
 
             await measureAsyncFunction(() => OnyxUtils.initializeWithDefaultKeyStates(), {
                 beforeEach: async () => {
@@ -575,7 +570,7 @@ describe('OnyxUtils', () => {
 
     describe('isValidNonEmptyCollectionForMerge', () => {
         test('one call', async () => {
-            await measureFunction(() => OnyxUtils.isValidNonEmptyCollectionForMerge(mockedReportActionsMap as GenericCollection));
+            await measureFunction(() => OnyxUtils.isValidNonEmptyCollectionForMerge(mockedReportActionsMap));
         });
     });
 

@@ -1,4 +1,4 @@
-import bindAll from 'lodash/bindAll';
+import bindAll from 'lodash.bindall';
 import * as Logger from './Logger';
 import type {ConnectOptions} from './Onyx';
 import OnyxUtils from './OnyxUtils';
@@ -138,7 +138,7 @@ class OnyxConnectionManager {
                     (callback as DefaultConnectCallback<OnyxKey>)(connection.cachedCallbackValue, connection.cachedCallbackKey as OnyxKey);
                 }
             } catch (error) {
-                Logger.logAlert(`[ConnectionManager] Subscriber callback threw an error for key '${connection.onyxKey}': ${error}`);
+                Logger.logAlert(`[ConnectionManager] Subscriber callback threw an error for key '${connection.onyxKey}': ${String(error)}`);
             }
         }
     }
@@ -173,7 +173,7 @@ class OnyxConnectionManager {
             subscriptionID = OnyxUtils.subscribeToKey({
                 ...connectOptions,
                 callback,
-            } as ConnectOptions<TKey>);
+            });
 
             connectionMetadata = {
                 subscriptionID,

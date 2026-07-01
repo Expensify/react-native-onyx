@@ -1,50 +1,43 @@
-import expensify from 'eslint-config-expensify';
-import tsPlugin from '@typescript-eslint/eslint-plugin';
-import tsParser from '@typescript-eslint/parser';
+import browserConfig from 'eslint-config-expensify/browser';
+import reactConfig from 'eslint-config-expensify/react';
+import scriptsConfig from 'eslint-config-expensify/scripts';
+import tsExpensifyConfig from 'eslint-config-expensify/typescript';
+import jestConfig from 'eslint-config-expensify/jest';
 import prettierConfig from 'eslint-config-prettier';
+import seatbelt from 'eslint-seatbelt';
+import rulesdir from 'eslint-plugin-rulesdir';
+import {defineConfig, globalIgnores} from 'eslint/config';
+import globals from 'globals';
+import path from 'node:path';
+import {createRequire} from 'node:module';
+import {fileURLToPath} from 'node:url';
 
-export default [
-    ...expensify,
-    prettierConfig,
+const dirname = path.dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
+const expensifyConfigDirectory = path.dirname(require.resolve('eslint-config-expensify'));
+rulesdir.RULES_DIR = path.resolve(expensifyConfigDirectory, 'eslint-plugin-expensify');
+
+export default defineConfig([
+    seatbelt.configs.enable,
+    globalIgnores(['dist/**', 'node_modules/**', '**/*.d.ts', '**/*.config.js', '**/*.config.cjs', 'tests/types/**/*.ts', 'cpp/**', 'bench-results/**', '.github/**']),
+    ...browserConfig,
+    ...reactConfig,
+    ...tsExpensifyConfig,
+    ...jestConfig,
+    ...scriptsConfig,
     {
-        ignores: ['dist/**', 'node_modules/**', '.github/**', '*.d.ts', '*.config.js', '*.config.cjs', 'tests/types/**/*.ts'],
-    },
-    {
-        // Overwriting this for now because web-e will conflict with this
-        files: ['**/*.js', '**/*.jsx'],
-        settings: {
-            'import/resolver': {
-                node: {
-                    extensions: ['.js', '.website.js', '.desktop.js', '.native.js', '.ios.js', '.android.js', '.config.js', '.ts', '.tsx'],
-                },
-            },
-        },
-        rules: {
-            'react/jsx-filename-extension': [1, {extensions: ['.js']}],
-            'rulesdir/no-multiple-onyx-in-file': 'off',
-            'import/extensions': [
-                'error',
-                'ignorePackages',
-                {
-                    js: 'never',
-                    jsx: 'never',
-                    ts: 'never',
-                    tsx: 'never',
-                },
-            ],
-        },
-    },
-    {
-        files: ['**/*.ts', '**/*.tsx'],
         plugins: {
-            '@typescript-eslint': tsPlugin,
+            rulesdir,
         },
-        languageOptions: {
-            parser: tsParser,
-            parserOptions: {
-                project: './tsconfig.json',
+        settings: {
+            seatbelt: {
+                seatbeltFile: path.join(dirname, 'eslint.seatbelt.tsv'),
+                threadsafe: true,
             },
         },
+    },
+    {
+        files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
         settings: {
             'import/resolver': {
                 typescript: {
@@ -54,88 +47,112 @@ export default [
             },
         },
         rules: {
-            ...tsPlugin.configs.recommended.rules,
-            ...tsPlugin.configs.stylistic.rules,
-            'rulesdir/prefer-underscore-method': 'off',
-            'react/jsx-props-no-spreading': 'off',
+            'react/prop-types': 'off',
             'react/require-default-props': 'off',
-            'react/jsx-filename-extension': ['error', {extensions: ['.tsx', '.jsx']}],
-            'import/no-unresolved': 'error',
-            'import/consistent-type-specifier-style': ['error', 'prefer-top-level'],
-            'no-use-before-define': 'off',
+        },
+    },
+    {
+        files: ['.prettierrc.cjs', 'jest-sequencer.js', 'jestSetup.js', 'jest-test-environment.ts', 'buildDocs.ts'],
+        languageOptions: {
+            globals: globals.node,
+        },
+    },
+    {
+        files: ['lib/OnyxUtils.ts'],
+        rules: {
             '@typescript-eslint/no-use-before-define': 'off',
-            '@typescript-eslint/no-unused-vars': ['error', {argsIgnorePattern: '^_', caughtErrors: 'none'}],
-            '@typescript-eslint/consistent-type-imports': ['error', {prefer: 'type-imports'}],
-            '@typescript-eslint/consistent-type-exports': ['error', {fixMixedExportsWithInlineTypeSpecifier: false}],
-            '@typescript-eslint/no-non-null-assertion': 'off',
-            '@typescript-eslint/array-type': ['error', {default: 'array-simple'}],
-            '@typescript-eslint/consistent-type-definitions': 'off',
-            '@typescript-eslint/no-empty-object-type': 'off',
-            'rulesdir/no-multiple-onyx-in-file': 'off',
-            'valid-jsdoc': 'off',
-            'rulesdir/prefer-import-module-contents': 'off',
-            'es/no-optional-chaining': 'off',
-            'es/no-nullish-coalescing-operators': 'off',
-            // Disable JSDoc type rules for TypeScript files (TypeScript provides the types)
-            'jsdoc/require-param': 'off',
-            'jsdoc/require-param-type': 'off',
-            'jsdoc/check-param-names': 'off',
-            'jsdoc/check-tag-names': 'off',
-            'jsdoc/check-types': 'off',
-            'no-func-assign': 'off',
-            'no-loop-func': 'off',
-            'no-redeclare': 'off',
-            '@typescript-eslint/no-redeclare': 'error',
-            'import/extensions': [
+        },
+    },
+    {
+        files: ['tests/**/*'],
+        rules: {
+            '@typescript-eslint/naming-convention': [
                 'error',
-                'ignorePackages',
                 {
-                    js: 'never',
-                    jsx: 'never',
-                    ts: 'never',
-                    tsx: 'never',
+                    selector: ['variable', 'property'],
+                    format: null,
+                    filter: {
+                        regex: '^__esModule$',
+                        match: true,
+                    },
+                },
+                {
+                    selector: ['variable', 'property'],
+                    format: ['camelCase', 'UPPER_CASE', 'PascalCase'],
+                    filter: {
+                        regex: '^private_[a-z][a-zA-Z0-9]*$',
+                        match: false,
+                    },
+                },
+                {
+                    selector: 'objectLiteralProperty',
+                    format: null,
+                    filter: {
+                        regex: '_',
+                        match: true,
+                    },
+                },
+                {
+                    selector: 'objectLiteralProperty',
+                    format: null,
+                    filter: {
+                        regex: '^[0-9]+$',
+                        match: true,
+                    },
+                },
+                {
+                    selector: 'function',
+                    format: ['camelCase', 'PascalCase'],
+                },
+                {
+                    selector: ['typeLike', 'enumMember'],
+                    format: ['PascalCase'],
+                },
+                {
+                    selector: ['parameter', 'method'],
+                    format: ['camelCase', 'PascalCase'],
+                    leadingUnderscore: 'allow',
                 },
             ],
-            'rulesdir/prefer-onyx-connect-in-libs': 'off',
         },
     },
     {
-        files: ['tests/**/*.{js,jsx,ts,tsx}', 'jestSetup.js', 'lib/**/__mocks__/**/*.{js,ts}'],
-        languageOptions: {
-            globals: {
-                jest: 'readonly',
-                describe: 'readonly',
-                it: 'readonly',
-                test: 'readonly',
-                expect: 'readonly',
-                beforeEach: 'readonly',
-                afterEach: 'readonly',
-                beforeAll: 'readonly',
-                afterAll: 'readonly',
-                fail: 'readonly',
-            },
-        },
+        files: ['tests/**/*', 'jestSetup.js', 'lib/**/__mocks__/**/*'],
         rules: {
-            '@lwc/lwc/no-async-await': 'off',
-            'no-await-in-loop': 'off',
-            'no-restricted-syntax': ['error', 'ForInStatement', 'LabeledStatement', 'WithStatement'],
             'import/extensions': 'off',
-            '@typescript-eslint/no-require-imports': 'off',
-            'no-restricted-imports': 'off',
         },
     },
     {
-        files: ['**/*.native.ts', '**/*.native.tsx'],
+        files: ['lib/storage/providers/SQLiteProvider.ts'],
         rules: {
-            '@typescript-eslint/no-require-imports': 'off',
+            '@typescript-eslint/naming-convention': [
+                'error',
+                {
+                    selector: 'typeProperty',
+                    format: ['camelCase', 'snake_case'],
+                },
+            ],
         },
     },
     {
         files: ['lib/storage/providers/MemoryOnlyProvider.ts'],
         languageOptions: {
             globals: {
-                jest: 'readonly',
+                ...globals.jest,
             },
         },
     },
-];
+    {
+        files: ['tests/**/*Test.ts', 'tests/perf-test/**/*'],
+        rules: {
+            '@typescript-eslint/dot-notation': 'off',
+        },
+    },
+    {
+        files: ['tests/perf-test/**/*'],
+        rules: {
+            'rulesdir/prefer-at': 'off',
+        },
+    },
+    prettierConfig,
+]);

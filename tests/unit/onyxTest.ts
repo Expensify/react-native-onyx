@@ -222,7 +222,9 @@ describe('Onyx', () => {
 
         await Onyx.set(collectionKey, []);
         expect((testKeyValue as Record<string, unknown>)?.[collectionKey]).toStrictEqual([]);
-        await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {[collectionKey]: {test: 'value'}});
+        await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+            [collectionKey]: {test: 'value'},
+        });
         expect((testKeyValue as Record<string, unknown>)?.[collectionKey]).toStrictEqual({test: 'value'});
     });
 
@@ -576,15 +578,21 @@ describe('Onyx', () => {
                 });
             })
             .then(() => {
-                expect(testKeyValue).toEqual({test1: {test2: 'test2', test3: 'test3'}});
+                expect(testKeyValue).toEqual({
+                    test1: {test2: 'test2', test3: 'test3'},
+                });
                 return Onyx.merge(ONYX_KEYS.TEST_KEY, {test1: undefined});
             })
             .then(() => {
-                expect(testKeyValue).toEqual({test1: {test2: 'test2', test3: 'test3'}});
+                expect(testKeyValue).toEqual({
+                    test1: {test2: 'test2', test3: 'test3'},
+                });
                 return Onyx.merge(ONYX_KEYS.TEST_KEY, undefined);
             })
             .then(() => {
-                expect(testKeyValue).toEqual({test1: {test2: 'test2', test3: 'test3'}});
+                expect(testKeyValue).toEqual({
+                    test1: {test2: 'test2', test3: 'test3'},
+                });
             });
     });
 
@@ -680,7 +688,7 @@ describe('Onyx', () => {
                 ID: 345,
                 value: 'three',
             },
-        } as GenericCollection)
+        })
             .then(() =>
                 // 2 key values to update and 2 new keys to add.
                 // MergeCollection will perform a mix of multiSet and multiMerge
@@ -702,14 +710,18 @@ describe('Onyx', () => {
                         ID: 567,
                         value: 'one',
                     },
-                } as GenericCollection),
+                }),
             )
             .then(() => {
                 // Callback fires once per mergeCollection with the full collection object.
                 expect(mockCallback).toHaveBeenCalledTimes(2);
                 expect(mockCallback).toHaveBeenNthCalledWith(
                     1,
-                    {test_1: {ID: 123, value: 'one'}, test_2: {ID: 234, value: 'two'}, test_3: {ID: 345, value: 'three'}},
+                    {
+                        test_1: {ID: 123, value: 'one'},
+                        test_2: {ID: 234, value: 'two'},
+                        test_3: {ID: 345, value: 'three'},
+                    },
                     ONYX_KEYS.COLLECTION.TEST_KEY,
                 );
                 expect(mockCallback).toHaveBeenNthCalledWith(
@@ -734,7 +746,10 @@ describe('Onyx', () => {
             callback: (data, key) => (valuesReceived[key] = data),
         });
 
-        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {test_1: {ID: 123}, notMyTest: {beep: 'boop'}} as GenericCollection).then(() => {
+        return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+            test_1: {ID: 123},
+            notMyTest: {beep: 'boop'},
+        }).then(() => {
             expect(valuesReceived).toEqual({});
         });
     });
@@ -764,7 +779,7 @@ describe('Onyx', () => {
                         ID: 234,
                         value: 'two',
                     },
-                } as GenericCollection),
+                }),
             )
             .then(() => {
                 expect(lastCollectionObject).toEqual({
@@ -808,7 +823,7 @@ describe('Onyx', () => {
         expect(mockCallback).toHaveBeenCalledTimes(1);
 
         // Should receive the entire merged collection
-        const receivedData = mockCallback.mock.calls[0][0];
+        const receivedData = mockCallback.mock.calls.at(0)[0];
         expect(receivedData).toEqual(
             expect.objectContaining({
                 [key1]: {id: '1', name: 'Item 1'},
@@ -851,7 +866,7 @@ describe('Onyx', () => {
         expect(mockCallback).toHaveBeenCalledTimes(1);
 
         // Should receive filtered collection
-        const receivedData = mockCallback.mock.calls[0][0];
+        const receivedData = mockCallback.mock.calls.at(0)[0];
         expect(receivedData).toEqual({
             [key2]: {id: '2', name: 'Updated Item 2'},
         });
@@ -934,7 +949,10 @@ describe('Onyx', () => {
             })
             .then(() => {
                 // The collection callback receives the whole collection object.
-                expect(mockCallback.mock.calls[mockCallback.mock.calls.length - 1][0]).toEqual({test_1: {existingData: 'test'}, test_2: {existingData: 'test'}});
+                expect(mockCallback.mock.calls[mockCallback.mock.calls.length - 1][0]).toEqual({
+                    test_1: {existingData: 'test'},
+                    test_2: {existingData: 'test'},
+                });
                 mockCallback.mockReset();
 
                 // When we pass a mergeCollection data object to Onyx.update
@@ -955,7 +973,7 @@ describe('Onyx', () => {
                                 ID: 345,
                                 value: 'three',
                             },
-                        } as GenericCollection,
+                        },
                     },
                 ]);
             })
@@ -1194,12 +1212,25 @@ describe('Onyx', () => {
 
         connections.push(Onyx.connect({key: ONYX_KEYS.TEST_KEY, callback: testCallback}));
         connections.push(Onyx.connect({key: ONYX_KEYS.OTHER_TEST, callback: otherTestCallback}));
-        connections.push(Onyx.connect({key: ONYX_KEYS.COLLECTION.TEST_UPDATE, callback: collectionCallback}));
+        connections.push(
+            Onyx.connect({
+                key: ONYX_KEYS.COLLECTION.TEST_UPDATE,
+                callback: collectionCallback,
+            }),
+        );
         return waitForPromisesToResolve().then(() =>
             Onyx.update([
                 {onyxMethod: Onyx.METHOD.SET, key: ONYX_KEYS.TEST_KEY, value: 'taco'},
-                {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.OTHER_TEST, value: 'pizza'},
-                {onyxMethod: Onyx.METHOD.MERGE_COLLECTION, key: ONYX_KEYS.COLLECTION.TEST_UPDATE, value: {[itemKey]: {a: 'a'}} as GenericCollection},
+                {
+                    onyxMethod: Onyx.METHOD.MERGE,
+                    key: ONYX_KEYS.OTHER_TEST,
+                    value: 'pizza',
+                },
+                {
+                    onyxMethod: Onyx.METHOD.MERGE_COLLECTION,
+                    key: ONYX_KEYS.COLLECTION.TEST_UPDATE,
+                    value: {[itemKey]: {a: 'a'}},
+                },
             ]).then(() => {
                 expect(collectionCallback).toHaveBeenCalledTimes(2);
                 expect(collectionCallback).toHaveBeenNthCalledWith(1, undefined, ONYX_KEYS.COLLECTION.TEST_UPDATE);
@@ -1407,7 +1438,7 @@ describe('Onyx', () => {
                     3: null,
                 },
             },
-        } as GenericCollection).then(() => {
+        }).then(() => {
             expect(result).toEqual({
                 [routineRoute]: {
                     waypoints: {
@@ -1494,10 +1525,14 @@ describe('Onyx', () => {
         await Onyx.update([{key: cat, value: finalValue, onyxMethod: Onyx.METHOD.MERGE}]);
 
         // The SNAPSHOT collection-root subscriber receives the whole collection.
-        expect(callback).toBeCalledTimes(2);
-        expect(callback.mock.calls[0][0]).toEqual({[snapshot1]: {data: {[cat]: initialValue}}});
+        expect(callback).toHaveBeenCalledTimes(2);
+        expect(callback.mock.calls[0][0]).toEqual({
+            [snapshot1]: {data: {[cat]: initialValue}},
+        });
         expect(callback.mock.calls[0][1]).toBe(ONYX_KEYS.COLLECTION.SNAPSHOT);
-        expect(callback.mock.calls[1][0]).toEqual({[snapshot1]: {data: {[cat]: finalValue}}});
+        expect(callback.mock.calls[1][0]).toEqual({
+            [snapshot1]: {data: {[cat]: finalValue}},
+        });
         expect(callback.mock.calls[1][1]).toBe(ONYX_KEYS.COLLECTION.SNAPSHOT);
     });
 
@@ -1528,10 +1563,22 @@ describe('Onyx', () => {
         await Onyx.update([{key: cat, value: finalValue, onyxMethod: Onyx.METHOD.MERGE}]);
 
         // The SNAPSHOT collection-root subscriber receives the whole collection.
-        expect(callback).toBeCalledTimes(2);
-        expect(callback.mock.calls[0][0]).toEqual({[snapshot1]: {data: {[cat]: initialValue}}});
+        expect(callback).toHaveBeenCalledTimes(2);
+        expect(callback.mock.calls[0][0]).toEqual({
+            [snapshot1]: {data: {[cat]: initialValue}},
+        });
         expect(callback.mock.calls[0][1]).toBe(ONYX_KEYS.COLLECTION.SNAPSHOT);
-        expect(callback.mock.calls[1][0]).toEqual({[snapshot1]: {data: {[cat]: {name: 'Kitty', pendingAction: 'delete', pendingFields: {preview: 'delete'}}}}});
+        expect(callback.mock.calls[1][0]).toEqual({
+            [snapshot1]: {
+                data: {
+                    [cat]: {
+                        name: 'Kitty',
+                        pendingAction: 'delete',
+                        pendingFields: {preview: 'delete'},
+                    },
+                },
+            },
+        });
         expect(callback.mock.calls[1][1]).toBe(ONYX_KEYS.COLLECTION.SNAPSHOT);
     });
 
@@ -1598,7 +1645,7 @@ describe('Onyx', () => {
                                 0: 'Bed',
                             },
                         },
-                    } as GenericCollection,
+                    },
                 },
                 {
                     onyxMethod: Onyx.METHOD.MERGE,
@@ -1663,7 +1710,12 @@ describe('Onyx', () => {
             const catCallback = jest.fn();
 
             connections.push(Onyx.connect({key: ONYX_KEYS.TEST_KEY, callback: testCallback}));
-            connections.push(Onyx.connect({key: ONYX_KEYS.OTHER_TEST, callback: otherTestCallback}));
+            connections.push(
+                Onyx.connect({
+                    key: ONYX_KEYS.OTHER_TEST,
+                    callback: otherTestCallback,
+                }),
+            );
             connections.push(
                 Onyx.connect({
                     key: ONYX_KEYS.COLLECTION.ANIMALS,
@@ -1679,11 +1731,31 @@ describe('Onyx', () => {
             connections.push(Onyx.connect({key: cat, callback: catCallback}));
 
             return Onyx.update([
-                {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.TEST_KEY, value: 'none'},
-                {onyxMethod: Onyx.METHOD.SET, key: ONYX_KEYS.TEST_KEY, value: {food: 'taco'}},
-                {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.TEST_KEY, value: {drink: 'wine'}},
-                {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.OTHER_TEST, value: {food: 'pizza'}},
-                {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.OTHER_TEST, value: {drink: 'water'}},
+                {
+                    onyxMethod: Onyx.METHOD.MERGE,
+                    key: ONYX_KEYS.TEST_KEY,
+                    value: 'none',
+                },
+                {
+                    onyxMethod: Onyx.METHOD.SET,
+                    key: ONYX_KEYS.TEST_KEY,
+                    value: {food: 'taco'},
+                },
+                {
+                    onyxMethod: Onyx.METHOD.MERGE,
+                    key: ONYX_KEYS.TEST_KEY,
+                    value: {drink: 'wine'},
+                },
+                {
+                    onyxMethod: Onyx.METHOD.MERGE,
+                    key: ONYX_KEYS.OTHER_TEST,
+                    value: {food: 'pizza'},
+                },
+                {
+                    onyxMethod: Onyx.METHOD.MERGE,
+                    key: ONYX_KEYS.OTHER_TEST,
+                    value: {drink: 'water'},
+                },
                 {onyxMethod: Onyx.METHOD.MERGE, key: dog, value: {sound: 'woof'}},
                 {
                     onyxMethod: Onyx.METHOD.MERGE_COLLECTION,
@@ -1691,12 +1763,16 @@ describe('Onyx', () => {
                     value: {
                         [cat]: {age: 5, size: 'S'},
                         [dog]: {size: 'M'},
-                    } as GenericCollection,
+                    },
                 },
                 {onyxMethod: Onyx.METHOD.SET, key: cat, value: {age: 3}},
                 {onyxMethod: Onyx.METHOD.MERGE, key: cat, value: {sound: 'meow'}},
                 {onyxMethod: Onyx.METHOD.MERGE, key: bob, value: {car: 'sedan'}},
-                {onyxMethod: Onyx.METHOD.MERGE, key: lisa, value: {car: 'SUV', age: 21}},
+                {
+                    onyxMethod: Onyx.METHOD.MERGE,
+                    key: lisa,
+                    value: {car: 'SUV', age: 21},
+                },
                 {onyxMethod: Onyx.METHOD.MERGE, key: bob, value: {age: 25}},
             ]).then(() => {
                 expect(testCallback).toHaveBeenNthCalledWith(1, {food: 'taco', drink: 'wine'}, ONYX_KEYS.TEST_KEY);
@@ -1802,7 +1878,11 @@ describe('Onyx', () => {
 
             await Onyx.update(queuedUpdates);
 
-            expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {someKey: 'someValueChanged'}});
+            expect(result).toEqual({
+                [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {
+                    someKey: 'someValueChanged',
+                },
+            });
             expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual({someKey: 'someValueChanged'});
         });
 
@@ -1825,7 +1905,9 @@ describe('Onyx', () => {
                         someKey: 'someValue',
                     },
                 };
-                await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1});
+                await Onyx.multiSet({
+                    [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1,
+                });
 
                 const entry1ExpectedResult = lodashCloneDeep(entry1);
                 const queuedUpdates: Array<OnyxUpdate<OnyxKey>> = [];
@@ -1855,7 +1937,9 @@ describe('Onyx', () => {
 
                 await Onyx.update(queuedUpdates);
 
-                expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult});
+                expect(result).toEqual({
+                    [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult,
+                });
                 expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual(entry1ExpectedResult);
             });
 
@@ -1872,7 +1956,9 @@ describe('Onyx', () => {
                         },
                     },
                 };
-                await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1});
+                await Onyx.multiSet({
+                    [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1,
+                });
 
                 const entry1ExpectedResult = lodashCloneDeep(entry1);
                 const queuedUpdates: Array<OnyxUpdate<OnyxKey>> = [];
@@ -1927,7 +2013,9 @@ describe('Onyx', () => {
 
                 await Onyx.update(queuedUpdates);
 
-                expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult});
+                expect(result).toEqual({
+                    [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult,
+                });
                 expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual(entry1ExpectedResult);
             });
 
@@ -1944,7 +2032,9 @@ describe('Onyx', () => {
                         },
                     },
                 };
-                await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1});
+                await Onyx.multiSet({
+                    [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1,
+                });
 
                 const entry1ExpectedResult = lodashCloneDeep(entry1);
                 const queuedUpdates: Array<OnyxUpdate<OnyxKey>> = [];
@@ -1987,7 +2077,9 @@ describe('Onyx', () => {
 
                 await Onyx.update(queuedUpdates);
 
-                expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult});
+                expect(result).toEqual({
+                    [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult,
+                });
                 expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual(entry1ExpectedResult);
             });
 
@@ -2026,7 +2118,10 @@ describe('Onyx', () => {
                         },
                     },
                 });
-                entry1ExpectedResult = {someKey: 'someValueChanged', someNestedObject: {someNestedKey: 'someNestedValue'}};
+                entry1ExpectedResult = {
+                    someKey: 'someValueChanged',
+                    someNestedObject: {someNestedKey: 'someNestedValue'},
+                };
 
                 queuedUpdates.push({
                     key: `${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`,
@@ -2049,11 +2144,15 @@ describe('Onyx', () => {
                         },
                     },
                 });
-                entry1ExpectedResult.someNestedObject = {someNestedKeyChanged: 'someNestedValueChange'};
+                entry1ExpectedResult.someNestedObject = {
+                    someNestedKeyChanged: 'someNestedValueChange',
+                };
 
                 await Onyx.update(queuedUpdates);
 
-                expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult});
+                expect(result).toEqual({
+                    [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult,
+                });
                 expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual(entry1ExpectedResult);
             });
 
@@ -2072,8 +2171,12 @@ describe('Onyx', () => {
                             someKey: 'someValue',
                         },
                     };
-                    await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1});
-                    await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`]: entry2});
+                    await Onyx.multiSet({
+                        [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1,
+                    });
+                    await Onyx.multiSet({
+                        [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry2`]: entry2,
+                    });
 
                     const entry1ExpectedResult = lodashCloneDeep(entry1);
                     const entry2ExpectedResult = lodashCloneDeep(entry2);
@@ -2179,7 +2282,7 @@ describe('Onyx', () => {
                 [routeA]: {name: 'Route A'},
                 [routeB]: {name: 'Route B'},
                 [routeC]: {name: 'Route C'},
-            } as GenericCollection)
+            })
                 .then(() =>
                     Onyx.update([
                         {
@@ -2188,7 +2291,7 @@ describe('Onyx', () => {
                             value: {
                                 [routeA]: {name: 'New Route A'},
                                 [routeB]: {name: 'New Route B'},
-                            } as GenericCollection,
+                            },
                         },
                     ]),
                 )
@@ -2224,7 +2327,7 @@ describe('Onyx', () => {
             return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
                 [routeA]: {name: 'Route A'},
                 [routeB]: {name: 'Route B'},
-            } as GenericCollection)
+            })
                 .then(() =>
                     Onyx.update([
                         {
@@ -2237,7 +2340,7 @@ describe('Onyx', () => {
                             key: ONYX_KEYS.COLLECTION.ROUTES,
                             value: {
                                 [routeA]: {name: 'Final Route A'},
-                            } as GenericCollection,
+                            },
                         },
                         {
                             onyxMethod: Onyx.METHOD.MERGE,
@@ -2290,7 +2393,7 @@ describe('Onyx', () => {
                     value: {
                         [key1]: {id: '1', name: 'Updated Item 1'},
                         [key2]: {id: '2', name: 'Updated Item 2'},
-                    } as GenericCollection,
+                    },
                 },
             ]);
 
@@ -2347,8 +2450,12 @@ describe('Onyx', () => {
                 await act(async () =>
                     Onyx.update([
                         {onyxMethod: 'set', key: ONYX_KEYS.TEST_KEY, value: 'test1'},
-                        // @ts-expect-error invalid method
-                        {onyxMethod: 'invalidMethod', key: ONYX_KEYS.OTHER_TEST, value: 'test2'},
+                        {
+                            // @ts-expect-error invalid method
+                            onyxMethod: 'invalidMethod',
+                            key: ONYX_KEYS.OTHER_TEST,
+                            value: 'test2',
+                        },
                     ]),
                 );
 
@@ -2381,7 +2488,11 @@ describe('Onyx', () => {
                 await act(async () =>
                     Onyx.update([
                         // @ts-expect-error invalid value
-                        {onyxMethod: 'mergecollection', key: ONYX_KEYS.COLLECTION.TEST_KEY, value: 'test1'},
+                        {
+                            onyxMethod: 'mergecollection',
+                            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+                            value: 'test1',
+                        },
                     ]),
                 );
 
@@ -2418,7 +2529,11 @@ describe('Onyx', () => {
 
             await waitForPromisesToResolve();
 
-            expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {someKey: 'someValueChanged'}});
+            expect(result).toEqual({
+                [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: {
+                    someKey: 'someValueChanged',
+                },
+            });
             expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual({someKey: 'someValueChanged'});
         });
 
@@ -2441,7 +2556,9 @@ describe('Onyx', () => {
                         someKey: 'someValue',
                     },
                 };
-                await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1});
+                await Onyx.multiSet({
+                    [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1,
+                });
 
                 const entry1ExpectedResult = lodashCloneDeep(entry1);
 
@@ -2462,7 +2579,9 @@ describe('Onyx', () => {
 
                 await waitForPromisesToResolve();
 
-                expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult});
+                expect(result).toEqual({
+                    [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult,
+                });
                 expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual(entry1ExpectedResult);
             });
 
@@ -2479,7 +2598,9 @@ describe('Onyx', () => {
                         },
                     },
                 };
-                await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1});
+                await Onyx.multiSet({
+                    [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1,
+                });
 
                 const entry1ExpectedResult = lodashCloneDeep(entry1);
 
@@ -2521,7 +2642,9 @@ describe('Onyx', () => {
 
                 await waitForPromisesToResolve();
 
-                expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult});
+                expect(result).toEqual({
+                    [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult,
+                });
                 expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual(entry1ExpectedResult);
             });
 
@@ -2538,7 +2661,9 @@ describe('Onyx', () => {
                         },
                     },
                 };
-                await Onyx.multiSet({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1});
+                await Onyx.multiSet({
+                    [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1,
+                });
 
                 const entry1ExpectedResult = lodashCloneDeep(entry1);
 
@@ -2572,7 +2697,9 @@ describe('Onyx', () => {
 
                 await waitForPromisesToResolve();
 
-                expect(result).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult});
+                expect(result).toEqual({
+                    [`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`]: entry1ExpectedResult,
+                });
                 expect(await StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST_UPDATE}entry1`)).toEqual(entry1ExpectedResult);
             });
         });
@@ -2618,7 +2745,9 @@ describe('Onyx', () => {
         it('should not save a RAM-only key to storage when using merge', async () => {
             await Onyx.merge(ONYX_KEYS.RAM_ONLY_TEST_KEY, {someProperty: 'value'});
 
-            expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toEqual({someProperty: 'value'});
+            expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toEqual({
+                someProperty: 'value',
+            });
             expect(await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeNull();
         });
 
@@ -2648,7 +2777,9 @@ describe('Onyx', () => {
                 .then(() => {
                     expect(testKeyValue).toEqual(testData);
 
-                    return Onyx.set(ONYX_KEYS.TEST_KEY, testData, {skipCacheCheck: true});
+                    return Onyx.set(ONYX_KEYS.TEST_KEY, testData, {
+                        skipCacheCheck: true,
+                    });
                 })
                 .then(() => {
                     expect(testKeyValue).toEqual(testData);
@@ -2708,14 +2839,14 @@ describe('Onyx', () => {
                 [routeA]: {name: 'Route A'},
                 [routeB1]: {name: 'Route B1'},
                 [routeC]: {name: 'Route C'},
-            } as GenericCollection);
+            });
 
             // Replace with new collection data
             await Onyx.setCollection(ONYX_KEYS.COLLECTION.ROUTES, {
                 [routeA]: {name: 'New Route A'},
                 [routeB]: {name: 'New Route B'},
                 [routeC]: {name: 'New Route C'},
-            } as GenericCollection);
+            });
 
             expect(result).toEqual({
                 [routeA]: {name: 'New Route A'},
@@ -2742,9 +2873,9 @@ describe('Onyx', () => {
 
             await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
                 [routeA]: {name: 'Route A'},
-            } as GenericCollection);
+            });
 
-            await Onyx.setCollection(ONYX_KEYS.COLLECTION.ROUTES, {} as GenericCollection);
+            await Onyx.setCollection(ONYX_KEYS.COLLECTION.ROUTES, {});
 
             expect(result).toEqual({});
         });
@@ -2761,7 +2892,7 @@ describe('Onyx', () => {
 
             await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
                 [routeA]: {name: 'Route A'},
-            } as GenericCollection);
+            });
 
             await Onyx.setCollection(ONYX_KEYS.COLLECTION.ROUTES, {
                 [invalidRoute]: {name: 'Invalid Route'},
@@ -2792,13 +2923,13 @@ describe('Onyx', () => {
                 [routeA]: null,
                 [routeB]: {name: 'Route B'},
                 [routeC]: null,
-            } as GenericCollection);
+            });
 
             // Should only be called once
             expect(mockCallback).toHaveBeenCalledTimes(1);
 
             // Should receive filtered collection (only non-null values)
-            const receivedData = mockCallback.mock.calls[0][0];
+            const receivedData = mockCallback.mock.calls.at(0)[0];
             expect(receivedData).toEqual({
                 [routeB]: {name: 'Route B'},
             });
@@ -2830,11 +2961,20 @@ describe('Onyx', () => {
                 },
             });
 
-            await Onyx.set(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`, {id: 'entry1_id', name: 'entry2_name'});
-            await Onyx.set(`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`, {id: 'skippable-id_id', name: 'skippable-id_name'});
+            await Onyx.set(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`, {
+                id: 'entry1_id',
+                name: 'entry2_name',
+            });
+            await Onyx.set(`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`, {
+                id: 'skippable-id_id',
+                name: 'skippable-id_name',
+            });
 
             expect(testKeyValue).toEqual({
-                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry2_name'},
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {
+                    id: 'entry1_id',
+                    name: 'entry2_name',
+                },
             });
         });
 
@@ -2847,11 +2987,20 @@ describe('Onyx', () => {
                 },
             });
 
-            await Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`, {id: 'entry1_id', name: 'entry2_name'});
-            await Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`, {id: 'skippable-id_id', name: 'skippable-id_name'});
+            await Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`, {
+                id: 'entry1_id',
+                name: 'entry2_name',
+            });
+            await Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`, {
+                id: 'skippable-id_id',
+                name: 'skippable-id_name',
+            });
 
             expect(testKeyValue).toEqual({
-                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry2_name'},
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {
+                    id: 'entry1_id',
+                    name: 'entry2_name',
+                },
             });
         });
 
@@ -2865,14 +3014,29 @@ describe('Onyx', () => {
             });
 
             await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
-                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
-                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
-                [`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`]: {id: 'skippable-id_id', name: 'skippable-id_name'},
-            } as GenericCollection);
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {
+                    id: 'entry1_id',
+                    name: 'entry1_name',
+                },
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {
+                    id: 'entry2_id',
+                    name: 'entry2_name',
+                },
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`]: {
+                    id: 'skippable-id_id',
+                    name: 'skippable-id_name',
+                },
+            });
 
             expect(testKeyValue).toEqual({
-                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
-                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {
+                    id: 'entry1_id',
+                    name: 'entry1_name',
+                },
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {
+                    id: 'entry2_id',
+                    name: 'entry2_name',
+                },
             });
         });
 
@@ -2886,14 +3050,29 @@ describe('Onyx', () => {
             });
 
             await Onyx.setCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
-                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
-                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
-                [`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`]: {id: 'skippable-id_id', name: 'skippable-id_name'},
-            } as GenericCollection);
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {
+                    id: 'entry1_id',
+                    name: 'entry1_name',
+                },
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {
+                    id: 'entry2_id',
+                    name: 'entry2_name',
+                },
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`]: {
+                    id: 'skippable-id_id',
+                    name: 'skippable-id_name',
+                },
+            });
 
             expect(testKeyValue).toEqual({
-                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
-                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {
+                    id: 'entry1_id',
+                    name: 'entry1_name',
+                },
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {
+                    id: 'entry2_id',
+                    name: 'entry2_name',
+                },
             });
         });
 
@@ -2907,14 +3086,29 @@ describe('Onyx', () => {
             });
 
             await Onyx.multiSet({
-                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
-                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
-                [`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`]: {id: 'skippable-id_id', name: 'skippable-id_name'},
-            } as GenericCollection);
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {
+                    id: 'entry1_id',
+                    name: 'entry1_name',
+                },
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {
+                    id: 'entry2_id',
+                    name: 'entry2_name',
+                },
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}skippable-id`]: {
+                    id: 'skippable-id_id',
+                    name: 'skippable-id_name',
+                },
+            });
 
             expect(testKeyValue).toEqual({
-                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
-                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: {
+                    id: 'entry1_id',
+                    name: 'entry1_name',
+                },
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry2`]: {
+                    id: 'entry2_id',
+                    name: 'entry2_name',
+                },
             });
         });
         it('should clear pending merge for a key during multiSet()', async () => {
@@ -3010,7 +3204,9 @@ describe('Onyx.init', () => {
         });
 
         it('mergeCollection', async () => {
-            Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {[`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: 'test_1'});
+            Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: 'test_1',
+            });
             await act(async () => waitForPromisesToResolve());
 
             expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toBeUndefined();
@@ -3049,7 +3245,9 @@ describe('Onyx.init', () => {
         });
 
         it('setCollection', async () => {
-            Onyx.setCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {[`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: 'test_1'});
+            Onyx.setCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`]: 'test_1',
+            });
             await act(async () => waitForPromisesToResolve());
 
             expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toBeUndefined();
@@ -3135,7 +3333,9 @@ describe('RAM-only keys should not read from storage', () => {
     it('should not include stale RAM-only keys in getAllKeys results', async () => {
         // Simulate stale data in storage
         await StorageMock.setItem(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'stale_value');
-        await StorageMock.setItem(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`, {stale: 'member'});
+        await StorageMock.setItem(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`, {
+            stale: 'member',
+        });
         await StorageMock.setItem(ONYX_KEYS.OTHER_TEST, 'normal_value');
 
         Onyx.init({
@@ -3171,7 +3371,10 @@ describe('RAM-only keys should not read from storage', () => {
 
     it('should not use stale storage data as merge base for RAM-only keys', async () => {
         // Simulate stale data in storage
-        await StorageMock.setItem(ONYX_KEYS.RAM_ONLY_TEST_KEY, {name: 'stale', token: 'old_token'});
+        await StorageMock.setItem(ONYX_KEYS.RAM_ONLY_TEST_KEY, {
+            name: 'stale',
+            token: 'old_token',
+        });
 
         Onyx.init({
             keys: ONYX_KEYS,
@@ -3259,7 +3462,7 @@ describe('RAM-only keys should not read from storage', () => {
         await act(async () => waitForPromisesToResolve());
 
         // Get the callback that was passed to keepInstancesSync
-        const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls[0]?.[0];
+        const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls.at(0)?.[0];
         expect(syncCallback).toBeDefined();
 
         let receivedValue: unknown;
@@ -3304,7 +3507,9 @@ describe('RAM-only keys should not read from storage', () => {
 
         // Pre-seed storage with stale data for both normal and RAM-only keys
         await StorageMock.setItem(normalMember, 'normal_from_storage');
-        await StorageMock.setItem(ramOnlyMember, {data: 'stale_collection_member'});
+        await StorageMock.setItem(ramOnlyMember, {
+            data: 'stale_collection_member',
+        });
 
         Onyx.init({
             keys: ONYX_KEYS,
@@ -3389,8 +3594,16 @@ describe('get() should prefer cache over stale storage', () => {
 
         // 2+ collection keys get batched into mergeCollectionWithPatches (deferred cache write)
         const updatePromise = Onyx.update([
-            {onyxMethod: Onyx.METHOD.MERGE, key: member1, value: {isOptimistic: true, name: 'first'}},
-            {onyxMethod: Onyx.METHOD.MERGE, key: member2, value: {isOptimistic: true, name: 'second'}},
+            {
+                onyxMethod: Onyx.METHOD.MERGE,
+                key: member1,
+                value: {isOptimistic: true, name: 'first'},
+            },
+            {
+                onyxMethod: Onyx.METHOD.MERGE,
+                key: member2,
+                value: {isOptimistic: true, name: 'second'},
+            },
         ]);
 
         // Concurrent merge fires before cache write — its get() hits the delayed storage mock

@@ -1,5 +1,5 @@
 import {deepEqual} from 'fast-equals';
-import bindAll from 'lodash/bindAll';
+import bindAll from 'lodash.bindall';
 import type {ValueOf} from 'type-fest';
 import utils from './utils';
 import type {CollectionKeyBase, KeyValueMapping, NonUndefined, OnyxCollection, OnyxKey, OnyxValue} from './types';
@@ -42,7 +42,7 @@ class OnyxCache {
      * Captured pending tasks for already running storage methods
      * Using a map yields better performance on operations such a delete
      */
-    private pendingPromises: Map<string, Promise<OnyxValue<OnyxKey> | OnyxKey[]>>;
+    private pendingPromises: Map<string, Promise<unknown>>;
 
     /** List of keys that are safe to remove when we reach max storage */
     private evictionAllowList: OnyxKey[] = [];
@@ -272,7 +272,7 @@ class OnyxCache {
      * provided from this function
      * @param taskName - unique name given for the task
      */
-    getTaskPromise(taskName: CacheTask): Promise<OnyxValue<OnyxKey> | OnyxKey[]> | undefined {
+    getTaskPromise(taskName: CacheTask): Promise<unknown> | undefined {
         return this.pendingPromises.get(taskName);
     }
 

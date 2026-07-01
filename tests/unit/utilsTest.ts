@@ -137,7 +137,7 @@ describe('utils', () => {
             });
 
             it('should add the "ONYX_INTERNALS__REPLACE_OBJECT_MARK" flag to the merged object when the change is set to null and "objectRemovalMode" is set to "mark"', () => {
-                const result = utils.fastMerge(testMergeChanges[1], testMergeChanges[0], {
+                const result = utils.fastMerge(testMergeChanges.at(1), testMergeChanges.at(0), {
                     shouldRemoveNestedNulls: true,
                     objectRemovalMode: 'mark',
                 });
@@ -146,7 +146,7 @@ describe('utils', () => {
                     b: {
                         d: {
                             h: 'h',
-                            [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                            [utils.ONYX_INTERNALS_REPLACE_OBJECT_MARK]: true,
                         },
                         h: 'h',
                     },
@@ -161,7 +161,7 @@ describe('utils', () => {
                         b: {
                             d: {
                                 h: 'h',
-                                [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                                [utils.ONYX_INTERNALS_REPLACE_OBJECT_MARK]: true,
                             },
                             h: 'h',
                         },
