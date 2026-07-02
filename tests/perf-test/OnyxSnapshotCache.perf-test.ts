@@ -2,6 +2,7 @@ import {measureFunction} from 'reassure';
 import {OnyxSnapshotCache} from '../../lib/OnyxSnapshotCache';
 import type {UseOnyxOptions, UseOnyxResult, UseOnyxSelector} from '../../lib/useOnyx';
 import type {OnyxKey} from '../../lib';
+import getAtIndex from '../utils/getAtIndex';
 
 // Define types for test data
 type MockData = {
@@ -179,7 +180,7 @@ describe('OnyxSnapshotCache', () => {
                         // Pre-populate cache with 1000 entries
                         for (let i = 0; i < 1000; i++) {
                             const key = `test_key_${i}`;
-                            const result = mockResults[i];
+                            const result = getAtIndex(mockResults, i);
                             cache.setCachedResult(key, `cache_key_${i}`, result);
                         }
                         // Set our target entry

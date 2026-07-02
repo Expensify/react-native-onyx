@@ -26,6 +26,10 @@
 "lib/storage/providers/NoopProvider.ts"	"@typescript-eslint/no-unsafe-type-assertion"	1
 "lib/storage/providers/SQLiteProvider.ts"	"@typescript-eslint/no-unsafe-return"	3
 "lib/storage/providers/SQLiteProvider.ts"	"@typescript-eslint/no-unsafe-type-assertion"	3
+# useLiveRef is deprecated but still used by useOnyx; refs assignment during render is intentional
+"lib/useLiveRef.ts"	"@typescript-eslint/no-deprecated"	1
+"lib/useLiveRef.ts"	"react-hooks/refs"	1
+"lib/useOnyx.ts"	"@typescript-eslint/no-deprecated"	1
 "lib/useOnyx.ts"	"@typescript-eslint/no-unsafe-type-assertion"	2
 "lib/utils.ts"	"@typescript-eslint/no-unsafe-type-assertion"	5
 "tests/perf-test/Onyx.perf-test.ts"	"@typescript-eslint/no-unsafe-type-assertion"	1
@@ -41,6 +45,7 @@
 "tests/perf-test/utils.perf-test.ts"	"@typescript-eslint/no-unsafe-member-access"	3
 "tests/unit/DevToolsTest.ts"	"@typescript-eslint/no-unsafe-assignment"	2
 "tests/unit/DevToolsTest.ts"	"@typescript-eslint/no-unsafe-type-assertion"	9
+"tests/utils/onyxConnectionManagerTestHarness.ts"	"@typescript-eslint/no-unsafe-type-assertion"	1
 "tests/unit/OnyxConnectionManagerTest.ts"	"@typescript-eslint/no-unsafe-return"	1
 "tests/unit/OnyxConnectionManagerTest.ts"	"@typescript-eslint/no-unsafe-type-assertion"	2
 "tests/unit/OnyxSnapshotCacheTest.ts"	"@typescript-eslint/no-unsafe-type-assertion"	7
