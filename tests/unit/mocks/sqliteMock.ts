@@ -54,7 +54,7 @@ function wrapRows<TRow extends QueryResultRow>(rowsArray: TRow[]): NitroSQLiteQu
     };
 }
 
-function prepareAndBind(database: Database, sql: string, parameters?: SQLiteQueryParams) {
+function prepareAndBind(database: Database, sql: BatchQueryCommand['query'], parameters?: BatchQueryCommand['params']) {
     const namedOrder = extractNamedParameterOrder(sql);
     if (namedOrder) {
         // Map positional parameters array to named bindings object — NitroSQLite's
@@ -71,18 +71,13 @@ function prepareAndBind(database: Database, sql: string, parameters?: SQLiteQuer
     return {statement: database.prepare(sql), boundArguments: parameters ?? []};
 }
 
-type BatchQuery = {
-    query: string;
-    params?: SQLiteQueryParams;
-};
-
 /**
  * Expands batch commands the same way NitroSQLite does in `batchParamsToCommands`:
  * `params` is either one binding set for the query, or an array of binding sets
  * (same query executed once per row).
  */
-function batchParamsToCommands(commands: BatchQueryCommand[]): BatchQuery[] {
-    const expanded: BatchQuery[] = [];
+function batchParamsToCommands(commands: BatchQueryCommand[]): BatchQueryCommand[] {
+    const expanded: BatchQueryCommand[] = [];
 
     for (const command of commands) {
         const {query, params} = command;
