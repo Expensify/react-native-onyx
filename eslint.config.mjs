@@ -63,6 +63,8 @@ export default defineConfig([
             '@typescript-eslint/no-use-before-define': 'off',
         },
     },
+    // Flat config replaces the whole naming-convention array, so this repeats eslint-config-expensify/typescript
+    // and adds objectLiteralProperty exceptions for Onyx key strings (underscores) and numeric collection IDs.
     {
         files: ['tests/**/*'],
         rules: {
@@ -120,18 +122,6 @@ export default defineConfig([
         files: ['tests/**/*', 'jestSetup.js', 'lib/**/__mocks__/**/*'],
         rules: {
             'import/extensions': 'off',
-        },
-    },
-    {
-        files: ['lib/storage/providers/SQLiteProvider.ts'],
-        rules: {
-            '@typescript-eslint/naming-convention': [
-                'error',
-                {
-                    selector: 'typeProperty',
-                    format: ['camelCase', 'snake_case'],
-                },
-            ],
         },
     },
     {
