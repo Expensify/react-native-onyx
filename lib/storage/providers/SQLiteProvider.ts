@@ -201,11 +201,19 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             throw new Error('Store is not initialized!');
         }
 
-        return provider.store.executeAsync<OnyxSQLiteKeyValuePair>('SELECT record_key, valueJSON FROM keyvaluepairs;').then(({rows}) => {
-            // eslint-disable-next-line no-underscore-dangle
-            const result = rows?._array.map((row) => [row.record_key, JSON.parse(row.valueJSON)]);
-            return (result ?? []) as StorageKeyValuePair[];
-        });
+        // We ask SQLite to combine the whole table into one JSON string, instead of returning
+        // every row and parsing each one in JavaScript. This way we only run JSON.parse a single
+        // time. Since record_key is the primary key, the rows already come back sorted by key,
+        // so ordering by record_key costs almost nothing.
+        return provider.store
+            .executeAsync<{aggregated: string | null}>('SELECT json_group_array(json_array(record_key, json(valueJSON))) AS aggregated FROM keyvaluepairs ORDER BY record_key;')
+            .then(({rows}) => {
+                const aggregated = rows?.item(0)?.aggregated;
+                if (aggregated == null) {
+                    return [];
+                }
+                return JSON.parse(aggregated) as StorageKeyValuePair[];
+            });
     },
     removeItem(key) {
         if (!provider.store) {
