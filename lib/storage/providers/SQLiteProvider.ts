@@ -201,12 +201,10 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             throw new Error('Store is not initialized!');
         }
 
-        // We ask SQLite to combine the whole table into one JSON string, instead of returning
-        // every row and parsing each one in JavaScript. This way we only run JSON.parse a single
-        // time. Since record_key is the primary key, the rows already come back sorted by key,
-        // so ordering by record_key costs almost nothing.
+        // Aggregate the whole table into a single JSON string in SQLite so we only run JSON.parse
+        // once, instead of returning every row and parsing each one individually in JavaScript.
         return provider.store
-            .executeAsync<{aggregated: string | null}>('SELECT json_group_array(json_array(record_key, json(valueJSON))) AS aggregated FROM keyvaluepairs ORDER BY record_key;')
+            .executeAsync<{aggregated: string | null}>('SELECT json_group_array(json_array(record_key, json(valueJSON))) AS aggregated FROM keyvaluepairs;')
             .then(({rows}) => {
                 const aggregated = rows?.item(0)?.aggregated;
                 if (aggregated == null) {
