@@ -290,6 +290,23 @@ describe('SQLiteProvider', () => {
         });
     });
 
+    describe('getAll', () => {
+        it('should return every stored key-value pair with correct values', async () => {
+            await SQLiteProvider.multiSet(testEntries);
+
+            const out = await SQLiteProvider.getAll();
+            const sortedActual = [...out].sort((a, b) => a[0].localeCompare(b[0]));
+            const sortedExpected = [...testEntries].sort((a, b) => a[0].localeCompare(b[0]));
+
+            expect(out).toHaveLength(5);
+            expect(sortedActual).toEqual(sortedExpected);
+        });
+
+        it('should return an empty array when the store is empty', async () => {
+            expect(await SQLiteProvider.getAll()).toEqual([]);
+        });
+    });
+
     describe('removeItem', () => {
         it('should remove the key from the store', async () => {
             await SQLiteProvider.multiSet(testEntries);
