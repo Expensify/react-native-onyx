@@ -773,11 +773,57 @@ function reportStorageQuota(error?: Error): Promise<void> {
         });
 }
 
+// 64 KB — Chromium wraps any IndexedDB value larger than this into an external blob file
+// (application/vnd.blink-idb-value-wrapper); that file write is what fails as "Failed to write blobs".
+const IDB_VALUE_WRAP_THRESHOLD_BYTES = 64 * 1024;
+
+/**
+ * Diagnostic for UNRECOVERABLE blob-write failures: reports the key(s) in the failed write and each
+ * value's approximate serialized size (never the values themselves), so telemetry can reveal whether
+ * the failing writes are the >64 KB ones Chromium externalizes to blob files, and which keys they are.
+ */
+function summarizeFailedWritePayload(defaultParams: unknown): string {
+    try {
+        const params = defaultParams as Record<string, unknown> | undefined;
+        let pairs: Array<[string, unknown]> = [];
+        if (params && typeof params === 'object') {
+            if ('key' in params && 'value' in params) {
+                pairs = [[String(params.key), params.value]];
+            } else if ('collection' in params && params.collection && typeof params.collection === 'object') {
+                pairs = Object.entries(params.collection as Record<string, unknown>);
+            } else {
+                pairs = Object.entries(params as Record<string, unknown>);
+            }
+        }
+        const sized = pairs
+            .map(([key, value]) => {
+                let bytes = -1;
+                try {
+                    bytes = JSON.stringify(value)?.length ?? 0;
+                } catch {
+                    bytes = -1;
+                }
+                return {key, bytes};
+            })
+            .sort((a, b) => b.bytes - a.bytes);
+        const overThreshold = sized.filter((entry) => entry.bytes >= IDB_VALUE_WRAP_THRESHOLD_BYTES).length;
+        const largest = sized
+            .slice(0, 5)
+            .map((entry) => `${entry.key}=${entry.bytes}B`)
+            .join(', ');
+        return `pairs: ${sized.length}. over64KB: ${overThreshold}. largest: [${largest}].`;
+    } catch {
+        return 'payload summary unavailable.';
+    }
+}
+
 /**
  * Handles storage operation failures based on the error class (see lib/storage/errors.ts).
  * The connection layer (createStore) owns connection/transport recovery; this operation layer owns
  * capacity recovery (eviction) so that a given failure is retried by exactly one layer:
  * - INVALID_DATA: logs an alert and throws (the same data will always fail).
+ * - UNRECOVERABLE: an engine-level write fault or permanently invalid payload that no retry,
+ *   reopen, or eviction can fix — skip the write quietly (no throw, unlike INVALID_DATA).
  * - TRANSIENT / FATAL: the connection layer already retried (transient) or exhausted its heal budget
  *   and alerted (fatal). Retrying here would only re-amplify, so we skip the write quietly.
  * - CAPACITY: evicts the least recently accessed evictable key and retries, under a session-level
@@ -817,6 +863,13 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(
 
     if (errorClass === StorageErrorClass.TRANSIENT || errorClass === StorageErrorClass.FATAL) {
         Logger.logInfo(`Storage operation skipped retry; ${errorClass} errors are handled by the connection layer. Error: ${error}. onyxMethod: ${onyxMethod.name}.`);
+        return Promise.resolve();
+    }
+
+    if (errorClass === StorageErrorClass.UNRECOVERABLE) {
+        Logger.logInfo(
+            `Storage operation skipped retry; ${errorClass} errors cannot be recovered by retrying. Error: ${error}. onyxMethod: ${onyxMethod.name}. ${summarizeFailedWritePayload(defaultParams)}`,
+        );
         return Promise.resolve();
     }
 
