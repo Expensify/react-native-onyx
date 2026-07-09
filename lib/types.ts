@@ -190,14 +190,16 @@ type NonTransformableTypes =
  *
  * settings = applySavedSettings({textEditor: {fontWeight: 500, fontColor: null}});
  */
-type NullishDeep<T> = T extends NonTransformableTypes ? T : T extends Record<string, unknown> ? NullishObjectDeep<T> : T;
+/* eslint-disable @typescript-eslint/no-restricted-types -- Interface-based CustomTypeOptions values are not assignable to Record<string, unknown>; object is required for deep nullish mapping. */
+type NullishDeep<T> = T extends NonTransformableTypes ? T : T extends object ? NullishObjectDeep<T> : unknown;
 
 /**
- * Same as `NullishDeep`, but accepts only records as inputs. Internal helper for `NullishDeep`.
+ * Same as `NullishDeep`, but accepts only objects as inputs. Internal helper for `NullishDeep`.
  */
-type NullishObjectDeep<ObjectType extends Record<string, unknown>> = {
+type NullishObjectDeep<ObjectType extends object> = {
     [KeyType in keyof ObjectType]?: NullishDeep<ObjectType[KeyType]> | null;
 };
+/* eslint-enable @typescript-eslint/no-restricted-types */
 
 /**
  * Represents a mapping between Onyx collection keys and their respective values.
