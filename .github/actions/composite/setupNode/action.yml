@@ -40,4 +40,4 @@ runs:
       with:
         timeout_minutes: 30
         max_attempts: 3
-        command: npm ci
+        command: npm ci --legacy-peer-deps

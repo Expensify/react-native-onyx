@@ -71,7 +71,7 @@
     "@types/underscore": "^1.11.15",
     "@typescript-eslint/eslint-plugin": "^8.51.0",
     "@typescript-eslint/parser": "^8.51.0",
-    "@vercel/ncc": "0.38.1",
+    "@vercel/ncc": "^0.38.1",
     "better-sqlite3": "^12.10.0",
     "date-fns": "^4.1.0",
     "eslint": "^9.39.2",
@@ -99,7 +99,7 @@
     "reassure": "1.4.0",
     "ts-node": "^10.9.2",
     "type-fest": "^3.12.0",
-    "typescript": "^5.9.2"
+    "typescript": "^7.0.2"
   },
   "peerDependencies": {
     "idb-keyval": "^6.2.1",
@@ -126,6 +126,14 @@
   "engines": {
     "node": ">=20.19.5",
     "npm": ">=10.8.2"
+  },
+  "overrides": {
+    "@typescript-eslint/eslint-plugin": {
+      "typescript": "$typescript"
+    },
+    "@typescript-eslint/parser": {
+      "typescript": "$typescript"
+    }
   },
   "sideEffects": false
 }

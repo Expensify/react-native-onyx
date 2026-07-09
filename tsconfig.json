@@ -10,12 +10,13 @@
         "jsx": "react",
         "isolatedModules": true,
         "strict": true,
-        "moduleResolution": "node",
+        "moduleResolution": "bundler",
         "resolveJsonModule": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
         "declaration": true,
         "outDir": "./dist"
     },
+    "include": ["lib/**/*", "tests/**/*", "buildDocs.ts", "jest-test-environment.ts"],
     "exclude": ["**/node_modules/**/*", "**/dist/**/*", "tests/types/**/*.ts"]
 }
