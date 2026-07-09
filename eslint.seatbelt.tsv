@@ -24,6 +24,7 @@
 "lib/storage/providers/IDBKeyValProvider/index.ts"	"@typescript-eslint/no-unsafe-type-assertion"	3
 "lib/storage/providers/MemoryOnlyProvider.ts"	"@typescript-eslint/no-unsafe-type-assertion"	5
 "lib/storage/providers/NoopProvider.ts"	"@typescript-eslint/no-unsafe-type-assertion"	1
+"lib/storage/providers/SQLiteProvider.ts"	"@typescript-eslint/naming-convention"	3
 "lib/storage/providers/SQLiteProvider.ts"	"@typescript-eslint/no-unsafe-return"	3
 "lib/storage/providers/SQLiteProvider.ts"	"@typescript-eslint/no-unsafe-type-assertion"	3
 # useLiveRef is deprecated but still used by useOnyx; refs assignment during render is intentional
