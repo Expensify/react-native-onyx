@@ -13,7 +13,19 @@ ASYNC_BUILDS=()
 # Build all the actions in the background
 for ACTION in "$ACTIONS_DIR"/*/*.ts; do
     ACTION_DIR=$(dirname "$ACTION")
-    npx ncc build --transpile-only --external encoding "$ACTION" -o "$ACTION_DIR" &
+    ACTION_NAME=$(basename "$ACTION" .ts)
+    BUILD_DIR=$(mktemp -d)
+
+    npx tsc "$ACTION" --outDir "$BUILD_DIR" \
+        --ignoreConfig \
+        --module commonjs \
+        --target ES2020 \
+        --esModuleInterop \
+        --skipLibCheck \
+        --moduleResolution bundler \
+        --declaration false
+
+    npx ncc build --transpile-only --external encoding "$BUILD_DIR/$ACTION_NAME.js" -o "$ACTION_DIR" &
     ASYNC_BUILDS+=($!)
 done
 
