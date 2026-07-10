@@ -739,7 +739,6 @@ describe('OnyxUtils', () => {
     });
 
     describe('retryOperation', () => {
-        const retryOperationSpy = jest.spyOn(OnyxUtils, 'retryOperation');
         /** Mirrors StorageCircuitBreaker rolling-window trip threshold. */
         const STORAGE_FAILURE_THRESHOLD = 50;
         const genericError = new Error('Generic storage error');
@@ -751,21 +750,23 @@ describe('OnyxUtils', () => {
         beforeEach(() => StorageCircuitBreaker.reset());
 
         it('should retry only one time if the operation is firstly failed and then passed', async () => {
-            StorageMock.setItem = jest.fn(StorageMock.setItem).mockRejectedValueOnce(genericError).mockImplementation(StorageMock.setItem);
+            const setItemSpy = jest.fn(StorageMock.setItem).mockRejectedValueOnce(genericError).mockImplementation(StorageMock.setItem);
+            StorageMock.setItem = setItemSpy;
 
             await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
-            // Should be called once, since Storage.setItem if failed only once
-            expect(retryOperationSpy).toHaveBeenCalledTimes(1);
+            // Initial attempt plus one retry after the first failure
+            expect(setItemSpy).toHaveBeenCalledTimes(2);
         });
 
         it('should stop retrying after MAX_STORAGE_OPERATION_RETRY_ATTEMPTS retries for failing operation', async () => {
-            StorageMock.setItem = jest.fn().mockRejectedValue(genericError);
+            const setItemSpy = jest.fn().mockRejectedValue(genericError);
+            StorageMock.setItem = setItemSpy;
 
             await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
-            // Should be called 6 times: initial attempt + 5 retries (MAX_STORAGE_OPERATION_RETRY_ATTEMPTS)
-            expect(retryOperationSpy).toHaveBeenCalledTimes(6);
+            // Initial attempt plus MAX_STORAGE_OPERATION_RETRY_ATTEMPTS retries
+            expect(setItemSpy).toHaveBeenCalledTimes(6);
         });
 
         it('should log the full shape of an unclassified (UNKNOWN) error once per operation', async () => {
@@ -790,21 +791,23 @@ describe('OnyxUtils', () => {
         });
 
         it('should not retry in case of storage capacity error and no keys to evict', async () => {
-            StorageMock.setItem = jest.fn().mockRejectedValue(diskFullError);
+            const setItemSpy = jest.fn().mockRejectedValue(diskFullError);
+            StorageMock.setItem = setItemSpy;
 
             await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
             // Should only be called once since there are no evictable keys
-            expect(retryOperationSpy).toHaveBeenCalledTimes(1);
+            expect(setItemSpy).toHaveBeenCalledTimes(1);
         });
 
         it('should not retry for non-retriable IndexedDB backing-store errors', async () => {
-            StorageMock.setItem = jest.fn().mockRejectedValue(nonRetriableIdbError);
+            const setItemSpy = jest.fn().mockRejectedValue(nonRetriableIdbError);
+            StorageMock.setItem = setItemSpy;
 
             await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
             // Called once (initial attempt only) -- no recursion, unlike the 6 calls for generic errors
-            expect(retryOperationSpy).toHaveBeenCalledTimes(1);
+            expect(setItemSpy).toHaveBeenCalledTimes(1);
         });
 
         it('should skip retry quietly (info, not alert) for fatal connection-layer errors', async () => {
