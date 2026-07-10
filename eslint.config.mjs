@@ -57,12 +57,6 @@ export default defineConfig([
             globals: globals.node,
         },
     },
-    {
-        files: ['lib/OnyxUtils.ts'],
-        rules: {
-            '@typescript-eslint/no-use-before-define': 'off',
-        },
-    },
     // Flat config replaces the whole naming-convention array, so this repeats eslint-config-expensify/typescript
     // and adds objectLiteralProperty exceptions for Onyx key strings (underscores) and numeric collection IDs.
     {
