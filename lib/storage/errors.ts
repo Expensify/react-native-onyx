@@ -25,6 +25,23 @@ const StorageErrorClass = {
 } as const;
 
 /**
+ * Serializes non-Error thrown values for classifier matching. JSON.stringify is preferred for plain
+ * objects, but it throws on circular structures and returns undefined for BigInt/function/symbol, so
+ * fall back to String() to keep normalization from throwing before classifyError runs.
+ */
+function serializeThrownValue(error: unknown): string {
+    try {
+        const serialized = JSON.stringify(error);
+        if (serialized !== undefined) {
+            return serialized;
+        }
+    } catch {
+        // fall through to String()
+    }
+    return String(error);
+}
+
+/**
  * Normalizes any thrown value into a lowercased `{name, message}` pair for matching. Shared by every
  * provider's classifier so they all extract the error the same way.
  */
@@ -41,7 +58,7 @@ function getErrorParts(error: unknown): {name: string; message: string} {
     if (error === null || error === undefined) {
         return {name: '', message: ''};
     }
-    return {name: '', message: JSON.stringify(error).toLowerCase()};
+    return {name: '', message: serializeThrownValue(error).toLowerCase()};
 }
 
 export {StorageErrorClass, getErrorParts};
