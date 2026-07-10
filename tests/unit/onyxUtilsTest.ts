@@ -677,6 +677,12 @@ describe('OnyxUtils', () => {
             expect(result).toEqual(1);
         });
 
+        it('should preserve undefined when the last queued change is undefined', () => {
+            const {result} = OnyxUtils.mergeChanges([null, undefined] as Parameters<typeof OnyxUtils.mergeChanges>[0]);
+
+            expect(result).toBeUndefined();
+        });
+
         it('should merge data correctly when applying batched changes', () => {
             const batchedChanges: GenericDeepRecord = {
                 b: {

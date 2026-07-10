@@ -986,10 +986,7 @@ function mergeInternal<TValue extends OnyxInput<OnyxKey>, TChange extends OnyxIn
 
     // If we have anything else we can't merge it so we'll
     // simply return the last value that was queued
-    if (lastChange === undefined) {
-        return {result: (existingValue ?? {}) as TChange, replaceNullPatches: []};
-    }
-    return {result: lastChange, replaceNullPatches: []};
+    return {result: lastChange as TChange, replaceNullPatches: []};
 }
 
 /**
