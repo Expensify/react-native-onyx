@@ -1,14 +1,16 @@
 import {act} from '@testing-library/react-native';
-import Onyx from '../../lib';
-import OnyxUtils from '../../lib/OnyxUtils';
-import type {GenericDeepRecord} from '../types';
-import utils from '../../lib/utils';
+
 import type {Collection, OnyxCollection} from '../../lib/types';
-import OnyxCache from '../../lib/OnyxCache';
+import type {GenericDeepRecord} from '../types';
+
+import Onyx from '../../lib';
+import createDeferredTask from '../../lib/createDeferredTask';
 import * as Logger from '../../lib/Logger';
+import OnyxCache from '../../lib/OnyxCache';
+import OnyxUtils from '../../lib/OnyxUtils';
 import StorageMock from '../../lib/storage';
 import StorageCircuitBreaker from '../../lib/StorageCircuitBreaker';
-import createDeferredTask from '../../lib/createDeferredTask';
+import utils from '../../lib/utils';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 const testObject: GenericDeepRecord = {
@@ -678,6 +680,7 @@ describe('OnyxUtils', () => {
         });
 
         it('should preserve undefined when the last queued change is undefined', () => {
+            // Simulates Onyx.update() batching a SET whose value is undefined (e.g. optional Partial fields).
             const {result} = OnyxUtils.mergeChanges([null, undefined] as Parameters<typeof OnyxUtils.mergeChanges>[0]);
 
             expect(result).toBeUndefined();

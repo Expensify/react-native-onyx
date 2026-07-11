@@ -1,14 +1,11 @@
-import {shallowEqual} from 'fast-equals';
 import type {ValueOf} from 'type-fest';
+
+import {shallowEqual} from 'fast-equals';
 import _ from 'underscore';
-import DevTools from './DevTools';
-import * as Logger from './Logger';
+
+import type {DeferredTask} from './createDeferredTask';
 import type Onyx from './Onyx';
-import cache, {TASK} from './OnyxCache';
-import OnyxKeys from './OnyxKeys';
-import StorageCircuitBreaker from './StorageCircuitBreaker';
-import Storage from './storage';
-import {StorageErrorClass} from './storage/errors';
+import type {StorageKeyValuePair} from './storage/providers/types';
 import type {
     CollectionKeyBase,
     ConnectOptions,
@@ -33,11 +30,17 @@ import type {
     RetriableOnyxOperation,
 } from './types';
 import type {FastMergeOptions, FastMergeResult} from './utils';
-import utils from './utils';
-import type {DeferredTask} from './createDeferredTask';
+
 import createDeferredTask from './createDeferredTask';
-import type {StorageKeyValuePair} from './storage/providers/types';
+import DevTools from './DevTools';
+import * as Logger from './Logger';
 import logMessages from './logMessages';
+import cache, {TASK} from './OnyxCache';
+import OnyxKeys from './OnyxKeys';
+import Storage from './storage';
+import {StorageErrorClass} from './storage/errors';
+import StorageCircuitBreaker from './StorageCircuitBreaker';
+import utils from './utils';
 
 // Method constants
 const METHOD = {
@@ -919,7 +922,7 @@ function prepareKeyValuePairsForStorage(
             continue;
         }
 
-        const valueWithoutNestedNullValues = shouldRemoveNestedNulls ?? true ? utils.removeNestedNullValues(value) : value;
+        const valueWithoutNestedNullValues = (shouldRemoveNestedNulls ?? true) ? utils.removeNestedNullValues(value) : value;
 
         if (valueWithoutNestedNullValues !== undefined) {
             pairs.push([key, valueWithoutNestedNullValues, replaceNullPatches?.[key]]);
