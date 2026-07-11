@@ -922,7 +922,8 @@ function prepareKeyValuePairsForStorage(
             continue;
         }
 
-        const valueWithoutNestedNullValues = (shouldRemoveNestedNulls ?? true) ? utils.removeNestedNullValues(value) : value;
+        const shouldRemoveNestedNullsWithDefault = shouldRemoveNestedNulls ?? true;
+        const valueWithoutNestedNullValues = shouldRemoveNestedNullsWithDefault ? utils.removeNestedNullValues(value) : value;
 
         if (valueWithoutNestedNullValues !== undefined) {
             pairs.push([key, valueWithoutNestedNullValues, replaceNullPatches?.[key]]);
