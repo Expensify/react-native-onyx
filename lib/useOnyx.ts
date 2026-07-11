@@ -1,16 +1,12 @@
-import type {DependencyList} from 'react';
-
 import {deepEqual, shallowEqual} from 'fast-equals';
 import {useCallback, useEffect, useMemo, useRef, useSyncExternalStore} from 'react';
-
-import type {Connection} from './OnyxConnectionManager';
-import type {ConnectOptions, OnyxKey, OnyxValue} from './types';
-
+import type {DependencyList} from 'react';
 import OnyxCache, {TASK} from './OnyxCache';
+import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
-import OnyxKeys from './OnyxKeys';
-import onyxSnapshotCache from './OnyxSnapshotCache';
 import OnyxUtils from './OnyxUtils';
+import type {CollectionKeyBase, OnyxKey, OnyxValue} from './types';
+import onyxSnapshotCache from './OnyxSnapshotCache';
 import useLiveRef from './useLiveRef';
 
 type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (data: OnyxValue<TKey> | undefined) => TReturnValue;
@@ -34,12 +30,11 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
 
 type FetchStatus = 'loading' | 'loaded';
 
-type ResultMetadata<TValue> = {
+type ResultMetadata = {
     status: FetchStatus;
-    sourceValue?: NonNullable<TValue> | undefined;
 };
 
-type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata<TValue>];
+type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata];
 
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     key: TKey,
@@ -120,9 +115,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
     // Indicates if we should get the newest cached value from Onyx during `getSnapshot()` execution.
     const shouldGetCachedValueRef = useRef(true);
-
-    // Tracks the source value from the most recent collection connect callback.
-    const sourceValueRef = useRef<NonNullable<TReturnValue> | undefined>(undefined);
 
     // Cache the options key to avoid regenerating it every getSnapshot call
     const cacheKey = useMemo(
@@ -230,7 +222,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                 previousValueRef.current ?? undefined,
                 {
                     status: newFetchStatus,
-                    sourceValue: sourceValueRef.current,
                 },
             ];
         }
@@ -250,7 +241,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             if (hasMountedRef.current) {
                 previousValueRef.current = null;
                 newValueRef.current = null;
-                sourceValueRef.current = undefined;
                 resultRef.current = [undefined, {status: 'loading'}];
                 shouldGetCachedValueRef.current = true;
             }
@@ -259,9 +249,9 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
             isConnectingRef.current = true;
             onStoreChangeFnRef.current = onStoreChange;
 
-            const connectOptions = {
+            connectionRef.current = connectionManager.connect<CollectionKeyBase>({
                 key,
-                callback: (value: OnyxValue<TKey>, callbackKey: OnyxKey, sourceValue?: OnyxValue<TKey>) => {
+                callback: () => {
                     isConnectingRef.current = false;
                     onStoreChangeFnRef.current = onStoreChange;
 
@@ -272,8 +262,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                     // Signals that we want to get the newest cached value again in `getSnapshot()`.
                     shouldGetCachedValueRef.current = true;
 
-                    sourceValueRef.current = sourceValue as NonNullable<TReturnValue>;
-
                     // Invalidate snapshot cache for this key when data changes
                     onyxSnapshotCache.invalidateForKey(key);
 
@@ -281,10 +269,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                     onStoreChange();
                 },
                 reuseConnection: options?.reuseConnection,
-                ...(OnyxKeys.isCollectionKey(key) ? {waitForCollectionCallback: true as const} : {}),
-            };
-
-            connectionRef.current = connectionManager.connect(connectOptions as ConnectOptions<TKey>);
+            });
 
             return () => {
                 if (!connectionRef.current) {

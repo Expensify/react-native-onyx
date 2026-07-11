@@ -7,7 +7,6 @@ import type {DeferredTask} from './createDeferredTask';
 import type Onyx from './Onyx';
 import type {StorageKeyValuePair} from './storage/providers/types';
 import type {
-    CollectionConnectCallback,
     CollectionKeyBase,
     ConnectOptions,
     DeepRecord,
@@ -15,7 +14,6 @@ import type {
     KeyValueMapping,
     CallbackToStateMapping,
     MultiMergeReplaceNullPatches,
-    NonUndefined,
     OnyxCollection,
     OnyxEntry,
     OnyxInput,
@@ -590,7 +588,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
                 value: cachedCollection,
                 matchedKey: subscriber.key,
             });
-            subscriber.callback(cachedCollection, subscriber.key, partialCollection);
+            subscriber.callback(cachedCollection, subscriber.key);
         } catch (error) {
             Logger.logAlert(`[OnyxUtils.keysChanged] Subscriber callback threw an error for key '${collectionKey}': ${formatCaughtError(error)}`);
         }
@@ -688,7 +686,7 @@ function keyChanged<TKey extends OnyxKey>(
                         value: cachedCollection,
                         matchedKey: subscriber.key,
                     });
-                    (subscriber.callback as CollectionConnectCallback<OnyxKey>)(cachedCollection, subscriber.key, {[key]: value});
+                    subscriber.callback(cachedCollection, subscriber.key);
                     continue;
                 }
 
@@ -743,11 +741,7 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: CallbackToStateMapp
         return;
     }
 
-    if (OnyxKeys.isCollectionKey(mapping.key)) {
-        (mapping.callback as CollectionConnectCallback<TKey> | undefined)?.(value as NonUndefined<OnyxCollection<KeyValueMapping[TKey]>>, mapping.key);
-    } else {
-        (mapping.callback as DefaultConnectCallback<TKey> | undefined)?.(value, matchedKey as TKey);
-    }
+    (mapping.callback as DefaultConnectCallback<TKey> | undefined)?.(value, matchedKey as TKey);
 }
 
 /**
