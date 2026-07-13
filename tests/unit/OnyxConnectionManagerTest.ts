@@ -3,15 +3,13 @@ import Onyx from '../../lib';
 import type {Connection} from '../../lib/OnyxConnectionManager';
 import connectionManager from '../../lib/OnyxConnectionManager';
 import StorageMock from '../../lib/storage';
-import {getOnyxConnectionManagerTestHarness} from '../utils/onyxConnectionManagerTestHarness';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 // We need access to some internal properties of `connectionManager` during the tests but they are private,
 // so this workaround allows us to have access to them.
-const testConnectionManager = getOnyxConnectionManagerTestHarness();
-const connectionsMap = testConnectionManager.connectionsMap;
-const generateConnectionID = testConnectionManager.generateConnectionID.bind(connectionManager);
-const getSessionID = () => testConnectionManager.sessionID;
+const connectionsMap = connectionManager['connectionsMap'];
+const generateConnectionID = connectionManager['generateConnectionID'].bind(connectionManager);
+const getSessionID = () => connectionManager['sessionID'];
 
 const ONYXKEYS = {
     TEST_KEY: 'test',

@@ -1,15 +1,15 @@
 import browserConfig from 'eslint-config-expensify/browser';
+import jestConfig from 'eslint-config-expensify/jest';
 import reactConfig from 'eslint-config-expensify/react';
 import scriptsConfig from 'eslint-config-expensify/scripts';
 import tsExpensifyConfig from 'eslint-config-expensify/typescript';
-import jestConfig from 'eslint-config-expensify/jest';
 import prettierConfig from 'eslint-config-prettier';
-import seatbelt from 'eslint-seatbelt';
 import rulesdir from 'eslint-plugin-rulesdir';
+import seatbelt from 'eslint-seatbelt';
 import {defineConfig, globalIgnores} from 'eslint/config';
 import globals from 'globals';
-import path from 'node:path';
 import {createRequire} from 'node:module';
+import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -124,6 +124,18 @@ export default defineConfig([
             globals: {
                 ...globals.jest,
             },
+        },
+    },
+    {
+        files: ['tests/**/*Test.ts', 'tests/perf-test/**/*'],
+        rules: {
+            '@typescript-eslint/dot-notation': 'off',
+        },
+    },
+    {
+        files: ['tests/perf-test/**/*'],
+        rules: {
+            'rulesdir/prefer-at': 'off',
         },
     },
     prettierConfig,

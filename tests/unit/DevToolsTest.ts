@@ -1,17 +1,8 @@
 import Onyx from '../../lib';
 import {getDevToolsInstance} from '../../lib/DevTools';
-import type {DevtoolsConnection} from '../../lib/DevTools';
+import type {DevtoolsConnection, RealDevTools as RealDevToolsType} from '../../lib/DevTools';
 import RealDevTools from '../../lib/DevTools/RealDevTools';
 import utils from '../../lib/utils';
-
-type RealDevToolsTestHarness = {
-    state: Record<string, unknown>;
-    defaultState: Record<string, unknown>;
-};
-
-function getDevToolsTestHarness(): RealDevToolsTestHarness {
-    return getDevToolsInstance() as unknown as RealDevToolsTestHarness;
-}
 
 const ONYX_KEYS = {
     NUM_KEY: 'numKey',
@@ -77,12 +68,12 @@ describe('DevTools', () => {
             expect(initMock).toHaveBeenCalledWith(initialKeyStates);
         });
         it('Sets the default state correctly', () => {
-            const devToolsInstance = getDevToolsTestHarness();
-            expect(devToolsInstance.defaultState).toEqual(initialKeyStates);
+            const devToolsInstance = getDevToolsInstance() as RealDevToolsType;
+            expect(devToolsInstance['defaultState']).toEqual(initialKeyStates);
         });
         it('Sets the internal state correctly', () => {
-            const devToolsInstance = getDevToolsTestHarness();
-            expect(devToolsInstance.state).toEqual(initialKeyStates);
+            const devToolsInstance = getDevToolsInstance() as RealDevToolsType;
+            expect(devToolsInstance['state']).toEqual(initialKeyStates);
         });
     });
 
@@ -99,8 +90,8 @@ describe('DevTools', () => {
         });
         it('Sets the internal state correctly', async () => {
             await Onyx.set(ONYX_KEYS.SOME_KEY, 3);
-            const devToolsInstance = getDevToolsTestHarness();
-            expect(devToolsInstance.state).toEqual({
+            const devToolsInstance = getDevToolsInstance() as RealDevToolsType;
+            expect(devToolsInstance['state']).toEqual({
                 ...initialKeyStates,
                 [ONYX_KEYS.SOME_KEY]: 3,
             });
@@ -120,8 +111,8 @@ describe('DevTools', () => {
         });
         it('Sets the internal state correctly', async () => {
             await Onyx.merge(ONYX_KEYS.OBJECT_KEY, exampleObject);
-            const devToolsInstance = getDevToolsTestHarness();
-            expect(devToolsInstance.state).toEqual(mergedObject);
+            const devToolsInstance = getDevToolsInstance() as RealDevToolsType;
+            expect(devToolsInstance['state']).toEqual(mergedObject);
         });
     });
 
@@ -138,8 +129,8 @@ describe('DevTools', () => {
         });
         it('Sets the internal state correctly', async () => {
             await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.NUM_KEY, exampleCollection);
-            const devToolsInstance = getDevToolsTestHarness();
-            expect(devToolsInstance.state).toEqual(mergedCollection);
+            const devToolsInstance = getDevToolsInstance() as RealDevToolsType;
+            expect(devToolsInstance['state']).toEqual(mergedCollection);
         });
     });
 
@@ -156,8 +147,8 @@ describe('DevTools', () => {
         });
         it('Sets the internal state correctly', async () => {
             await Onyx.multiSet(exampleCollection);
-            const devToolsInstance = getDevToolsTestHarness();
-            expect(devToolsInstance.state).toEqual(mergedCollection);
+            const devToolsInstance = getDevToolsInstance() as RealDevToolsType;
+            expect(devToolsInstance['state']).toEqual(mergedCollection);
         });
     });
 
@@ -174,8 +165,8 @@ describe('DevTools', () => {
         it('Clears internal state correctly', async () => {
             await Onyx.merge(ONYX_KEYS.NUM_KEY, 2);
             await Onyx.clear([ONYX_KEYS.NUM_KEY]);
-            const devToolsInstance = getDevToolsTestHarness();
-            expect(devToolsInstance.state).toEqual({
+            const devToolsInstance = getDevToolsInstance() as RealDevToolsType;
+            expect(devToolsInstance['state']).toEqual({
                 ...initialKeyStates,
                 [ONYX_KEYS.NUM_KEY]: 2,
             });
@@ -184,8 +175,8 @@ describe('DevTools', () => {
         it('Preserves collection member keys when a collection key is passed to keysToPreserve', async () => {
             await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.NUM_KEY, exampleCollection);
             await Onyx.clear([ONYX_KEYS.COLLECTION.NUM_KEY]);
-            const devToolsInstance = getDevToolsTestHarness();
-            expect(devToolsInstance.state).toEqual({
+            const devToolsInstance = getDevToolsInstance() as RealDevToolsType;
+            expect(devToolsInstance['state']).toEqual({
                 ...initialKeyStates,
                 ...exampleCollection,
             });

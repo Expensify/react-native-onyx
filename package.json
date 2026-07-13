@@ -73,7 +73,7 @@
     "better-sqlite3": "^12.10.0",
     "date-fns": "^4.1.0",
     "eslint": "^9.39.2",
-    "eslint-config-expensify": "4.0.6",
+    "eslint-config-expensify": "^4.0.7",
     "eslint-config-prettier": "^10.1.5",
     "eslint-import-resolver-typescript": "^4.4.5",
     "eslint-seatbelt": "^0.1.3",
