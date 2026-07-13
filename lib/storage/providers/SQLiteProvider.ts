@@ -41,7 +41,7 @@ const DB_NAME = 'OnyxDB';
  * Prevents the stringifying of the object markers.
  */
 function objectMarkRemover(key: string, value: unknown) {
-    if (key === utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK) return undefined;
+    if (key === utils.ONYX_INTERNALS_REPLACE_OBJECT_MARK) return undefined;
     return value;
 }
 

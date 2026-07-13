@@ -54,9 +54,9 @@ describe('IDBKeyValProvider', () => {
             await IDB.setMany(testEntries, IDBKeyValProvider.store);
 
             expect(await IDBKeyValProvider.multiGet([`${ONYXKEYS.COLLECTION.TEST_KEY}id1`, ONYXKEYS.TEST_KEY, ONYXKEYS.TEST_KEY_2])).toEqual([
-                testEntries[3],
-                testEntries[0],
-                testEntries[1],
+                testEntries.at(3),
+                testEntries.at(0),
+                testEntries.at(1),
             ]);
         });
     });
@@ -121,7 +121,7 @@ describe('IDBKeyValProvider', () => {
                         property: {
                             nestedProperty: {
                                 nestedKey2: 'nestedValue2_changed',
-                                [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                                [utils.ONYX_INTERNALS_REPLACE_OBJECT_MARK]: true,
                             },
                             newKey: 'newValue',
                         },
@@ -134,7 +134,9 @@ describe('IDBKeyValProvider', () => {
             const expectedEntries = structuredClone(changedEntries);
             const expectedTestKey3Value = structuredClone(testEntries[2])[1] as GenericDeepRecord;
             expectedTestKey3Value.key = 'value_changed';
-            expectedTestKey3Value.property.nestedProperty = {nestedKey2: 'nestedValue2_changed'};
+            expectedTestKey3Value.property.nestedProperty = {
+                nestedKey2: 'nestedValue2_changed',
+            };
             expectedTestKey3Value.property.newKey = 'newValue';
             expectedEntries[2][1] = expectedTestKey3Value;
 
@@ -175,7 +177,9 @@ describe('IDBKeyValProvider', () => {
 
         it('should insert a new record when key does not exist', async () => {
             await IDBKeyValProvider.multiMerge([[ONYXKEYS.TEST_KEY_2, {fresh: true}]]);
-            expect(await IDBKeyValProvider.getItem(ONYXKEYS.TEST_KEY_2)).toEqual({fresh: true});
+            expect(await IDBKeyValProvider.getItem(ONYXKEYS.TEST_KEY_2)).toEqual({
+                fresh: true,
+            });
         });
     });
 
@@ -263,7 +267,7 @@ describe('IDBKeyValProvider', () => {
             await IDBKeyValProvider.mergeItem(ONYXKEYS.TEST_KEY_3, {
                 key: 'value_changed',
                 property: {
-                    [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                    [utils.ONYX_INTERNALS_REPLACE_OBJECT_MARK]: true,
                     newKey: 'newValue',
                 },
             });
@@ -328,7 +332,15 @@ describe('IDBKeyValProvider', () => {
         beforeEach(() => {
             Object.defineProperty(window.navigator, 'storage', {
                 value: {
-                    estimate: jest.fn().mockResolvedValue({quota: 750000, usage: 250000, usageDetails: {caches: 100000, fileSystem: 50000, indexedDB: 100000}}),
+                    estimate: jest.fn().mockResolvedValue({
+                        quota: 750000,
+                        usage: 250000,
+                        usageDetails: {
+                            caches: 100000,
+                            fileSystem: 50000,
+                            indexedDB: 100000,
+                        },
+                    }),
                 },
                 configurable: true,
             });

@@ -24,7 +24,12 @@ const ONYXKEYS = {
 // Mock selector functions
 const simpleSelector: UseOnyxSelector<OnyxKey, number | undefined> = (data) => (data as MockData | undefined)?.value;
 
-type ComplexSelectorResult = {id?: number; name?: string; computed: number; formatted: string};
+type ComplexSelectorResult = {
+    id?: number;
+    name?: string;
+    computed: number;
+    formatted: string;
+};
 const complexSelector: UseOnyxSelector<OnyxKey, ComplexSelectorResult> = (data) => {
     const mockData = data as MockData | undefined;
     return {
@@ -114,7 +119,10 @@ describe('OnyxSnapshotCache', () => {
                 () => {
                     for (let i = 0; i < 1000; i++) {
                         const selector: UseOnyxSelector<OnyxKey, string> = (data) => ((data as MockData | undefined)?.field ?? '') + i;
-                        const options: UseOnyxOptions<string, string> = {...selectorOptions, selector};
+                        const options: UseOnyxOptions<string, string> = {
+                            ...selectorOptions,
+                            selector,
+                        };
                         cache.registerConsumer(ONYXKEYS.TEST_KEY, options);
                     }
                 },
