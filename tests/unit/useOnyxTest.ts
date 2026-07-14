@@ -1,13 +1,11 @@
 import {act, renderHook} from '@testing-library/react-native';
-
 import type {OnyxCollection, OnyxEntry, OnyxKey} from '../../lib';
-import type {UseOnyxSelector} from '../../lib/useOnyx';
-import type GenericCollection from '../utils/GenericCollection';
-
 import Onyx, {useOnyx} from '../../lib';
-import onyxSnapshotCache from '../../lib/OnyxSnapshotCache';
 import StorageMock from '../../lib/storage';
+import type GenericCollection from '../utils/GenericCollection';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
+import onyxSnapshotCache from '../../lib/OnyxSnapshotCache';
+import type {UseOnyxSelector} from '../../lib/useOnyx';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
