@@ -29,7 +29,7 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
 
     /**
      * Defaults to `true`. When `false`, keeps the connection open (value stays cache-warm) but stops
-     * re-rendering on background writes. It defers the render trigger, not the value: any other render still reads the latest value. 
+     * re-rendering on background writes. It defers the render trigger, not the value: any other render still reads the latest value.
      * Flipping back to `true` re-renders.
      */
     subscribed?: boolean;
