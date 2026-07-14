@@ -26,6 +26,13 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
      * @see `useOnyx` cannot return `null` and so selector will replace `null` with `undefined` to maintain compatibility.
      */
     selector?: UseOnyxSelector<TKey, TReturnValue>;
+
+    /**
+     * Defaults to `true`. When `false`, keeps the connection open (value stays cache-warm) but stops
+     * re-rendering on background writes. It defers the render trigger, not the value: any other render still reads the latest value. 
+     * Flipping back to `true` re-renders.
+     */
+    subscribed?: boolean;
 };
 
 type FetchStatus = 'loading' | 'loaded';
@@ -44,6 +51,13 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     const connectionRef = useRef<Connection | null>(null);
     const currentDependenciesRef = useLiveRef(dependencies);
     const selector = options?.selector;
+
+    // Read via a ref inside the Onyx callback so toggling `subscribed` never re-subscribes.
+    const subscribed = options?.subscribed !== false;
+    const subscribedRef = useRef(subscribed);
+    useEffect(() => {
+        subscribedRef.current = subscribed;
+    }, [subscribed]);
 
     // Create memoized version of selector for performance
     const memoizedSelector = useMemo((): UseOnyxSelector<TKey, TReturnValue> | null => {
@@ -150,7 +164,10 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // Invalidate cache when dependencies change so selector runs with new closure values
         onyxSnapshotCache.invalidateForKey(key);
         shouldGetCachedValueRef.current = true;
-        onStoreChangeFnRef.current();
+        // Skip the re-render while paused; the next render picks up the new dependencies via `getSnapshot()`.
+        if (subscribedRef.current) {
+            onStoreChangeFnRef.current();
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [...dependencies]);
 
@@ -266,7 +283,11 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                     onyxSnapshotCache.invalidateForKey(key);
 
                     // Finally, we signal that the store changed, making `getSnapshot()` be called again.
-                    onStoreChange();
+                    // Skipped while paused so background writes don't re-render; the freshest value is still
+                    // read via `getSnapshot()` on the next render.
+                    if (subscribedRef.current) {
+                        onStoreChange();
+                    }
                 },
                 reuseConnection: options?.reuseConnection,
             });
