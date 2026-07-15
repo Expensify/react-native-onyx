@@ -1,12 +1,15 @@
+import type {DependencyList} from 'react';
+
 import {deepEqual, shallowEqual} from 'fast-equals';
 import {useCallback, useEffect, useMemo, useRef, useSyncExternalStore} from 'react';
-import type {DependencyList} from 'react';
-import OnyxCache, {TASK} from './OnyxCache';
+
 import type {Connection} from './OnyxConnectionManager';
-import connectionManager from './OnyxConnectionManager';
-import OnyxUtils from './OnyxUtils';
 import type {CollectionKeyBase, OnyxKey, OnyxValue} from './types';
+
+import OnyxCache, {TASK} from './OnyxCache';
+import connectionManager from './OnyxConnectionManager';
 import onyxSnapshotCache from './OnyxSnapshotCache';
+import OnyxUtils from './OnyxUtils';
 import useLiveRef from './useLiveRef';
 
 type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (data: OnyxValue<TKey> | undefined) => TReturnValue;
@@ -280,9 +283,11 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                     onyxSnapshotCache.invalidateForKey(key);
 
                     // Finally, we signal that the store changed, making `getSnapshot()` be called again.
-                    // Skipped while paused so background writes don't re-render; the freshest value is still
-                    // read via `getSnapshot()` on the next render.
-                    if (subscribedRef.current) {
+                    // Background writes are skipped while paused so they don't re-render; the freshest value is
+                    // still read via `getSnapshot()` on the next render. The INITIAL load is always delivered
+                    // though (status still 'loading'), otherwise a cold key mounted with `subscribed: false` would
+                    // stay stuck at 'loading' until some unrelated render — only subsequent updates should pause.
+                    if (subscribedRef.current || resultRef.current?.[1]?.status === 'loading') {
                         onStoreChange();
                     }
                 },
