@@ -55,12 +55,10 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     const currentDependenciesRef = useLiveRef(dependencies);
     const selector = options?.selector;
 
-    // Read via a ref inside the Onyx callback so toggling `subscribed` never re-subscribes.
+    // Read via a ref inside the Onyx callback so toggling `subscribed` never re-subscribes. Synced during
+    // render (not in an effect) so a `false`→`true` flip can't miss a write that lands before effects run.
     const subscribed = options?.subscribed !== false;
-    const subscribedRef = useRef(subscribed);
-    useEffect(() => {
-        subscribedRef.current = subscribed;
-    }, [subscribed]);
+    const subscribedRef = useLiveRef(subscribed);
 
     // Create memoized version of selector for performance
     const memoizedSelector = useMemo((): UseOnyxSelector<TKey, TReturnValue> | null => {
@@ -282,11 +280,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                     // Invalidate snapshot cache for this key when data changes
                     onyxSnapshotCache.invalidateForKey(key);
 
-                    // Finally, we signal that the store changed, making `getSnapshot()` be called again.
-                    // Background writes are skipped while paused so they don't re-render; the freshest value is
-                    // still read via `getSnapshot()` on the next render. The INITIAL load is always delivered
-                    // though (status still 'loading'), otherwise a cold key mounted with `subscribed: false` would
-                    // stay stuck at 'loading' until some unrelated render — only subsequent updates should pause.
+                    // Trigger a re-render, except for paused background writes. The initial load is never paused
+                    // though, otherwise a cold `subscribed: false` key would stay stuck 'loading' until some render.
                     if (subscribedRef.current || resultRef.current?.[1]?.status === 'loading') {
                         onStoreChange();
                     }
@@ -305,7 +300,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                 onStoreChangeFnRef.current = null;
             };
         },
-        [key, options?.reuseConnection],
+        [key, options?.reuseConnection, subscribedRef],
     );
 
     const result = useSyncExternalStore<UseOnyxResult<TReturnValue>>(subscribe, getSnapshot);
