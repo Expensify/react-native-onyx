@@ -1,11 +1,13 @@
 import {act, renderHook} from '@testing-library/react-native';
+
 import type {OnyxCollection, OnyxEntry, OnyxKey} from '../../lib';
-import Onyx, {useOnyx} from '../../lib';
-import StorageMock from '../../lib/storage';
-import type GenericCollection from '../utils/GenericCollection';
-import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
-import onyxSnapshotCache from '../../lib/OnyxSnapshotCache';
 import type {UseOnyxSelector} from '../../lib/useOnyx';
+import type GenericCollection from '../utils/GenericCollection';
+
+import Onyx, {useOnyx} from '../../lib';
+import onyxSnapshotCache from '../../lib/OnyxSnapshotCache';
+import StorageMock from '../../lib/storage';
+import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -1352,8 +1354,7 @@ describe('useOnyx', () => {
             expect(result.current[0]).toEqual('v1');
         });
 
-        // A render from any other cause while paused should serve the latest value, not a stale snapshot.
-        // Keeping the connection open and invalidating on each write is what makes this pass.
+        // A render from any other cause while paused serves the latest value, not a stale snapshot.
         it('serves the latest value on an unrelated re-render while subscribed is false', async () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, 'v1');
 
@@ -1380,9 +1381,7 @@ describe('useOnyx', () => {
             expect(result.current[0]).toEqual('v2');
         });
 
-        // A dependencies change is consumer-driven, not a background write, so subscribed: false must not defer
-        // it. Uses a stable selector whose output depends on an external value fed via `dependencies` — the only
-        // shape where the deps-effect notify is load-bearing (getSnapshot's hasSelectorChanged can't recompute it).
+        // A dependencies change is consumer-driven, not a background write, so subscribed: false must not defer it.
         it('applies a dependencies change while subscribed is false', async () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, 'base');
 
@@ -1412,8 +1411,35 @@ describe('useOnyx', () => {
             expect(result.current[0]).toEqual('base-B');
         });
 
-        // Flipping subscribed from false to true (re-focus) re-renders with the latest value, and a warm
-        // key shows 'loaded' immediately without a loading flash.
+        // A cold key mounted with subscribed: false must still complete its initial load (only later writes pause).
+        it('delivers the initial load for a cold key even while subscribed is false', async () => {
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'storage_value');
+
+            let renderCount = 0;
+            const {result} = renderHook(() => {
+                renderCount++;
+                return useOnyx(ONYXKEYS.TEST_KEY, {subscribed: false});
+            });
+
+            // Nothing in cache yet → starts loading.
+            expect(result.current[1].status).toEqual('loading');
+
+            // The initial load is delivered while paused — no refocus, no unrelated render needed.
+            await act(async () => waitForPromisesToResolve());
+            expect(result.current[0]).toEqual('storage_value');
+            expect(result.current[1].status).toEqual('loaded');
+
+            // A SUBSEQUENT background write is still suppressed while paused (no re-render, value unchanged).
+            const rendersAfterLoad = renderCount;
+            await act(async () => {
+                Onyx.merge(ONYXKEYS.TEST_KEY, 'updated_value');
+                await waitForPromisesToResolve();
+            });
+            expect(result.current[0]).toEqual('storage_value');
+            expect(renderCount).toBe(rendersAfterLoad);
+        });
+
+        // Flipping back to subscribed re-renders with the latest value; a warm key shows 'loaded' with no flash.
         it('catches up to the latest value with no loading flash when flipped back to subscribed', async () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, 'v1');
 
