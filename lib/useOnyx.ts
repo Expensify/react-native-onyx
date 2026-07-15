@@ -164,10 +164,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // Invalidate cache when dependencies change so selector runs with new closure values
         onyxSnapshotCache.invalidateForKey(key);
         shouldGetCachedValueRef.current = true;
-        // Skip the re-render while paused; the next render picks up the new dependencies via `getSnapshot()`.
-        if (subscribedRef.current) {
-            onStoreChangeFnRef.current();
-        }
+        onStoreChangeFnRef.current();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [...dependencies]);
 

@@ -1380,6 +1380,38 @@ describe('useOnyx', () => {
             expect(result.current[0]).toEqual('v2');
         });
 
+        // A dependencies change is consumer-driven, not a background write, so subscribed: false must not defer
+        // it. Uses a stable selector whose output depends on an external value fed via `dependencies` — the only
+        // shape where the deps-effect notify is load-bearing (getSnapshot's hasSelectorChanged can't recompute it).
+        it('applies a dependencies change while subscribed is false', async () => {
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'base');
+
+            // Stable selector reference; its output closes over `dep`, signalled via `dependencies`
+            let dep = 'A';
+            const selector = (value: unknown) => `${value as string}-${dep}`;
+
+            // `dependencies` is [dep] only; `subscribed` is a prop purely to force re-renders
+            const {result, rerender} = renderHook(({subscribed}: SubscribedProps) => useOnyx(ONYXKEYS.TEST_KEY, {subscribed, selector}, [dep]), {
+                initialProps: {subscribed: false} as SubscribedProps,
+            });
+
+            await act(async () => waitForPromisesToResolve());
+            expect(result.current[0]).toEqual('base-A');
+
+            // Warm-up re-render (dep unchanged) to clear the "read fresh from cache" flag the connect callback left set
+            await act(async () => rerender({subscribed: false}));
+            expect(result.current[0]).toEqual('base-A');
+
+            // Change the dependency while paused — the Onyx value is untouched, so the deps change is the only signal
+            await act(async () => {
+                dep = 'B';
+                rerender({subscribed: false});
+            });
+
+            // getSnapshot should recompute with the new dependency: base-B, not the stale base-A
+            expect(result.current[0]).toEqual('base-B');
+        });
+
         // Flipping subscribed from false to true (re-focus) re-renders with the latest value, and a warm
         // key shows 'loaded' immediately without a loading flash.
         it('catches up to the latest value with no loading flash when flipped back to subscribed', async () => {
