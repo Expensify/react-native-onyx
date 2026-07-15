@@ -55,10 +55,12 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     const currentDependenciesRef = useLiveRef(dependencies);
     const selector = options?.selector;
 
-    // Read via a ref inside the Onyx callback so toggling `subscribed` never re-subscribes. Synced during
-    // render (not in an effect) so a `false`→`true` flip can't miss a write that lands before effects run.
+    // Read via a ref inside the Onyx callback so toggling `subscribed` never re-subscribes.
     const subscribed = options?.subscribed !== false;
-    const subscribedRef = useLiveRef(subscribed);
+    const subscribedRef = useRef(subscribed);
+    useEffect(() => {
+        subscribedRef.current = subscribed;
+    }, [subscribed]);
 
     // Create memoized version of selector for performance
     const memoizedSelector = useMemo((): UseOnyxSelector<TKey, TReturnValue> | null => {
@@ -300,7 +302,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                 onStoreChangeFnRef.current = null;
             };
         },
-        [key, options?.reuseConnection, subscribedRef],
+        [key, options?.reuseConnection],
     );
 
     const result = useSyncExternalStore<UseOnyxResult<TReturnValue>>(subscribe, getSnapshot);
