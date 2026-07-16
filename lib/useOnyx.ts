@@ -60,6 +60,15 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     const subscribedRef = useRef(subscribed);
     useEffect(() => {
         subscribedRef.current = subscribed;
+
+        // Catch-up for the commit→effect gap: a write can land after the `false`→`true` flip render commits
+        // but before this effect syncs the ref, and the still-stale ref gates its `onStoreChange()`. The gated
+        // callback leaves `shouldGetCachedValueRef` set, so deliver it now (mirrors TanStack's
+        // `observer.updateResult()` after subscribing). No-op when nothing was gated: `getSnapshot()` then
+        // returns the same cached reference and `useSyncExternalStore` bails out.
+        if (subscribed && shouldGetCachedValueRef.current) {
+            onStoreChangeFnRef.current?.();
+        }
     }, [subscribed]);
 
     // Create memoized version of selector for performance
