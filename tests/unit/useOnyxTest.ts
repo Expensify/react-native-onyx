@@ -1324,7 +1324,6 @@ describe('useOnyx', () => {
     describe('subscribed option', () => {
         type SubscribedProps = {subscribed?: boolean; tick?: number};
 
-        // While subscribed is false, a background write should not re-render the consumer.
         it('does not re-render on a background write when subscribed is false', async () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, 'v1');
 
@@ -1354,7 +1353,6 @@ describe('useOnyx', () => {
             expect(result.current[0]).toEqual('v1');
         });
 
-        // A render from any other cause while paused serves the latest value, not a stale snapshot.
         it('serves the latest value on an unrelated re-render while subscribed is false', async () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, 'v1');
 
@@ -1407,11 +1405,9 @@ describe('useOnyx', () => {
                 rerender({subscribed: false});
             });
 
-            // getSnapshot should recompute with the new dependency: base-B, not the stale base-A
             expect(result.current[0]).toEqual('base-B');
         });
 
-        // A cold key mounted with subscribed: false must still complete its initial load (only later writes pause).
         it('delivers the initial load for a cold key even while subscribed is false', async () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'storage_value');
 
@@ -1421,7 +1417,6 @@ describe('useOnyx', () => {
                 return useOnyx(ONYXKEYS.TEST_KEY, {subscribed: false});
             });
 
-            // Nothing in cache yet → starts loading.
             expect(result.current[1].status).toEqual('loading');
 
             // The initial load is delivered while paused — no refocus, no unrelated render needed.
@@ -1429,7 +1424,7 @@ describe('useOnyx', () => {
             expect(result.current[0]).toEqual('storage_value');
             expect(result.current[1].status).toEqual('loaded');
 
-            // A SUBSEQUENT background write is still suppressed while paused (no re-render, value unchanged).
+            // A subsequent background write is still suppressed while paused (no re-render, value unchanged).
             const rendersAfterLoad = renderCount;
             await act(async () => {
                 Onyx.merge(ONYXKEYS.TEST_KEY, 'updated_value');
@@ -1439,7 +1434,6 @@ describe('useOnyx', () => {
             expect(renderCount).toBe(rendersAfterLoad);
         });
 
-        // Flipping back to subscribed re-renders with the latest value; a warm key shows 'loaded' with no flash.
         it('catches up to the latest value with no loading flash when flipped back to subscribed', async () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, 'v1');
 
@@ -1454,7 +1448,6 @@ describe('useOnyx', () => {
             });
             expect(result.current[0]).toEqual('v1'); // Paused: still stale
 
-            // Re-focus
             await act(async () => {
                 rerender({subscribed: true});
             });
@@ -1470,7 +1463,36 @@ describe('useOnyx', () => {
             expect(result.current[0]).toEqual('v3');
         });
 
-        // Default (true) is unchanged: writes re-render as before.
+        // The production pattern (`subscribed: isFocused`) mounts subscribed and blurs later, so gating must
+        // engage via the ref sync on the flip — mounting already-paused (covered above) doesn't exercise it.
+        it('stops re-rendering on background writes after flipping subscribed to false', async () => {
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'v1');
+
+            const renders: unknown[] = [];
+            const {result, rerender} = renderHook(
+                ({subscribed}: SubscribedProps) => {
+                    const r = useOnyx(ONYXKEYS.TEST_KEY, {subscribed});
+                    renders.push(r[0]);
+                    return r;
+                },
+                {initialProps: {subscribed: true} as SubscribedProps},
+            );
+
+            await act(async () => waitForPromisesToResolve());
+            expect(result.current[0]).toEqual('v1');
+
+            await act(async () => rerender({subscribed: false}));
+            const rendersAfterFlip = renders.length;
+
+            await act(async () => {
+                Onyx.merge(ONYXKEYS.TEST_KEY, 'v2');
+                await waitForPromisesToResolve();
+            });
+
+            expect(renders.length).toBe(rendersAfterFlip);
+            expect(result.current[0]).toEqual('v1');
+        });
+
         it('re-renders on background writes when subscribed is omitted (default true)', async () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, 'v1');
 
@@ -1493,7 +1515,6 @@ describe('useOnyx', () => {
             expect(renders.length).toBeGreaterThan(rendersAfterMount);
         });
 
-        // With two subscribers on the same key, pausing one should not stop the other from re-rendering.
         it('isolates paused/active subscribers sharing a connection (reuseConnection)', async () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, 'v1');
 

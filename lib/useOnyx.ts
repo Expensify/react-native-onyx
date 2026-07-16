@@ -31,9 +31,9 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
     selector?: UseOnyxSelector<TKey, TReturnValue>;
 
     /**
-     * Defaults to `true`. When `false`, keeps the connection open (value stays cache-warm) but stops
-     * re-rendering on background writes. It defers the render trigger, not the value: any other render still reads the latest value.
-     * Flipping back to `true` re-renders.
+     * Defaults to `true`. When `false`, the connection stays open (the value stays cache-warm) but background
+     * writes no longer trigger a re-render. Only the render trigger is deferred, not the value: any render still
+     * reads the latest value, and flipping back to `true` re-renders with it.
      */
     subscribed?: boolean;
 };
@@ -55,17 +55,16 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     const currentDependenciesRef = useLiveRef(dependencies);
     const selector = options?.selector;
 
-    // Read via a ref inside the Onyx callback so toggling `subscribed` never re-subscribes.
+    // The Onyx callback reads `subscribed` via a ref so toggling it never re-subscribes. The ref is synced in an
+    // effect so the gate only ever reflects committed renders.
     const subscribed = options?.subscribed !== false;
     const subscribedRef = useRef(subscribed);
     useEffect(() => {
         subscribedRef.current = subscribed;
 
-        // Catch-up for the commit→effect gap: a write can land after the `false`→`true` flip render commits
-        // but before this effect syncs the ref, and the still-stale ref gates its `onStoreChange()`. The gated
-        // callback leaves `shouldGetCachedValueRef` set, so deliver it now (mirrors TanStack's
-        // `observer.updateResult()` after subscribing). No-op when nothing was gated: `getSnapshot()` then
-        // returns the same cached reference and `useSyncExternalStore` bails out.
+        // A write can land between the flip render (`false` to `true`) and this effect, while the stale ref still
+        // gates it. The gated callback leaves `shouldGetCachedValueRef` set, so deliver it now. No-op otherwise:
+        // `getSnapshot()` returns the same cached reference and `useSyncExternalStore` bails out.
         if (subscribed && shouldGetCachedValueRef.current) {
             onStoreChangeFnRef.current?.();
         }
@@ -291,8 +290,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                     // Invalidate snapshot cache for this key when data changes
                     onyxSnapshotCache.invalidateForKey(key);
 
-                    // Trigger a re-render, except for paused background writes. The initial load is never paused
-                    // though, otherwise a cold `subscribed: false` key would stay stuck 'loading' until some render.
+                    // Trigger a re-render unless paused. The initial load is never paused — gating it would leave
+                    // a cold `subscribed: false` key stuck at 'loading' until some unrelated render.
                     if (subscribedRef.current || resultRef.current?.[1]?.status === 'loading') {
                         onStoreChange();
                     }
