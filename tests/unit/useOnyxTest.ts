@@ -1557,5 +1557,33 @@ describe('useOnyx', () => {
             expect(pausedRenders.length).toBe(pausedAfterMount);
             expect(paused.result.current[0]).toEqual('v1');
         });
+
+        // A selector-identity change while paused is a consumer-driven dirtying signal with no Onyx write behind
+        // it. The paused fast path must mark the snapshot dirty so resubscribe recomputes; otherwise the hook
+        // keeps returning the old selector output until some later store update or parent render.
+        it('recomputes a selector change on resubscribe, not while paused', async () => {
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'v1');
+
+            const selectorA = (value: unknown) => `A:${value as string}`;
+            const selectorB = (value: unknown) => `B:${value as string}`;
+
+            type SelectorProps = {subscribed?: boolean; selector: (value: unknown) => string};
+            const {result, rerender} = renderHook(({subscribed, selector}: SelectorProps) => useOnyx(ONYXKEYS.TEST_KEY, {subscribed, selector}), {
+                initialProps: {subscribed: false, selector: selectorA} as SelectorProps,
+            });
+
+            await act(async () => waitForPromisesToResolve());
+            expect(result.current[0]).toEqual('A:v1');
+
+            // Selector identity changes while paused — no Onyx write, no dependency change
+            await act(async () => rerender({subscribed: false, selector: selectorB}));
+
+            // Frozen: the selector change is deferred, not applied while paused
+            expect(result.current[0]).toEqual('A:v1');
+
+            // Resubscribing must catch up to the new selector output
+            await act(async () => rerender({subscribed: true, selector: selectorB}));
+            expect(result.current[0]).toEqual('B:v1');
+        });
     });
 });

@@ -188,7 +188,14 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // While unsubscribed, keep returning the last delivered result so incidental re-renders don't leak fresh data past the gate. Pending writes leave `shouldGetCachedValueRef`
         // set, and the `subscribed` flip effect delivers the fresh value once the consumer resubscribes.
         // First connection and `loading` are exempt so a cold `subscribed: false` key still resolves.
+        const hasSelectorChanged = lastComputedSelectorRef.current !== memoizedSelector;
+
         if (!subscribedRef.current && connectedKeyRef.current === key && resultRef.current[1].status !== 'loading') {
+            // A selector-identity change is a consumer-driven dirtying signal with no Onyx write behind it,
+            // so mark the snapshot dirty; otherwise the catch-up effect can't detect it on resubscribe.
+            if (hasSelectorChanged) {
+                shouldGetCachedValueRef.current = true;
+            }
             return resultRef.current;
         }
 
@@ -206,7 +213,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // We get the value from cache while the first connection to Onyx is being made or if the key has changed,
         // so we can return any cached value right away. For the case where the key has changed, If we don't return the cached value right away, then the UI will show the incorrect (previous) value for a brief period which looks like a UI glitch to the user. After the connection is made, we only
         // update `newValueRef` when `Onyx.connect()` callback is fired.
-        const hasSelectorChanged = lastComputedSelectorRef.current !== memoizedSelector;
         if (isFirstConnection || shouldGetCachedValueRef.current || hasSelectorChanged) {
             // Gets the value from cache and maps it with selector. It changes `null` to `undefined` for `useOnyx` compatibility.
             const value = OnyxUtils.tryGetCachedValue(key) as OnyxValue<TKey>;
