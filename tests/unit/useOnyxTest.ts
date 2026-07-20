@@ -1353,7 +1353,7 @@ describe('useOnyx', () => {
             expect(result.current[0]).toEqual('v1');
         });
 
-        it('serves the latest value on an unrelated re-render while subscribed is false', async () => {
+        it('keeps returning the last delivered value on an unrelated re-render while subscribed is false, then delivers on resubscribe', async () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, 'v1');
 
             const {result, rerender} = renderHook(({subscribed}: SubscribedProps) => useOnyx(ONYXKEYS.TEST_KEY, {subscribed}), {
@@ -1375,12 +1375,19 @@ describe('useOnyx', () => {
                 rerender({subscribed: false, tick: 1});
             });
 
-            // getSnapshot should read fresh: v2, not the stale v1
+            // The snapshot stays frozen at the last delivered value: incidental re-renders must not leak
+            // fresh data past the gate (otherwise any parent/focus re-render defeats the pause).
+            expect(result.current[0]).toEqual('v1');
+
+            // Resubscribing delivers the pending fresh value
+            await act(async () => {
+                rerender({subscribed: true, tick: 1});
+            });
             expect(result.current[0]).toEqual('v2');
         });
 
         // A dependencies change is consumer-driven, not a background write, so subscribed: false must not defer it.
-        it('applies a dependencies change while subscribed is false', async () => {
+        it('defers a dependencies change while subscribed is false and applies it on resubscribe', async () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, 'base');
 
             // Stable selector reference; its output closes over `dep`, signalled via `dependencies`
@@ -1399,12 +1406,15 @@ describe('useOnyx', () => {
             await act(async () => rerender({subscribed: false}));
             expect(result.current[0]).toEqual('base-A');
 
-            // Change the dependency while paused — the Onyx value is untouched, so the deps change is the only signal
+            // Change the dependency while paused — the snapshot stays frozen at the last delivered value
             await act(async () => {
                 dep = 'B';
                 rerender({subscribed: false});
             });
+            expect(result.current[0]).toEqual('base-A');
 
+            // Resubscribing recomputes with the new dependency closure
+            await act(async () => rerender({subscribed: true}));
             expect(result.current[0]).toEqual('base-B');
         });
 

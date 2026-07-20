@@ -185,6 +185,13 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     const lastComputedSelectorRef = useRef(memoizedSelector);
 
     const getSnapshot = useCallback(() => {
+        // While unsubscribed, keep returning the last delivered result so incidental re-renders don't leak fresh data past the gate. Pending writes leave `shouldGetCachedValueRef`
+        // set, and the `subscribed` flip effect delivers the fresh value once the consumer resubscribes.
+        // First connection and `loading` are exempt so a cold `subscribed: false` key still resolves.
+        if (!subscribedRef.current && connectedKeyRef.current === key && resultRef.current[1].status !== 'loading') {
+            return resultRef.current;
+        }
+
         // Check if we have any cache for this Onyx key
         // Don't use cache during active data updates (when shouldGetCachedValueRef is true)
         const isFirstConnection = connectedKeyRef.current !== key;
