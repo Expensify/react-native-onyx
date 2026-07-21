@@ -1558,10 +1558,9 @@ describe('useOnyx', () => {
             expect(paused.result.current[0]).toEqual('v1');
         });
 
-        // A selector-identity change while paused is a consumer-driven dirtying signal with no Onyx write behind
-        // it. The paused fast path must mark the snapshot dirty so resubscribe recomputes; otherwise the hook
-        // keeps returning the old selector output until some later store update or parent render.
-        it('recomputes a selector change on resubscribe, not while paused', async () => {
+        // A selector-identity change while paused must be frozen like any other update: the paused fast path
+        // returns the last delivered output instead of recomputing. On resubscribe the new selector applies
+        it('freezes a selector change while paused and applies it on resubscribe', async () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, 'v1');
 
             const selectorA = (value: unknown) => `A:${value as string}`;

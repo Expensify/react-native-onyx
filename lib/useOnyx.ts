@@ -32,8 +32,9 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
 
     /**
      * Defaults to `true`. When `false`, the connection stays open (the value stays cache-warm) but background
-     * writes no longer trigger a re-render. Only the render trigger is deferred, not the value: any render still
-     * reads the latest value, and flipping back to `true` re-renders with it.
+     * writes no longer trigger a re-render, and the value is frozen: incidental re-renders keep returning the
+     * last delivered result instead of the latest one. The initial load is exempt, so a cold key still resolves.
+     * Flipping back to `true` re-renders and catches up to the latest value.
      */
     subscribed?: boolean;
 };
