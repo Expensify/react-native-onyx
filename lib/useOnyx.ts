@@ -1,12 +1,15 @@
+import type {DependencyList} from 'react';
+
 import {deepEqual, shallowEqual} from 'fast-equals';
 import {useCallback, useEffect, useMemo, useRef, useSyncExternalStore} from 'react';
-import type {DependencyList} from 'react';
-import OnyxCache, {TASK} from './OnyxCache';
+
 import type {Connection} from './OnyxConnectionManager';
-import connectionManager from './OnyxConnectionManager';
-import OnyxUtils from './OnyxUtils';
 import type {CollectionKeyBase, OnyxKey, OnyxValue} from './types';
+
+import OnyxCache, {TASK} from './OnyxCache';
+import connectionManager from './OnyxConnectionManager';
 import onyxSnapshotCache from './OnyxSnapshotCache';
+import OnyxUtils from './OnyxUtils';
 import useLiveRef from './useLiveRef';
 
 type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (data: OnyxValue<TKey> | undefined) => TReturnValue;
@@ -26,6 +29,14 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
      * @see `useOnyx` cannot return `null` and so selector will replace `null` with `undefined` to maintain compatibility.
      */
     selector?: UseOnyxSelector<TKey, TReturnValue>;
+
+    /**
+     * Defaults to `true`. When `false`, the connection stays open (the value stays cache-warm) but background
+     * writes no longer trigger a re-render, and the value is frozen: incidental re-renders keep returning the
+     * last delivered result instead of the latest one. The initial load is exempt, so a cold key still resolves.
+     * Flipping back to `true` re-renders and catches up to the latest value.
+     */
+    subscribed?: boolean;
 };
 
 type FetchStatus = 'loading' | 'loaded';
@@ -44,6 +55,21 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     const connectionRef = useRef<Connection | null>(null);
     const currentDependenciesRef = useLiveRef(dependencies);
     const selector = options?.selector;
+
+    // The Onyx callback reads `subscribed` via a ref so toggling it never re-subscribes. The ref is synced in an
+    // effect so the gate only ever reflects committed renders.
+    const subscribed = options?.subscribed !== false;
+    const subscribedRef = useRef(subscribed);
+    useEffect(() => {
+        subscribedRef.current = subscribed;
+
+        // A write can land between the flip render (`false` to `true`) and this effect, while the stale ref still
+        // gates it. The gated callback leaves `shouldGetCachedValueRef` set, so deliver it now. No-op otherwise:
+        // `getSnapshot()` returns the same cached reference and `useSyncExternalStore` bails out.
+        if (subscribed && shouldGetCachedValueRef.current) {
+            onStoreChangeFnRef.current?.();
+        }
+    }, [subscribed]);
 
     // Create memoized version of selector for performance
     const memoizedSelector = useMemo((): UseOnyxSelector<TKey, TReturnValue> | null => {
@@ -160,6 +186,20 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     const lastComputedSelectorRef = useRef(memoizedSelector);
 
     const getSnapshot = useCallback(() => {
+        // While unsubscribed, keep returning the last delivered result so incidental re-renders don't leak fresh data past the gate. Pending writes leave `shouldGetCachedValueRef`
+        // set, and the `subscribed` flip effect delivers the fresh value once the consumer resubscribes.
+        // First connection and `loading` are exempt so a cold `subscribed: false` key still resolves.
+        const hasSelectorChanged = lastComputedSelectorRef.current !== memoizedSelector;
+
+        if (!subscribedRef.current && connectedKeyRef.current === key && resultRef.current[1].status !== 'loading') {
+            // A selector-identity change is a consumer-driven dirtying signal with no Onyx write behind it,
+            // so mark the snapshot dirty; otherwise the catch-up effect can't detect it on resubscribe.
+            if (hasSelectorChanged) {
+                shouldGetCachedValueRef.current = true;
+            }
+            return resultRef.current;
+        }
+
         // Check if we have any cache for this Onyx key
         // Don't use cache during active data updates (when shouldGetCachedValueRef is true)
         const isFirstConnection = connectedKeyRef.current !== key;
@@ -174,7 +214,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // We get the value from cache while the first connection to Onyx is being made or if the key has changed,
         // so we can return any cached value right away. For the case where the key has changed, If we don't return the cached value right away, then the UI will show the incorrect (previous) value for a brief period which looks like a UI glitch to the user. After the connection is made, we only
         // update `newValueRef` when `Onyx.connect()` callback is fired.
-        const hasSelectorChanged = lastComputedSelectorRef.current !== memoizedSelector;
         if (isFirstConnection || shouldGetCachedValueRef.current || hasSelectorChanged) {
             // Gets the value from cache and maps it with selector. It changes `null` to `undefined` for `useOnyx` compatibility.
             const value = OnyxUtils.tryGetCachedValue(key) as OnyxValue<TKey>;
@@ -265,8 +304,11 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                     // Invalidate snapshot cache for this key when data changes
                     onyxSnapshotCache.invalidateForKey(key);
 
-                    // Finally, we signal that the store changed, making `getSnapshot()` be called again.
-                    onStoreChange();
+                    // Trigger a re-render unless paused. The initial load is never paused — gating it would leave
+                    // a cold `subscribed: false` key stuck at 'loading' until some unrelated render.
+                    if (subscribedRef.current || resultRef.current?.[1]?.status === 'loading') {
+                        onStoreChange();
+                    }
                 },
                 reuseConnection: options?.reuseConnection,
             });
