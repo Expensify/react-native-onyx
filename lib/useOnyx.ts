@@ -51,7 +51,7 @@ function memoizedShallowEqual(a: unknown, b: unknown): boolean {
     }
 
     const cachedVerdict = verdictsForA.get(b);
-    
+
     if (cachedVerdict !== undefined) {
         return cachedVerdict;
     }
