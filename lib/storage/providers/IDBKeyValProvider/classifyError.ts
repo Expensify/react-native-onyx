@@ -19,6 +19,13 @@ function classifyIDBError(error: unknown): ValueOf<typeof StorageErrorClass> {
         return StorageErrorClass.CAPACITY;
     }
 
+    // Chromium blob-file write failure (IOError / InvalidBlob) when externalizing large IDB
+    // values. Not disk pressure and not the caller's data — an engine-level fault; retrying
+    // never succeeds, so skip quietly instead of amplifying.
+    if (message.includes('failed to write blobs')) {
+        return StorageErrorClass.UNRECOVERABLE;
+    }
+
     // Backing-store corruption (Chromium LevelDB). Recoverable only via a budgeted reopen.
     if (message.includes('internal error opening backing store')) {
         return StorageErrorClass.FATAL;
