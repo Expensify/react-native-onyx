@@ -1,6 +1,6 @@
 {
   "name": "react-native-onyx",
-  "version": "3.0.69",
+  "version": "3.0.91",
   "author": "Expensify, Inc.",
   "homepage": "https://expensify.com",
   "description": "State management for React Native",
@@ -61,6 +61,7 @@
     "@react-native/babel-preset": "0.76.3",
     "@react-native/polyfills": "^2.0.0",
     "@testing-library/react-native": "^13.2.0",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/jest": "^29.5.14",
     "@types/jsdoc-to-markdown": "^7.0.6",
     "@types/lodash": "^4.14.202",
@@ -71,6 +72,7 @@
     "@typescript-eslint/eslint-plugin": "^8.51.0",
     "@typescript-eslint/parser": "^8.51.0",
     "@vercel/ncc": "0.38.1",
+    "better-sqlite3": "^12.10.0",
     "date-fns": "^4.1.0",
     "eslint": "^9.39.2",
     "eslint-config-expensify": "2.0.108",

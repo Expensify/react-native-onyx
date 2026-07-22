@@ -37,27 +37,16 @@ const complexSelector: UseOnyxSelector<OnyxKey, ComplexSelectorResult> = (data) 
 
 const selectorOptions: UseOnyxOptions<string, number | undefined> = {
     selector: simpleSelector,
-    initWithStoredValues: true,
 };
 
 const complexSelectorOptions: UseOnyxOptions<string, ComplexSelectorResult> = {
     selector: complexSelector,
-    initWithStoredValues: true,
 };
 
 // Mock results
-const mockResult: UseOnyxResult<MockData> = [
-    {id: 1, name: 'Test', value: 42},
-    {status: 'loaded', sourceValue: {id: 1, name: 'Test', value: 42}},
-];
+const mockResult: UseOnyxResult<MockData> = [{id: 1, name: 'Test', value: 42}, {status: 'loaded'}];
 
-const mockResults = Array.from(
-    {length: 1000},
-    (_, i): UseOnyxResult<MockData> => [
-        {id: i, name: `Test${i}`, value: i * 10},
-        {status: 'loaded', sourceValue: {id: i, name: `Test${i}`, value: i * 10}},
-    ],
-);
+const mockResults = Array.from({length: 1000}, (_, i): UseOnyxResult<MockData> => [{id: i, name: `Test${i}`, value: i * 10}, {status: 'loaded'}]);
 
 describe('OnyxSnapshotCache', () => {
     let cache: OnyxSnapshotCache;
@@ -101,7 +90,7 @@ describe('OnyxSnapshotCache', () => {
         test('generating key for selector options', async () => {
             await measureFunction(
                 () => {
-                    cache.registerConsumer(selectorOptions);
+                    cache.registerConsumer(ONYXKEYS.TEST_KEY, selectorOptions);
                 },
                 {
                     beforeEach: resetCacheBeforeEachMeasure,
@@ -112,7 +101,7 @@ describe('OnyxSnapshotCache', () => {
         test('generating key for complex selector options', async () => {
             await measureFunction(
                 () => {
-                    cache.registerConsumer(complexSelectorOptions);
+                    cache.registerConsumer(ONYXKEYS.TEST_KEY, complexSelectorOptions);
                 },
                 {
                     beforeEach: resetCacheBeforeEachMeasure,
@@ -126,7 +115,7 @@ describe('OnyxSnapshotCache', () => {
                     for (let i = 0; i < 1000; i++) {
                         const selector: UseOnyxSelector<OnyxKey, string> = (data) => ((data as MockData | undefined)?.field ?? '') + i;
                         const options: UseOnyxOptions<string, string> = {...selectorOptions, selector};
-                        cache.registerConsumer(options);
+                        cache.registerConsumer(ONYXKEYS.TEST_KEY, options);
                     }
                 },
                 {
@@ -138,7 +127,7 @@ describe('OnyxSnapshotCache', () => {
 
     describe('getCachedResult', () => {
         test('getting cached result (cache hit)', async () => {
-            const cacheKey = cache.registerConsumer(selectorOptions);
+            const cacheKey = cache.registerConsumer(ONYXKEYS.TEST_KEY, selectorOptions);
             await measureFunction(
                 () => {
                     cache.getCachedResult(ONYXKEYS.TEST_KEY, cacheKey);
@@ -146,7 +135,7 @@ describe('OnyxSnapshotCache', () => {
                 {
                     beforeEach: () => {
                         resetCacheBeforeEachMeasure();
-                        const key = cache.registerConsumer(selectorOptions);
+                        const key = cache.registerConsumer(ONYXKEYS.TEST_KEY, selectorOptions);
                         cache.setCachedResult(ONYXKEYS.TEST_KEY, key, mockResult);
                     },
                 },
@@ -154,11 +143,8 @@ describe('OnyxSnapshotCache', () => {
         });
 
         test('getting cached result with complex selector (cache hit)', async () => {
-            const cacheKey = cache.registerConsumer(complexSelectorOptions);
-            const complexResult: UseOnyxResult<ComplexSelectorResult> = [
-                {id: 1, name: 'Test', computed: 84, formatted: 'Test: 42'},
-                {status: 'loaded', sourceValue: {id: 1, name: 'Test', computed: 84, formatted: 'Test: 42'}},
-            ];
+            const cacheKey = cache.registerConsumer(ONYXKEYS.TEST_KEY, complexSelectorOptions);
+            const complexResult: UseOnyxResult<ComplexSelectorResult> = [{id: 1, name: 'Test', computed: 84, formatted: 'Test: 42'}, {status: 'loaded'}];
             await measureFunction(
                 () => {
                     cache.getCachedResult(ONYXKEYS.TEST_KEY, cacheKey);
@@ -166,7 +152,7 @@ describe('OnyxSnapshotCache', () => {
                 {
                     beforeEach: () => {
                         resetCacheBeforeEachMeasure();
-                        const key = cache.registerConsumer(complexSelectorOptions);
+                        const key = cache.registerConsumer(ONYXKEYS.TEST_KEY, complexSelectorOptions);
                         cache.setCachedResult(ONYXKEYS.TEST_KEY, key, complexResult);
                     },
                 },
@@ -174,7 +160,7 @@ describe('OnyxSnapshotCache', () => {
         });
 
         test('getting cached result with 1000 keys in cache', async () => {
-            const cacheKey = cache.registerConsumer(selectorOptions);
+            const cacheKey = cache.registerConsumer(ONYXKEYS.TEST_KEY, selectorOptions);
             await measureFunction(
                 () => {
                     cache.getCachedResult(ONYXKEYS.TEST_KEY, cacheKey);
@@ -198,7 +184,7 @@ describe('OnyxSnapshotCache', () => {
 
     describe('setCachedResult', () => {
         test('setting cached result for new key', async () => {
-            const cacheKey = cache.registerConsumer(selectorOptions);
+            const cacheKey = cache.registerConsumer(ONYXKEYS.TEST_KEY, selectorOptions);
             await measureFunction(
                 () => {
                     cache.setCachedResult(ONYXKEYS.TEST_KEY, cacheKey, mockResult);
@@ -210,7 +196,7 @@ describe('OnyxSnapshotCache', () => {
         });
 
         test('setting cached result for existing key', async () => {
-            const cacheKey = cache.registerConsumer(selectorOptions);
+            const cacheKey = cache.registerConsumer(ONYXKEYS.TEST_KEY, selectorOptions);
             await measureFunction(
                 () => {
                     cache.setCachedResult(ONYXKEYS.TEST_KEY, cacheKey, mockResult);
@@ -235,7 +221,7 @@ describe('OnyxSnapshotCache', () => {
                 {
                     beforeEach: () => {
                         resetCacheBeforeEachMeasure();
-                        const cacheKey = cache.registerConsumer(selectorOptions);
+                        const cacheKey = cache.registerConsumer(ONYXKEYS.TEST_KEY, selectorOptions);
                         cache.setCachedResult(ONYXKEYS.TEST_KEY, cacheKey, mockResult);
                     },
                 },
@@ -251,7 +237,7 @@ describe('OnyxSnapshotCache', () => {
                 {
                     beforeEach: () => {
                         resetCacheBeforeEachMeasure();
-                        const cacheKey = cache.registerConsumer(selectorOptions);
+                        const cacheKey = cache.registerConsumer(ONYXKEYS.TEST_KEY, selectorOptions);
                         // Cache both collection and member
                         cache.setCachedResult(ONYXKEYS.COLLECTION.REPORTS, cacheKey, mockResult);
                         cache.setCachedResult(collectionMemberKey, cacheKey, mockResult);

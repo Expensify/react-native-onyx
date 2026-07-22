@@ -19,7 +19,7 @@ const metadataStatusMatcher = (onyxKey: OnyxKey, expected: FetchStatus) => `meta
 type UseOnyxMatcherProps = {
     onyxKey: OnyxKey;
     data: OnyxValue<OnyxKey>;
-    metadata: ResultMetadata<OnyxValue<OnyxKey>>;
+    metadata: ResultMetadata;
 };
 
 function UseOnyxMatcher({onyxKey, data, metadata}: UseOnyxMatcherProps) {
@@ -170,31 +170,6 @@ describe('useOnyx', () => {
                         Onyx.merge(key, {name: 'test_name2'});
 
                         await screen.findByText(dataMatcher(key, 'test_name2_changed'));
-                        await screen.findByText(metadataStatusMatcher(key, 'loaded'));
-                    },
-                    afterEach: clearOnyxAfterEachMeasure,
-                },
-            );
-        });
-    });
-
-    describe('initWithStoredValues', () => {
-        /**
-         * Expected renders: 1.
-         */
-        test('connecting with initWithStoredValues set to false', async () => {
-            const key = ONYXKEYS.TEST_KEY;
-            await measureRenders(
-                <UseOnyxWrapper
-                    onyxKey={key}
-                    onyxOptions={{initWithStoredValues: false}}
-                />,
-                {
-                    beforeEach: async () => {
-                        await Onyx.set(key, 'test');
-                    },
-                    scenario: async () => {
-                        await screen.findByText(dataMatcher(key, undefined));
                         await screen.findByText(metadataStatusMatcher(key, 'loaded'));
                     },
                     afterEach: clearOnyxAfterEachMeasure,

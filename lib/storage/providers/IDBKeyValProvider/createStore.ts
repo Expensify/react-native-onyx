@@ -1,6 +1,10 @@
 import * as IDB from 'idb-keyval';
 import type {UseStore} from 'idb-keyval';
 import * as Logger from '../../../Logger';
+import {StorageErrorClass} from '../../errors';
+import classifyIDBError from './classifyError';
+
+const HEAL_ATTEMPTS_MAX = 3;
 
 // This is a copy of the createStore function from idb-keyval, we need a custom implementation
 // because we need to create the database manually in order to ensure that the store exists before we use it.
@@ -8,6 +12,7 @@ import * as Logger from '../../../Logger';
 // source: https://github.com/jakearchibald/idb-keyval/blob/9d19315b4a83897df1e0193dccdc29f78466a0f3/src/index.ts#L12
 function createStore(dbName: string, storeName: string): UseStore {
     let dbp: Promise<IDBDatabase> | undefined;
+    let healAttemptsRemaining = HEAL_ATTEMPTS_MAX;
 
     const attachHandlers = (db: IDBDatabase) => {
         // Browsers may close idle IDB connections at any time, especially Safari.
@@ -24,24 +29,36 @@ function createStore(dbName: string, storeName: string): UseStore {
         // https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/versionchange_event
         // eslint-disable-next-line no-param-reassign
         db.onversionchange = () => {
-            Logger.logInfo('IDB connection closing due to version change', {dbName, storeName});
+            Logger.logInfo('IDB connection closing due to version change', {
+                dbName,
+                storeName,
+            });
             db.close();
             dbp = undefined;
         };
     };
 
+    // Cache the open promise and attach handlers + rejection cleanup.
+    // On rejection, clears dbp so the next operation retries with a fresh indexedDB.open()
+    // instead of returning the same rejected promise.
+    // Guard: only clear if dbp hasn't been replaced by a concurrent heal/retry.
+    function cacheOpenPromise(openPromise: Promise<IDBDatabase>) {
+        dbp = openPromise;
+        const currentPromise = openPromise;
+        openPromise.then(attachHandlers, () => {
+            if (dbp !== currentPromise) {
+                return;
+            }
+            dbp = undefined;
+        });
+        return openPromise;
+    }
+
     const getDB = () => {
         if (dbp) return dbp;
         const request = indexedDB.open(dbName);
         request.onupgradeneeded = () => request.result.createObjectStore(storeName);
-        dbp = IDB.promisifyRequest(request);
-
-        dbp.then(
-            attachHandlers,
-            // eslint-disable-next-line @typescript-eslint/no-empty-function
-            () => {},
-        );
-        return dbp;
+        return cacheOpenPromise(IDB.promisifyRequest(request));
     };
 
     // Ensures the store exists in the DB. If missing, bumps the version to trigger
@@ -66,10 +83,7 @@ function createStore(dbName: string, storeName: string): UseStore {
             updatedDatabase.createObjectStore(storeName);
         };
 
-        dbp = IDB.promisifyRequest(request);
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
-        dbp.then(attachHandlers, () => {});
-        return dbp;
+        return cacheOpenPromise(IDB.promisifyRequest(request));
     };
 
     function executeTransaction<T>(txMode: IDBTransactionMode, callback: (store: IDBObjectStore) => T | PromiseLike<T>): Promise<T> {
@@ -78,23 +92,127 @@ function createStore(dbName: string, storeName: string): UseStore {
             .then((db) => callback(db.transaction(storeName, txMode).objectStore(storeName)));
     }
 
-    // If the connection was closed between getDB() resolving and db.transaction() executing,
-    // the transaction throws InvalidStateError. We catch it and retry once with a fresh connection.
-    return (txMode, callback) =>
-        executeTransaction(txMode, callback).catch((error) => {
-            if (error instanceof DOMException && error.name === 'InvalidStateError') {
-                Logger.logAlert('IDB InvalidStateError, retrying with fresh connection', {
-                    dbName,
-                    storeName,
-                    txMode,
-                    errorMessage: error.message,
-                });
-                dbp = undefined;
-                // Retry only once — this call is not wrapped, so if it also fails the error propagates normally.
-                return executeTransaction(txMode, callback);
+    function resetHealBudget<T>(result: T): T {
+        healAttemptsRemaining = HEAL_ATTEMPTS_MAX;
+        return result;
+    }
+
+    // Proactive IDB health check when tab returns to foreground.
+    // Safari kills IDB connections for backgrounded tabs. By probing as soon as
+    // the tab becomes visible, we drop the stale dbp early so the first real
+    // operation opens a fresh connection instead of failing.
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState !== 'visible' || !dbp) {
+            return;
+        }
+
+        Logger.logInfo('IDB visibilitychange probe: tab became visible, checking connection health', {dbName, storeName});
+
+        const probePromise = dbp;
+
+        const dropCacheIfStale = (error: unknown) => {
+            // A stale/dead connection surfaces as TRANSIENT (InvalidStateError, Safari connection lost)
+            // or FATAL (Chromium backing-store corruption) per the shared taxonomy (lib/storage/errors.ts).
+            const errorClass = classifyIDBError(error);
+            const isStaleConnection = errorClass === StorageErrorClass.TRANSIENT || errorClass === StorageErrorClass.FATAL;
+            if (dbp !== probePromise || !isStaleConnection) {
+                return;
             }
-            throw error;
-        });
+            Logger.logAlert('IDB visibilitychange probe: stale connection detected, dropping cached connection', {
+                dbName,
+                storeName,
+                errorMessage: error instanceof Error ? error.message : String(error),
+            });
+            dbp = undefined;
+        };
+
+        probePromise
+            .then((db) => {
+                if (dbp !== probePromise) {
+                    return;
+                }
+                try {
+                    const tx = db.transaction(storeName, 'readonly');
+                    const probeStore = tx.objectStore(storeName);
+                    const req = probeStore.count();
+                    req.onsuccess = () => {
+                        Logger.logInfo('IDB visibilitychange probe: connection is healthy', {dbName, storeName});
+                    };
+                    req.onerror = () => {
+                        dropCacheIfStale(req.error);
+                    };
+                } catch (error) {
+                    dropCacheIfStale(error);
+                }
+            })
+            .catch(() => {
+                // The cached open promise rejected; cacheOpenPromise already cleared dbp on its own
+                // branch. Swallow here so the probe's separate branch doesn't surface an unhandled rejection.
+            });
+    });
+
+    // The connection layer owns recovery for connection/transport failures. It reacts per the shared
+    // error taxonomy (see lib/storage/errors.ts):
+    // - TRANSIENT (InvalidStateError, AbortError, Safari connection lost) — the cached connection is
+    //   stale. Drop it and retry once with a fresh one. Unbudgeted: a single reopen is always worth it
+    //   and is bounded per operation.
+    // - FATAL (Chromium backing-store corruption) — reopening can recover transient corruption, but
+    //   repeating forever is futile, so the heal is budgeted (3 attempts, reset on success).
+    //   Mirrors Dexie's PR1398_maxLoop pattern: https://github.com/dexie/Dexie.js/blob/master/src/functions/temp-transaction.ts
+    // - CAPACITY / UNKNOWN are NOT the connection layer's responsibility — propagate to the operation
+    //   layer (OnyxUtils.retryOperation) without retrying here, to avoid compounding retries.
+    // Note: concurrent store() calls share the heal budget. Under overlapping failures each caller
+    // decrements independently, so the budget may drain faster than one-per-incident. This is
+    // acceptable — same as Dexie's approach — and the budget resets on any success.
+    return (txMode, callback) =>
+        executeTransaction(txMode, callback)
+            .then(resetHealBudget)
+            .catch((error) => {
+                const errorClass = classifyIDBError(error);
+
+                if (errorClass === StorageErrorClass.TRANSIENT) {
+                    Logger.logInfo('IDB transient error — dropping cached connection and retrying once', {
+                        dbName,
+                        storeName,
+                        txMode,
+                        errorMessage: error instanceof Error ? error.message : String(error),
+                    });
+                    dbp = undefined;
+                    return executeTransaction(txMode, callback).then(resetHealBudget);
+                }
+
+                if (errorClass === StorageErrorClass.FATAL && healAttemptsRemaining > 0) {
+                    healAttemptsRemaining--;
+                    Logger.logInfo(`IDB heal: backing store error detected — dropping cached connection and reopening (${healAttemptsRemaining} attempts left)`, {
+                        dbName,
+                        storeName,
+                    });
+                    dbp = undefined;
+                    return executeTransaction(txMode, callback).then((result) => {
+                        Logger.logInfo('IDB heal: successfully recovered after backing store error', {dbName, storeName});
+                        return resetHealBudget(result);
+                    });
+                }
+
+                if (errorClass === StorageErrorClass.FATAL) {
+                    Logger.logAlert('IDB heal: backing store error — heal budget exhausted, giving up', {
+                        dbName,
+                        storeName,
+                    });
+                } else if (errorClass === StorageErrorClass.UNKNOWN) {
+                    // UNKNOWN — unexpected at this layer; record it so it's visible. CAPACITY is the
+                    // expected propagation path (the operation layer owns its logging, and suppresses it
+                    // entirely once the circuit breaker is open), so we do NOT log it here — doing so was a
+                    // per-failed-write line that dominated the storm.
+                    Logger.logInfo('IDB error not recoverable at the connection layer, propagating', {
+                        dbName,
+                        storeName,
+                        errorClass,
+                        errorMessage: error instanceof Error ? error.message : String(error),
+                    });
+                }
+                throw error;
+            });
 }
 
 export default createStore;

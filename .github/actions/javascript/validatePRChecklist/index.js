@@ -29983,6 +29983,7 @@ const fs = __importStar(__nccwpck_require__(7147));
 const path = __importStar(__nccwpck_require__(1017));
 const UNCHECKED_PATTERN = /- \[ \]/g;
 const CHECKED_PATTERN = /- \[x\]/gi;
+const E_APP_PR_URL_PATTERN = /^https?:\/\/github\.com\/Expensify\/App\/pull\/\d+\/?$/;
 function getAuthorChecklistSection(body) {
     const startMarker = '### Author Checklist';
     const endMarker = '### Screenshots/Videos';
@@ -30024,6 +30025,13 @@ function validateChecklist(body) {
     }
     if (unchecked > 0) {
         errors.push(`${unchecked} checklist item(s) are unchecked. All items must be checked before merging — including items that don't apply (check them and note why if needed).`);
+    }
+    const linkedEAppPR = getSectionContent(body, 'Linked E/App PR');
+    if (!linkedEAppPR) {
+        errors.push('The "Linked E/App PR" section is empty. Every Onyx PR must link to a corresponding Expensify/App PR that pins this PR via git+https and runs the full E/App test suite.');
+    }
+    else if (!E_APP_PR_URL_PATTERN.test(linkedEAppPR)) {
+        errors.push(`The "Linked E/App PR" section must contain a single Expensify/App PR URL (e.g. https://github.com/Expensify/App/pull/12345), found: "${linkedEAppPR}".`);
     }
     // Section warnings
     if (!getSectionContent(body, 'Automated Tests')) {

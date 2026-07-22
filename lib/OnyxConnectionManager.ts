@@ -4,7 +4,7 @@ import type {ConnectOptions} from './Onyx';
 import OnyxUtils from './OnyxUtils';
 import OnyxKeys from './OnyxKeys';
 import * as Str from './Str';
-import type {CollectionConnectCallback, DefaultConnectCallback, DefaultConnectOptions, OnyxKey, OnyxValue} from './types';
+import type {CollectionConnectCallback, DefaultConnectCallback, OnyxKey, OnyxValue} from './types';
 import onyxSnapshotCache from './OnyxSnapshotCache';
 
 type ConnectCallback = DefaultConnectCallback<OnyxKey> | CollectionConnectCallback<OnyxKey>;
@@ -43,16 +43,6 @@ type ConnectionMetadata = {
      * The last callback key returned by `OnyxUtils.subscribeToKey()`'s callback.
      */
     cachedCallbackKey?: OnyxKey;
-
-    /**
-     * The value that triggered the last update
-     */
-    sourceValue?: OnyxValue<OnyxKey>;
-
-    /**
-     * Whether the subscriber is waiting for the collection callback to be fired.
-     */
-    waitForCollectionCallback?: boolean;
 };
 
 /**
@@ -115,26 +105,20 @@ class OnyxConnectionManager {
      * according to their purpose and effect they produce in the Onyx connection.
      */
     private generateConnectionID<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): string {
-        const {key, initWithStoredValues, reuseConnection, waitForCollectionCallback} = connectOptions;
+        const {key, reuseConnection} = connectOptions;
 
         // The current session ID is appended to the connection ID so we can have different connections
         // after an `Onyx.clear()` operation.
         let suffix = `,sessionID=${this.sessionID}`;
 
-        // We will generate a unique ID in any of the following situations:
-        // - `reuseConnection` is `false`. That means the subscriber explicitly wants the connection to not be reused.
-        // - `initWithStoredValues` is `false`. This flag changes the subscription flow when set to `false`, so the connection can't be reused.
-        // - `key` is a collection key AND `waitForCollectionCallback` is `undefined/false`. This combination needs a new connection at every subscription
-        //   in order to send all the collection entries, so the connection can't be reused.
-        if (
-            reuseConnection === false ||
-            initWithStoredValues === false ||
-            (OnyxKeys.isCollectionKey(key) && (waitForCollectionCallback === undefined || waitForCollectionCallback === false))
-        ) {
+        // We will generate a unique ID when `reuseConnection` is `false`, which means the subscriber
+        // explicitly wants the connection to not be reused. Collection-root subscriptions are now always
+        // snapshot mode, so they can be reused like any other connection.
+        if (reuseConnection === false) {
             suffix += `,uniqueID=${Str.guid()}`;
         }
 
-        return `onyxKey=${key},initWithStoredValues=${initWithStoredValues ?? true},waitForCollectionCallback=${waitForCollectionCallback ?? false}${suffix}`;
+        return `onyxKey=${key}${suffix}`;
     }
 
     /**
@@ -147,10 +131,14 @@ class OnyxConnectionManager {
         }
 
         for (const callback of connection.callbacks.values()) {
-            if (connection.waitForCollectionCallback) {
-                (callback as CollectionConnectCallback<OnyxKey>)(connection.cachedCallbackValue as Record<string, unknown>, connection.cachedCallbackKey as OnyxKey, connection.sourceValue);
-            } else {
-                (callback as DefaultConnectCallback<OnyxKey>)(connection.cachedCallbackValue, connection.cachedCallbackKey as OnyxKey);
+            try {
+                if (OnyxKeys.isCollectionKey(connection.onyxKey)) {
+                    (callback as CollectionConnectCallback<OnyxKey>)(connection.cachedCallbackValue as Record<string, unknown>, connection.cachedCallbackKey as OnyxKey);
+                } else {
+                    (callback as DefaultConnectCallback<OnyxKey>)(connection.cachedCallbackValue, connection.cachedCallbackKey as OnyxKey);
+                }
+            } catch (error) {
+                Logger.logAlert(`[ConnectionManager] Subscriber callback threw an error for key '${connection.onyxKey}': ${error}`);
             }
         }
     }
@@ -170,7 +158,7 @@ class OnyxConnectionManager {
 
         // If there is no connection yet for that connection ID, we create a new one.
         if (!connectionMetadata) {
-            const callback: ConnectCallback = (value, key, sourceValue) => {
+            const callback: ConnectCallback = (value: OnyxValue<OnyxKey>, key: OnyxKey) => {
                 const createdConnection = this.connectionsMap.get(connectionID);
                 if (createdConnection) {
                     // We signal that the first connection was made and now any new subscribers
@@ -178,22 +166,20 @@ class OnyxConnectionManager {
                     createdConnection.isConnectionMade = true;
                     createdConnection.cachedCallbackValue = value;
                     createdConnection.cachedCallbackKey = key;
-                    createdConnection.sourceValue = sourceValue;
                     this.fireCallbacks(connectionID);
                 }
             };
 
             subscriptionID = OnyxUtils.subscribeToKey({
                 ...connectOptions,
-                callback: callback as DefaultConnectCallback<TKey>,
-            });
+                callback,
+            } as ConnectOptions<TKey>);
 
             connectionMetadata = {
                 subscriptionID,
                 onyxKey: connectOptions.key,
                 isConnectionMade: false,
                 callbacks: new Map(),
-                waitForCollectionCallback: connectOptions.waitForCollectionCallback,
             };
 
             this.connectionsMap.set(connectionID, connectionMetadata);
@@ -209,7 +195,7 @@ class OnyxConnectionManager {
             // Defer the callback execution to the next tick of the event loop.
             // This ensures that the current execution flow completes and the result connection object is available when the callback fires.
             Promise.resolve().then(() => {
-                (connectOptions as DefaultConnectOptions<OnyxKey>).callback?.(connectionMetadata.cachedCallbackValue, connectionMetadata.cachedCallbackKey as OnyxKey);
+                (connectOptions.callback as DefaultConnectCallback<OnyxKey> | undefined)?.(connectionMetadata.cachedCallbackValue, connectionMetadata.cachedCallbackKey as OnyxKey);
             });
         }
 

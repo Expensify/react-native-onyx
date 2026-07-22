@@ -36,7 +36,6 @@ describe('Set data while storage is clearing', () => {
         });
         connection = Onyx.connect({
             key: ONYX_KEYS.DEFAULT_KEY,
-            initWithStoredValues: false,
             callback: (val) => (onyxValue = val),
         });
         return waitForPromisesToResolve();
@@ -90,7 +89,6 @@ describe('Set data while storage is clearing', () => {
         let regularKeyOnyxValue: unknown;
         Onyx.connect({
             key: ONYX_KEYS.REGULAR_KEY,
-            initWithStoredValues: false,
             callback: (val) => (regularKeyOnyxValue = val),
         });
         Onyx.set(ONYX_KEYS.REGULAR_KEY, SET_VALUE).then(() => {
@@ -215,7 +213,6 @@ describe('Set data while storage is clearing', () => {
         const collectionCallback = jest.fn();
         const testConnection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST,
-            waitForCollectionCallback: true,
             callback: collectionCallback,
         });
         return (
@@ -242,7 +239,7 @@ describe('Set data while storage is clearing', () => {
                     expect(collectionCallback).toHaveBeenCalledTimes(3);
 
                     // And it should be called with the expected parameters each time
-                    expect(collectionCallback).toHaveBeenNthCalledWith(1, undefined, ONYX_KEYS.COLLECTION.TEST, undefined);
+                    expect(collectionCallback).toHaveBeenNthCalledWith(1, undefined, ONYX_KEYS.COLLECTION.TEST);
                     expect(collectionCallback).toHaveBeenNthCalledWith(
                         2,
                         {
@@ -252,19 +249,8 @@ describe('Set data while storage is clearing', () => {
                             test_4: 4,
                         },
                         ONYX_KEYS.COLLECTION.TEST,
-                        {
-                            test_1: 1,
-                            test_2: 2,
-                            test_3: 3,
-                            test_4: 4,
-                        },
                     );
-                    expect(collectionCallback).toHaveBeenLastCalledWith({}, ONYX_KEYS.COLLECTION.TEST, {
-                        test_1: undefined,
-                        test_2: undefined,
-                        test_3: undefined,
-                        test_4: undefined,
-                    });
+                    expect(collectionCallback).toHaveBeenLastCalledWith({}, ONYX_KEYS.COLLECTION.TEST);
                 })
         );
     });

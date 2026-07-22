@@ -38,23 +38,20 @@ describe('OnyxConnectionManager', () => {
     describe('generateConnectionID', () => {
         it('should generate a stable connection ID', async () => {
             const connectionID = generateConnectionID({key: ONYXKEYS.TEST_KEY});
-            expect(connectionID).toEqual(`onyxKey=${ONYXKEYS.TEST_KEY},initWithStoredValues=true,waitForCollectionCallback=false,sessionID=${getSessionID()}`);
+            expect(connectionID).toEqual(`onyxKey=${ONYXKEYS.TEST_KEY},sessionID=${getSessionID()}`);
         });
 
-        it("should generate a stable connection ID regardless of the order which the option's properties were passed", async () => {
-            const connectionID = generateConnectionID({key: ONYXKEYS.TEST_KEY, waitForCollectionCallback: true, initWithStoredValues: true});
-            expect(connectionID).toEqual(`onyxKey=${ONYXKEYS.TEST_KEY},initWithStoredValues=true,waitForCollectionCallback=true,sessionID=${getSessionID()}`);
+        it('should generate a stable, reusable connection ID for collection keys', async () => {
+            const connectionID = generateConnectionID({key: ONYXKEYS.COLLECTION.TEST_KEY});
+            expect(connectionID).toEqual(`onyxKey=${ONYXKEYS.COLLECTION.TEST_KEY},sessionID=${getSessionID()}`);
         });
 
         it('should generate unique connection IDs if certain options are passed', async () => {
             const connectionID1 = generateConnectionID({key: ONYXKEYS.TEST_KEY, reuseConnection: false});
             const connectionID2 = generateConnectionID({key: ONYXKEYS.TEST_KEY, reuseConnection: false});
-            expect(connectionID1.startsWith(`onyxKey=${ONYXKEYS.TEST_KEY},initWithStoredValues=true,waitForCollectionCallback=false,sessionID=${getSessionID()},uniqueID=`)).toBeTruthy();
-            expect(connectionID2.startsWith(`onyxKey=${ONYXKEYS.TEST_KEY},initWithStoredValues=true,waitForCollectionCallback=false,sessionID=${getSessionID()},uniqueID=`)).toBeTruthy();
+            expect(connectionID1.startsWith(`onyxKey=${ONYXKEYS.TEST_KEY},sessionID=${getSessionID()},uniqueID=`)).toBeTruthy();
+            expect(connectionID2.startsWith(`onyxKey=${ONYXKEYS.TEST_KEY},sessionID=${getSessionID()},uniqueID=`)).toBeTruthy();
             expect(connectionID1).not.toEqual(connectionID2);
-
-            const connectionID3 = generateConnectionID({key: ONYXKEYS.TEST_KEY, initWithStoredValues: false});
-            expect(connectionID3.startsWith(`onyxKey=${ONYXKEYS.TEST_KEY},initWithStoredValues=false,waitForCollectionCallback=false,sessionID=${getSessionID()},uniqueID=`)).toBeTruthy();
         });
 
         it('should generate an unique connection ID if the session ID is changed', async () => {
@@ -111,7 +108,7 @@ describe('OnyxConnectionManager', () => {
             expect(connectionsMap.size).toEqual(0);
         });
 
-        it('should connect two times to the same key but with different options, and fire the callbacks differently', async () => {
+        it('should connect two times to the same collection key, reuse the connection, and fire both callbacks with the whole collection object', async () => {
             const obj1 = {id: 'entry1_id', name: 'entry1_name'};
             const obj2 = {id: 'entry2_id', name: 'entry2_name'};
             const collection = {
@@ -124,21 +121,18 @@ describe('OnyxConnectionManager', () => {
             const connection1 = connectionManager.connect({key: ONYXKEYS.COLLECTION.TEST_KEY, callback: callback1});
 
             const callback2 = jest.fn();
-            const connection2 = connectionManager.connect({key: ONYXKEYS.COLLECTION.TEST_KEY, callback: callback2, waitForCollectionCallback: true});
+            const connection2 = connectionManager.connect({key: ONYXKEYS.COLLECTION.TEST_KEY, callback: callback2});
 
-            expect(connection1.id).not.toEqual(connection2.id);
-            expect(connectionsMap.size).toEqual(2);
+            // Collection-root connections are now always snapshot mode and are reused.
+            expect(connection1.id).toEqual(connection2.id);
+            expect(connectionsMap.size).toEqual(1);
             expect(connectionsMap.has(connection1.id)).toBeTruthy();
-            expect(connectionsMap.has(connection2.id)).toBeTruthy();
 
             await act(async () => waitForPromisesToResolve());
 
-            expect(callback1).toHaveBeenCalledTimes(2);
-            expect(callback1).toHaveBeenNthCalledWith(1, obj1, `${ONYXKEYS.COLLECTION.TEST_KEY}entry1`);
-            expect(callback1).toHaveBeenNthCalledWith(2, obj2, `${ONYXKEYS.COLLECTION.TEST_KEY}entry2`);
-
-            expect(callback2).toHaveBeenCalledTimes(1);
-            expect(callback2).toHaveBeenCalledWith(collection, ONYXKEYS.COLLECTION.TEST_KEY, undefined);
+            // Both subscribers share the connection and receive the whole collection object.
+            expect(callback1).toHaveBeenCalledWith(collection, ONYXKEYS.COLLECTION.TEST_KEY);
+            expect(callback2).toHaveBeenCalledWith(collection, ONYXKEYS.COLLECTION.TEST_KEY);
 
             connectionManager.disconnect(connection1);
             connectionManager.disconnect(connection2);
@@ -218,44 +212,7 @@ describe('OnyxConnectionManager', () => {
             expect(connectionsMap.has(connection2.id)).toBeTruthy();
         });
 
-        it('should create a separate connection to the same key when setting initWithStoredValues to false', async () => {
-            await Onyx.set(ONYXKEYS.TEST_KEY, 'test');
-
-            const callback1 = jest.fn();
-            const connection1 = connectionManager.connect({key: ONYXKEYS.TEST_KEY, initWithStoredValues: false, callback: callback1});
-
-            await act(async () => waitForPromisesToResolve());
-
-            expect(callback1).not.toHaveBeenCalled();
-            expect(connectionsMap.size).toEqual(1);
-            expect(connectionsMap.has(connection1.id)).toBeTruthy();
-
-            await Onyx.set(ONYXKEYS.TEST_KEY, 'test2');
-
-            expect(callback1).toHaveBeenCalledTimes(1);
-            expect(callback1).toHaveBeenCalledWith('test2', ONYXKEYS.TEST_KEY);
-
-            const callback2 = jest.fn();
-            const connection2 = connectionManager.connect({key: ONYXKEYS.TEST_KEY, initWithStoredValues: false, callback: callback2});
-
-            await act(async () => waitForPromisesToResolve());
-
-            expect(callback2).not.toHaveBeenCalled();
-            expect(connectionsMap.size).toEqual(2);
-            expect(connectionsMap.has(connection2.id)).toBeTruthy();
-
-            await Onyx.set(ONYXKEYS.TEST_KEY, 'test3');
-
-            expect(callback2).toHaveBeenCalledTimes(1);
-            expect(callback2).toHaveBeenCalledWith('test3', ONYXKEYS.TEST_KEY);
-
-            connectionManager.disconnect(connection1);
-            connectionManager.disconnect(connection2);
-
-            expect(connectionsMap.size).toEqual(0);
-        });
-
-        it("should create a separate connection to the same key when it's a collection one and waitForCollectionCallback is undefined/false", async () => {
+        it('should reuse the connection to the same collection key and deliver the whole collection object to all subscribers', async () => {
             const collection = {
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
@@ -267,29 +224,22 @@ describe('OnyxConnectionManager', () => {
             await act(async () => waitForPromisesToResolve());
 
             const callback1 = jest.fn();
-            const connection1 = connectionManager.connect({key: ONYXKEYS.COLLECTION.TEST_KEY, waitForCollectionCallback: undefined, callback: callback1});
+            const connection1 = connectionManager.connect({key: ONYXKEYS.COLLECTION.TEST_KEY, callback: callback1});
 
             await act(async () => waitForPromisesToResolve());
 
-            expect(callback1).toHaveBeenCalledTimes(3);
-            expect(callback1).toHaveBeenNthCalledWith(1, collection[`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`], `${ONYXKEYS.COLLECTION.TEST_KEY}entry1`);
-            expect(callback1).toHaveBeenNthCalledWith(2, collection[`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`], `${ONYXKEYS.COLLECTION.TEST_KEY}entry2`);
-            expect(callback1).toHaveBeenNthCalledWith(3, collection[`${ONYXKEYS.COLLECTION.TEST_KEY}entry3`], `${ONYXKEYS.COLLECTION.TEST_KEY}entry3`);
+            expect(callback1).toHaveBeenCalledWith(collection, ONYXKEYS.COLLECTION.TEST_KEY);
 
             const callback2 = jest.fn();
-            const connection2 = connectionManager.connect({key: ONYXKEYS.COLLECTION.TEST_KEY, waitForCollectionCallback: false, callback: callback2});
+            const connection2 = connectionManager.connect({key: ONYXKEYS.COLLECTION.TEST_KEY, callback: callback2});
 
-            expect(connection1.id).not.toEqual(connection2.id);
-            expect(connectionsMap.size).toEqual(2);
+            expect(connection1.id).toEqual(connection2.id);
+            expect(connectionsMap.size).toEqual(1);
             expect(connectionsMap.has(connection1.id)).toBeTruthy();
-            expect(connectionsMap.has(connection2.id)).toBeTruthy();
 
             await act(async () => waitForPromisesToResolve());
 
-            expect(callback2).toHaveBeenCalledTimes(3);
-            expect(callback2).toHaveBeenNthCalledWith(1, collection[`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`], `${ONYXKEYS.COLLECTION.TEST_KEY}entry1`);
-            expect(callback2).toHaveBeenNthCalledWith(2, collection[`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`], `${ONYXKEYS.COLLECTION.TEST_KEY}entry2`);
-            expect(callback2).toHaveBeenNthCalledWith(3, collection[`${ONYXKEYS.COLLECTION.TEST_KEY}entry3`], `${ONYXKEYS.COLLECTION.TEST_KEY}entry3`);
+            expect(callback2).toHaveBeenCalledWith(collection, ONYXKEYS.COLLECTION.TEST_KEY);
         });
 
         it('should not throw any errors when passing an undefined connection or trying to access an inexistent one inside disconnect()', () => {
@@ -448,8 +398,8 @@ describe('OnyxConnectionManager', () => {
         });
     });
 
-    describe('sourceValue parameter', () => {
-        it('should pass the sourceValue parameter to collection callbacks when waitForCollectionCallback is true', async () => {
+    describe('collection callback arguments', () => {
+        it('should call collection-root callbacks with only the value and key', async () => {
             const obj1 = {id: 'entry1_id', name: 'entry1_name'};
             const obj2 = {id: 'entry2_id', name: 'entry2_name'};
 
@@ -457,14 +407,13 @@ describe('OnyxConnectionManager', () => {
             const connection = connectionManager.connect({
                 key: ONYXKEYS.COLLECTION.TEST_KEY,
                 callback,
-                waitForCollectionCallback: true,
             });
 
             await act(async () => waitForPromisesToResolve());
 
             // Initial callback with undefined values
             expect(callback).toHaveBeenCalledTimes(1);
-            expect(callback).toHaveBeenCalledWith(undefined, ONYXKEYS.COLLECTION.TEST_KEY, undefined);
+            expect(callback).toHaveBeenCalledWith(undefined, ONYXKEYS.COLLECTION.TEST_KEY);
 
             // Reset mock to test the next update
             callback.mockReset();
@@ -473,7 +422,7 @@ describe('OnyxConnectionManager', () => {
             await Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`, obj1);
 
             expect(callback).toHaveBeenCalledTimes(1);
-            expect(callback).toHaveBeenCalledWith({[`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: obj1}, ONYXKEYS.COLLECTION.TEST_KEY, {[`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: obj1});
+            expect(callback).toHaveBeenCalledWith({[`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: obj1}, ONYXKEYS.COLLECTION.TEST_KEY);
 
             // Reset mock to test the next update
             callback.mockReset();
@@ -488,28 +437,26 @@ describe('OnyxConnectionManager', () => {
                     [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: obj2,
                 },
                 ONYXKEYS.COLLECTION.TEST_KEY,
-                {[`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: obj2},
             );
 
             connectionManager.disconnect(connection);
         });
 
-        it('should not pass sourceValue to regular callbacks when waitForCollectionCallback is false', async () => {
+        it('should call regular (non-collection) key callbacks with only the value and key', async () => {
             const obj1 = {id: 'entry1_id', name: 'entry1_name'};
 
             const callback = jest.fn();
             const connection = connectionManager.connect({
-                key: ONYXKEYS.COLLECTION.TEST_KEY,
+                key: ONYXKEYS.TEST_KEY,
                 callback,
-                waitForCollectionCallback: false,
             });
 
             await act(async () => waitForPromisesToResolve());
 
             // Update with object
-            await Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`, obj1);
+            await Onyx.merge(ONYXKEYS.TEST_KEY, obj1);
 
-            expect(callback).toHaveBeenCalledWith(obj1, `${ONYXKEYS.COLLECTION.TEST_KEY}entry1`);
+            expect(callback).toHaveBeenCalledWith(obj1, ONYXKEYS.TEST_KEY);
 
             connectionManager.disconnect(connection);
         });

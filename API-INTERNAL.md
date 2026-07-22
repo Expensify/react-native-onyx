@@ -79,11 +79,18 @@ If the requested key is a collection, it will return an object with all the coll
 <dd><p>Remove a key from Onyx and update the subscribers</p>
 </dd>
 <dt><a href="#retryOperation">retryOperation()</a></dt>
-<dd><p>Handles storage operation failures based on the error type:</p>
+<dd><p>Handles storage operation failures based on the error class (see lib/storage/errors.ts).
+The connection layer (createStore) owns connection/transport recovery; this operation layer owns
+capacity recovery (eviction) so that a given failure is retried by exactly one layer:</p>
 <ul>
-<li>Storage capacity errors: evicts data and retries the operation</li>
-<li>Invalid data errors: logs an alert and throws an error</li>
-<li>Other errors: retries the operation</li>
+<li>INVALID_DATA: logs an alert and throws (the same data will always fail).</li>
+<li>TRANSIENT / FATAL: the connection layer already retried (transient) or exhausted its heal budget
+and alerted (fatal). Retrying here would only re-amplify, so we skip the write quietly.</li>
+<li>CAPACITY: evicts the least recently accessed evictable key and retries, under a session-level
+circuit breaker (see lib/StorageCircuitBreaker.ts) that halts the loop once eviction stops making
+progress or failures storm — the per-operation budget alone cannot stop a session-wide storm.</li>
+<li>UNKNOWN: the provider couldn&#39;t classify it — log the full error shape (name + message +
+provider) once so it&#39;s visible, then bounded retry without eviction.</li>
 </ul>
 </dd>
 <dt><a href="#broadcastUpdate">broadcastUpdate()</a></dt>
@@ -144,9 +151,6 @@ that this internal function allows passing an additional <code>mergeReplaceNullP
 <dd><p>Sets keys in a collection by replacing all targeted collection members with new values.
 Any existing collection members not included in the new data will not be removed.
 Retries on failure.</p>
-</dd>
-<dt><a href="#getCallbackToStateMapping">getCallbackToStateMapping()</a></dt>
-<dd><p>Getter - returns the callback to state mapping, useful in test environments.</p>
 </dd>
 <dt><a href="#clearOnyxUtilsInternals">clearOnyxUtilsInternals()</a></dt>
 <dd><p>Clear internal variables used in this file, useful in test environments.</p>
@@ -293,33 +297,12 @@ If the requested key is a collection, it will return an object with all the coll
 When a collection of keys change, search for any callbacks matching the collection key and trigger those callbacks
 
 **Kind**: global function  
-
-* [keysChanged()](#keysChanged)
-    * [~isSubscribedToCollectionKey](#keysChanged..isSubscribedToCollectionKey)
-    * [~isSubscribedToCollectionMemberKey](#keysChanged..isSubscribedToCollectionMemberKey)
-
-<a name="keysChanged..isSubscribedToCollectionKey"></a>
-
-### keysChanged~isSubscribedToCollectionKey
-e.g. Onyx.connect({key: ONYXKEYS.COLLECTION.REPORT, callback: ...});
-
-**Kind**: inner constant of [<code>keysChanged</code>](#keysChanged)  
-<a name="keysChanged..isSubscribedToCollectionMemberKey"></a>
-
-### keysChanged~isSubscribedToCollectionMemberKey
-e.g. Onyx.connect({key: `${ONYXKEYS.COLLECTION.REPORT}{reportID}`, callback: ...});
-
-**Kind**: inner constant of [<code>keysChanged</code>](#keysChanged)  
 <a name="keyChanged"></a>
 
 ## keyChanged()
 When a key change happens, search for any callbacks matching the key or collection key and trigger those callbacks
 
 **Kind**: global function  
-**Example**  
-```js
-keyChanged(key, value, subscriber => subscriber.initWithStoredValues === false)
-```
 <a name="sendDataToConnection"></a>
 
 ## sendDataToConnection()
@@ -341,10 +324,17 @@ Remove a key from Onyx and update the subscribers
 <a name="retryOperation"></a>
 
 ## retryOperation()
-Handles storage operation failures based on the error type:
-- Storage capacity errors: evicts data and retries the operation
-- Invalid data errors: logs an alert and throws an error
-- Other errors: retries the operation
+Handles storage operation failures based on the error class (see lib/storage/errors.ts).
+The connection layer (createStore) owns connection/transport recovery; this operation layer owns
+capacity recovery (eviction) so that a given failure is retried by exactly one layer:
+- INVALID_DATA: logs an alert and throws (the same data will always fail).
+- TRANSIENT / FATAL: the connection layer already retried (transient) or exhausted its heal budget
+  and alerted (fatal). Retrying here would only re-amplify, so we skip the write quietly.
+- CAPACITY: evicts the least recently accessed evictable key and retries, under a session-level
+  circuit breaker (see lib/StorageCircuitBreaker.ts) that halts the loop once eviction stops making
+  progress or failures storm — the per-operation budget alone cannot stop a session-wide storm.
+- UNKNOWN: the provider couldn't classify it — log the full error shape (name + message +
+  provider) once so it's visible, then bounded retry without eviction.
 
 **Kind**: global function  
 <a name="broadcastUpdate"></a>
@@ -522,12 +512,6 @@ Retries on failure.
 | params.collection | Object collection keyed by individual collection member keys and values |
 | retryAttempt | retry attempt |
 
-<a name="getCallbackToStateMapping"></a>
-
-## getCallbackToStateMapping()
-Getter - returns the callback to state mapping, useful in test environments.
-
-**Kind**: global function  
 <a name="clearOnyxUtilsInternals"></a>
 
 ## clearOnyxUtilsInternals()

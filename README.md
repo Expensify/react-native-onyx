@@ -257,20 +257,10 @@ export default MyComponent;
 This will add a prop to the component called `allReports` which is an object of collection member key/values. Changes to the individual member keys will modify the entire object and new props will be passed with each individual key update. The prop doesn't update on the initial rendering of the component until the entire collection has been read out of Onyx.
 
 ```js
-Onyx.connect({key: ONYXKEYS.COLLECTION.REPORT}, callback: (memberValue, memberKey) => {...});
+Onyx.connect({key: ONYXKEYS.COLLECTION.REPORT}, callback: (allReports, collectionKey) => {...});
 ```
 
-This will fire the callback once per member key depending on how many collection member keys are currently stored. Changes to those keys after the initial callbacks fire will occur when each individual key is updated.
-
-```js
-Onyx.connect({
-    key: ONYXKEYS.COLLECTION.REPORT,
-    waitForCollectionCallback: true,
-    callback: (allReports, collectionKey, sourceValue) => {...},
-});
-```
-
-This final option forces `Onyx.connect()` to behave more like `useOnyx()` and only update the callback once with the entire collection initially and later with an updated version of the collection when individual keys update. The `sourceValue` parameter contains only the specific keys and values that triggered the current update, which can be useful for optimizing your code to only process what changed. This parameter is not available when `waitForCollectionCallback` is false or the key is not a collection key.
+This will fire the callback once with the entire collection initially and later with an updated version of the collection when individual keys update.
 
 ### Performance Considerations When Using Collections
 
