@@ -7,6 +7,7 @@ import connectionManager from './OnyxConnectionManager';
 import OnyxUtils from './OnyxUtils';
 import type {CollectionKeyBase, OnyxKey, OnyxValue} from './types';
 import onyxSnapshotCache from './OnyxSnapshotCache';
+import memoizedShallowEqual from './memoizedShallowEqual';
 import useLiveRef from './useLiveRef';
 
 type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (data: OnyxValue<TKey> | undefined) => TReturnValue;
@@ -201,9 +202,11 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 
         // shallowEqual checks === first (O(1) for frozen snapshots and stable selector references),
         // then falls back to comparing top-level properties for individual keys that may have
-        // new references with equivalent content.
+        // new references with equivalent content. The comparison is memoized by object identity
+        // (see `memoizedShallowEqual`) so N hooks comparing the same two cache objects pay for
+        // one walk in total instead of one walk each.
         // Normalize null to undefined to ensure consistent comparison (both represent "no value").
-        const areValuesEqual = shallowEqual(previousValueRef.current ?? undefined, newValueRef.current ?? undefined);
+        const areValuesEqual = memoizedShallowEqual(previousValueRef.current ?? undefined, newValueRef.current ?? undefined);
 
         // We update the cached value and the result in the following conditions:
         // We will update the cached value and the result in any of the following situations:
