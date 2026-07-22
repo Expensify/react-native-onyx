@@ -1318,4 +1318,187 @@ describe('useOnyx', () => {
             expect(renders.length).toBe(3);
         });
     });
+
+    describe('subscribed option', () => {
+        type SubscribedProps = {subscribed?: boolean; tick?: number};
+
+        // While subscribed is false, a background write should not re-render the consumer.
+        it('does not re-render on a background write when subscribed is false', async () => {
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'v1');
+
+            const renders: Array<{value: unknown; status: string}> = [];
+            const {result} = renderHook(
+                ({subscribed}: SubscribedProps) => {
+                    const r = useOnyx(ONYXKEYS.TEST_KEY, {subscribed});
+                    renders.push({value: r[0], status: r[1].status});
+                    return r;
+                },
+                {initialProps: {subscribed: false}},
+            );
+
+            // Mount reads the warm value straight from cache
+            await act(async () => waitForPromisesToResolve());
+            expect(result.current[0]).toEqual('v1');
+            expect(renders.length).toBe(1);
+
+            // Background write while paused — connection stays open but onStoreChange is gated
+            await act(async () => {
+                Onyx.merge(ONYXKEYS.TEST_KEY, 'v2');
+                await waitForPromisesToResolve();
+            });
+
+            // No extra render, and the value is intentionally still the old one
+            expect(renders.length).toBe(1);
+            expect(result.current[0]).toEqual('v1');
+        });
+
+        // A render from any other cause while paused should serve the latest value, not a stale snapshot.
+        // Keeping the connection open and invalidating on each write is what makes this pass.
+        it('serves the latest value on an unrelated re-render while subscribed is false', async () => {
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'v1');
+
+            const {result, rerender} = renderHook(({subscribed}: SubscribedProps) => useOnyx(ONYXKEYS.TEST_KEY, {subscribed}), {
+                initialProps: {subscribed: false, tick: 0} as SubscribedProps,
+            });
+
+            await act(async () => waitForPromisesToResolve());
+            expect(result.current[0]).toEqual('v1');
+
+            // Write while paused — no re-render from Onyx
+            await act(async () => {
+                Onyx.merge(ONYXKEYS.TEST_KEY, 'v2');
+                await waitForPromisesToResolve();
+            });
+            expect(result.current[0]).toEqual('v1'); // Not yet re-rendered
+
+            // Force an unrelated re-render — subscribed stays false, only tick changes
+            await act(async () => {
+                rerender({subscribed: false, tick: 1});
+            });
+
+            // getSnapshot should read fresh: v2, not the stale v1
+            expect(result.current[0]).toEqual('v2');
+        });
+
+        // A dependencies change is consumer-driven, not a background write, so subscribed: false must not defer
+        // it. Uses a stable selector whose output depends on an external value fed via `dependencies` — the only
+        // shape where the deps-effect notify is load-bearing (getSnapshot's hasSelectorChanged can't recompute it).
+        it('applies a dependencies change while subscribed is false', async () => {
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'base');
+
+            // Stable selector reference; its output closes over `dep`, signalled via `dependencies`
+            let dep = 'A';
+            const selector = (value: unknown) => `${value as string}-${dep}`;
+
+            // `dependencies` is [dep] only; `subscribed` is a prop purely to force re-renders
+            const {result, rerender} = renderHook(({subscribed}: SubscribedProps) => useOnyx(ONYXKEYS.TEST_KEY, {subscribed, selector}, [dep]), {
+                initialProps: {subscribed: false} as SubscribedProps,
+            });
+
+            await act(async () => waitForPromisesToResolve());
+            expect(result.current[0]).toEqual('base-A');
+
+            // Warm-up re-render (dep unchanged) to clear the "read fresh from cache" flag the connect callback left set
+            await act(async () => rerender({subscribed: false}));
+            expect(result.current[0]).toEqual('base-A');
+
+            // Change the dependency while paused — the Onyx value is untouched, so the deps change is the only signal
+            await act(async () => {
+                dep = 'B';
+                rerender({subscribed: false});
+            });
+
+            // getSnapshot should recompute with the new dependency: base-B, not the stale base-A
+            expect(result.current[0]).toEqual('base-B');
+        });
+
+        // Flipping subscribed from false to true (re-focus) re-renders with the latest value, and a warm
+        // key shows 'loaded' immediately without a loading flash.
+        it('catches up to the latest value with no loading flash when flipped back to subscribed', async () => {
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'v1');
+
+            const {result, rerender} = renderHook(({subscribed}: SubscribedProps) => useOnyx(ONYXKEYS.TEST_KEY, {subscribed}), {initialProps: {subscribed: false} as SubscribedProps});
+
+            await act(async () => waitForPromisesToResolve());
+            expect(result.current[0]).toEqual('v1');
+
+            await act(async () => {
+                Onyx.merge(ONYXKEYS.TEST_KEY, 'v2');
+                await waitForPromisesToResolve();
+            });
+            expect(result.current[0]).toEqual('v1'); // Paused: still stale
+
+            // Re-focus
+            await act(async () => {
+                rerender({subscribed: true});
+            });
+
+            expect(result.current[0]).toEqual('v2');
+            expect(result.current[1].status).toEqual('loaded');
+
+            // Once subscribed again, later writes re-render
+            await act(async () => {
+                Onyx.merge(ONYXKEYS.TEST_KEY, 'v3');
+                await waitForPromisesToResolve();
+            });
+            expect(result.current[0]).toEqual('v3');
+        });
+
+        // Default (true) is unchanged: writes re-render as before.
+        it('re-renders on background writes when subscribed is omitted (default true)', async () => {
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'v1');
+
+            const renders: Array<{value: unknown; status: string}> = [];
+            const {result} = renderHook(() => {
+                const r = useOnyx(ONYXKEYS.TEST_KEY);
+                renders.push({value: r[0], status: r[1].status});
+                return r;
+            });
+
+            await act(async () => waitForPromisesToResolve());
+            const rendersAfterMount = renders.length;
+
+            await act(async () => {
+                Onyx.merge(ONYXKEYS.TEST_KEY, 'v2');
+                await waitForPromisesToResolve();
+            });
+
+            expect(result.current[0]).toEqual('v2');
+            expect(renders.length).toBeGreaterThan(rendersAfterMount);
+        });
+
+        // With two subscribers on the same key, pausing one should not stop the other from re-rendering.
+        it('isolates paused/active subscribers sharing a connection (reuseConnection)', async () => {
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'v1');
+
+            const activeRenders: unknown[] = [];
+            const pausedRenders: unknown[] = [];
+
+            const active = renderHook(() => {
+                const r = useOnyx(ONYXKEYS.TEST_KEY, {reuseConnection: true});
+                activeRenders.push(r[0]);
+                return r;
+            });
+            const paused = renderHook(() => {
+                const r = useOnyx(ONYXKEYS.TEST_KEY, {reuseConnection: true, subscribed: false});
+                pausedRenders.push(r[0]);
+                return r;
+            });
+
+            await act(async () => waitForPromisesToResolve());
+            const activeAfterMount = activeRenders.length;
+            const pausedAfterMount = pausedRenders.length;
+
+            await act(async () => {
+                Onyx.merge(ONYXKEYS.TEST_KEY, 'v2');
+                await waitForPromisesToResolve();
+            });
+
+            // Active subscriber re-rendered to the new value; paused one did not re-render at all
+            expect(active.result.current[0]).toEqual('v2');
+            expect(activeRenders.length).toBeGreaterThan(activeAfterMount);
+            expect(pausedRenders.length).toBe(pausedAfterMount);
+            expect(paused.result.current[0]).toEqual('v1');
+        });
+    });
 });

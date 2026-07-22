@@ -1,6 +1,7 @@
 import {deepEqual, shallowEqual} from 'fast-equals';
 import {useCallback, useEffect, useMemo, useRef, useSyncExternalStore} from 'react';
 import type {DependencyList} from 'react';
+import NOOP from 'lodash/noop';
 import OnyxCache, {TASK} from './OnyxCache';
 import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
@@ -27,6 +28,13 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
      * @see `useOnyx` cannot return `null` and so selector will replace `null` with `undefined` to maintain compatibility.
      */
     selector?: UseOnyxSelector<TKey, TReturnValue>;
+
+    /**
+     * Defaults to `true`. When `false`, keeps the connection open (value stays cache-warm) but stops
+     * re-rendering on background writes. It defers the render trigger, not the value: any other render still reads the latest value.
+     * Flipping back to `true` re-renders.
+     */
+    subscribed?: boolean;
 };
 
 type FetchStatus = 'loading' | 'loaded';
@@ -45,6 +53,10 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
     const connectionRef = useRef<Connection | null>(null);
     const currentDependenciesRef = useLiveRef(dependencies);
     const selector = options?.selector;
+
+    // TanStack `shouldSubscribe` parity: `subscribed` gates whether we open a live subscription at all.
+    // It's in the `subscribe` deps below, so flipping it re-runs subscribe (connect on resume, noop while paused).
+    const subscribed = options?.subscribed !== false;
 
     // Create memoized version of selector for performance
     const memoizedSelector = useMemo((): UseOnyxSelector<TKey, TReturnValue> | null => {
@@ -164,7 +176,9 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // Check if we have any cache for this Onyx key
         // Don't use cache during active data updates (when shouldGetCachedValueRef is true)
         const isFirstConnection = connectedKeyRef.current !== key;
-        if (!shouldGetCachedValueRef.current) {
+        // TanStack `getCurrentResult` parity: while paused there is no live connection to invalidate the snapshot
+        // cache on writes, so we must never serve it — always recompute from the freshest Onyx cache value below.
+        if (subscribed && !shouldGetCachedValueRef.current) {
             const cachedResult = onyxSnapshotCache.getCachedResult<UseOnyxResult<TReturnValue>>(key, cacheKey);
             if (cachedResult !== undefined) {
                 resultRef.current = cachedResult;
@@ -176,7 +190,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         // so we can return any cached value right away. For the case where the key has changed, If we don't return the cached value right away, then the UI will show the incorrect (previous) value for a brief period which looks like a UI glitch to the user. After the connection is made, we only
         // update `newValueRef` when `Onyx.connect()` callback is fired.
         const hasSelectorChanged = lastComputedSelectorRef.current !== memoizedSelector;
-        if (isFirstConnection || shouldGetCachedValueRef.current || hasSelectorChanged) {
+        if (!subscribed || isFirstConnection || shouldGetCachedValueRef.current || hasSelectorChanged) {
             // Gets the value from cache and maps it with selector. It changes `null` to `undefined` for `useOnyx` compatibility.
             const value = OnyxUtils.tryGetCachedValue(key) as OnyxValue<TKey>;
             const selectedValue = memoizedSelector ? memoizedSelector(value) : value;
@@ -234,10 +248,17 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
         }
 
         return resultRef.current;
-    }, [key, memoizedSelector, cacheKey]);
+    }, [key, memoizedSelector, cacheKey, subscribed]);
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
+            // TanStack `subscribed: false` parity: don't wire a live subscription while paused. getSnapshot still
+            // serves the current cache value on any render, and flipping `subscribed` back to true re-runs this
+            // callback (it's in the deps) and re-renders with the latest value.
+            if (!subscribed) {   
+                return NOOP
+            }
+
             // Reset internal state so the hook properly transitions through loading
             // for the new key instead of preserving stale state from the previous one.
             // Only reset when the key has actually changed (not on initial mount).
@@ -285,7 +306,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
                 onStoreChangeFnRef.current = null;
             };
         },
-        [key, options?.reuseConnection],
+        [key, options?.reuseConnection, subscribed],
     );
 
     const result = useSyncExternalStore<UseOnyxResult<TReturnValue>>(subscribe, getSnapshot);
@@ -296,3 +317,4 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(
 export default useOnyx;
 
 export type {FetchStatus, ResultMetadata, UseOnyxResult, UseOnyxOptions, UseOnyxSelector};
+

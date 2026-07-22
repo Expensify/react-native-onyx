@@ -98,6 +98,9 @@ function init({
  *        Using this setting on `useOnyx()` can have very positive performance benefits because the component will only re-render
  *        when the subset of data changes. Otherwise, any change of data on any property would normally
  *        cause the component to re-render (and that can be expensive from a performance standpoint).
+ * @param connectOptions.subscribed Defaults to `true`. **Only used inside `useOnyx()` hook.** When `false`, keeps the connection open
+ *        (value stays cache-warm) but stops re-rendering on background writes. It defers the render trigger, not the value: any other
+ *        render still reads the latest value, and flipping back to `true` re-renders.
  * @returns The connection object to use when calling `Onyx.disconnect()`.
  */
 function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Connection {
@@ -122,6 +125,9 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
  *        Using this setting on `useOnyx()` can have very positive performance benefits because the component will only re-render
  *        when the subset of data changes. Otherwise, any change of data on any property would normally
  *        cause the component to re-render (and that can be expensive from a performance standpoint).
+ * @param connectOptions.subscribed Defaults to `true`. **Only used inside `useOnyx()` hook.** When `false`, keeps the connection open
+ *        (value stays cache-warm) but stops re-rendering on background writes. It defers the render trigger, not the value: any other
+ *        render still reads the latest value, and flipping back to `true` re-renders.
  * @returns The connection object to use when calling `Onyx.disconnect()`.
  */
 function connectWithoutView<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Connection {
