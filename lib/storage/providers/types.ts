@@ -12,7 +12,8 @@ type DatabaseSize = {
     usageDetails?: Record<string, number>;
 };
 
-type OnStorageKeyChanged = <TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>) => void;
+/** Called with the full batch of key/value pairs that changed together in a single cross-tab sync event. */
+type OnStorageKeysChanged = (pairs: StorageKeyValuePair[]) => void;
 
 type StorageProvider<TStore> = {
     store: TStore;
@@ -99,8 +100,8 @@ type StorageProvider<TStore> = {
     /**
      * @param onStorageKeyChanged Storage synchronization mechanism keeping all opened tabs in sync
      */
-    keepInstancesSync?: (onStorageKeyChanged: OnStorageKeyChanged) => void;
+    keepInstancesSync?: (onStorageKeysChanged: OnStorageKeysChanged) => void;
 };
 
 export default StorageProvider;
-export type {StorageKeyList, StorageKeyValuePair, OnStorageKeyChanged};
+export type {StorageKeyList, StorageKeyValuePair, OnStorageKeysChanged};
