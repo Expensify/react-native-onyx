@@ -385,7 +385,7 @@ class OnyxCache {
         // Initialize frozen snapshots for collection keys
         for (const collectionKey of collectionKeys) {
             if (!this.collectionSnapshots.has(collectionKey)) {
-                this.collectionSnapshots.set(collectionKey, Object.freeze({}));
+                this.collectionSnapshots.set(collectionKey, FROZEN_EMPTY_COLLECTION);
             }
         }
     }
@@ -403,6 +403,7 @@ class OnyxCache {
 
         const members: NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>> = {};
         let hasMemberChanges = false;
+        let hasMembers = false;
 
         // Use the indexed forward lookup for O(collectionMembers) iteration.
         // Falls back to scanning all storageKeys if the index isn't populated yet.
@@ -421,6 +422,7 @@ class OnyxCache {
             // and should not be included in the frozen collection snapshot.
             if (val !== undefined && val !== null) {
                 members[key] = val;
+                hasMembers = true;
 
                 // Check if this member's reference changed from the old snapshot
                 if (!hasMemberChanges && (!previousSnapshot || previousSnapshot[key] !== val)) {
@@ -449,6 +451,14 @@ class OnyxCache {
             return;
         }
 
+        // When the collection has no members, reuse one shared empty object for every empty
+        // collection. That way reads can tell a collection is empty with a quick `===` check
+        // instead of looping over its keys every time.
+        if (!hasMembers) {
+            this.collectionSnapshots.set(collectionKey, FROZEN_EMPTY_COLLECTION);
+            return;
+        }
+
         Object.freeze(members);
 
         this.collectionSnapshots.set(collectionKey, members);
@@ -466,16 +476,19 @@ class OnyxCache {
         }
 
         const snapshot = this.collectionSnapshots.get(collectionKey);
-        if (utils.isEmptyObject(snapshot)) {
-            // We check storageKeys.size (not collection-specific keys) to distinguish
-            // "init complete, this collection is genuinely empty" from "init not done yet."
-            // During init, setAllKeys loads ALL keys at once — so if any key exists,
-            // the full storage picture is loaded and an empty collection is truly empty.
-            // Returning undefined before init prevents subscribers from seeing a false empty state.
-            if (this.storageKeys.size > 0) {
-                return FROZEN_EMPTY_COLLECTION;
-            }
+
+        // We never stored anything for this collection key.
+        if (snapshot === undefined) {
             return undefined;
+        }
+
+        // The collection is empty (it holds our shared empty object). But "empty" is ambiguous
+        // during startup: we can't tell an actually-empty collection apart from one whose data
+        // hasn't loaded yet. Once any key exists, we know setAllKeys has run and loaded everything,
+        // so an empty collection really is empty. Before that, return undefined so subscribers
+        // don't briefly see a collection as empty when it just hasn't loaded.
+        if (snapshot === FROZEN_EMPTY_COLLECTION) {
+            return this.storageKeys.size > 0 ? FROZEN_EMPTY_COLLECTION : undefined;
         }
 
         return snapshot;
