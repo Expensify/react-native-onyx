@@ -2,7 +2,7 @@
  * The SQLiteStorage provider stores everything in a key/value store by
  * converting the value to a JSON string
  */
-import type {BatchQueryCommand, NitroSQLiteConnection} from 'react-native-nitro-sqlite';
+import type {BatchQueryCommand, NitroSQLiteConnection, QueryResult} from 'react-native-nitro-sqlite';
 import {open} from 'react-native-nitro-sqlite';
 import {getFreeDiskStorage} from 'react-native-device-info';
 import type {FastMergeReplaceNullPatch} from '../../utils';
@@ -10,6 +10,13 @@ import utils from '../../utils';
 import type StorageProvider from './types';
 import type {StorageKeyList, StorageKeyValuePair} from './types';
 import classifySQLiteError from './classifySQLiteError';
+
+/**
+ * The result of the `PRAGMA compile_options`, which lists SQLite compile-time options
+ */
+type CompileOptionsResult = {
+    compile_options: string;
+};
 
 /**
  * The type of the key-value pair stored in the SQLite database
@@ -36,6 +43,40 @@ type PageCountResult = {
 };
 
 const DB_NAME = 'OnyxDB';
+const SQLITE_MAX_VARIABLE_NUMBER = 32766;
+const COMPILE_OPTIONS = {
+    MAX_VARIABLE_NUMBER: 'MAX_VARIABLE_NUMBER',
+} as const;
+
+/** SQLite's maximum number of bound parameters per statement, read once from PRAGMA compile_options in init(). */
+let sqliteMaxVariableNumber = SQLITE_MAX_VARIABLE_NUMBER;
+
+/**
+ * Returns the value of a compile option from the rows returned by `PRAGMA compile_options`.
+ * For flag-only options (e.g. `ENABLE_FTS3`), returns an empty string when the option is present.
+ */
+function getCompileOptionValue(compileOptionsResult: QueryResult<CompileOptionsResult>, optionName: string): string | undefined {
+    const optionPrefix = `${optionName}=`;
+    const rowCount = compileOptionsResult.rows?.length ?? 0;
+
+    for (let index = 0; index < rowCount; index++) {
+        const compileOption = compileOptionsResult.rows?.item(index)?.compile_options;
+
+        if (!compileOption) {
+            continue;
+        }
+
+        if (compileOption === optionName) {
+            return '';
+        }
+
+        if (compileOption.startsWith(optionPrefix)) {
+            return compileOption.slice(optionPrefix.length);
+        }
+    }
+
+    return undefined;
+}
 
 /**
  * Prevents the stringifying of the object markers.
@@ -81,6 +122,13 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
         provider.store.execute('PRAGMA CACHE_SIZE=-20000;');
         provider.store.execute('PRAGMA synchronous=NORMAL;');
         provider.store.execute('PRAGMA journal_mode=WAL;');
+
+        const compileOptionsResult = provider.store.execute<CompileOptionsResult>('PRAGMA compile_options;');
+
+        // Get the value of MAX_VARIABLE_NUMBER from the compile options and
+        // stores it in a global variable, that is going to be used during runtime.
+        const maxVariableNumber = Number(getCompileOptionValue(compileOptionsResult, COMPILE_OPTIONS.MAX_VARIABLE_NUMBER));
+        sqliteMaxVariableNumber = maxVariableNumber > 0 ? maxVariableNumber : SQLITE_MAX_VARIABLE_NUMBER;
     },
     getItem(key) {
         if (!provider.store) {
@@ -105,12 +153,29 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             throw new Error('Store is not initialized!');
         }
 
-        const placeholders = keys.map(() => '?').join(',');
-        const command = `SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
-        return provider.store.executeAsync<OnyxSQLiteKeyValuePair>(command, keys).then(({rows}) => {
-            // eslint-disable-next-line no-underscore-dangle
-            const result = rows?._array.map((row) => [row.record_key, JSON.parse(row.valueJSON)]);
-            return (result ?? []) as StorageKeyValuePair[];
+        if (keys.length === 0) {
+            return Promise.resolve([]);
+        }
+
+        const keyChunks = utils.chunkArray(keys, sqliteMaxVariableNumber);
+
+        return Promise.all(
+            keyChunks.map((keyChunk) => {
+                if (!provider.store) {
+                    throw new Error('Store is not initialized!');
+                }
+
+                const placeholders = keyChunk.map(() => '?').join(',');
+                const command = `SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
+                return provider.store.executeAsync<OnyxSQLiteKeyValuePair>(command, keyChunk);
+            }),
+        ).then((results) => {
+            const result = results.flatMap(
+                ({rows}) =>
+                    // eslint-disable-next-line no-underscore-dangle
+                    rows?._array.map((row) => [row.record_key, JSON.parse(row.valueJSON)]) ?? [],
+            );
+            return result as StorageKeyValuePair[];
         });
     },
     setItem(key, value) {
@@ -126,7 +191,7 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
         }
 
         const query = 'REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);';
-        const params = pairs.map((pair) => [pair[0], JSON.stringify(pair[1] === undefined ? null : pair[1])]);
+        const params = pairs.map(([key, value]) => [key, JSON.stringify(value === undefined ? null : value)]);
         if (utils.isEmptyObject(params)) {
             return Promise.resolve();
         }
@@ -225,9 +290,28 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             throw new Error('Store is not initialized!');
         }
 
-        const placeholders = keys.map(() => '?').join(',');
-        const query = `DELETE FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
-        return provider.store.executeAsync(query, keys).then(() => undefined);
+        if (keys.length === 0) {
+            return Promise.resolve();
+        }
+
+        const keyChunks = utils.chunkArray(keys, sqliteMaxVariableNumber);
+
+        const buildDeleteQuery = (keyChunk: readonly string[]) => {
+            const placeholders = keyChunk.map(() => '?').join(',');
+            return `DELETE FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
+        };
+
+        if (keyChunks.length === 1) {
+            const keyChunk = keyChunks[0];
+            return provider.store.executeAsync(buildDeleteQuery(keyChunk), keyChunk).then(() => undefined);
+        }
+
+        const commands: BatchQueryCommand[] = keyChunks.map((keyChunk) => ({
+            query: buildDeleteQuery(keyChunk),
+            params: keyChunk,
+        }));
+
+        return provider.store.executeBatchAsync(commands).then(() => undefined);
     },
     clear() {
         if (!provider.store) {
