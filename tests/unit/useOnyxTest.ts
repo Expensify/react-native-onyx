@@ -1558,6 +1558,105 @@ describe('useOnyx', () => {
             expect(paused.result.current[0]).toEqual('v1');
         });
 
+        // A key change is consumer-driven (like a dependencies change), so subscribed: false must not block it:
+        // the hook re-subscribes and treats the new key as a first connection, which is exempt from the gate.
+        it('loads the new key value on a key change while subscribed is false, then keeps gating background writes', async () => {
+            await Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}1000`, 'report_1000_value');
+            await Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}1001`, 'report_1001_value');
+
+            type KeyProps = {key: string};
+            const {result, rerender} = renderHook(({key}: KeyProps) => useOnyx(key, {subscribed: false}), {
+                initialProps: {key: `${ONYXKEYS.COLLECTION.TEST_KEY}1000`} as KeyProps,
+            });
+
+            await act(async () => waitForPromisesToResolve());
+            expect(result.current[0]).toEqual('report_1000_value');
+            expect(result.current[1].status).toEqual('loaded');
+
+            // Switch to another collection member while paused
+            await act(async () => {
+                rerender({key: `${ONYXKEYS.COLLECTION.TEST_KEY}1001`});
+                await waitForPromisesToResolve();
+            });
+
+            expect(result.current[0]).toEqual('report_1001_value');
+            expect(result.current[1].status).toEqual('loaded');
+
+            // Still paused on the new key: background writes remain suppressed
+            await act(async () => {
+                Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}1001`, 'report_1001_updated');
+                await waitForPromisesToResolve();
+            });
+            expect(result.current[0]).toEqual('report_1001_value');
+
+            // And writes to the old key are ignored entirely
+            await act(async () => {
+                Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}1000`, 'report_1000_updated');
+                await waitForPromisesToResolve();
+            });
+            expect(result.current[0]).toEqual('report_1001_value');
+        });
+
+        // Unlike the warm switch above, a cold member has no cached value to read during the switch render,
+        // so resolving it depends on the connect callback's initial-load exemption firing after the storage read.
+        it('resolves a cold key through loading on a key change while subscribed is false', async () => {
+            await StorageMock.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}1000`, {id: 1000});
+            await StorageMock.setItem(`${ONYXKEYS.COLLECTION.TEST_KEY}1001`, {id: 1001});
+
+            type KeyProps = {key: string};
+            const {result, rerender} = renderHook(({key}: KeyProps) => useOnyx(key, {subscribed: false}), {
+                initialProps: {key: `${ONYXKEYS.COLLECTION.TEST_KEY}1000`} as KeyProps,
+            });
+
+            await act(async () => waitForPromisesToResolve());
+            expect(result.current[0]).toEqual({id: 1000});
+
+            // Switch to a member that only exists in storage
+            rerender({key: `${ONYXKEYS.COLLECTION.TEST_KEY}1001`});
+            expect(result.current[1].status).toEqual('loading');
+
+            await act(async () => waitForPromisesToResolve());
+            expect(result.current[0]).toEqual({id: 1001});
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        // The pause freezes per subscription, not per key: writes suppressed while paused must surface
+        // when the consumer switches away and back, since each key change is a fresh first connection.
+        it('shows values written while paused after switching away and back to the key', async () => {
+            await Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}1000`, 'report_1000_value');
+            await Onyx.set(`${ONYXKEYS.COLLECTION.TEST_KEY}1001`, 'report_1001_value');
+
+            type KeyProps = {key: string};
+            const {result, rerender} = renderHook(({key}: KeyProps) => useOnyx(key, {subscribed: false}), {
+                initialProps: {key: `${ONYXKEYS.COLLECTION.TEST_KEY}1000`} as KeyProps,
+            });
+
+            await act(async () => waitForPromisesToResolve());
+            expect(result.current[0]).toEqual('report_1000_value');
+
+            // While paused: a write to the connected key is suppressed, a write to the future key lands unconnected
+            await act(async () => {
+                Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}1000`, 'report_1000_updated');
+                Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}1001`, 'report_1001_updated');
+                await waitForPromisesToResolve();
+            });
+            expect(result.current[0]).toEqual('report_1000_value');
+
+            // Switching to the other member shows its latest value, regardless of write timing
+            await act(async () => {
+                rerender({key: `${ONYXKEYS.COLLECTION.TEST_KEY}1001`});
+                await waitForPromisesToResolve();
+            });
+            expect(result.current[0]).toEqual('report_1001_updated');
+
+            // Switching back shows the write that was suppressed while paused
+            await act(async () => {
+                rerender({key: `${ONYXKEYS.COLLECTION.TEST_KEY}1000`});
+                await waitForPromisesToResolve();
+            });
+            expect(result.current[0]).toEqual('report_1000_updated');
+        });
+
         // A selector-identity change while paused must be frozen like any other update: the paused fast path
         // returns the last delivered output instead of recomputing. On resubscribe the new selector applies
         it('freezes a selector change while paused and applies it on resubscribe', async () => {
