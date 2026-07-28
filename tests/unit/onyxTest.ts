@@ -3317,7 +3317,6 @@ describe('RAM-only keys should not read from storage', () => {
         let collection: GenericCollection = {};
         const collectionConn = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
-            waitForCollectionCallback: true,
             callback: (value) => {
                 collection = value as GenericCollection;
             },
@@ -3366,7 +3365,6 @@ describe('RAM-only keys should not read from storage', () => {
         const collectionCallback = jest.fn();
         const connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_KEY,
-            waitForCollectionCallback: true,
             callback: collectionCallback,
         });
         await act(async () => waitForPromisesToResolve());
