@@ -44,18 +44,9 @@ const complexSelectorOptions: UseOnyxOptions<string, ComplexSelectorResult> = {
 };
 
 // Mock results
-const mockResult: UseOnyxResult<MockData> = [
-    {id: 1, name: 'Test', value: 42},
-    {status: 'loaded', sourceValue: {id: 1, name: 'Test', value: 42}},
-];
+const mockResult: UseOnyxResult<MockData> = [{id: 1, name: 'Test', value: 42}, {status: 'loaded'}];
 
-const mockResults = Array.from(
-    {length: 1000},
-    (_, i): UseOnyxResult<MockData> => [
-        {id: i, name: `Test${i}`, value: i * 10},
-        {status: 'loaded', sourceValue: {id: i, name: `Test${i}`, value: i * 10}},
-    ],
-);
+const mockResults = Array.from({length: 1000}, (_, i): UseOnyxResult<MockData> => [{id: i, name: `Test${i}`, value: i * 10}, {status: 'loaded'}]);
 
 describe('OnyxSnapshotCache', () => {
     let cache: OnyxSnapshotCache;
@@ -153,10 +144,7 @@ describe('OnyxSnapshotCache', () => {
 
         test('getting cached result with complex selector (cache hit)', async () => {
             const cacheKey = cache.registerConsumer(ONYXKEYS.TEST_KEY, complexSelectorOptions);
-            const complexResult: UseOnyxResult<ComplexSelectorResult> = [
-                {id: 1, name: 'Test', computed: 84, formatted: 'Test: 42'},
-                {status: 'loaded', sourceValue: {id: 1, name: 'Test', computed: 84, formatted: 'Test: 42'}},
-            ];
+            const complexResult: UseOnyxResult<ComplexSelectorResult> = [{id: 1, name: 'Test', computed: 84, formatted: 'Test: 42'}, {status: 'loaded'}];
             await measureFunction(
                 () => {
                     cache.getCachedResult(ONYXKEYS.TEST_KEY, cacheKey);

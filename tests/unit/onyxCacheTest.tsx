@@ -625,6 +625,27 @@ describe('Onyx', () => {
                 });
             });
 
+            it('should return the stable empty reference after all members are removed', async () => {
+                await initOnyx();
+                // Unrelated key keeps storageKeys non-empty so an empty collection is treated as "loaded and empty"
+                await Onyx.set(ONYX_KEYS.TEST_KEY, 'value');
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1});
+
+                const populated = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+                expect(Object.keys(populated!)).toHaveLength(1);
+
+                // Remove the last member — the collection becomes empty
+                await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, null);
+
+                const first = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+                const second = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+
+                expect(first).toBeDefined();
+                expect(Object.keys(first!)).toHaveLength(0);
+                // Reads must return the same empty reference so useSyncExternalStore doesn't re-render
+                expect(first).toBe(second);
+            });
+
             it('should preserve unchanged member references when a sibling is updated', async () => {
                 await initOnyx();
                 const member1Value = {id: 1, name: 'unchanged'};

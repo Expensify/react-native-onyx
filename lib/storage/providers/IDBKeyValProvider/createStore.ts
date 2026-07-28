@@ -1,48 +1,10 @@
 import * as IDB from 'idb-keyval';
 import type {UseStore} from 'idb-keyval';
 import * as Logger from '../../../Logger';
+import {StorageErrorClass} from '../../errors';
+import classifyIDBError from './classifyError';
 
 const HEAL_ATTEMPTS_MAX = 3;
-
-/**
- * Detects the Chromium-specific IDB backing store corruption error.
- * Fires when LevelDB files backing IndexedDB are corrupted and Chrome's
- * internal recovery (RepairDB -> delete -> recreate) also fails.
- */
-function isBackingStoreError(error: unknown): boolean {
-    return (error instanceof Error || error instanceof DOMException) && (error as Error).message.includes('Internal error opening backing store');
-}
-
-/**
- * Detects Safari/WebKit IDB connection termination errors.
- * Fires when Safari kills the IDB server process for backgrounded tabs.
- * WebKit bugs: https://bugs.webkit.org/show_bug.cgi?id=197050, https://bugs.webkit.org/show_bug.cgi?id=201483
- */
-function isConnectionLostError(error: unknown): boolean {
-    if (!(error instanceof Error || error instanceof DOMException)) return false;
-    const msg = (error as Error).message.toLowerCase();
-    return msg.includes('connection to indexed database server lost') || msg.includes('connection is closing');
-}
-
-function isInvalidStateError(error: unknown): boolean {
-    return (error instanceof Error || error instanceof DOMException) && (error as Error).name === 'InvalidStateError';
-}
-
-/** Errors that trigger a budgeted heal-and-retry in store(). */
-function isBudgetedHealError(error: unknown): boolean {
-    return isBackingStoreError(error) || isConnectionLostError(error);
-}
-
-function getBudgetedHealErrorLabel(error: unknown): string {
-    if (isBackingStoreError(error)) return 'backing store';
-    if (isConnectionLostError(error)) return 'connection lost';
-    return 'unknown';
-}
-
-/** Union of all error types indicating a stale/dead IDB connection. Used by the visibilitychange probe. */
-function isStaleConnectionError(error: unknown): boolean {
-    return isInvalidStateError(error) || isBackingStoreError(error) || isConnectionLostError(error);
-}
 
 // This is a copy of the createStore function from idb-keyval, we need a custom implementation
 // because we need to create the database manually in order to ensure that the store exists before we use it.
@@ -67,7 +29,10 @@ function createStore(dbName: string, storeName: string): UseStore {
         // https://developer.mozilla.org/en-US/docs/Web/API/IDBDatabase/versionchange_event
         // eslint-disable-next-line no-param-reassign
         db.onversionchange = () => {
-            Logger.logInfo('IDB connection closing due to version change', {dbName, storeName});
+            Logger.logInfo('IDB connection closing due to version change', {
+                dbName,
+                storeName,
+            });
             db.close();
             dbp = undefined;
         };
@@ -146,7 +111,11 @@ function createStore(dbName: string, storeName: string): UseStore {
         const probePromise = dbp;
 
         const dropCacheIfStale = (error: unknown) => {
-            if (dbp !== probePromise || !isStaleConnectionError(error)) {
+            // A stale/dead connection surfaces as TRANSIENT (InvalidStateError, Safari connection lost)
+            // or FATAL (Chromium backing-store corruption) per the shared taxonomy (lib/storage/errors.ts).
+            const errorClass = classifyIDBError(error);
+            const isStaleConnection = errorClass === StorageErrorClass.TRANSIENT || errorClass === StorageErrorClass.FATAL;
+            if (dbp !== probePromise || !isStaleConnection) {
                 return;
             }
             Logger.logAlert('IDB visibilitychange probe: stale connection detected, dropping cached connection', {
@@ -182,22 +151,27 @@ function createStore(dbName: string, storeName: string): UseStore {
             });
     });
 
-    // Handles three recoverable error classes:
-    // 1. InvalidStateError — connection closed between getDB() resolving and db.transaction().
-    //    Retry once with a fresh connection. No budget limit (transient, always worth one reopen).
-    // 2. Backing store corruption (Chromium UnknownError) — drop cached connection and reopen.
-    // 3. Connection lost (Safari UnknownError) — IDB server terminated for backgrounded tabs.
-    //    Both 2 and 3 share a heal budget (3 attempts, reset on success).
-    //    Mirrors Dexie's PR1398_maxLoop pattern: https://github.com/dexie/Dexie.js/blob/master/src/functions/temp-transaction.ts
-    // Note: concurrent store() calls share the budget. Under overlapping failures each caller
+    // The connection layer owns recovery for connection/transport failures. It reacts per the shared
+    // error taxonomy (see lib/storage/errors.ts):
+    // - TRANSIENT (InvalidStateError, AbortError, Safari connection lost) — the cached connection is
+    //   stale. Drop it and retry once with a fresh one. Unbudgeted: a single reopen is always worth it
+    //   and is bounded per operation.
+    // - FATAL (Chromium backing-store corruption) — reopening can recover transient corruption, but
+    //   repeating forever is futile, so the heal is budgeted (3 attempts, reset on success).
+    //   Mirrors Dexie's PR1398_maxLoop pattern: https://github.com/dexie/Dexie.js/blob/master/src/functions/temp-transaction.ts
+    // - CAPACITY / UNKNOWN are NOT the connection layer's responsibility — propagate to the operation
+    //   layer (OnyxUtils.retryOperation) without retrying here, to avoid compounding retries.
+    // Note: concurrent store() calls share the heal budget. Under overlapping failures each caller
     // decrements independently, so the budget may drain faster than one-per-incident. This is
     // acceptable — same as Dexie's approach — and the budget resets on any success.
     return (txMode, callback) =>
         executeTransaction(txMode, callback)
             .then(resetHealBudget)
             .catch((error) => {
-                if (isInvalidStateError(error)) {
-                    Logger.logInfo('IDB InvalidStateError — dropping cached connection and retrying', {
+                const errorClass = classifyIDBError(error);
+
+                if (errorClass === StorageErrorClass.TRANSIENT) {
+                    Logger.logInfo('IDB transient error — dropping cached connection and retrying once', {
                         dbName,
                         storeName,
                         txMode,
@@ -207,29 +181,33 @@ function createStore(dbName: string, storeName: string): UseStore {
                     return executeTransaction(txMode, callback).then(resetHealBudget);
                 }
 
-                if (isBudgetedHealError(error) && healAttemptsRemaining > 0) {
+                if (errorClass === StorageErrorClass.FATAL && healAttemptsRemaining > 0) {
                     healAttemptsRemaining--;
-                    const label = getBudgetedHealErrorLabel(error);
-                    Logger.logInfo(`IDB heal: ${label} error detected — dropping cached connection and reopening (${healAttemptsRemaining} attempts left)`, {
+                    Logger.logInfo(`IDB heal: backing store error detected — dropping cached connection and reopening (${healAttemptsRemaining} attempts left)`, {
                         dbName,
                         storeName,
                     });
                     dbp = undefined;
                     return executeTransaction(txMode, callback).then((result) => {
-                        Logger.logInfo(`IDB heal: successfully recovered after ${label} error`, {dbName, storeName});
+                        Logger.logInfo('IDB heal: successfully recovered after backing store error', {dbName, storeName});
                         return resetHealBudget(result);
                     });
                 }
 
-                if (isBudgetedHealError(error)) {
-                    Logger.logAlert(`IDB heal: ${getBudgetedHealErrorLabel(error)} error — heal budget exhausted, giving up`, {
+                if (errorClass === StorageErrorClass.FATAL) {
+                    Logger.logAlert('IDB heal: backing store error — heal budget exhausted, giving up', {
                         dbName,
                         storeName,
                     });
-                } else {
-                    Logger.logAlert('IDB error is not recoverable, giving up', {
+                } else if (errorClass === StorageErrorClass.UNKNOWN) {
+                    // UNKNOWN — unexpected at this layer; record it so it's visible. CAPACITY is the
+                    // expected propagation path (the operation layer owns its logging, and suppresses it
+                    // entirely once the circuit breaker is open), so we do NOT log it here — doing so was a
+                    // per-failed-write line that dominated the storm.
+                    Logger.logInfo('IDB error not recoverable at the connection layer, propagating', {
                         dbName,
                         storeName,
+                        errorClass,
                         errorMessage: error instanceof Error ? error.message : String(error),
                     });
                 }
