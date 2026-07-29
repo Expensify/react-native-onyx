@@ -819,11 +819,9 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(
         return Promise.resolve();
     }
 
-    // DISK_PRESSURE: the filesystem around the database is out of space or its files are unreadable, so
-    // neither retries nor in-DB eviction can succeed — every operation fails identically until the OS
-    // frees space, and the burst recovers on its own once it does. Drop the write (the cache stays
-    // authoritative) and log one alert + quota snapshot per interval instead of one per operation; the
-    // quota snapshot carries the free-disk bytes that confirm (or rule out) disk pressure in telemetry.
+    // DISK_PRESSURE: the device disk is full, so neither retries nor eviction can succeed until the OS
+    // frees space. Drop the write (cache stays authoritative) and log one alert + quota snapshot per
+    // interval — the snapshot's free-disk bytes let telemetry confirm (or rule out) disk pressure.
     if (errorClass === StorageErrorClass.DISK_PRESSURE) {
         const now = Date.now();
         if (now - lastDiskPressureLogTime < DISK_PRESSURE_LOG_INTERVAL_MS) {
