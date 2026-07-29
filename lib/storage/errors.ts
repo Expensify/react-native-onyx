@@ -15,6 +15,10 @@ const StorageErrorClass = {
     TRANSIENT: 'transient',
     /** Quota exceeded / disk full. Owner: operation layer — evict and retry. */
     CAPACITY: 'capacity',
+    /** Filesystem-level failure around the database files (device disk full, or the files cannot be
+     *  created/read). Owner: operation layer — skip retries and eviction (neither can free OS-level
+     *  space) and log one throttled alert + quota snapshot per burst. */
+    DISK_PRESSURE: 'diskPressure',
     /** Non-serializable payload. Never retriable — the same data will always fail. */
     INVALID_DATA: 'invalidData',
     /** Backing-store corruption. Owner: connection layer — budgeted heal, then give up. */

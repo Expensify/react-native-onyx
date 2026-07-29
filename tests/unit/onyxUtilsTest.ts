@@ -748,8 +748,12 @@ describe('OnyxUtils', () => {
         const diskFullError = new Error('database or disk is full');
         const nonRetriableIdbError = Object.assign(new Error('Internal error opening backing store for indexedDB.open.'), {name: 'UnknownError'});
 
-        // The circuit breaker is process-scoped, so reset it between tests to avoid state leaking.
-        beforeEach(() => StorageCircuitBreaker.reset());
+        // The circuit breaker and the disk-pressure log throttle are process-scoped, so reset them
+        // between tests to avoid state leaking.
+        beforeEach(() => {
+            StorageCircuitBreaker.reset();
+            OnyxUtils.resetDiskPressureLogThrottle();
+        });
 
         it('should retry only one time if the operation is firstly failed and then passed', async () => {
             StorageMock.setItem = jest.fn(StorageMock.setItem).mockRejectedValueOnce(genericError).mockImplementation(StorageMock.setItem);
@@ -806,6 +810,42 @@ describe('OnyxUtils', () => {
 
             // Called once (initial attempt only) -- no recursion, unlike the 6 calls for generic errors
             expect(retryOperationSpy).toHaveBeenCalledTimes(1);
+        });
+
+        it.each([
+            ['[NativeNitroSQLiteException][SqlExecutionError] disk I/O error'],
+            ['[NativeNitroSQLiteException][SqlExecutionError] unable to open database file'],
+            ['[NativeNitroSQLiteException][SqlExecutionError] cannot rollback - no transaction is active'],
+        ])('should not retry disk-pressure errors (%s)', async (message) => {
+            StorageMock.setItem = jest.fn().mockRejectedValue(new Error(message));
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+
+            // Called once (initial attempt only): retries cannot succeed while the device disk is full.
+            expect(retryOperationSpy).toHaveBeenCalledTimes(1);
+        });
+
+        it('should log a single throttled alert with a quota snapshot for a disk-pressure burst', async () => {
+            const logAlertSpy = jest.spyOn(Logger, 'logAlert');
+            const logInfoSpy = jest.spyOn(Logger, 'logInfo');
+            const diskIOError = new Error('[NativeNitroSQLiteException][SqlExecutionError] disk I/O error');
+            StorageMock.setItem = jest.fn().mockRejectedValue(diskIOError);
+
+            // A burst: several operations all failing with the identical error.
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data2'});
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data3'});
+
+            // One alert for the whole burst (the rest are throttled within DISK_PRESSURE_LOG_INTERVAL_MS)...
+            const alerts = logAlertSpy.mock.calls.filter((call) => typeof call[0] === 'string' && call[0].startsWith('Disk-pressure storage error'));
+            expect(alerts).toHaveLength(1);
+            expect(alerts[0][0]).toBe(`Disk-pressure storage error; skipping retries. provider: MemoryOnlyProvider. message: ${diskIOError.message}. onyxMethod: setWithRetry.`);
+            // ...paired with exactly one quota snapshot (carries the free-disk bytes on native platforms).
+            const quotaLogs = logInfoSpy.mock.calls.filter((call) => typeof call[0] === 'string' && call[0].startsWith('Storage Quota Check'));
+            expect(quotaLogs).toHaveLength(1);
+            // And no "failed after N retries" alert: the writes were dropped, not retried to exhaustion.
+            const retryAlerts = logAlertSpy.mock.calls.filter((call) => typeof call[0] === 'string' && call[0].startsWith('Storage operation failed after'));
+            expect(retryAlerts).toHaveLength(0);
         });
 
         it('should skip retry quietly (info, not alert) for fatal connection-layer errors', async () => {

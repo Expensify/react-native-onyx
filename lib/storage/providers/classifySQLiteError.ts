@@ -18,6 +18,15 @@ function classifySQLiteError(error: unknown): ValueOf<typeof StorageErrorClass> 
         return StorageErrorClass.CAPACITY;
     }
 
+    // Filesystem-level failures around the database files, seen when the device disk is (nearly) full.
+    // "disk I/O error" (SQLITE_IOERR) fires on every operation — reads included — after SQLite fails to
+    // size the -shm file while (re)opening the database on a full disk; "unable to open database file"
+    // (SQLITE_CANTOPEN) when the -shm file cannot be created at all; "cannot rollback" is a batch-write
+    // failure whose original error was masked by the ROLLBACK itself failing on the same full disk.
+    if (message.includes('disk i/o error') || message.includes('unable to open database file') || message.includes('cannot rollback - no transaction is active')) {
+        return StorageErrorClass.DISK_PRESSURE;
+    }
+
     return StorageErrorClass.UNKNOWN;
 }
 
