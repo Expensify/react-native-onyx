@@ -3387,6 +3387,52 @@ describe('RAM-only keys should not read from storage', () => {
         Onyx.disconnect(connection);
     });
 
+    it('should notify subscribers with undefined when a collection member is removed in another instance', async () => {
+        Onyx.init({
+            keys: ONYX_KEYS,
+            shouldSyncMultipleInstances: true,
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls.at(-1)?.[0];
+        expect(syncCallback).toBeDefined();
+
+        await Onyx.setCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {name: 'entry 1'},
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {name: 'entry 2'},
+        } as GenericCollection);
+
+        let collection: GenericCollection = {};
+        const collectionConn = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            callback: (value) => {
+                collection = value as GenericCollection;
+            },
+        });
+
+        let collectionMember2: unknown = 'initial';
+        const collectionMember2Conn = Onyx.connect({
+            key: `${ONYX_KEYS.COLLECTION.TEST_KEY}2`,
+            callback: (value) => {
+                collectionMember2 = value;
+            },
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        // Another tab removes member 2; the removed key reads back as undefined from storage.
+        syncCallback([[`${ONYX_KEYS.COLLECTION.TEST_KEY}2`, undefined]]);
+        await act(async () => waitForPromisesToResolve());
+
+        // The member subscriber must be told the member is gone.
+        expect(collectionMember2).toBeUndefined();
+
+        // The collection-root subscriber must receive the collection without the removed member.
+        expect(collection).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {name: 'entry 1'}});
+
+        Onyx.disconnect(collectionConn);
+        Onyx.disconnect(collectionMember2Conn);
+    });
+
     it('should serve RAM-only keys from cache and normal keys from storage in multiGet', async () => {
         const ramOnlyMember = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
         const normalMember = `${ONYX_KEYS.COLLECTION.TEST_KEY}1`;
