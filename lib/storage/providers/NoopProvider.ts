@@ -1,4 +1,5 @@
 import type {OnyxValue} from '../../types';
+import {StorageErrorClass} from '../errors';
 import type StorageProvider from './types';
 
 const provider: StorageProvider<unknown> = {
@@ -8,6 +9,11 @@ const provider: StorageProvider<unknown> = {
      * The name of the provider that can be printed to the logs
      */
     name: 'NoopProvider',
+
+    /**
+     * The noop provider never throws, so nothing is classifiable.
+     */
+    classifyError: () => StorageErrorClass.UNKNOWN,
 
     /**
      * Initializes the storage provider

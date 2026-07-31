@@ -1,13 +1,12 @@
-import {shallowEqual} from 'fast-equals';
 import {useCallback, useEffect, useMemo, useRef, useSyncExternalStore} from 'react';
 import createMemoizedSelector from './createMemoizedSelector';
 import OnyxCache, {TASK} from './OnyxCache';
 import type {Connection} from './OnyxConnectionManager';
 import connectionManager from './OnyxConnectionManager';
 import OnyxUtils from './OnyxUtils';
-import OnyxKeys from './OnyxKeys';
 import type {CollectionKeyBase, OnyxKey, OnyxValue} from './types';
 import onyxSnapshotCache from './OnyxSnapshotCache';
+import memoizedShallowEqual from './memoizedShallowEqual';
 
 type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (data: OnyxValue<TKey> | undefined) => TReturnValue;
 
@@ -30,12 +29,11 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
 
 type FetchStatus = 'loading' | 'loaded';
 
-type ResultMetadata<TValue> = {
+type ResultMetadata = {
     status: FetchStatus;
-    sourceValue?: NonNullable<TValue> | undefined;
 };
 
-type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata<TValue>];
+type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata];
 
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey, options?: UseOnyxOptions<TKey, TReturnValue>): UseOnyxResult<TReturnValue> {
     const connectionRef = useRef<Connection | null>(null);
@@ -86,9 +84,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
 
     // Indicates if we should get the newest cached value from Onyx during `getSnapshot()` execution.
     const shouldGetCachedValueRef = useRef(true);
-
-    // Inside useOnyx.ts, we need to track the sourceValue separately
-    const sourceValueRef = useRef<NonNullable<TReturnValue> | undefined>(undefined);
 
     // Cache the options key to avoid regenerating it every getSnapshot call
     const cacheKey = useMemo(
@@ -148,9 +143,11 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
 
         // shallowEqual checks === first (O(1) for frozen snapshots and stable selector references),
         // then falls back to comparing top-level properties for individual keys that may have
-        // new references with equivalent content.
+        // new references with equivalent content. The comparison is memoized by object identity
+        // (see `memoizedShallowEqual`) so N hooks comparing the same two cache objects pay for
+        // one walk in total instead of one walk each.
         // Normalize null to undefined to ensure consistent comparison (both represent "no value").
-        const areValuesEqual = shallowEqual(previousValueRef.current ?? undefined, newValueRef.current ?? undefined);
+        const areValuesEqual = memoizedShallowEqual(previousValueRef.current ?? undefined, newValueRef.current ?? undefined);
 
         // We update the cached value and the result in the following conditions:
         // We will update the cached value and the result in any of the following situations:
@@ -169,7 +166,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
                 previousValueRef.current ?? undefined,
                 {
                     status: newFetchStatus,
-                    sourceValue: sourceValueRef.current,
                 },
             ];
         }
@@ -189,7 +185,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
             if (hasMountedRef.current) {
                 previousValueRef.current = null;
                 newValueRef.current = null;
-                sourceValueRef.current = undefined;
                 resultRef.current = [undefined, {status: 'loading'}];
                 shouldGetCachedValueRef.current = true;
             }
@@ -200,7 +195,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
 
             connectionRef.current = connectionManager.connect<CollectionKeyBase>({
                 key,
-                callback: (value, callbackKey, sourceValue) => {
+                callback: () => {
                     isConnectingRef.current = false;
                     onStoreChangeFnRef.current = onStoreChange;
 
@@ -211,16 +206,12 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
                     // Signals that we want to get the newest cached value again in `getSnapshot()`.
                     shouldGetCachedValueRef.current = true;
 
-                    // sourceValue is unknown type, so we need to cast it to the correct type.
-                    sourceValueRef.current = sourceValue as NonNullable<TReturnValue>;
-
                     // Invalidate snapshot cache for this key when data changes
                     onyxSnapshotCache.invalidateForKey(key);
 
                     // Finally, we signal that the store changed, making `getSnapshot()` be called again.
                     onStoreChange();
                 },
-                waitForCollectionCallback: OnyxKeys.isCollectionKey(key) as true,
                 reuseConnection: options?.reuseConnection,
             });
 
