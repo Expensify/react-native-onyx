@@ -98,7 +98,7 @@ type StorageProvider<TStore> = {
     classifyError: (error: unknown) => ValueOf<typeof StorageErrorClass>;
 
     /**
-     * @param onStorageKeyChanged Storage synchronization mechanism keeping all opened tabs in sync
+     * @param onStorageKeysChanged Storage synchronization mechanism keeping all opened tabs in sync
      */
     keepInstancesSync?: (onStorageKeysChanged: OnStorageKeysChanged) => void;
 };
