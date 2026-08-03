@@ -8,22 +8,22 @@ import type {
     ConnectOptions,
     InitOptions,
     KeyValueMapping,
-    OnyxInputKeyValueMapping,
     MixedOperationsQueue,
+    NonUndefined,
+    OnyxCollection,
+    OnyxEntry,
+    OnyxInput,
+    OnyxInputKeyValueMapping,
     OnyxKey,
     OnyxMergeCollectionInput,
-    OnyxSetCollectionInput,
     OnyxMergeInput,
+    OnyxMethodMap,
     OnyxMultiSetInput,
+    OnyxSetCollectionInput,
     OnyxSetInput,
     OnyxUpdate,
     OnyxValue,
-    OnyxInput,
-    OnyxMethodMap,
     SetOptions,
-    OnyxCollection,
-    NonUndefined,
-    OnyxEntry,
 } from './types';
 import OnyxUtils from './OnyxUtils';
 import OnyxKeys from './OnyxKeys';
@@ -82,6 +82,7 @@ function init({
                         collectionBatches.set(collectionKey, batch);
                     }
                     batch.partial[key] = value;
+
                     // Keep the earliest previous value in case the same member appears twice in one batch.
                     if (!(key in batch.previous)) {
                         batch.previous[key] = previousValue;

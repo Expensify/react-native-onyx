@@ -20,7 +20,7 @@ const MAX_SYNC_PAYLOAD_LENGTH = 1_000_000;
 
 /**
  * Parses the SYNC_ONYX storage event value.
- * The payload is a JSON array of the changed keys (a batch). I fall backs to treating the raw
+ * The payload is a JSON array of the changed keys (a batch). It falls back to treating the raw
  * value as a single key for backwards compatibility with the previous one-key-per-event format.
  */
 function parseSyncOnyxStorageEventValue(value: string): StorageKeyList {
