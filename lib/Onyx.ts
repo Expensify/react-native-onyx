@@ -218,11 +218,16 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
         }
         mergeQueue[key] = [changes];
 
-        mergeQueuePromise[key] = OnyxUtils.get(key).then((existingValue) => {
+        mergeQueuePromise[key] = OnyxUtils.get(key).then((valueFromGet) => {
             // Calls to Onyx.set after a merge will terminate the current merge process and clear the merge queue
             if (mergeQueue[key] == null) {
                 return Promise.resolve();
             }
+
+            // Other writers (notably Onyx.update's mergeCollection path, which doesn't participate in mergeQueue)
+            // can land between get() resolving and this callback running. Applying the delta on top of the value
+            // captured back then and broadcasting it would overwrite those writes wholesale, so re-read the cache.
+            const existingValue = cache.hasCacheForKey(key) ? (cache.get(key) as OnyxInput<TKey> | undefined) : valueFromGet;
 
             try {
                 const validChanges = mergeQueue[key].filter((change) => {
