@@ -2638,11 +2638,7 @@ describe('Onyx', () => {
                 jest.restoreAllMocks();
             });
 
-            // Onyx.merge reads the key, computes the whole merged value and writes it back with cache.set(), which is
-            // a full replace. Onyx.update's mergeCollection path writes the same key with cache.merge() and never
-            // registers in mergeQueue, so the two don't serialize. If merge() applies its delta to the value get()
-            // resolved with rather than to the current one, everything the update wrote meanwhile is silently dropped.
-            it('should the delta on top of an Onyx.update that landed after get() is resolved', async () => {
+            it('should apply the delta on top of an Onyx.update that landed after get() is resolved', async () => {
                 const member1 = `${ONYX_KEYS.COLLECTION.TEST_KEY}1`;
                 const member2 = `${ONYX_KEYS.COLLECTION.TEST_KEY}2`;
 
@@ -2650,11 +2646,9 @@ describe('Onyx', () => {
                 await Onyx.merge(member2, {itemC: {name: 'c'}});
                 await waitForPromisesToResolve();
 
-                // The value merge()'s get() would have resolved with, before the update below runs.
                 const staleValue = lodashCloneDeep(cache.get(member1));
 
-                // Park merge()'s read so the update is guaranteed to land first. Doing this explicitly keeps the test
-                // deterministic instead of relying on the two operations interleaving by luck.
+                // Park merge()'s read so the update below is guaranteed to land first.
                 const deferredGet = createDeferredTask();
                 const originalGet = OnyxUtils.get;
                 jest.spyOn(OnyxUtils, 'get').mockImplementation(((key: OnyxKey) =>
@@ -2662,26 +2656,18 @@ describe('Onyx', () => {
 
                 const mergePromise = Onyx.merge(member1, {itemA: {childID: '1'}});
 
-                // Two keys of the same collection, so Onyx.update batches them into mergeCollectionWithPatches.
+                // Two keys of the same collection, so this goes through mergeCollectionWithPatches.
                 await Onyx.update([
                     {onyxMethod: Onyx.METHOD.MERGE, key: member1, value: {itemA: {pendingAction: null}, itemB: null}},
                     {onyxMethod: Onyx.METHOD.MERGE, key: member2, value: {itemC: {touched: true}}},
                 ]);
                 await waitForPromisesToResolve();
 
-                // Release the read: merge() now applies its delta with a value that is already out of date.
                 deferredGet.resolve();
                 await mergePromise;
                 await waitForPromisesToResolve();
 
-                const value = cache.get(member1) as GenericDeepRecord;
-                expect(value).toEqual({itemA: {childID: '1'}});
-                // Spelled out so a failure says which half of the update was lost.
-                expect(value.itemA).not.toHaveProperty('pendingAction');
-                expect(value).not.toHaveProperty('itemB');
-                expect(value.itemA).toHaveProperty('childID', '1');
-
-                // Storage must agree with the cache, otherwise the divergence resurfaces on the next app start.
+                expect(cache.get(member1)).toEqual({itemA: {childID: '1'}});
                 expect(await StorageMock.getItem(member1)).toEqual({itemA: {childID: '1'}});
             });
         });
