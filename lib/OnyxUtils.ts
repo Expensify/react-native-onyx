@@ -1211,6 +1211,12 @@ function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, me
         let updatedData: Record<string, unknown> = {};
 
         for (const {key, value} of data) {
+            // `clear`/`multiset` updates legitimately carry no key (and `Onyx.update` skips other keyless
+            // entries), so ignore them here too instead of crashing on `key.startsWith` below.
+            if (typeof key !== 'string') {
+                continue;
+            }
+
             // snapshots are normal keys so we want to skip update if they are written to Onyx
             if (OnyxKeys.isCollectionMemberKey(snapshotCollectionKey, key)) {
                 continue;
