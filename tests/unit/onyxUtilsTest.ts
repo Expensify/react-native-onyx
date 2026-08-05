@@ -812,18 +812,17 @@ describe('OnyxUtils', () => {
             expect(retryOperationSpy).toHaveBeenCalledTimes(1);
         });
 
-        it.each([
-            ['[NativeNitroSQLiteException][SqlExecutionError] disk I/O error'],
-            ['[NativeNitroSQLiteException][SqlExecutionError] unable to open database file'],
-            ['[NativeNitroSQLiteException][SqlExecutionError] cannot rollback - no transaction is active'],
-        ])('should not retry disk-pressure errors (%s)', async (message) => {
-            StorageMock.setItem = jest.fn().mockRejectedValue(new Error(message));
+        it.each([['[NativeNitroSQLiteException][SqlExecutionError] disk I/O error'], ['[NativeNitroSQLiteException][SqlExecutionError] unable to open database file']])(
+            'should not retry disk-pressure errors (%s)',
+            async (message) => {
+                StorageMock.setItem = jest.fn().mockRejectedValue(new Error(message));
 
-            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+                await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
-            // Called once (initial attempt only): retries cannot succeed while the device disk is full.
-            expect(retryOperationSpy).toHaveBeenCalledTimes(1);
-        });
+                // Called once (initial attempt only): retries cannot succeed while the device disk is full.
+                expect(retryOperationSpy).toHaveBeenCalledTimes(1);
+            },
+        );
 
         it('should log a single throttled alert with a quota snapshot for a disk-pressure burst', async () => {
             const logAlertSpy = jest.spyOn(Logger, 'logAlert');

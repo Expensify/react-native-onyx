@@ -19,9 +19,8 @@ function classifySQLiteError(error: unknown): ValueOf<typeof StorageErrorClass> 
     }
 
     // Full-disk failures around the database files: SQLITE_IOERR (cannot size the -shm file on reopen,
-    // fails reads too), SQLITE_CANTOPEN (cannot create it), and a failed ROLLBACK masking the original
-    // write error. None can succeed until the OS frees space.
-    if (message.includes('disk i/o error') || message.includes('unable to open database file') || message.includes('cannot rollback - no transaction is active')) {
+    // fails reads too) and SQLITE_CANTOPEN (cannot create it). Neither can succeed until the OS frees space.
+    if (message.includes('disk i/o error') || message.includes('unable to open database file')) {
         return StorageErrorClass.DISK_PRESSURE;
     }
 
