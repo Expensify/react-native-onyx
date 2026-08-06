@@ -24,6 +24,9 @@ function classifySQLiteError(error: unknown): ValueOf<typeof StorageErrorClass> 
         return StorageErrorClass.DISK_PRESSURE;
     }
 
+    // "cannot rollback - no transaction is active" lands here deliberately: it is a mask, not a cause —
+    // nitro-sqlite's rollback-on-error replaced the original failure until 9.7.0. UNKNOWN gives it
+    // bounded retry + shape logging instead of a disk-pressure guess.
     return StorageErrorClass.UNKNOWN;
 }
 
