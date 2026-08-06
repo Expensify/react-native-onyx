@@ -2,9 +2,21 @@
 
 # Internal API Reference
 
+## Constants
+
+<dl>
+<dt><a href="#DISK_PRESSURE_LOG_INTERVAL_MS">DISK_PRESSURE_LOG_INTERVAL_MS</a></dt>
+<dd><p>Minimum interval between disk-pressure alerts. One disk-pressure burst fails every queued operation
+with the identical error, so per-operation logging would amplify the very storm it reports.</p>
+</dd>
+</dl>
+
 ## Functions
 
 <dl>
+<dt><a href="#resetDiskPressureLogThrottle">resetDiskPressureLogThrottle()</a></dt>
+<dd><p>Test-only: clears the disk-pressure log throttle so each test observes its own alert.</p>
+</dd>
 <dt><a href="#getMergeQueue">getMergeQueue()</a></dt>
 <dd><p>Getter - returns the merge queue.</p>
 </dd>
@@ -89,6 +101,9 @@ and alerted (fatal). Retrying here would only re-amplify, so we skip the write q
 <li>CAPACITY: evicts the least recently accessed evictable key and retries, under a session-level
 circuit breaker (see lib/StorageCircuitBreaker.ts) that halts the loop once eviction stops making
 progress or failures storm — the per-operation budget alone cannot stop a session-wide storm.</li>
+<li>DISK_PRESSURE: the device disk itself is full (or the database files are unreadable), so neither
+retries nor in-DB eviction can free space — the write is dropped (cache stays authoritative) with
+a single throttled alert + quota snapshot per burst.</li>
 <li>UNKNOWN: the provider couldn&#39;t classify it — log the full error shape (name + message +
 provider) once so it&#39;s visible, then bounded retry without eviction.</li>
 </ul>
@@ -157,6 +172,19 @@ Retries on failure.</p>
 </dd>
 </dl>
 
+<a name="DISK_PRESSURE_LOG_INTERVAL_MS"></a>
+
+## DISK\_PRESSURE\_LOG\_INTERVAL\_MS
+Minimum interval between disk-pressure alerts. One disk-pressure burst fails every queued operation
+with the identical error, so per-operation logging would amplify the very storm it reports.
+
+**Kind**: global constant  
+<a name="resetDiskPressureLogThrottle"></a>
+
+## resetDiskPressureLogThrottle()
+Test-only: clears the disk-pressure log throttle so each test observes its own alert.
+
+**Kind**: global function  
 <a name="getMergeQueue"></a>
 
 ## getMergeQueue()
@@ -333,6 +361,9 @@ capacity recovery (eviction) so that a given failure is retried by exactly one l
 - CAPACITY: evicts the least recently accessed evictable key and retries, under a session-level
   circuit breaker (see lib/StorageCircuitBreaker.ts) that halts the loop once eviction stops making
   progress or failures storm — the per-operation budget alone cannot stop a session-wide storm.
+- DISK_PRESSURE: the device disk itself is full (or the database files are unreadable), so neither
+  retries nor in-DB eviction can free space — the write is dropped (cache stays authoritative) with
+  a single throttled alert + quota snapshot per burst.
 - UNKNOWN: the provider couldn't classify it — log the full error shape (name + message +
   provider) once so it's visible, then bounded retry without eviction.
 
