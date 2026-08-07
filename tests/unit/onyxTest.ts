@@ -1,17 +1,20 @@
+import {act} from '@testing-library/react-native';
+
 import lodashClone from 'lodash/clone';
 import lodashCloneDeep from 'lodash/cloneDeep';
-import {act} from '@testing-library/react-native';
-import Onyx from '../../lib';
-import * as Logger from '../../lib/Logger';
-import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
-import OnyxUtils from '../../lib/OnyxUtils';
+
 import type OnyxCache from '../../lib/OnyxCache';
-import StorageMock from '../../lib/storage';
+import type {Connection} from '../../lib/OnyxConnectionManager';
 import type {OnyxCollection, OnyxKey, OnyxUpdate} from '../../lib/types';
 import type {GenericDeepRecord} from '../types';
 import type GenericCollection from '../utils/GenericCollection';
-import type {Connection} from '../../lib/OnyxConnectionManager';
+
+import Onyx from '../../lib';
 import createDeferredTask from '../../lib/createDeferredTask';
+import * as Logger from '../../lib/Logger';
+import OnyxUtils from '../../lib/OnyxUtils';
+import StorageMock from '../../lib/storage';
+import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
@@ -2629,6 +2632,45 @@ describe('Onyx', () => {
             expect(cache.get(collectionMemberKey)).toEqual({data: 'test'});
             expect(await StorageMock.getItem(collectionMemberKey)).toBeNull();
         });
+
+        describe('concurrency with Onyx.update', () => {
+            afterEach(() => {
+                jest.restoreAllMocks();
+            });
+
+            it('should apply the delta on top of an Onyx.update that landed after get() is resolved', async () => {
+                const member1 = `${ONYX_KEYS.COLLECTION.TEST_KEY}1`;
+                const member2 = `${ONYX_KEYS.COLLECTION.TEST_KEY}2`;
+
+                await Onyx.merge(member1, {itemA: {pendingAction: 'add'}, itemB: {name: 'b'}});
+                await Onyx.merge(member2, {itemC: {name: 'c'}});
+                await waitForPromisesToResolve();
+
+                const staleValue = lodashCloneDeep(cache.get(member1));
+
+                // Park merge()'s read so the update below is guaranteed to land first.
+                const deferredGet = createDeferredTask();
+                const originalGet = OnyxUtils.get;
+                jest.spyOn(OnyxUtils, 'get').mockImplementation(((key: OnyxKey) =>
+                    key === member1 ? deferredGet.promise.then(() => staleValue) : originalGet(key)) as typeof OnyxUtils.get);
+
+                const mergePromise = Onyx.merge(member1, {itemA: {childID: '1'}});
+
+                // Two keys of the same collection, so this goes through mergeCollectionWithPatches.
+                await Onyx.update([
+                    {onyxMethod: Onyx.METHOD.MERGE, key: member1, value: {itemA: {pendingAction: null}, itemB: null}},
+                    {onyxMethod: Onyx.METHOD.MERGE, key: member2, value: {itemC: {touched: true}}},
+                ]);
+                await waitForPromisesToResolve();
+
+                deferredGet.resolve();
+                await mergePromise;
+                await waitForPromisesToResolve();
+
+                expect(cache.get(member1)).toEqual({itemA: {childID: '1'}});
+                expect(await StorageMock.getItem(member1)).toEqual({itemA: {childID: '1'}});
+            });
+        });
     });
 
     describe('set', () => {
@@ -3495,6 +3537,12 @@ describe('RAM-only keys should not read from storage', () => {
 describe('get() should prefer cache over stale storage', () => {
     let cache: typeof OnyxCache;
 
+    // StorageMock.getItem is a plain jest.fn(), not a spy, so jest.restoreAllMocks() will not undo a
+    // mockImplementation() set on it. Capture the default now and put it back after each test, otherwise the
+    // override below leaks into every suite that runs afterwards.
+    const getItemMock = StorageMock.getItem as jest.Mock;
+    const defaultGetItem = getItemMock.getMockImplementation() as (key: OnyxKey) => Promise<unknown>;
+
     beforeEach(() => {
         Object.assign(OnyxUtils.getDeferredInitTask(), createDeferredTask());
         cache = require('../../lib/OnyxCache').default;
@@ -3502,6 +3550,7 @@ describe('get() should prefer cache over stale storage', () => {
     });
 
     afterEach(() => {
+        getItemMock.mockImplementation(defaultGetItem);
         jest.restoreAllMocks();
         return Onyx.clear();
     });
@@ -3511,15 +3560,13 @@ describe('get() should prefer cache over stale storage', () => {
         const member2 = `${ONYX_KEYS.COLLECTION.TEST_KEY}2`;
 
         // Delay getItem for member1 to simulate slow Native storage (returns null before the write lands)
-        const getItemMock = StorageMock.getItem as jest.Mock;
-        const originalGetItem = getItemMock.getMockImplementation()!;
         getItemMock.mockImplementation((key: OnyxKey) => {
             if (key === member1) {
                 return new Promise<undefined>((resolve) => {
                     setTimeout(() => resolve(undefined), 50);
                 });
             }
-            return originalGetItem(key);
+            return defaultGetItem(key);
         });
 
         // 2+ collection keys get batched into mergeCollectionWithPatches (deferred cache write)
