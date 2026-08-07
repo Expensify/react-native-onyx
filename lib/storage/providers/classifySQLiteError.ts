@@ -18,15 +18,10 @@ function classifySQLiteError(error: unknown): ValueOf<typeof StorageErrorClass> 
         return StorageErrorClass.CAPACITY;
     }
 
-    // Full-disk failures around the database files: SQLITE_IOERR (cannot size the -shm file on reopen,
-    // fails reads too) and SQLITE_CANTOPEN (cannot create it). Neither can succeed until the OS frees space.
     if (message.includes('disk i/o error') || message.includes('unable to open database file')) {
         return StorageErrorClass.DISK_PRESSURE;
     }
 
-    // "cannot rollback - no transaction is active" lands here deliberately: it is a mask, not a cause —
-    // nitro-sqlite's rollback-on-error replaced the original failure until 9.7.0. UNKNOWN gives it
-    // bounded retry + shape logging instead of a disk-pressure guess.
     return StorageErrorClass.UNKNOWN;
 }
 
