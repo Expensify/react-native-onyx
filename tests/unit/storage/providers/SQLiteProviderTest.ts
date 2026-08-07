@@ -453,5 +453,15 @@ describe('SQLiteProvider', () => {
 
             expect(after.bytesUsed).toBeGreaterThan(before.bytesUsed);
         });
+
+        it('should still report free-disk bytes when the PRAGMAs fail (disk pressure)', async () => {
+            // During disk pressure the SQLite connection itself fails, but free-disk comes from the
+            // filesystem — the snapshot must survive with bytesUsed degraded instead of rejecting.
+            const executeAsyncSpy = jest.spyOn(SQLiteProvider.store!, 'executeAsync').mockRejectedValue(new Error('[NativeNitroSQLiteException][SqlExecutionError] disk I/O error'));
+
+            await expect(SQLiteProvider.getDatabaseSize()).resolves.toEqual({bytesUsed: -1, bytesRemaining: 12345});
+
+            executeAsyncSpy.mockRestore();
+        });
     });
 });

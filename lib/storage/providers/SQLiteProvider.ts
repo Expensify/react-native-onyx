@@ -325,16 +325,20 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             throw new Error('Store is not initialized!');
         }
 
-        return Promise.all([provider.store.executeAsync<PageSizeResult>('PRAGMA page_size;'), provider.store.executeAsync<PageCountResult>('PRAGMA page_count;'), getFreeDiskStorage()]).then(
-            ([pageSizeResult, pageCountResult, bytesRemaining]) => {
+        // The PRAGMAs need the SQLite connection; getFreeDiskStorage() is filesystem-level. Degrade
+        // bytesUsed to -1 instead of failing, so the free-disk bytes always get logged.
+        const bytesUsedPromise = Promise.all([provider.store.executeAsync<PageSizeResult>('PRAGMA page_size;'), provider.store.executeAsync<PageCountResult>('PRAGMA page_count;')])
+            .then(([pageSizeResult, pageCountResult]) => {
                 const pageSize = pageSizeResult.rows?.item(0)?.page_size ?? 0;
                 const pageCount = pageCountResult.rows?.item(0)?.page_count ?? 0;
-                return {
-                    bytesUsed: pageSize * pageCount,
-                    bytesRemaining,
-                };
-            },
-        );
+                return pageSize * pageCount;
+            })
+            .catch(() => -1);
+
+        return Promise.all([bytesUsedPromise, getFreeDiskStorage()]).then(([bytesUsed, bytesRemaining]) => ({
+            bytesUsed,
+            bytesRemaining,
+        }));
     },
 };
 

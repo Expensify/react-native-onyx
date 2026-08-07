@@ -18,6 +18,10 @@ function classifySQLiteError(error: unknown): ValueOf<typeof StorageErrorClass> 
         return StorageErrorClass.CAPACITY;
     }
 
+    if (message.includes('disk i/o error') || message.includes('unable to open database file')) {
+        return StorageErrorClass.DISK_PRESSURE;
+    }
+
     return StorageErrorClass.UNKNOWN;
 }
 

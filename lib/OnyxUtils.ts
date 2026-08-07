@@ -52,6 +52,16 @@ const METHOD = {
 // Max number of retries for failed storage operations
 const MAX_STORAGE_OPERATION_RETRY_ATTEMPTS = 5;
 
+/** Minimum interval between disk-pressure alerts. One disk-pressure burst fails every queued operation
+ * with the identical error, so per-operation logging would amplify the very storm it reports. */
+const DISK_PRESSURE_LOG_INTERVAL_MS = 60000;
+let lastDiskPressureLogTime = 0;
+
+/** Test-only: clears the disk-pressure log throttle so each test observes its own alert. */
+function resetDiskPressureLogThrottle(): void {
+    lastDiskPressureLogTime = 0;
+}
+
 type OnyxMethod = ValueOf<typeof METHOD>;
 
 // Key/value store of Onyx key and arrays of values to merge
@@ -783,6 +793,9 @@ function reportStorageQuota(error?: Error): Promise<void> {
  * - CAPACITY: evicts the least recently accessed evictable key and retries, under a session-level
  *   circuit breaker (see lib/StorageCircuitBreaker.ts) that halts the loop once eviction stops making
  *   progress or failures storm — the per-operation budget alone cannot stop a session-wide storm.
+ * - DISK_PRESSURE: the device disk itself is full (or the database files are unreadable), so neither
+ *   retries nor in-DB eviction can free space — the write is dropped (cache stays authoritative) with
+ *   a single throttled alert + quota snapshot per burst.
  * - UNKNOWN: the provider couldn't classify it — log the full error shape (name + message +
  *   provider) once so it's visible, then bounded retry without eviction.
  */
@@ -804,6 +817,19 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(
     if (errorClass === StorageErrorClass.CAPACITY && !StorageCircuitBreaker.isAllowed()) {
         StorageCircuitBreaker.recordProbeFailure();
         return Promise.resolve();
+    }
+
+    // DISK_PRESSURE: the device disk is full, so neither retries nor eviction can succeed until the OS
+    // frees space. Drop the write (cache stays authoritative) and log one alert + quota snapshot per
+    // interval — the snapshot's free-disk bytes let telemetry confirm (or rule out) disk pressure.
+    if (errorClass === StorageErrorClass.DISK_PRESSURE) {
+        const now = Date.now();
+        if (now - lastDiskPressureLogTime < DISK_PRESSURE_LOG_INTERVAL_MS) {
+            return Promise.resolve();
+        }
+        lastDiskPressureLogTime = now;
+        Logger.logAlert(`Disk-pressure storage error; skipping retries. provider: ${Storage.getStorageProvider().name}. message: ${error?.message}. onyxMethod: ${onyxMethod.name}.`);
+        return reportStorageQuota(error);
     }
 
     Logger.logInfo(
@@ -1816,6 +1842,7 @@ const OnyxUtils = {
     getCollectionDataAndSendAsObject,
     remove,
     reportStorageQuota,
+    resetDiskPressureLogThrottle,
     retryOperation,
     broadcastUpdate,
     hasPendingMergeForKey,
