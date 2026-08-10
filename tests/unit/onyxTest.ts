@@ -1554,8 +1554,6 @@ describe('Onyx', () => {
 
         await waitForPromisesToResolve();
 
-        // A keyless entry (e.g. a malformed server update) used to crash updateSnapshots with
-        // "can't access property 'startsWith', key is undefined" and reject the whole update.
         const keylessUpdate = {onyxMethod: Onyx.METHOD.MERGE, value: {name: 'Ghost'}} as unknown as OnyxUpdate<OnyxKey>;
 
         await expect(Onyx.update([keylessUpdate, {key: cat, value: finalValue, onyxMethod: Onyx.METHOD.MERGE}])).resolves.not.toThrow();
