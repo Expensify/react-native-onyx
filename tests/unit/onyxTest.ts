@@ -3071,6 +3071,32 @@ describe('Onyx', () => {
             expect(keys.has(routeB)).toBe(false);
         });
 
+        it('notifies member subscribers when a cached-only (RAM-only) member is removed via a batched set', async () => {
+            const ramKey = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}removal`;
+
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, {
+                [ramKey]: {name: 'RAM member'},
+            } as GenericCollection);
+
+            let received: unknown = 'sentinel';
+            connection = Onyx.connect({
+                key: ramKey,
+                callback: (value) => (received = value),
+            });
+            await waitForPromisesToResolve();
+            expect(received).toEqual({name: 'RAM member'});
+
+            // Two set updates on members of the same collection are batched into partialSetCollection,
+            // where the removed member exists only in cache (RAM-only keys are never persisted).
+            const ramKeyOther = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}other`;
+            await Onyx.update([
+                {onyxMethod: Onyx.METHOD.SET, key: ramKey, value: null},
+                {onyxMethod: Onyx.METHOD.SET, key: ramKeyOther, value: {name: 'other'}},
+            ]);
+
+            expect(received).toBeUndefined();
+        });
+
         it('multiSet deletes null keys via one batched removeItems call', async () => {
             await Onyx.multiSet({[ONYX_KEYS.OTHER_TEST]: 42});
 
