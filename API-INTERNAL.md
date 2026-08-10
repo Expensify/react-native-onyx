@@ -111,10 +111,11 @@ provider) once so it&#39;s visible, then bounded retry without eviction.</li>
 <dt><a href="#broadcastUpdate">broadcastUpdate()</a></dt>
 <dd><p>Notifies subscribers and writes current value to cache</p>
 </dd>
-<dt><a href="#prepareKeyValuePairsForStorage">prepareKeyValuePairsForStorage()</a> ⇒</dt>
+<dt><a href="#prepareKeyValuePairsForStorage">prepareKeyValuePairsForStorage()</a></dt>
 <dd><p>Storage expects array like: [[&quot;@MyApp_user&quot;, value_1], [&quot;@MyApp_key&quot;, value_2]]
 This method transforms an object like {&#39;@MyApp_user&#39;: myUserValue, &#39;@MyApp_key&#39;: myKeyValue}
-to an array of key-value pairs in the above format and removes key-value pairs that are being set to null</p>
+to an array of key-value pairs in the above format, and collects the keys of null values into
+<code>keysToRemove</code> for the caller to delete as one batch (cache drop + notification + batched storage removal).</p>
 </dd>
 <dt><a href="#mergeChanges">mergeChanges(changes, existingValue)</a></dt>
 <dd><p>Merges an array of changes with an existing value or creates a single change.</p>
@@ -376,13 +377,13 @@ Notifies subscribers and writes current value to cache
 **Kind**: global function  
 <a name="prepareKeyValuePairsForStorage"></a>
 
-## prepareKeyValuePairsForStorage() ⇒
+## prepareKeyValuePairsForStorage()
 Storage expects array like: [["@MyApp_user", value_1], ["@MyApp_key", value_2]]
 This method transforms an object like {'@MyApp_user': myUserValue, '@MyApp_key': myKeyValue}
-to an array of key-value pairs in the above format and removes key-value pairs that are being set to null
+to an array of key-value pairs in the above format, and collects the keys of null values into
+`keysToRemove` for the caller to delete as one batch (cache drop + notification + batched storage removal).
 
 **Kind**: global function  
-**Returns**: an array of key - value pairs <[key, value]>  
 <a name="mergeChanges"></a>
 
 ## mergeChanges(changes, existingValue)
