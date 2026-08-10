@@ -100,6 +100,10 @@ const InstanceSync = {
     init: (onStorageKeysChanged: OnStorageKeysChanged, store: StorageProvider<unknown>) => {
         storage = store;
 
+        // Coalesce storage events into one dispatch per tick: a per-key sender would otherwise re-run
+        // the whole notification pipeline once per key and can flood the receiving tab into unresponsiveness.
+        let pendingSyncKeys: Set<OnyxKey> | null = null;
+
         // This listener will only be triggered by events coming from other tabs
         global.addEventListener('storage', (event) => {
             // Ignore events that don't originate from the SYNC_ONYX logic
@@ -109,7 +113,19 @@ const InstanceSync = {
 
             const onyxKeys = parseSyncOnyxStorageEventValue(event.newValue);
 
-            storage.multiGet(onyxKeys).then((pairs) => onStorageKeysChanged(pairs));
+            if (pendingSyncKeys) {
+                for (const onyxKey of onyxKeys) {
+                    pendingSyncKeys.add(onyxKey);
+                }
+                return;
+            }
+
+            pendingSyncKeys = new Set(onyxKeys);
+            setTimeout(() => {
+                const keys = Array.from(pendingSyncKeys ?? []);
+                pendingSyncKeys = null;
+                storage.multiGet(keys).then((pairs) => onStorageKeysChanged(pairs));
+            }, 0);
         });
     },
     setItem: raiseStorageSyncEvent,

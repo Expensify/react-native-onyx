@@ -2981,6 +2981,111 @@ describe('Onyx', () => {
         });
     });
 
+    describe('batched collection member removals', () => {
+        const routeA = `${ONYX_KEYS.COLLECTION.ROUTES}A`;
+        const routeB = `${ONYX_KEYS.COLLECTION.ROUTES}B`;
+
+        it('mergeCollection deletes null members from cache and storage via one batched removeItems call', async () => {
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                [routeA]: {name: 'Route A'},
+                [routeB]: {name: 'Route B'},
+            } as GenericCollection);
+
+            (StorageMock.removeItem as jest.Mock).mockClear();
+            (StorageMock.removeItems as jest.Mock).mockClear();
+
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                [routeA]: null,
+                [routeB]: {name: 'Route B v2'},
+            } as GenericCollection);
+
+            // Per-key removals would raise one cross-tab sync event per member; the batch must persist in one call.
+            expect(StorageMock.removeItem).not.toHaveBeenCalled();
+            expect(StorageMock.removeItems).toHaveBeenCalledTimes(1);
+            expect(StorageMock.removeItems).toHaveBeenCalledWith([routeA]);
+
+            expect(cache.get(routeA)).toBeUndefined();
+            const keys = await OnyxUtils.getAllKeys();
+            expect(keys.has(routeA)).toBe(false);
+            expect(keys.has(routeB)).toBe(true);
+        });
+
+        it('mergeCollection notifies member subscribers about batched removals', async () => {
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                [routeA]: {name: 'Route A'},
+            } as GenericCollection);
+
+            let received: unknown = 'sentinel';
+            connection = Onyx.connect({
+                key: routeA,
+                callback: (value) => (received = value),
+            });
+            await waitForPromisesToResolve();
+            expect(received).toEqual({name: 'Route A'});
+
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                [routeA]: null,
+            } as GenericCollection);
+
+            expect(received).toBeUndefined();
+        });
+
+        it('mergeCollection skips removals of members that are neither cached nor persisted', async () => {
+            const routeMissing = `${ONYX_KEYS.COLLECTION.ROUTES}Missing`;
+
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                [routeA]: {name: 'Route A'},
+            } as GenericCollection);
+
+            (StorageMock.removeItem as jest.Mock).mockClear();
+            (StorageMock.removeItems as jest.Mock).mockClear();
+
+            // Nulling a member that was never stored must not raise any storage removal.
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                [routeMissing]: null,
+                [routeA]: {name: 'Route A v2'},
+            } as GenericCollection);
+
+            expect(StorageMock.removeItem).not.toHaveBeenCalled();
+            expect(StorageMock.removeItems).not.toHaveBeenCalled();
+        });
+
+        it('setCollection deletes missing members via one batched removeItems call', async () => {
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                [routeA]: {name: 'Route A'},
+                [routeB]: {name: 'Route B'},
+            } as GenericCollection);
+
+            (StorageMock.removeItem as jest.Mock).mockClear();
+            (StorageMock.removeItems as jest.Mock).mockClear();
+
+            await Onyx.setCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                [routeA]: {name: 'New Route A'},
+            } as GenericCollection);
+
+            expect(StorageMock.removeItem).not.toHaveBeenCalled();
+            expect(StorageMock.removeItems).toHaveBeenCalledTimes(1);
+            expect(StorageMock.removeItems).toHaveBeenCalledWith([routeB]);
+
+            const keys = await OnyxUtils.getAllKeys();
+            expect(keys.has(routeB)).toBe(false);
+        });
+
+        it('multiSet deletes null keys via one batched removeItems call', async () => {
+            await Onyx.multiSet({[ONYX_KEYS.OTHER_TEST]: 42});
+
+            (StorageMock.removeItem as jest.Mock).mockClear();
+            (StorageMock.removeItems as jest.Mock).mockClear();
+
+            await Onyx.multiSet({[ONYX_KEYS.OTHER_TEST]: null});
+
+            expect(StorageMock.removeItem).not.toHaveBeenCalled();
+            expect(StorageMock.removeItems).toHaveBeenCalledTimes(1);
+            expect(StorageMock.removeItems).toHaveBeenCalledWith([ONYX_KEYS.OTHER_TEST]);
+            expect(cache.get(ONYX_KEYS.OTHER_TEST)).toBeUndefined();
+        });
+    });
+
     describe('clear', () => {
         it('should handle RAM-only keys with defaults correctly during clear', async () => {
             // Set a value for RAM-only key
