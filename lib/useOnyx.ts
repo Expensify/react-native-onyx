@@ -108,6 +108,12 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
         if (!shouldGetCachedValueRef.current) {
             const cachedResult = onyxSnapshotCache.getCachedResult<UseOnyxResult<TReturnValue>>(key, cacheKey);
             if (cachedResult !== undefined) {
+                // The slot is shared by all subscribers of the same (key, selector) pair, so it can hold a content-equal
+                // result computed by another subscriber. Keep our own result then, otherwise we would needlessly change
+                // this hook's result identity and re-render its consumer.
+                if (cachedResult !== resultRef.current && memoizedShallowEqual(cachedResult[0], resultRef.current[0]) && cachedResult[1].status === resultRef.current[1].status) {
+                    return resultRef.current;
+                }
                 resultRef.current = cachedResult;
                 return cachedResult;
             }
