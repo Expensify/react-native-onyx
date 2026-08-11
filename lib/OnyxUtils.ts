@@ -1210,9 +1210,12 @@ function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, me
 
         let updatedData: Record<string, unknown> = {};
 
-        for (const {key, value} of data) {
+        for (const {key, value, onyxMethod} of data) {
             if (typeof key !== 'string') {
-                Logger.logInfo(`Invalid ${typeof key} key provided in Onyx update. Key must be of type string. Skipping snapshot update for this entry.`);
+                // clear/multiset entries legitimately carry no key; snapshots have nothing to update for them
+                if (onyxMethod !== METHOD.CLEAR && onyxMethod !== METHOD.MULTI_SET) {
+                    Logger.logInfo(`Invalid ${typeof key} key (method: ${onyxMethod}, key: ${String(key).slice(0, 50)}) provided in Onyx update. Skipping snapshot update for this entry.`);
+                }
                 continue;
             }
 
