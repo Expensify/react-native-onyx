@@ -1212,6 +1212,7 @@ function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, me
 
         for (const {key, value} of data) {
             if (typeof key !== 'string') {
+                Logger.logInfo(`Invalid ${typeof key} key provided in Onyx update. Key must be of type string. Skipping snapshot update for this entry.`);
                 continue;
             }
 
