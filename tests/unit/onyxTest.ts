@@ -3110,6 +3110,63 @@ describe('Onyx', () => {
             expect(StorageMock.removeItems).toHaveBeenCalledWith([ONYX_KEYS.OTHER_TEST]);
             expect(cache.get(ONYX_KEYS.OTHER_TEST)).toBeUndefined();
         });
+
+        it('multiSet skips removals of keys that are neither cached nor persisted', async () => {
+            const routeMissing = `${ONYX_KEYS.COLLECTION.ROUTES}Missing`;
+            await Onyx.multiSet({[ONYX_KEYS.OTHER_TEST]: 42});
+
+            (StorageMock.removeItem as jest.Mock).mockClear();
+            (StorageMock.removeItems as jest.Mock).mockClear();
+
+            // Nulling a key that was never stored must not raise any storage removal.
+            await Onyx.multiSet({[routeMissing]: null, [ONYX_KEYS.OTHER_TEST]: 43});
+
+            expect(StorageMock.removeItem).not.toHaveBeenCalled();
+            expect(StorageMock.removeItems).not.toHaveBeenCalled();
+        });
+
+        it('mergeCollection removal does not wipe out a concurrent write issued during the pre-warm read', async () => {
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                [routeA]: {a: 1},
+                [routeB]: {b: 1},
+            } as GenericCollection);
+
+            // Evict both members' values (their keys stay indexed) so the merge below takes the slow
+            // pre-warm path and awaits a real storage read before applying.
+            cache.set(routeA, undefined);
+            cache.set(routeB, undefined);
+
+            const removal = Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                [routeA]: null,
+                [routeB]: {b: 2},
+            } as GenericCollection);
+            const concurrent = Onyx.merge(routeA, {y: 2});
+            await Promise.all([removal, concurrent]);
+
+            // The merge was issued after the removal, so it must win in both cache and storage.
+            expect(cache.get(routeA)).toEqual(expect.objectContaining({y: 2}));
+            const persisted = await StorageMock.getItem(routeA);
+            expect(persisted).toEqual(expect.objectContaining({y: 2}));
+        });
+
+        it('does not re-run the whole write when only the batched removal fails', async () => {
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                [routeA]: {name: 'Route A'},
+                [routeB]: {name: 'Route B'},
+            } as GenericCollection);
+
+            (StorageMock.multiSet as jest.Mock).mockClear();
+            (StorageMock.removeItems as jest.Mock).mockImplementationOnce(() => Promise.reject(new Error('storage removal failed')));
+
+            // routeB is missing from the new collection, so its removal is attempted and fails.
+            await Onyx.setCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                [routeA]: {name: 'New Route A'},
+            } as GenericCollection);
+
+            // The failed removal must not trigger a retry of the (already successful) multiSet.
+            expect(StorageMock.multiSet).toHaveBeenCalledTimes(1);
+            expect(cache.get(routeB)).toBeUndefined();
+        });
     });
 
     describe('clear', () => {

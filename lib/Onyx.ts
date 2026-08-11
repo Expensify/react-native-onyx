@@ -324,7 +324,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
  * @param collection Object collection keyed by individual collection member keys and values
  */
 function mergeCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey>): Promise<void> {
-    return OnyxUtils.afterInit(() => OnyxUtils.mergeCollectionWithPatches({collectionKey, collection, isProcessingCollectionUpdate: true}));
+    return OnyxUtils.afterInit(() => OnyxUtils.mergeCollectionWithPatches({collectionKey, collection}));
 }
 
 /**
@@ -565,7 +565,6 @@ function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<vo
                         collectionKey,
                         collection: batchedCollectionUpdates.merge as OnyxMergeCollectionInput<OnyxKey>,
                         mergeReplaceNullPatches: batchedCollectionUpdates.mergeReplaceNullPatches,
-                        isProcessingCollectionUpdate: true,
                     }),
                 );
             }

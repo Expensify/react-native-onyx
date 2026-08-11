@@ -525,7 +525,6 @@ that this internal function allows passing an additional `mergeReplaceNullPatche
 | params.collectionKey | e.g. `ONYXKEYS.COLLECTION.REPORT` |
 | params.collection | Object collection keyed by individual collection member keys and values |
 | params.mergeReplaceNullPatches | Record where the key is a collection member key and the value is a list of tuples that we'll use to replace the nested objects of that collection member record with something else. |
-| params.isProcessingCollectionUpdate | whether this is part of a collection update operation. |
 | retryAttempt | retry attempt |
 
 <a name="partialSetCollection"></a>
