@@ -77,6 +77,7 @@ class OnyxCache {
             'set',
             'drop',
             'merge',
+            'hydrate',
             'hasPendingTask',
             'getTaskPromise',
             'captureTask',
@@ -197,6 +198,73 @@ class OnyxCache {
 
         this.storageKeys.delete(key);
         OnyxKeys.deregisterMemberKey(key);
+    }
+
+    /**
+     * Bulk-loads values into a cache that's expected to be empty, skipping merge()'s per-key clone when
+     * safe. Falls back to a real merge for any key that already has a value, in case the cache wasn't
+     * empty after all. Used only by `Onyx.init()`.
+     * @param data - a map of (cache) key - values
+     */
+    hydrate(data: Record<OnyxKey, OnyxValue<OnyxKey>>): void {
+        if (typeof data !== 'object' || Array.isArray(data)) {
+            throw new Error('data passed to cache.hydrate() must be an Object of onyx key/value pairs');
+        }
+
+        const affectedCollections = new Set<OnyxKey>();
+
+        // eslint-disable-next-line no-restricted-syntax, guard-for-in
+        for (const key in data) {
+            if (!Object.hasOwn(data, key)) {
+                continue;
+            }
+
+            const value = data[key];
+            this.addKey(key);
+
+            if (value === undefined) {
+                this.addNullishStorageKey(key);
+                continue;
+            }
+
+            const collectionKey = OnyxKeys.getCollectionKey(key);
+
+            if (value === null) {
+                this.addNullishStorageKey(key);
+                delete this.storageMap[key];
+
+                if (collectionKey) {
+                    affectedCollections.add(collectionKey);
+                }
+            } else {
+                this.nullishStorageKeys.delete(key);
+
+                const existing = this.storageMap[key];
+
+                if (existing !== undefined) {
+                    // Key already has a value, so the empty-cache assumption doesn't hold here - merge instead of clobbering.
+                    this.storageMap[key] = utils.fastMerge(existing, value, {
+                        shouldRemoveNestedNulls: true,
+                        objectRemovalMode: 'replace',
+                    }).result;
+                } else if (utils.needsNormalization(value)) {
+                    this.storageMap[key] = utils.fastMerge(undefined, value, {
+                        shouldRemoveNestedNulls: true,
+                        objectRemovalMode: 'replace',
+                    }).result;
+                } else {
+                    this.storageMap[key] = value;
+                }
+
+                if (collectionKey) {
+                    affectedCollections.add(collectionKey);
+                }
+            }
+        }
+
+        for (const collectionKey of affectedCollections) {
+            this.dirtyCollections.add(collectionKey);
+        }
     }
 
     /**
