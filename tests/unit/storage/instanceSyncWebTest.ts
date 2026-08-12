@@ -109,6 +109,34 @@ describe('InstanceSync (web)', () => {
             expect(multiGet).toHaveBeenCalledWith(['123']);
         });
 
+        it('coalesces a burst of storage events into one multiGet and one dispatch', async () => {
+            // A tab running an older bundle emits one event per key; the burst must collapse into one batch.
+            storageEventHandler({key: SYNC_ONYX, newValue: 'test_1'});
+            storageEventHandler({key: SYNC_ONYX, newValue: JSON.stringify(['test_2', 'test_3'])});
+            storageEventHandler({key: SYNC_ONYX, newValue: 'test_2'});
+            await waitForPromisesToResolve();
+
+            expect(multiGet).toHaveBeenCalledTimes(1);
+            expect(multiGet).toHaveBeenCalledWith(['test_1', 'test_2', 'test_3']);
+            expect(onStorageKeysChanged).toHaveBeenCalledTimes(1);
+            expect(onStorageKeysChanged).toHaveBeenCalledWith([
+                ['test_1', 'value_of_test_1'],
+                ['test_2', 'value_of_test_2'],
+                ['test_3', 'value_of_test_3'],
+            ]);
+        });
+
+        it('dispatches separate batches for separate bursts', async () => {
+            storageEventHandler({key: SYNC_ONYX, newValue: 'test_1'});
+            await waitForPromisesToResolve();
+            storageEventHandler({key: SYNC_ONYX, newValue: 'test_2'});
+            await waitForPromisesToResolve();
+
+            expect(multiGet).toHaveBeenCalledTimes(2);
+            expect(multiGet).toHaveBeenNthCalledWith(1, ['test_1']);
+            expect(multiGet).toHaveBeenNthCalledWith(2, ['test_2']);
+        });
+
         it('ignores storage events that are not SYNC_ONYX', async () => {
             storageEventHandler({key: 'someOtherKey', newValue: 'test_1'});
             storageEventHandler({key: SYNC_ONYX, newValue: null});
