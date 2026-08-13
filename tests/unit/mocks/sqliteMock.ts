@@ -7,13 +7,13 @@
  *   - open({name})
  *   - connection.execute(sql)
  *   - connection.executeAsync<T>(sql, params?)
- *   - connection.executeBatchAsync([{query, params}])
+ *   - connection.executeBatchAsync([{query, params}, ...])
  *
  * Result rows are shaped to match Nitro: `{rows: {_array, item, length}}`.
  */
 import BetterSqlite3 from 'better-sqlite3';
 import type {Database} from 'better-sqlite3';
-import type {NitroSQLiteConnection, NitroSQLiteQueryResultRows, QueryResult, QueryResultRow, SQLiteQueryParams} from 'react-native-nitro-sqlite';
+import type {BatchQueryCommand, NitroSQLiteConnection, NitroSQLiteQueryResultRows, QueryResult, QueryResultRow, SQLiteQueryParams} from 'react-native-nitro-sqlite';
 
 // `better-sqlite3` is declared as `export = Database` (CommonJS), so the type is
 // derived from the default import's namespace rather than via a named type import.
@@ -54,7 +54,7 @@ function wrapRows<TRow extends QueryResultRow>(rowsArray: TRow[]): NitroSQLiteQu
     };
 }
 
-function prepareAndBind(database: Database, sql: string, parameters?: SQLiteQueryParams) {
+function prepareAndBind(database: Database, sql: BatchQueryCommand['query'], parameters?: BatchQueryCommand['params']) {
     const namedOrder = extractNamedParameterOrder(sql);
     if (namedOrder) {
         // Map positional parameters array to named bindings object — NitroSQLite's
@@ -69,6 +69,35 @@ function prepareAndBind(database: Database, sql: string, parameters?: SQLiteQuer
         return {statement, boundArguments: [bindings] as const};
     }
     return {statement: database.prepare(sql), boundArguments: parameters ?? []};
+}
+
+/**
+ * Expands batch commands the same way NitroSQLite does in `batchParamsToCommands`:
+ * `params` is either one binding set for the query, or an array of binding sets
+ * (same query executed once per row).
+ */
+function batchParamsToCommands(commands: BatchQueryCommand[]): BatchQueryCommand[] {
+    const expanded: BatchQueryCommand[] = [];
+
+    for (const command of commands) {
+        const {query, params} = command;
+
+        if (!params) {
+            expanded.push({query});
+            continue;
+        }
+
+        if (Array.isArray(params[0])) {
+            for (const rowParams of params as SQLiteQueryParams[]) {
+                expanded.push({query, params: rowParams});
+            }
+            continue;
+        }
+
+        expanded.push({query, params: params as SQLiteQueryParams});
+    }
+
+    return expanded;
 }
 
 function runOne<TRow extends QueryResultRow>(database: Database, sql: string, parameters?: SQLiteQueryParams): QueryResult<TRow> {
@@ -120,29 +149,13 @@ function makeConnection(name: string): Pick<NitroSQLiteConnection, 'execute' | '
         executeBatchAsync(commands) {
             try {
                 let total = 0;
+                const expandedCommands = batchParamsToCommands(commands);
+
                 connection.transaction(() => {
-                    for (const command of commands) {
-                        const namedOrder = extractNamedParameterOrder(command.query);
-                        const statement = connection.prepare(command.query);
-                        const parameterRows = (command.params ?? []) as SQLiteQueryParams[];
-                        if (parameterRows.length === 0) {
-                            const info = statement.run();
-                            total += info.changes;
-                            continue;
-                        }
-                        for (const row of parameterRows) {
-                            if (namedOrder) {
-                                const bindings: Record<string, unknown> = {};
-                                for (let index = 0; index < namedOrder.length; index++) {
-                                    bindings[namedOrder[index]] = row[index];
-                                }
-                                const info = statement.run(bindings);
-                                total += info.changes;
-                            } else {
-                                const info = statement.run(...row);
-                                total += info.changes;
-                            }
-                        }
+                    for (const command of expandedCommands) {
+                        const {statement, boundArguments} = prepareAndBind(connection, command.query, command.params);
+                        const info = statement.run(...(boundArguments as unknown[]));
+                        total += info.changes;
                     }
                 })();
                 return Promise.resolve({rowsAffected: total});

@@ -342,7 +342,6 @@ type MergeCollectionWithPatchesParams<TKey extends CollectionKeyBase> = {
     collectionKey: TKey;
     collection: OnyxMergeCollectionInput<TKey>;
     mergeReplaceNullPatches?: MultiMergeReplaceNullPatches;
-    isProcessingCollectionUpdate?: boolean;
 };
 
 type RetriableOnyxOperation =

@@ -14,6 +14,13 @@ function classifyIDBError(error: unknown): ValueOf<typeof StorageErrorClass> {
         return StorageErrorClass.INVALID_DATA;
     }
 
+    // A queued File/Blob whose backing bytes are gone — the source OS file was modified, deleted, or
+    // renamed after being picked, so the structured clone fails at write time. Chromium reports it as
+    // InvalidBlob (Windows) or IOError (macOS). Retrying re-reads the same dead blob and can never succeed.
+    if (message.includes('failed to write blobs')) {
+        return StorageErrorClass.INVALID_DATA;
+    }
+
     // Browser quota exceeded.
     if (name.includes('quotaexceedederror') || message.includes('quotaexceedederror')) {
         return StorageErrorClass.CAPACITY;

@@ -1,17 +1,20 @@
+import {act} from '@testing-library/react-native';
+
 import lodashClone from 'lodash/clone';
 import lodashCloneDeep from 'lodash/cloneDeep';
-import {act} from '@testing-library/react-native';
-import Onyx from '../../lib';
-import * as Logger from '../../lib/Logger';
-import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
-import OnyxUtils from '../../lib/OnyxUtils';
+
 import type OnyxCache from '../../lib/OnyxCache';
-import StorageMock from '../../lib/storage';
+import type {Connection} from '../../lib/OnyxConnectionManager';
 import type {OnyxCollection, OnyxKey, OnyxUpdate} from '../../lib/types';
 import type {GenericDeepRecord} from '../types';
 import type GenericCollection from '../utils/GenericCollection';
-import type {Connection} from '../../lib/OnyxConnectionManager';
+
+import Onyx from '../../lib';
 import createDeferredTask from '../../lib/createDeferredTask';
+import * as Logger from '../../lib/Logger';
+import OnyxUtils from '../../lib/OnyxUtils';
+import StorageMock from '../../lib/storage';
+import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 const ONYX_KEYS = {
     TEST_KEY: 'test',
@@ -2627,6 +2630,45 @@ describe('Onyx', () => {
             expect(cache.get(collectionMemberKey)).toEqual({data: 'test'});
             expect(await StorageMock.getItem(collectionMemberKey)).toBeNull();
         });
+
+        describe('concurrency with Onyx.update', () => {
+            afterEach(() => {
+                jest.restoreAllMocks();
+            });
+
+            it('should apply the delta on top of an Onyx.update that landed after get() is resolved', async () => {
+                const member1 = `${ONYX_KEYS.COLLECTION.TEST_KEY}1`;
+                const member2 = `${ONYX_KEYS.COLLECTION.TEST_KEY}2`;
+
+                await Onyx.merge(member1, {itemA: {pendingAction: 'add'}, itemB: {name: 'b'}});
+                await Onyx.merge(member2, {itemC: {name: 'c'}});
+                await waitForPromisesToResolve();
+
+                const staleValue = lodashCloneDeep(cache.get(member1));
+
+                // Park merge()'s read so the update below is guaranteed to land first.
+                const deferredGet = createDeferredTask();
+                const originalGet = OnyxUtils.get;
+                jest.spyOn(OnyxUtils, 'get').mockImplementation(((key: OnyxKey) =>
+                    key === member1 ? deferredGet.promise.then(() => staleValue) : originalGet(key)) as typeof OnyxUtils.get);
+
+                const mergePromise = Onyx.merge(member1, {itemA: {childID: '1'}});
+
+                // Two keys of the same collection, so this goes through mergeCollectionWithPatches.
+                await Onyx.update([
+                    {onyxMethod: Onyx.METHOD.MERGE, key: member1, value: {itemA: {pendingAction: null}, itemB: null}},
+                    {onyxMethod: Onyx.METHOD.MERGE, key: member2, value: {itemC: {touched: true}}},
+                ]);
+                await waitForPromisesToResolve();
+
+                deferredGet.resolve();
+                await mergePromise;
+                await waitForPromisesToResolve();
+
+                expect(cache.get(member1)).toEqual({itemA: {childID: '1'}});
+                expect(await StorageMock.getItem(member1)).toEqual({itemA: {childID: '1'}});
+            });
+        });
     });
 
     describe('set', () => {
@@ -2934,6 +2976,194 @@ describe('Onyx', () => {
             expect(mockMergeQueue[testKey]).toBeUndefined();
 
             jest.restoreAllMocks();
+        });
+    });
+
+    describe('batched collection member removals', () => {
+        const routeA = `${ONYX_KEYS.COLLECTION.ROUTES}A`;
+        const routeB = `${ONYX_KEYS.COLLECTION.ROUTES}B`;
+
+        it('mergeCollection deletes null members from cache and storage via one batched removeItems call', async () => {
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                [routeA]: {name: 'Route A'},
+                [routeB]: {name: 'Route B'},
+            } as GenericCollection);
+
+            (StorageMock.removeItem as jest.Mock).mockClear();
+            (StorageMock.removeItems as jest.Mock).mockClear();
+
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                [routeA]: null,
+                [routeB]: {name: 'Route B v2'},
+            } as GenericCollection);
+
+            // Per-key removals would raise one cross-tab sync event per member; the batch must persist in one call.
+            expect(StorageMock.removeItem).not.toHaveBeenCalled();
+            expect(StorageMock.removeItems).toHaveBeenCalledTimes(1);
+            expect(StorageMock.removeItems).toHaveBeenCalledWith([routeA]);
+
+            expect(cache.get(routeA)).toBeUndefined();
+            const keys = await OnyxUtils.getAllKeys();
+            expect(keys.has(routeA)).toBe(false);
+            expect(keys.has(routeB)).toBe(true);
+        });
+
+        it('mergeCollection notifies member subscribers about batched removals', async () => {
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                [routeA]: {name: 'Route A'},
+            } as GenericCollection);
+
+            let received: unknown = 'sentinel';
+            connection = Onyx.connect({
+                key: routeA,
+                callback: (value) => (received = value),
+            });
+            await waitForPromisesToResolve();
+            expect(received).toEqual({name: 'Route A'});
+
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                [routeA]: null,
+            } as GenericCollection);
+
+            expect(received).toBeUndefined();
+        });
+
+        it('mergeCollection skips removals of members that are neither cached nor persisted', async () => {
+            const routeMissing = `${ONYX_KEYS.COLLECTION.ROUTES}Missing`;
+
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                [routeA]: {name: 'Route A'},
+            } as GenericCollection);
+
+            (StorageMock.removeItem as jest.Mock).mockClear();
+            (StorageMock.removeItems as jest.Mock).mockClear();
+
+            // Nulling a member that was never stored must not raise any storage removal.
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                [routeMissing]: null,
+                [routeA]: {name: 'Route A v2'},
+            } as GenericCollection);
+
+            expect(StorageMock.removeItem).not.toHaveBeenCalled();
+            expect(StorageMock.removeItems).not.toHaveBeenCalled();
+        });
+
+        it('setCollection deletes missing members via one batched removeItems call', async () => {
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                [routeA]: {name: 'Route A'},
+                [routeB]: {name: 'Route B'},
+            } as GenericCollection);
+
+            (StorageMock.removeItem as jest.Mock).mockClear();
+            (StorageMock.removeItems as jest.Mock).mockClear();
+
+            await Onyx.setCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                [routeA]: {name: 'New Route A'},
+            } as GenericCollection);
+
+            expect(StorageMock.removeItem).not.toHaveBeenCalled();
+            expect(StorageMock.removeItems).toHaveBeenCalledTimes(1);
+            expect(StorageMock.removeItems).toHaveBeenCalledWith([routeB]);
+
+            const keys = await OnyxUtils.getAllKeys();
+            expect(keys.has(routeB)).toBe(false);
+        });
+
+        it('notifies member subscribers when a cached-only (RAM-only) member is removed via a batched set', async () => {
+            const ramKey = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}removal`;
+
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION, {
+                [ramKey]: {name: 'RAM member'},
+            } as GenericCollection);
+
+            let received: unknown = 'sentinel';
+            connection = Onyx.connect({
+                key: ramKey,
+                callback: (value) => (received = value),
+            });
+            await waitForPromisesToResolve();
+            expect(received).toEqual({name: 'RAM member'});
+
+            // Two set updates on members of the same collection are batched into partialSetCollection,
+            // where the removed member exists only in cache (RAM-only keys are never persisted).
+            const ramKeyOther = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}other`;
+            await Onyx.update([
+                {onyxMethod: Onyx.METHOD.SET, key: ramKey, value: null},
+                {onyxMethod: Onyx.METHOD.SET, key: ramKeyOther, value: {name: 'other'}},
+            ]);
+
+            expect(received).toBeUndefined();
+        });
+
+        it('multiSet deletes null keys via one batched removeItems call', async () => {
+            await Onyx.multiSet({[ONYX_KEYS.OTHER_TEST]: 42});
+
+            (StorageMock.removeItem as jest.Mock).mockClear();
+            (StorageMock.removeItems as jest.Mock).mockClear();
+
+            await Onyx.multiSet({[ONYX_KEYS.OTHER_TEST]: null});
+
+            expect(StorageMock.removeItem).not.toHaveBeenCalled();
+            expect(StorageMock.removeItems).toHaveBeenCalledTimes(1);
+            expect(StorageMock.removeItems).toHaveBeenCalledWith([ONYX_KEYS.OTHER_TEST]);
+            expect(cache.get(ONYX_KEYS.OTHER_TEST)).toBeUndefined();
+        });
+
+        it('multiSet skips removals of keys that are neither cached nor persisted', async () => {
+            const routeMissing = `${ONYX_KEYS.COLLECTION.ROUTES}Missing`;
+            await Onyx.multiSet({[ONYX_KEYS.OTHER_TEST]: 42});
+
+            (StorageMock.removeItem as jest.Mock).mockClear();
+            (StorageMock.removeItems as jest.Mock).mockClear();
+
+            // Nulling a key that was never stored must not raise any storage removal.
+            await Onyx.multiSet({[routeMissing]: null, [ONYX_KEYS.OTHER_TEST]: 43});
+
+            expect(StorageMock.removeItem).not.toHaveBeenCalled();
+            expect(StorageMock.removeItems).not.toHaveBeenCalled();
+        });
+
+        it('mergeCollection removal does not wipe out a concurrent write issued during the pre-warm read', async () => {
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                [routeA]: {a: 1},
+                [routeB]: {b: 1},
+            } as GenericCollection);
+
+            // Evict both members' values (their keys stay indexed) so the merge below takes the slow
+            // pre-warm path and awaits a real storage read before applying.
+            cache.set(routeA, undefined);
+            cache.set(routeB, undefined);
+
+            const removal = Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                [routeA]: null,
+                [routeB]: {b: 2},
+            } as GenericCollection);
+            const concurrent = Onyx.merge(routeA, {y: 2});
+            await Promise.all([removal, concurrent]);
+
+            // The merge was issued after the removal, so it must win in both cache and storage.
+            expect(cache.get(routeA)).toEqual(expect.objectContaining({y: 2}));
+            const persisted = await StorageMock.getItem(routeA);
+            expect(persisted).toEqual(expect.objectContaining({y: 2}));
+        });
+
+        it('does not re-run the whole write when only the batched removal fails', async () => {
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                [routeA]: {name: 'Route A'},
+                [routeB]: {name: 'Route B'},
+            } as GenericCollection);
+
+            (StorageMock.multiSet as jest.Mock).mockClear();
+            (StorageMock.removeItems as jest.Mock).mockImplementationOnce(() => Promise.reject(new Error('storage removal failed')));
+
+            // routeB is missing from the new collection, so its removal is attempted and fails.
+            await Onyx.setCollection(ONYX_KEYS.COLLECTION.ROUTES, {
+                [routeA]: {name: 'New Route A'},
+            } as GenericCollection);
+
+            // The failed removal must not trigger a retry of the (already successful) multiSet.
+            expect(StorageMock.multiSet).toHaveBeenCalledTimes(1);
+            expect(cache.get(routeB)).toBeUndefined();
         });
     });
 
@@ -3270,7 +3500,7 @@ describe('RAM-only keys should not read from storage', () => {
         await act(async () => waitForPromisesToResolve());
 
         // Simulate another tab syncing a stale RAM-only key value
-        syncCallback(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'synced_stale_value');
+        syncCallback([[ONYX_KEYS.RAM_ONLY_TEST_KEY, 'synced_stale_value']]);
         await act(async () => waitForPromisesToResolve());
 
         // The RAM-only key should NOT have been updated from the sync
@@ -3287,13 +3517,148 @@ describe('RAM-only keys should not read from storage', () => {
         });
         await act(async () => waitForPromisesToResolve());
 
-        syncCallback(ONYX_KEYS.OTHER_TEST, 'synced_normal_value');
+        syncCallback([[ONYX_KEYS.OTHER_TEST, 'synced_normal_value']]);
         await act(async () => waitForPromisesToResolve());
 
         expect(normalValue).toEqual('synced_normal_value');
 
         Onyx.disconnect(connection);
         Onyx.disconnect(connection2);
+    });
+
+    it('should notify collection-root and collection member subscribers when a collection member syncs from another instance', async () => {
+        Onyx.init({
+            keys: ONYX_KEYS,
+            shouldSyncMultipleInstances: true,
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls.at(-1)?.[0];
+        expect(syncCallback).toBeDefined();
+
+        await Onyx.setCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {name: 'entry 1'},
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {name: 'entry 2'},
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}3`]: {name: 'entry 3'},
+        } as GenericCollection);
+
+        let collection: GenericCollection = {};
+        const collectionConn = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            callback: (value) => {
+                collection = value as GenericCollection;
+            },
+        });
+
+        let collectionMember2: unknown;
+        const collectionMember2Conn = Onyx.connect({
+            key: `${ONYX_KEYS.COLLECTION.TEST_KEY}2`,
+            callback: (value) => {
+                collectionMember2 = value;
+            },
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        // Another tab writes a collection member; the storage-sync batch must notify the collection-root subscriber.
+        syncCallback([[`${ONYX_KEYS.COLLECTION.TEST_KEY}2`, {name: 'entry 2 changed'}]]);
+        await act(async () => waitForPromisesToResolve());
+
+        // The collection-root subscriber must receive the whole collection including the synced member.
+        expect(Object.keys(collection).length).toBe(3);
+        expect(collection[`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]).toEqual({name: 'entry 2 changed'});
+
+        // The collection member subscriber must receive the synced data.
+        expect(collectionMember2).toEqual({name: 'entry 2 changed'});
+
+        Onyx.disconnect(collectionConn);
+        Onyx.disconnect(collectionMember2Conn);
+    });
+
+    it('should notify a collection-root subscriber once when multiple members sync from another instance', async () => {
+        Onyx.init({
+            keys: ONYX_KEYS,
+            shouldSyncMultipleInstances: true,
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls.at(-1)?.[0];
+        expect(syncCallback).toBeDefined();
+
+        await Onyx.setCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {name: 'entry 1'},
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {name: 'entry 2'},
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}3`]: {name: 'entry 3'},
+        } as GenericCollection);
+
+        const collectionCallback = jest.fn();
+        const connection = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            callback: collectionCallback,
+        });
+        await act(async () => waitForPromisesToResolve());
+        collectionCallback.mockClear();
+
+        // Another tab writes two members; storage sync delivers them as one batch.
+        syncCallback([
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`, {name: 'entry 1 changed'}],
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}3`, {name: 'entry 3 changed'}],
+        ]);
+        await waitForPromisesToResolve();
+
+        // The batch produces a single collection-root notification carrying all members.
+        expect(collectionCallback).toHaveBeenCalledTimes(1);
+        const collection = collectionCallback.mock.calls[0][0] as Record<string, unknown>;
+        expect(collection[`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]).toEqual({name: 'entry 1 changed'});
+        expect(collection[`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]).toEqual({name: 'entry 2'});
+        expect(collection[`${ONYX_KEYS.COLLECTION.TEST_KEY}3`]).toEqual({name: 'entry 3 changed'});
+
+        Onyx.disconnect(connection);
+    });
+
+    it('should notify subscribers with undefined when a collection member is removed in another instance', async () => {
+        Onyx.init({
+            keys: ONYX_KEYS,
+            shouldSyncMultipleInstances: true,
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls.at(-1)?.[0];
+        expect(syncCallback).toBeDefined();
+
+        await Onyx.setCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {name: 'entry 1'},
+            [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {name: 'entry 2'},
+        } as GenericCollection);
+
+        let collection: GenericCollection = {};
+        const collectionConn = Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.TEST_KEY,
+            callback: (value) => {
+                collection = value as GenericCollection;
+            },
+        });
+
+        let collectionMember2: unknown = 'initial';
+        const collectionMember2Conn = Onyx.connect({
+            key: `${ONYX_KEYS.COLLECTION.TEST_KEY}2`,
+            callback: (value) => {
+                collectionMember2 = value;
+            },
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        // Another tab removes member 2; the removed key reads back as undefined from storage.
+        syncCallback([[`${ONYX_KEYS.COLLECTION.TEST_KEY}2`, undefined]]);
+        await act(async () => waitForPromisesToResolve());
+
+        // The member subscriber must be told the member is gone.
+        expect(collectionMember2).toBeUndefined();
+
+        // The collection-root subscriber must receive the collection without the removed member.
+        expect(collection).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {name: 'entry 1'}});
+
+        Onyx.disconnect(collectionConn);
+        Onyx.disconnect(collectionMember2Conn);
     });
 
     it('should serve RAM-only keys from cache and normal keys from storage in multiGet', async () => {
@@ -3358,6 +3723,12 @@ describe('RAM-only keys should not read from storage', () => {
 describe('get() should prefer cache over stale storage', () => {
     let cache: typeof OnyxCache;
 
+    // StorageMock.getItem is a plain jest.fn(), not a spy, so jest.restoreAllMocks() will not undo a
+    // mockImplementation() set on it. Capture the default now and put it back after each test, otherwise the
+    // override below leaks into every suite that runs afterwards.
+    const getItemMock = StorageMock.getItem as jest.Mock;
+    const defaultGetItem = getItemMock.getMockImplementation() as (key: OnyxKey) => Promise<unknown>;
+
     beforeEach(() => {
         Object.assign(OnyxUtils.getDeferredInitTask(), createDeferredTask());
         cache = require('../../lib/OnyxCache').default;
@@ -3365,6 +3736,7 @@ describe('get() should prefer cache over stale storage', () => {
     });
 
     afterEach(() => {
+        getItemMock.mockImplementation(defaultGetItem);
         jest.restoreAllMocks();
         return Onyx.clear();
     });
@@ -3374,15 +3746,13 @@ describe('get() should prefer cache over stale storage', () => {
         const member2 = `${ONYX_KEYS.COLLECTION.TEST_KEY}2`;
 
         // Delay getItem for member1 to simulate slow Native storage (returns null before the write lands)
-        const getItemMock = StorageMock.getItem as jest.Mock;
-        const originalGetItem = getItemMock.getMockImplementation()!;
         getItemMock.mockImplementation((key: OnyxKey) => {
             if (key === member1) {
                 return new Promise<undefined>((resolve) => {
                     setTimeout(() => resolve(undefined), 50);
                 });
             }
-            return originalGetItem(key);
+            return defaultGetItem(key);
         });
 
         // 2+ collection keys get batched into mergeCollectionWithPatches (deferred cache write)
