@@ -2,6 +2,7 @@ import {deepEqual} from 'fast-equals';
 import bindAll from 'lodash/bindAll';
 import type {ValueOf} from 'type-fest';
 import utils from './utils';
+import type {FastMergeOptions} from './utils';
 import type {CollectionKeyBase, KeyValueMapping, NonUndefined, OnyxCollection, OnyxKey, OnyxValue} from './types';
 import OnyxKeys from './OnyxKeys';
 
@@ -14,6 +15,16 @@ type CollectionSnapshot = Readonly<NonUndefined<OnyxCollection<KeyValueMapping[O
  * which relies on === equality to detect changes.
  */
 const FROZEN_EMPTY_COLLECTION: Readonly<NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>>> = Object.freeze({});
+
+/**
+ * Merge options shared by every cache write path (`merge()` and `hydrate()`'s fallback), so the
+ * three call sites can't drift apart. Cached values must never hold nested nulls, and a source
+ * object carrying the replace mark must replace the target object rather than merge into it.
+ */
+const CACHE_MERGE_OPTIONS: FastMergeOptions = {
+    shouldRemoveNestedNulls: true,
+    objectRemovalMode: 'replace',
+};
 
 // Task constants
 const TASK = {
@@ -242,16 +253,21 @@ class OnyxCache {
                 const existing = this.storageMap[key];
 
                 if (existing !== undefined) {
-                    // Key already has a value, so the empty-cache assumption doesn't hold here - merge instead of clobbering.
-                    this.storageMap[key] = utils.fastMerge(existing, value, {
-                        shouldRemoveNestedNulls: true,
-                        objectRemovalMode: 'replace',
-                    }).result;
+                    // Key already has a value, so the empty-cache assumption doesn't hold here (e.g. a write
+                    // landed while storage was still being read). Fall back to a real merge, which has exactly
+                    // the same semantics as the old `cache.merge(allDataFromStorage)` init path: the value
+                    // loaded from disk is the merge source, so it wins on any overlapping leaf key.
+                    const merged = utils.fastMerge(existing, value, CACHE_MERGE_OPTIONS).result;
+
+                    // fastMerge is reference-stable: returns the original target when nothing changed, so a
+                    // simple === check detects no-ops and avoids dirtying the collection for nothing.
+                    if (merged === existing) {
+                        continue;
+                    }
+
+                    this.storageMap[key] = merged;
                 } else if (utils.needsNormalization(value)) {
-                    this.storageMap[key] = utils.fastMerge(undefined, value, {
-                        shouldRemoveNestedNulls: true,
-                        objectRemovalMode: 'replace',
-                    }).result;
+                    this.storageMap[key] = utils.fastMerge(undefined, value, CACHE_MERGE_OPTIONS).result;
                 } else {
                     this.storageMap[key] = value;
                 }
@@ -301,10 +317,7 @@ class OnyxCache {
 
                 // Per-key merge instead of spreading the entire storageMap
                 const existing = this.storageMap[key];
-                const merged = utils.fastMerge(existing, value, {
-                    shouldRemoveNestedNulls: true,
-                    objectRemovalMode: 'replace',
-                }).result;
+                const merged = utils.fastMerge(existing, value, CACHE_MERGE_OPTIONS).result;
 
                 // fastMerge is reference-stable: returns the original target when
                 // nothing changed, so a simple === check detects no-ops.
