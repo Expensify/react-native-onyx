@@ -8,6 +8,31 @@ import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 const MOCK_TASK = 'mockTask' as CacheTask;
 
+/**
+ * Builds an extra cache instance in its own module registry, so a `hydrate()` result can be compared
+ * against the `merge()` result for the same input without the two sharing any state.
+ */
+function createIsolatedCache(): typeof OnyxCache {
+    let isolated!: typeof OnyxCache;
+
+    jest.isolateModules(() => {
+        isolated = require('../../lib/OnyxCache').default;
+    });
+
+    return isolated;
+}
+
+/** Asserts that two cache instances are indistinguishable through the cache's public read surface. */
+function expectSameCacheState(actual: typeof OnyxCache, expected: typeof OnyxCache, keys: string[]) {
+    expect(actual.getAllKeys()).toEqual(expected.getAllKeys());
+
+    for (const key of keys) {
+        expect(actual.get(key)).toEqual(expected.get(key));
+        expect(actual.hasCacheForKey(key)).toBe(expected.hasCacheForKey(key));
+        expect(actual.hasNullishStorageKey(key)).toBe(expected.hasNullishStorageKey(key));
+    }
+}
+
 describe('Onyx', () => {
     describe('Cache Service', () => {
         /** @type OnyxCache */
@@ -362,6 +387,176 @@ describe('Onyx', () => {
             });
         });
 
+        describe('hydrate', () => {
+            // Every value shape init can hand the cache. Built fresh per call because `hydrate()` stores
+            // values by reference, so the two caches under comparison must never share source objects.
+            const buildStorageData = (): Record<string, unknown> => ({
+                stringKey: 'mockValue',
+                numberKey: 0,
+                booleanKey: false,
+                emptyObjectKey: {},
+                plainObjectKey: {value: 'mockValue'},
+                nestedObjectKey: {a: {b: {c: 1}}},
+                nestedNullsKey: {keep: 1, drop: null, nested: {keep: 2, drop: null}},
+                arrayKey: [{ID: 1}, {ID: 2}],
+                objectWithArrayKey: {ID: [1, 2]},
+                nullKey: null,
+                undefinedKey: undefined,
+            });
+
+            const ALL_KEYS = Object.keys(buildStorageData());
+
+            it('Should produce the same cache state as merge() for an empty cache', () => {
+                // Given two empty caches
+                const mergeCache = createIsolatedCache();
+
+                // When one is hydrated and the other merged with the same data
+                cache.hydrate(buildStorageData());
+                mergeCache.merge(buildStorageData());
+
+                // Then both caches are indistinguishable through their public read surface
+                expectSameCacheState(cache, mergeCache, ALL_KEYS);
+            });
+
+            it('Should produce the same cache state as merge() when keys already have values', () => {
+                // Given two caches holding the same pre-existing values (e.g. a write landed while
+                // storage was still being read). Both existing values overlap the storage value on a
+                // leaf, so the merge direction is actually exercised.
+                const mergeCache = createIsolatedCache();
+                const buildExistingData = () => ({
+                    plainObjectKey: {value: 'fromWrite', fromWrite: true},
+                    nestedObjectKey: {a: {b: {c: 99, fromWrite: true}}},
+                    stringKey: 'fromWrite',
+                });
+
+                for (const [key, value] of Object.entries(buildExistingData())) {
+                    cache.set(key, value);
+                    mergeCache.set(key, value);
+                }
+
+                // When one is hydrated and the other merged with the same data
+                cache.hydrate(buildStorageData());
+                mergeCache.merge(buildStorageData());
+
+                // Then the fallback merge inside hydrate() matches merge() exactly
+                expectSameCacheState(cache, mergeCache, ALL_KEYS);
+
+                // And the value loaded from storage wins on every overlapping leaf, as merge() does
+                expect(cache.get('plainObjectKey')).toEqual({value: 'mockValue', fromWrite: true});
+                expect(cache.get('nestedObjectKey')).toEqual({a: {b: {c: 1, fromWrite: true}}});
+                expect(cache.get('stringKey')).toBe('mockValue');
+            });
+
+            it('Should register every key, including keys with nullish values', () => {
+                // When hydrate is called with nullish and non-nullish values
+                cache.hydrate(buildStorageData());
+
+                // Then all of them are reported by getAllKeys, so nothing is invisible to reads
+                expect(cache.getAllKeys()).toEqual(new Set(ALL_KEYS));
+                expect(cache.getAllKeys().has('nullKey')).toBe(true);
+                expect(cache.getAllKeys().has('undefinedKey')).toBe(true);
+            });
+
+            it('Should store values by reference when no normalization is needed', () => {
+                // Given a value with no nested nullish properties
+                const value = {id: 1, nested: {deep: true}};
+
+                // When hydrate is called on an empty cache
+                cache.hydrate({mockKey: value});
+
+                // Then the value is stored as is - this is the clone that hydrate() exists to skip
+                expect(cache.get('mockKey')).toBe(value);
+            });
+
+            it('Should normalize values that carry nested nullish properties', () => {
+                // Given a value with nested nulls
+                const value = {keep: 1, drop: null, nested: {keep: 2, drop: null}};
+
+                // When hydrate is called
+                cache.hydrate({mockKey: value});
+
+                // Then the cached value is a cleaned copy
+                expect(cache.get('mockKey')).not.toBe(value);
+                expect(cache.get('mockKey')).toEqual({keep: 1, nested: {keep: 2}});
+
+                // And the source object handed to hydrate is left untouched
+                expect(value).toEqual({keep: 1, drop: null, nested: {keep: 2, drop: null}});
+            });
+
+            it('Should keep the existing reference when the hydrated value changes nothing', () => {
+                // Given a cache that already holds a deep-equal value
+                const existing = {id: 1, nested: {deep: true}};
+                cache.set('mockKey', existing);
+
+                // When hydrate is called with an equal but distinct value
+                cache.hydrate({mockKey: {id: 1, nested: {deep: true}}});
+
+                // Then the reference is preserved, so subscribers don't see a spurious change
+                expect(cache.get('mockKey')).toBe(existing);
+            });
+
+            it('Should remove `null` values from the storage map and mark them nullish', () => {
+                // Given a cache with an existing value
+                cache.set('mockKey', {ID: 5});
+
+                // When hydrate is called with null
+                cache.hydrate({mockKey: null, mockNullKey: null});
+
+                // Then the values are dropped but the keys stay known
+                expect(cache.get('mockKey')).toBeUndefined();
+                expect(cache.get('mockNullKey')).toBeUndefined();
+                expect(cache.hasNullishStorageKey('mockKey')).toBe(true);
+                expect(cache.hasNullishStorageKey('mockNullKey')).toBe(true);
+                expect(cache.getAllKeys()).toEqual(new Set(['mockKey', 'mockNullKey']));
+            });
+
+            it('Should leave the existing value untouched for `undefined` values', () => {
+                // Given a cache with an existing value
+                cache.set('mockKey', {ID: 5});
+
+                // When hydrate is called with undefined, which means "no change"
+                cache.hydrate({mockKey: undefined});
+
+                // Then the value is unchanged
+                expect(cache.get('mockKey')).toEqual({ID: 5});
+            });
+
+            it('Should expose hydrated collection members through collection reads, same as merge()', () => {
+                // Given two caches that know about the same collection key
+                const mergeCache = createIsolatedCache();
+                const collectionKey = 'mock_collection_';
+                const collectionData = {
+                    [`${collectionKey}1`]: {id: 1},
+                    [`${collectionKey}2`]: {id: 2},
+                    [`${collectionKey}3`]: null,
+                };
+
+                cache.setCollectionKeys(new Set([collectionKey]));
+                mergeCache.setCollectionKeys(new Set([collectionKey]));
+
+                // When one is hydrated and the other merged with the same collection members
+                cache.hydrate({...collectionData});
+                mergeCache.merge({...collectionData});
+
+                // Then the collection snapshot is rebuilt and reports the same members
+                expect(cache.getCollectionData(collectionKey)).toEqual({
+                    [`${collectionKey}1`]: {id: 1},
+                    [`${collectionKey}2`]: {id: 2},
+                });
+                expect(cache.getCollectionData(collectionKey)).toEqual(mergeCache.getCollectionData(collectionKey));
+            });
+
+            it('Should throw if called with anything that is not an object', () => {
+                // @ts-expect-error -- intentionally testing invalid input
+                expect(() => cache.hydrate([])).toThrow();
+                // @ts-expect-error -- intentionally testing invalid input
+                expect(() => cache.hydrate('')).toThrow();
+                // @ts-expect-error -- intentionally testing invalid input
+                expect(() => cache.hydrate(0)).toThrow();
+                expect(() => cache.hydrate({})).not.toThrow();
+            });
+        });
+
         describe('hasPendingTask', () => {
             it('Should return false when there is no started task', () => {
                 // Given empty cache with no started tasks
@@ -537,6 +732,78 @@ describe('Onyx', () => {
                 expect(allKeys.has(ONYX_KEYS.TEST_KEY)).toBe(true);
                 expect(allKeys.has(ONYX_KEYS.OTHER_TEST)).toBe(true);
                 expect(allKeys.has(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`)).toBe(true);
+            });
+
+            it('should register keys whose stored value is nullish', async () => {
+                // Given storage holding a null value alongside a normal one
+                await StorageMock.setItem(ONYX_KEYS.TEST_KEY, null);
+                await StorageMock.setItem(ONYX_KEYS.OTHER_TEST, 'value');
+                await initOnyx();
+
+                // Then the nullish key is still part of the key index, so reads don't treat it as unloaded
+                expect(cache.getAllKeys()).toEqual(new Set([ONYX_KEYS.TEST_KEY, ONYX_KEYS.OTHER_TEST]));
+                expect(cache.get(ONYX_KEYS.TEST_KEY)).toBeUndefined();
+                expect(cache.hasNullishStorageKey(ONYX_KEYS.TEST_KEY)).toBe(true);
+                expect(cache.hasCacheForKey(ONYX_KEYS.TEST_KEY)).toBe(true);
+            });
+
+            it('should expose collection members loaded from storage through collection reads', async () => {
+                // Given storage holding collection members
+                await StorageMock.setItem(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1, name: 'Item 1'});
+                await StorageMock.setItem(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}2`, {id: 2, name: 'Item 2'});
+                await initOnyx();
+
+                // Then the collection index is populated, so the snapshot contains both members
+                expect(cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION)).toEqual({
+                    [`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`]: {id: 1, name: 'Item 1'},
+                    [`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}2`]: {id: 2, name: 'Item 2'},
+                });
+                expect(OnyxKeys.getCollectionKey(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`)).toBe(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+            });
+
+            it('should merge, not overwrite, keys written while storage was still being read', async () => {
+                // Given a storage read that has not resolved yet
+                let releaseGetAll: (() => void) | undefined;
+                const gate = new Promise<void>((resolve) => {
+                    releaseGetAll = resolve;
+                });
+                (StorageMock.getAll as jest.Mock).mockImplementationOnce(() => gate.then(() => [[ONYX_KEYS.TEST_KEY, {fromStorage: true, shared: 'fromStorage'}]]));
+
+                Onyx.init({keys: ONYX_KEYS});
+
+                // When a write lands on that key before the read completes
+                cache.set(ONYX_KEYS.TEST_KEY, {fromWrite: true, shared: 'fromWrite'});
+                releaseGetAll?.();
+                await waitForPromisesToResolve();
+
+                // Then hydrate falls back to a merge instead of dropping the write, and the value from
+                // storage wins on the overlapping leaf - exactly what the old merge-based init did
+                expect(cache.get(ONYX_KEYS.TEST_KEY)).toEqual({fromStorage: true, fromWrite: true, shared: 'fromStorage'});
+            });
+
+            it('should leave the cache in the same state a merge-based init would produce', async () => {
+                // Given storage holding every value shape init has to deal with
+                const storageData: Record<string, unknown> = {
+                    [ONYX_KEYS.TEST_KEY]: 'storageValue',
+                    [ONYX_KEYS.OTHER_TEST]: {nested: {value: 1}, keep: true, drop: null},
+                    [`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`]: {id: 1, name: 'Item 1'},
+                    [`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}2`]: [{ID: 1}, {ID: 2}],
+                    [`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}3`]: null,
+                };
+                const allKeys = Object.keys(storageData);
+
+                await StorageMock.multiSet(Object.entries(storageData));
+                await initOnyx();
+
+                // When the previous init path (setAllKeys + merge) is replayed on a separate cache
+                const mergeCache = createIsolatedCache();
+                mergeCache.setCollectionKeys(new Set([ONYX_KEYS.COLLECTION.MOCK_COLLECTION]));
+                mergeCache.setAllKeys(allKeys);
+                mergeCache.merge({...storageData});
+
+                // Then the hydrated cache is indistinguishable from it
+                expectSameCacheState(cache, mergeCache, allKeys);
+                expect(cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION)).toEqual(mergeCache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION));
             });
         });
 
