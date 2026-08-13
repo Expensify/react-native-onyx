@@ -224,7 +224,7 @@ class OnyxCache {
 
         const affectedCollections = new Set<OnyxKey>();
 
-        // eslint-disable-next-line no-restricted-syntax, guard-for-in
+        // eslint-disable-next-line no-restricted-syntax
         for (const key in data) {
             if (!Object.hasOwn(data, key)) {
                 continue;
