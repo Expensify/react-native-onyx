@@ -205,6 +205,7 @@ function needsNormalization(value: unknown): boolean {
         return false;
     }
 
+    // Use for-in loop to avoid an unnecessary array allocation from Object.keys()
     // eslint-disable-next-line no-restricted-syntax, guard-for-in
     for (const key in value) {
         if (key === ONYX_INTERNALS__REPLACE_OBJECT_MARK) {

@@ -224,6 +224,7 @@ class OnyxCache {
 
         const affectedCollections = new Set<OnyxKey>();
 
+        // Use for-in loop to avoid an unnecessary array allocation from Object.keys()
         // eslint-disable-next-line no-restricted-syntax
         for (const key in data) {
             if (!Object.hasOwn(data, key)) {
