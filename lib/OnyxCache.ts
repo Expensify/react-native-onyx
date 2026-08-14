@@ -218,7 +218,7 @@ class OnyxCache {
      * @param data - a map of (cache) key - values
      */
     hydrate(data: Record<OnyxKey, OnyxValue<OnyxKey>>): void {
-        if (typeof data !== 'object' || Array.isArray(data)) {
+        if (data === null || typeof data !== 'object' || Array.isArray(data)) {
             throw new Error('data passed to cache.hydrate() must be an Object of onyx key/value pairs');
         }
 
