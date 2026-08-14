@@ -1042,7 +1042,8 @@ function initializeWithDefaultKeyStates(): Promise<void> {
             // Load all storage data into cache silently (no subscriber notifications).
             // hydrate() rather than merge(): the cache is empty at this point, so a per-key fastMerge
             // would only deep-clone every row it was handed.
-            cache.setAllKeys(Object.keys(allDataFromStorage));
+            // No setAllKeys() call is needed: hydrate() calls addKey() for every key, which populates the
+            // key index and registers collection member keys itself.
             cache.hydrate(allDataFromStorage);
 
             // For keys that have a developer-defined default (via `initialKeyStates`), merge the
