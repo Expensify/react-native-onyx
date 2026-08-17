@@ -553,6 +553,8 @@ describe('Onyx', () => {
                 expect(() => cache.hydrate('')).toThrow();
                 // @ts-expect-error -- intentionally testing invalid input
                 expect(() => cache.hydrate(0)).toThrow();
+                // @ts-expect-error -- intentionally testing invalid input
+                expect(() => cache.hydrate(null)).toThrow();
                 expect(() => cache.hydrate({})).not.toThrow();
             });
         });
