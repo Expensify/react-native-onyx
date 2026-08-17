@@ -620,11 +620,22 @@ function setCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, coll
     return OnyxUtils.afterInit(() => OnyxUtils.setCollectionWithRetry({collectionKey, collection}));
 }
 
+/**
+ * Reads a value out of the cache synchronously. A collection key reads every member.
+ *
+ * Not a subscription, so the value never updates: use `useOnyx` for anything rendered. Returns `undefined` for a
+ * key with no value, and for every key until `init()` has hydrated the cache.
+ */
+function get<TKey extends OnyxKey>(key: TKey): OnyxValue<TKey> {
+    return OnyxUtils.tryGetCachedValue(key) as OnyxValue<TKey>;
+}
+
 const Onyx = {
     METHOD: OnyxUtils.METHOD,
     connect,
     connectWithoutView,
     disconnect,
+    get,
     set,
     multiSet,
     merge,
