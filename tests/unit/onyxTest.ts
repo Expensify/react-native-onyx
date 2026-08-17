@@ -1562,6 +1562,32 @@ describe('Onyx', () => {
         expect(callback.mock.calls.at(-1)?.[0]).toEqual({[snapshot1]: {data: {[cat]: finalValue}}});
     });
 
+    it('should expand keyless multiSet updates into per-key Snapshot updates', async () => {
+        const cat = `${ONYX_KEYS.COLLECTION.ANIMALS}cat`;
+        const dog = `${ONYX_KEYS.COLLECTION.ANIMALS}dog`;
+        const snapshot1 = `${ONYX_KEYS.COLLECTION.SNAPSHOT}1`;
+
+        await Onyx.set(cat, {name: 'Fluffy'});
+        await Onyx.set(dog, {name: 'Rex'});
+        await Onyx.set(snapshot1, {data: {[cat]: {name: 'Fluffy'}}});
+
+        const callback = jest.fn();
+
+        Onyx.connect({
+            key: ONYX_KEYS.COLLECTION.SNAPSHOT,
+            callback,
+        });
+
+        await waitForPromisesToResolve();
+
+        const multiSetUpdate = {onyxMethod: Onyx.METHOD.MULTI_SET, value: {[cat]: {name: 'Kitty'}, [dog]: {name: 'Buddy'}}} as unknown as OnyxUpdate<OnyxKey>;
+
+        await Onyx.update([multiSetUpdate]);
+
+        // Only the key that exists in the snapshot is updated there, so it stays in sync with the real Onyx value.
+        expect(callback.mock.calls.at(-1)?.[0]).toEqual({[snapshot1]: {data: {[cat]: {name: 'Kitty'}}}});
+    });
+
     describe('update', () => {
         let logInfoFn = jest.fn();
 

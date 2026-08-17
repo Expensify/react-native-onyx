@@ -1202,6 +1202,15 @@ function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, me
 
     const snapshotCollection = getCachedCollection(snapshotCollectionKey);
 
+    // Multiset entries are keyless but update every key of their payload, so expand them into
+    // per-key entries to keep cached snapshots in sync with the real Onyx data.
+    const flattenedData = data.flatMap<{onyxMethod: OnyxMethod; key: unknown; value?: unknown}>((entry) => {
+        if (entry.onyxMethod === METHOD.MULTI_SET && typeof entry.key !== 'string' && entry.value && typeof entry.value === 'object' && !Array.isArray(entry.value)) {
+            return Object.entries(entry.value).map(([key, value]) => ({onyxMethod: METHOD.SET, key, value}));
+        }
+        return entry;
+    });
+
     for (const [snapshotEntryKey, snapshotEntryValue] of Object.entries(snapshotCollection)) {
         // Snapshots may not be present in cache. We don't know how to update them so we skip.
         if (!snapshotEntryValue) {
@@ -1210,11 +1219,11 @@ function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, me
 
         let updatedData: Record<string, unknown> = {};
 
-        for (const {key, value, onyxMethod} of data) {
+        for (const {key, value, onyxMethod} of flattenedData) {
             if (typeof key !== 'string') {
-                // clear/multiset entries legitimately carry no key; snapshots have nothing to update for them
+                // clear entries legitimately carry no key, and malformed multiset payloads are already logged by update() itself
                 if (onyxMethod !== METHOD.CLEAR && onyxMethod !== METHOD.MULTI_SET) {
-                    Logger.logInfo(`Invalid ${typeof key} key (method: ${onyxMethod}, key: ${String(key).slice(0, 50)}) provided in Onyx update. Skipping snapshot update for this entry.`);
+                    Logger.logHmmm(`Invalid ${typeof key} key (method: ${onyxMethod}, key: ${String(key).slice(0, 50)}) provided in Onyx update. Skipping snapshot update for this entry.`);
                 }
                 continue;
             }
