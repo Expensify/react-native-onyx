@@ -1265,6 +1265,39 @@ describe('OnyxUtils', () => {
         });
     });
 
+    describe('tryGetCachedValue', () => {
+        const memberOne = `${ONYXKEYS.COLLECTION.TEST_KEY}1`;
+        const memberTwo = `${ONYXKEYS.COLLECTION.TEST_KEY}2`;
+
+        it('accepts either shape of key, unlike get', async () => {
+            await Onyx.merge(memberOne, {id: 1, title: 'One'});
+            await Onyx.merge(memberTwo, {id: 2, title: 'Two'});
+
+            expect(OnyxUtils.tryGetCachedValue(memberOne)).toEqual({id: 1, title: 'One'});
+            expect(OnyxUtils.tryGetCachedValue(ONYXKEYS.COLLECTION.TEST_KEY)).toEqual({
+                [memberOne]: {id: 1, title: 'One'},
+                [memberTwo]: {id: 2, title: 'Two'},
+            });
+            expect(OnyxUtils.get(ONYXKEYS.COLLECTION.TEST_KEY)).toBeUndefined();
+        });
+
+        it('answers undefined for an empty collection while the store holds no key at all', () => {
+            expect(OnyxCache.getAllKeys().size).toBe(0);
+
+            // An unloaded store reads as "cannot tell yet" here and as empty through getCachedCollection.
+            expect(OnyxUtils.tryGetCachedValue(ONYXKEYS.COLLECTION.TEST_KEY)).toBeUndefined();
+            expect(OnyxUtils.getCachedCollection(ONYXKEYS.COLLECTION.TEST_KEY)).toEqual({});
+        });
+
+        it('answers an empty object for that same collection once any unrelated key exists', async () => {
+            await Onyx.merge(ONYXKEYS.TEST_KEY, {title: 'unrelated'});
+
+            // Same empty collection, different answer, decided by an unrelated key: a caller has to treat undefined and {} alike.
+            expect(OnyxUtils.tryGetCachedValue(ONYXKEYS.COLLECTION.TEST_KEY)).toEqual({});
+            expect(OnyxUtils.getCachedCollection(ONYXKEYS.COLLECTION.TEST_KEY)).toEqual({});
+        });
+    });
+
     describe('multiGet cache hit consistency', () => {
         // Same suite-pollution guard as the pre-warm block above — capture pristine StorageMock
         // refs at file-load time and restore them in beforeEach, since retryOperation tests leak.

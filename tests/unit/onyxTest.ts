@@ -2860,6 +2860,51 @@ describe('Onyx', () => {
         });
     });
 
+    describe('get', () => {
+        const memberOne = `${ONYX_KEYS.COLLECTION.TEST_KEY}1`;
+        const memberTwo = `${ONYX_KEYS.COLLECTION.TEST_KEY}2`;
+
+        it('reads a value out of the cache synchronously', async () => {
+            await Onyx.merge(ONYX_KEYS.TEST_KEY, {id: 1, title: 'One'});
+
+            expect(Onyx.get(ONYX_KEYS.TEST_KEY)).toEqual({id: 1, title: 'One'});
+            expect(Onyx.get(ONYX_KEYS.TEST_KEY)).toEqual(OnyxUtils.get(ONYX_KEYS.TEST_KEY));
+        });
+
+        it('returns undefined for a key that has no value', () => {
+            expect(Onyx.get(ONYX_KEYS.TEST_KEY)).toBeUndefined();
+            expect(Onyx.get(memberOne)).toBeUndefined();
+        });
+
+        it('reads every member when given a collection key', async () => {
+            await Onyx.merge(memberOne, {id: 1, title: 'One'});
+            await Onyx.merge(memberTwo, {id: 2, title: 'Two'});
+
+            expect(Onyx.get(ONYX_KEYS.COLLECTION.TEST_KEY)).toEqual({
+                [memberOne]: {id: 1, title: 'One'},
+                [memberTwo]: {id: 2, title: 'Two'},
+            });
+        });
+
+        it('agrees with a whole-collection subscriber', async () => {
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                [memberOne]: {id: 1, title: 'One'},
+                [memberTwo]: {id: 2, title: 'Two'},
+            } as GenericCollection);
+
+            let subscribed: OnyxCollection<unknown>;
+            connection = Onyx.connectWithoutView({
+                key: ONYX_KEYS.COLLECTION.TEST_KEY,
+                callback: (collection) => {
+                    subscribed = collection;
+                },
+            });
+            await waitForPromisesToResolve();
+
+            expect(Onyx.get(ONYX_KEYS.COLLECTION.TEST_KEY)).toEqual(subscribed);
+        });
+    });
+
     describe('skippable collection member ids', () => {
         it('should skip the collection member id value when using Onyx.set()', async () => {
             let testKeyValue: unknown;
