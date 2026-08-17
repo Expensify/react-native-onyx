@@ -258,6 +258,8 @@ class OnyxCache {
                     // landed while storage was still being read). Fall back to a real merge, which has exactly
                     // the same semantics as the old `cache.merge(allDataFromStorage)` init path: the value
                     // loaded from disk is the merge source, so it wins on any overlapping leaf key.
+                    // Note: this only covers non-null writes. A `cache.set(key, null)` that lands before hydrate
+                    // clears the nullish marker too, so a deletion racing init is still undone - same as before.
                     const merged = utils.fastMerge(existing, value, CACHE_MERGE_OPTIONS).result;
 
                     // fastMerge is reference-stable: returns the original target when nothing changed, so a
