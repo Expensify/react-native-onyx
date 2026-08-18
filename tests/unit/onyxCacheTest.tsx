@@ -406,7 +406,7 @@ describe('Onyx', () => {
 
             const ALL_KEYS = Object.keys(buildStorageData());
 
-            it('Should produce the same cache state as merge() for an empty cache', () => {
+            it('should produce the same cache state as merge() for an empty cache', () => {
                 // Given two empty caches
                 const mergeCache = createIsolatedCache();
 
@@ -418,7 +418,7 @@ describe('Onyx', () => {
                 expectSameCacheState(cache, mergeCache, ALL_KEYS);
             });
 
-            it('Should produce the same cache state as merge() when keys already have values', () => {
+            it('should produce the same cache state as merge() when keys already have values', () => {
                 // Given two caches holding the same pre-existing values (e.g. a write landed while
                 // storage was still being read). Both existing values overlap the storage value on a
                 // leaf, so the merge direction is actually exercised.
@@ -447,7 +447,7 @@ describe('Onyx', () => {
                 expect(cache.get('stringKey')).toBe('mockValue');
             });
 
-            it('Should register every key, including keys with nullish values', () => {
+            it('should register every key, including keys with nullish values', () => {
                 // When hydrate is called with nullish and non-nullish values
                 cache.hydrate(buildStorageData());
 
@@ -457,7 +457,7 @@ describe('Onyx', () => {
                 expect(cache.getAllKeys().has('undefinedKey')).toBe(true);
             });
 
-            it('Should store values by reference when no normalization is needed', () => {
+            it('should store values by reference when no normalization is needed', () => {
                 // Given a value with no nested nullish properties
                 const value = {id: 1, nested: {deep: true}};
 
@@ -468,7 +468,7 @@ describe('Onyx', () => {
                 expect(cache.get('mockKey')).toBe(value);
             });
 
-            it('Should normalize values that carry nested nullish properties', () => {
+            it('should normalize values that carry nested nullish properties', () => {
                 // Given a value with nested nulls
                 const value = {keep: 1, drop: null, nested: {keep: 2, drop: null}};
 
@@ -483,7 +483,7 @@ describe('Onyx', () => {
                 expect(value).toEqual({keep: 1, drop: null, nested: {keep: 2, drop: null}});
             });
 
-            it('Should keep the existing reference when the hydrated value changes nothing', () => {
+            it('should keep the existing reference when the hydrated value changes nothing', () => {
                 // Given a cache that already holds a deep-equal value
                 const existing = {id: 1, nested: {deep: true}};
                 cache.set('mockKey', existing);
@@ -495,7 +495,7 @@ describe('Onyx', () => {
                 expect(cache.get('mockKey')).toBe(existing);
             });
 
-            it('Should remove `null` values from the storage map and mark them nullish', () => {
+            it('should remove `null` values from the storage map and mark them nullish', () => {
                 // Given a cache with an existing value
                 cache.set('mockKey', {ID: 5});
 
@@ -510,7 +510,7 @@ describe('Onyx', () => {
                 expect(cache.getAllKeys()).toEqual(new Set(['mockKey', 'mockNullKey']));
             });
 
-            it('Should leave the existing value untouched for `undefined` values', () => {
+            it('should leave the existing value untouched for `undefined` values', () => {
                 // Given a cache with an existing value
                 cache.set('mockKey', {ID: 5});
 
@@ -521,7 +521,7 @@ describe('Onyx', () => {
                 expect(cache.get('mockKey')).toEqual({ID: 5});
             });
 
-            it('Should expose hydrated collection members through collection reads, same as merge()', () => {
+            it('should expose hydrated collection members through collection reads, same as merge()', () => {
                 // Given two caches that know about the same collection key
                 const mergeCache = createIsolatedCache();
                 const collectionKey = 'mock_collection_';
@@ -546,7 +546,7 @@ describe('Onyx', () => {
                 expect(cache.getCollectionData(collectionKey)).toEqual(mergeCache.getCollectionData(collectionKey));
             });
 
-            it('Should throw if called with anything that is not an object', () => {
+            it('should throw if called with anything that is not an object', () => {
                 // @ts-expect-error -- intentionally testing invalid input
                 expect(() => cache.hydrate([])).toThrow();
                 // @ts-expect-error -- intentionally testing invalid input
