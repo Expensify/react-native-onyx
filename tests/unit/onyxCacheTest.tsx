@@ -46,7 +46,7 @@ describe('Onyx', () => {
         });
 
         describe('getAllKeys', () => {
-            it('Should be empty initially', () => {
+            it('should be empty initially', () => {
                 // Given empty cache
 
                 // When all keys are retrieved
@@ -56,7 +56,7 @@ describe('Onyx', () => {
                 expect(allKeys).toEqual(new Set());
             });
 
-            it('Should keep storage keys', () => {
+            it('should keep storage keys', () => {
                 // Given cache with some items
                 cache.set('mockKey', 'mockValue');
                 cache.set('mockKey2', 'mockValue');
@@ -67,7 +67,7 @@ describe('Onyx', () => {
                 expect(allKeys).toEqual(new Set(['mockKey', 'mockKey2', 'mockKey3']));
             });
 
-            it('Should keep storage keys even when no values are provided', () => {
+            it('should keep storage keys even when no values are provided', () => {
                 // Given cache with some items
                 cache.set('mockKey', undefined);
                 cache.set('mockKey2', undefined);
@@ -78,7 +78,7 @@ describe('Onyx', () => {
                 expect(allKeys).toEqual(new Set(['mockKey', 'mockKey2', 'mockKey3']));
             });
 
-            it('Should not store duplicate keys', () => {
+            it('should not store duplicate keys', () => {
                 // Given cache with some items
                 cache.set('mockKey', 'mockValue');
                 cache.set('mockKey2', 'mockValue');
@@ -94,7 +94,7 @@ describe('Onyx', () => {
         });
 
         describe('getValue', () => {
-            it('Should return undefined when there is no stored value', () => {
+            it('should return undefined when there is no stored value', () => {
                 // Given empty cache
 
                 // When a value is retrieved
@@ -104,7 +104,7 @@ describe('Onyx', () => {
                 expect(result).not.toBeDefined();
             });
 
-            it('Should return cached value when it exists', () => {
+            it('should return cached value when it exists', () => {
                 // Given cache with some items
                 cache.set('mockKey', {items: ['mockValue', 'mockValue2']});
                 cache.set('mockKey2', 'mockValue3');
@@ -117,7 +117,7 @@ describe('Onyx', () => {
         });
 
         describe('hasCacheForKey', () => {
-            it('Should return false when there is no stored value', () => {
+            it('should return false when there is no stored value', () => {
                 // Given empty cache
 
                 // When a value does not exist in cache
@@ -125,7 +125,7 @@ describe('Onyx', () => {
                 expect(cache.hasCacheForKey('mockKey')).toBe(false);
             });
 
-            it('Should return true when cached value exists', () => {
+            it('should return true when cached value exists', () => {
                 // Given cache with some items
                 cache.set('mockKey', {items: ['mockValue', 'mockValue2']});
                 cache.set('mockKey2', 'mockValue3');
@@ -138,7 +138,7 @@ describe('Onyx', () => {
         });
 
         describe('addKey', () => {
-            it('Should store the key so that it is returned by `getAllKeys`', () => {
+            it('should store the key so that it is returned by `getAllKeys`', () => {
                 // Given empty cache
 
                 // When set is called with key and value
@@ -151,7 +151,7 @@ describe('Onyx', () => {
                 expect(cache.getAllKeys()).toEqual(new Set(['mockKey']));
             });
 
-            it('Should not make duplicate keys', () => {
+            it('should not make duplicate keys', () => {
                 // Given empty cache
 
                 // When the same item is added multiple times
@@ -167,7 +167,7 @@ describe('Onyx', () => {
         });
 
         describe('set', () => {
-            it('Should add data to cache when both key and value are provided', () => {
+            it('should add data to cache when both key and value are provided', () => {
                 // Given empty cache
 
                 // When set is called with key and value
@@ -178,7 +178,7 @@ describe('Onyx', () => {
                 expect(data).toEqual({value: 'mockValue'});
             });
 
-            it('Should store the key so that it is returned by `getAllKeys`', () => {
+            it('should store the key so that it is returned by `getAllKeys`', () => {
                 // Given empty cache
 
                 // When set is called with key and value
@@ -188,7 +188,7 @@ describe('Onyx', () => {
                 expect(cache.getAllKeys()).toEqual(new Set(['mockKey']));
             });
 
-            it('Should overwrite existing cache items for the Given key', () => {
+            it('should overwrite existing cache items for the Given key', () => {
                 // Given cache with some items
                 cache.set('mockKey', {value: 'mockValue'});
                 cache.set('mockKey2', {other: 'otherMockValue'});
@@ -202,7 +202,7 @@ describe('Onyx', () => {
         });
 
         describe('drop', () => {
-            it('Should remove the key from cache', () => {
+            it('should remove the key from cache', () => {
                 // Given cache with some items
                 cache.set('mockKey', {items: ['mockValue', 'mockValue2']});
                 cache.set('mockKey2', 'mockValue3');
@@ -218,7 +218,7 @@ describe('Onyx', () => {
         });
 
         describe('merge', () => {
-            it('Should create the value in cache when it does not exist', () => {
+            it('should create the value in cache when it does not exist', () => {
                 // Given empty cache
 
                 // When merge is called with new key value pairs
@@ -232,7 +232,7 @@ describe('Onyx', () => {
                 expect(cache.get('mockKey2')).toEqual({value: 'mockValue2'});
             });
 
-            it('Should merge data to existing cache value', () => {
+            it('should merge data to existing cache value', () => {
                 // Given cache with some items
                 cache.set('mockKey', {value: 'mockValue'});
                 cache.set('mockKey2', {other: 'otherMockValue', mock: 'mock', items: [3, 4, 5]});
@@ -256,7 +256,7 @@ describe('Onyx', () => {
                 });
             });
 
-            it('Should merge objects correctly', () => {
+            it('should merge objects correctly', () => {
                 // Given cache with existing object data
                 cache.set('mockKey', {value: 'mockValue', otherValue: 'overwrite me'});
 
@@ -273,7 +273,7 @@ describe('Onyx', () => {
                 });
             });
 
-            it('Should merge arrays correctly', () => {
+            it('should merge arrays correctly', () => {
                 // Given cache with existing array data
                 cache.set('mockKey', [{ID: 1}, {ID: 2}, {ID: 3}]);
 
@@ -286,7 +286,7 @@ describe('Onyx', () => {
                 expect(cache.get('mockKey')).toEqual([{ID: 3}, {added: 'field'}, {}, {ID: 1000}]);
             });
 
-            it('Should merge arrays inside objects correctly', () => {
+            it('should merge arrays inside objects correctly', () => {
                 // Given cache with existing array data
                 cache.set('mockKey', {ID: [1]});
 
@@ -299,7 +299,7 @@ describe('Onyx', () => {
                 expect(cache.get('mockKey')).toEqual({ID: [2]});
             });
 
-            it('Should work with primitive values', () => {
+            it('should work with primitive values', () => {
                 // Given cache with existing data
                 cache.set('mockKey', {});
 
@@ -334,7 +334,7 @@ describe('Onyx', () => {
                 expect(cache.get('mockKey')).toEqual({value: 'myMockObject'});
             });
 
-            it('Should ignore `undefined` values', () => {
+            it('should ignore `undefined` values', () => {
                 // Given cache with existing data
                 cache.set('mockKey', {ID: 5});
 
@@ -350,7 +350,7 @@ describe('Onyx', () => {
                 expect(cache.get('mockKey')).toEqual({ID: 5});
             });
 
-            it('Should update storageKeys when new keys are created', () => {
+            it('should update storageKeys when new keys are created', () => {
                 // Given cache with some items
                 cache.set('mockKey', {value: 'mockValue'});
                 cache.set('mockKey2', {other: 'otherMockValue', mock: 'mock', items: [3, 4, 5]});
@@ -366,7 +366,7 @@ describe('Onyx', () => {
                 expect(cache.getAllKeys()).toEqual(new Set(['mockKey', 'mockKey2', 'mockKey3', 'mockKey4']));
             });
 
-            it('Should throw if called with anything that is not an object', () => {
+            it('should throw if called with anything that is not an object', () => {
                 // @ts-expect-error -- intentionally testing invalid input
                 expect(() => cache.merge([])).toThrow();
                 // @ts-expect-error -- intentionally testing invalid input
@@ -376,7 +376,7 @@ describe('Onyx', () => {
                 expect(() => cache.merge({})).not.toThrow();
             });
 
-            it('Should remove `null` values when merging', () => {
+            it('should remove `null` values when merging', () => {
                 cache.set('mockKey', {ID: 5});
                 cache.set('mockNullKey', null);
 
@@ -560,14 +560,14 @@ describe('Onyx', () => {
         });
 
         describe('hasPendingTask', () => {
-            it('Should return false when there is no started task', () => {
+            it('should return false when there is no started task', () => {
                 // Given empty cache with no started tasks
                 // When a task has not been started
                 // Then it should return false
                 expect(cache.hasPendingTask(MOCK_TASK)).toBe(false);
             });
 
-            it('Should return true when a task is running', () => {
+            it('should return true when a task is running', () => {
                 // Given empty cache with no started tasks
                 // When a unique task is started
                 const promise = Promise.resolve();
@@ -585,7 +585,7 @@ describe('Onyx', () => {
         });
 
         describe('getTaskPromise', () => {
-            it('Should return undefined when there is no stored value', () => {
+            it('should return undefined when there is no stored value', () => {
                 // Given empty cache with no started tasks
 
                 // When a task is retrieved
@@ -595,7 +595,7 @@ describe('Onyx', () => {
                 expect(task).not.toBeDefined();
             });
 
-            it('Should return captured task when it exists', () => {
+            it('should return captured task when it exists', () => {
                 // Given empty cache with no started tasks
                 // When a unique task is started
                 const promise = Promise.resolve({mockResult: true});
