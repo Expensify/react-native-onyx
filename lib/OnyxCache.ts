@@ -225,17 +225,14 @@ class OnyxCache {
         const affectedCollections = new Set<OnyxKey>();
 
         // Use for-in loop to avoid an unnecessary array allocation from Object.keys()
-        // eslint-disable-next-line no-restricted-syntax
+        // eslint-disable-next-line no-restricted-syntax, guard-for-in
         for (const key in data) {
-            if (!Object.hasOwn(data, key)) {
-                continue;
-            }
-
             const value = data[key];
             this.addKey(key);
 
             if (value === undefined) {
                 this.addNullishStorageKey(key);
+                // undefined means "no change" — skip storageMap modification
                 continue;
             }
 
@@ -262,8 +259,8 @@ class OnyxCache {
                     // clears the nullish marker too, so a deletion racing init is still undone - same as before.
                     const merged = utils.fastMerge(existing, value, CACHE_MERGE_OPTIONS).result;
 
-                    // fastMerge is reference-stable: returns the original target when nothing changed, so a
-                    // simple === check detects no-ops and avoids dirtying the collection for nothing.
+                    // fastMerge is reference-stable: returns the original target when
+                    // nothing changed, so a simple === check detects no-ops.
                     if (merged === existing) {
                         continue;
                     }
@@ -281,6 +278,7 @@ class OnyxCache {
             }
         }
 
+        // Mark affected collections as dirty — snapshots will be lazily rebuilt on next read
         for (const collectionKey of affectedCollections) {
             this.dirtyCollections.add(collectionKey);
         }
@@ -297,7 +295,10 @@ class OnyxCache {
 
         const affectedCollections = new Set<OnyxKey>();
 
-        for (const [key, value] of Object.entries(data)) {
+        // Use for-in loop to avoid an unnecessary array allocation from Object.entries()
+        // eslint-disable-next-line no-restricted-syntax, guard-for-in
+        for (const key in data) {
+            const value = data[key];
             this.addKey(key);
 
             const collectionKey = OnyxKeys.getCollectionKey(key);
