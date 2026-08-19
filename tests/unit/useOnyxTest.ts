@@ -953,4 +953,30 @@ describe('useOnyx', () => {
             expect(renderCount).toBe(1);
         });
     });
+
+    describe('loading status', () => {
+        it('should report loading while a pending merge is in flight, then loaded once it resolves', async () => {
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test1');
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test3');
+
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
+
+            expect(result.current[1].status).toEqual('loading');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('test3');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should report loaded immediately for a cached value with no pending merge', async () => {
+            Onyx.set(ONYXKEYS.TEST_KEY, 'cached');
+
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
+
+            expect(result.current[0]).toEqual('cached');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+    });
 });

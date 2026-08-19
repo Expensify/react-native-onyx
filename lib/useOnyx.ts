@@ -2,6 +2,7 @@ import {useCallback, useMemo} from 'react';
 import {deepEqual} from 'fast-equals';
 import {useSyncExternalStoreWithSelector} from 'use-sync-external-store/with-selector';
 import onyxStore from './OnyxStore';
+import OnyxUtils from './OnyxUtils';
 import type {OnyxKey, OnyxValue} from './types';
 
 type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (data: OnyxValue<TKey> | undefined) => TReturnValue;
@@ -29,8 +30,6 @@ type ResultMetadata = {
 };
 
 type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata];
-
-const LOADED_METADATA: ResultMetadata = {status: 'loaded'};
 
 /**
  * Subscribes a React component to an Onyx key. The component re-renders when the value
@@ -66,8 +65,14 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
 
     const value = useSyncExternalStoreWithSelector<OnyxValue<TKey> | undefined, TReturnValue | undefined>(subscribe, getSnapshot, undefined, select, isEqual);
 
-    // Stable result tuple: re-allocated only when the (already deduped) `value` reference changes.
-    return useMemo<UseOnyxResult<TReturnValue>>(() => [value as NonNullable<TReturnValue> | undefined, LOADED_METADATA], [value]);
+    // The `loading` flag means a write is in flight: a pending `Onyx.merge` whose result the cache may not
+    // reflect yet. It flips back to `loaded` when the merge applies — that write fires a store
+    // notification which re-renders this hook. Cached reads are synchronous, so they are always `loaded`.
+    const loadingStatus: FetchStatus = OnyxUtils.hasPendingMergeForKey(key) ? 'loading' : 'loaded';
+
+    // Stable result tuple: re-built only when the (already deduped) `value` reference or the primitive
+    // `loadingStatus` changes, so render-to-render the same cached tuple (and metadata object) is returned.
+    return useMemo<UseOnyxResult<TReturnValue>>(() => [value as NonNullable<TReturnValue> | undefined, {status: loadingStatus}], [value, loadingStatus]);
 }
 
 export default useOnyx;
