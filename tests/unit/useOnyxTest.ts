@@ -978,5 +978,87 @@ describe('useOnyx', () => {
             expect(result.current[0]).toEqual('cached');
             expect(result.current[1].status).toEqual('loaded');
         });
+
+        it('should not flip back to loading for a merge queued after the hook has already connected', async () => {
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'existing');
+
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
+
+            // Let the hook complete its first connection.
+            await act(async () => waitForPromisesToResolve());
+            expect(result.current[0]).toEqual('existing');
+            expect(result.current[1].status).toEqual('loaded');
+
+            // A merge queued after the hook has connected is an optimistic update — status must stay loaded
+            // so already-shown data is never blanked mid-interaction.
+            await act(async () => {
+                Onyx.merge(ONYXKEYS.TEST_KEY, 'updated');
+                await waitForPromisesToResolve();
+            });
+            expect(result.current[0]).toEqual('updated');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should not re-enter loading after the value is cleared while connected', async () => {
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'existing');
+
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
+
+            await act(async () => waitForPromisesToResolve());
+            expect(result.current[1].status).toEqual('loaded');
+
+            // Clear the value and queue a merge to repopulate it. The hook has already connected, so this is
+            // not a first connection and status must stay loaded — a value going away does not re-trigger loading.
+            await act(async () => {
+                Onyx.set(ONYXKEYS.TEST_KEY, null);
+                Onyx.merge(ONYXKEYS.TEST_KEY, 'again');
+                await waitForPromisesToResolve();
+            });
+            expect(result.current[0]).toEqual('again');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should report loading with a selector while a merge is pending, then return the selected value', async () => {
+            const selector = ((entry: OnyxEntry<{id: string}>) => entry?.id) as UseOnyxSelector<OnyxKey, string | undefined>;
+
+            Onyx.merge(ONYXKEYS.TEST_KEY, {id: 'abc'});
+
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {selector}));
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loading');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('abc');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+    });
+
+    describe('clear', () => {
+        it('should return the cleared value for both existing and newly-connected subscribers, then propagate a later merge', async () => {
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'test');
+
+            const {result: existing} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
+            await act(async () => waitForPromisesToResolve());
+            expect(existing.current[0]).toEqual('test');
+
+            await act(async () => Onyx.clear());
+
+            // A subscriber that connects after the clear sees the cleared value, not stale data.
+            const {result: fresh} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
+            await act(async () => waitForPromisesToResolve());
+
+            expect(existing.current[0]).toBeUndefined();
+            expect(existing.current[1].status).toEqual('loaded');
+            expect(fresh.current[0]).toBeUndefined();
+            expect(fresh.current[1].status).toEqual('loaded');
+
+            // A merge after the clear reaches both the pre-clear and post-clear subscribers.
+            await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, 'test2'));
+
+            expect(existing.current[0]).toEqual('test2');
+            expect(fresh.current[0]).toEqual('test2');
+        });
     });
 });

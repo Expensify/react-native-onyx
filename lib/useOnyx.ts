@@ -1,4 +1,4 @@
-import {useCallback, useMemo} from 'react';
+import {useCallback, useEffect, useMemo, useRef} from 'react';
 import {deepEqual} from 'fast-equals';
 import {useSyncExternalStoreWithSelector} from 'use-sync-external-store/with-selector';
 import onyxStore from './OnyxStore';
@@ -51,6 +51,10 @@ type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata];
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey, options?: UseOnyxOptions<TKey, TReturnValue>): UseOnyxResult<TReturnValue> {
     const selector = options?.selector;
 
+    // Tracks the key this hook has already connected to, so we can tell a key's first render apart from
+    // later ones (see the loading-status gate below). Starts null so the initial mount counts as first.
+    const connectedKeyRef = useRef<OnyxKey | null>(null);
+
     const subscribe = useCallback((onStoreChange: () => void) => onyxStore.subscribe(key, onStoreChange), [key]);
     const getSnapshot = useCallback(() => onyxStore.getState(key) as OnyxValue<TKey> | undefined, [key]);
 
@@ -65,14 +69,25 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
 
     const value = useSyncExternalStoreWithSelector<OnyxValue<TKey> | undefined, TReturnValue | undefined>(subscribe, getSnapshot, undefined, select, isEqual);
 
-    // The `loading` flag means a write is in flight: a pending `Onyx.merge` whose result the cache may not
-    // reflect yet. It flips back to `loaded` when the merge applies — that write fires a store
-    // notification which re-renders this hook. Cached reads are synchronous, so they are always `loaded`.
-    const loadingStatus: FetchStatus = OnyxUtils.hasPendingMergeForKey(key) ? 'loading' : 'loaded';
+    // `loading` only on a key's first render (mount or key change) when a merge is still in flight for it.
+    // `connectedKeyRef` differs from `key` only on that first render; the effect below catches it up, so a
+    // later merge on an already-connected key never surfaces loading.
+    // Reading the ref during render is safe: it's written only in the effect below and re-renders are driven
+    // by `useSyncExternalStore` and the `key` prop, so it can't cause a missed update — it gates a one-shot signal.
+    // eslint-disable-next-line react-hooks/refs
+    const isLoading = connectedKeyRef.current !== key && OnyxUtils.hasPendingMergeForKey(key);
+    const loadingStatus: FetchStatus = isLoading ? 'loading' : 'loaded';
 
-    // Stable result tuple: re-built only when the (already deduped) `value` reference or the primitive
+    useEffect(() => {
+        connectedKeyRef.current = key;
+    }, [key]);
+
+    // While loading, the pending merge's result isn't in cache yet, so surface `undefined` until it applies.
+    const result = isLoading ? undefined : (value as NonNullable<TReturnValue> | undefined);
+
+    // Stable result tuple: re-built only when the (already deduped) `result` reference or the primitive
     // `loadingStatus` changes, so render-to-render the same cached tuple (and metadata object) is returned.
-    return useMemo<UseOnyxResult<TReturnValue>>(() => [value as NonNullable<TReturnValue> | undefined, {status: loadingStatus}], [value, loadingStatus]);
+    return useMemo<UseOnyxResult<TReturnValue>>(() => [result, {status: loadingStatus}], [result, loadingStatus]);
 }
 
 export default useOnyx;
