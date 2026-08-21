@@ -23,7 +23,10 @@ export default defineConfig([
     ...browserConfig,
     ...reactConfig,
     ...tsExpensifyConfig,
-    ...jestConfig,
+    ...jestConfig.map((config) => ({
+        ...config,
+        files: ['tests/**', 'lib/**/__mocks__/**', 'jestSetup.js', 'jest-sequencer.js', 'jest-test-environment.ts'],
+    })),
     ...scriptsConfig,
     {
         plugins: {
