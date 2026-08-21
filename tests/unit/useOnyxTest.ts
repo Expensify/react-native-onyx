@@ -645,6 +645,28 @@ describe('useOnyx', () => {
             expect(oldResult).toBe(result.current);
         });
 
+        it('should keep result identity when a new subscriber with the same key and selector mounts', async () => {
+            Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name'});
+
+            const selector = ((entry: OnyxEntry<{id: string; name: string}>) => ({id: entry?.id})) as UseOnyxSelector<OnyxKey, {id?: string}>;
+
+            const {result, rerender} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {selector}));
+
+            await act(async () => waitForPromisesToResolve());
+
+            const oldResult = result.current;
+
+            // A subscriber that mounts later computes its own content-equal selector output and publishes it into the shared snapshot cache slot.
+            renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {selector}));
+
+            await act(async () => waitForPromisesToResolve());
+
+            rerender(undefined);
+
+            // must be the same reference — the new subscriber's content-equal result must not replace it
+            expect(result.current).toBe(oldResult);
+        });
+
         it('should always use the current selector reference to return new data', async () => {
             Onyx.set(ONYXKEYS.TEST_KEY, {id: 'test_id', name: 'test_name'});
 

@@ -302,6 +302,58 @@ describe('utils', () => {
         });
     });
 
+    describe('needsNormalization', () => {
+        it('should return false for nullish and primitive values', () => {
+            expect(utils.needsNormalization(null)).toBe(false);
+            expect(utils.needsNormalization(undefined)).toBe(false);
+            expect(utils.needsNormalization('a')).toBe(false);
+            expect(utils.needsNormalization(0)).toBe(false);
+            expect(utils.needsNormalization(false)).toBe(false);
+        });
+
+        it('should return false for an empty object', () => {
+            expect(utils.needsNormalization({})).toBe(false);
+        });
+
+        it('should return false for an object without nullish values or the replace-object mark', () => {
+            expect(utils.needsNormalization(testObject)).toBe(false);
+        });
+
+        it('should return true for an object with a nullish value at the top level', () => {
+            expect(utils.needsNormalization({a: 'a', b: null})).toBe(true);
+            expect(utils.needsNormalization({a: 'a', b: undefined})).toBe(true);
+        });
+
+        it('should return true for an object with a nullish value nested deeply', () => {
+            expect(utils.needsNormalization(testObjectWithNullishValues)).toBe(true);
+            expect(utils.needsNormalization({a: {b: {c: {d: null}}}})).toBe(true);
+        });
+
+        it('should return true for an object marked with the replace-object mark at the top level', () => {
+            expect(utils.needsNormalization({[utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true})).toBe(true);
+        });
+
+        it('should return true for an object marked with the replace-object mark nested deeply', () => {
+            expect(utils.needsNormalization({a: {b: {[utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true, c: 'c'}}})).toBe(true);
+        });
+
+        it('should return false for arrays, since arrays are stored as-is and are not normalized', () => {
+            expect(utils.needsNormalization([])).toBe(false);
+            expect(utils.needsNormalization([1, 2, 3])).toBe(false);
+            expect(utils.needsNormalization([null, undefined])).toBe(false);
+        });
+
+        it('should not look inside nested arrays', () => {
+            expect(utils.needsNormalization({a: [null, undefined]})).toBe(false);
+            expect(utils.needsNormalization({a: [{b: null}]})).toBe(false);
+        });
+
+        it('should return false for Date and RegExp values, which have no enumerable properties', () => {
+            expect(utils.needsNormalization({a: new Date()})).toBe(false);
+            expect(utils.needsNormalization({a: /abc/})).toBe(false);
+        });
+    });
+
     describe('removeNestedNullValues', () => {
         it('should remove null values by merging two identical objects with fastMerge', () => {
             const result = utils.removeNestedNullValues(testObjectWithNullishValues);
@@ -387,6 +439,53 @@ describe('utils', () => {
                 const result = utils.removeNestedNullValues(value);
                 expect(result).toBe(value);
             });
+        });
+    });
+
+    describe('chunkArray', () => {
+        it('should return an empty array when given an empty array', () => {
+            expect(utils.chunkArray([], 3)).toEqual([]);
+        });
+
+        it('should return a single chunk when the array length is less than maxChunkSize', () => {
+            const items = [1, 2];
+            const result = utils.chunkArray(items, 3);
+
+            expect(result).toEqual([[1, 2]]);
+            expect(result[0]).toBe(items);
+        });
+
+        it('should return a single chunk when the array length equals maxChunkSize', () => {
+            const items = [1, 2, 3];
+            const result = utils.chunkArray(items, 3);
+
+            expect(result).toEqual([[1, 2, 3]]);
+            expect(result[0]).toBe(items);
+        });
+
+        it('should split the array into evenly sized chunks', () => {
+            expect(utils.chunkArray([1, 2, 3, 4, 5, 6], 3)).toEqual([
+                [1, 2, 3],
+                [4, 5, 6],
+            ]);
+        });
+
+        it('should include a smaller final chunk when the array length is not divisible by maxChunkSize', () => {
+            expect(utils.chunkArray([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
+        });
+
+        it('should create one item per chunk when maxChunkSize is 1', () => {
+            expect(utils.chunkArray(['a', 'b', 'c'], 1)).toEqual([['a'], ['b'], ['c']]);
+        });
+
+        it('should work with readonly arrays and preserve element types', () => {
+            const items = Object.freeze(['x', 'y', 'z', 'w']) as readonly string[];
+            const result = utils.chunkArray(items, 2);
+
+            expect(result).toEqual([
+                ['x', 'y'],
+                ['z', 'w'],
+            ]);
         });
     });
 
