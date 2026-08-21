@@ -129,7 +129,7 @@ function init({
 
     // Initialize all of our keys with data provided then give green light to any pending connections.
     // addEvictableKeysToRecentlyAccessedList must run after initializeWithDefaultKeyStates because
-    // eager cache loading populates the key index (cache.setAllKeys) inside initializeWithDefaultKeyStates,
+    // eager cache loading populates the key index (cache.hydrate) inside initializeWithDefaultKeyStates,
     // and the evictable keys list depends on that index being populated.
     OnyxUtils.initializeWithDefaultKeyStates()
         .then(() => cache.addEvictableKeysToRecentlyAccessedList(OnyxKeys.isCollectionKey, OnyxUtils.getAllKeys))

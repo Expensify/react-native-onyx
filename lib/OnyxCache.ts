@@ -2,6 +2,7 @@ import {deepEqual} from 'fast-equals';
 import bindAll from 'lodash/bindAll';
 import type {ValueOf} from 'type-fest';
 import utils from './utils';
+import type {FastMergeOptions} from './utils';
 import type {CollectionKeyBase, KeyValueMapping, NonUndefined, OnyxCollection, OnyxKey, OnyxValue} from './types';
 import OnyxKeys from './OnyxKeys';
 
@@ -14,6 +15,16 @@ type CollectionSnapshot = Readonly<NonUndefined<OnyxCollection<KeyValueMapping[O
  * which relies on === equality to detect changes.
  */
 const FROZEN_EMPTY_COLLECTION: Readonly<NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>>> = Object.freeze({});
+
+/**
+ * Merge options shared by every cache write path (`merge()` and `hydrate()`'s fallback), so the
+ * three call sites can't drift apart. Cached values must never hold nested nulls, and a source
+ * object carrying the replace mark must replace the target object rather than merge into it.
+ */
+const CACHE_MERGE_OPTIONS: FastMergeOptions = {
+    shouldRemoveNestedNulls: true,
+    objectRemovalMode: 'replace',
+};
 
 // Task constants
 const TASK = {
@@ -77,6 +88,7 @@ class OnyxCache {
             'set',
             'drop',
             'merge',
+            'hydrate',
             'hasPendingTask',
             'getTaskPromise',
             'captureTask',
@@ -200,6 +212,79 @@ class OnyxCache {
     }
 
     /**
+     * Bulk-loads values into a cache that's expected to be empty, skipping merge()'s per-key clone when
+     * safe. Falls back to a real merge for any key that already has a value, in case the cache wasn't
+     * empty after all. Used only by `Onyx.init()`.
+     * @param data - a map of (cache) key - values
+     */
+    hydrate(data: Record<OnyxKey, OnyxValue<OnyxKey>>): void {
+        if (data === null || typeof data !== 'object' || Array.isArray(data)) {
+            throw new Error('data passed to cache.hydrate() must be an Object of onyx key/value pairs');
+        }
+
+        const affectedCollections = new Set<OnyxKey>();
+
+        // Use for-in loop to avoid an unnecessary array allocation from Object.keys()
+        // eslint-disable-next-line no-restricted-syntax, guard-for-in
+        for (const key in data) {
+            const value = data[key];
+            this.addKey(key);
+
+            if (value === undefined) {
+                this.addNullishStorageKey(key);
+                // undefined means "no change" — skip storageMap modification
+                continue;
+            }
+
+            const collectionKey = OnyxKeys.getCollectionKey(key);
+
+            if (value === null) {
+                this.addNullishStorageKey(key);
+                delete this.storageMap[key];
+
+                if (collectionKey) {
+                    affectedCollections.add(collectionKey);
+                }
+            } else {
+                this.nullishStorageKeys.delete(key);
+
+                const existing = this.storageMap[key];
+
+                if (existing !== undefined) {
+                    // Key already has a value, so the empty-cache assumption doesn't hold here (e.g. a write
+                    // landed while storage was still being read). Fall back to a real merge, which has exactly
+                    // the same semantics as the old `cache.merge(allDataFromStorage)` init path: the value
+                    // loaded from disk is the merge source, so it wins on any overlapping leaf key.
+                    // Note: this only covers non-null writes. A `cache.set(key, null)` that lands before hydrate
+                    // clears the nullish marker too, so a deletion racing init is still undone - same as before.
+                    const merged = utils.fastMerge(existing, value, CACHE_MERGE_OPTIONS).result;
+
+                    // fastMerge is reference-stable: returns the original target when
+                    // nothing changed, so a simple === check detects no-ops.
+                    if (merged === existing) {
+                        continue;
+                    }
+
+                    this.storageMap[key] = merged;
+                } else if (utils.needsNormalization(value)) {
+                    this.storageMap[key] = utils.fastMerge(undefined, value, CACHE_MERGE_OPTIONS).result;
+                } else {
+                    this.storageMap[key] = value;
+                }
+
+                if (collectionKey) {
+                    affectedCollections.add(collectionKey);
+                }
+            }
+        }
+
+        // Mark affected collections as dirty — snapshots will be lazily rebuilt on next read
+        for (const collectionKey of affectedCollections) {
+            this.dirtyCollections.add(collectionKey);
+        }
+    }
+
+    /**
      * Deep merge data to cache, any non existing keys will be created
      * @param data - a map of (cache) key - values
      */
@@ -210,7 +295,10 @@ class OnyxCache {
 
         const affectedCollections = new Set<OnyxKey>();
 
-        for (const [key, value] of Object.entries(data)) {
+        // Use for-in loop to avoid an unnecessary array allocation from Object.entries()
+        // eslint-disable-next-line no-restricted-syntax, guard-for-in
+        for (const key in data) {
+            const value = data[key];
             this.addKey(key);
 
             const collectionKey = OnyxKeys.getCollectionKey(key);
@@ -233,10 +321,7 @@ class OnyxCache {
 
                 // Per-key merge instead of spreading the entire storageMap
                 const existing = this.storageMap[key];
-                const merged = utils.fastMerge(existing, value, {
-                    shouldRemoveNestedNulls: true,
-                    objectRemovalMode: 'replace',
-                }).result;
+                const merged = utils.fastMerge(existing, value, CACHE_MERGE_OPTIONS).result;
 
                 // fastMerge is reference-stable: returns the original target when
                 // nothing changed, so a simple === check detects no-ops.
