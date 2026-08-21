@@ -330,11 +330,11 @@ describe('utils', () => {
         });
 
         it('should return true for an object marked with the replace-object mark at the top level', () => {
-            expect(utils.needsNormalization({[utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true})).toBe(true);
+            expect(utils.needsNormalization({[utils.ONYX_INTERNALS_REPLACE_OBJECT_MARK]: true})).toBe(true);
         });
 
         it('should return true for an object marked with the replace-object mark nested deeply', () => {
-            expect(utils.needsNormalization({a: {b: {[utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true, c: 'c'}}})).toBe(true);
+            expect(utils.needsNormalization({a: {b: {[utils.ONYX_INTERNALS_REPLACE_OBJECT_MARK]: true, c: 'c'}}})).toBe(true);
         });
 
         it('should return false for arrays, since arrays are stored as-is and are not normalized', () => {

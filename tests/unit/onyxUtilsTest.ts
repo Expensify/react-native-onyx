@@ -826,12 +826,13 @@ describe('OnyxUtils', () => {
         it.each([['[NativeNitroSQLiteException][SqlExecutionError] disk I/O error'], ['[NativeNitroSQLiteException][SqlExecutionError] unable to open database file']])(
             'should not retry disk-pressure errors (%s)',
             async (message) => {
-                StorageMock.setItem = jest.fn().mockRejectedValue(new Error(message));
+                const setItemSpy = jest.fn().mockRejectedValue(new Error(message));
+                StorageMock.setItem = setItemSpy;
 
                 await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
                 // Called once (initial attempt only): retries cannot succeed while the device disk is full.
-                expect(retryOperationSpy).toHaveBeenCalledTimes(1);
+                expect(setItemSpy).toHaveBeenCalledTimes(1);
             },
         );
 
