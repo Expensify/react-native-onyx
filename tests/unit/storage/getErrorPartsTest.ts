@@ -33,7 +33,8 @@ describe('getErrorParts', () => {
     });
 
     it('should not throw on BigInt', () => {
-        expect(() => getErrorParts(1n)).not.toThrow();
-        expect(getErrorParts(1n)).toEqual({name: '', message: '1'});
+        const value = BigInt(1);
+        expect(() => getErrorParts(value)).not.toThrow();
+        expect(getErrorParts(value)).toEqual({name: '', message: '1'});
     });
 });
