@@ -234,7 +234,7 @@ function sendActionToDevTools(
     value: OnyxCollection<KeyValueMapping[OnyxKey]> | OnyxEntry<KeyValueMapping[OnyxKey]>,
     mergedValue: OnyxEntry<KeyValueMapping[OnyxKey]> = undefined,
 ): void {
-    DevTools.registerAction(utils.formatActionName(method, key), value, key ? {[key]: mergedValue || value} : (value as OnyxCollection<KeyValueMapping[OnyxKey]>));
+    DevTools.registerAction(utils.formatActionName(method, key), value, key ? {[key]: mergedValue !== undefined ? mergedValue : value} : (value as OnyxCollection<KeyValueMapping[OnyxKey]>));
 }
 
 /**
