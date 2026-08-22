@@ -35,14 +35,10 @@ const StorageErrorClass = {
  */
 function serializeThrownValue(error: unknown): string {
     try {
-        const serialized = JSON.stringify(error);
-        if (serialized !== undefined) {
-            return serialized;
-        }
+        return JSON.stringify(error) ?? String(error);
     } catch {
-        // fall through to String()
+        return String(error);
     }
-    return String(error);
 }
 
 /**
