@@ -28,7 +28,6 @@
 "lib/storage/InstanceSync/index.web.ts"	"@typescript-eslint/no-unsafe-type-assertion"	1
 "lib/storage/InstanceSync/index.web.ts"	"@typescript-eslint/restrict-template-expressions"	1
 "lib/storage/__mocks__/index.ts"	"@typescript-eslint/no-unsafe-argument"	1
-"lib/storage/index.ts"	"no-nested-ternary"	1
 "lib/storage/providers/IDBKeyValProvider/index.ts"	"@typescript-eslint/no-unsafe-return"	1
 "lib/storage/providers/IDBKeyValProvider/index.ts"	"@typescript-eslint/no-unsafe-type-assertion"	3
 "lib/storage/providers/IDBKeyValProvider/index.ts"	"rulesdir/prefer-at"	1

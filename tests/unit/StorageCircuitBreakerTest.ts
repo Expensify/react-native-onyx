@@ -140,10 +140,12 @@ describe('StorageCircuitBreaker', () => {
             StorageCircuitBreaker.recordCapacityFailure();
         }
         expectAdmissionOpen();
+        expect(StorageCircuitBreaker.peekState()).toBe('open');
 
         advance(ROLLING_WINDOW_MS);
 
         expectAdmissionHalfOpen();
+        expect(StorageCircuitBreaker.peekState()).toBe('halfOpen');
     });
 
     it('should admit only one capacity retry while half-open', () => {
