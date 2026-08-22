@@ -1,5 +1,5 @@
 import {deepEqual} from 'fast-equals';
-import bindAll from 'lodash/bindAll';
+import bindAll from 'lodash.bindall';
 import type {ValueOf} from 'type-fest';
 import utils from './utils';
 import type {FastMergeOptions} from './utils';

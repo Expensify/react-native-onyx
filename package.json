@@ -65,6 +65,7 @@
     "@types/jest": "^29.5.14",
     "@types/jsdoc-to-markdown": "^7.0.6",
     "@types/lodash": "^4.14.202",
+    "@types/lodash.bindall": "^4.4.9",
     "@types/node": "^20.11.5",
     "@types/react": "^18.2.14",
     "@types/react-native": "^0.70.0",
