@@ -1,4 +1,4 @@
-import bindAll from 'lodash/bindAll';
+import bindAll from 'lodash.bindall';
 import * as Logger from './Logger';
 import type {ConnectOptions} from './Onyx';
 import OnyxUtils from './OnyxUtils';
