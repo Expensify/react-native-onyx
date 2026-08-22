@@ -123,6 +123,25 @@ describe('OnyxSnapshotCache', () => {
             expect(secondCall).toBe(thirdCall);
         });
 
+        it('should return a stable number for the same selector and a different number for a different selector', () => {
+            const selectorA: TestSelector = (data) => {
+                const testData = data as TestData | undefined;
+                return testData?.name ?? '';
+            };
+            const selectorB: TestSelector = (data) => {
+                const testData = data as TestData | undefined;
+                return testData?.id ?? '';
+            };
+
+            const firstA = cache.getSelectorID(selectorA);
+            const firstB = cache.getSelectorID(selectorB);
+            const secondA = cache.getSelectorID(selectorA);
+
+            expect(typeof firstA).toBe('number');
+            expect(firstA).toBe(secondA);
+            expect(firstB).not.toBe(firstA);
+        });
+
         it('should clear selector IDs and reset counter', () => {
             const selector1: TestSelector = (data) => {
                 const testData = data as TestData | undefined;

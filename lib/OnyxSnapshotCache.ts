@@ -43,11 +43,13 @@ class OnyxSnapshotCache {
      */
     getSelectorID<TKey extends OnyxKey, TReturnValue>(selector: UseOnyxSelector<TKey, TReturnValue>): number {
         const typedSelector = selector as unknown as UseOnyxSelector<OnyxKey, unknown>;
-        if (!this.selectorIDMap.has(typedSelector)) {
-            const id = this.selectorIDCounter++;
-            this.selectorIDMap.set(typedSelector, id);
+        const existingID = this.selectorIDMap.get(typedSelector);
+        if (existingID !== undefined) {
+            return existingID;
         }
-        return this.selectorIDMap.get(typedSelector)!;
+        const id = this.selectorIDCounter++;
+        this.selectorIDMap.set(typedSelector, id);
+        return id;
     }
 
     /**
@@ -67,7 +69,7 @@ class OnyxSnapshotCache {
         const cacheKey = `${key}_${selectorID}`;
 
         // Increment reference count for this cache key
-        const currentCount = this.cacheKeyRefCounts.get(cacheKey) || 0;
+        const currentCount = this.cacheKeyRefCounts.get(cacheKey) ?? 0;
         this.cacheKeyRefCounts.set(cacheKey, currentCount + 1);
 
         return cacheKey;
@@ -78,7 +80,7 @@ class OnyxSnapshotCache {
      * Decrements reference counter and removes cache entry if no consumers remain.
      */
     deregisterConsumer(key: OnyxKey, cacheKey: string): void {
-        const currentCount = this.cacheKeyRefCounts.get(cacheKey) || 0;
+        const currentCount = this.cacheKeyRefCounts.get(cacheKey) ?? 0;
 
         if (currentCount <= 1) {
             // Last consumer - remove from reference counter and cache
@@ -111,10 +113,12 @@ class OnyxSnapshotCache {
      * Set cached snapshot result for a key and cache key combination
      */
     setCachedResult<TResult extends UseOnyxResult<OnyxValue<OnyxKey>>>(key: OnyxKey, cacheKey: string, result: TResult): void {
-        if (!this.snapshotCache.has(key)) {
-            this.snapshotCache.set(key, new Map());
+        let keyCache = this.snapshotCache.get(key);
+        if (!keyCache) {
+            keyCache = new Map();
+            this.snapshotCache.set(key, keyCache);
         }
-        this.snapshotCache.get(key)!.set(cacheKey, result);
+        keyCache.set(cacheKey, result);
     }
 
     /**
