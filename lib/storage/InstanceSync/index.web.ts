@@ -95,7 +95,7 @@ let storage = NoopProvider;
 const InstanceSync = {
     shouldBeUsed: true,
     /**
-     * @param {Function} onStorageKeysChanged Storage synchronization mechanism keeping all opened tabs in sync
+     * @param onStorageKeysChanged Storage synchronization mechanism keeping all opened tabs in sync
      */
     init: (onStorageKeysChanged: OnStorageKeysChanged, store: StorageProvider<unknown>) => {
         storage = store;

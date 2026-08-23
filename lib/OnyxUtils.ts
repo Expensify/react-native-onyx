@@ -1,14 +1,11 @@
-import {shallowEqual} from 'fast-equals';
 import type {ValueOf} from 'type-fest';
+
+import {shallowEqual} from 'fast-equals';
 import _ from 'underscore';
-import DevTools from './DevTools';
-import * as Logger from './Logger';
+
+import type {DeferredTask} from './createDeferredTask';
 import type Onyx from './Onyx';
-import cache, {TASK} from './OnyxCache';
-import OnyxKeys from './OnyxKeys';
-import StorageCircuitBreaker from './StorageCircuitBreaker';
-import Storage from './storage';
-import {StorageErrorClass} from './storage/errors';
+import type {StorageKeyValuePair} from './storage/providers/types';
 import type {
     CollectionKeyBase,
     ConnectOptions,
@@ -33,11 +30,17 @@ import type {
     RetriableOnyxOperation,
 } from './types';
 import type {FastMergeOptions, FastMergeResult} from './utils';
-import utils from './utils';
-import type {DeferredTask} from './createDeferredTask';
+
 import createDeferredTask from './createDeferredTask';
-import type {StorageKeyValuePair} from './storage/providers/types';
+import DevTools from './DevTools';
+import * as Logger from './Logger';
 import logMessages from './logMessages';
+import cache, {TASK} from './OnyxCache';
+import OnyxKeys from './OnyxKeys';
+import Storage from './storage';
+import {StorageErrorClass} from './storage/errors';
+import StorageCircuitBreaker from './StorageCircuitBreaker';
+import utils from './utils';
 
 // Method constants
 const METHOD = {
@@ -63,6 +66,10 @@ function resetDiskPressureLogThrottle(): void {
 }
 
 type OnyxMethod = ValueOf<typeof METHOD>;
+
+function formatCaughtError(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
+}
 
 /** Result of `prepareKeyValuePairsForStorage`: pairs to write and keys whose `null` value marks them for removal. */
 type PreparedKeyValuePairs = {
@@ -364,7 +371,10 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
             // Wait for all the pending tasks to resolve and then add the data to the data map.
             .then((values) => {
                 for (const [index, value] of values.entries()) {
-                    dataMap.set(pendingKeys[index], value);
+                    const pendingKey = pendingKeys.at(index);
+                    if (pendingKey !== undefined) {
+                        dataMap.set(pendingKey, value);
+                    }
                 }
 
                 return Promise.resolve();
@@ -406,7 +416,7 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
                     }
 
                     dataMap.set(key, value as OnyxValue<TKey>);
-                    temp[key] = value as OnyxValue<TKey>;
+                    temp[key] = value;
                 }
                 cache.merge(temp);
                 return dataMap;
@@ -509,7 +519,7 @@ function tryGetCachedValue<TKey extends OnyxKey>(key: TKey): OnyxValue<OnyxKey> 
 function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collectionMemberKeys?: string[]): NonNullable<OnyxCollection<KeyValueMapping[TKey]>> {
     // Use optimized collection data retrieval when cache is populated
     const collectionData = cache.getCollectionData(collectionKey);
-    const allKeys = collectionMemberKeys || cache.getAllKeys();
+    const allKeys = collectionMemberKeys ?? cache.getAllKeys();
     if (collectionData !== undefined && (Array.isArray(allKeys) ? allKeys.length > 0 : allKeys.size > 0)) {
         // If we have specific member keys, filter the collection
         if (collectionMemberKeys) {
@@ -595,10 +605,13 @@ function keysChanged<TKey extends CollectionKeyBase>(
         }
 
         try {
-            lastConnectionCallbackData.set(subscriber.subscriptionID, {value: cachedCollection, matchedKey: subscriber.key});
+            lastConnectionCallbackData.set(subscriber.subscriptionID, {
+                value: cachedCollection,
+                matchedKey: subscriber.key,
+            });
             subscriber.callback(cachedCollection, subscriber.key);
         } catch (error) {
-            Logger.logAlert(`[OnyxUtils.keysChanged] Subscriber callback threw an error for key '${collectionKey}': ${error}`);
+            Logger.logAlert(`[OnyxUtils.keysChanged] Subscriber callback threw an error for key '${collectionKey}': ${formatCaughtError(error)}`);
         }
     }
 
@@ -621,7 +634,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
                 matchedKey: subscriber.key,
             });
         } catch (error) {
-            Logger.logAlert(`[OnyxUtils.keysChanged] Subscriber callback threw an error for key '${collectionKey}': ${error}`);
+            Logger.logAlert(`[OnyxUtils.keysChanged] Subscriber callback threw an error for key '${collectionKey}': ${formatCaughtError(error)}`);
         }
     }
 }
@@ -680,7 +693,10 @@ function keyChanged<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>, can
                         cachedCollection = getCachedCollection(subscriber.key);
                         cachedCollections[subscriber.key] = cachedCollection;
                     }
-                    lastConnectionCallbackData.set(subscriber.subscriptionID, {value: cachedCollection, matchedKey: subscriber.key});
+                    lastConnectionCallbackData.set(subscriber.subscriptionID, {
+                        value: cachedCollection,
+                        matchedKey: subscriber.key,
+                    });
                     subscriber.callback(cachedCollection, subscriber.key);
                     continue;
                 }
@@ -694,7 +710,7 @@ function keyChanged<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>, can
                 });
                 continue;
             } catch (error) {
-                Logger.logAlert(`[OnyxUtils.keyChanged] Subscriber callback threw an error for key '${key}': ${error}`);
+                Logger.logAlert(`[OnyxUtils.keyChanged] Subscriber callback threw an error for key '${key}': ${formatCaughtError(error)}`);
             }
 
             continue;
@@ -932,7 +948,8 @@ function prepareKeyValuePairsForStorage(
             continue;
         }
 
-        const valueWithoutNestedNullValues = shouldRemoveNestedNulls ?? true ? utils.removeNestedNullValues(value) : value;
+        const shouldRemoveNestedNullsWithDefault = shouldRemoveNestedNulls ?? true;
+        const valueWithoutNestedNullValues = shouldRemoveNestedNullsWithDefault ? utils.removeNestedNullValues(value) : value;
 
         if (valueWithoutNestedNullValues !== undefined) {
             pairs.push([key, valueWithoutNestedNullValues, replaceNullPatches?.[key]]);
@@ -948,7 +965,7 @@ function prepareKeyValuePairsForStorage(
  * @param changes Array of changes that should be merged
  * @param existingValue The existing value that should be merged with the changes
  */
-function mergeChanges<TValue extends OnyxInput<OnyxKey> | undefined, TChange extends OnyxInput<OnyxKey> | undefined>(changes: TChange[], existingValue?: TValue): FastMergeResult<TChange> {
+function mergeChanges<TValue extends OnyxInput<OnyxKey>, TChange extends OnyxInput<OnyxKey>>(changes: TChange[], existingValue?: TValue): FastMergeResult<TChange> {
     return mergeInternal('merge', changes, existingValue);
 }
 
@@ -959,10 +976,7 @@ function mergeChanges<TValue extends OnyxInput<OnyxKey> | undefined, TChange ext
  * @param changes Array of changes that should be merged
  * @param existingValue The existing value that should be merged with the changes
  */
-function mergeAndMarkChanges<TValue extends OnyxInput<OnyxKey> | undefined, TChange extends OnyxInput<OnyxKey> | undefined>(
-    changes: TChange[],
-    existingValue?: TValue,
-): FastMergeResult<TChange> {
+function mergeAndMarkChanges<TValue extends OnyxInput<OnyxKey>, TChange extends OnyxInput<OnyxKey>>(changes: TChange[], existingValue?: TValue): FastMergeResult<TChange> {
     return mergeInternal('mark', changes, existingValue);
 }
 
@@ -972,11 +986,7 @@ function mergeAndMarkChanges<TValue extends OnyxInput<OnyxKey> | undefined, TCha
  * @param changes Array of changes that should be merged
  * @param existingValue The existing value that should be merged with the changes
  */
-function mergeInternal<TValue extends OnyxInput<OnyxKey> | undefined, TChange extends OnyxInput<OnyxKey> | undefined>(
-    mode: 'merge' | 'mark',
-    changes: TChange[],
-    existingValue?: TValue,
-): FastMergeResult<TChange> {
+function mergeInternal<TValue extends OnyxInput<OnyxKey>, TChange extends OnyxInput<OnyxKey>>(mode: 'merge' | 'mark', changes: TChange[], existingValue?: TValue): FastMergeResult<TChange> {
     const lastChange = changes?.at(-1);
 
     if (Array.isArray(lastChange)) {
@@ -1267,7 +1277,7 @@ function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, me
             }
 
             if (Array.isArray(value) || Array.isArray(snapshotData[key])) {
-                updatedData[key] = value || [];
+                updatedData[key] = value ?? [];
                 continue;
             }
 
@@ -1276,7 +1286,7 @@ function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, me
                 continue;
             }
 
-            const oldValue = updatedData[key] || {};
+            const oldValue = updatedData[key] ?? {};
 
             // Snapshot entries are stored as a "shape" of the last known data per key, so by default we only
             // merge fields that already exist in the snapshot to avoid unintentionally bloating snapshot data.
@@ -1304,6 +1314,14 @@ function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, me
     return promises;
 }
 
+function logKeyChanged(onyxMethod: Extract<OnyxMethod, 'set' | 'merge'>, key: OnyxKey, value: unknown, hasChanged: boolean) {
+    Logger.logInfo(`${onyxMethod} called for key: ${key}${_.isObject(value) ? ` properties: ${_.keys(value).join(',')}` : ''} hasChanged: ${hasChanged}`);
+}
+
+function logKeyRemoved(onyxMethod: Extract<OnyxMethod, 'set' | 'merge'>, key: OnyxKey) {
+    Logger.logInfo(`${onyxMethod} called for key: ${key} => null passed, so key was removed`);
+}
+
 /**
  * Writes a value to our store with the given key.
  * Serves as core implementation for `Onyx.set()` public function, the difference being
@@ -1318,8 +1336,8 @@ function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, me
 function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKey>, retryAttempt?: number): Promise<void> {
     // When we use Onyx.set to set a key we want to clear the current delta changes from Onyx.merge that were queued
     // before the value was set. If Onyx.merge is currently reading the old value from storage, it will then not apply the changes.
-    if (OnyxUtils.hasPendingMergeForKey(key)) {
-        delete OnyxUtils.getMergeQueue()[key];
+    if (hasPendingMergeForKey(key)) {
+        delete getMergeQueue()[key];
     }
 
     if (skippableCollectionMemberIDs.size) {
@@ -1363,18 +1381,18 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
     // If the change is null, we can just delete the key.
     // Therefore, we don't need to further broadcast and update the value so we can return early.
     if (value === null) {
-        OnyxUtils.remove(key);
-        OnyxUtils.logKeyRemoved(OnyxUtils.METHOD.SET, key);
+        remove(key);
+        logKeyRemoved(METHOD.SET, key);
         return Promise.resolve();
     }
 
     const valueWithoutNestedNullValues = utils.removeNestedNullValues(value) as OnyxValue<TKey>;
     const hasChanged = options?.skipCacheCheck ? true : cache.hasValueChanged(key, valueWithoutNestedNullValues);
 
-    OnyxUtils.logKeyChanged(OnyxUtils.METHOD.SET, key, value, hasChanged);
+    logKeyChanged(METHOD.SET, key, value, hasChanged);
 
     // This approach prioritizes fast UI changes without waiting for data to be stored in device storage.
-    OnyxUtils.broadcastUpdate(key, valueWithoutNestedNullValues, hasChanged);
+    broadcastUpdate(key, valueWithoutNestedNullValues, hasChanged);
 
     // If the value has not changed and this isn't a retry attempt, calling Storage.setItem() would be redundant and a waste of performance, so return early instead.
     if (!hasChanged && !retryAttempt) {
@@ -1383,15 +1401,15 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
 
     // If a key is a RAM-only key or a member of RAM-only collection, we skip the step that modifies the storage
     if (OnyxKeys.isRamOnlyKey(key)) {
-        OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
+        sendActionToDevTools(METHOD.SET, key, valueWithoutNestedNullValues);
         return Promise.resolve();
     }
 
     return Storage.setItem(key, valueWithoutNestedNullValues)
         .then(() => StorageCircuitBreaker.recordWriteSuccess())
-        .catch((error) => OnyxUtils.retryOperation(error, setWithRetry, {key, value: valueWithoutNestedNullValues, options}, retryAttempt))
+        .catch((error) => retryOperation(error, setWithRetry, {key, value: valueWithoutNestedNullValues, options}, retryAttempt))
         .then(() => {
-            OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
+            sendActionToDevTools(METHOD.SET, key, valueWithoutNestedNullValues);
         });
 }
 
@@ -1423,7 +1441,7 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
         }, {});
     }
 
-    const {pairs: keyValuePairsToSet, keysToRemove: removalCandidates} = OnyxUtils.prepareKeyValuePairsForStorage(newData, true);
+    const {pairs: keyValuePairsToSet, keysToRemove: removalCandidates} = prepareKeyValuePairsForStorage(newData, true);
 
     // Removals of keys that are neither cached nor persisted are no-ops and skipped. When the key
     // index has not been loaded yet (empty set), keep the removal to be safe.
@@ -1445,8 +1463,8 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
     for (const [key, value] of keyValuePairsToSet) {
         // When we use multiSet to set a key we want to clear the current delta changes from Onyx.merge that were queued
         // before the value was set. If Onyx.merge is currently reading the old value from storage, it will then not apply the changes.
-        if (OnyxUtils.hasPendingMergeForKey(key)) {
-            delete OnyxUtils.getMergeQueue()[key];
+        if (hasPendingMergeForKey(key)) {
+            delete getMergeQueue()[key];
         }
 
         const collectionKey = OnyxKeys.getCollectionKey(key);
@@ -1502,7 +1520,7 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
     // Skip on retry — already notified on attempt 0 (see same-reason comment above).
     if (!retryAttempt) {
         for (const [collectionKey, batch] of collectionBatches) {
-            keysChanged(collectionKey as CollectionKeyBase, batch.partial, batch.previous);
+            keysChanged(collectionKey, batch.partial, batch.previous);
         }
     }
 
@@ -1523,9 +1541,9 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
 
     return Promise.all(storagePromises)
         .then(() => StorageCircuitBreaker.recordWriteSuccess())
-        .catch((error) => OnyxUtils.retryOperation(error, multiSetWithRetry, newData, retryAttempt, inFlightKeys))
+        .catch((error) => retryOperation(error, multiSetWithRetry, newData, retryAttempt, inFlightKeys))
         .then(() => {
-            OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MULTI_SET, undefined, newData);
+            sendActionToDevTools(METHOD.MULTI_SET, undefined, newData);
         });
 }
 
@@ -1545,7 +1563,7 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
     let resultCollectionKeys = Object.keys(resultCollection);
 
     // Confirm all the collection keys belong to the same parent
-    if (!OnyxUtils.doAllCollectionItemsBelongToSameParent(collectionKey, resultCollectionKeys)) {
+    if (!doAllCollectionItemsBelongToSameParent(collectionKey, resultCollectionKeys)) {
         Logger.logAlert(`setCollection called with keys that do not belong to the same parent ${collectionKey}. Skipping this update.`);
         return Promise.resolve();
     }
@@ -1568,7 +1586,7 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
     }
     resultCollectionKeys = Object.keys(resultCollection);
 
-    return OnyxUtils.getAllKeys().then((persistedKeys) => {
+    return getAllKeys().then((persistedKeys) => {
         const mutableCollection: OnyxInputKeyValueMapping = {...resultCollection};
 
         for (const key of persistedKeys) {
@@ -1582,11 +1600,11 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
             mutableCollection[key] = null;
         }
 
-        const {pairs: keyValuePairs, keysToRemove: removalCandidates} = OnyxUtils.prepareKeyValuePairsForStorage(mutableCollection, true);
+        const {pairs: keyValuePairs, keysToRemove: removalCandidates} = prepareKeyValuePairsForStorage(mutableCollection, true);
         // Removals of keys that are neither cached nor persisted are no-ops and skipped.
         const keysToRemove = removalCandidates.filter((key) => cache.get(key) !== undefined || persistedKeys.has(key));
         // Snapshot before cache mutations so keysChanged() can diff removed members.
-        const previousCollection = OnyxUtils.getCachedCollection(collectionKey);
+        const previousCollection = getCachedCollection(collectionKey);
 
         for (const [key, value] of keyValuePairs) cache.set(key, value);
         for (const key of keysToRemove) cache.drop(key);
@@ -1601,7 +1619,7 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
 
         // RAM-only keys are not supposed to be saved to storage
         if (OnyxKeys.isRamOnlyKey(collectionKey)) {
-            OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET_COLLECTION, undefined, mutableCollection);
+            sendActionToDevTools(METHOD.SET_COLLECTION, undefined, mutableCollection);
             return;
         }
 
@@ -1616,9 +1634,9 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
 
         return Promise.all(storagePromises)
             .then(() => StorageCircuitBreaker.recordWriteSuccess())
-            .catch((error) => OnyxUtils.retryOperation(error, setCollectionWithRetry, {collectionKey, collection}, retryAttempt, inFlightKeys))
+            .catch((error) => retryOperation(error, setCollectionWithRetry, {collectionKey, collection}, retryAttempt, inFlightKeys))
             .then(() => {
-                OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET_COLLECTION, undefined, mutableCollection);
+                sendActionToDevTools(METHOD.SET_COLLECTION, undefined, mutableCollection);
             });
     });
 }
@@ -1902,14 +1920,6 @@ function partialSetCollection<TKey extends CollectionKeyBase>({collectionKey, co
                 sendActionToDevTools(METHOD.SET_COLLECTION, undefined, mutableCollection);
             });
     });
-}
-
-function logKeyChanged(onyxMethod: Extract<OnyxMethod, 'set' | 'merge'>, key: OnyxKey, value: unknown, hasChanged: boolean) {
-    Logger.logInfo(`${onyxMethod} called for key: ${key}${_.isObject(value) ? ` properties: ${_.keys(value).join(',')}` : ''} hasChanged: ${hasChanged}`);
-}
-
-function logKeyRemoved(onyxMethod: Extract<OnyxMethod, 'set' | 'merge'>, key: OnyxKey) {
-    Logger.logInfo(`${onyxMethod} called for key: ${key} => null passed, so key was removed`);
 }
 
 /**

@@ -29,10 +29,8 @@ const mockedReportActionsKeys = Object.keys(mockedReportActionsMap);
 
 // We need access to some internal properties of `connectionManager` during the tests but they are private,
 // so this workaround allows us to have access to them.
-// eslint-disable-next-line dot-notation
-const generateConnectionID = connectionManager['generateConnectionID'];
-// eslint-disable-next-line dot-notation
-const fireCallbacks = connectionManager['fireCallbacks'];
+const generateConnectionID = connectionManager['generateConnectionID'].bind(connectionManager);
+const fireCallbacks = connectionManager['fireCallbacks'].bind(connectionManager);
 
 const resetConectionManagerAfterEachMeasure = () => {
     connectionManager.disconnectAll();
@@ -66,9 +64,15 @@ describe('OnyxConnectionManager', () => {
 
             await measureFunction(() => fireCallbacks(connectionID), {
                 beforeEach: async () => {
-                    connectionID = connectionManager.connect({key: mockedReportActionsKeys[0], callback: jest.fn()}).id;
+                    connectionID = connectionManager.connect({
+                        key: mockedReportActionsKeys[0],
+                        callback: jest.fn(),
+                    }).id;
                     for (let i = 0; i < 9999; i++) {
-                        connectionManager.connect({key: mockedReportActionsKeys[0], callback: jest.fn()});
+                        connectionManager.connect({
+                            key: mockedReportActionsKeys[0],
+                            callback: jest.fn(),
+                        });
                     }
                 },
                 afterEach: async () => {
@@ -108,11 +112,14 @@ describe('OnyxConnectionManager', () => {
 
             await measureFunction(
                 () => {
-                    connectionManager.disconnect(connection as Connection);
+                    connectionManager.disconnect(connection!);
                 },
                 {
                     beforeEach: async () => {
-                        connection = connectionManager.connect({key: mockedReportActionsKeys[0], callback: jest.fn()});
+                        connection = connectionManager.connect({
+                            key: mockedReportActionsKeys[0],
+                            callback: jest.fn(),
+                        });
                     },
                     afterEach: async () => {
                         resetConectionManagerAfterEachMeasure();
@@ -128,7 +135,10 @@ describe('OnyxConnectionManager', () => {
             await measureFunction(() => connectionManager.disconnectAll(), {
                 beforeEach: async () => {
                     for (let i = 0; i < 10000; i++) {
-                        connectionManager.connect({key: mockedReportActionsKeys[0], callback: jest.fn()});
+                        connectionManager.connect({
+                            key: mockedReportActionsKeys[0],
+                            callback: jest.fn(),
+                        });
                     }
                 },
                 afterEach: async () => {

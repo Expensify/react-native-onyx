@@ -14,7 +14,7 @@ const getRandomDate = (): string => {
 
 const getRandomReportActions = (collection: string, length = 10000) =>
     createCollection<Record<string, unknown>>(
-        (item) => `${collection}${item.reportActionID}`,
+        (item) => `${collection}${String(item.reportActionID)}`,
         (index) => createRandomReportAction(index),
         length,
     );

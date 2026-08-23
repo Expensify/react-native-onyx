@@ -3,16 +3,12 @@ import Onyx from '../../lib';
 import type {Connection} from '../../lib/OnyxConnectionManager';
 import connectionManager from '../../lib/OnyxConnectionManager';
 import StorageMock from '../../lib/storage';
-import type GenericCollection from '../utils/GenericCollection';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 // We need access to some internal properties of `connectionManager` during the tests but they are private,
 // so this workaround allows us to have access to them.
-// eslint-disable-next-line dot-notation
 const connectionsMap = connectionManager['connectionsMap'];
-// eslint-disable-next-line dot-notation
-const generateConnectionID = connectionManager['generateConnectionID'];
-// eslint-disable-next-line dot-notation
+const generateConnectionID = connectionManager['generateConnectionID'].bind(connectionManager);
 const getSessionID = () => connectionManager['sessionID'];
 
 const ONYXKEYS = {
@@ -43,13 +39,21 @@ describe('OnyxConnectionManager', () => {
         });
 
         it('should generate a stable, reusable connection ID for collection keys', async () => {
-            const connectionID = generateConnectionID({key: ONYXKEYS.COLLECTION.TEST_KEY});
+            const connectionID = generateConnectionID({
+                key: ONYXKEYS.COLLECTION.TEST_KEY,
+            });
             expect(connectionID).toEqual(`onyxKey=${ONYXKEYS.COLLECTION.TEST_KEY},sessionID=${getSessionID()}`);
         });
 
         it('should generate unique connection IDs if certain options are passed', async () => {
-            const connectionID1 = generateConnectionID({key: ONYXKEYS.TEST_KEY, reuseConnection: false});
-            const connectionID2 = generateConnectionID({key: ONYXKEYS.TEST_KEY, reuseConnection: false});
+            const connectionID1 = generateConnectionID({
+                key: ONYXKEYS.TEST_KEY,
+                reuseConnection: false,
+            });
+            const connectionID2 = generateConnectionID({
+                key: ONYXKEYS.TEST_KEY,
+                reuseConnection: false,
+            });
             expect(connectionID1.startsWith(`onyxKey=${ONYXKEYS.TEST_KEY},sessionID=${getSessionID()},uniqueID=`)).toBeTruthy();
             expect(connectionID2.startsWith(`onyxKey=${ONYXKEYS.TEST_KEY},sessionID=${getSessionID()},uniqueID=`)).toBeTruthy();
             expect(connectionID1).not.toEqual(connectionID2);
@@ -69,7 +73,10 @@ describe('OnyxConnectionManager', () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
 
             const callback1 = jest.fn();
-            const connection = connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback1});
+            const connection = connectionManager.connect({
+                key: ONYXKEYS.TEST_KEY,
+                callback: callback1,
+            });
 
             expect(connectionsMap.has(connection.id)).toBeTruthy();
 
@@ -87,10 +94,16 @@ describe('OnyxConnectionManager', () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
 
             const callback1 = jest.fn();
-            const connection1 = connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback1});
+            const connection1 = connectionManager.connect({
+                key: ONYXKEYS.TEST_KEY,
+                callback: callback1,
+            });
 
             const callback2 = jest.fn();
-            const connection2 = connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback2});
+            const connection2 = connectionManager.connect({
+                key: ONYXKEYS.TEST_KEY,
+                callback: callback2,
+            });
 
             expect(connection1.id).toEqual(connection2.id);
             expect(connectionsMap.size).toEqual(1);
@@ -115,17 +128,23 @@ describe('OnyxConnectionManager', () => {
             const collection = {
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: obj1,
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: obj2,
-            } as GenericCollection;
+            };
             await StorageMock.multiSet([
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`, obj1],
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`, obj2],
             ]);
 
             const callback1 = jest.fn();
-            const connection1 = connectionManager.connect({key: ONYXKEYS.COLLECTION.TEST_KEY, callback: callback1});
+            const connection1 = connectionManager.connect({
+                key: ONYXKEYS.COLLECTION.TEST_KEY,
+                callback: callback1,
+            });
 
             const callback2 = jest.fn();
-            const connection2 = connectionManager.connect({key: ONYXKEYS.COLLECTION.TEST_KEY, callback: callback2});
+            const connection2 = connectionManager.connect({
+                key: ONYXKEYS.COLLECTION.TEST_KEY,
+                callback: callback2,
+            });
 
             // Collection-root connections are now always snapshot mode and are reused.
             expect(connection1.id).toEqual(connection2.id);
@@ -148,7 +167,10 @@ describe('OnyxConnectionManager', () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
 
             const callback1 = jest.fn();
-            connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback1});
+            connectionManager.connect({
+                key: ONYXKEYS.TEST_KEY,
+                callback: callback1,
+            });
 
             await act(async () => waitForPromisesToResolve());
 
@@ -156,13 +178,22 @@ describe('OnyxConnectionManager', () => {
             expect(callback1).toHaveBeenCalledWith('test', ONYXKEYS.TEST_KEY);
 
             const callback2 = jest.fn();
-            connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback2});
+            connectionManager.connect({
+                key: ONYXKEYS.TEST_KEY,
+                callback: callback2,
+            });
 
             const callback3 = jest.fn();
-            connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback3});
+            connectionManager.connect({
+                key: ONYXKEYS.TEST_KEY,
+                callback: callback3,
+            });
 
             const callback4 = jest.fn();
-            connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback4});
+            connectionManager.connect({
+                key: ONYXKEYS.TEST_KEY,
+                callback: callback4,
+            });
 
             await act(async () => waitForPromisesToResolve());
 
@@ -178,7 +209,10 @@ describe('OnyxConnectionManager', () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
 
             const callback1 = jest.fn();
-            connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback1});
+            connectionManager.connect({
+                key: ONYXKEYS.TEST_KEY,
+                callback: callback1,
+            });
 
             await act(async () => waitForPromisesToResolve());
 
@@ -205,10 +239,17 @@ describe('OnyxConnectionManager', () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
 
             const callback1 = jest.fn();
-            const connection1 = connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback1});
+            const connection1 = connectionManager.connect({
+                key: ONYXKEYS.TEST_KEY,
+                callback: callback1,
+            });
 
             const callback2 = jest.fn();
-            const connection2 = connectionManager.connect({key: ONYXKEYS.TEST_KEY, reuseConnection: false, callback: callback2});
+            const connection2 = connectionManager.connect({
+                key: ONYXKEYS.TEST_KEY,
+                reuseConnection: false,
+                callback: callback2,
+            });
 
             expect(connection1.id).not.toEqual(connection2.id);
             expect(connectionsMap.size).toEqual(2);
@@ -218,24 +259,39 @@ describe('OnyxConnectionManager', () => {
 
         it('should reuse the connection to the same collection key and deliver the whole collection object to all subscribers', async () => {
             const collection = {
-                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {id: 'entry1_id', name: 'entry1_name'},
-                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {id: 'entry2_id', name: 'entry2_name'},
-                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry3`]: {id: 'entry3_id', name: 'entry3_name'},
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry1`]: {
+                    id: 'entry1_id',
+                    name: 'entry1_name',
+                },
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry2`]: {
+                    id: 'entry2_id',
+                    name: 'entry2_name',
+                },
+                [`${ONYXKEYS.COLLECTION.TEST_KEY}entry3`]: {
+                    id: 'entry3_id',
+                    name: 'entry3_name',
+                },
             };
 
-            Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, collection as GenericCollection);
+            Onyx.mergeCollection(ONYXKEYS.COLLECTION.TEST_KEY, collection);
 
             await act(async () => waitForPromisesToResolve());
 
             const callback1 = jest.fn();
-            const connection1 = connectionManager.connect({key: ONYXKEYS.COLLECTION.TEST_KEY, callback: callback1});
+            const connection1 = connectionManager.connect({
+                key: ONYXKEYS.COLLECTION.TEST_KEY,
+                callback: callback1,
+            });
 
             await act(async () => waitForPromisesToResolve());
 
             expect(callback1).toHaveBeenCalledWith(collection, ONYXKEYS.COLLECTION.TEST_KEY);
 
             const callback2 = jest.fn();
-            const connection2 = connectionManager.connect({key: ONYXKEYS.COLLECTION.TEST_KEY, callback: callback2});
+            const connection2 = connectionManager.connect({
+                key: ONYXKEYS.COLLECTION.TEST_KEY,
+                callback: callback2,
+            });
 
             expect(connection1.id).toEqual(connection2.id);
             expect(connectionsMap.size).toEqual(1);
@@ -254,7 +310,10 @@ describe('OnyxConnectionManager', () => {
             }).not.toThrow();
 
             expect(() => {
-                connectionManager.disconnect({id: 'connectionID1', callbackID: 'callbackID1'});
+                connectionManager.disconnect({
+                    id: 'connectionID1',
+                    callbackID: 'callbackID1',
+                });
             }).not.toThrow();
         });
 
@@ -262,7 +321,10 @@ describe('OnyxConnectionManager', () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
 
             const callback1 = jest.fn();
-            connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback1});
+            connectionManager.connect({
+                key: ONYXKEYS.TEST_KEY,
+                callback: callback1,
+            });
             expect(connectionsMap.size).toEqual(1);
 
             await act(async () => waitForPromisesToResolve());
@@ -278,10 +340,16 @@ describe('OnyxConnectionManager', () => {
             callback1.mockReset();
 
             const callback2 = jest.fn();
-            connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback2});
+            connectionManager.connect({
+                key: ONYXKEYS.TEST_KEY,
+                callback: callback2,
+            });
 
             const callback3 = jest.fn();
-            connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback3});
+            connectionManager.connect({
+                key: ONYXKEYS.TEST_KEY,
+                callback: callback3,
+            });
 
             // We expect to have two connections for ONYXKEYS.TEST_KEY, one for the first subscription before Onyx.clear(),
             // and the other for the two subscriptions with the same key after Onyx.clear().
@@ -313,8 +381,16 @@ describe('OnyxConnectionManager', () => {
         it('should clean up the correct subscription ID from lastConnectionCallbackData on disconnect', async () => {
             const deleteSpy = jest.spyOn(Map.prototype, 'delete');
 
-            const connectionA = Onyx.connect({key: ONYXKEYS.TEST_KEY, callback: jest.fn(), reuseConnection: false});
-            Onyx.connect({key: ONYXKEYS.TEST_KEY, callback: jest.fn(), reuseConnection: false});
+            const connectionA = Onyx.connect({
+                key: ONYXKEYS.TEST_KEY,
+                callback: jest.fn(),
+                reuseConnection: false,
+            });
+            Onyx.connect({
+                key: ONYXKEYS.TEST_KEY,
+                callback: jest.fn(),
+                reuseConnection: false,
+            });
             await act(async () => waitForPromisesToResolve());
 
             const subscriptionIdA = connectionsMap.get(connectionA.id)?.subscriptionID;
@@ -334,8 +410,16 @@ describe('OnyxConnectionManager', () => {
         it('should remove the subscription ID from onyxKeyToSubscriptionIDs on disconnect', async () => {
             const setSpy = jest.spyOn(Map.prototype, 'set');
 
-            const connectionA = Onyx.connect({key: ONYXKEYS.TEST_KEY, callback: jest.fn(), reuseConnection: false});
-            const connectionB = Onyx.connect({key: ONYXKEYS.TEST_KEY, callback: jest.fn(), reuseConnection: false});
+            const connectionA = Onyx.connect({
+                key: ONYXKEYS.TEST_KEY,
+                callback: jest.fn(),
+                reuseConnection: false,
+            });
+            const connectionB = Onyx.connect({
+                key: ONYXKEYS.TEST_KEY,
+                callback: jest.fn(),
+                reuseConnection: false,
+            });
             await act(async () => waitForPromisesToResolve());
 
             const subscriptionIdA = connectionsMap.get(connectionA.id)?.subscriptionID;
@@ -347,7 +431,7 @@ describe('OnyxConnectionManager', () => {
             const setCallsForKey = setSpy.mock.calls.filter((call) => call[0] === ONYXKEYS.TEST_KEY);
             expect(setCallsForKey.length).toBeGreaterThan(0);
 
-            const updatedIDs = setCallsForKey[setCallsForKey.length - 1][1] as number[];
+            const updatedIDs = setCallsForKey.at(setCallsForKey.length - 1)![1] as number[];
             expect(updatedIDs).not.toContain(subscriptionIdA);
             expect(updatedIDs).toContain(subscriptionIdB);
 
@@ -362,13 +446,22 @@ describe('OnyxConnectionManager', () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY_2, 'test2');
 
             const callback1 = jest.fn();
-            const connection1 = connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback1});
+            const connection1 = connectionManager.connect({
+                key: ONYXKEYS.TEST_KEY,
+                callback: callback1,
+            });
 
             const callback2 = jest.fn();
-            const connection2 = connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: callback2});
+            const connection2 = connectionManager.connect({
+                key: ONYXKEYS.TEST_KEY,
+                callback: callback2,
+            });
 
             const callback3 = jest.fn();
-            const connection3 = connectionManager.connect({key: ONYXKEYS.TEST_KEY_2, callback: callback3});
+            const connection3 = connectionManager.connect({
+                key: ONYXKEYS.TEST_KEY_2,
+                callback: callback3,
+            });
 
             expect(connection1.id).toEqual(connection2.id);
             expect(connectionsMap.size).toEqual(2);
@@ -388,13 +481,19 @@ describe('OnyxConnectionManager', () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
             await StorageMock.setItem(ONYXKEYS.TEST_KEY_2, 'test2');
 
-            const connection1 = connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: jest.fn()});
+            const connection1 = connectionManager.connect({
+                key: ONYXKEYS.TEST_KEY,
+                callback: jest.fn(),
+            });
 
             expect(connectionsMap.size).toEqual(1);
 
             connectionManager.refreshSessionID();
 
-            const connection2 = connectionManager.connect({key: ONYXKEYS.TEST_KEY, callback: jest.fn()});
+            const connection2 = connectionManager.connect({
+                key: ONYXKEYS.TEST_KEY,
+                callback: jest.fn(),
+            });
 
             expect(connectionsMap.size).toEqual(2);
             expect(connectionsMap.has(connection1.id)).toBeTruthy();

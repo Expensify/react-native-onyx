@@ -37,7 +37,7 @@ type FastMergeResult<TValue> = {
     replaceNullPatches: FastMergeReplaceNullPatch[];
 };
 
-const ONYX_INTERNALS__REPLACE_OBJECT_MARK = 'ONYX_INTERNALS__REPLACE_OBJECT_MARK';
+const ONYX_INTERNALS_REPLACE_OBJECT_MARK = 'ONYX_INTERNALS__REPLACE_OBJECT_MARK';
 
 /**
  * Merges two objects and removes null values if "shouldRemoveNestedNulls" is set to true
@@ -66,7 +66,10 @@ function fastMerge<TValue>(target: TValue, source: TValue, options?: FastMergeOp
 
     const mergedValue = mergeObject(target, source as Record<string, unknown>, optionsWithDefaults, metadata, basePath) as TValue;
 
-    return {result: mergedValue, replaceNullPatches: metadata.replaceNullPatches};
+    return {
+        result: mergedValue,
+        replaceNullPatches: metadata.replaceNullPatches,
+    };
 }
 
 /**
@@ -143,19 +146,19 @@ function mergeObject<TObject extends Record<string, unknown>>(
         // When calling fastMerge again with "mark" removal mode, the marked objects will be removed.
         if (options.objectRemovalMode === 'mark' && targetProperty === null) {
             hasChanged = true;
-            targetProperty = {[ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true};
+            targetProperty = {[ONYX_INTERNALS_REPLACE_OBJECT_MARK]: true};
             metadata.replaceNullPatches.push([[...basePath, key], {...sourceProperty}]);
         }
 
         // Later, when merging the batched changes with the Onyx value, if a nested object of the batched changes
         // has the internal flag set, we replace the entire destination object with the source one and remove
         // the flag.
-        if (options.objectRemovalMode === 'replace' && sourceProperty[ONYX_INTERNALS__REPLACE_OBJECT_MARK]) {
+        if (options.objectRemovalMode === 'replace' && sourceProperty[ONYX_INTERNALS_REPLACE_OBJECT_MARK]) {
             hasChanged = true;
             // We do a spread here in order to have a new object reference and allow us to delete the internal flag
             // of the merged object only.
             const sourcePropertyWithoutMark = {...sourceProperty};
-            delete sourcePropertyWithoutMark.ONYX_INTERNALS__REPLACE_OBJECT_MARK;
+            delete sourcePropertyWithoutMark[ONYX_INTERNALS_REPLACE_OBJECT_MARK];
             destination[key] = sourcePropertyWithoutMark;
             continue;
         }
@@ -208,7 +211,7 @@ function needsNormalization(value: unknown): boolean {
     // Use for-in loop to avoid an unnecessary array allocation from Object.keys()
     // eslint-disable-next-line no-restricted-syntax, guard-for-in
     for (const key in value) {
-        if (key === ONYX_INTERNALS__REPLACE_OBJECT_MARK) {
+        if (key === ONYX_INTERNALS_REPLACE_OBJECT_MARK) {
             return true;
         }
 
@@ -227,7 +230,7 @@ function needsNormalization(value: unknown): boolean {
 }
 
 /** Deep removes the nested null values from the given value. Returns the original reference if no nulls were found. */
-function removeNestedNullValues<TValue extends OnyxInput<OnyxKey> | null>(value: TValue): TValue {
+function removeNestedNullValues<TValue extends OnyxInput<OnyxKey>>(value: TValue): TValue {
     if (value === null || value === undefined || typeof value !== 'object' || Array.isArray(value)) {
         return value;
     }
@@ -267,7 +270,12 @@ function formatActionName(method: string, key?: OnyxKey): string {
 function checkCompatibilityWithExistingValue(
     value: unknown,
     existingValue: unknown,
-): {isCompatible: boolean; existingValueType?: string; newValueType?: string; isEmptyArrayCoercion?: boolean} {
+): {
+    isCompatible: boolean;
+    existingValueType?: string;
+    newValueType?: string;
+    isEmptyArrayCoercion?: boolean;
+} {
     if (!existingValue || !value) {
         return {
             isCompatible: true,
@@ -381,6 +389,6 @@ export default {
     pick,
     omit,
     chunkArray,
-    ONYX_INTERNALS__REPLACE_OBJECT_MARK,
+    ONYX_INTERNALS_REPLACE_OBJECT_MARK,
 };
 export type {FastMergeResult, FastMergeReplaceNullPatch, FastMergeOptions};

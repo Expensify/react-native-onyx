@@ -178,7 +178,7 @@ function splitCollectionMemberKey<TKey extends CollectionKey, CollectionKeyType 
     collectionKey?: string,
 ): [CollectionKeyType, string] {
     if (collectionKey && !isCollectionMemberKey(collectionKey, key)) {
-        throw new Error(`Invalid '${collectionKey}' collection key provided, it isn't compatible with '${key}' key.`);
+        throw new Error(`Invalid '${collectionKey}' collection key provided, it isn't compatible with '${String(key)}' key.`);
     }
 
     if (!collectionKey) {

@@ -88,6 +88,7 @@ type TypeOptions = Merge<
  * }
  * ```
  */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/consistent-type-definitions -- must remain an interface so consumers can augment via declare module
 interface CustomTypeOptions {}
 
 /**
@@ -189,14 +190,16 @@ type NonTransformableTypes =
  *
  * settings = applySavedSettings({textEditor: {fontWeight: 500, fontColor: null}});
  */
+/* eslint-disable @typescript-eslint/no-restricted-types -- Interface-based CustomTypeOptions values are not assignable to Record<string, unknown>; object is required for deep nullish mapping. */
 type NullishDeep<T> = T extends NonTransformableTypes ? T : T extends object ? NullishObjectDeep<T> : unknown;
 
 /**
- * Same as `NullishDeep`, but accepts only `object`s as inputs. Internal helper for `NullishDeep`.
+ * Same as `NullishDeep`, but accepts only objects as inputs. Internal helper for `NullishDeep`.
  */
 type NullishObjectDeep<ObjectType extends object> = {
     [KeyType in keyof ObjectType]?: NullishDeep<ObjectType[KeyType]> | null;
 };
+/* eslint-enable @typescript-eslint/no-restricted-types */
 
 /**
  * Represents a mapping between Onyx collection keys and their respective values.
@@ -311,12 +314,36 @@ type ExpandOnyxKeys<TKey extends OnyxKey> = TKey extends CollectionKeyBase ? NoI
 type OnyxUpdate<TKey extends OnyxKey> = {
     // ⚠️ DO NOT CHANGE THIS TYPE, UNLESS YOU KNOW WHAT YOU ARE DOING. ⚠️
     [K in TKey]:
-        | {onyxMethod: typeof OnyxUtils.METHOD.SET; key: ExpandOnyxKeys<K>; value: OnyxSetInput<K>}
-        | {onyxMethod: typeof OnyxUtils.METHOD.MULTI_SET; key: ExpandOnyxKeys<K>; value: OnyxMultiSetInput}
-        | {onyxMethod: typeof OnyxUtils.METHOD.MERGE; key: ExpandOnyxKeys<K>; value: OnyxMergeInput<K>}
-        | {onyxMethod: typeof OnyxUtils.METHOD.CLEAR; key: ExpandOnyxKeys<K>; value?: never}
-        | {onyxMethod: typeof OnyxUtils.METHOD.MERGE_COLLECTION; key: K; value: OnyxMergeCollectionInput<K>}
-        | {onyxMethod: typeof OnyxUtils.METHOD.SET_COLLECTION; key: K; value: OnyxSetCollectionInput<K>};
+        | {
+              onyxMethod: typeof OnyxUtils.METHOD.SET;
+              key: ExpandOnyxKeys<K>;
+              value: OnyxSetInput<K>;
+          }
+        | {
+              onyxMethod: typeof OnyxUtils.METHOD.MULTI_SET;
+              key: ExpandOnyxKeys<K>;
+              value: OnyxMultiSetInput;
+          }
+        | {
+              onyxMethod: typeof OnyxUtils.METHOD.MERGE;
+              key: ExpandOnyxKeys<K>;
+              value: OnyxMergeInput<K>;
+          }
+        | {
+              onyxMethod: typeof OnyxUtils.METHOD.CLEAR;
+              key: ExpandOnyxKeys<K>;
+              value?: never;
+          }
+        | {
+              onyxMethod: typeof OnyxUtils.METHOD.MERGE_COLLECTION;
+              key: K;
+              value: OnyxMergeCollectionInput<K>;
+          }
+        | {
+              onyxMethod: typeof OnyxUtils.METHOD.SET_COLLECTION;
+              key: K;
+              value: OnyxSetCollectionInput<K>;
+          };
 }[TKey];
 
 /**

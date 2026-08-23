@@ -1,7 +1,6 @@
 import {measureAsyncFunction, measureFunction} from 'reassure';
 import type OnyxCache from '../../lib/OnyxCache';
 import createRandomReportAction, {getRandomReportActions} from '../utils/collections/reportActions';
-import type GenericCollection from '../utils/GenericCollection';
 import {TASK} from '../../lib/OnyxCache';
 
 const ONYXKEYS = {
@@ -135,9 +134,7 @@ describe('OnyxCache', () => {
 
     describe('merge', () => {
         test('one call merging 10k keys', async () => {
-            const changedReportActions = Object.fromEntries(
-                Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const),
-            ) as GenericCollection;
+            const changedReportActions = Object.fromEntries(Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const));
 
             await measureFunction(() => cache.merge(changedReportActions), {
                 beforeEach: async () => {
@@ -161,7 +158,7 @@ describe('OnyxCache', () => {
 
     describe('getTaskPromise', () => {
         test('one call checking one task', async () => {
-            await measureAsyncFunction(() => cache.getTaskPromise(`${TASK.GET}:${mockedReportActionsKeys[0]}`) as Promise<unknown>, {
+            await measureAsyncFunction(() => cache.getTaskPromise(`${TASK.GET}:${mockedReportActionsKeys[0]}`)!, {
                 beforeEach: async () => {
                     resetCacheBeforeEachMeasure();
                     cache.captureTask(`${TASK.GET}:${mockedReportActionsKeys[0]}`, Promise.resolve());

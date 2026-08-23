@@ -7,7 +7,6 @@ type LogData = {
 };
 type LoggerCallback = (data: LogData) => void;
 
-// eslint-disable-next-line @typescript-eslint/no-empty-function
 let logger: LoggerCallback = () => {};
 
 /**

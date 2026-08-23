@@ -1,10 +1,8 @@
-/* eslint-disable dot-notation */
 import Onyx from '../../lib';
 import {getDevToolsInstance} from '../../lib/DevTools';
 import type {DevtoolsConnection, RealDevTools as RealDevToolsType} from '../../lib/DevTools';
 import RealDevTools from '../../lib/DevTools/RealDevTools';
 import utils from '../../lib/utils';
-import type GenericCollection from '../utils/GenericCollection';
 
 const ONYX_KEYS = {
     NUM_KEY: 'numKey',
@@ -26,13 +24,16 @@ const initialKeyStates = {
 const exampleCollection = {
     [`${ONYX_KEYS.COLLECTION.NUM_KEY}1`]: 1,
     [`${ONYX_KEYS.COLLECTION.NUM_KEY}2`]: 2,
-} as GenericCollection;
+};
 
 const exampleObject = {name: 'Pedro'};
 
 const mergedCollection = {...initialKeyStates, ...exampleCollection};
 
-const mergedObject = {...initialKeyStates, [ONYX_KEYS.OBJECT_KEY]: {...exampleObject, id: 42}};
+const mergedObject = {
+    ...initialKeyStates,
+    [ONYX_KEYS.OBJECT_KEY]: {...exampleObject, id: 42},
+};
 
 describe('DevTools', () => {
     let initMock: jest.Mock<void>;
@@ -45,7 +46,10 @@ describe('DevTools', () => {
 
         // Mock the connectViaExtension method to return our mock connection
         // This needs to happen before RealDevTools is instantiated
-        const mockConnection = {init: initMock, send: sendMock} as unknown as DevtoolsConnection;
+        const mockConnection = {
+            init: initMock,
+            send: sendMock,
+        } as unknown as DevtoolsConnection;
         jest.spyOn(RealDevTools.prototype, 'connectViaExtension').mockReturnValue(mockConnection);
 
         Onyx.init({
@@ -76,19 +80,34 @@ describe('DevTools', () => {
     describe('Set', () => {
         it('Sends the set state correctly to the extension', async () => {
             await Onyx.set(ONYX_KEYS.SOME_KEY, 3);
-            expect(sendMock).toHaveBeenCalledWith({payload: 3, type: utils.formatActionName(Onyx.METHOD.SET, ONYX_KEYS.SOME_KEY)}, {...initialKeyStates, [ONYX_KEYS.SOME_KEY]: 3});
+            expect(sendMock).toHaveBeenCalledWith(
+                {
+                    payload: 3,
+                    type: utils.formatActionName(Onyx.METHOD.SET, ONYX_KEYS.SOME_KEY),
+                },
+                {...initialKeyStates, [ONYX_KEYS.SOME_KEY]: 3},
+            );
         });
         it('Sets the internal state correctly', async () => {
             await Onyx.set(ONYX_KEYS.SOME_KEY, 3);
             const devToolsInstance = getDevToolsInstance() as RealDevToolsType;
-            expect(devToolsInstance['state']).toEqual({...initialKeyStates, [ONYX_KEYS.SOME_KEY]: 3});
+            expect(devToolsInstance['state']).toEqual({
+                ...initialKeyStates,
+                [ONYX_KEYS.SOME_KEY]: 3,
+            });
         });
     });
 
     describe('Merge', () => {
         it('Sends the merged state correctly to the extension', async () => {
             await Onyx.merge(ONYX_KEYS.OBJECT_KEY, exampleObject);
-            expect(sendMock).toHaveBeenCalledWith({payload: exampleObject, type: utils.formatActionName(Onyx.METHOD.MERGE, ONYX_KEYS.OBJECT_KEY)}, mergedObject);
+            expect(sendMock).toHaveBeenCalledWith(
+                {
+                    payload: exampleObject,
+                    type: utils.formatActionName(Onyx.METHOD.MERGE, ONYX_KEYS.OBJECT_KEY),
+                },
+                mergedObject,
+            );
         });
         it('Sets the internal state correctly', async () => {
             await Onyx.merge(ONYX_KEYS.OBJECT_KEY, exampleObject);
@@ -100,7 +119,13 @@ describe('DevTools', () => {
     describe('MergeCollection', () => {
         it('Sends the mergecollection state correctly to the extension', async () => {
             await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.NUM_KEY, exampleCollection);
-            expect(sendMock).toHaveBeenCalledWith({payload: exampleCollection, type: utils.formatActionName(Onyx.METHOD.MERGE_COLLECTION)}, mergedCollection);
+            expect(sendMock).toHaveBeenCalledWith(
+                {
+                    payload: exampleCollection,
+                    type: utils.formatActionName(Onyx.METHOD.MERGE_COLLECTION),
+                },
+                mergedCollection,
+            );
         });
         it('Sets the internal state correctly', async () => {
             await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.NUM_KEY, exampleCollection);
@@ -112,7 +137,13 @@ describe('DevTools', () => {
     describe('MultiSet', () => {
         it('Sends the multiset state correctly to the extension', async () => {
             await Onyx.multiSet(exampleCollection);
-            expect(sendMock).toHaveBeenCalledWith({payload: exampleCollection, type: utils.formatActionName(Onyx.METHOD.MULTI_SET)}, mergedCollection);
+            expect(sendMock).toHaveBeenCalledWith(
+                {
+                    payload: exampleCollection,
+                    type: utils.formatActionName(Onyx.METHOD.MULTI_SET),
+                },
+                mergedCollection,
+            );
         });
         it('Sets the internal state correctly', async () => {
             await Onyx.multiSet(exampleCollection);
@@ -135,14 +166,20 @@ describe('DevTools', () => {
             await Onyx.merge(ONYX_KEYS.NUM_KEY, 2);
             await Onyx.clear([ONYX_KEYS.NUM_KEY]);
             const devToolsInstance = getDevToolsInstance() as RealDevToolsType;
-            expect(devToolsInstance['state']).toEqual({...initialKeyStates, [ONYX_KEYS.NUM_KEY]: 2});
+            expect(devToolsInstance['state']).toEqual({
+                ...initialKeyStates,
+                [ONYX_KEYS.NUM_KEY]: 2,
+            });
         });
 
         it('Preserves collection member keys when a collection key is passed to keysToPreserve', async () => {
             await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.NUM_KEY, exampleCollection);
             await Onyx.clear([ONYX_KEYS.COLLECTION.NUM_KEY]);
             const devToolsInstance = getDevToolsInstance() as RealDevToolsType;
-            expect(devToolsInstance['state']).toEqual({...initialKeyStates, ...exampleCollection});
+            expect(devToolsInstance['state']).toEqual({
+                ...initialKeyStates,
+                ...exampleCollection,
+            });
         });
     });
 });

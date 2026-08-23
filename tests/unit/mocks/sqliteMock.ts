@@ -49,7 +49,7 @@ function extractNamedParameterOrder(sql: string): string[] | null {
 function wrapRows<TRow extends QueryResultRow>(rowsArray: TRow[]): NitroSQLiteQueryResultRows<TRow> {
     return {
         _array: rowsArray,
-        item: (index: number) => rowsArray[index],
+        item: (index: number) => rowsArray.at(index),
         length: rowsArray.length,
     };
 }
