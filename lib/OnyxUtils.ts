@@ -62,6 +62,10 @@ function resetDiskPressureLogThrottle(): void {
     lastDiskPressureLogTime = 0;
 }
 
+function formatCaughtError(error: unknown): string {
+    return error instanceof Error ? error.toString() : String(error);
+}
+
 type OnyxMethod = ValueOf<typeof METHOD>;
 
 /** Result of `prepareKeyValuePairsForStorage`: pairs to write and keys whose `null` value marks them for removal. */
@@ -598,7 +602,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
             lastConnectionCallbackData.set(subscriber.subscriptionID, {value: cachedCollection, matchedKey: subscriber.key});
             subscriber.callback(cachedCollection, subscriber.key);
         } catch (error) {
-            Logger.logAlert(`[OnyxUtils.keysChanged] Subscriber callback threw an error for key '${collectionKey}': ${error}`);
+            Logger.logAlert(`[OnyxUtils.keysChanged] Subscriber callback threw an error for key '${collectionKey}': ${formatCaughtError(error)}`);
         }
     }
 
@@ -621,7 +625,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
                 matchedKey: subscriber.key,
             });
         } catch (error) {
-            Logger.logAlert(`[OnyxUtils.keysChanged] Subscriber callback threw an error for key '${collectionKey}': ${error}`);
+            Logger.logAlert(`[OnyxUtils.keysChanged] Subscriber callback threw an error for key '${collectionKey}': ${formatCaughtError(error)}`);
         }
     }
 }
@@ -694,7 +698,7 @@ function keyChanged<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>, can
                 });
                 continue;
             } catch (error) {
-                Logger.logAlert(`[OnyxUtils.keyChanged] Subscriber callback threw an error for key '${key}': ${error}`);
+                Logger.logAlert(`[OnyxUtils.keyChanged] Subscriber callback threw an error for key '${key}': ${formatCaughtError(error)}`);
             }
 
             continue;
