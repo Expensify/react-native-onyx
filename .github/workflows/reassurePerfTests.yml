@@ -43,7 +43,13 @@ jobs:
         run: |
           git fetch origin ${{ github.event.pull_request.head.sha }} --no-tags --depth=1
           git switch --force --detach ${{ github.event.pull_request.head.sha }}
-          
+
+      # v4 — re-run setup so Node/npm match the PR's .nvmrc, which may differ from the base branch
+      - name: Setup Node for PR head
+        uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e
+        with:
+          node-version-file: '.nvmrc'
+
       - name: Reinstall dependencies
         run: npm ci
 
