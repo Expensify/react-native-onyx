@@ -126,7 +126,14 @@
   },
   "engines": {
     "node": ">=20.19.5",
-    "npm": ">=11.10.0"
+    "npm": ">=10.8.2"
   },
-  "sideEffects": false
+  "sideEffects": false,
+  "devEngines": {
+    "packageManager": {
+      "name": "npm",
+      "version": ">=11.10.0",
+      "onFail": "error"
+    }
+  }
 }
