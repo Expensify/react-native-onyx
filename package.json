@@ -126,7 +126,7 @@
   },
   "engines": {
     "node": ">=20.19.5",
-    "npm": ">=10.8.2"
+    "npm": ">=11.10.0"
   },
   "sideEffects": false
 }
