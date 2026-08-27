@@ -612,24 +612,6 @@ function setCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, coll
 }
 
 /**
- * Reads a collection from the cache, falling back to storage while the key index is still cold.
- *
- * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
- */
-function getCollection<TKey extends OnyxKey>(collectionKey: TKey): Promise<OnyxValue<TKey>> {
-    const cachedCollection = OnyxUtils.tryGetCachedValue(collectionKey);
-
-    if (cachedCollection) {
-        return Promise.resolve(cachedCollection as OnyxValue<TKey>);
-    }
-
-    // Only reached on a cold key index, since that is the one case tryGetCachedValue cannot answer.
-    return OnyxUtils.getAllKeys()
-        .then((allKeys) => OnyxUtils.multiGet([...allKeys].filter((key) => OnyxKeys.isCollectionMemberKey(collectionKey, key))))
-        .then(() => OnyxUtils.tryGetCachedValue(collectionKey) as OnyxValue<TKey>);
-}
-
-/**
  * Reads the current value of an Onyx key once, without subscribing to it. Use `useOnyx()` or
  * `Onyx.connectWithoutView()` when the value has to stay current.
  *
@@ -647,7 +629,16 @@ function getCollection<TKey extends OnyxKey>(collectionKey: TKey): Promise<OnyxV
 function get<TKey extends OnyxKey>(key: TKey): Promise<OnyxValue<TKey>> {
     return OnyxUtils.afterInit(() => {
         if (OnyxKeys.isCollectionKey(key)) {
-            return getCollection(key);
+            const cachedCollection = OnyxUtils.tryGetCachedValue(key);
+
+            if (cachedCollection) {
+                return Promise.resolve(cachedCollection as OnyxValue<TKey>);
+            }
+
+            // Only reached on a cold key index, since that is the one case tryGetCachedValue cannot answer.
+            return OnyxUtils.getAllKeys()
+                .then((allKeys) => OnyxUtils.multiGet([...allKeys].filter((memberKey) => OnyxKeys.isCollectionMemberKey(key, memberKey))))
+                .then(() => OnyxUtils.tryGetCachedValue(key) as OnyxValue<TKey>);
         }
 
         // OnyxUtils.get is cache-first and already guards RAM-only keys. A key that storage has never

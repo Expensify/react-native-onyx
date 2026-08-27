@@ -58,9 +58,6 @@ value will be saved to storage after the default value.</p>
 <dd><p>Sets a collection by replacing all existing collection members with new values.
 Any existing collection members not included in the new data will be removed.</p>
 </dd>
-<dt><a href="#getCollection">getCollection(collectionKey)</a></dt>
-<dd><p>Reads a collection from the cache, falling back to storage while the key index is still cold.</p>
-</dd>
 <dt><a href="#get">get(key)</a> ⇒</dt>
 <dd><p>Reads the current value of an Onyx key once, without subscribing to it. Use <code>useOnyx()</code> or
 <code>Onyx.connectWithoutView()</code> when the value has to stay current.</p>
@@ -266,17 +263,6 @@ Onyx.setCollection(ONYXKEYS.COLLECTION.REPORT, {
     [`${ONYXKEYS.COLLECTION.REPORT}2`]: report2,
 });
 ```
-<a name="getCollection"></a>
-
-## getCollection(collectionKey)
-Reads a collection from the cache, falling back to storage while the key index is still cold.
-
-**Kind**: global function  
-
-| Param | Description |
-| --- | --- |
-| collectionKey | e.g. `ONYXKEYS.COLLECTION.REPORT` |
-
 <a name="get"></a>
 
 ## get(key) ⇒
