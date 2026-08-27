@@ -3455,7 +3455,6 @@ describe('Onyx', () => {
             // A collection is shared and frozen, so the same mutation throws.
             expect(Object.isFrozen(collection)).toBe(true);
         });
-
     });
 });
 
