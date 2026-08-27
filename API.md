@@ -58,6 +58,15 @@ value will be saved to storage after the default value.</p>
 <dd><p>Sets a collection by replacing all existing collection members with new values.
 Any existing collection members not included in the new data will be removed.</p>
 </dd>
+<dt><a href="#getCollection">getCollection(collectionKey)</a></dt>
+<dd><p>Reads a collection from the cache, falling back to storage while the key index is still cold.</p>
+</dd>
+<dt><a href="#get">get(key)</a> ⇒</dt>
+<dd><p>Reads the current value of an Onyx key once, without subscribing to it. Use <code>useOnyx()</code> or
+<code>Onyx.connectWithoutView()</code> when the value has to stay current.</p>
+<p>The result is the cached object itself rather than a copy, so treat it as read-only. A write that
+is still queued when <code>get()</code> is called is not visible to it, so await the write before reading.</p>
+</dd>
 </dl>
 
 <a name="init"></a>
@@ -256,4 +265,37 @@ Onyx.setCollection(ONYXKEYS.COLLECTION.REPORT, {
     [`${ONYXKEYS.COLLECTION.REPORT}1`]: report1,
     [`${ONYXKEYS.COLLECTION.REPORT}2`]: report2,
 });
+```
+<a name="getCollection"></a>
+
+## getCollection(collectionKey)
+Reads a collection from the cache, falling back to storage while the key index is still cold.
+
+**Kind**: global function  
+
+| Param | Description |
+| --- | --- |
+| collectionKey | e.g. `ONYXKEYS.COLLECTION.REPORT` |
+
+<a name="get"></a>
+
+## get(key) ⇒
+Reads the current value of an Onyx key once, without subscribing to it. Use `useOnyx()` or
+`Onyx.connectWithoutView()` when the value has to stay current.
+
+The result is the cached object itself rather than a copy, so treat it as read-only. A write that
+is still queued when `get()` is called is not visible to it, so await the write before reading.
+
+**Kind**: global function  
+**Returns**: The current value, or `undefined` if the key has none. A collection with no members
+         resolves to ``, or to `undefined` when the store itself is empty.  
+
+| Param | Description |
+| --- | --- |
+| key | ONYXKEY to read, either a collection key or a single key |
+
+**Example**  
+```js
+const report = await Onyx.get(`${ONYXKEYS.COLLECTION.REPORT}${reportID}`);
+const allReports = await Onyx.get(ONYXKEYS.COLLECTION.REPORT);
 ```

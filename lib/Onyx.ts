@@ -611,6 +611,51 @@ function setCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, coll
     return OnyxUtils.afterInit(() => OnyxUtils.setCollectionWithRetry({collectionKey, collection}));
 }
 
+/**
+ * Reads a collection from the cache, falling back to storage while the key index is still cold.
+ *
+ * @param collectionKey e.g. `ONYXKEYS.COLLECTION.REPORT`
+ */
+function getCollection<TKey extends OnyxKey>(collectionKey: TKey): Promise<OnyxValue<TKey>> {
+    const cachedCollection = OnyxUtils.tryGetCachedValue(collectionKey);
+
+    if (cachedCollection) {
+        return Promise.resolve(cachedCollection as OnyxValue<TKey>);
+    }
+
+    // Only reached on a cold key index, since that is the one case tryGetCachedValue cannot answer.
+    return OnyxUtils.getAllKeys()
+        .then((allKeys) => OnyxUtils.multiGet([...allKeys].filter((key) => OnyxKeys.isCollectionMemberKey(collectionKey, key))))
+        .then(() => OnyxUtils.tryGetCachedValue(collectionKey) as OnyxValue<TKey>);
+}
+
+/**
+ * Reads the current value of an Onyx key once, without subscribing to it. Use `useOnyx()` or
+ * `Onyx.connectWithoutView()` when the value has to stay current.
+ *
+ * The result is the cached object itself rather than a copy, so treat it as read-only. A write that
+ * is still queued when `get()` is called is not visible to it, so await the write before reading.
+ *
+ * @example
+ * const report = await Onyx.get(`${ONYXKEYS.COLLECTION.REPORT}${reportID}`);
+ * const allReports = await Onyx.get(ONYXKEYS.COLLECTION.REPORT);
+ *
+ * @param key ONYXKEY to read, either a collection key or a single key
+ * @returns The current value, or `undefined` if the key has none. A collection with no members
+ *          resolves to `{}`, or to `undefined` when the store itself is empty.
+ */
+function get<TKey extends OnyxKey>(key: TKey): Promise<OnyxValue<TKey>> {
+    return OnyxUtils.afterInit(() => {
+        if (OnyxKeys.isCollectionKey(key)) {
+            return getCollection(key);
+        }
+
+        // OnyxUtils.get is cache-first and already guards RAM-only keys. A key that storage has never
+        // held resolves to null there, which the public surface reports as undefined.
+        return OnyxUtils.get(key).then((value) => (value ?? undefined) as OnyxValue<TKey>);
+    });
+}
+
 const Onyx = {
     METHOD: OnyxUtils.METHOD,
     connect,
@@ -624,6 +669,7 @@ const Onyx = {
     update,
     clear,
     init,
+    get,
     registerLogger: Logger.registerLogger,
 };
 
