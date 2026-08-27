@@ -63,6 +63,8 @@ Any existing collection members not included in the new data will be removed.</p
 <code>Onyx.connectWithoutView()</code> when the value has to stay current.</p>
 <p>The result is the cached object itself rather than a copy, so treat it as read-only. A write that
 is still queued when <code>get()</code> is called is not visible to it, so await the write before reading.</p>
+<p>A collection with no members resolves to <code>{}</code>, while a collection read on an empty store resolves
+to <code>undefined</code>.</p>
 </dd>
 </dl>
 
@@ -272,9 +274,11 @@ Reads the current value of an Onyx key once, without subscribing to it. Use `use
 The result is the cached object itself rather than a copy, so treat it as read-only. A write that
 is still queued when `get()` is called is not visible to it, so await the write before reading.
 
+A collection with no members resolves to `{}`, while a collection read on an empty store resolves
+to `undefined`.
+
 **Kind**: global function  
-**Returns**: The current value, or `undefined` if the key has none. A collection with no members
-         resolves to ``, or to `undefined` when the store itself is empty.  
+**Returns**: The current value, or `undefined` if the key has none.  
 
 | Param | Description |
 | --- | --- |

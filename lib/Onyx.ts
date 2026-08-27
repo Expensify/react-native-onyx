@@ -618,13 +618,15 @@ function setCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, coll
  * The result is the cached object itself rather than a copy, so treat it as read-only. A write that
  * is still queued when `get()` is called is not visible to it, so await the write before reading.
  *
+ * A collection with no members resolves to `{}`, while a collection read on an empty store resolves
+ * to `undefined`.
+ *
  * @example
  * const report = await Onyx.get(`${ONYXKEYS.COLLECTION.REPORT}${reportID}`);
  * const allReports = await Onyx.get(ONYXKEYS.COLLECTION.REPORT);
  *
  * @param key ONYXKEY to read, either a collection key or a single key
- * @returns The current value, or `undefined` if the key has none. A collection with no members
- *          resolves to `{}`, or to `undefined` when the store itself is empty.
+ * @returns The current value, or `undefined` if the key has none.
  */
 function get<TKey extends OnyxKey>(key: TKey): Promise<OnyxValue<TKey>> {
     return OnyxUtils.afterInit(() => {
