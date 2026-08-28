@@ -1,3 +1,4 @@
+import type {ReadonlyDeep} from 'type-fest';
 import * as Logger from './Logger';
 import cache, {TASK} from './OnyxCache';
 import Storage from './storage';
@@ -628,24 +629,24 @@ function setCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, coll
  * @param key ONYXKEY to read, either a collection key or a single key
  * @returns The current value, or `undefined` if the key has none.
  */
-function get<TKey extends OnyxKey>(key: TKey): Promise<OnyxValue<TKey>> {
+function get<TKey extends OnyxKey>(key: TKey): Promise<ReadonlyDeep<OnyxValue<TKey>>> {
     return OnyxUtils.afterInit(() => {
         if (OnyxKeys.isCollectionKey(key)) {
             const cachedCollection = OnyxUtils.tryGetCachedValue(key);
 
             if (cachedCollection) {
-                return Promise.resolve(cachedCollection as OnyxValue<TKey>);
+                return Promise.resolve(cachedCollection as ReadonlyDeep<OnyxValue<TKey>>);
             }
 
             // Only reached on a cold key index, since that is the one case tryGetCachedValue cannot answer.
             return OnyxUtils.getAllKeys()
                 .then((allKeys) => OnyxUtils.multiGet([...allKeys].filter((memberKey) => OnyxKeys.isCollectionMemberKey(key, memberKey))))
-                .then(() => OnyxUtils.tryGetCachedValue(key) as OnyxValue<TKey>);
+                .then(() => OnyxUtils.tryGetCachedValue(key) as ReadonlyDeep<OnyxValue<TKey>>);
         }
 
         // OnyxUtils.get is cache-first and already guards RAM-only keys. A key that storage has never
         // held resolves to null there, which the public surface reports as undefined.
-        return OnyxUtils.get(key).then((value) => (value ?? undefined) as OnyxValue<TKey>);
+        return OnyxUtils.get(key).then((value) => (value ?? undefined) as ReadonlyDeep<OnyxValue<TKey>>);
     });
 }
 
