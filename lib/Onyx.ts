@@ -1,4 +1,3 @@
-import type {ReadonlyDeep} from 'type-fest';
 import * as Logger from './Logger';
 import cache, {TASK} from './OnyxCache';
 import Storage from './storage';
@@ -616,8 +615,10 @@ function setCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, coll
  * Reads the current value of an Onyx key once, without subscribing to it. Use `useOnyx()` or
  * `Onyx.connectWithoutView()` when the value has to stay current.
  *
- * The result is the cached object itself rather than a copy, so treat it as read-only. A write that
- * is still queued when `get()` is called is not visible to it, so await the write before reading.
+ * The result is the cached object itself rather than a copy, so treat it as read-only: mutating it would
+ * be seen by every other reader of that key. This is a convention rather than a type rule, because
+ * `useOnyx()` hands back that same object typed mutable and the two surfaces should not disagree. A write
+ * that is still queued when `get()` is called is not visible to it, so await the write before reading.
  *
  * A collection with no members resolves to `{}`, while a collection read on an empty store resolves
  * to `undefined`.
@@ -629,24 +630,24 @@ function setCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, coll
  * @param key ONYXKEY to read, either a collection key or a single key
  * @returns The current value, or `undefined` if the key has none.
  */
-function get<TKey extends OnyxKey>(key: TKey): Promise<ReadonlyDeep<OnyxValue<TKey>>> {
+function get<TKey extends OnyxKey>(key: TKey): Promise<OnyxValue<TKey>> {
     return OnyxUtils.afterInit(() => {
         if (OnyxKeys.isCollectionKey(key)) {
             const cachedCollection = OnyxUtils.tryGetCachedValue(key);
 
             if (cachedCollection) {
-                return Promise.resolve(cachedCollection as ReadonlyDeep<OnyxValue<TKey>>);
+                return Promise.resolve(cachedCollection as OnyxValue<TKey>);
             }
 
             // Only reached on a cold key index, since that is the one case tryGetCachedValue cannot answer.
             return OnyxUtils.getAllKeys()
                 .then((allKeys) => OnyxUtils.multiGet([...allKeys].filter((memberKey) => OnyxKeys.isCollectionMemberKey(key, memberKey))))
-                .then(() => OnyxUtils.tryGetCachedValue(key) as ReadonlyDeep<OnyxValue<TKey>>);
+                .then(() => OnyxUtils.tryGetCachedValue(key) as OnyxValue<TKey>);
         }
 
         // OnyxUtils.get is cache-first and already guards RAM-only keys. A key that storage has never
         // held resolves to null there, which the public surface reports as undefined.
-        return OnyxUtils.get(key).then((value) => (value ?? undefined) as ReadonlyDeep<OnyxValue<TKey>>);
+        return OnyxUtils.get(key).then((value) => (value ?? undefined) as OnyxValue<TKey>);
     });
 }
 

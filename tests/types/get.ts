@@ -1,9 +1,11 @@
-import Onyx from '../../lib/Onyx';
+import Onyx from '../../dist/Onyx';
 import ONYX_KEYS from './setup';
 
 /**
- * `Onyx.get` resolves to the object the cache holds rather than a copy, so its type is deeply readonly.
- * Each `@ts-expect-error` below fails this typecheck if that ever stops being true.
+ * `Onyx.get` and `useOnyx` hand back the same cached object, so they agree on its type: neither is
+ * deeply readonly. Not mutating a cached value is a convention documented on `Onyx.get`, not something
+ * the type system enforces, because enforcing it on one surface and not the other only makes the read
+ * harder to adopt than the subscription it replaces. These assignments fail if that ever drifts.
  */
 async function readCollectionMember() {
     const member = await Onyx.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`);
@@ -12,12 +14,9 @@ async function readCollectionMember() {
         return;
     }
 
-    // @ts-expect-error the cached object is readonly
-    member.str = 'mutated';
+    member.str = 'assignable';
 
-    const copy = {...member, str: 'copied'};
-
-    return copy;
+    return member;
 }
 
 async function readCollection() {
@@ -27,10 +26,9 @@ async function readCollection() {
         return;
     }
 
-    // @ts-expect-error a member of the cached collection is readonly
-    collection.test_1 = {str: 'mutated'};
+    collection.test_1 = {str: 'assignable'};
 
-    return {...collection};
+    return collection;
 }
 
 export {readCollectionMember, readCollection};
