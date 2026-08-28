@@ -514,11 +514,11 @@ function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey
  * that also performs LRU bookkeeping for eviction. Write paths call this instead
  * of touching the subscriber registry directly.
  *
- * Pass `suppressCollectionSnapshot: true` when notifying within a collection-batch
- * operation — the outer `notifyCollection()` fires snapshot listeners once, so
+ * Pass `suppressCollectionNotify: true` when notifying within a collection-batch
+ * operation. The outer `notifyCollection()` fires collection listeners once, so
  * each per-key fire shouldn't re-trigger them.
  */
-function notifyKey<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>, options?: {suppressCollectionSnapshot?: boolean}): void {
+function notifyKey<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>, options?: {suppressCollectionNotify?: boolean}): void {
     if (value !== null && value !== undefined) {
         cache.addLastAccessedKey(key, OnyxKeys.isCollectionKey(key));
     } else {
@@ -552,12 +552,12 @@ function notifyCollection<TKey extends CollectionKeyBase>(
 /**
  * Remove a key from Onyx and update the subscribers.
  *
- * `suppressCollectionSnapshot` skips the collection-level snapshot fire — used by
+ * `suppressCollectionNotify` skips the collection-level fire. Used by
  * `prepareKeyValuePairsForStorage()` when called inside a collection-batch operation
  * (setCollection/mergeCollection/partialSetCollection/multiSet's collection batch),
- * because the outer `notifyCollection()` fires snapshot listeners once.
+ * because the outer `notifyCollection()` fires collection listeners once.
  */
-function remove<TKey extends OnyxKey>(key: TKey, options?: {suppressCollectionSnapshot?: boolean}): Promise<void> {
+function remove<TKey extends OnyxKey>(key: TKey, options?: {suppressCollectionNotify?: boolean}): Promise<void> {
     cache.drop(key);
     notifyKey(key, undefined as OnyxValue<TKey>, options);
 
