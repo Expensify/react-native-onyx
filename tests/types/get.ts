@@ -1,4 +1,4 @@
-import Onyx from '../../dist/Onyx';
+import Onyx from '../../lib/Onyx';
 import ONYX_KEYS from './setup';
 
 /**
