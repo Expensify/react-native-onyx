@@ -111,10 +111,10 @@ describe('OnyxStore', () => {
         });
     });
 
-    describe('collection-snapshot routing on notifyKey', () => {
-        it('should fire the collection-root snapshot listener with the cache snapshot when a member is written', () => {
-            const snapshot = {[MEMBER_1]: {id: 1}, [MEMBER_2]: {id: 2}};
-            const getCollectionData = jest.spyOn(cache, 'getCollectionData').mockReturnValue(snapshot);
+    describe('collection routing on notifyKey', () => {
+        it('should fire the collection-root listener with the cache collection object when a member is written', () => {
+            const collectionData = {[MEMBER_1]: {id: 1}, [MEMBER_2]: {id: 2}};
+            const getCollectionData = jest.spyOn(cache, 'getCollectionData').mockReturnValue(collectionData);
 
             const callback = jest.fn();
             onyxStore.subscribe(COLLECTION, callback);
@@ -123,37 +123,37 @@ describe('OnyxStore', () => {
 
             expect(getCollectionData).toHaveBeenCalledWith(COLLECTION);
             expect(callback).toHaveBeenCalledTimes(1);
-            expect(callback).toHaveBeenCalledWith(snapshot, COLLECTION);
+            expect(callback).toHaveBeenCalledWith(collectionData, COLLECTION);
         });
 
-        it('should fire both the exact-member listener and the collection-root snapshot listener', () => {
-            const snapshot = {[MEMBER_1]: {id: 1}};
-            jest.spyOn(cache, 'getCollectionData').mockReturnValue(snapshot);
+        it('should fire both the exact-member listener and the collection-root listener', () => {
+            const collectionData = {[MEMBER_1]: {id: 1}};
+            jest.spyOn(cache, 'getCollectionData').mockReturnValue(collectionData);
 
             const memberCallback = jest.fn();
-            const snapshotCallback = jest.fn();
+            const collectionCallback = jest.fn();
             onyxStore.subscribe(MEMBER_1, memberCallback);
-            onyxStore.subscribe(COLLECTION, snapshotCallback);
+            onyxStore.subscribe(COLLECTION, collectionCallback);
 
             onyxStore.notifyKey(MEMBER_1, {id: 1});
 
             expect(memberCallback).toHaveBeenCalledWith({id: 1}, MEMBER_1);
-            expect(snapshotCallback).toHaveBeenCalledWith(snapshot, COLLECTION);
+            expect(collectionCallback).toHaveBeenCalledWith(collectionData, COLLECTION);
         });
 
-        it('should skip the collection-root listener but still fire the exact-member listener when suppressCollectionSnapshot is set', () => {
+        it('should skip the collection-root listener but still fire the exact-member listener when suppressCollectionNotify is set', () => {
             const getCollectionData = jest.spyOn(cache, 'getCollectionData').mockReturnValue({});
 
             const memberCallback = jest.fn();
-            const snapshotCallback = jest.fn();
+            const collectionCallback = jest.fn();
             onyxStore.subscribe(MEMBER_1, memberCallback);
-            onyxStore.subscribe(COLLECTION, snapshotCallback);
+            onyxStore.subscribe(COLLECTION, collectionCallback);
 
-            onyxStore.notifyKey(MEMBER_1, {id: 1}, {suppressCollectionSnapshot: true});
+            onyxStore.notifyKey(MEMBER_1, {id: 1}, {suppressCollectionNotify: true});
 
             expect(memberCallback).toHaveBeenCalledTimes(1);
-            expect(snapshotCallback).not.toHaveBeenCalled();
-            // The snapshot is never read when suppressed.
+            expect(collectionCallback).not.toHaveBeenCalled();
+            // The collection object is never read when suppressed.
             expect(getCollectionData).not.toHaveBeenCalled();
         });
 
@@ -170,9 +170,9 @@ describe('OnyxStore', () => {
     });
 
     describe('notifyCollection', () => {
-        it('should fire the snapshot listener once with the cache snapshot', () => {
-            const snapshot = {[MEMBER_1]: {id: 1}, [MEMBER_2]: {id: 2}};
-            jest.spyOn(cache, 'getCollectionData').mockReturnValue(snapshot);
+        it('should fire the collection listener once with the cache collection object', () => {
+            const collectionData = {[MEMBER_1]: {id: 1}, [MEMBER_2]: {id: 2}};
+            jest.spyOn(cache, 'getCollectionData').mockReturnValue(collectionData);
 
             const callback = jest.fn();
             onyxStore.subscribe(COLLECTION, callback);
@@ -180,13 +180,13 @@ describe('OnyxStore', () => {
             onyxStore.notifyCollection(COLLECTION, {[MEMBER_1]: {id: 1}, [MEMBER_2]: {id: 2}});
 
             expect(callback).toHaveBeenCalledTimes(1);
-            expect(callback).toHaveBeenCalledWith(snapshot, COLLECTION);
+            expect(callback).toHaveBeenCalledWith(collectionData, COLLECTION);
         });
 
         it('should fire exact-member listeners only for members whose value reference changed', () => {
-            const shared = {id: 2}; // same reference in snapshot and previous → should be skipped
-            const snapshot = {[MEMBER_1]: {id: 1}, [MEMBER_2]: shared};
-            jest.spyOn(cache, 'getCollectionData').mockReturnValue(snapshot);
+            const shared = {id: 2}; // same reference in collection and previous, should be skipped
+            const collectionData = {[MEMBER_1]: {id: 1}, [MEMBER_2]: shared};
+            jest.spyOn(cache, 'getCollectionData').mockReturnValue(collectionData);
 
             const member1Callback = jest.fn();
             const member2Callback = jest.fn();
