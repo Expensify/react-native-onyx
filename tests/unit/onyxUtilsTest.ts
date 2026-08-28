@@ -8,6 +8,7 @@ import type GenericCollection from '../utils/GenericCollection';
 import OnyxCache from '../../lib/OnyxCache';
 import * as Logger from '../../lib/Logger';
 import StorageMock from '../../lib/storage';
+import StorageCircuitBreaker from '../../lib/StorageCircuitBreaker';
 import createDeferredTask from '../../lib/createDeferredTask';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
@@ -115,7 +116,6 @@ describe('OnyxUtils', () => {
             const connection = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.ROUTES,
                 callback: (value) => (result = value),
-                waitForCollectionCallback: true,
             });
 
             // Set initial collection state
@@ -151,7 +151,6 @@ describe('OnyxUtils', () => {
             const connection = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.ROUTES,
                 callback: (value) => (result = value),
-                waitForCollectionCallback: true,
             });
 
             await Onyx.mergeCollection(ONYXKEYS.COLLECTION.ROUTES, {
@@ -177,7 +176,6 @@ describe('OnyxUtils', () => {
             const connection = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.ROUTES,
                 callback: (value) => (result = value),
-                waitForCollectionCallback: true,
             });
 
             await Onyx.mergeCollection(ONYXKEYS.COLLECTION.ROUTES, {
@@ -205,7 +203,6 @@ describe('OnyxUtils', () => {
             const connection = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.TEST_KEY,
                 callback: collectionCallback,
-                waitForCollectionCallback: true,
             });
 
             await waitForPromisesToResolve();
@@ -275,7 +272,6 @@ describe('OnyxUtils', () => {
             const connCollection = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.TEST_KEY,
                 callback: collectionCallback,
-                waitForCollectionCallback: true,
             });
             const connSingle = Onyx.connect({
                 key: ONYXKEYS.TEST_KEY,
@@ -309,12 +305,10 @@ describe('OnyxUtils', () => {
             const connTest = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.TEST_KEY,
                 callback: testCallback,
-                waitForCollectionCallback: true,
             });
             const connRoutes = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.ROUTES,
                 callback: routesCallback,
-                waitForCollectionCallback: true,
             });
             await waitForPromisesToResolve();
             testCallback.mockClear();
@@ -377,15 +371,13 @@ describe('OnyxUtils', () => {
             Onyx.disconnect(conn2);
         });
 
-        it('should stop firing callbacks for a collection subscriber that disconnects itself mid-batch', async () => {
-            // A collection subscriber (waitForCollectionCallback=false) disconnects itself when
-            // it receives the first member. Subsequent changed members in the same batch must NOT
-            // trigger further callbacks for this subscriber.
+        it('should not fire again for a collection subscriber that disconnects itself in its callback', async () => {
+            // A collection-root subscriber disconnects itself when it receives a
+            // collection object. A subsequent collection change must NOT trigger another callback.
             const callback = jest.fn();
             const connection = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.TEST_KEY,
                 callback,
-                waitForCollectionCallback: false,
             });
             await waitForPromisesToResolve();
             callback.mockReset();
@@ -393,13 +385,18 @@ describe('OnyxUtils', () => {
                 Onyx.disconnect(connection);
             });
 
+            // First batch fires the collection callback once, which disconnects the subscriber.
             await Onyx.multiSet({
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}1`]: {id: 1},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}2`]: {id: 2},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}3`]: {id: 3},
             });
 
-            // Despite 3 changed members, callback should fire at most once before disconnect stops it
+            expect(callback).toHaveBeenCalledTimes(1);
+
+            // A subsequent change must not fire the now-disconnected subscriber again.
+            await Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}1`, {id: 11});
+
             expect(callback).toHaveBeenCalledTimes(1);
         });
 
@@ -535,7 +532,7 @@ describe('OnyxUtils', () => {
             await Onyx.disconnect(connection);
         });
 
-        it('should notify collection-level subscribers with waitForCollectionCallback', async () => {
+        it('should notify collection-level subscribers with the whole collection object', async () => {
             const entryKey = `${ONYXKEYS.COLLECTION.TEST_KEY}789`;
             const entryData = {value: 'data'};
 
@@ -543,7 +540,6 @@ describe('OnyxUtils', () => {
             const connection = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.TEST_KEY,
                 callback: collectionCallback,
-                waitForCollectionCallback: true,
             });
 
             await Onyx.set(entryKey, entryData);
@@ -553,11 +549,10 @@ describe('OnyxUtils', () => {
             OnyxUtils.keysChanged(ONYXKEYS.COLLECTION.TEST_KEY, {[entryKey]: entryData}, {});
 
             expect(collectionCallback).toHaveBeenCalledTimes(1);
-            // Collection subscriber receives the full cached collection, subscriber.key, and partial
-            const [receivedCollection, receivedKey, receivedPartial] = collectionCallback.mock.calls[0];
+            // Collection subscriber receives the full cached collection and subscriber.key
+            const [receivedCollection, receivedKey] = collectionCallback.mock.calls[0];
             expect(receivedKey).toBe(ONYXKEYS.COLLECTION.TEST_KEY);
             expect(receivedCollection[entryKey]).toEqual(entryData);
-            expect(receivedPartial).toEqual({[entryKey]: entryData});
 
             Onyx.disconnect(connection);
         });
@@ -746,10 +741,19 @@ describe('OnyxUtils', () => {
 
     describe('retryOperation', () => {
         const retryOperationSpy = jest.spyOn(OnyxUtils, 'retryOperation');
+        /** Mirrors StorageCircuitBreaker rolling-window trip threshold. */
+        const STORAGE_FAILURE_THRESHOLD = 50;
         const genericError = new Error('Generic storage error');
         const invalidDataError = new Error("Failed to execute 'put' on 'IDBObjectStore': invalid data");
         const diskFullError = new Error('database or disk is full');
         const nonRetriableIdbError = Object.assign(new Error('Internal error opening backing store for indexedDB.open.'), {name: 'UnknownError'});
+
+        // The circuit breaker and the disk-pressure log throttle are process-scoped, so reset them
+        // between tests to avoid state leaking.
+        beforeEach(() => {
+            StorageCircuitBreaker.reset();
+            OnyxUtils.resetDiskPressureLogThrottle();
+        });
 
         it('should retry only one time if the operation is firstly failed and then passed', async () => {
             StorageMock.setItem = jest.fn(StorageMock.setItem).mockRejectedValueOnce(genericError).mockImplementation(StorageMock.setItem);
@@ -767,6 +771,21 @@ describe('OnyxUtils', () => {
 
             // Should be called 6 times: initial attempt + 5 retries (MAX_STORAGE_OPERATION_RETRY_ATTEMPTS)
             expect(retryOperationSpy).toHaveBeenCalledTimes(6);
+        });
+
+        it('should log the full shape of an unclassified (UNKNOWN) error once per operation', async () => {
+            const logAlertSpy = jest.spyOn(Logger, 'logAlert');
+            StorageMock.setItem = jest.fn().mockRejectedValue(genericError);
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+
+            // UNKNOWN is instrumented so we can see what to promote into a real class. The shape (provider
+            // + name + message) is logged exactly once even though the operation retries 6 times.
+            const unclassifiedCalls = logAlertSpy.mock.calls.filter((call) => typeof call[0] === 'string' && call[0].startsWith('Unclassified storage error.'));
+            expect(unclassifiedCalls).toHaveLength(1);
+            expect(unclassifiedCalls[0][0]).toBe(
+                `Unclassified storage error. provider: MemoryOnlyProvider. name: ${genericError.name}. message: ${genericError.message}. onyxMethod: setWithRetry.`,
+            );
         });
 
         it("should throw error for if operation failed with \"Failed to execute 'put' on 'IDBObjectStore': invalid data\" error", async () => {
@@ -793,15 +812,54 @@ describe('OnyxUtils', () => {
             expect(retryOperationSpy).toHaveBeenCalledTimes(1);
         });
 
-        it('should log a single skip alert for non-retriable errors', async () => {
+        it.each([['[NativeNitroSQLiteException][SqlExecutionError] disk I/O error'], ['[NativeNitroSQLiteException][SqlExecutionError] unable to open database file']])(
+            'should not retry disk-pressure errors (%s)',
+            async (message) => {
+                StorageMock.setItem = jest.fn().mockRejectedValue(new Error(message));
+
+                await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+
+                // Called once (initial attempt only): retries cannot succeed while the device disk is full.
+                expect(retryOperationSpy).toHaveBeenCalledTimes(1);
+            },
+        );
+
+        it('should log a single throttled alert with a quota snapshot for a disk-pressure burst', async () => {
             const logAlertSpy = jest.spyOn(Logger, 'logAlert');
+            const logInfoSpy = jest.spyOn(Logger, 'logInfo');
+            const diskIOError = new Error('[NativeNitroSQLiteException][SqlExecutionError] disk I/O error');
+            StorageMock.setItem = jest.fn().mockRejectedValue(diskIOError);
+
+            // A burst: several operations all failing with the identical error.
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data2'});
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data3'});
+
+            // One alert for the whole burst (the rest are throttled within DISK_PRESSURE_LOG_INTERVAL_MS)...
+            const alerts = logAlertSpy.mock.calls.filter((call) => typeof call[0] === 'string' && call[0].startsWith('Disk-pressure storage error'));
+            expect(alerts).toHaveLength(1);
+            expect(alerts[0][0]).toBe(`Disk-pressure storage error; skipping retries. provider: MemoryOnlyProvider. message: ${diskIOError.message}. onyxMethod: setWithRetry.`);
+            // ...paired with exactly one quota snapshot (carries the free-disk bytes on native platforms).
+            const quotaLogs = logInfoSpy.mock.calls.filter((call) => typeof call[0] === 'string' && call[0].startsWith('Storage Quota Check'));
+            expect(quotaLogs).toHaveLength(1);
+            // And no "failed after N retries" alert: the writes were dropped, not retried to exhaustion.
+            const retryAlerts = logAlertSpy.mock.calls.filter((call) => typeof call[0] === 'string' && call[0].startsWith('Storage operation failed after'));
+            expect(retryAlerts).toHaveLength(0);
+        });
+
+        it('should skip retry quietly (info, not alert) for fatal connection-layer errors', async () => {
+            const logAlertSpy = jest.spyOn(Logger, 'logAlert');
+            const logInfoSpy = jest.spyOn(Logger, 'logInfo');
             StorageMock.setItem = jest.fn().mockRejectedValue(nonRetriableIdbError);
 
             await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
-            expect(logAlertSpy).toHaveBeenCalledWith(`Storage operation skipped retry for non-retriable error. Error: ${nonRetriableIdbError}. onyxMethod: setWithRetry.`);
-            // Not paired with the "5 retries exhausted" alert
-            expect(logAlertSpy).toHaveBeenCalledTimes(1);
+            // The connection layer (createStore) owns and alerts on fatal errors; the operation layer
+            // just skips the retry at info level. No alert here, and no "5 retries exhausted" alert.
+            expect(logInfoSpy).toHaveBeenCalledWith(
+                `Storage operation skipped retry; fatal errors are handled by the connection layer. Error: ${nonRetriableIdbError}. onyxMethod: setWithRetry.`,
+            );
+            expect(logAlertSpy).not.toHaveBeenCalled();
         });
 
         it('should include the error in logAlert for IDBObjectStore invalid data errors', async () => {
@@ -821,7 +879,9 @@ describe('OnyxUtils', () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
             expect(logAlertSpy).toHaveBeenCalledWith(`Out of storage. But found no acceptable keys to remove. Error: ${diskFullError}`);
-            expect(logInfoSpy).toHaveBeenCalledWith(`Storage Quota Check -- bytesUsed: 0 bytesRemaining: Infinity. Original error: ${diskFullError}`);
+            expect(logInfoSpy).toHaveBeenCalledWith(
+                `Storage Quota Check -- bytesUsed: 0 originWideBytesRemaining (estimate, not per-DB headroom): Infinity. Original error: ${diskFullError}`,
+            );
         });
 
         it('should include usageDetails in the storage quota log when available', async () => {
@@ -841,7 +901,9 @@ describe('OnyxUtils', () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
             expect(logInfoSpy).toHaveBeenCalledWith(
-                `Storage Quota Check -- bytesUsed: 13289269 bytesRemaining: 5000000 usageDetails: ${JSON.stringify(usageDetails)}. Original error: ${diskFullError}`,
+                `Storage Quota Check -- bytesUsed: 13289269 originWideBytesRemaining (estimate, not per-DB headroom): 5000000 usageDetails: ${JSON.stringify(
+                    usageDetails,
+                )}. Original error: ${diskFullError}`,
             );
         });
 
@@ -854,6 +916,43 @@ describe('OnyxUtils', () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
             expect(logAlertSpy).toHaveBeenCalledWith(`Unable to get database size. getDatabaseSize error: ${dbSizeError}. Original error: ${diskFullError}`);
+        });
+
+        it('should trip the circuit breaker and alert once after sustained capacity failures', async () => {
+            const logAlertSpy = jest.spyOn(Logger, 'logAlert');
+            StorageMock.setItem = jest.fn().mockRejectedValue(diskFullError);
+
+            // No evictable keys are configured, so each failing write records exactly one capacity
+            // failure with the breaker (it cannot evict). Enough of them within one window trips it.
+            for (let i = 0; i <= STORAGE_FAILURE_THRESHOLD; i++) {
+                await Onyx.set(ONYXKEYS.TEST_KEY, {test: i});
+            }
+            await waitForPromisesToResolve();
+
+            expect(StorageCircuitBreaker.isAllowed()).toBe(false);
+            expect(logAlertSpy).toHaveBeenCalledWith(expect.stringContaining('Storage circuit breaker tripped'));
+        });
+
+        it('should drop capacity writes silently while the circuit breaker is open', async () => {
+            // Trip the breaker deterministically so every capacity failure below is observed while open.
+            for (let i = 0; i <= STORAGE_FAILURE_THRESHOLD; i++) {
+                StorageCircuitBreaker.recordCapacityFailure();
+            }
+            expect(StorageCircuitBreaker.isAllowed()).toBe(false);
+
+            // Clear so we only observe logging caused by the write below, not the trip alert above.
+            const logInfoSpy = jest.spyOn(Logger, 'logInfo').mockClear();
+            const logAlertSpy = jest.spyOn(Logger, 'logAlert').mockClear();
+            StorageMock.setItem = jest.fn().mockRejectedValue(diskFullError);
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+            await waitForPromisesToResolve();
+
+            // The write and any cascading derived writes are dropped without per-write log spam, and
+            // without re-alerting — the single trip alert is the only signal while open.
+            expect(StorageCircuitBreaker.isAllowed()).toBe(false);
+            expect(logInfoSpy).not.toHaveBeenCalledWith(expect.stringContaining('Failed to save to storage'));
+            expect(logAlertSpy).not.toHaveBeenCalled();
         });
 
         it('should not re-add an evicted key to recentlyAccessedKeys after removal', async () => {
@@ -899,7 +998,6 @@ describe('OnyxUtils', () => {
             const collectionCallback = jest.fn();
             Onyx.connect({
                 key: collectionKey,
-                waitForCollectionCallback: true,
                 callback: collectionCallback,
             });
             await waitForPromisesToResolve();
@@ -941,7 +1039,6 @@ describe('OnyxUtils', () => {
             const collectionCallback = jest.fn();
             Onyx.connect({
                 key: collectionKey,
-                waitForCollectionCallback: true,
                 callback: collectionCallback,
             });
             await waitForPromisesToResolve();
@@ -988,7 +1085,7 @@ describe('OnyxUtils', () => {
         // re-enters the failing method on the next attempt.
         const transientError = new Error('Transient storage error');
 
-        it('mergeCollection — waitForCollectionCallback subscriber fires once across retries', async () => {
+        it('mergeCollection — collection-root subscriber fires once across retries', async () => {
             const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
             const existingMemberKey = `${collectionKey}1`;
             const newMemberKey = `${collectionKey}2`;
@@ -998,7 +1095,6 @@ describe('OnyxUtils', () => {
             const collectionCallback = jest.fn();
             Onyx.connect({
                 key: collectionKey,
-                waitForCollectionCallback: true,
                 callback: collectionCallback,
             });
             await waitForPromisesToResolve();
@@ -1012,7 +1108,7 @@ describe('OnyxUtils', () => {
             } as GenericCollection);
 
             // Before this fix, every retry attempt re-fired keysChanged() — and
-            // waitForCollectionCallback subscribers fire on every keysChanged() call by contract.
+            // Collection-root subscribers fire on every keysChanged() call by contract.
             // After the fix, retries skip the keysChanged re-fire, so subscribers are notified
             // exactly once per logical operation.
             expect(collectionCallback).toHaveBeenCalledTimes(1);
@@ -1026,7 +1122,6 @@ describe('OnyxUtils', () => {
             const collectionCallback = jest.fn();
             Onyx.connect({
                 key: collectionKey,
-                waitForCollectionCallback: true,
                 callback: collectionCallback,
             });
             await waitForPromisesToResolve();
@@ -1050,7 +1145,6 @@ describe('OnyxUtils', () => {
             const collectionCallback = jest.fn();
             Onyx.connect({
                 key: collectionKey,
-                waitForCollectionCallback: true,
                 callback: collectionCallback,
             });
             await waitForPromisesToResolve();
@@ -1074,7 +1168,6 @@ describe('OnyxUtils', () => {
             const collectionCallback = jest.fn();
             Onyx.connect({
                 key: collectionKey,
-                waitForCollectionCallback: true,
                 callback: collectionCallback,
             });
             await waitForPromisesToResolve();
@@ -1212,7 +1305,6 @@ describe('OnyxUtils', () => {
             const collectionCallback = jest.fn();
             Onyx.connect({
                 key: collectionKey,
-                waitForCollectionCallback: true,
                 callback: collectionCallback,
             });
             await waitForPromisesToResolve();
@@ -1280,7 +1372,6 @@ describe('OnyxUtils', () => {
             const collectionCallback = jest.fn();
             Onyx.connect({
                 key: collectionKey,
-                waitForCollectionCallback: true,
                 callback: collectionCallback,
             });
             await waitForPromisesToResolve();
@@ -1421,6 +1512,42 @@ describe('OnyxUtils', () => {
             expect(LocalOnyxCache.get(ONYXKEYS.TEST_KEY)).toEqual({test: 'data'});
         });
 
+        it('should recover via a half-open eviction+retry probe after the open window clears', async () => {
+            // Regression for the bug where the capacity failure that triggers the half-open probe
+            // re-tripped the breaker before the eviction+retry could run — permanently disabling
+            // eviction-based recovery after the first trip. Drive the whole probe through retryOperation.
+            const ROLLING_WINDOW_MS = 60_000;
+            const FAILURE_THRESHOLD = 50;
+            const LocalStorageCircuitBreaker = require('../../lib/StorageCircuitBreaker').default as typeof StorageCircuitBreaker;
+
+            let currentTime = 1_000_000;
+            const nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => currentTime);
+
+            // Seed an evictable key so the probe has something to evict, then trip the breaker open.
+            const evictableKey = `${ONYXKEYS.COLLECTION.TEST_KEY}1`;
+            await LocalOnyx.set(evictableKey, {id: 1});
+            for (let i = 0; i <= FAILURE_THRESHOLD; i++) {
+                LocalStorageCircuitBreaker.recordCapacityFailure();
+            }
+            expect(LocalStorageCircuitBreaker.isAllowed()).toBe(false);
+
+            // Let the open window clear so the next capacity write is admitted as the half-open probe.
+            currentTime += ROLLING_WINDOW_MS;
+
+            // The probe write fails once with capacity (triggering the probe), then its post-eviction retry succeeds.
+            LocalStorageMock.setItem = jest.fn(LocalStorageMock.setItem).mockRejectedValueOnce(diskFullError).mockImplementation(LocalStorageMock.setItem);
+            await LocalOnyx.set(ONYXKEYS.TEST_KEY, {test: 'recovered'});
+            await waitForPromisesToResolve();
+
+            // The probe ran: the evictable key was evicted, the write landed, and the successful retry closed the circuit.
+            expect(LocalOnyxCache.hasCacheForKey(evictableKey)).toBe(false);
+            expect(LocalOnyxCache.get(ONYXKEYS.TEST_KEY)).toEqual({test: 'recovered'});
+            expect(LocalStorageCircuitBreaker.isAllowed()).toBe(true);
+            expect(LocalStorageCircuitBreaker.isAllowed()).toBe(true);
+
+            nowSpy.mockRestore();
+        });
+
         it('should evict the least recently accessed key first (LRU order)', async () => {
             const key1 = `${ONYXKEYS.COLLECTION.TEST_KEY}1`;
             const key2 = `${ONYXKEYS.COLLECTION.TEST_KEY}2`;
@@ -1514,7 +1641,9 @@ describe('OnyxUtils', () => {
             await LocalOnyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
             expect(logInfoSpy).toHaveBeenCalledWith(`Out of storage. Evicting least recently accessed key (${key1}) and retrying. Error: ${diskFullError}`);
-            expect(logInfoSpy).toHaveBeenCalledWith(`Storage Quota Check -- bytesUsed: 0 bytesRemaining: Infinity. Original error: ${diskFullError}`);
+            expect(logInfoSpy).toHaveBeenCalledWith(
+                `Storage Quota Check -- bytesUsed: 0 originWideBytesRemaining (estimate, not per-DB headroom): Infinity. Original error: ${diskFullError}`,
+            );
         });
 
         it('multiSet — eviction of an UNRELATED key still notifies its subscribers (codex regression guard)', async () => {

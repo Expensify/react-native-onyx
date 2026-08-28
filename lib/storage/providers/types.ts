@@ -1,5 +1,7 @@
+import type {ValueOf} from 'type-fest';
 import type {OnyxKey, OnyxValue} from '../../types';
 import type {FastMergeReplaceNullPatch} from '../../utils';
+import type {StorageErrorClass} from '../errors';
 
 type StorageKeyValuePair = [key: OnyxKey, value: OnyxValue<OnyxKey>, replaceNullPatches?: FastMergeReplaceNullPatch[]];
 type StorageKeyList = OnyxKey[];
@@ -10,7 +12,8 @@ type DatabaseSize = {
     usageDetails?: Record<string, number>;
 };
 
-type OnStorageKeyChanged = <TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>) => void;
+/** Called with the full batch of key/value pairs that changed together in a single cross-tab sync event. */
+type OnStorageKeysChanged = (pairs: StorageKeyValuePair[]) => void;
 
 type StorageProvider<TStore> = {
     store: TStore;
@@ -88,10 +91,17 @@ type StorageProvider<TStore> = {
     getDatabaseSize: () => Promise<DatabaseSize>;
 
     /**
-     * @param onStorageKeyChanged Storage synchronization mechanism keeping all opened tabs in sync
+     * Classifies a write error from THIS engine into the shared {@link StorageErrorClass} taxonomy.
+     * Each provider owns its own matchers (IndexedDB DOMExceptions, SQLite messages, …) so the central
+     * taxonomy stays engine-agnostic. Anything the provider doesn't recognize must return UNKNOWN.
      */
-    keepInstancesSync?: (onStorageKeyChanged: OnStorageKeyChanged) => void;
+    classifyError: (error: unknown) => ValueOf<typeof StorageErrorClass>;
+
+    /**
+     * @param onStorageKeysChanged Storage synchronization mechanism keeping all opened tabs in sync
+     */
+    keepInstancesSync?: (onStorageKeysChanged: OnStorageKeysChanged) => void;
 };
 
 export default StorageProvider;
-export type {StorageKeyList, StorageKeyValuePair, OnStorageKeyChanged};
+export type {StorageKeyList, StorageKeyValuePair, OnStorageKeysChanged};

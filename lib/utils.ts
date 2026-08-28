@@ -196,6 +196,36 @@ function isMergeableObject<TObject extends Record<string, unknown>>(value: unkno
     return isNonNullObject && !(value instanceof RegExp) && !(value instanceof Date) && !Array.isArray(value);
 }
 
+/**
+ * Reports whether a value needs cleaning (nested null/undefined, or the replace-object mark) before it's
+ * safe to store by reference. Read-only, non-allocating.
+ */
+function needsNormalization(value: unknown): boolean {
+    if (value === null || value === undefined || typeof value !== 'object' || Array.isArray(value)) {
+        return false;
+    }
+
+    // Use for-in loop to avoid an unnecessary array allocation from Object.keys()
+    // eslint-disable-next-line no-restricted-syntax, guard-for-in
+    for (const key in value) {
+        if (key === ONYX_INTERNALS__REPLACE_OBJECT_MARK) {
+            return true;
+        }
+
+        const propertyValue = (value as Record<string, unknown>)[key];
+
+        if (propertyValue === null || propertyValue === undefined) {
+            return true;
+        }
+
+        if (typeof propertyValue === 'object' && !Array.isArray(propertyValue) && needsNormalization(propertyValue)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 /** Deep removes the nested null values from the given value. Returns the original reference if no nulls were found. */
 function removeNestedNullValues<TValue extends OnyxInput<OnyxKey> | null>(value: TValue): TValue {
     if (value === null || value === undefined || typeof value !== 'object' || Array.isArray(value)) {
@@ -322,14 +352,35 @@ function omit<TValue>(obj: Record<string, TValue>, condition: string | string[] 
     return filterObject(obj, condition, false);
 }
 
+/**
+ * Splits an array into chunks no larger than maxChunkSize.
+ */
+function chunkArray<T>(items: readonly T[], maxChunkSize: number): T[][] {
+    if (items.length === 0) {
+        return [];
+    }
+
+    if (items.length <= maxChunkSize) {
+        return [items as T[]];
+    }
+
+    const chunks: T[][] = [];
+    for (let i = 0; i < items.length; i += maxChunkSize) {
+        chunks.push(items.slice(i, i + maxChunkSize));
+    }
+    return chunks;
+}
+
 export default {
     fastMerge,
     isEmptyObject,
     formatActionName,
     removeNestedNullValues,
+    needsNormalization,
     checkCompatibilityWithExistingValue,
     pick,
     omit,
+    chunkArray,
     ONYX_INTERNALS__REPLACE_OBJECT_MARK,
 };
 export type {FastMergeResult, FastMergeReplaceNullPatch, FastMergeOptions};

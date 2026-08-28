@@ -50,6 +50,12 @@ const storage: Storage = {
     },
 
     /**
+     * Classifies a write error using the active provider's own classifier. Synchronous and pure —
+     * never wrapped in tryOrDegradePerformance.
+     */
+    classifyError: (error) => provider.classifyError(error),
+
+    /**
      * Initializes all providers in the list of storage providers
      * and enables fallback providers if necessary
      */
@@ -182,14 +188,14 @@ const storage: Storage = {
     getDatabaseSize: () => tryOrDegradePerformance(() => provider.getDatabaseSize()),
 
     /**
-     * @param onStorageKeyChanged - Storage synchronization mechanism keeping all opened tabs in sync (web only)
+     * @param onStorageKeysChanged - Storage synchronization mechanism keeping all opened tabs in sync (web only)
      */
-    keepInstancesSync(onStorageKeyChanged) {
+    keepInstancesSync(onStorageKeysChanged) {
         // If InstanceSync shouldn't be used, it means we're on a native platform and we don't need to keep instances in sync
         if (!InstanceSync.shouldBeUsed) return;
 
         shouldKeepInstancesSync = true;
-        InstanceSync.init(onStorageKeyChanged, this);
+        InstanceSync.init(onStorageKeysChanged, this);
     },
 };
 

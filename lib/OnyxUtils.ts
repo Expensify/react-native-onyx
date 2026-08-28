@@ -6,14 +6,14 @@ import * as Logger from './Logger';
 import type Onyx from './Onyx';
 import cache, {TASK} from './OnyxCache';
 import OnyxKeys from './OnyxKeys';
-import * as Str from './Str';
+import StorageCircuitBreaker from './StorageCircuitBreaker';
 import Storage from './storage';
+import {StorageErrorClass} from './storage/errors';
 import type {
     CollectionKeyBase,
     ConnectOptions,
     DeepRecord,
     DefaultConnectCallback,
-    DefaultConnectOptions,
     KeyValueMapping,
     CallbackToStateMapping,
     MultiMergeReplaceNullPatches,
@@ -49,30 +49,26 @@ const METHOD = {
     CLEAR: 'clear',
 } as const;
 
-// IndexedDB errors that indicate storage capacity issues where eviction can help
-const IDB_STORAGE_ERRORS = [
-    'quotaexceedederror', // Browser storage quota exceeded
-] as const;
-
-// SQLite errors that indicate storage capacity issues where eviction can help
-const SQLITE_STORAGE_ERRORS = [
-    'database or disk is full', // Device storage is full
-] as const;
-
-const STORAGE_ERRORS = [...IDB_STORAGE_ERRORS, ...SQLITE_STORAGE_ERRORS];
-
-// IndexedDB errors where retrying is futile because the underlying connection/store is broken.
-// The healing path (separate from retryOperation) is responsible for recovery.
-const IDB_NON_RETRIABLE_ERRORS = [
-    'internal error opening backing store', // LevelDB backing store is broken at the filesystem level
-] as const;
-
-const NON_RETRIABLE_ERRORS = [...IDB_NON_RETRIABLE_ERRORS];
-
 // Max number of retries for failed storage operations
 const MAX_STORAGE_OPERATION_RETRY_ATTEMPTS = 5;
 
+/** Minimum interval between disk-pressure alerts. One disk-pressure burst fails every queued operation
+ * with the identical error, so per-operation logging would amplify the very storm it reports. */
+const DISK_PRESSURE_LOG_INTERVAL_MS = 60000;
+let lastDiskPressureLogTime = 0;
+
+/** Test-only: clears the disk-pressure log throttle so each test observes its own alert. */
+function resetDiskPressureLogThrottle(): void {
+    lastDiskPressureLogTime = 0;
+}
+
 type OnyxMethod = ValueOf<typeof METHOD>;
+
+/** Result of `prepareKeyValuePairsForStorage`: pairs to write and keys whose `null` value marks them for removal. */
+type PreparedKeyValuePairs = {
+    pairs: StorageKeyValuePair[];
+    keysToRemove: OnyxKey[];
+};
 
 // Key/value store of Onyx key and arrays of values to merge
 let mergeQueue: Record<OnyxKey, Array<OnyxValue<OnyxKey>>> = {};
@@ -425,7 +421,9 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
  * Note: just using `.map`, you'd end up with `Array<OnyxCollection<Report>|OnyxEntry<string>>`, which is not what we want. This preserves the order of the keys provided.
  */
 function tupleGet<Keys extends readonly OnyxKey[]>(keys: Keys): Promise<{[Index in keyof Keys]: OnyxValue<Keys[Index]>}> {
-    return Promise.all(keys.map((key) => get(key))) as Promise<{[Index in keyof Keys]: OnyxValue<Keys[Index]>}>;
+    return Promise.all(keys.map((key) => get(key))) as Promise<{
+        [Index in keyof Keys]: OnyxValue<Keys[Index]>;
+    }>;
 }
 
 /**
@@ -598,27 +596,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
 
         try {
             lastConnectionCallbackData.set(subscriber.subscriptionID, {value: cachedCollection, matchedKey: subscriber.key});
-
-            if (subscriber.waitForCollectionCallback) {
-                subscriber.callback(cachedCollection, subscriber.key, partialCollection);
-                continue;
-            }
-
-            // Not using waitForCollectionCallback — notify per changed key.
-            // Re-check the subscription on each iteration because the callback may
-            // synchronously disconnect itself (removing it from callbackToStateMapping),
-            // in which case we must stop firing further callbacks for this subscriber.
-            for (const dataKey of changedMemberKeys) {
-                const currentSubscriber = callbackToStateMapping[subID];
-                if (!currentSubscriber || typeof currentSubscriber.callback !== 'function') {
-                    break;
-                }
-                if (cachedCollection[dataKey] === previousCollection[dataKey]) {
-                    continue;
-                }
-                const currentSubscriberCallback = currentSubscriber.callback as DefaultConnectCallback<TKey>;
-                currentSubscriberCallback(cachedCollection[dataKey], dataKey as TKey);
-            }
+            subscriber.callback(cachedCollection, subscriber.key);
         } catch (error) {
             Logger.logAlert(`[OnyxUtils.keysChanged] Subscriber callback threw an error for key '${collectionKey}': ${error}`);
         }
@@ -638,7 +616,10 @@ function keysChanged<TKey extends CollectionKeyBase>(
         try {
             const subscriberCallback = subscriber.callback as DefaultConnectCallback<TKey>;
             subscriberCallback(cachedCollection[subscriber.key], subscriber.key as TKey);
-            lastConnectionCallbackData.set(subscriber.subscriptionID, {value: cachedCollection[subscriber.key], matchedKey: subscriber.key});
+            lastConnectionCallbackData.set(subscriber.subscriptionID, {
+                value: cachedCollection[subscriber.key],
+                matchedKey: subscriber.key,
+            });
         } catch (error) {
             Logger.logAlert(`[OnyxUtils.keysChanged] Subscriber callback threw an error for key '${collectionKey}': ${error}`);
         }
@@ -648,12 +629,7 @@ function keysChanged<TKey extends CollectionKeyBase>(
 /**
  * When a key change happens, search for any callbacks matching the key or collection key and trigger those callbacks
  */
-function keyChanged<TKey extends OnyxKey>(
-    key: TKey,
-    value: OnyxValue<TKey>,
-    canUpdateSubscriber: (subscriber?: CallbackToStateMapping<OnyxKey>) => boolean = () => true,
-    isProcessingCollectionUpdate = false,
-): void {
+function keyChanged<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>, canUpdateSubscriber: (subscriber?: CallbackToStateMapping<OnyxKey>) => boolean = () => true): void {
     // Add or remove this key from the recentlyAccessedKeys list
     if (value !== null && value !== undefined) {
         cache.addLastAccessedKey(key, OnyxKeys.isCollectionKey(key));
@@ -696,12 +672,7 @@ function keyChanged<TKey extends OnyxKey>(
                     continue;
                 }
 
-                if (OnyxKeys.isCollectionKey(subscriber.key) && subscriber.waitForCollectionCallback) {
-                    // Skip individual key changes for collection callbacks during collection updates
-                    // to prevent duplicate callbacks - the collection update will handle this properly
-                    if (isProcessingCollectionUpdate) {
-                        continue;
-                    }
+                if (OnyxKeys.isCollectionKey(subscriber.key)) {
                     // Cache once per dispatch to ensure all subscribers see a consistent snapshot
                     // even if a previous callback synchronously wrote to the same collection.
                     let cachedCollection = cachedCollections[subscriber.key];
@@ -710,14 +681,17 @@ function keyChanged<TKey extends OnyxKey>(
                         cachedCollections[subscriber.key] = cachedCollection;
                     }
                     lastConnectionCallbackData.set(subscriber.subscriptionID, {value: cachedCollection, matchedKey: subscriber.key});
-                    subscriber.callback(cachedCollection, subscriber.key, {[key]: value});
+                    subscriber.callback(cachedCollection, subscriber.key);
                     continue;
                 }
 
                 const subscriberCallback = subscriber.callback as DefaultConnectCallback<TKey>;
                 subscriberCallback(value, key);
 
-                lastConnectionCallbackData.set(subscriber.subscriptionID, {value, matchedKey: key});
+                lastConnectionCallbackData.set(subscriber.subscriptionID, {
+                    value,
+                    matchedKey: key,
+                });
                 continue;
             } catch (error) {
                 Logger.logAlert(`[OnyxUtils.keyChanged] Subscriber callback threw an error for key '${key}': ${error}`);
@@ -741,10 +715,10 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: CallbackToStateMapp
     }
 
     // Always read the latest value from cache to avoid stale or duplicate data.
-    // For collection subscribers with waitForCollectionCallback, read the full collection.
+    // For collection-root subscribers, read the full collection.
     // For individual key subscribers, read just that key's value.
     let value: OnyxValue<TKey> | undefined;
-    if (OnyxKeys.isCollectionKey(mapping.key) && mapping.waitForCollectionCallback) {
+    if (OnyxKeys.isCollectionKey(mapping.key)) {
         const collection = getCachedCollection(mapping.key);
         value = Object.keys(collection).length > 0 ? (collection as OnyxValue<TKey>) : undefined;
     } else {
@@ -762,7 +736,7 @@ function sendDataToConnection<TKey extends OnyxKey>(mapping: CallbackToStateMapp
         return;
     }
 
-    (mapping as DefaultConnectOptions<TKey>).callback?.(value, matchedKey as TKey);
+    (mapping.callback as DefaultConnectCallback<TKey> | undefined)?.(value, matchedKey as TKey);
 }
 
 /**
@@ -777,9 +751,9 @@ function getCollectionDataAndSendAsObject<TKey extends OnyxKey>(matchingKeys: Co
 /**
  * Remove a key from Onyx and update the subscribers
  */
-function remove<TKey extends OnyxKey>(key: TKey, isProcessingCollectionUpdate?: boolean): Promise<void> {
+function remove<TKey extends OnyxKey>(key: TKey): Promise<void> {
     cache.drop(key);
-    keyChanged(key, undefined as OnyxValue<TKey>, undefined, isProcessingCollectionUpdate);
+    keyChanged(key, undefined as OnyxValue<TKey>);
 
     if (OnyxKeys.isRamOnlyKey(key)) {
         return Promise.resolve();
@@ -791,8 +765,11 @@ function remove<TKey extends OnyxKey>(key: TKey, isProcessingCollectionUpdate?: 
 function reportStorageQuota(error?: Error): Promise<void> {
     return Storage.getDatabaseSize()
         .then(({bytesUsed, bytesRemaining, usageDetails}) => {
+            // `bytesRemaining` comes from navigator.storage.estimate() and is an ORIGIN-WIDE estimate,
+            // not headroom for this database. The browser allocates IndexedDB storage dynamically, so a
+            // QuotaExceededError can legitimately occur even when this number still looks large.
             Logger.logInfo(
-                `Storage Quota Check -- bytesUsed: ${bytesUsed} bytesRemaining: ${bytesRemaining}${
+                `Storage Quota Check -- bytesUsed: ${bytesUsed} originWideBytesRemaining (estimate, not per-DB headroom): ${bytesRemaining}${
                     usageDetails ? ` usageDetails: ${JSON.stringify(usageDetails)}` : ''
                 }. Original error: ${error}`,
             );
@@ -803,11 +780,20 @@ function reportStorageQuota(error?: Error): Promise<void> {
 }
 
 /**
- * Handles storage operation failures based on the error type:
- * - Storage capacity errors: evicts data and retries the operation
- * - Invalid data errors: logs an alert and throws an error
- * - Non-retriable errors: logs an alert and resolves without retrying
- * - Other errors: retries the operation
+ * Handles storage operation failures based on the error class (see lib/storage/errors.ts).
+ * The connection layer (createStore) owns connection/transport recovery; this operation layer owns
+ * capacity recovery (eviction) so that a given failure is retried by exactly one layer:
+ * - INVALID_DATA: logs an alert and throws (the same data will always fail).
+ * - TRANSIENT / FATAL: the connection layer already retried (transient) or exhausted its heal budget
+ *   and alerted (fatal). Retrying here would only re-amplify, so we skip the write quietly.
+ * - CAPACITY: evicts the least recently accessed evictable key and retries, under a session-level
+ *   circuit breaker (see lib/StorageCircuitBreaker.ts) that halts the loop once eviction stops making
+ *   progress or failures storm — the per-operation budget alone cannot stop a session-wide storm.
+ * - DISK_PRESSURE: the device disk itself is full (or the database files are unreadable), so neither
+ *   retries nor in-DB eviction can free space — the write is dropped (cache stays authoritative) with
+ *   a single throttled alert + quota snapshot per burst.
+ * - UNKNOWN: the provider couldn't classify it — log the full error shape (name + message +
+ *   provider) once so it's visible, then bounded retry without eviction.
  */
 function retryOperation<TMethod extends RetriableOnyxOperation>(
     error: Error,
@@ -818,32 +804,69 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(
 ): Promise<void> {
     const currentRetryAttempt = retryAttempt ?? 0;
     const nextRetryAttempt = currentRetryAttempt + 1;
+    const errorClass = Storage.classifyError(error);
 
-    Logger.logInfo(`Failed to save to storage. Error: ${error}. onyxMethod: ${onyxMethod.name}. retryAttempt: ${currentRetryAttempt}/${MAX_STORAGE_OPERATION_RETRY_ATTEMPTS}`);
+    // While open (or while a half-open probe is already in flight), drop capacity retries silently —
+    // the breaker already emitted its single alert, and logging per failed write is exactly the storm
+    // we are suppressing. A rejected half-open caller is the in-flight probe failing; record that so
+    // the circuit reopens for another window. (We return before the log line below on purpose.)
+    if (errorClass === StorageErrorClass.CAPACITY && !StorageCircuitBreaker.isAllowed()) {
+        StorageCircuitBreaker.recordProbeFailure();
+        return Promise.resolve();
+    }
 
-    if (error && Str.startsWith(error.message, "Failed to execute 'put' on 'IDBObjectStore'")) {
+    // DISK_PRESSURE: the device disk is full, so neither retries nor eviction can succeed until the OS
+    // frees space. Drop the write (cache stays authoritative) and log one alert + quota snapshot per
+    // interval — the snapshot's free-disk bytes let telemetry confirm (or rule out) disk pressure.
+    if (errorClass === StorageErrorClass.DISK_PRESSURE) {
+        const now = Date.now();
+        if (now - lastDiskPressureLogTime < DISK_PRESSURE_LOG_INTERVAL_MS) {
+            return Promise.resolve();
+        }
+        lastDiskPressureLogTime = now;
+        Logger.logAlert(`Disk-pressure storage error; skipping retries. provider: ${Storage.getStorageProvider().name}. message: ${error?.message}. onyxMethod: ${onyxMethod.name}.`);
+        return reportStorageQuota(error);
+    }
+
+    Logger.logInfo(
+        `Failed to save to storage. Error: ${error}. class: ${errorClass}. onyxMethod: ${onyxMethod.name}. retryAttempt: ${currentRetryAttempt}/${MAX_STORAGE_OPERATION_RETRY_ATTEMPTS}`,
+    );
+
+    if (errorClass === StorageErrorClass.INVALID_DATA) {
         Logger.logAlert(`Attempted to set invalid data set in Onyx. Please ensure all data is serializable. Error: ${error}`);
         throw error;
     }
 
-    const errorMessage = error?.message?.toLowerCase?.();
-    const errorName = error?.name?.toLowerCase?.();
-    const isStorageCapacityError = STORAGE_ERRORS.some((storageError) => errorName?.includes(storageError) || errorMessage?.includes(storageError));
-    const isNonRetriableError = NON_RETRIABLE_ERRORS.some((nonRetriableError) => errorName?.includes(nonRetriableError) || errorMessage?.includes(nonRetriableError));
-
-    if (isNonRetriableError) {
-        Logger.logAlert(`Storage operation skipped retry for non-retriable error. Error: ${error}. onyxMethod: ${onyxMethod.name}.`);
+    if (errorClass === StorageErrorClass.TRANSIENT || errorClass === StorageErrorClass.FATAL) {
+        Logger.logInfo(`Storage operation skipped retry; ${errorClass} errors are handled by the connection layer. Error: ${error}. onyxMethod: ${onyxMethod.name}.`);
         return Promise.resolve();
     }
 
     if (nextRetryAttempt > MAX_STORAGE_OPERATION_RETRY_ATTEMPTS) {
-        Logger.logAlert(`Storage operation failed after 5 retries. Error: ${error}. onyxMethod: ${onyxMethod.name}.`);
+        Logger.logAlert(`Storage operation failed after ${MAX_STORAGE_OPERATION_RETRY_ATTEMPTS} retries. Error: ${error}. onyxMethod: ${onyxMethod.name}.`);
         return Promise.resolve();
     }
 
-    if (!isStorageCapacityError) {
+    if (errorClass === StorageErrorClass.UNKNOWN) {
+        // UNKNOWN is the blind spot: the active provider's classifier did not recognize this error, so
+        // we cannot route it to a real recovery strategy. Log the full error shape (name + message +
+        // provider) once per operation so telemetry can reveal what lives in UNKNOWN, letting us promote
+        // recurring cases into TRANSIENT/CAPACITY/FATAL. Logged on the first attempt only to avoid the
+        // per-retry amplification this mechanism is trying to kill. Then bounded retry without eviction.
+        if (currentRetryAttempt === 0) {
+            Logger.logAlert(`Unclassified storage error. provider: ${Storage.getStorageProvider().name}. name: ${error?.name}. message: ${error?.message}. onyxMethod: ${onyxMethod.name}.`);
+        }
         // @ts-expect-error No overload matches this call.
         return onyxMethod(defaultParams, nextRetryAttempt);
+    }
+
+    // CAPACITY: feed the session-level circuit breaker before evicting. The per-operation budget above
+    // cannot stop a session-wide storm — each evicted key triggers an OnyxDerived recompute that spawns
+    // a fresh write with its own budget — so the breaker is what actually halts the meltdown. (The
+    // already-open case returned silently at the top of this function.)
+    if (StorageCircuitBreaker.recordCapacityFailure()) {
+        // This failure tripped the breaker; it already emitted its single alert. Stop here.
+        return Promise.resolve();
     }
 
     // Find the least recently accessed evictable key that we can remove. Never evict an in-flight
@@ -862,8 +885,15 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(
     Logger.logInfo(`Out of storage. Evicting least recently accessed key (${keyForRemoval}) and retrying. Error: ${error}`);
     reportStorageQuota(error);
 
-    // @ts-expect-error No overload matches this call.
-    return remove(keyForRemoval).then(() => onyxMethod(defaultParams, nextRetryAttempt));
+    return remove(keyForRemoval).then(() => {
+        // Mark the eviction only once the deletion has actually completed, immediately before the
+        // retry it pairs with. Recording earlier lets a concurrent write's capacity failure consume
+        // the marker as a no-progress cycle while this deletion is still pending and may yet free
+        // space — so the verdict belongs to the retry that follows the deletion, not the eviction call.
+        StorageCircuitBreaker.recordEviction();
+        // @ts-expect-error No overload matches this call.
+        return onyxMethod(defaultParams, nextRetryAttempt);
+    });
 }
 
 /**
@@ -885,21 +915,20 @@ function hasPendingMergeForKey(key: OnyxKey): boolean {
 /**
  * Storage expects array like: [["@MyApp_user", value_1], ["@MyApp_key", value_2]]
  * This method transforms an object like {'@MyApp_user': myUserValue, '@MyApp_key': myKeyValue}
- * to an array of key-value pairs in the above format and removes key-value pairs that are being set to null
- *
- * @return an array of key - value pairs <[key, value]>
+ * to an array of key-value pairs in the above format, and collects the keys of null values into
+ * `keysToRemove` for the caller to delete as one batch (cache drop + notification + batched storage removal).
  */
 function prepareKeyValuePairsForStorage(
     data: Record<OnyxKey, OnyxInput<OnyxKey>>,
     shouldRemoveNestedNulls?: boolean,
     replaceNullPatches?: MultiMergeReplaceNullPatches,
-    isProcessingCollectionUpdate?: boolean,
-): StorageKeyValuePair[] {
+): PreparedKeyValuePairs {
     const pairs: StorageKeyValuePair[] = [];
+    const keysToRemove: OnyxKey[] = [];
 
     for (const [key, value] of Object.entries(data)) {
         if (value === null) {
-            remove(key, isProcessingCollectionUpdate);
+            keysToRemove.push(key);
             continue;
         }
 
@@ -910,7 +939,7 @@ function prepareKeyValuePairsForStorage(
         }
     }
 
-    return pairs;
+    return {pairs, keysToRemove};
 }
 
 /**
@@ -1010,9 +1039,12 @@ function initializeWithDefaultKeyStates(): Promise<void> {
                 allDataFromStorage[key] = value;
             }
 
-            // Load all storage data into cache silently (no subscriber notifications)
-            cache.setAllKeys(Object.keys(allDataFromStorage));
-            cache.merge(allDataFromStorage);
+            // Load all storage data into cache silently (no subscriber notifications).
+            // hydrate() rather than merge(): the cache is empty at this point, so a per-key fastMerge
+            // would only deep-clone every row it was handed.
+            // No setAllKeys() call is needed: hydrate() calls addKey() for every key, which populates the
+            // key index and registers collection member keys itself.
+            cache.hydrate(allDataFromStorage);
 
             // For keys that have a developer-defined default (via `initialKeyStates`), merge the
             // persisted value with the default so new properties added in code updates are applied
@@ -1143,7 +1175,7 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
                     cache.addNullishStorageKey(mapping.key);
                 }
 
-                const matchedKey = OnyxKeys.isCollectionKey(mapping.key) && mapping.waitForCollectionCallback ? mapping.key : undefined;
+                const matchedKey = OnyxKeys.isCollectionKey(mapping.key) ? mapping.key : undefined;
 
                 // Here we cannot use batching because the nullish value is expected to be set immediately for default props
                 // or they will be undefined.
@@ -1151,22 +1183,11 @@ function subscribeToKey<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKe
                 return;
             }
 
-            // When using a callback subscriber we will either trigger the provided callback for each key we find or combine all values
-            // into an object and just make a single call. The latter behavior is enabled by providing a waitForCollectionCallback key
-            // combined with a subscription to a collection key.
+            // When using a callback subscriber, a subscription to a collection key combines all matching
+            // member values into a single object and makes one call with the whole collection object.
             if (typeof mapping.callback === 'function') {
                 if (OnyxKeys.isCollectionKey(mapping.key)) {
-                    if (mapping.waitForCollectionCallback) {
-                        getCollectionDataAndSendAsObject(matchingKeys, mapping);
-                        return;
-                    }
-
-                    // We did not opt into using waitForCollectionCallback mode so the callback is called for every matching key.
-                    multiGet(matchingKeys).then(() => {
-                        for (const key of matchingKeys) {
-                            sendDataToConnection(mapping, key as TKey);
-                        }
-                    });
+                    getCollectionDataAndSendAsObject(matchingKeys, mapping);
                     return;
                 }
 
@@ -1205,6 +1226,15 @@ function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, me
 
     const snapshotCollection = getCachedCollection(snapshotCollectionKey);
 
+    // Multiset entries are keyless but update every key of their payload, so expand them into
+    // per-key entries to keep cached snapshots in sync with the real Onyx data.
+    const flattenedData = data.flatMap<{onyxMethod: OnyxMethod; key: unknown; value?: unknown}>((entry) => {
+        if (entry.onyxMethod === METHOD.MULTI_SET && typeof entry.key !== 'string' && entry.value && typeof entry.value === 'object' && !Array.isArray(entry.value)) {
+            return Object.entries(entry.value).map(([key, value]) => ({onyxMethod: METHOD.SET, key, value}));
+        }
+        return entry;
+    });
+
     for (const [snapshotEntryKey, snapshotEntryValue] of Object.entries(snapshotCollection)) {
         // Snapshots may not be present in cache. We don't know how to update them so we skip.
         if (!snapshotEntryValue) {
@@ -1213,7 +1243,15 @@ function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, me
 
         let updatedData: Record<string, unknown> = {};
 
-        for (const {key, value} of data) {
+        for (const {key, value, onyxMethod} of flattenedData) {
+            if (typeof key !== 'string') {
+                // clear entries legitimately carry no key, and malformed multiset payloads are already logged by update() itself
+                if (onyxMethod !== METHOD.CLEAR && onyxMethod !== METHOD.MULTI_SET) {
+                    Logger.logHmmm(`Invalid ${typeof key} key (method: ${onyxMethod}, key: ${String(key).slice(0, 50)}) provided in Onyx update. Skipping snapshot update for this entry.`);
+                }
+                continue;
+            }
+
             // snapshots are normal keys so we want to skip update if they are written to Onyx
             if (OnyxKeys.isCollectionMemberKey(snapshotCollectionKey, key)) {
                 continue;
@@ -1249,7 +1287,10 @@ function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, me
             const keysToCopy = new Set([...snapshotExistingKeys, ...allowedNewKeys]);
             const newValue = typeof value === 'object' && value !== null ? utils.pick(value as Record<string, unknown>, [...keysToCopy]) : {};
 
-            updatedData = {...updatedData, [key]: Object.assign(oldValue, newValue)};
+            updatedData = {
+                ...updatedData,
+                [key]: Object.assign(oldValue, newValue),
+            };
         }
 
         // Skip the update if there's no data to be merged
@@ -1347,6 +1388,7 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
     }
 
     return Storage.setItem(key, valueWithoutNestedNullValues)
+        .then(() => StorageCircuitBreaker.recordWriteSuccess())
         .catch((error) => OnyxUtils.retryOperation(error, setWithRetry, {key, value: valueWithoutNestedNullValues, options}, retryAttempt))
         .then(() => {
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
@@ -1381,13 +1423,24 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
         }, {});
     }
 
-    const keyValuePairsToSet = OnyxUtils.prepareKeyValuePairsForStorage(newData, true);
+    const {pairs: keyValuePairsToSet, keysToRemove: removalCandidates} = OnyxUtils.prepareKeyValuePairsForStorage(newData, true);
+
+    // Removals of keys that are neither cached nor persisted are no-ops and skipped. When the key
+    // index has not been loaded yet (empty set), keep the removal to be safe.
+    const persistedKeys = cache.getAllKeys();
+    const keysToRemove = removalCandidates.filter((key) => cache.get(key) !== undefined || persistedKeys.size === 0 || persistedKeys.has(key));
 
     // Group collection members by their parent collection key so each collection can be notified
     // via a single batched keysChanged() call instead of one keyChanged() per member. For each
     // collection, `partial` holds the new values being set and `previous` holds the cached values
     // from before the set, which keysChanged() uses to skip subscribers whose value didn't change.
-    const collectionBatches = new Map<string, {partial: Record<string, OnyxValue<OnyxKey>>; previous: Record<string, OnyxValue<OnyxKey>>}>();
+    const collectionBatches = new Map<
+        string,
+        {
+            partial: Record<string, OnyxValue<OnyxKey>>;
+            previous: Record<string, OnyxValue<OnyxKey>>;
+        }
+    >();
 
     for (const [key, value] of keyValuePairsToSet) {
         // When we use multiSet to set a key we want to clear the current delta changes from Onyx.merge that were queued
@@ -1416,10 +1469,31 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
             // and subscriber state, matching the original per-key notification semantics.
             cache.set(key, value);
             // Skip subscriber notification on retry — already notified on attempt 0.
-            // waitForCollectionCallback subscribers re-fire on every keyChanged by contract.
+            // Collection-root subscribers re-fire on every keyChanged by contract.
             if (!retryAttempt) {
                 keyChanged(key, value);
             }
+        }
+    }
+
+    // Null keys join the same per-collection batches (as undefined) and are deleted from storage
+    // in one batched call below, so cross-tab sync raises a single event instead of one per key.
+    for (const key of keysToRemove) {
+        const previousValue = cache.get(key);
+        cache.drop(key);
+
+        const collectionKey = OnyxKeys.getCollectionKey(key);
+        if (collectionKey && OnyxKeys.isCollectionMemberKey(collectionKey, key)) {
+            let batch = collectionBatches.get(collectionKey);
+            if (!batch) {
+                batch = {partial: {}, previous: {}};
+                collectionBatches.set(collectionKey, batch);
+            }
+            batch.partial[key] = undefined;
+            batch.previous[key] = previousValue;
+        } else if (!retryAttempt) {
+            // Skip subscriber notification on retry — already notified on attempt 0.
+            keyChanged(key, undefined);
         }
     }
 
@@ -1437,10 +1511,18 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
         // Filter out the RAM-only key value pairs, as they should not be saved to storage
         return !OnyxKeys.isRamOnlyKey(key);
     });
+    const keysToRemoveFromStorage = keysToRemove.filter((key) => !OnyxKeys.isRamOnlyKey(key));
 
     const inFlightKeys = new Set<OnyxKey>(keyValuePairsToSet.map(([key]) => key));
 
-    return Storage.multiSet(keyValuePairsToStore)
+    // A failed removal is logged, not retried — keysToRemove cannot be re-derived after the cache update.
+    const storagePromises = [Storage.multiSet(keyValuePairsToStore)];
+    if (keysToRemoveFromStorage.length > 0) {
+        storagePromises.push(Storage.removeItems(keysToRemoveFromStorage).catch((error) => Logger.logAlert(`multiSet failed to remove keys from storage. Error: ${error}`)));
+    }
+
+    return Promise.all(storagePromises)
+        .then(() => StorageCircuitBreaker.recordWriteSuccess())
         .catch((error) => OnyxUtils.retryOperation(error, multiSetWithRetry, newData, retryAttempt, inFlightKeys))
         .then(() => {
             OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MULTI_SET, undefined, newData);
@@ -1500,15 +1582,21 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
             mutableCollection[key] = null;
         }
 
-        const keyValuePairs = OnyxUtils.prepareKeyValuePairsForStorage(mutableCollection, true, undefined, true);
+        const {pairs: keyValuePairs, keysToRemove: removalCandidates} = OnyxUtils.prepareKeyValuePairsForStorage(mutableCollection, true);
+        // Removals of keys that are neither cached nor persisted are no-ops and skipped.
+        const keysToRemove = removalCandidates.filter((key) => cache.get(key) !== undefined || persistedKeys.has(key));
+        // Snapshot before cache mutations so keysChanged() can diff removed members.
         const previousCollection = OnyxUtils.getCachedCollection(collectionKey);
 
         for (const [key, value] of keyValuePairs) cache.set(key, value);
+        for (const key of keysToRemove) cache.drop(key);
 
         // Skip subscriber notification on retry — already notified on attempt 0.
-        // waitForCollectionCallback subscribers re-fire on every keysChanged by contract.
+        // Collection-root subscribers re-fire on every keysChanged by contract.
         if (!retryAttempt) {
-            keysChanged(collectionKey, mutableCollection, previousCollection);
+            // Removed members are notified as undefined, matching mergeCollection/multiSet.
+            const partialForNotify = Object.fromEntries(Object.entries(mutableCollection).map(([key, value]) => [key, value ?? undefined]));
+            keysChanged(collectionKey, partialForNotify, previousCollection);
         }
 
         // RAM-only keys are not supposed to be saved to storage
@@ -1519,7 +1607,15 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
 
         const inFlightKeys = new Set<OnyxKey>(keyValuePairs.map(([key]) => key));
 
-        return Storage.multiSet(keyValuePairs)
+        // One batched removal = one cross-tab sync event instead of one per key. A failed removal is
+        // logged, not retried — keysToRemove cannot be re-derived after the cache update.
+        const storagePromises = [Storage.multiSet(keyValuePairs)];
+        if (keysToRemove.length > 0) {
+            storagePromises.push(Storage.removeItems(keysToRemove).catch((error) => Logger.logAlert(`setCollection failed to remove keys from storage. Error: ${error}`)));
+        }
+
+        return Promise.all(storagePromises)
+            .then(() => StorageCircuitBreaker.recordWriteSuccess())
             .catch((error) => OnyxUtils.retryOperation(error, setCollectionWithRetry, {collectionKey, collection}, retryAttempt, inFlightKeys))
             .then(() => {
                 OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET_COLLECTION, undefined, mutableCollection);
@@ -1537,11 +1633,10 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
  * @param params.collection Object collection keyed by individual collection member keys and values
  * @param params.mergeReplaceNullPatches Record where the key is a collection member key and the value is a list of
  * tuples that we'll use to replace the nested objects of that collection member record with something else.
- * @param params.isProcessingCollectionUpdate whether this is part of a collection update operation.
  * @param retryAttempt retry attempt
  */
 function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
-    {collectionKey, collection, mergeReplaceNullPatches, isProcessingCollectionUpdate = false}: MergeCollectionWithPatchesParams<TKey>,
+    {collectionKey, collection, mergeReplaceNullPatches}: MergeCollectionWithPatchesParams<TKey>,
     retryAttempt?: number,
 ): Promise<void> {
     if (!isValidNonEmptyCollectionForMerge(collection)) {
@@ -1577,14 +1672,33 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
 
     return getAllKeys()
         .then((persistedKeys) => {
-            // Split to keys that exist in storage and keys that don't
+            // Split to keys that exist in storage and keys that don't. Null members are collected
+            // for one batched removal below; nulls that are neither cached nor persisted are no-ops and skipped.
+            const keysToRemove: OnyxKey[] = [];
             const keys = resultCollectionKeys.filter((key) => {
                 if (resultCollection[key] === null) {
-                    remove(key, isProcessingCollectionUpdate);
+                    if (cache.get(key) !== undefined || persistedKeys.has(key)) {
+                        keysToRemove.push(key);
+                    }
                     return false;
                 }
                 return true;
             });
+
+            // Drop removed members before the pre-warm await below, so a concurrent write to one of
+            // these keys during the pre-warm is not wiped out by a late drop.
+            const removedPreviousValues: OnyxInputKeyValueMapping = {};
+            for (const key of keysToRemove) {
+                removedPreviousValues[key] = cache.get(key);
+                cache.drop(key);
+            }
+
+            // One batched removal = one cross-tab sync event instead of one per key. Issued at drop time
+            // so a concurrent later write to a removed key persists after the removal.
+            const removalPromise =
+                !OnyxKeys.isRamOnlyKey(collectionKey) && keysToRemove.length > 0
+                    ? Storage.removeItems(keysToRemove).catch((error) => Logger.logAlert(`mergeCollection failed to remove keys from storage. Error: ${error}`))
+                    : undefined;
 
             const existingKeys = keys.filter((key) => persistedKeys.has(key));
 
@@ -1623,14 +1737,17 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
             // When (multi-)merging the values with the existing values in storage,
             // we don't want to remove nested null values from the data that we pass to the storage layer,
             // because the storage layer uses them to remove nested keys from storage natively.
-            const keyValuePairsForExistingCollection = prepareKeyValuePairsForStorage(existingKeyCollection, false, mergeReplaceNullPatches);
+            const {pairs: keyValuePairsForExistingCollection} = prepareKeyValuePairsForStorage(existingKeyCollection, false, mergeReplaceNullPatches);
 
             // We can safely remove nested null values when using (multi-)set,
             // because we will simply overwrite the existing values in storage.
-            const keyValuePairsForNewCollection = prepareKeyValuePairsForStorage(newCollection, true);
+            const {pairs: keyValuePairsForNewCollection} = prepareKeyValuePairsForStorage(newCollection, true);
 
             // finalMergedCollection contains all the keys that were merged, without the keys of incompatible updates
-            const finalMergedCollection = {...existingKeyCollection, ...newCollection};
+            const finalMergedCollection = {
+                ...existingKeyCollection,
+                ...newCollection,
+            };
 
             // Pre-warm cache for cache-miss existingKeys so cache.merge() merges the new delta into
             // the real previous storage value. Fast path (all warm) skips the pre-warm to preserve
@@ -1650,14 +1767,23 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
                 // ensuring subscribers still reflect the merged data even if the subsequent storage
                 // write fails.
                 const previousCollection = getCachedCollection(collectionKey, existingKeys);
+
                 cache.merge(finalMergedCollection);
                 // Skip subscriber notification on retry — already notified on attempt 0.
-                // waitForCollectionCallback subscribers re-fire on every keysChanged by contract.
+                // Collection-root subscribers re-fire on every keysChanged by contract.
                 if (!retryAttempt) {
-                    keysChanged(collectionKey, finalMergedCollection, previousCollection);
+                    const partialForNotify = keysToRemove.length > 0 ? {...finalMergedCollection, ...Object.fromEntries(keysToRemove.map((key) => [key, undefined]))} : finalMergedCollection;
+                    const previousForNotify = keysToRemove.length > 0 ? {...previousCollection, ...removedPreviousValues} : previousCollection;
+                    if (Object.keys(partialForNotify).length > 0) {
+                        keysChanged(collectionKey, partialForNotify, previousForNotify);
+                    }
                 }
 
                 const promises = [];
+
+                if (removalPromise) {
+                    promises.push(removalPromise);
+                }
 
                 // New keys go through multiSet and existing keys through multiMerge. multiMerge on a
                 // missing key stores the value just like multiSet across all backends; splitting them lets
@@ -1675,11 +1801,16 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
                 const inFlightKeys = new Set<OnyxKey>(Object.keys(finalMergedCollection));
 
                 return Promise.all(promises)
+                    .then(() => StorageCircuitBreaker.recordWriteSuccess())
                     .catch((error) =>
                         retryOperation(
                             error,
                             mergeCollectionWithPatches,
-                            {collectionKey, collection: resultCollection as OnyxMergeCollectionInput<TKey>, mergeReplaceNullPatches, isProcessingCollectionUpdate},
+                            {
+                                collectionKey,
+                                collection: resultCollection as OnyxMergeCollectionInput<TKey>,
+                                mergeReplaceNullPatches,
+                            },
                             retryAttempt,
                             inFlightKeys,
                         ),
@@ -1733,15 +1864,21 @@ function partialSetCollection<TKey extends CollectionKeyBase>({collectionKey, co
     return getAllKeys().then((persistedKeys) => {
         const mutableCollection: OnyxInputKeyValueMapping = {...resultCollection};
         const existingKeys = resultCollectionKeys.filter((key) => persistedKeys.has(key));
+        const {pairs: keyValuePairs, keysToRemove: removalCandidates} = prepareKeyValuePairsForStorage(mutableCollection, true);
+        // Removals of keys that are neither cached nor persisted are no-ops and skipped.
+        const keysToRemove = removalCandidates.filter((key) => cache.get(key) !== undefined || persistedKeys.has(key));
+        // Snapshot before cache mutations so keysChanged() can diff removed members.
         const previousCollection = getCachedCollection(collectionKey, existingKeys);
-        const keyValuePairs = prepareKeyValuePairsForStorage(mutableCollection, true, undefined, true);
 
         for (const [key, value] of keyValuePairs) cache.set(key, value);
+        for (const key of keysToRemove) cache.drop(key);
 
         // Skip subscriber notification on retry — already notified on attempt 0.
-        // waitForCollectionCallback subscribers re-fire on every keysChanged by contract.
+        // Collection-root subscribers re-fire on every keysChanged by contract.
         if (!retryAttempt) {
-            keysChanged(collectionKey, mutableCollection, previousCollection);
+            // Removed members are notified as undefined, matching mergeCollection/multiSet.
+            const partialForNotify = Object.fromEntries(Object.entries(mutableCollection).map(([key, value]) => [key, value ?? undefined]));
+            keysChanged(collectionKey, partialForNotify, previousCollection);
         }
 
         if (OnyxKeys.isRamOnlyKey(collectionKey)) {
@@ -1751,7 +1888,15 @@ function partialSetCollection<TKey extends CollectionKeyBase>({collectionKey, co
 
         const inFlightKeys = new Set<OnyxKey>(keyValuePairs.map(([key]) => key));
 
-        return Storage.multiSet(keyValuePairs)
+        // One batched removal = one cross-tab sync event instead of one per key. A failed removal is
+        // logged, not retried — keysToRemove cannot be re-derived after the cache update.
+        const storagePromises = [Storage.multiSet(keyValuePairs)];
+        if (keysToRemove.length > 0) {
+            storagePromises.push(Storage.removeItems(keysToRemove).catch((error) => Logger.logAlert(`setCollection failed to remove keys from storage. Error: ${error}`)));
+        }
+
+        return Promise.all(storagePromises)
+            .then(() => StorageCircuitBreaker.recordWriteSuccess())
             .catch((error) => retryOperation(error, partialSetCollection, {collectionKey, collection}, retryAttempt, inFlightKeys))
             .then(() => {
                 sendActionToDevTools(METHOD.SET_COLLECTION, undefined, mutableCollection);
@@ -1797,6 +1942,7 @@ const OnyxUtils = {
     getCollectionDataAndSendAsObject,
     remove,
     reportStorageQuota,
+    resetDiskPressureLogThrottle,
     retryOperation,
     broadcastUpdate,
     hasPendingMergeForKey,

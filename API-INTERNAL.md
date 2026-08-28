@@ -2,9 +2,21 @@
 
 # Internal API Reference
 
+## Constants
+
+<dl>
+<dt><a href="#DISK_PRESSURE_LOG_INTERVAL_MS">DISK_PRESSURE_LOG_INTERVAL_MS</a></dt>
+<dd><p>Minimum interval between disk-pressure alerts. One disk-pressure burst fails every queued operation
+with the identical error, so per-operation logging would amplify the very storm it reports.</p>
+</dd>
+</dl>
+
 ## Functions
 
 <dl>
+<dt><a href="#resetDiskPressureLogThrottle">resetDiskPressureLogThrottle()</a></dt>
+<dd><p>Test-only: clears the disk-pressure log throttle so each test observes its own alert.</p>
+</dd>
 <dt><a href="#getMergeQueue">getMergeQueue()</a></dt>
 <dd><p>Getter - returns the merge queue.</p>
 </dd>
@@ -79,21 +91,31 @@ If the requested key is a collection, it will return an object with all the coll
 <dd><p>Remove a key from Onyx and update the subscribers</p>
 </dd>
 <dt><a href="#retryOperation">retryOperation()</a></dt>
-<dd><p>Handles storage operation failures based on the error type:</p>
+<dd><p>Handles storage operation failures based on the error class (see lib/storage/errors.ts).
+The connection layer (createStore) owns connection/transport recovery; this operation layer owns
+capacity recovery (eviction) so that a given failure is retried by exactly one layer:</p>
 <ul>
-<li>Storage capacity errors: evicts data and retries the operation</li>
-<li>Invalid data errors: logs an alert and throws an error</li>
-<li>Non-retriable errors: logs an alert and resolves without retrying</li>
-<li>Other errors: retries the operation</li>
+<li>INVALID_DATA: logs an alert and throws (the same data will always fail).</li>
+<li>TRANSIENT / FATAL: the connection layer already retried (transient) or exhausted its heal budget
+and alerted (fatal). Retrying here would only re-amplify, so we skip the write quietly.</li>
+<li>CAPACITY: evicts the least recently accessed evictable key and retries, under a session-level
+circuit breaker (see lib/StorageCircuitBreaker.ts) that halts the loop once eviction stops making
+progress or failures storm — the per-operation budget alone cannot stop a session-wide storm.</li>
+<li>DISK_PRESSURE: the device disk itself is full (or the database files are unreadable), so neither
+retries nor in-DB eviction can free space — the write is dropped (cache stays authoritative) with
+a single throttled alert + quota snapshot per burst.</li>
+<li>UNKNOWN: the provider couldn&#39;t classify it — log the full error shape (name + message +
+provider) once so it&#39;s visible, then bounded retry without eviction.</li>
 </ul>
 </dd>
 <dt><a href="#broadcastUpdate">broadcastUpdate()</a></dt>
 <dd><p>Notifies subscribers and writes current value to cache</p>
 </dd>
-<dt><a href="#prepareKeyValuePairsForStorage">prepareKeyValuePairsForStorage()</a> ⇒</dt>
+<dt><a href="#prepareKeyValuePairsForStorage">prepareKeyValuePairsForStorage()</a></dt>
 <dd><p>Storage expects array like: [[&quot;@MyApp_user&quot;, value_1], [&quot;@MyApp_key&quot;, value_2]]
 This method transforms an object like {&#39;@MyApp_user&#39;: myUserValue, &#39;@MyApp_key&#39;: myKeyValue}
-to an array of key-value pairs in the above format and removes key-value pairs that are being set to null</p>
+to an array of key-value pairs in the above format, and collects the keys of null values into
+<code>keysToRemove</code> for the caller to delete as one batch (cache drop + notification + batched storage removal).</p>
 </dd>
 <dt><a href="#mergeChanges">mergeChanges(changes, existingValue)</a></dt>
 <dd><p>Merges an array of changes with an existing value or creates a single change.</p>
@@ -151,6 +173,19 @@ Retries on failure.</p>
 </dd>
 </dl>
 
+<a name="DISK_PRESSURE_LOG_INTERVAL_MS"></a>
+
+## DISK\_PRESSURE\_LOG\_INTERVAL\_MS
+Minimum interval between disk-pressure alerts. One disk-pressure burst fails every queued operation
+with the identical error, so per-operation logging would amplify the very storm it reports.
+
+**Kind**: global constant  
+<a name="resetDiskPressureLogThrottle"></a>
+
+## resetDiskPressureLogThrottle()
+Test-only: clears the disk-pressure log throttle so each test observes its own alert.
+
+**Kind**: global function  
 <a name="getMergeQueue"></a>
 
 ## getMergeQueue()
@@ -318,11 +353,20 @@ Remove a key from Onyx and update the subscribers
 <a name="retryOperation"></a>
 
 ## retryOperation()
-Handles storage operation failures based on the error type:
-- Storage capacity errors: evicts data and retries the operation
-- Invalid data errors: logs an alert and throws an error
-- Non-retriable errors: logs an alert and resolves without retrying
-- Other errors: retries the operation
+Handles storage operation failures based on the error class (see lib/storage/errors.ts).
+The connection layer (createStore) owns connection/transport recovery; this operation layer owns
+capacity recovery (eviction) so that a given failure is retried by exactly one layer:
+- INVALID_DATA: logs an alert and throws (the same data will always fail).
+- TRANSIENT / FATAL: the connection layer already retried (transient) or exhausted its heal budget
+  and alerted (fatal). Retrying here would only re-amplify, so we skip the write quietly.
+- CAPACITY: evicts the least recently accessed evictable key and retries, under a session-level
+  circuit breaker (see lib/StorageCircuitBreaker.ts) that halts the loop once eviction stops making
+  progress or failures storm — the per-operation budget alone cannot stop a session-wide storm.
+- DISK_PRESSURE: the device disk itself is full (or the database files are unreadable), so neither
+  retries nor in-DB eviction can free space — the write is dropped (cache stays authoritative) with
+  a single throttled alert + quota snapshot per burst.
+- UNKNOWN: the provider couldn't classify it — log the full error shape (name + message +
+  provider) once so it's visible, then bounded retry without eviction.
 
 **Kind**: global function  
 <a name="broadcastUpdate"></a>
@@ -333,13 +377,13 @@ Notifies subscribers and writes current value to cache
 **Kind**: global function  
 <a name="prepareKeyValuePairsForStorage"></a>
 
-## prepareKeyValuePairsForStorage() ⇒
+## prepareKeyValuePairsForStorage()
 Storage expects array like: [["@MyApp_user", value_1], ["@MyApp_key", value_2]]
 This method transforms an object like {'@MyApp_user': myUserValue, '@MyApp_key': myKeyValue}
-to an array of key-value pairs in the above format and removes key-value pairs that are being set to null
+to an array of key-value pairs in the above format, and collects the keys of null values into
+`keysToRemove` for the caller to delete as one batch (cache drop + notification + batched storage removal).
 
 **Kind**: global function  
-**Returns**: an array of key - value pairs <[key, value]>  
 <a name="mergeChanges"></a>
 
 ## mergeChanges(changes, existingValue)
@@ -481,7 +525,6 @@ that this internal function allows passing an additional `mergeReplaceNullPatche
 | params.collectionKey | e.g. `ONYXKEYS.COLLECTION.REPORT` |
 | params.collection | Object collection keyed by individual collection member keys and values |
 | params.mergeReplaceNullPatches | Record where the key is a collection member key and the value is a list of tuples that we'll use to replace the nested objects of that collection member record with something else. |
-| params.isProcessingCollectionUpdate | whether this is part of a collection update operation. |
 | retryAttempt | retry attempt |
 
 <a name="partialSetCollection"></a>

@@ -8,18 +8,21 @@ import type {
     ConnectOptions,
     InitOptions,
     KeyValueMapping,
-    OnyxInputKeyValueMapping,
     MixedOperationsQueue,
+    NonUndefined,
+    OnyxCollection,
+    OnyxEntry,
+    OnyxInput,
+    OnyxInputKeyValueMapping,
     OnyxKey,
     OnyxMergeCollectionInput,
-    OnyxSetCollectionInput,
     OnyxMergeInput,
+    OnyxMethodMap,
     OnyxMultiSetInput,
+    OnyxSetCollectionInput,
     OnyxSetInput,
     OnyxUpdate,
     OnyxValue,
-    OnyxInput,
-    OnyxMethodMap,
     SetOptions,
 } from './types';
 import OnyxUtils from './OnyxUtils';
@@ -50,21 +53,55 @@ function init({
     OnyxKeys.setRamOnlyKeys(new Set<OnyxKey>(ramOnlyKeys));
 
     if (shouldSyncMultipleInstances) {
-        Storage.keepInstancesSync?.((key, value) => {
-            // RAM-only keys should never sync from storage as they may have stale persisted data
-            // from before the key was migrated to RAM-only.
-            if (OnyxKeys.isRamOnlyKey(key)) {
-                return;
+        // Cross-tab sync (InstanceSync) hands us the full batch of key/value pairs that changed together in
+        // a single write. We process it synchronously, grouping collection members so each affected
+        // collection is notified once (mirroring the local mergeCollection batching) instead of
+        // re-delivering the whole collection per member.
+        Storage.keepInstancesSync?.((pairs) => {
+            const individual: Array<[OnyxKey, OnyxEntry<KeyValueMapping[OnyxKey]>]> = [];
+            const collectionBatches = new Map<string, {partial: NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>>; previous: NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>>}>();
+
+            for (const [key, value] of pairs) {
+                // RAM-only keys should never sync from storage as they may have stale persisted data
+                // from before the key was migrated to RAM-only.
+                if (OnyxKeys.isRamOnlyKey(key)) {
+                    continue;
+                }
+
+                const collectionKey = OnyxKeys.getCollectionKey(key);
+                const isCollectionMember = !!collectionKey && OnyxKeys.isCollectionMemberKey(collectionKey, key);
+
+                // Capture the previous cached value BEFORE cache.set() so keysChanged() can diff old vs new per member.
+                const previousValue = isCollectionMember ? cache.get(key) : undefined;
+                cache.set(key, value);
+
+                if (isCollectionMember && collectionKey) {
+                    let batch = collectionBatches.get(collectionKey);
+                    if (!batch) {
+                        batch = {partial: {}, previous: {}};
+                        collectionBatches.set(collectionKey, batch);
+                    }
+                    batch.partial[key] = value;
+
+                    // Keep the earliest previous value in case the same member appears twice in one batch.
+                    if (!(key in batch.previous)) {
+                        batch.previous[key] = previousValue;
+                    }
+                } else {
+                    individual.push([key, value]);
+                }
             }
 
-            cache.set(key, value);
+            // Non-collection keys: notify individually, matching keyChanged() semantics for exact keys.
+            for (const [key, value] of individual) {
+                OnyxUtils.keyChanged(key, value);
+            }
 
-            // Check if this is a collection member key to prevent duplicate callbacks
-            // When a collection is updated, individual members sync separately to other tabs
-            // Setting isProcessingCollectionUpdate=true prevents triggering collection callbacks for each individual update
-            const isKeyCollectionMember = OnyxKeys.isCollectionMember(key);
-
-            OnyxUtils.keyChanged(key, value as OnyxValue<typeof key>, undefined, isKeyCollectionMember);
+            // One keysChanged() per collection notifies the collection-root subscriber once and lets
+            // keysChanged() decide which individual member subscribers actually changed.
+            for (const [collectionKey, {partial, previous}] of collectionBatches) {
+                OnyxUtils.keysChanged(collectionKey, partial, previous);
+            }
         });
     }
 
@@ -72,7 +109,7 @@ function init({
 
     // Initialize all of our keys with data provided then give green light to any pending connections.
     // addEvictableKeysToRecentlyAccessedList must run after initializeWithDefaultKeyStates because
-    // eager cache loading populates the key index (cache.setAllKeys) inside initializeWithDefaultKeyStates,
+    // eager cache loading populates the key index (cache.hydrate) inside initializeWithDefaultKeyStates,
     // and the evictable keys list depends on that index being populated.
     OnyxUtils.initializeWithDefaultKeyStates()
         .then(() => cache.addEvictableKeysToRecentlyAccessedList(OnyxKeys.isCollectionKey, OnyxUtils.getAllKeys))
@@ -94,7 +131,6 @@ function init({
  * @param connectOptions The options object that will define the behavior of the connection.
  * @param connectOptions.key The Onyx key to subscribe to.
  * @param connectOptions.callback A function that will be called when the Onyx data we are subscribed changes.
- * @param connectOptions.waitForCollectionCallback If set to `true`, it will return the entire collection to the callback as a single object.
  * @param connectOptions.selector This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook.**
  *        Using this setting on `useOnyx()` can have very positive performance benefits because the component will only re-render
  *        when the subset of data changes. Otherwise, any change of data on any property would normally
@@ -119,7 +155,6 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
  * @param connectOptions The options object that will define the behavior of the connection.
  * @param connectOptions.key The Onyx key to subscribe to.
  * @param connectOptions.callback A function that will be called when the Onyx data we are subscribed changes.
- * @param connectOptions.waitForCollectionCallback If set to `true`, it will return the entire collection to the callback as a single object.
  * @param connectOptions.selector This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook.**
  *        Using this setting on `useOnyx()` can have very positive performance benefits because the component will only re-render
  *        when the subset of data changes. Otherwise, any change of data on any property would normally
@@ -220,11 +255,16 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
         }
         mergeQueue[key] = [changes];
 
-        mergeQueuePromise[key] = OnyxUtils.get(key).then((existingValue) => {
+        mergeQueuePromise[key] = OnyxUtils.get(key).then((valueFromGet) => {
             // Calls to Onyx.set after a merge will terminate the current merge process and clear the merge queue
             if (mergeQueue[key] == null) {
                 return Promise.resolve();
             }
+
+            // Other writers (notably Onyx.update's mergeCollection path, which doesn't participate in mergeQueue)
+            // can land between get() resolving and this callback running. Applying the delta on top of the value
+            // captured back then and broadcasting it would overwrite those writes wholesale, so re-read the cache.
+            const existingValue = cache.hasCacheForKey(key) ? (cache.get(key) as OnyxInput<TKey> | undefined) : valueFromGet;
 
             try {
                 const validChanges = mergeQueue[key].filter((change) => {
@@ -284,7 +324,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
  * @param collection Object collection keyed by individual collection member keys and values
  */
 function mergeCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey>): Promise<void> {
-    return OnyxUtils.afterInit(() => OnyxUtils.mergeCollectionWithPatches({collectionKey, collection, isProcessingCollectionUpdate: true}));
+    return OnyxUtils.afterInit(() => OnyxUtils.mergeCollectionWithPatches({collectionKey, collection}));
 }
 
 /**
@@ -525,7 +565,6 @@ function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<vo
                         collectionKey,
                         collection: batchedCollectionUpdates.merge as OnyxMergeCollectionInput<OnyxKey>,
                         mergeReplaceNullPatches: batchedCollectionUpdates.mergeReplaceNullPatches,
-                        isProcessingCollectionUpdate: true,
                     }),
                 );
             }
