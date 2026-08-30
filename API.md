@@ -58,6 +58,11 @@ value will be saved to storage after the default value.</p>
 <dd><p>Sets a collection by replacing all existing collection members with new values.
 Any existing collection members not included in the new data will be removed.</p>
 </dd>
+<dt><a href="#get">get()</a></dt>
+<dd><p>Reads a value out of the cache synchronously. A collection key reads every member.</p>
+<p>Not a subscription, so the value never updates: use <code>useOnyx</code> for anything rendered. Returns <code>undefined</code> for a
+key with no value, and for every key until <code>init()</code> has hydrated the cache.</p>
+</dd>
 </dl>
 
 <a name="init"></a>
@@ -257,3 +262,12 @@ Onyx.setCollection(ONYXKEYS.COLLECTION.REPORT, {
     [`${ONYXKEYS.COLLECTION.REPORT}2`]: report2,
 });
 ```
+<a name="get"></a>
+
+## get()
+Reads a value out of the cache synchronously. A collection key reads every member.
+
+Not a subscription, so the value never updates: use `useOnyx` for anything rendered. Returns `undefined` for a
+key with no value, and for every key until `init()` has hydrated the cache.
+
+**Kind**: global function  
