@@ -1,6 +1,7 @@
 import * as IDB from 'idb-keyval';
-import createStore from '../../../../lib/storage/providers/IDBKeyValProvider/createStore';
+
 import * as Logger from '../../../../lib/Logger';
+import createStore from '../../../../lib/storage/providers/IDBKeyValProvider/createStore';
 
 const STORE_NAME = 'teststore';
 let testDbCounter = 0;
@@ -130,6 +131,60 @@ describe('createStore', () => {
                 }),
             );
             expect(logAlertSpy).not.toHaveBeenCalled();
+        });
+
+        it('should retry once and succeed on a WebKit "without an in-progress transaction" UnknownError', async () => {
+            const store = createStore(uniqueDBName(), STORE_NAME);
+
+            await store('readwrite', (s) => {
+                s.put('initial', 'key1');
+                return IDB.promisifyRequest(s.transaction);
+            });
+
+            const original = IDBDatabase.prototype.transaction;
+            let callCount = 0;
+            jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
+                callCount += 1;
+                if (callCount === 1) {
+                    throw new DOMException('Attempt to get a record from database without an in-progress transaction', 'UnknownError');
+                }
+                return original.apply(this, args);
+            });
+
+            const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
+
+            expect(result).toBe('initial');
+            expect(callCount).toBe(2);
+            expect(logInfoSpy).toHaveBeenCalledWith(expect.stringContaining('IDB transient error'), expect.anything());
+        });
+
+        it('should retry once and succeed on a WebKit "generate key" UnknownError during a write', async () => {
+            const store = createStore(uniqueDBName(), STORE_NAME);
+
+            await store('readwrite', (s) => {
+                s.put('initial', 'key1');
+                return IDB.promisifyRequest(s.transaction);
+            });
+
+            const original = IDBDatabase.prototype.transaction;
+            let callCount = 0;
+            jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
+                callCount += 1;
+                if (callCount === 1) {
+                    throw new DOMException('Attempt to generate key in database without an in-progress transaction', 'UnknownError');
+                }
+                return original.apply(this, args);
+            });
+
+            await store('readwrite', (s) => {
+                s.put('written', 'key1');
+                return IDB.promisifyRequest(s.transaction);
+            });
+
+            const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
+
+            expect(result).toBe('written');
+            expect(callCount).toBe(3);
         });
 
         it('should preserve data integrity after a successful retry', async () => {
