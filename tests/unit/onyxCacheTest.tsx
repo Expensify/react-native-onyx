@@ -868,11 +868,11 @@ describe('Onyx', () => {
                 expect(Object.keys(first!)).toHaveLength(0);
             });
 
-            it('should return the frozen-empty snapshot for empty collections once init has registered the collection key', async () => {
+            it('should return the frozen empty collection object for empty collections once init has registered the collection key', async () => {
                 await initOnyx();
 
                 // Post-init, a known collection key with no members resolves to the frozen
-                // empty snapshot — not `undefined`. Returning `{}` reliably across init,
+                // empty collection object, not `undefined`. Returning `{}` reliably across init,
                 // writes, and `Onyx.clear()` keeps `Onyx.connect({waitForCollectionCallback: true})`
                 // subscribers seeing a consistent "collection is empty" signal instead of
                 // mistakenly skipping the update.

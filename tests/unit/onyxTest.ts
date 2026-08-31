@@ -920,7 +920,7 @@ describe('Onyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                // Snapshot mode: multiSet fires the collection callback per write.
+                // Collection mode: multiSet fires the collection callback per write.
                 expect(mockCallback).toHaveBeenLastCalledWith({test_1: {existingData: 'test'}, test_2: {existingData: 'test'}}, ONYX_KEYS.COLLECTION.TEST_KEY);
                 mockCallback.mockReset();
 
@@ -1061,9 +1061,8 @@ describe('Onyx', () => {
                     // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
                     expect(mockCallback).toHaveBeenCalledTimes(2);
 
-                    // Initial fire delivers the post-init frozen empty collection `{}` (the legacy
-                    // "undefined for empty-on-initial-fire" shim was removed; callers that needed
-                    // that behavior now guard at the consumer level).
+                    // Initial fire delivers the post-init frozen empty collection `{}`. Callers that
+                    // need a different signal for an empty collection guard at the consumer level.
                     expect(mockCallback).toHaveBeenNthCalledWith(1, {}, ONYX_KEYS.COLLECTION.TEST_POLICY);
 
                     // AND the value for the second call should be collectionUpdate since the collection was updated
@@ -1092,9 +1091,8 @@ describe('Onyx', () => {
                     // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
                     expect(mockCallback).toHaveBeenCalledTimes(2);
 
-                    // Initial fire delivers `(undefined, key)` — the cache has no entry for
-                    // `testPolicy_1` yet, but we still pass the key. (Legacy `(undefined, undefined)`
-                    // no-match shim was removed.)
+                    // Initial fire delivers `(undefined, key)`: the cache has no entry for
+                    // `testPolicy_1` yet, but we still pass the key.
                     expect(mockCallback).toHaveBeenNthCalledWith(1, undefined, 'testPolicy_1');
 
                     // AND the value for the second call should be collectionUpdate since the collection was updated
@@ -1122,7 +1120,7 @@ describe('Onyx', () => {
                     // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
                     expect(mockCallback).toHaveBeenCalledTimes(2);
 
-                    // Initial fire delivers `{}` (legacy `undefined`-for-empty-initial shim was removed).
+                    // Initial fire delivers `{}` for a known-but-empty collection.
                     expect(mockCallback).toHaveBeenNthCalledWith(1, {}, ONYX_KEYS.COLLECTION.TEST_POLICY);
                     expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate, ONYX_KEYS.COLLECTION.TEST_POLICY);
                 })
@@ -1200,7 +1198,7 @@ describe('Onyx', () => {
                 expect(collectionCallback).toHaveBeenNthCalledWith(2, {[itemKey]: {a: 'a'}}, ONYX_KEYS.COLLECTION.TEST_UPDATE);
 
                 expect(testCallback).toHaveBeenCalledTimes(2);
-                // Initial fire delivers `(undefined, key)` — cache has no entry yet, but we still pass the key.
+                // Initial fire delivers `(undefined, key)`: cache has no entry yet, but we still pass the key.
                 expect(testCallback).toHaveBeenNthCalledWith(1, undefined, ONYX_KEYS.TEST_KEY);
                 expect(testCallback).toHaveBeenNthCalledWith(2, 'taco', ONYX_KEYS.TEST_KEY);
 
@@ -1492,7 +1490,7 @@ describe('Onyx', () => {
 
         await Onyx.update([{key: cat, value: finalValue, onyxMethod: Onyx.METHOD.MERGE}]);
 
-        // Snapshot mode: callback fires with the whole SNAPSHOT-collection snapshot.
+        // Collection mode: callback fires with the whole SNAPSHOT collection object.
         expect(callback).toBeCalledTimes(2);
         expect(callback).toHaveBeenNthCalledWith(1, {[snapshot1]: {data: {[cat]: initialValue}}}, ONYX_KEYS.COLLECTION.SNAPSHOT);
         expect(callback).toHaveBeenNthCalledWith(2, {[snapshot1]: {data: {[cat]: finalValue}}}, ONYX_KEYS.COLLECTION.SNAPSHOT);
@@ -1524,7 +1522,7 @@ describe('Onyx', () => {
 
         await Onyx.update([{key: cat, value: finalValue, onyxMethod: Onyx.METHOD.MERGE}]);
 
-        // Snapshot mode: callback fires with the whole SNAPSHOT-collection snapshot.
+        // Collection mode: callback fires with the whole SNAPSHOT collection object.
         expect(callback).toBeCalledTimes(2);
         expect(callback).toHaveBeenNthCalledWith(1, {[snapshot1]: {data: {[cat]: initialValue}}}, ONYX_KEYS.COLLECTION.SNAPSHOT);
         expect(callback).toHaveBeenNthCalledWith(
@@ -1672,9 +1670,9 @@ describe('Onyx', () => {
                 },
             ]).then(() => {
                 // Initial fire is deferred past in-flight writes via `scheduleInitialFire`,
-                // so it reads the post-update snapshot. The write-driven fire already
-                // delivered the same snapshot, so the dedup in `deliverSnapshot` suppresses
-                // the initial fire — matching legacy timing.
+                // so it reads the post-update collection. The write-driven fire already
+                // delivered the same collection, so the dedup in `deliverCollection` suppresses
+                // the initial fire.
                 expect(routesCollectionCallback).toHaveBeenCalledTimes(1);
                 expect(routesCollectionCallback).toHaveBeenNthCalledWith(
                     1,
@@ -1756,11 +1754,9 @@ describe('Onyx', () => {
                 {onyxMethod: Onyx.METHOD.MERGE, key: lisa, value: {car: 'SUV', age: 21}},
                 {onyxMethod: Onyx.METHOD.MERGE, key: bob, value: {age: 25}},
             ]).then(() => {
-                // The store-based wrapper always fires an initial callback before the
-                // post-update callback (the legacy ConnectionManager's deep-promise chain
-                // suppressed it accidentally). We assert on the final post-update call
-                // via `toHaveBeenLastCalledWith` instead of pinning specific indices.
-                // The `sourceValue` 3rd argument was also dropped.
+                // The wrapper fires an initial callback before the post-update callback, so we
+                // assert on the final post-update call via `toHaveBeenLastCalledWith` instead of
+                // pinning specific indices.
                 expect(testCallback).toHaveBeenLastCalledWith({food: 'taco', drink: 'wine'}, ONYX_KEYS.TEST_KEY);
 
                 expect(otherTestCallback).toHaveBeenLastCalledWith({food: 'pizza', drink: 'water'}, ONYX_KEYS.OTHER_TEST);
@@ -3405,10 +3401,9 @@ describe('RAM-only keys should not read from storage', () => {
         });
         await act(async () => waitForPromisesToResolve());
 
-        // Initial fire delivers the post-init frozen `{}` snapshot for a known-but-empty
-        // collection (legacy `undefined`-for-empty-initial shim was removed). What matters
-        // for this test is that the RAM-only members have NOT been hydrated from storage —
-        // the snapshot has no entries, and `cache.get(member)` returns `undefined`.
+        // Initial fire delivers the post-init frozen `{}` for a known-but-empty collection.
+        // What matters for this test is that the RAM-only members have not been hydrated from
+        // storage: the collection has no entries, and `cache.get(member)` returns `undefined`.
         expect(receivedCollection).toEqual({});
         expect(cache.get(collectionMember1)).toBeUndefined();
         expect(cache.get(collectionMember2)).toBeUndefined();

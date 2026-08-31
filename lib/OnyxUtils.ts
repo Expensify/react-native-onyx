@@ -1155,7 +1155,7 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
 
         const collectionKey = OnyxKeys.getCollectionKey(key);
         if (collectionKey && OnyxKeys.isCollectionMemberKey(collectionKey, key)) {
-            // Capture the previous cached value BEFORE calling cache.set() so notifyCollection()
+            // Capture the previous cached value before calling cache.set() so notifyCollection()
             // can diff old vs new per-member.
             const previousValue = cache.get(key);
             cache.set(key, value);
@@ -1200,7 +1200,7 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
         }
     }
 
-    // One notifyCollection() per collection — fires each collection-level subscriber once and lets
+    // One notifyCollection() per collection: fires each collection-level subscriber once and lets
     // notifyCollection() internally decide which individual member subscribers need notification.
     // Skip on retry — already notified on attempt 0 (see same-reason comment above).
     if (!retryAttempt) {
@@ -1288,7 +1288,7 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
         const {pairs: keyValuePairs, keysToRemove: removalCandidates} = OnyxUtils.prepareKeyValuePairsForStorage(mutableCollection, true);
         // Removals of keys that are neither cached nor persisted are no-ops and skipped.
         const keysToRemove = removalCandidates.filter((key) => cache.get(key) !== undefined || persistedKeys.has(key));
-        // Snapshot before cache mutations so notifyCollection() can diff removed members.
+        // Capture the previous collection before cache mutations so notifyCollection() can diff removed members.
         const previousCollection = OnyxUtils.getCachedCollection(collectionKey);
 
         for (const [key, value] of keyValuePairs) cache.set(key, value);
@@ -1462,7 +1462,7 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
                 ? multiGet(existingKeys).catch((err) => Logger.logInfo(`mergeCollectionWithPatches pre-warm failed; proceeding with cache-only merge. Error: ${err}`))
                 : Promise.resolve();
             return prewarmPromise.then(() => {
-                // Snapshot previous values from the (now-warm) cache for the subscriber diff, then update
+                // Capture previous values from the (now-warm) cache for the subscriber diff, then update
                 // cache and notify subscribers synchronously BEFORE issuing storage writes. This matches
                 // the cache-first / storage-second invariant followed by every other Onyx write method
                 // (setWithRetry, applyMerge, setCollectionWithRetry, partialSetCollection, clear),
@@ -1568,7 +1568,7 @@ function partialSetCollection<TKey extends CollectionKeyBase>({collectionKey, co
         const {pairs: keyValuePairs, keysToRemove: removalCandidates} = prepareKeyValuePairsForStorage(mutableCollection, true);
         // Removals of keys that are neither cached nor persisted are no-ops and skipped.
         const keysToRemove = removalCandidates.filter((key) => cache.get(key) !== undefined || persistedKeys.has(key));
-        // Snapshot before cache mutations so notifyCollection() can diff removed members.
+        // Capture the previous collection before cache mutations so notifyCollection() can diff removed members.
         const previousCollection = getCachedCollection(collectionKey, existingKeys);
 
         for (const [key, value] of keyValuePairs) cache.set(key, value);

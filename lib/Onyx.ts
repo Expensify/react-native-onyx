@@ -43,11 +43,11 @@ type Connection = {
 };
 
 /**
- * Shared sentinel for "nothing delivered yet" in `connect()`'s per-subscription dedup.
- * A unique Symbol can't collide with any real Onyx value, so the first `Object.is` check
- * never matches and the initial fire always runs — even for a key whose genuine first
- * value is `undefined`. It only needs to be distinct from real values, not unique per
- * subscription, so a single module-level instance is reused by every connection.
+ * Sentinel for "nothing delivered yet" in `connect()`'s per-subscription dedup. A Symbol
+ * can't collide with any real Onyx value, so the first `Object.is` check never matches and
+ * the initial fire runs even when a key's genuine first value is `undefined`. It only needs
+ * to be distinct from real values, not unique per subscription, so one module-level instance
+ * is reused by every connection.
  */
 // eslint-disable-next-line rulesdir/no-negated-variables
 const NOT_DELIVERED = Symbol('NOT_DELIVERED');
@@ -82,8 +82,7 @@ function init({
             const collectionBatches = new Map<string, {partial: NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>>; previous: NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>>}>();
 
             for (const [key, value] of pairs) {
-                // RAM-only keys should never sync from storage as they may have stale persisted data
-                // from before the key was migrated to RAM-only.
+                // RAM-only keys never sync from storage; any persisted data for them is stale.
                 if (OnyxKeys.isRamOnlyKey(key)) {
                     continue;
                 }
@@ -91,7 +90,7 @@ function init({
                 const collectionKey = OnyxKeys.getCollectionKey(key);
                 const isCollectionMember = !!collectionKey && OnyxKeys.isCollectionMemberKey(collectionKey, key);
 
-                // Capture the previous cached value BEFORE cache.set() so notifyCollection() can diff old vs new per member.
+                // Capture the previous cached value before cache.set() so notifyCollection() can diff old vs new per member.
                 const previousValue = isCollectionMember ? cache.get(key) : undefined;
                 cache.set(key, value);
 
@@ -137,7 +136,7 @@ function init({
 }
 
 /**
- * Sync, cache-only read of an Onyx key. Returns the frozen collection snapshot for
+ * Sync, cache-only read of an Onyx key. Returns the frozen collection object for
  * collection keys, the cached value for single keys, or `undefined` if the key isn't
  * in cache (no storage fallback).
  *
@@ -151,10 +150,10 @@ function getState<TKey extends OnyxKey>(key: TKey): OnyxValue<TKey> {
  * Defer initial-fire of `Onyx.connect` callbacks far enough that any Onyx writes
  * scheduled in the same synchronous tick have applied before the callback reads cache.
  *
- * The legacy `subscribeToKey` chain (`deferredInitTask.then(getAllKeys).then(multiGet)
+ * FIXME: The legacy `subscribeToKey` chain (`deferredInitTask.then(getAllKeys).then(multiGet)
  * .then(sendDataToConnection)`) reached this depth incidentally via storage I/O. The
  * new store-based wrapper has no storage chain, so we have to introduce the depth
- * explicitly. The three nested `.then()`s match the legacy effective depth — enough
+ * explicitly. The three nested `.then()`s match the legacy effective depth, enough
  * to outpace the longest in-flight write chain: `Onyx.update` -> `clearPromise.then`
  * -> per-item `Onyx.merge` -> `OnyxUtils.get(key).then(applyMerge)` is two hops to
  * apply, so the third hop guarantees initial-fire reads the post-write cache.
@@ -162,7 +161,7 @@ function getState<TKey extends OnyxKey>(key: TKey): OnyxValue<TKey> {
  * Microtask depth (not `setTimeout(0)`) is required because Jest test bodies run
  * entirely in microtask land via chained `.then()`s; a macrotask-deferred initial
  * fire would not run until the chain returns to the event loop, which can be after
- * the test's assertions execute — leaving module-level Onyx subscribers stale.
+ * the test's assertions execute, leaving module-level Onyx subscribers stale.
  */
 function scheduleInitialFire(fn: () => void): void {
     Promise.resolve()
@@ -175,7 +174,7 @@ function scheduleInitialFire(fn: () => void): void {
  * Subscribe to changes for `key`.
  *
  * For a collection root key, the callback fires with the entire frozen collection
- * snapshot whenever any member changes; signature `(collection, collectionKey)`.
+ * object whenever any member changes; signature `(collection, collectionKey)`.
  * For any other key, the callback fires with the value at that key; signature
  * `(value, key)`. Initial fire is deferred via `scheduleInitialFire` so it reads
  * cache after any same-tick writes have applied.
@@ -194,32 +193,30 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
         }
 
         if (OnyxKeys.isCollectionKey(key)) {
-            // Collection-root snapshot mode — listener fires with the whole snapshot per
-            // collection change. Callback shape is `(snapshot, key)`. Dedup: skip identical
-            // snapshot refs. Initial fire always delivers the current snapshot (frozen `{}`
-            // for an empty-but-known collection, `undefined` only if the collection key has
-            // not been seen yet).
-            let lastDeliveredSnapshot: unknown = NOT_DELIVERED;
-            const deliverSnapshot = (rawSnapshot: OnyxValue<TKey> | undefined, k: TKey) => {
-                if (Object.is(lastDeliveredSnapshot, rawSnapshot)) {
+            // Collection-root mode: dedup skips identical collection refs. Initial fire delivers
+            // the current collection object: frozen `{}` for an empty-but-known collection,
+            // `undefined` only if the collection key has not been seen yet.
+            let lastDeliveredCollection: unknown = NOT_DELIVERED;
+            const deliverCollection = (rawCollection: OnyxValue<TKey> | undefined, k: TKey) => {
+                if (Object.is(lastDeliveredCollection, rawCollection)) {
                     return;
                 }
-                lastDeliveredSnapshot = rawSnapshot;
-                (callback as CollectionConnectCallback<TKey> | undefined)?.(rawSnapshot as NonNullable<OnyxCollection<KeyValueMapping[TKey]>>, k);
+                lastDeliveredCollection = rawCollection;
+                (callback as CollectionConnectCallback<TKey> | undefined)?.(rawCollection as NonNullable<OnyxCollection<KeyValueMapping[TKey]>>, k);
             };
             unsubscribeFn = onyxStore.subscribe(key, (value, k) => {
-                deliverSnapshot(value as unknown as OnyxValue<TKey>, k as TKey);
+                deliverCollection(value as unknown as OnyxValue<TKey>, k as TKey);
             });
             scheduleInitialFire(() => {
                 if (!active) {
                     return;
                 }
-                deliverSnapshot(onyxStore.getState(key) as unknown as OnyxValue<TKey>, key as TKey);
+                deliverCollection(onyxStore.getState(key) as unknown as OnyxValue<TKey>, key as TKey);
             });
             return;
         }
 
-        // Non-collection key (or a specific collection member) — single-value subscription.
+        // Non-collection key (or a specific collection member): single-value subscription.
         let lastDelivered: unknown = NOT_DELIVERED;
         const deliverValue = (value: OnyxValue<TKey>, k: TKey | undefined) => {
             if (Object.is(lastDelivered, value)) {
@@ -259,7 +256,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
 }
 
 /**
- * Identical to `connect()` — kept for naming consistency with existing call sites.
+ * Alias of `connect()` for call-site naming consistency.
  */
 function connectWithoutView<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Connection {
     return connect(connectOptions);

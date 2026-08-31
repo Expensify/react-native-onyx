@@ -989,7 +989,7 @@ describe('useOnyx', () => {
             expect(result.current[0]).toEqual('existing');
             expect(result.current[1].status).toEqual('loaded');
 
-            // A merge queued after the hook has connected is an optimistic update — status must stay loaded
+            // A merge queued after the hook has connected is an optimistic update, so status must stay loaded
             // so already-shown data is never blanked mid-interaction.
             await act(async () => {
                 Onyx.merge(ONYXKEYS.TEST_KEY, 'updated');
@@ -1008,7 +1008,7 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
 
             // Clear the value and queue a merge to repopulate it. The hook has already connected, so this is
-            // not a first connection and status must stay loaded — a value going away does not re-trigger loading.
+            // not a first connection and status must stay loaded; a value going away does not re-trigger loading.
             await act(async () => {
                 Onyx.set(ONYXKEYS.TEST_KEY, null);
                 Onyx.merge(ONYXKEYS.TEST_KEY, 'again');

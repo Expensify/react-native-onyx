@@ -10,18 +10,18 @@ type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (da
 type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
     /**
      * Subscribe to a subset of an Onyx key's data. The component re-renders only when the
-     * selector's output *changes by deep equality* — a selector that allocates a fresh object
-     * (e.g. `(e) => ({id: e?.id})`) or one whose identity churns every render (an inline
-     * selector closing over a fresh array) is collapsed to a stable reference internally, so it
+     * selector's output changes by deep equality. A selector that allocates a fresh object
+     * (e.g. `(e) => ({id: e?.id})`), or one whose identity churns every render (an inline
+     * selector closing over a fresh array), is deduped to a stable reference internally, so it
      * never causes `useSyncExternalStore` to loop and never forces a redundant re-render.
      */
     selector?: UseOnyxSelector<TKey, TReturnValue>;
 };
 
 /**
- * Always `'loaded'` in the store-based design. The type is preserved so existing
- * destructures like `const [val, {status}] = useOnyx(KEY)` keep compiling. Will be
- * removed in a future cleanup once consumers stop reading it.
+ * `loading` only on a key's first connection while a merge for it is still in flight;
+ * `loaded` otherwise. Retained so existing destructures like
+ * `const [val, {status}] = useOnyx(KEY)` and `isLoadingOnyxValue` consumers keep working.
  */
 type FetchStatus = 'loading' | 'loaded';
 
@@ -33,16 +33,16 @@ type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata];
 
 /**
  * Subscribes a React component to an Onyx key. The component re-renders when the value
- * at `key` changes (for collection keys, when any member changes — the returned value is
- * the frozen collection snapshot).
+ * at `key` changes (for a collection key, when any member changes; the returned value is
+ * the frozen collection object).
  *
- * Returns `[value, {status: 'loaded'}]`. With eager-load + the structural-sharing cache,
- * there's no loading phase — the cache always has an answer (a value or "absent"). The
- * `status` field is retained for API compatibility and is always `'loaded'`.
+ * Returns `[value, {status}]`. `status` is `loading` only on a key's first connection while
+ * a merge for it is still in flight, and `loaded` otherwise. With eager-load and the
+ * structural-sharing cache the cache otherwise always has an answer (a value or "absent").
  *
  * Selector stability is delegated to React's `useSyncExternalStoreWithSelector`: the selection
  * is deduped against the last value committed to React (by deep equality when a selector is
- * present), and that dedup survives the selector function's *identity* changing every render.
+ * present), and that dedup survives the selector function's identity changing every render.
  * So consumers can pass inline selectors that close over freshly allocated arrays/objects
  * without stabilizing the inputs themselves. Subscriptions without a selector read the raw,
  * already reference-stable cache value and rely on the default `Object.is` comparison (no
@@ -73,7 +73,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
     // `connectedKeyRef` differs from `key` only on that first render; the effect below catches it up, so a
     // later merge on an already-connected key never surfaces loading.
     // Reading the ref during render is safe: it's written only in the effect below and re-renders are driven
-    // by `useSyncExternalStore` and the `key` prop, so it can't cause a missed update — it gates a one-shot signal.
+    // by `useSyncExternalStore` and the `key` prop, so it can't cause a missed update; it gates a one-shot signal.
     // eslint-disable-next-line react-hooks/refs
     const isLoading = connectedKeyRef.current !== key && OnyxUtils.hasPendingMergeForKey(key);
     const loadingStatus: FetchStatus = isLoading ? 'loading' : 'loaded';

@@ -223,11 +223,10 @@ type CollectionConnectCallback<TKey extends OnyxKey> = (value: NonUndefined<Onyx
  * `(collection, key)`). For any other key, the callback fires with the value at
  * that key (signature `(value, key)`).
  *
- * The legacy `waitForCollectionCallback` flag has been removed — collection-root
- * subscriptions always deliver snapshots. Per-member dispatch (the old default)
- * is no longer supported; consumers that need per-member processing should
- * subscribe to the snapshot and diff against the previous value (structural
- * sharing makes the per-member ref-check O(1)).
+ * Collection-root subscriptions always deliver the frozen collection object. Per-member
+ * dispatch is not supported; consumers that need per-member processing subscribe to the
+ * collection and diff against the previous value (structural sharing makes the per-member
+ * ref-check O(1)).
  */
 type ConnectOptions<TKey extends OnyxKey> = {
     /** The Onyx key to subscribe to. */
@@ -236,9 +235,9 @@ type ConnectOptions<TKey extends OnyxKey> = {
     /**
      * A function that will be called when the Onyx data we are subscribed changes.
      *
-     * The value is a conditional *parameter* (collection snapshot vs. entry) inside a single
-     * function type — rather than a union of two distinct callback types — so that callers using a
-     * generic or union `TKey` still get an assignable, non-`any` callback. Collection snapshots stay
+     * The value is a conditional parameter (collection object vs. entry) inside a single
+     * function type, not a union of two distinct callback types, so that callers using a
+     * generic or union `TKey` still get an assignable, non-`any` callback. Collection objects stay
      * `NonUndefined`.
      */
     callback?: (value: TKey extends CollectionKeyBase ? NonUndefined<OnyxCollection<KeyValueMapping[TKey]>> : OnyxEntry<KeyValueMapping[TKey]>, key: TKey) => void;

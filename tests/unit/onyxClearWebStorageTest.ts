@@ -239,7 +239,7 @@ describe('Set data while storage is clearing', () => {
                     expect(collectionCallback).toHaveBeenCalledTimes(3);
 
                     // And it should be called with the expected parameters each time. Initial fire
-                    // delivers `{}` (legacy `undefined`-for-empty-initial shim was removed).
+                    // delivers `{}` for a known-but-empty collection.
                     expect(collectionCallback).toHaveBeenNthCalledWith(1, {}, ONYX_KEYS.COLLECTION.TEST);
                     expect(collectionCallback).toHaveBeenNthCalledWith(
                         2,
