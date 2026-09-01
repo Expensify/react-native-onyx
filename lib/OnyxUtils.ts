@@ -7,7 +7,6 @@ import cache, {TASK} from './OnyxCache';
 import OnyxKeys from './OnyxKeys';
 import StorageCircuitBreaker from './StorageCircuitBreaker';
 import onyxStore from './OnyxStore';
-import * as Str from './Str';
 import Storage from './storage';
 import {StorageErrorClass} from './storage/errors';
 import type {
@@ -437,30 +436,6 @@ function getAllKeys(): Promise<Set<OnyxKey>> {
     });
 
     return cache.captureTask(TASK.GET_ALL_KEYS, promise) as Promise<Set<OnyxKey>>;
-}
-
-/**
- * Tries to get a value from the cache. If the value is not present in cache it will return the default value or undefined.
- * If the requested key is a collection, it will return an object with all the collection members.
- */
-function tryGetCachedValue<TKey extends OnyxKey>(key: TKey): OnyxValue<OnyxKey> {
-    let val = cache.get(key);
-
-    if (OnyxKeys.isCollectionKey(key)) {
-        const collectionData = cache.getCollectionData(key);
-        if (collectionData !== undefined) {
-            val = collectionData;
-        } else {
-            // If we haven't loaded all keys yet, we can't determine if the collection exists
-            if (cache.getAllKeys().size === 0) {
-                return;
-            }
-            // Set an empty collection object for collections that exist but have no data
-            val = {};
-        }
-    }
-
-    return val;
 }
 
 function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collectionMemberKeys?: string[]): NonNullable<OnyxCollection<KeyValueMapping[TKey]>> {
@@ -1631,7 +1606,6 @@ const OnyxUtils = {
     sendActionToDevTools,
     get,
     getAllKeys,
-    tryGetCachedValue,
     getCachedCollection,
     notifyKey,
     notifyCollection,

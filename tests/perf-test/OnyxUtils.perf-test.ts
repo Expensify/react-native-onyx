@@ -197,33 +197,6 @@ describe('OnyxUtils', () => {
         });
     });
 
-    describe('tryGetCachedValue', () => {
-        const key = `${collectionKey}0`;
-        const reportAction = mockedReportActionsMap[`${collectionKey}0`];
-        const collections = {
-            ...getRandomReportActions(ONYXKEYS.COLLECTION.TEST_KEY_2),
-            ...getRandomReportActions(collectionKey),
-        };
-
-        test('one call passing normal key', async () => {
-            await measureFunction(() => OnyxUtils.tryGetCachedValue(key), {
-                beforeEach: async () => {
-                    await Onyx.set(key, reportAction);
-                },
-                afterEach: clearOnyxAfterEachMeasure,
-            });
-        });
-
-        test('one call passing collection key', async () => {
-            await measureFunction(() => OnyxUtils.tryGetCachedValue(collectionKey), {
-                beforeEach: async () => {
-                    await Onyx.multiSet(collections);
-                },
-                afterEach: clearOnyxAfterEachMeasure,
-            });
-        });
-    });
-
     describe('removeLastAccessedKey', () => {
         test('one call removing one key', async () => {
             await measureFunction(() => OnyxCache.removeLastAccessedKey(`${collectionKey}5000`), {
