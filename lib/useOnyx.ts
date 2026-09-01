@@ -1,9 +1,12 @@
-import {useCallback, useEffect, useMemo, useRef} from 'react';
 import {deepEqual} from 'fast-equals';
+import {useCallback, useEffect, useMemo, useRef} from 'react';
 import {useSyncExternalStoreWithSelector} from 'use-sync-external-store/with-selector';
+
+import type {OnyxKey, OnyxValue} from './types';
+
+import cache from './OnyxCache';
 import onyxStore from './OnyxStore';
 import OnyxUtils from './OnyxUtils';
-import type {OnyxKey, OnyxValue} from './types';
 
 type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (data: OnyxValue<TKey> | undefined) => TReturnValue;
 
@@ -16,7 +19,8 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
 };
 
 /**
- * `loading` only on a key's first connection while a merge is still in flight, else `loaded`.
+ * `loading` only on a key's first connection while a merge is in flight and nothing is cached yet
+ * (the merge will produce the first value); `loaded` otherwise.
  */
 type FetchStatus = 'loading' | 'loaded';
 
@@ -29,7 +33,7 @@ type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata];
 /**
  * Subscribes a component to an Onyx key, re-rendering when the value changes (for a collection key,
  * when any member changes; the value is the frozen collection object). Returns `[value, {status}]`,
- * `status` `loading` only on the first connection while a merge is in flight.
+ * `status` `loading` only on the first connection while a merge is in flight and nothing is cached yet.
  *
  * Selection is delegated to `useSyncExternalStoreWithSelector`, whose dedup survives the selector's
  * identity changing every render, so consumers can pass inline selectors without stabilizing them.
@@ -50,11 +54,11 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
 
     const value = useSyncExternalStoreWithSelector<OnyxValue<TKey> | undefined, TReturnValue | undefined>(subscribe, getSnapshot, undefined, select, isEqual);
 
-    // Loading only on a key's first render while a merge is in flight; the effect below advances
-    // connectedKeyRef so a later merge never re-surfaces it. Reading the ref in render is safe: it
-    // gates this one-shot signal only, and re-renders are driven by SES and the key prop.
+    // Loading only on a key's first render when a merge is in flight and nothing is cached yet.
+    // A cached key stays loaded, so an optimistic merge never blanks shown data and a no-op merge can't leave it stuck.
+    // connectedKeyRef limits this to the first render.
     // eslint-disable-next-line react-hooks/refs
-    const isLoading = connectedKeyRef.current !== key && OnyxUtils.hasPendingMergeForKey(key);
+    const isLoading = connectedKeyRef.current !== key && !cache.hasCacheForKey(key) && OnyxUtils.hasPendingMergeForKey(key);
     const loadingStatus: FetchStatus = isLoading ? 'loading' : 'loaded';
 
     useEffect(() => {

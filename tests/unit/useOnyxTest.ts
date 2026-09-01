@@ -1,10 +1,12 @@
 import {act, renderHook} from '@testing-library/react-native';
+
 import type {OnyxCollection, OnyxEntry, OnyxKey} from '../../lib';
+import type {UseOnyxSelector} from '../../lib/useOnyx';
+import type GenericCollection from '../utils/GenericCollection';
+
 import Onyx, {useOnyx} from '../../lib';
 import StorageMock from '../../lib/storage';
-import type GenericCollection from '../utils/GenericCollection';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
-import type {UseOnyxSelector} from '../../lib/useOnyx';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -1031,6 +1033,22 @@ describe('useOnyx', () => {
             await act(async () => waitForPromisesToResolve());
 
             expect(result.current[0]).toEqual('abc');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should show a cached value as loaded when a merge is pending on first render', async () => {
+            await Onyx.set(ONYXKEYS.TEST_KEY, {a: 1});
+
+            Onyx.merge(ONYXKEYS.TEST_KEY, {a: 1});
+
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
+
+            expect(result.current[0]).toEqual({a: 1});
+            expect(result.current[1].status).toEqual('loaded');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual({a: 1});
             expect(result.current[1].status).toEqual('loaded');
         });
     });
