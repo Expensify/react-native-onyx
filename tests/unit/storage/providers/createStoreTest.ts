@@ -1,7 +1,6 @@
 import * as IDB from 'idb-keyval';
-
-import * as Logger from '../../../../lib/Logger';
 import createStore from '../../../../lib/storage/providers/IDBKeyValProvider/createStore';
+import * as Logger from '../../../../lib/Logger';
 
 const STORE_NAME = 'teststore';
 let testDbCounter = 0;

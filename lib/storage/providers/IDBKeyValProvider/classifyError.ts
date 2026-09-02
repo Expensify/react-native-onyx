@@ -1,5 +1,4 @@
 import type {ValueOf} from 'type-fest';
-
 import {StorageErrorClass, getErrorParts} from '../../errors';
 
 /**
@@ -34,12 +33,7 @@ function classifyIDBError(error: unknown): ValueOf<typeof StorageErrorClass> {
         name.includes('aborterror') ||
         message.includes('connection to indexed database server lost') ||
         message.includes('connection is closing') ||
-        // WebKit's IDB server tore the transaction down under a live connection (page reload or
-        // foregrounding after process suspension). Emitted as UnknownError with messages like
-        // "Attempt to get a record from database without an in-progress transaction" — the shared
-        // suffix covers the whole family. A fresh connection heals it.
         message.includes('without an in-progress transaction') ||
-        // This is related to https://github.com/Expensify/react-native-onyx/pull/796 — remove this comment when #796 is merged.
         message.includes('idb write transaction aborted without an error')
     ) {
         return StorageErrorClass.TRANSIENT;
