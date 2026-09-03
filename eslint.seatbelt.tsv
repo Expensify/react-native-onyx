@@ -32,8 +32,6 @@
 "lib/storage/providers/IDBKeyValProvider/index.ts"	"@typescript-eslint/no-unsafe-type-assertion"	3
 "lib/storage/providers/IDBKeyValProvider/index.ts"	"rulesdir/prefer-at"	1
 "lib/storage/providers/MemoryOnlyProvider.ts"	"@typescript-eslint/no-unsafe-type-assertion"	5
-"lib/storage/providers/NoopProvider.ts"	"@typescript-eslint/no-unsafe-type-assertion"	1
-"lib/storage/providers/NoopProvider.ts"	"no-void"	1
 "lib/storage/providers/SQLiteProvider.ts"	"@typescript-eslint/naming-convention"	4
 "lib/storage/providers/SQLiteProvider.ts"	"@typescript-eslint/no-unsafe-return"	2
 "lib/storage/providers/SQLiteProvider.ts"	"@typescript-eslint/no-unsafe-type-assertion"	3

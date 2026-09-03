@@ -2,6 +2,11 @@ import type {OnyxKey, OnyxValue} from '../../types';
 import {StorageErrorClass} from '../errors';
 import type StorageProvider from './types';
 
+function emptyOnyxValue<TKey extends OnyxKey>(key: TKey): OnyxValue<TKey>;
+function emptyOnyxValue(): null {
+    return null;
+}
+
 const provider: StorageProvider<unknown> = {
     store: undefined,
 
@@ -26,8 +31,7 @@ const provider: StorageProvider<unknown> = {
      * Get the value of a given key or return `null` if it's not available in memory
      */
     getItem<TKey extends OnyxKey>(key: TKey) {
-        void key;
-        return Promise.resolve(null as OnyxValue<TKey>);
+        return Promise.resolve(emptyOnyxValue(key));
     },
 
     /**
