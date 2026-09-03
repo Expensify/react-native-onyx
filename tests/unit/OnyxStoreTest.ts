@@ -248,6 +248,55 @@ describe('OnyxStore', () => {
         });
     });
 
+    describe('subscription mutation during dispatch', () => {
+        it('should fire a listener that unsubscribes and re-subscribes itself during dispatch only once', () => {
+            let unsubscribe: () => void = jest.fn();
+            const callback = jest.fn(() => {
+                unsubscribe();
+                unsubscribe = onyxStore.subscribe(ONYXKEYS.TEST_KEY, callback);
+            });
+            unsubscribe = onyxStore.subscribe(ONYXKEYS.TEST_KEY, callback);
+
+            onyxStore.notifyKey(ONYXKEYS.TEST_KEY, 'x');
+
+            expect(callback).toHaveBeenCalledTimes(1);
+        });
+
+        it('should not deliver the in-flight notification to a listener added during dispatch', () => {
+            const lateCallback = jest.fn();
+            const firstCallback = jest.fn(() => {
+                onyxStore.subscribe(ONYXKEYS.TEST_KEY, lateCallback);
+            });
+            onyxStore.subscribe(ONYXKEYS.TEST_KEY, firstCallback);
+
+            onyxStore.notifyKey(ONYXKEYS.TEST_KEY, 'first');
+            expect(lateCallback).not.toHaveBeenCalled();
+
+            // It receives later notifications normally.
+            onyxStore.notifyKey(ONYXKEYS.TEST_KEY, 'second');
+            expect(lateCallback).toHaveBeenCalledTimes(1);
+            expect(lateCallback).toHaveBeenCalledWith('second', ONYXKEYS.TEST_KEY);
+        });
+
+        it('should still fire a sibling unsubscribed during dispatch this round, but not on later notifications', () => {
+            const siblingCallback = jest.fn();
+            let unsubscribeSibling: () => void = jest.fn();
+            const firstCallback = jest.fn(() => {
+                unsubscribeSibling();
+            });
+            onyxStore.subscribe(ONYXKEYS.TEST_KEY, firstCallback);
+            unsubscribeSibling = onyxStore.subscribe(ONYXKEYS.TEST_KEY, siblingCallback);
+
+            // The sibling was registered when dispatch began, so the snapshot still fires it.
+            onyxStore.notifyKey(ONYXKEYS.TEST_KEY, 'first');
+            expect(siblingCallback).toHaveBeenCalledTimes(1);
+
+            // Now unsubscribed, it does not fire again.
+            onyxStore.notifyKey(ONYXKEYS.TEST_KEY, 'second');
+            expect(siblingCallback).toHaveBeenCalledTimes(1);
+        });
+    });
+
     describe('listener error isolation', () => {
         it('should log a throwing listener and still fire the other listeners', () => {
             const logAlertSpy = jest.spyOn(Logger, 'logAlert').mockImplementation(() => {
