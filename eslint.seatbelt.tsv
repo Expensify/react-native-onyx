@@ -24,7 +24,6 @@
 "lib/OnyxUtils.ts"	"@typescript-eslint/non-nullable-type-assertion-style"	2
 "lib/StateMachine.ts"	"@typescript-eslint/no-unsafe-type-assertion"	2
 "lib/Str.ts"	"@typescript-eslint/no-unsafe-type-assertion"	1
-"lib/memoizedShallowEqual.ts"	"@typescript-eslint/no-restricted-types"	2
 "lib/storage/InstanceSync/index.web.ts"	"@typescript-eslint/no-unsafe-type-assertion"	1
 "lib/storage/InstanceSync/index.web.ts"	"@typescript-eslint/restrict-template-expressions"	1
 "lib/storage/__mocks__/index.ts"	"@typescript-eslint/no-unsafe-argument"	1
