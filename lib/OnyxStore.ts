@@ -1,33 +1,45 @@
-import cache from './OnyxCache';
-import OnyxKeys from './OnyxKeys';
-import * as Logger from './Logger';
 import type {CollectionKeyBase, KeyValueMapping, OnyxCollection, OnyxKey, OnyxValue} from './types';
 
+import * as Logger from './Logger';
+import cache from './OnyxCache';
+import OnyxKeys from './OnyxKeys';
+
 /**
- * Listener fired when an exact key's value changes. For a collection root key this is the
- * collection listener: it receives the frozen collection object every time a member changes.
+ * Listener fired when an exact key's value changes.
  */
 type KeyListener<TKey extends OnyxKey = OnyxKey> = (value: OnyxValue<TKey>, key: TKey) => void;
+
+/**
+ * Storage form of a listener, value erased so one Map can hold listeners for every key type.
+ */
+type StoredListener = (value: unknown, key: OnyxKey) => void;
+
+type NotifyKeyOptions = {
+    /**
+     * Skips collection-level routing. Collection-batch write paths set it so each member write
+     * doesn't re-trigger the collection-level listeners; the outer `notifyCollection()` fires those once.
+     */
+    suppressCollectionNotify?: boolean;
+};
 
 /**
  * `OnyxStore` is a single listener registry for Onyx reads/subscriptions. One index backs
  * every subscription:
  *
- *   keyListeners: exact-key listeners (a single key, a collection root in collection mode,
+ *   keyListeners: exact-key listeners (a single key, a collection object,
  *                 or a specific collection member).
  *
- * Write paths call `notifyKey()` (single-key write) or `notifyCollection()` (batch collection
- * update from `mergeCollection`/`setCollection`/`clear`).
+ * Write paths call `notifyKey()` (single-key write) or `notifyCollection()` (batch collection update).
  */
 class OnyxStore {
-    private keyListeners: Map<OnyxKey, Set<KeyListener>>;
+    private keyListeners: Map<OnyxKey, Set<StoredListener>>;
 
     constructor() {
         this.keyListeners = new Map();
     }
 
     /**
-     * Sync, cache-only read. Returns the frozen collection object for collection
+     * Returns the frozen collection object for collection
      * keys, the cached value for single keys, or `undefined` if not in cache.
      */
     getState<TKey extends OnyxKey>(key: TKey): OnyxValue<TKey> {
@@ -50,13 +62,17 @@ class OnyxStore {
             listeners = new Set();
             this.keyListeners.set(key, listeners);
         }
-        listeners.add(listener as unknown as KeyListener);
+
+        listeners.add(listener as StoredListener);
+
         return () => {
             const set = this.keyListeners.get(key);
             if (!set) {
                 return;
             }
-            set.delete(listener as unknown as KeyListener);
+
+            set.delete(listener as StoredListener);
+
             if (set.size === 0) {
                 this.keyListeners.delete(key);
             }
@@ -69,18 +85,14 @@ class OnyxStore {
      * Dispatch:
      *   1. keyListeners.get(key): exact-key subscribers (always fires).
      *   2. If key is a collection member, keyListeners.get(collectionKey): collection
-     *      listeners for the parent collection (unless suppressed).
-     *
-     * `options.suppressCollectionNotify` skips step 2. Collection-batch write paths set
-     * it so each member write doesn't re-trigger the collection-level listeners;
-     * the outer `notifyCollection()` fires those once.
+     *      listeners for the parent collection (unless `options.suppressCollectionNotify`).
      */
-    notifyKey<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>, options?: {suppressCollectionNotify?: boolean}): void {
+    notifyKey<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>, options?: NotifyKeyOptions): void {
         // 1. Exact-key listeners
         const exact = this.keyListeners.get(key);
         if (exact && exact.size > 0) {
             for (const listener of exact) {
-                this.safeInvoke(() => listener(value as OnyxValue<OnyxKey>, key), key);
+                this.safeInvoke(() => listener(value, key), key);
             }
         }
 
@@ -94,15 +106,14 @@ class OnyxStore {
             if (collectionListeners && collectionListeners.size > 0) {
                 const collectionData = cache.getCollectionData(collectionKey);
                 for (const listener of collectionListeners) {
-                    this.safeInvoke(() => listener(collectionData as OnyxValue<OnyxKey>, collectionKey), collectionKey);
+                    this.safeInvoke(() => listener(collectionData, collectionKey), collectionKey);
                 }
             }
         }
     }
 
     /**
-     * Notify of a collection-level batch update. Used by `mergeCollection`,
-     * `setCollection`, and `clear`'s collection path.
+     * Notify of a collection-level batch update.
      *
      * Dispatch:
      *   1. keyListeners.get(collectionKey): fires once with the new collection object.
@@ -129,7 +140,7 @@ class OnyxStore {
         const collectionListeners = this.keyListeners.get(collectionKey);
         if (collectionListeners && collectionListeners.size > 0) {
             for (const listener of collectionListeners) {
-                this.safeInvoke(() => listener(collectionData as OnyxValue<OnyxKey>, collectionKey), collectionKey);
+                this.safeInvoke(() => listener(collectionData, collectionKey), collectionKey);
             }
         }
 
@@ -140,33 +151,44 @@ class OnyxStore {
             if (value === prev) {
                 continue;
             }
+
             const exact = this.keyListeners.get(memberKey);
             if (!exact || exact.size === 0) {
                 continue;
             }
+
             for (const listener of exact) {
-                this.safeInvoke(() => listener(value as OnyxValue<OnyxKey>, memberKey), memberKey);
+                this.safeInvoke(() => listener(value, memberKey), memberKey);
             }
         }
     }
 
-    /** Wipe all subscriptions. Used by tests and `Onyx.clear()` follow-on. */
+    /**
+     * Wipe all subscriptions. Used by tests and `Onyx.clear()` follow-on.
+     */
     clearAll(): void {
         this.keyListeners.clear();
     }
 
-    /** True if there are any subscribers for the given key (exact or parent collection). */
+    /**
+     * True if there are any subscribers for the given key (exact or parent collection).
+     */
     hasListenersForKey(key: OnyxKey): boolean {
         if ((this.keyListeners.get(key)?.size ?? 0) > 0) {
             return true;
         }
+
         const collectionKey = OnyxKeys.getCollectionKey(key);
         if (collectionKey && collectionKey !== key && (this.keyListeners.get(collectionKey)?.size ?? 0) > 0) {
             return true;
         }
+
         return false;
     }
 
+    /**
+     * Runs a listener, catching and logging any throw so one failing listener can't stop the rest.
+     */
     private safeInvoke(fn: () => void, contextKey: OnyxKey): void {
         try {
             fn();
