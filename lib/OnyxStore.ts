@@ -91,7 +91,7 @@ class OnyxStore {
         // 1. Exact-key listeners
         const exact = this.keyListeners.get(key);
         if (exact && exact.size > 0) {
-            for (const listener of exact) {
+            for (const listener of [...exact]) {
                 this.safeInvoke(() => listener(value, key), key);
             }
         }
@@ -105,7 +105,7 @@ class OnyxStore {
             const collectionListeners = this.keyListeners.get(collectionKey);
             if (collectionListeners && collectionListeners.size > 0) {
                 const collectionData = cache.getCollectionData(collectionKey);
-                for (const listener of collectionListeners) {
+                for (const listener of [...collectionListeners]) {
                     this.safeInvoke(() => listener(collectionData, collectionKey), collectionKey);
                 }
             }
@@ -139,7 +139,7 @@ class OnyxStore {
         // 1. Collection listeners fire once with the new collection object.
         const collectionListeners = this.keyListeners.get(collectionKey);
         if (collectionListeners && collectionListeners.size > 0) {
-            for (const listener of collectionListeners) {
+            for (const listener of [...collectionListeners]) {
                 this.safeInvoke(() => listener(collectionData, collectionKey), collectionKey);
             }
         }
@@ -157,7 +157,7 @@ class OnyxStore {
                 continue;
             }
 
-            for (const listener of exact) {
+            for (const listener of [...exact]) {
                 this.safeInvoke(() => listener(value, memberKey), memberKey);
             }
         }
