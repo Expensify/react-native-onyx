@@ -4,8 +4,10 @@ import Storage from './storage';
 import utils from './utils';
 import DevTools, {initDevTools} from './DevTools';
 import type {
+    CollectionConnectCallback,
     CollectionKeyBase,
     ConnectOptions,
+    DefaultConnectCallback,
     InitOptions,
     KeyValueMapping,
     MixedOperationsQueue,
@@ -28,9 +30,27 @@ import type {
 import OnyxUtils from './OnyxUtils';
 import OnyxKeys from './OnyxKeys';
 import logMessages from './logMessages';
-import type {Connection} from './OnyxConnectionManager';
-import connectionManager from './OnyxConnectionManager';
+import onyxStore from './OnyxStore';
 import OnyxMerge from './OnyxMerge';
+
+/**
+ * Opaque handle returned by `Onyx.connect()` / `Onyx.connectWithoutView()`.
+ * Pass it to `Onyx.disconnect()` to stop receiving callbacks for this subscription.
+ */
+type Connection = {
+    /** Unsubscribe this connection. Idempotent. */
+    unsubscribe: () => void;
+};
+
+/**
+ * Sentinel for "nothing delivered yet" in `connect()`'s per-subscription dedup. A Symbol
+ * can't collide with any real Onyx value, so the first `Object.is` check never matches and
+ * the initial fire runs even when a key's genuine first value is `undefined`. It only needs
+ * to be distinct from real values, not unique per subscription, so one module-level instance
+ * is reused by every connection.
+ */
+// eslint-disable-next-line rulesdir/no-negated-variables
+const NOT_DELIVERED = Symbol('NOT_DELIVERED');
 
 /** Initialize the store with actions and listening for storage events */
 function init({
@@ -62,8 +82,7 @@ function init({
             const collectionBatches = new Map<string, {partial: NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>>; previous: NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>>}>();
 
             for (const [key, value] of pairs) {
-                // RAM-only keys should never sync from storage as they may have stale persisted data
-                // from before the key was migrated to RAM-only.
+                // RAM-only keys never sync from storage; any persisted data for them is stale.
                 if (OnyxKeys.isRamOnlyKey(key)) {
                     continue;
                 }
@@ -71,7 +90,7 @@ function init({
                 const collectionKey = OnyxKeys.getCollectionKey(key);
                 const isCollectionMember = !!collectionKey && OnyxKeys.isCollectionMemberKey(collectionKey, key);
 
-                // Capture the previous cached value BEFORE cache.set() so keysChanged() can diff old vs new per member.
+                // Capture the previous cached value before cache.set() so notifyCollection() can diff old vs new per member.
                 const previousValue = isCollectionMember ? cache.get(key) : undefined;
                 cache.set(key, value);
 
@@ -92,15 +111,15 @@ function init({
                 }
             }
 
-            // Non-collection keys: notify individually, matching keyChanged() semantics for exact keys.
+            // Non-collection keys: notify individually, matching notifyKey() semantics for exact keys.
             for (const [key, value] of individual) {
-                OnyxUtils.keyChanged(key, value);
+                OnyxUtils.notifyKey(key, value);
             }
 
-            // One keysChanged() per collection notifies the collection-root subscriber once and lets
-            // keysChanged() decide which individual member subscribers actually changed.
+            // One notifyCollection() per collection notifies the collection-root subscriber once and lets
+            // notifyCollection() decide which individual member subscribers actually changed.
             for (const [collectionKey, {partial, previous}] of collectionBatches) {
-                OnyxUtils.keysChanged(collectionKey, partial, previous);
+                OnyxUtils.notifyCollection(collectionKey, partial, previous);
             }
         });
     }
@@ -117,71 +136,140 @@ function init({
 }
 
 /**
- * Connects to an Onyx key given the options passed and listens to its changes.
- * This method will be deprecated soon. Please use `Onyx.connectWithoutView()` instead.
+ * Sync, cache-only read of an Onyx key. Returns the frozen collection object for
+ * collection keys, the cached value for single keys, or `undefined` if the key isn't
+ * in cache (no storage fallback).
  *
- * @example
- * ```ts
- * const connection = Onyx.connectWithoutView({
- *     key: ONYXKEYS.SESSION,
- *     callback: onSessionChange,
- * });
- * ```
+ * Use this for one-off reads outside React. Inside React, prefer `useOnyx`.
+ */
+function getState<TKey extends OnyxKey>(key: TKey): OnyxValue<TKey> {
+    return onyxStore.getState(key);
+}
+
+/**
+ * Defer initial-fire of `Onyx.connect` callbacks far enough that any Onyx writes
+ * scheduled in the same synchronous tick have applied before the callback reads cache.
  *
- * @param connectOptions The options object that will define the behavior of the connection.
- * @param connectOptions.key The Onyx key to subscribe to.
- * @param connectOptions.callback A function that will be called when the Onyx data we are subscribed changes.
- * @param connectOptions.selector This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook.**
- *        Using this setting on `useOnyx()` can have very positive performance benefits because the component will only re-render
- *        when the subset of data changes. Otherwise, any change of data on any property would normally
- *        cause the component to re-render (and that can be expensive from a performance standpoint).
- * @returns The connection object to use when calling `Onyx.disconnect()`.
+ * FIXME: The legacy `subscribeToKey` chain (`deferredInitTask.then(getAllKeys).then(multiGet)
+ * .then(sendDataToConnection)`) reached this depth incidentally via storage I/O. The
+ * new store-based wrapper has no storage chain, so we have to introduce the depth
+ * explicitly. The three nested `.then()`s match the legacy effective depth, enough
+ * to outpace the longest in-flight write chain: `Onyx.update` -> `clearPromise.then`
+ * -> per-item `Onyx.merge` -> `OnyxUtils.get(key).then(applyMerge)` is two hops to
+ * apply, so the third hop guarantees initial-fire reads the post-write cache.
+ *
+ * Microtask depth (not `setTimeout(0)`) is required because Jest test bodies run
+ * entirely in microtask land via chained `.then()`s; a macrotask-deferred initial
+ * fire would not run until the chain returns to the event loop, which can be after
+ * the test's assertions execute, leaving module-level Onyx subscribers stale.
+ */
+function scheduleInitialFire(fn: () => void): void {
+    Promise.resolve()
+        .then(() => Promise.resolve())
+        .then(() => Promise.resolve())
+        .then(fn);
+}
+
+/**
+ * Subscribe to changes for `key`.
+ *
+ * For a collection root key, the callback fires with the entire frozen collection
+ * object whenever any member changes; signature `(collection, collectionKey)`.
+ * For any other key, the callback fires with the value at that key; signature
+ * `(value, key)`. Initial fire is deferred via `scheduleInitialFire` so it reads
+ * cache after any same-tick writes have applied.
+ *
+ * Returns synchronously with a `Connection` handle. Disconnecting is idempotent.
  */
 function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Connection {
-    return connectionManager.connect(connectOptions);
+    const {key, callback} = connectOptions;
+
+    let active = true;
+    let unsubscribeFn: (() => void) | null = null;
+
+    const wireUp = () => {
+        if (!active) {
+            return;
+        }
+
+        if (OnyxKeys.isCollectionKey(key)) {
+            // Collection-root mode: dedup skips identical collection refs. Initial fire delivers
+            // the current collection object: frozen `{}` for an empty-but-known collection,
+            // `undefined` only if the collection key has not been seen yet.
+            let lastDeliveredCollection: unknown = NOT_DELIVERED;
+            const deliverCollection = (rawCollection: OnyxValue<TKey> | undefined, k: TKey) => {
+                if (Object.is(lastDeliveredCollection, rawCollection)) {
+                    return;
+                }
+                lastDeliveredCollection = rawCollection;
+                (callback as CollectionConnectCallback<TKey> | undefined)?.(rawCollection as NonNullable<OnyxCollection<KeyValueMapping[TKey]>>, k);
+            };
+            unsubscribeFn = onyxStore.subscribe(key, (value, k) => {
+                deliverCollection(value as unknown as OnyxValue<TKey>, k as TKey);
+            });
+            scheduleInitialFire(() => {
+                if (!active) {
+                    return;
+                }
+                deliverCollection(onyxStore.getState(key) as unknown as OnyxValue<TKey>, key as TKey);
+            });
+            return;
+        }
+
+        // Non-collection key (or a specific collection member): single-value subscription.
+        let lastDelivered: unknown = NOT_DELIVERED;
+        const deliverValue = (value: OnyxValue<TKey>, k: TKey | undefined) => {
+            if (Object.is(lastDelivered, value)) {
+                return;
+            }
+            lastDelivered = value;
+            (callback as DefaultConnectCallback<TKey> | undefined)?.(value, k as TKey);
+        };
+        unsubscribeFn = onyxStore.subscribe(key, (value, k) => {
+            deliverValue(value, k as TKey);
+        });
+        scheduleInitialFire(() => {
+            if (!active) {
+                return;
+            }
+            deliverValue(onyxStore.getState(key), key);
+        });
+    };
+
+    OnyxUtils.afterInit(() => {
+        wireUp();
+        return Promise.resolve();
+    });
+
+    return {
+        unsubscribe: () => {
+            if (!active) {
+                return;
+            }
+            active = false;
+            if (unsubscribeFn) {
+                unsubscribeFn();
+                unsubscribeFn = null;
+            }
+        },
+    };
 }
 
 /**
- * Connects to an Onyx key given the options passed and listens to its changes.
- *
- * @example
- * ```ts
- * const connection = Onyx.connectWithoutView({
- *     key: ONYXKEYS.SESSION,
- *     callback: onSessionChange,
- * });
- * ```
- *
- * @param connectOptions The options object that will define the behavior of the connection.
- * @param connectOptions.key The Onyx key to subscribe to.
- * @param connectOptions.callback A function that will be called when the Onyx data we are subscribed changes.
- * @param connectOptions.selector This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook.**
- *        Using this setting on `useOnyx()` can have very positive performance benefits because the component will only re-render
- *        when the subset of data changes. Otherwise, any change of data on any property would normally
- *        cause the component to re-render (and that can be expensive from a performance standpoint).
- * @returns The connection object to use when calling `Onyx.disconnect()`.
+ * Alias of `connect()` for call-site naming consistency.
  */
 function connectWithoutView<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Connection {
-    return connectionManager.connect(connectOptions);
+    return connect(connectOptions);
 }
 
 /**
- * Disconnects and removes the listener from the Onyx key.
- *
- * @example
- * ```ts
- * const connection = Onyx.connectWithoutView({
- *     key: ONYXKEYS.SESSION,
- *     callback: onSessionChange,
- * });
- *
- * Onyx.disconnect(connection);
- * ```
- *
- * @param connection Connection object returned by calling `Onyx.connect()` or `Onyx.connectWithoutView()`.
+ * Disconnects a subscription previously returned by `connect()` / `connectWithoutView()`.
  */
 function disconnect(connection: Connection): void {
-    connectionManager.disconnect(connection);
+    if (!connection) {
+        return;
+    }
+    connection.unsubscribe();
 }
 
 /**
@@ -424,17 +512,16 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                 // Remove only the items that we want cleared from storage, and reset others to default
                 for (const key of keysToBeClearedFromStorage) cache.drop(key);
                 return Storage.removeItems(keysToBeClearedFromStorage)
-                    .then(() => connectionManager.refreshSessionID())
                     .then(() => Storage.multiSet(defaultKeyValuePairs))
                     .then(() => {
                         DevTools.clearState(keysToPreserve);
 
                         // Notify the subscribers for each key/value group so they can receive the new values
                         for (const [key, value] of Object.entries(keyValuesToResetIndividually)) {
-                            OnyxUtils.keyChanged(key, value);
+                            OnyxUtils.notifyKey(key, value);
                         }
                         for (const [key, value] of Object.entries(keyValuesToResetAsCollection)) {
-                            OnyxUtils.keysChanged(key, value.newValues, value.oldValues);
+                            OnyxUtils.notifyCollection(key, value.newValues, value.oldValues);
                         }
                     });
             })
@@ -613,6 +700,7 @@ function setCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, coll
 
 const Onyx = {
     METHOD: OnyxUtils.METHOD,
+    getState,
     connect,
     connectWithoutView,
     disconnect,
@@ -628,4 +716,4 @@ const Onyx = {
 };
 
 export default Onyx;
-export type {OnyxUpdate, ConnectOptions, SetOptions};
+export type {OnyxUpdate, ConnectOptions, SetOptions, Connection};
