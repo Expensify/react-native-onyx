@@ -61,8 +61,8 @@ Any existing collection members not included in the new data will be removed.</p
 <dt><a href="#get">get(key)</a> ⇒</dt>
 <dd><p>Reads the current value of an Onyx key once, without subscribing. Use <code>useOnyx()</code> or
 <code>Onyx.connectWithoutView()</code> when the value has to stay current.</p>
-<p>The result is the cached object itself, not a copy, and is typed mutable, like <code>useOnyx()</code>. Treat
-it as read-only: mutations are visible to every other reader of that key. A write still queued when
+<p>The result is the cached object itself, not a copy, and is typed mutable, like <code>useOnyx()</code>. Treat it
+as read-only: mutations are visible to every other reader of that key. A write still queued when
 <code>get()</code> is called is not visible to it, so await the write before reading.</p>
 <p>A collection with no members resolves to <code>{}</code>. A collection read on an empty store resolves to
 <code>undefined</code>.</p>
