@@ -5,7 +5,7 @@
  * - **open**: tripped; requests are rejected outright so a known-bad dependency isn't hammered.
  * - **half-open**: a trial state entered after the open timeout — see {@link CIRCUIT_BREAKER_TRANSITIONS}.
  */
-type CircuitBreakerState = 'closed' | 'open' | 'half-open';
+type CircuitBreakerState = 'closed' | 'open' | 'halfOpen';
 
 /**
  * Legal state transitions. The flow is closed → open → half-open → (closed | open).
@@ -24,8 +24,8 @@ type CircuitBreakerState = 'closed' | 'open' | 'half-open';
  */
 const CIRCUIT_BREAKER_TRANSITIONS = {
     closed: ['open'],
-    open: ['half-open'],
-    'half-open': ['closed', 'open'],
+    open: ['halfOpen'],
+    halfOpen: ['closed', 'open'],
 } as const satisfies Record<CircuitBreakerState, readonly CircuitBreakerState[]>;
 
 type CircuitBreakerOptions = {

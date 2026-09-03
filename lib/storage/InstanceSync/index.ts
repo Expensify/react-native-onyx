@@ -1,4 +1,6 @@
-import NOOP from 'lodash/noop';
+function NOOP(..._args: unknown[]): void {
+    // Native InstanceSync is a no-op; web implements real cross-tab sync.
+}
 
 /**
  *  This is used to keep multiple browser tabs in sync, therefore only needed on web

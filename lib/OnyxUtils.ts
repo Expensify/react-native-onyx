@@ -59,6 +59,10 @@ function resetDiskPressureLogThrottle(): void {
     lastDiskPressureLogTime = 0;
 }
 
+function formatCaughtError(error: unknown): string {
+    return error instanceof Error ? error.toString() : String(error);
+}
+
 type OnyxMethod = ValueOf<typeof METHOD>;
 
 /** Result of `prepareKeyValuePairsForStorage`: pairs to write and keys whose `null` value marks them for removal. */
@@ -219,7 +223,7 @@ function sendActionToDevTools(
     value: OnyxCollection<KeyValueMapping[OnyxKey]> | OnyxEntry<KeyValueMapping[OnyxKey]>,
     mergedValue: OnyxEntry<KeyValueMapping[OnyxKey]> = undefined,
 ): void {
-    DevTools.registerAction(utils.formatActionName(method, key), value, key ? {[key]: mergedValue || value} : (value as OnyxCollection<KeyValueMapping[OnyxKey]>));
+    DevTools.registerAction(utils.formatActionName(method, key), value, key ? {[key]: mergedValue !== undefined ? mergedValue : value} : (value as OnyxCollection<KeyValueMapping[OnyxKey]>));
 }
 
 /**

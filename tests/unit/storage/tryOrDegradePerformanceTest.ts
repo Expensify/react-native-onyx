@@ -69,6 +69,24 @@ describe('storage/tryOrDegradePerformance', () => {
         expect(storage.getStorageProvider().name).toBe('MemoryOnlyProvider');
     });
 
+    it('serializes Error.cause as a readable string in the degrade log', async () => {
+        const {storage, Logger} = loadIsolatedStorage();
+        const capturedLogs: CapturedLog[] = [];
+        Logger.registerLogger((data: LogData) => capturedLogs.push({level: data.level, message: data.message}));
+
+        storage.init();
+
+        const originalProvider = storage.getStorageProvider();
+        const targetError = new Error('IDBKeyVal store could not be created', {cause: new Error('underlying disk is full')});
+        originalProvider.getAllKeys = jest.fn().mockReturnValue(Promise.reject(targetError));
+
+        await expect(storage.getAllKeys()).rejects.toBe(targetError);
+
+        const degradeLog = capturedLogs.find((log) => log.level === 'hmmm' && log.message.includes('Falling back to only using cache'));
+        expect(degradeLog?.message).toContain('Cause: underlying disk is full');
+        expect(degradeLog?.message).not.toContain('[object Object]');
+    });
+
     it('propagates async rejections with unrelated messages without falling back', async () => {
         const {storage, Logger} = loadIsolatedStorage();
         const capturedLogs: CapturedLog[] = [];
