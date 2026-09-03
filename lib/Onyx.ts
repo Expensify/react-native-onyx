@@ -301,7 +301,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
                     OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.MERGE, key, changes, mergedValue);
                 });
             } catch (error) {
-                Logger.logAlert(`An error occurred while applying merge for key: ${key}, Error: ${error}`);
+                Logger.logAlert(`An error occurred while applying merge for key: ${key}, Error: ${error instanceof Error ? error.toString() : String(error)}`);
                 return Promise.resolve();
             }
         });

@@ -1,6 +1,6 @@
 {
   "name": "react-native-onyx",
-  "version": "3.0.102",
+  "version": "3.0.109",
   "author": "Expensify, Inc.",
   "homepage": "https://expensify.com",
   "description": "State management for React Native",
@@ -65,6 +65,7 @@
     "@types/jest": "^29.5.14",
     "@types/jsdoc-to-markdown": "^7.0.6",
     "@types/lodash": "^4.14.202",
+    "@types/lodash.bindall": "^4.4.9",
     "@types/node": "^20.11.5",
     "@types/react": "^18.2.14",
     "@types/react-native": "^0.70.0",
@@ -127,5 +128,12 @@
     "node": ">=20.19.5",
     "npm": ">=10.8.2"
   },
-  "sideEffects": false
+  "sideEffects": false,
+  "devEngines": {
+    "packageManager": {
+      "name": "npm",
+      "version": ">=11.10.0",
+      "onFail": "error"
+    }
+  }
 }

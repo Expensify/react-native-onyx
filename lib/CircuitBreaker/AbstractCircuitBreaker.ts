@@ -7,7 +7,7 @@ import type {CircuitBreakerOptions, CircuitBreakerState} from './types';
  *
  * - **closed**: requests are allowed; failures are counted.
  * - **open**: requests are rejected until {@link resetTimeoutMs} elapses.
- * - **half-open**: the recovery-probe state. After the open timeout, the breaker admits exactly ONE
+ * - **halfOpen**: the recovery-probe state. After the open timeout, the breaker admits exactly ONE
  *   probe request: success means the dependency recovered, so the circuit closes. Failure means it's
  *   still down, so the circuit reopens. This single-request probe prevents a "thundering herd" where
  *   every caller fails loudly when the service hasn't recovered yet.
@@ -69,10 +69,10 @@ abstract class AbstractCircuitBreaker {
     /**
      * Whether a request may proceed.
      *
-     * Returns `false` while open. In half-open, the FIRST caller is admitted as the recovery probe and
+     * Returns `false` while open. In halfOpen, the FIRST caller is admitted as the recovery probe and
      * `isProbeInFlight` is latched so every subsequent caller is rejected until that probe resolves
      * (via {@link recordSuccess} → close, or {@link recordFailure} → reopen). That single-probe gate is
-     * the whole point of half-open: it tests recovery with one request instead of letting a herd of
+     * the whole point of halfOpen: it tests recovery with one request instead of letting a herd of
      * waiting callers stampede a dependency that may still be down.
      */
     isAllowed(): boolean {
@@ -82,7 +82,7 @@ abstract class AbstractCircuitBreaker {
             return false;
         }
 
-        if (currentState === 'half-open') {
+        if (currentState === 'halfOpen') {
             if (this.isProbeInFlight) {
                 return false;
             }
@@ -93,7 +93,7 @@ abstract class AbstractCircuitBreaker {
     }
 
     /**
-     * Record a failed request. May open the circuit from closed or half-open.
+     * Record a failed request. May open the circuit from closed or halfOpen.
      * @returns `true` when the circuit is open after recording (the request must not proceed).
      */
     recordFailure(): boolean {
@@ -101,7 +101,7 @@ abstract class AbstractCircuitBreaker {
             return true;
         }
 
-        if (this.machine.state === 'half-open') {
+        if (this.machine.state === 'halfOpen') {
             this.trip();
             return true;
         }
@@ -115,9 +115,9 @@ abstract class AbstractCircuitBreaker {
         return false;
     }
 
-    /** Record a successful request. Closes the circuit from half-open and clears failure counts. */
+    /** Record a successful request. Closes the circuit from halfOpen and clears failure counts. */
     recordSuccess(): void {
-        if (this.machine.state === 'half-open') {
+        if (this.machine.state === 'halfOpen') {
             this.close();
             return;
         }
@@ -129,7 +129,7 @@ abstract class AbstractCircuitBreaker {
 
     /**
      * The current state WITHOUT advancing recovery — a pure query, safe to call without side effects.
-     * The open→half-open transition is applied only at the admission point ({@link isAllowed}); by the
+     * The open→halfOpen transition is applied only at the admission point ({@link isAllowed}); by the
      * time a caller queries state after being admitted, that transition has already happened.
      */
     peekState(): CircuitBreakerState {
@@ -166,7 +166,7 @@ abstract class AbstractCircuitBreaker {
     }
 
     private close(): void {
-        // close() only ever runs from half-open (see recordSuccess), and half-open → closed is the one
+        // close() only ever runs from halfOpen (see recordSuccess), and halfOpen → closed is the one
         // legal closing transition — so go through transition() to keep the illegal open → closed jump
         // an error rather than silently constructing a fresh closed machine.
         this.machine = this.machine.transition('closed');
@@ -177,9 +177,9 @@ abstract class AbstractCircuitBreaker {
     }
 
     /**
-     * Lazily advance open → half-open once the reset timeout has elapsed. This is checked on read
+     * Lazily advance open → halfOpen once the reset timeout has elapsed. This is checked on read
      * (via {@link getCurrentState}) rather than on a timer, so there's nothing to schedule or clean up:
-     * the transition simply becomes visible to the next caller after the window. Entering half-open
+     * the transition simply becomes visible to the next caller after the window. Entering halfOpen
      * clears `isProbeInFlight` so the next admitted request becomes the recovery probe.
      */
     private maybeRecover(): void {
@@ -191,7 +191,7 @@ abstract class AbstractCircuitBreaker {
             return;
         }
 
-        this.machine = this.machine.transition('half-open');
+        this.machine = this.machine.transition('halfOpen');
         this.isProbeInFlight = false;
     }
 }

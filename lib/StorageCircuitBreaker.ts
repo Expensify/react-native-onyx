@@ -68,7 +68,7 @@ class StorageCircuitBreaker extends AbstractCircuitBreaker {
         // failure that triggered it must not re-trip the circuit. Let it proceed; the probe's outcome
         // is the verdict — recordWriteSuccess (retry landed) closes, recordProbeFailure (retry failed,
         // re-entering retryOperation) reopens.
-        if (this.peekState() === 'half-open') {
+        if (this.peekState() === 'halfOpen') {
             return false;
         }
         return this.recordFailure();
