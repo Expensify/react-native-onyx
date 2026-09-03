@@ -59,12 +59,13 @@ value will be saved to storage after the default value.</p>
 Any existing collection members not included in the new data will be removed.</p>
 </dd>
 <dt><a href="#get">get(key)</a> ⇒</dt>
-<dd><p>Reads the current value of an Onyx key once, without subscribing to it. Use <code>useOnyx()</code> or
+<dd><p>Reads the current value of an Onyx key once, without subscribing. Use <code>useOnyx()</code> or
 <code>Onyx.connectWithoutView()</code> when the value has to stay current.</p>
-<p>The result is the cached object itself rather than a copy, so treat it as read-only. A write that
-is still queued when <code>get()</code> is called is not visible to it, so await the write before reading.</p>
-<p>A collection with no members resolves to <code>{}</code>, while a collection read on an empty store resolves
-to <code>undefined</code>.</p>
+<p>The result is the cached object itself, not a copy, and is typed mutable, like <code>useOnyx()</code>. Treat
+it as read-only: mutations are visible to every other reader of that key. A write still queued when
+<code>get()</code> is called is not visible to it, so await the write before reading.</p>
+<p>A collection with no members resolves to <code>{}</code>. A collection read on an empty store resolves to
+<code>undefined</code>.</p>
 </dd>
 </dl>
 
@@ -268,14 +269,15 @@ Onyx.setCollection(ONYXKEYS.COLLECTION.REPORT, {
 <a name="get"></a>
 
 ## get(key) ⇒
-Reads the current value of an Onyx key once, without subscribing to it. Use `useOnyx()` or
+Reads the current value of an Onyx key once, without subscribing. Use `useOnyx()` or
 `Onyx.connectWithoutView()` when the value has to stay current.
 
-The result is the cached object itself rather than a copy, so treat it as read-only. A write that
-is still queued when `get()` is called is not visible to it, so await the write before reading.
+The result is the cached object itself, not a copy, and is typed mutable, like `useOnyx()`. Treat it
+as read-only: mutations are visible to every other reader of that key. A write still queued when
+`get()` is called is not visible to it, so await the write before reading.
 
-A collection with no members resolves to `{}`, while a collection read on an empty store resolves
-to `undefined`.
+A collection with no members resolves to `{}`. A collection read on an empty store resolves to
+`undefined`.
 
 **Kind**: global function  
 **Returns**: The current value, or `undefined` if the key has none.  

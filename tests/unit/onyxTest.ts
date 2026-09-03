@@ -3273,7 +3273,6 @@ describe('Onyx', () => {
         it('should fall back to storage when the key is not in cache', async () => {
             await Onyx.set(ONYX_KEYS.TEST_KEY, {a: 1});
 
-            // Value out of cache, storage intact.
             cache.drop(ONYX_KEYS.TEST_KEY);
             cache.clearNullishStorageKeys();
             expect(cache.hasCacheForKey(ONYX_KEYS.TEST_KEY)).toBe(false);
@@ -3300,7 +3299,6 @@ describe('Onyx', () => {
                 [memberKeys[1]]: {id: 2},
             } as GenericCollection);
 
-            // Cache and key index empty, storage intact: what a failed hydration leaves.
             for (const memberKey of memberKeys) {
                 cache.drop(memberKey);
             }
@@ -3596,7 +3594,6 @@ describe('Onyx.init', () => {
         });
 
         it('get resolves a collection as undefined on a completely empty store', async () => {
-            // No stored keys means no index, and an absent index cannot tell empty from unloaded.
             Onyx.init({keys: ONYX_KEYS});
             await act(async () => waitForPromisesToResolve());
 
