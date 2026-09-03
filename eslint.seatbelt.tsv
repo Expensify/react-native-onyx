@@ -22,7 +22,6 @@
 "lib/OnyxUtils.ts"	"@typescript-eslint/no-unsafe-member-access"	5
 "lib/OnyxUtils.ts"	"@typescript-eslint/no-unsafe-type-assertion"	31
 "lib/OnyxUtils.ts"	"@typescript-eslint/non-nullable-type-assertion-style"	2
-"lib/StateMachine.ts"	"@typescript-eslint/no-unsafe-type-assertion"	2
 "lib/Str.ts"	"@typescript-eslint/no-unsafe-type-assertion"	1
 "lib/memoizedShallowEqual.ts"	"@typescript-eslint/no-restricted-types"	2
 "lib/storage/InstanceSync/index.web.ts"	"@typescript-eslint/no-unsafe-type-assertion"	1
