@@ -58,6 +58,15 @@ value will be saved to storage after the default value.</p>
 <dd><p>Sets a collection by replacing all existing collection members with new values.
 Any existing collection members not included in the new data will be removed.</p>
 </dd>
+<dt><a href="#get">get(key)</a> ⇒</dt>
+<dd><p>Reads the current value of an Onyx key once, without subscribing. Use <code>useOnyx()</code> or
+<code>Onyx.connectWithoutView()</code> when the value has to stay current.</p>
+<p>The result is the cached object itself, not a copy, and is typed mutable, like <code>useOnyx()</code>. Treat it
+as read-only: mutations are visible to every other reader of that key. A write still queued when
+<code>get()</code> is called is not visible to it, so await the write before reading.</p>
+<p>A collection with no members resolves to <code>{}</code>. A collection read on an empty store resolves to
+<code>undefined</code>.</p>
+</dd>
 </dl>
 
 <a name="init"></a>
@@ -256,4 +265,29 @@ Onyx.setCollection(ONYXKEYS.COLLECTION.REPORT, {
     [`${ONYXKEYS.COLLECTION.REPORT}1`]: report1,
     [`${ONYXKEYS.COLLECTION.REPORT}2`]: report2,
 });
+```
+<a name="get"></a>
+
+## get(key) ⇒
+Reads the current value of an Onyx key once, without subscribing. Use `useOnyx()` or
+`Onyx.connectWithoutView()` when the value has to stay current.
+
+The result is the cached object itself, not a copy, and is typed mutable, like `useOnyx()`. Treat it
+as read-only: mutations are visible to every other reader of that key. A write still queued when
+`get()` is called is not visible to it, so await the write before reading.
+
+A collection with no members resolves to `{}`. A collection read on an empty store resolves to
+`undefined`.
+
+**Kind**: global function  
+**Returns**: The current value, or `undefined` if the key has none.  
+
+| Param | Description |
+| --- | --- |
+| key | ONYXKEY to read, either a collection key or a single key |
+
+**Example**  
+```js
+const report = await Onyx.get(`${ONYXKEYS.COLLECTION.REPORT}${reportID}`);
+const allReports = await Onyx.get(ONYXKEYS.COLLECTION.REPORT);
 ```
