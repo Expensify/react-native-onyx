@@ -12,7 +12,6 @@
 "lib/Onyx.ts"	"@typescript-eslint/no-unsafe-type-assertion"	6
 "lib/OnyxConnectionManager.ts"	"@typescript-eslint/no-unsafe-type-assertion"	7
 "lib/OnyxConnectionManager.ts"	"@typescript-eslint/non-nullable-type-assertion-style"	3
-"lib/OnyxKeys.ts"	"@typescript-eslint/no-unsafe-type-assertion"	1
 "lib/OnyxMerge/index.native.ts"	"@typescript-eslint/no-unsafe-type-assertion"	3
 "lib/OnyxMerge/index.ts"	"@typescript-eslint/no-unsafe-type-assertion"	2
 "lib/OnyxSnapshotCache.ts"	"@typescript-eslint/no-unsafe-type-assertion"	2
