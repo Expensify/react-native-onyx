@@ -218,6 +218,22 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
         });
 
+        it('should initially return undefined and then return cached value after multiple merge operations', async () => {
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test1');
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'test3');
+
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
+
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loading');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('test3');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
         it('should transition to loaded after a pending merge lands even when the selector output is unchanged', async () => {
             // Uncached key with an in-flight merge: first render is `loading`.
             const mergePromise = Onyx.merge(ONYXKEYS.TEST_KEY, {done: true});
@@ -1090,6 +1106,30 @@ describe('useOnyx', () => {
 
             // A merge after the clear reaches both the pre-clear and post-clear subscribers.
             await act(async () => Onyx.merge(ONYXKEYS.TEST_KEY, 'test2'));
+
+            expect(existing.current[0]).toEqual('test2');
+            expect(fresh.current[0]).toEqual('test2');
+        });
+
+        it('should return the cleared value then propagate a later merge for a collection member key', async () => {
+            const memberKey = `${ONYXKEYS.COLLECTION.TEST_KEY}entry1`;
+            await Onyx.set(memberKey, 'test');
+
+            const {result: existing} = renderHook(() => useOnyx(memberKey));
+            await act(async () => waitForPromisesToResolve());
+            expect(existing.current[0]).toEqual('test');
+
+            await act(async () => Onyx.clear());
+
+            const {result: fresh} = renderHook(() => useOnyx(memberKey));
+            await act(async () => waitForPromisesToResolve());
+
+            expect(existing.current[0]).toBeUndefined();
+            expect(existing.current[1].status).toEqual('loaded');
+            expect(fresh.current[0]).toBeUndefined();
+            expect(fresh.current[1].status).toEqual('loaded');
+
+            await act(async () => Onyx.merge(memberKey, 'test2'));
 
             expect(existing.current[0]).toEqual('test2');
             expect(fresh.current[0]).toEqual('test2');
