@@ -417,7 +417,17 @@ type MixedOperationsQueue = {
     set: OnyxInputKeyValueMapping;
 };
 
+/**
+ * Represents a connection to an Onyx key, returned by `Onyx.connect()`.
+ * Pass it to `Onyx.disconnect()` to stop receiving callbacks for this subscription.
+ */
+type Connection = {
+    /** Unsubscribe this connection. Idempotent. */
+    unsubscribe: () => void;
+};
+
 export type {
+    Connection,
     Collection,
     CollectionConnectCallback,
     CollectionKey,

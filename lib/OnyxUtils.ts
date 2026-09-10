@@ -79,6 +79,16 @@ let snapshotKey: OnyxKey | null = null;
 // Connections can be made before `Onyx.init`. They would wait for this task before resolving
 const deferredInitTask = createDeferredTask();
 
+/**
+ * Sentinel for "nothing delivered yet" in `connect()`'s per-subscription dedup. A Symbol
+ * can't collide with any real Onyx value, so the first `Object.is` check never matches and
+ * the initial fire runs even when a key's genuine first value is `undefined`. It only needs
+ * to be distinct from real values, not unique per subscription, so one module-level instance
+ * is reused by every connection.
+ */
+// eslint-disable-next-line rulesdir/no-negated-variables
+const NOT_DELIVERED = Symbol('NOT_DELIVERED');
+
 // Collection member IDs that Onyx should silently ignore across all operations — reads, writes, cache, and subscriber
 // notifications. This is used to filter out keys formed from invalid/default IDs (e.g. "-1", "0",
 // "undefined", "null", "NaN") that can appear when an ID variable is accidentally coerced to string.
@@ -1588,6 +1598,7 @@ function clearOnyxUtilsInternals() {
 
 const OnyxUtils = {
     METHOD,
+    NOT_DELIVERED,
     getMergeQueue,
     getMergeQueuePromise,
     getDefaultKeyStates,

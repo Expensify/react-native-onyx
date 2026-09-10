@@ -6,6 +6,7 @@ import DevTools, {initDevTools} from './DevTools';
 import type {
     CollectionConnectCallback,
     CollectionKeyBase,
+    Connection,
     ConnectOptions,
     DefaultConnectCallback,
     InitOptions,
@@ -32,25 +33,6 @@ import OnyxKeys from './OnyxKeys';
 import logMessages from './logMessages';
 import onyxSubscriptionManager from './OnyxSubscriptionManager';
 import OnyxMerge from './OnyxMerge';
-
-/**
- * Opaque handle returned by `Onyx.connect()` / `Onyx.connectWithoutView()`.
- * Pass it to `Onyx.disconnect()` to stop receiving callbacks for this subscription.
- */
-type Connection = {
-    /** Unsubscribe this connection. Idempotent. */
-    unsubscribe: () => void;
-};
-
-/**
- * Sentinel for "nothing delivered yet" in `connect()`'s per-subscription dedup. A Symbol
- * can't collide with any real Onyx value, so the first `Object.is` check never matches and
- * the initial fire runs even when a key's genuine first value is `undefined`. It only needs
- * to be distinct from real values, not unique per subscription, so one module-level instance
- * is reused by every connection.
- */
-// eslint-disable-next-line rulesdir/no-negated-variables
-const NOT_DELIVERED = Symbol('NOT_DELIVERED');
 
 /** Initialize the store with actions and listening for storage events */
 function init({
@@ -196,7 +178,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
             // Collection-root mode: dedup skips identical collection refs. Initial fire delivers
             // the current collection object: frozen `{}` for an empty-but-known collection,
             // `undefined` only if the collection key has not been seen yet.
-            let lastDeliveredCollection: unknown = NOT_DELIVERED;
+            let lastDeliveredCollection: unknown = OnyxUtils.NOT_DELIVERED;
             const deliverCollection = (rawCollection: OnyxValue<TKey> | undefined, k: TKey) => {
                 if (Object.is(lastDeliveredCollection, rawCollection)) {
                     return;
@@ -217,7 +199,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
         }
 
         // Non-collection key (or a specific collection member): single-value subscription.
-        let lastDelivered: unknown = NOT_DELIVERED;
+        let lastDelivered: unknown = OnyxUtils.NOT_DELIVERED;
         const deliverValue = (value: OnyxValue<TKey>, k: TKey | undefined) => {
             if (Object.is(lastDelivered, value)) {
                 return;
