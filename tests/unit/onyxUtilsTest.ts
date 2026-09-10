@@ -372,7 +372,7 @@ describe('OnyxUtils', () => {
         });
 
         it('should stop firing callbacks for a collection subscriber that disconnects itself mid-batch', async () => {
-            // A collection subscriber (waitForCollectionCallback=false) disconnects itself when
+            // A collection subscriber disconnects itself when
             // it receives the first member. Subsequent changed members in the same batch must not
             // trigger further callbacks for this subscriber.
             const callback = jest.fn();
@@ -866,7 +866,7 @@ describe('OnyxUtils', () => {
         // re-enters the failing method on the next attempt.
         const transientError = new Error('Transient storage error');
 
-        it('mergeCollection: waitForCollectionCallback subscriber fires once across retries', async () => {
+        it('mergeCollection: collection subscriber fires once across retries', async () => {
             const collectionKey = ONYXKEYS.COLLECTION.TEST_KEY;
             const existingMemberKey = `${collectionKey}1`;
             const newMemberKey = `${collectionKey}2`;
@@ -889,7 +889,7 @@ describe('OnyxUtils', () => {
             } as GenericCollection);
 
             // Before this fix, every retry attempt re-fired keysChanged() — and
-            // waitForCollectionCallback subscribers fire on every notifyCollection() call by contract.
+            // collection subscribers fire on every notifyCollection() call by contract.
             // After the fix, retries skip the keysChanged re-fire, so subscribers are notified
             // exactly once per logical operation.
             expect(collectionCallback).toHaveBeenCalledTimes(1);
