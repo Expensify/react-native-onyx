@@ -6,7 +6,7 @@ import type Onyx from './Onyx';
 import cache, {TASK} from './OnyxCache';
 import OnyxKeys from './OnyxKeys';
 import StorageCircuitBreaker from './StorageCircuitBreaker';
-import onyxStore from './OnyxStore';
+import onyxSubscriptionManager from './OnyxSubscriptionManager';
 import Storage from './storage';
 import {StorageErrorClass} from './storage/errors';
 import type {
@@ -57,10 +57,6 @@ let lastDiskPressureLogTime = 0;
 /** Test-only: clears the disk-pressure log throttle so each test observes its own alert. */
 function resetDiskPressureLogThrottle(): void {
     lastDiskPressureLogTime = 0;
-}
-
-function formatCaughtError(error: unknown): string {
-    return error instanceof Error ? error.toString() : String(error);
 }
 
 type OnyxMethod = ValueOf<typeof METHOD>;
@@ -489,26 +485,22 @@ function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey
 }
 
 /**
- * Notify subscribers of a single-key write. Wrapper over `onyxStore.notifyKey()`
+ * Notify subscribers of a single-key write. Wrapper over `onyxSubscriptionManager.notifyKey()`
  * that also performs LRU bookkeeping for eviction. Write paths call this instead
  * of touching the subscriber registry directly.
- *
- * Pass `suppressCollectionNotify: true` when notifying within a collection-batch
- * operation. The outer `notifyCollection()` fires collection listeners once, so
- * each per-key fire shouldn't re-trigger them.
  */
-function notifyKey<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>, options?: {suppressCollectionNotify?: boolean}): void {
+function notifyKey<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>): void {
     if (value !== null && value !== undefined) {
         cache.addLastAccessedKey(key, OnyxKeys.isCollectionKey(key));
     } else {
         cache.removeLastAccessedKey(key);
     }
-    onyxStore.notifyKey(key, value, options);
+    onyxSubscriptionManager.notifyKey(key, value);
 }
 
 /**
  * Notify subscribers of a batch collection update. Wrapper over
- * `onyxStore.notifyCollection()` that also performs LRU bookkeeping per
+ * `onyxSubscriptionManager.notifyCollection()` that also performs LRU bookkeeping per
  * changed member.
  */
 function notifyCollection<TKey extends CollectionKeyBase>(
@@ -525,20 +517,15 @@ function notifyCollection<TKey extends CollectionKeyBase>(
             cache.removeLastAccessedKey(memberKey);
         }
     }
-    onyxStore.notifyCollection(collectionKey, partialCollection, partialPreviousCollection);
+    onyxSubscriptionManager.notifyCollection(collectionKey, partialCollection, partialPreviousCollection);
 }
 
 /**
  * Remove a key from Onyx and update the subscribers.
- *
- * `suppressCollectionNotify` skips the collection-level fire. Used by
- * `prepareKeyValuePairsForStorage()` when called inside a collection-batch operation
- * (setCollection/mergeCollection/partialSetCollection/multiSet's collection batch),
- * because the outer `notifyCollection()` fires collection listeners once.
  */
-function remove<TKey extends OnyxKey>(key: TKey, options?: {suppressCollectionNotify?: boolean}): Promise<void> {
+function remove<TKey extends OnyxKey>(key: TKey): Promise<void> {
     cache.drop(key);
-    notifyKey(key, undefined as OnyxValue<TKey>, options);
+    notifyKey(key, undefined as OnyxValue<TKey>);
 
     if (OnyxKeys.isRamOnlyKey(key)) {
         return Promise.resolve();

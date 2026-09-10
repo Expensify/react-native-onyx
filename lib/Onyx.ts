@@ -30,7 +30,7 @@ import type {
 import OnyxUtils from './OnyxUtils';
 import OnyxKeys from './OnyxKeys';
 import logMessages from './logMessages';
-import onyxStore from './OnyxStore';
+import onyxSubscriptionManager from './OnyxSubscriptionManager';
 import OnyxMerge from './OnyxMerge';
 
 /**
@@ -143,7 +143,7 @@ function init({
  * Use this for one-off reads outside React. Inside React, prefer `useOnyx`.
  */
 function getState<TKey extends OnyxKey>(key: TKey): OnyxValue<TKey> {
-    return onyxStore.getState(key);
+    return onyxSubscriptionManager.getState(key);
 }
 
 /**
@@ -204,14 +204,14 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
                 lastDeliveredCollection = rawCollection;
                 (callback as CollectionConnectCallback<TKey> | undefined)?.(rawCollection as NonNullable<OnyxCollection<KeyValueMapping[TKey]>>, k);
             };
-            unsubscribeFn = onyxStore.subscribe(key, (value, k) => {
+            unsubscribeFn = onyxSubscriptionManager.subscribe(key, (value, k) => {
                 deliverCollection(value as unknown as OnyxValue<TKey>, k as TKey);
             });
             scheduleInitialFire(() => {
                 if (!active) {
                     return;
                 }
-                deliverCollection(onyxStore.getState(key) as unknown as OnyxValue<TKey>, key as TKey);
+                deliverCollection(onyxSubscriptionManager.getState(key) as unknown as OnyxValue<TKey>, key as TKey);
             });
             return;
         }
@@ -225,14 +225,14 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
             lastDelivered = value;
             (callback as DefaultConnectCallback<TKey> | undefined)?.(value, k as TKey);
         };
-        unsubscribeFn = onyxStore.subscribe(key, (value, k) => {
+        unsubscribeFn = onyxSubscriptionManager.subscribe(key, (value, k) => {
             deliverValue(value, k as TKey);
         });
         scheduleInitialFire(() => {
             if (!active) {
                 return;
             }
-            deliverValue(onyxStore.getState(key), key);
+            deliverValue(onyxSubscriptionManager.getState(key), key);
         });
     };
 

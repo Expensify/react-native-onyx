@@ -7,7 +7,7 @@ import StorageMock from '../../lib/storage';
 import OnyxCache from '../../lib/OnyxCache';
 import OnyxKeys from '../../lib/OnyxKeys';
 import OnyxUtils, {clearOnyxUtilsInternals} from '../../lib/OnyxUtils';
-import onyxStore from '../../lib/OnyxStore';
+import onyxSubscriptionManager from '../../lib/OnyxSubscriptionManager';
 import type GenericCollection from '../utils/GenericCollection';
 import type {OnyxUpdate} from '../../lib/Onyx';
 import type {OnyxEntry, OnyxInputKeyValueMapping, OnyxKey, RetriableOnyxOperation} from '../../lib/types';
@@ -283,7 +283,7 @@ describe('OnyxUtils', () => {
                 beforeEach: async () => {
                     await Onyx.multiSet(mockedReportActionsMap);
                     for (const key of mockedReportActionsKeys) {
-                        unsubscribes.push(onyxStore.subscribe(key, jest.fn()));
+                        unsubscribes.push(onyxSubscriptionManager.subscribe(key, jest.fn()));
                     }
                 },
                 afterEach: async () => {
@@ -309,7 +309,7 @@ describe('OnyxUtils', () => {
                 beforeEach: async () => {
                     await Onyx.set(key, previousReportAction);
                     for (let i = 0; i < 10000; i++) {
-                        unsubscribes.push(onyxStore.subscribe(key, jest.fn()));
+                        unsubscribes.push(onyxSubscriptionManager.subscribe(key, jest.fn()));
                     }
                 },
                 afterEach: async () => {
@@ -485,13 +485,13 @@ describe('OnyxUtils', () => {
         });
     });
 
-    describe('onyxStore.subscribe', () => {
+    describe('onyxSubscriptionManager.subscribe', () => {
         test('one call subscribing to a single key', async () => {
             let unsubscribe: (() => void) | undefined;
 
             await measureFunction(
                 () => {
-                    unsubscribe = onyxStore.subscribe(`${collectionKey}0`, jest.fn());
+                    unsubscribe = onyxSubscriptionManager.subscribe(`${collectionKey}0`, jest.fn());
                 },
                 {
                     beforeEach: async () => {
@@ -510,7 +510,7 @@ describe('OnyxUtils', () => {
 
             await measureFunction(
                 () => {
-                    unsubscribe = onyxStore.subscribe(collectionKey, jest.fn());
+                    unsubscribe = onyxSubscriptionManager.subscribe(collectionKey, jest.fn());
                 },
                 {
                     beforeEach: async () => {
@@ -525,14 +525,14 @@ describe('OnyxUtils', () => {
         });
     });
 
-    describe('onyxStore.subscribe unsubscribe', () => {
+    describe('onyxSubscriptionManager.subscribe unsubscribe', () => {
         test('one call', async () => {
             const key = `${collectionKey}0`;
             let unsubscribe: (() => void) | undefined;
 
             await measureFunction(() => unsubscribe?.(), {
                 beforeEach: async () => {
-                    unsubscribe = onyxStore.subscribe(key, jest.fn());
+                    unsubscribe = onyxSubscriptionManager.subscribe(key, jest.fn());
                 },
                 afterEach: clearOnyxAfterEachMeasure,
             });

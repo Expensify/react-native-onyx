@@ -5,7 +5,7 @@ import {useSyncExternalStoreWithSelector} from 'use-sync-external-store/with-sel
 import type {OnyxKey, OnyxValue} from './types';
 
 import cache from './OnyxCache';
-import onyxStore from './OnyxStore';
+import onyxSubscriptionManager from './OnyxSubscriptionManager';
 import OnyxUtils from './OnyxUtils';
 
 type UseOnyxSelector<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>> = (data: OnyxValue<TKey> | undefined) => TReturnValue;
@@ -44,8 +44,8 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
     // First-render marker for the loading gate below.
     const connectedKeyRef = useRef<OnyxKey | null>(null);
 
-    const subscribe = useCallback((onStoreChange: () => void) => onyxStore.subscribe(key, onStoreChange), [key]);
-    const getSnapshot = useCallback(() => onyxStore.getState(key) as OnyxValue<TKey> | undefined, [key]);
+    const subscribe = useCallback((onStoreChange: () => void) => onyxSubscriptionManager.subscribe(key, onStoreChange), [key]);
+    const getSnapshot = useCallback(() => onyxSubscriptionManager.getState(key) as OnyxValue<TKey> | undefined, [key]);
 
     const select = useCallback((data: OnyxValue<TKey> | undefined): TReturnValue | undefined => (selector ? selector(data) : (data as TReturnValue | undefined)) ?? undefined, [selector]);
 
