@@ -1006,7 +1006,7 @@ describe('Onyx', () => {
             });
     });
 
-    it('should return all collection keys as a single object when waitForCollectionCallback = true', () => {
+    it('should return all collection keys as a single object when connecting to a collection key', () => {
         const mockCallback = jest.fn();
 
         // Given some initial collection data
@@ -1027,7 +1027,7 @@ describe('Onyx', () => {
 
         return Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION, initialCollectionData as GenericCollection)
             .then(() => {
-                // When we connect to that collection with waitForCollectionCallback = true
+                // When we connect to that collection key
                 connection = Onyx.connect({
                     key: ONYX_KEYS.COLLECTION.TEST_CONNECT_COLLECTION,
                     callback: mockCallback,
@@ -1041,14 +1041,14 @@ describe('Onyx', () => {
             });
     });
 
-    it('should return all collection keys as a single object when updating a collection key with waitForCollectionCallback = true', () => {
+    it('should return all collection keys as a single object when updating a collection key', () => {
         const mockCallback = jest.fn();
         const collectionUpdate = {
             testPolicy_1: {ID: 234, value: 'one'},
             testPolicy_2: {ID: 123, value: 'two'},
         };
 
-        // Given an Onyx.connect call with waitForCollectionCallback=true
+        // Given an Onyx.connect call to a collection key
         connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_POLICY,
             callback: mockCallback,
@@ -1078,7 +1078,7 @@ describe('Onyx', () => {
             testPolicy_2: {ID: 123, value: 'two'},
         };
 
-        // Given an Onyx.connect call with waitForCollectionCallback=false
+        // Given an Onyx.connect call to a single collection member key
         connection = Onyx.connect({
             key: `${ONYX_KEYS.COLLECTION.TEST_POLICY}${1}`,
             callback: mockCallback,
@@ -1101,13 +1101,13 @@ describe('Onyx', () => {
         );
     });
 
-    it('should return all collection keys as a single object for subscriber using waitForCollectionCallback when a single collection member key is updated', () => {
+    it('should return all collection keys as a single object for a collection subscriber when a single collection member key is updated', () => {
         const mockCallback = jest.fn();
         const collectionUpdate = {
             testPolicy_1: {ID: 234, value: 'one'},
         };
 
-        // Given an Onyx.connect call with waitForCollectionCallback=true
+        // Given an Onyx.connect call to a collection key
         connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_POLICY,
             callback: mockCallback,
@@ -1142,7 +1142,7 @@ describe('Onyx', () => {
             testPolicy_1: {ID: 234, value: 'one'},
         };
 
-        // Given an Onyx.connect call with waitForCollectionCallback=true
+        // Given an Onyx.connect call to a collection key
         connection = Onyx.connect({
             key: ONYX_KEYS.COLLECTION.TEST_POLICY,
             callback: mockCallback,
@@ -1193,7 +1193,7 @@ describe('Onyx', () => {
                 {onyxMethod: Onyx.METHOD.MERGE_COLLECTION, key: ONYX_KEYS.COLLECTION.TEST_UPDATE, value: {[itemKey]: {a: 'a'}} as GenericCollection},
             ]).then(() => {
                 expect(collectionCallback).toHaveBeenCalledTimes(2);
-                // Initial fire delivers `{}` (legacy `undefined`-for-empty-initial shim was removed).
+                // Initial fire delivers `{}` for a known-but-empty collection.
                 expect(collectionCallback).toHaveBeenNthCalledWith(1, {}, ONYX_KEYS.COLLECTION.TEST_UPDATE);
                 expect(collectionCallback).toHaveBeenNthCalledWith(2, {[itemKey]: {a: 'a'}}, ONYX_KEYS.COLLECTION.TEST_UPDATE);
 
