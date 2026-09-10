@@ -218,6 +218,22 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
         });
 
+        it('should transition to loaded after a pending merge lands even when the selector output is unchanged', async () => {
+            // Uncached key with an in-flight merge: first render is `loading`.
+            const mergePromise = Onyx.merge(ONYXKEYS.TEST_KEY, {done: true});
+
+            // Same output before and after the value loads, so the selector subscription dedupes the load re-render.
+            const selector = (() => 'same') as UseOnyxSelector<OnyxKey, string>;
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY, {selector}));
+
+            expect(result.current[1].status).toEqual('loading');
+
+            await act(async () => mergePromise);
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
         it('should return loaded state after an Onyx.clear() call while connecting and loading from cache', async () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'test');
 

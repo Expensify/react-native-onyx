@@ -1,5 +1,5 @@
 import {deepEqual} from 'fast-equals';
-import {useCallback, useEffect, useMemo, useRef} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useSyncExternalStore} from 'react';
 import {useSyncExternalStoreWithSelector} from 'use-sync-external-store/with-selector';
 
 import type {OnyxKey, OnyxValue} from './types';
@@ -54,11 +54,14 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
 
     const value = useSyncExternalStoreWithSelector<OnyxValue<TKey> | undefined, TReturnValue | undefined>(subscribe, getSnapshot, undefined, select, isEqual);
 
+    // Reactive cache presence, so the first value landing re-renders even when the selector output is unchanged.
+    const isCached = useSyncExternalStore(subscribe, () => cache.hasCacheForKey(key));
+
     // Loading only on a key's first render when a merge is in flight and nothing is cached yet.
     // A cached key stays loaded, so an optimistic merge never blanks shown data and a no-op merge can't leave it stuck.
     // connectedKeyRef limits this to the first render.
     // eslint-disable-next-line react-hooks/refs
-    const isLoading = connectedKeyRef.current !== key && !cache.hasCacheForKey(key) && OnyxUtils.hasPendingMergeForKey(key);
+    const isLoading = connectedKeyRef.current !== key && !isCached && OnyxUtils.hasPendingMergeForKey(key);
     const loadingStatus: FetchStatus = isLoading ? 'loading' : 'loaded';
 
     useEffect(() => {
