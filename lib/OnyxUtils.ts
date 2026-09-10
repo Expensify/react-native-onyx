@@ -89,6 +89,39 @@ const deferredInitTask = createDeferredTask();
 // eslint-disable-next-line rulesdir/no-negated-variables
 const NOT_DELIVERED = Symbol('NOT_DELIVERED');
 
+/**
+ * Sync, cache-only read of an Onyx key. Returns the frozen collection object for
+ * collection keys, the cached value for single keys, or `undefined` if the key isn't
+ * in cache (no storage fallback).
+ */
+function getState<TKey extends OnyxKey>(key: TKey): OnyxValue<TKey> {
+    return onyxSubscriptionManager.getState(key);
+}
+
+/**
+ * Defer initial-fire of `Onyx.connect` callbacks far enough that any Onyx writes
+ * scheduled in the same synchronous tick have applied before the callback reads cache.
+ *
+ * FIXME: The legacy `subscribeToKey` chain (`deferredInitTask.then(getAllKeys).then(multiGet)
+ * .then(sendDataToConnection)`) reached this depth incidentally via storage I/O. The
+ * new store-based wrapper has no storage chain, so we have to introduce the depth
+ * explicitly. The three nested `.then()`s match the legacy effective depth, enough
+ * to outpace the longest in-flight write chain: `Onyx.update` -> `clearPromise.then`
+ * -> per-item `Onyx.merge` -> `OnyxUtils.get(key).then(applyMerge)` is two hops to
+ * apply, so the third hop guarantees initial-fire reads the post-write cache.
+ *
+ * Microtask depth (not `setTimeout(0)`) is required because Jest test bodies run
+ * entirely in microtask land via chained `.then()`s; a macrotask-deferred initial
+ * fire would not run until the chain returns to the event loop, which can be after
+ * the test's assertions execute, leaving module-level Onyx subscribers stale.
+ */
+function scheduleInitialFire(fn: () => void): void {
+    Promise.resolve()
+        .then(() => Promise.resolve())
+        .then(() => Promise.resolve())
+        .then(fn);
+}
+
 // Collection member IDs that Onyx should silently ignore across all operations — reads, writes, cache, and subscriber
 // notifications. This is used to filter out keys formed from invalid/default IDs (e.g. "-1", "0",
 // "undefined", "null", "NaN") that can appear when an ID variable is accidentally coerced to string.
@@ -1599,6 +1632,8 @@ function clearOnyxUtilsInternals() {
 const OnyxUtils = {
     METHOD,
     NOT_DELIVERED,
+    getState,
+    scheduleInitialFire,
     getMergeQueue,
     getMergeQueuePromise,
     getDefaultKeyStates,

@@ -118,41 +118,6 @@ function init({
 }
 
 /**
- * Sync, cache-only read of an Onyx key. Returns the frozen collection object for
- * collection keys, the cached value for single keys, or `undefined` if the key isn't
- * in cache (no storage fallback).
- *
- * Use this for one-off reads outside React. Inside React, prefer `useOnyx`.
- */
-function getState<TKey extends OnyxKey>(key: TKey): OnyxValue<TKey> {
-    return onyxSubscriptionManager.getState(key);
-}
-
-/**
- * Defer initial-fire of `Onyx.connect` callbacks far enough that any Onyx writes
- * scheduled in the same synchronous tick have applied before the callback reads cache.
- *
- * FIXME: The legacy `subscribeToKey` chain (`deferredInitTask.then(getAllKeys).then(multiGet)
- * .then(sendDataToConnection)`) reached this depth incidentally via storage I/O. The
- * new store-based wrapper has no storage chain, so we have to introduce the depth
- * explicitly. The three nested `.then()`s match the legacy effective depth, enough
- * to outpace the longest in-flight write chain: `Onyx.update` -> `clearPromise.then`
- * -> per-item `Onyx.merge` -> `OnyxUtils.get(key).then(applyMerge)` is two hops to
- * apply, so the third hop guarantees initial-fire reads the post-write cache.
- *
- * Microtask depth (not `setTimeout(0)`) is required because Jest test bodies run
- * entirely in microtask land via chained `.then()`s; a macrotask-deferred initial
- * fire would not run until the chain returns to the event loop, which can be after
- * the test's assertions execute, leaving module-level Onyx subscribers stale.
- */
-function scheduleInitialFire(fn: () => void): void {
-    Promise.resolve()
-        .then(() => Promise.resolve())
-        .then(() => Promise.resolve())
-        .then(fn);
-}
-
-/**
  * Subscribe to changes for `key`.
  *
  * For a collection root key, the callback fires with the entire frozen collection
@@ -189,7 +154,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
             unsubscribeFn = onyxSubscriptionManager.subscribe(key, (value, k) => {
                 deliverCollection(value as unknown as OnyxValue<TKey>, k as TKey);
             });
-            scheduleInitialFire(() => {
+            OnyxUtils.scheduleInitialFire(() => {
                 if (!active) {
                     return;
                 }
@@ -210,7 +175,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
         unsubscribeFn = onyxSubscriptionManager.subscribe(key, (value, k) => {
             deliverValue(value, k as TKey);
         });
-        scheduleInitialFire(() => {
+        OnyxUtils.scheduleInitialFire(() => {
             if (!active) {
                 return;
             }
@@ -682,7 +647,6 @@ function setCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, coll
 
 const Onyx = {
     METHOD: OnyxUtils.METHOD,
-    getState,
     connect,
     connectWithoutView,
     disconnect,
