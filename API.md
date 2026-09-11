@@ -63,11 +63,10 @@ Any existing collection members not included in the new data will be removed.</p
 <code>Onyx.connectWithoutView()</code> when the value has to stay current.</p>
 <p>A single key resolves to the cached object itself rather than a copy, and is typed read-only because
 mutating it would be visible to every other reader of that key. A collection resolves to a frozen
-snapshot of its members, which cannot be mutated at all.</p>
-<p>A merge is batched and applied on a later tick, so a read issued before it resolves does not see the
-change and the merge has to be awaited first. A set or a multiSet writes the cache before it returns,
-once init has finished, so a read issued after one of them sees the new value even when its promise
-is not awaited.</p>
+snapshot of its members.</p>
+<p>merge() queues its changes for a later tick, so a read issued before the merge resolves will not see
+them. Await the merge first. set() and multiSet() reach the cache before returning, once init() has
+finished, so a read issued after them sees the new value without awaiting the write.</p>
 <p>A collection with no members resolves to <code>{}</code>. A collection read on an empty store resolves to
 <code>undefined</code>.</p>
 </dd>
@@ -278,12 +277,11 @@ Reads the current value of an Onyx key once, without subscribing. Use `useOnyx()
 
 A single key resolves to the cached object itself rather than a copy, and is typed read-only because
 mutating it would be visible to every other reader of that key. A collection resolves to a frozen
-snapshot of its members, which cannot be mutated at all.
+snapshot of its members.
 
-A merge is batched and applied on a later tick, so a read issued before it resolves does not see the
-change and the merge has to be awaited first. A set or a multiSet writes the cache before it returns,
-once init has finished, so a read issued after one of them sees the new value even when its promise
-is not awaited.
+merge() queues its changes for a later tick, so a read issued before the merge resolves will not see
+them. Await the merge first. set() and multiSet() reach the cache before returning, once init() has
+finished, so a read issued after them sees the new value without awaiting the write.
 
 A collection with no members resolves to `{}`. A collection read on an empty store resolves to
 `undefined`.

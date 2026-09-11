@@ -3431,7 +3431,7 @@ describe('Onyx', () => {
         it('should see an un-awaited set to the same key', async () => {
             await Onyx.set(ONYX_KEYS.TEST_KEY, {a: 1});
 
-            // set() reaches the cache before returning, so the read does not need the write awaited.
+            // set() reaches the cache before returning, so the read needs no await.
             const setPromise = Onyx.set(ONYX_KEYS.TEST_KEY, {a: 2});
             await expect(Onyx.get(ONYX_KEYS.TEST_KEY)).resolves.toEqual({a: 2});
 
