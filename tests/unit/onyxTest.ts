@@ -3238,6 +3238,222 @@ describe('Onyx', () => {
             expect(cache.get(ONYX_KEYS.RAM_ONLY_WITH_INITIAL_VALUE)).toEqual('default');
         });
     });
+
+    describe('get', () => {
+        it('should read a single key', async () => {
+            await Onyx.set(ONYX_KEYS.TEST_KEY, 'value');
+
+            await expect(Onyx.get(ONYX_KEYS.TEST_KEY)).resolves.toEqual('value');
+        });
+
+        it('should read a missing key as undefined', async () => {
+            await expect(Onyx.get(ONYX_KEYS.TEST_KEY)).resolves.toBeUndefined();
+        });
+
+        it('should resolve from cache without consulting storage when the value is already there', async () => {
+            await Onyx.set(ONYX_KEYS.TEST_KEY, {a: 1});
+
+            await StorageMock.removeItem(ONYX_KEYS.TEST_KEY);
+
+            await expect(Onyx.get(ONYX_KEYS.TEST_KEY)).resolves.toEqual({a: 1});
+        });
+
+        it('should resolve a collection from cache without consulting storage', async () => {
+            await Onyx.setCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {id: 1},
+            } as GenericCollection);
+
+            await StorageMock.removeItem(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`);
+
+            await expect(Onyx.get(ONYX_KEYS.COLLECTION.TEST_KEY)).resolves.toEqual({
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {id: 1},
+            });
+        });
+
+        it('should fall back to storage when the key is not in cache', async () => {
+            await Onyx.set(ONYX_KEYS.TEST_KEY, {a: 1});
+
+            cache.drop(ONYX_KEYS.TEST_KEY);
+            cache.clearNullishStorageKeys();
+            expect(cache.hasCacheForKey(ONYX_KEYS.TEST_KEY)).toBe(false);
+
+            await expect(Onyx.get(ONYX_KEYS.TEST_KEY)).resolves.toEqual({a: 1});
+        });
+
+        it('should read a whole collection assembled from its member keys', async () => {
+            await Onyx.setCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {id: 1},
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {id: 2},
+            } as GenericCollection);
+
+            await expect(Onyx.get(ONYX_KEYS.COLLECTION.TEST_KEY)).resolves.toEqual({
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {id: 1},
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {id: 2},
+            });
+        });
+
+        it('should fall back to storage for a collection the cache holds nothing for', async () => {
+            const memberKeys = [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`, `${ONYX_KEYS.COLLECTION.TEST_KEY}2`];
+            await Onyx.setCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                [memberKeys[0]]: {id: 1},
+                [memberKeys[1]]: {id: 2},
+            } as GenericCollection);
+
+            for (const memberKey of memberKeys) {
+                cache.drop(memberKey);
+            }
+            cache.clearNullishStorageKeys();
+            cache.setAllKeys([]);
+
+            await expect(Onyx.get(ONYX_KEYS.COLLECTION.TEST_KEY)).resolves.toEqual({
+                [memberKeys[0]]: {id: 1},
+                [memberKeys[1]]: {id: 2},
+            });
+        });
+
+        it('should fall back to storage for a collection member read by its own key', async () => {
+            const memberKey = `${ONYX_KEYS.COLLECTION.TEST_KEY}1`;
+            await Onyx.set(memberKey, {id: 1});
+
+            cache.drop(memberKey);
+            cache.clearNullishStorageKeys();
+
+            await expect(Onyx.get(memberKey)).resolves.toEqual({id: 1});
+        });
+
+        it('should warm the cache with what it fell back to storage for', async () => {
+            await Onyx.set(ONYX_KEYS.TEST_KEY, {a: 1});
+            cache.drop(ONYX_KEYS.TEST_KEY);
+            cache.clearNullishStorageKeys();
+
+            await expect(Onyx.get(ONYX_KEYS.TEST_KEY)).resolves.toEqual({a: 1});
+
+            await StorageMock.removeItem(ONYX_KEYS.TEST_KEY);
+            await expect(Onyx.get(ONYX_KEYS.TEST_KEY)).resolves.toEqual({a: 1});
+        });
+
+        it('should not read stale storage data for a RAM-only key', async () => {
+            await StorageMock.setItem(ONYX_KEYS.RAM_ONLY_TEST_KEY, {stale: true});
+            cache.drop(ONYX_KEYS.RAM_ONLY_TEST_KEY);
+            cache.clearNullishStorageKeys();
+
+            await expect(Onyx.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).resolves.toBeUndefined();
+        });
+
+        it('should not read stale storage data for a member of a RAM-only collection', async () => {
+            const memberKey = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
+            await StorageMock.setItem(memberKey, {stale: true});
+            cache.drop(memberKey);
+            cache.clearNullishStorageKeys();
+
+            await expect(Onyx.get(memberKey)).resolves.toBeUndefined();
+
+            await expect(Onyx.get(ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION)).resolves.toEqual({});
+        });
+
+        it('should read a collection with no members as an empty object once the store holds data', async () => {
+            await Onyx.set(ONYX_KEYS.TEST_KEY, 'value');
+
+            // One key loaded means hydration ran, so "no members" is empty rather than unloaded.
+            await expect(Onyx.get(ONYX_KEYS.COLLECTION.ANIMALS)).resolves.toEqual({});
+        });
+
+        it('should return the same value useOnyx would read for the same key', async () => {
+            await Onyx.setCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {id: 1},
+            } as GenericCollection);
+
+            let fromSubscription: unknown;
+            connection = Onyx.connectWithoutView({
+                key: ONYX_KEYS.COLLECTION.TEST_KEY,
+                callback: (value) => {
+                    fromSubscription = value;
+                },
+            });
+            await waitForPromisesToResolve();
+
+            expect(await Onyx.get(ONYX_KEYS.COLLECTION.TEST_KEY)).toEqual(fromSubscription);
+        });
+
+        it('should agree with a subscription on a key the cache no longer holds', async () => {
+            await Onyx.set(ONYX_KEYS.TEST_KEY, {a: 1});
+            const allKeys = [...cache.getAllKeys()];
+
+            // Keep the key index: it is what tells a subscriber the key exists.
+            const evict = () => {
+                cache.drop(ONYX_KEYS.TEST_KEY);
+                cache.clearNullishStorageKeys();
+                cache.setAllKeys(allKeys);
+            };
+
+            evict();
+            const fromGet = await Onyx.get(ONYX_KEYS.TEST_KEY);
+
+            evict();
+            let fromSubscription: unknown;
+            connection = Onyx.connectWithoutView({
+                key: ONYX_KEYS.TEST_KEY,
+                callback: (value) => {
+                    fromSubscription = value;
+                },
+            });
+            await waitForPromisesToResolve();
+
+            expect(fromGet).toEqual({a: 1});
+            expect(fromGet).toEqual(fromSubscription);
+        });
+
+        it('should not subscribe to the key it reads', async () => {
+            await Onyx.set(ONYX_KEYS.TEST_KEY, 'first');
+            await Onyx.get(ONYX_KEYS.TEST_KEY);
+
+            const sendDataToConnectionSpy = jest.spyOn(OnyxUtils, 'sendDataToConnection');
+            await Onyx.set(ONYX_KEYS.TEST_KEY, 'second');
+
+            expect(sendDataToConnectionSpy).not.toHaveBeenCalled();
+            await expect(Onyx.get(ONYX_KEYS.TEST_KEY)).resolves.toEqual('second');
+
+            sendDataToConnectionSpy.mockRestore();
+        });
+
+        it('should not see an un-awaited merge to the same key', async () => {
+            await Onyx.set(ONYX_KEYS.TEST_KEY, {a: 1});
+
+            // merge() batches past the microtask an await yields, so awaiting the read does not fix
+            // read-after-write. Await the write, or read first.
+            const mergePromise = Onyx.merge(ONYX_KEYS.TEST_KEY, {b: 2});
+            await expect(Onyx.get(ONYX_KEYS.TEST_KEY)).resolves.toEqual({a: 1});
+
+            await mergePromise;
+            await expect(Onyx.get(ONYX_KEYS.TEST_KEY)).resolves.toEqual({a: 1, b: 2});
+        });
+
+        it('should see an awaited set to the same key', async () => {
+            await Onyx.set(ONYX_KEYS.TEST_KEY, {a: 1});
+
+            await expect(Onyx.get(ONYX_KEYS.TEST_KEY)).resolves.toEqual({a: 1});
+        });
+
+        it('should resolve a single key to the live cached object, not a copy', async () => {
+            await Onyx.set(ONYX_KEYS.TEST_KEY, {a: 1});
+
+            const value = await Onyx.get(ONYX_KEYS.TEST_KEY);
+
+            // Pinned so adding a defensive copy has to be a deliberate change.
+            expect(value).toBe(cache.get(ONYX_KEYS.TEST_KEY));
+        });
+
+        it('should resolve a collection to a frozen object', async () => {
+            await Onyx.setCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {id: 1},
+            } as GenericCollection);
+
+            const collection = await Onyx.get(ONYX_KEYS.COLLECTION.TEST_KEY);
+
+            // A collection is shared and frozen, so the same mutation throws.
+            expect(Object.isFrozen(collection)).toBe(true);
+        });
+    });
 });
 
 // Separate describe block for Onyx.init to control initialization during each test.
@@ -3341,6 +3557,64 @@ describe('Onyx.init', () => {
             await act(async () => waitForPromisesToResolve());
 
             expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toEqual('test_1');
+        });
+
+        // Pre-init state is asserted after init: asserting before it leaves the shared afterEach on an
+        // Onyx.clear() that never resolves, turning any failure into a 60s timeout.
+        it('get waits for initialization and then resolves with the hydrated value', async () => {
+            await StorageMock.setItem(ONYX_KEYS.TEST_KEY, 'from-storage');
+
+            let resolvedValue: unknown = 'not-resolved';
+            Onyx.get(ONYX_KEYS.TEST_KEY).then((value) => {
+                resolvedValue = value;
+            });
+            await act(async () => waitForPromisesToResolve());
+            const valueBeforeInit = resolvedValue;
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(valueBeforeInit).toBe('not-resolved');
+            expect(resolvedValue).toBe('from-storage');
+        });
+
+        it('get resolves undefined after initialization when the key has no value', async () => {
+            let resolvedValue: unknown = 'not-resolved';
+            Onyx.get(ONYX_KEYS.TEST_KEY).then((value) => {
+                resolvedValue = value;
+            });
+            await act(async () => waitForPromisesToResolve());
+            const valueBeforeInit = resolvedValue;
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(valueBeforeInit).toBe('not-resolved');
+            expect(resolvedValue).toBeUndefined();
+        });
+
+        it('get resolves a collection as undefined on a completely empty store', async () => {
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            await expect(Onyx.get(ONYX_KEYS.COLLECTION.TEST_KEY)).resolves.toBeUndefined();
+        });
+
+        it('get waits for initialization before resolving a collection', async () => {
+            await StorageMock.setItem(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`, {id: 1});
+
+            let resolvedValue: unknown = 'not-resolved';
+            Onyx.get(ONYX_KEYS.COLLECTION.TEST_KEY).then((value) => {
+                resolvedValue = value;
+            });
+            await act(async () => waitForPromisesToResolve());
+            const valueBeforeInit = resolvedValue;
+
+            Onyx.init({keys: ONYX_KEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            expect(valueBeforeInit).toBe('not-resolved');
+            expect(resolvedValue).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {id: 1}});
         });
     });
 });
