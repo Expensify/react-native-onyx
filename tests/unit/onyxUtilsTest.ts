@@ -371,10 +371,9 @@ describe('OnyxUtils', () => {
             Onyx.disconnect(conn2);
         });
 
-        it('should stop firing callbacks for a collection subscriber that disconnects itself mid-batch', async () => {
-            // A collection subscriber disconnects itself when
-            // it receives the first member. Subsequent changed members in the same batch must not
-            // trigger further callbacks for this subscriber.
+        it('should not fire again for a collection subscriber that disconnects itself in its callback', async () => {
+            // A collection-root subscriber disconnects itself when it receives a
+            // collection object. A subsequent collection change must NOT trigger another callback.
             const callback = jest.fn();
             const connection = Onyx.connect({
                 key: ONYXKEYS.COLLECTION.TEST_KEY,
@@ -386,13 +385,18 @@ describe('OnyxUtils', () => {
                 Onyx.disconnect(connection);
             });
 
+            // First batch fires the collection callback once, which disconnects the subscriber.
             await Onyx.multiSet({
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}1`]: {id: 1},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}2`]: {id: 2},
                 [`${ONYXKEYS.COLLECTION.TEST_KEY}3`]: {id: 3},
             });
 
-            // Despite 3 changed members, callback should fire at most once before disconnect stops it
+            expect(callback).toHaveBeenCalledTimes(1);
+
+            // A subsequent change must not fire the now-disconnected subscriber again.
+            await Onyx.merge(`${ONYXKEYS.COLLECTION.TEST_KEY}1`, {id: 11});
+
             expect(callback).toHaveBeenCalledTimes(1);
         });
 

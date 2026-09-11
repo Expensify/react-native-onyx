@@ -64,7 +64,8 @@ function init({
             const collectionBatches = new Map<string, {partial: NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>>; previous: NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>>}>();
 
             for (const [key, value] of pairs) {
-                // RAM-only keys never sync from storage; any persisted data for them is stale.
+                // RAM-only keys should never sync from storage as they may have stale persisted data
+                // from before the key was migrated to RAM-only.
                 if (OnyxKeys.isRamOnlyKey(key)) {
                     continue;
                 }
@@ -119,6 +120,7 @@ function init({
 
 /**
  * Connects to an Onyx key given the options passed and listens to its changes.
+ * This method will be deprecated soon. Please use `Onyx.connectWithoutView()` instead.
  *
  * @example
  * ```ts
@@ -133,8 +135,6 @@ function init({
  * For any other key, the callback fires with the value at that key; signature
  * `(value, key)`. Initial fire is deferred via `scheduleInitialFire` so it reads
  * cache after any same-tick writes have applied.
- *
- * This method will be deprecated soon. Please use `Onyx.connectWithoutView()` instead.
  *
  * @param connectOptions The options object that will define the behavior of the connection.
  * @param connectOptions.key The Onyx key to subscribe to.

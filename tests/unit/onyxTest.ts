@@ -920,7 +920,7 @@ describe('Onyx', () => {
                 return waitForPromisesToResolve();
             })
             .then(() => {
-                // Collection mode: multiSet fires the collection callback per write.
+                // The collection callback receives the whole collection object.
                 expect(mockCallback).toHaveBeenLastCalledWith({test_1: {existingData: 'test'}, test_2: {existingData: 'test'}}, ONYX_KEYS.COLLECTION.TEST_KEY);
                 mockCallback.mockReset();
 
@@ -949,7 +949,8 @@ describe('Onyx', () => {
             .then(() => {
                 // mergeCollection fires the collection object once with all 3 merged members.
                 expect(mockCallback).toHaveBeenCalledTimes(1);
-                expect(mockCallback).toHaveBeenCalledWith(
+                expect(mockCallback).toHaveBeenNthCalledWith(
+                    1,
                     {
                         test_1: {ID: 123, value: 'one', existingData: 'test'},
                         test_2: {ID: 234, value: 'two', existingData: 'test'},
@@ -1118,7 +1119,7 @@ describe('Onyx', () => {
                     // Then we expect the callback to have called twice, once for the initial connect call + once for the collection update
                     expect(mockCallback).toHaveBeenCalledTimes(2);
 
-                    // Initial fire delivers `{}` for a known-but-empty collection.
+                    // AND the value for the second call should be collectionUpdate
                     expect(mockCallback).toHaveBeenNthCalledWith(1, {}, ONYX_KEYS.COLLECTION.TEST_POLICY);
                     expect(mockCallback).toHaveBeenNthCalledWith(2, collectionUpdate, ONYX_KEYS.COLLECTION.TEST_POLICY);
                 })
@@ -1665,8 +1666,8 @@ describe('Onyx', () => {
                     },
                 },
             ]).then(() => {
-                // Initial fire is deferred past in-flight writes via `scheduleInitialFire`,
-                // so it reads the post-update collection.
+                // The deferred initial fire reads the post-update collection and dedups against the
+                // write-driven fire, so the subscriber receives the merged collection exactly once.
                 expect(routesCollectionCallback).toHaveBeenCalledTimes(1);
                 expect(routesCollectionCallback).toHaveBeenNthCalledWith(
                     1,
@@ -1752,6 +1753,13 @@ describe('Onyx', () => {
 
                 expect(otherTestCallback).toHaveBeenNthCalledWith(1, {food: 'pizza', drink: 'water'}, ONYX_KEYS.OTHER_TEST);
 
+                expect(animalsCollectionCallback).toHaveBeenNthCalledWith(
+                    1,
+                    {
+                        [cat]: {age: 3, sound: 'meow'},
+                    },
+                    ONYX_KEYS.COLLECTION.ANIMALS,
+                );
                 expect(animalsCollectionCallback).toHaveBeenNthCalledWith(
                     2,
                     {

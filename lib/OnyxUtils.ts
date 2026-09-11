@@ -96,14 +96,6 @@ const deferredInitTask = createDeferredTask();
 const NOT_DELIVERED = Symbol('NOT_DELIVERED');
 
 /**
- * Sync, cache-only read of an Onyx key. Returns the frozen collection object for
- * collection keys, the cached value for single keys, or `undefined` if the key isn't in cache.
- */
-function getState<TKey extends OnyxKey>(key: TKey): OnyxValue<TKey> {
-    return onyxSubscriptionManager.getState(key);
-}
-
-/**
  * Registers an in-flight write so `scheduleInitialFire` can wait for it. Returns the same
  * promise so callers can wrap a write's return value inline. The write is removed from the
  * pending set once it settles (success or failure).
@@ -1646,7 +1638,6 @@ function clearOnyxUtilsInternals() {
 const OnyxUtils = {
     METHOD,
     NOT_DELIVERED,
-    getState,
     scheduleInitialFire,
     trackPendingWrite,
     whenWritesSettled,
