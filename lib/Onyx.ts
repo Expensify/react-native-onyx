@@ -618,8 +618,12 @@ function setCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, coll
  *
  * A single key resolves to the cached object itself rather than a copy, and is typed read-only because
  * mutating it would be visible to every other reader of that key. A collection resolves to a frozen
- * snapshot of its members. A write still queued when `get()` is called is not visible to it, so await
- * the write before reading.
+ * snapshot of its members, which cannot be mutated at all.
+ *
+ * A merge is batched and applied on a later tick, so a read issued before it resolves does not see the
+ * change and the merge has to be awaited first. A set or a multiSet writes the cache before it returns,
+ * once init has finished, so a read issued after one of them sees the new value even when its promise
+ * is not awaited.
  *
  * A collection with no members resolves to `{}`. A collection read on an empty store resolves to
  * `undefined`.

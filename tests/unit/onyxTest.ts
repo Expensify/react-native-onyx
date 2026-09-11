@@ -3428,6 +3428,43 @@ describe('Onyx', () => {
             await expect(Onyx.get(ONYX_KEYS.TEST_KEY)).resolves.toEqual({a: 1, b: 2});
         });
 
+        it('should see an un-awaited set to the same key', async () => {
+            await Onyx.set(ONYX_KEYS.TEST_KEY, {a: 1});
+
+            // set() reaches the cache before returning, so the read does not need the write awaited.
+            const setPromise = Onyx.set(ONYX_KEYS.TEST_KEY, {a: 2});
+            await expect(Onyx.get(ONYX_KEYS.TEST_KEY)).resolves.toEqual({a: 2});
+
+            await setPromise;
+        });
+
+        it('should see an un-awaited multiSet', async () => {
+            await Onyx.set(ONYX_KEYS.TEST_KEY, {a: 1});
+
+            const multiSetPromise = Onyx.multiSet({[ONYX_KEYS.TEST_KEY]: {a: 3}});
+            await expect(Onyx.get(ONYX_KEYS.TEST_KEY)).resolves.toEqual({a: 3});
+
+            await multiSetPromise;
+        });
+
+        it('should not see an un-awaited mergeCollection', async () => {
+            await Onyx.setCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {id: 1},
+            } as GenericCollection);
+
+            const mergeCollectionPromise = Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {id: 2},
+            } as GenericCollection);
+            await expect(Onyx.get(ONYX_KEYS.COLLECTION.TEST_KEY)).resolves.toEqual({
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {id: 1},
+            });
+
+            await mergeCollectionPromise;
+            await expect(Onyx.get(ONYX_KEYS.COLLECTION.TEST_KEY)).resolves.toEqual({
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {id: 2},
+            });
+        });
+
         it('should see an awaited set to the same key', async () => {
             await Onyx.set(ONYX_KEYS.TEST_KEY, {a: 1});
 
