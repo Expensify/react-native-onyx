@@ -222,24 +222,12 @@ type CollectionConnectCallback<TKey extends OnyxKey> = (value: NonUndefined<Onyx
  * with the entire collection object whenever any member changes (signature
  * `(collection, key)`). For any other key, the callback fires with the value at
  * that key (signature `(value, key)`).
- *
- * Collection-root subscriptions always deliver the frozen collection object. Per-member
- * dispatch is not supported; consumers that need per-member processing subscribe to the
- * collection and diff against the previous value (structural sharing makes the per-member
- * ref-check O(1)).
  */
 type ConnectOptions<TKey extends OnyxKey> = {
     /** The Onyx key to subscribe to. */
     key: TKey;
 
-    /**
-     * A function that will be called when the Onyx data we are subscribed changes.
-     *
-     * The value is a conditional parameter (collection object vs. entry) inside a single
-     * function type, not a union of two distinct callback types, so that callers using a
-     * generic or union `TKey` still get an assignable, non-`any` callback. Collection objects stay
-     * `NonUndefined`.
-     */
+    /** A function that will be called when the Onyx data we are subscribed changes. */
     callback?: (value: TKey extends CollectionKeyBase ? NonUndefined<OnyxCollection<KeyValueMapping[TKey]>> : OnyxEntry<KeyValueMapping[TKey]>, key: TKey) => void;
 };
 
@@ -418,7 +406,7 @@ type MixedOperationsQueue = {
 };
 
 /**
- * Represents a connection to an Onyx key, returned by `Onyx.connect()`.
+ * Represents a connection to an Onyx key, returned by `Onyx.connect()`/`Onyx.connectWithoutView()`.
  * Pass it to `Onyx.disconnect()` to stop receiving callbacks for this subscription.
  */
 type Connection = {

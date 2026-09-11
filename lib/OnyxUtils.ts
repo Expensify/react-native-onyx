@@ -97,8 +97,7 @@ const NOT_DELIVERED = Symbol('NOT_DELIVERED');
 
 /**
  * Sync, cache-only read of an Onyx key. Returns the frozen collection object for
- * collection keys, the cached value for single keys, or `undefined` if the key isn't
- * in cache (no storage fallback).
+ * collection keys, the cached value for single keys, or `undefined` if the key isn't in cache.
  */
 function getState<TKey extends OnyxKey>(key: TKey): OnyxValue<TKey> {
     return onyxSubscriptionManager.getState(key);
@@ -544,8 +543,7 @@ function getCachedCollection<TKey extends CollectionKeyBase>(collectionKey: TKey
 
 /**
  * Notify subscribers of a single-key write. Wrapper over `onyxSubscriptionManager.notifyKey()`
- * that also performs LRU bookkeeping for eviction. Write paths call this instead
- * of touching the subscriber registry directly.
+ * that also performs LRU bookkeeping for eviction.
  */
 function notifyKey<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>): void {
     if (value !== null && value !== undefined) {

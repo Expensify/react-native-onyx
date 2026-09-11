@@ -34,9 +34,6 @@ type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata];
  * Subscribes a component to an Onyx key, re-rendering when the value changes (for a collection key,
  * when any member changes; the value is the frozen collection object). Returns `[value, {status}]`,
  * `status` `loading` only on the first connection while a merge is in flight and nothing is cached yet.
- *
- * Selection is delegated to `useSyncExternalStoreWithSelector`, whose dedup survives the selector's
- * identity changing every render, so consumers can pass inline selectors without stabilizing them.
  */
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey, options?: UseOnyxOptions<TKey, TReturnValue>): UseOnyxResult<TReturnValue> {
     const selector = options?.selector;
@@ -58,8 +55,6 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
     const isCached = useSyncExternalStore(subscribe, () => cache.hasCacheForKey(key));
 
     // Loading only on a key's first render when a merge is in flight and nothing is cached yet.
-    // A cached key stays loaded, so an optimistic merge never blanks shown data and a no-op merge can't leave it stuck.
-    // connectedKeyRef limits this to the first render.
     // eslint-disable-next-line react-hooks/refs
     const isLoading = connectedKeyRef.current !== key && !isCached && OnyxUtils.hasPendingMergeForKey(key);
     const loadingStatus: FetchStatus = isLoading ? 'loading' : 'loaded';

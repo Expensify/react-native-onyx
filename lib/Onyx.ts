@@ -118,7 +118,15 @@ function init({
 }
 
 /**
- * Subscribe to changes for `key`.
+ * Connects to an Onyx key given the options passed and listens to its changes.
+ *
+ * @example
+ * ```ts
+ * const connection = Onyx.connect({
+ *     key: ONYXKEYS.SESSION,
+ *     callback: onSessionChange,
+ * });
+ * ```
  *
  * For a collection root key, the callback fires with the entire frozen collection
  * object whenever any member changes; signature `(collection, collectionKey)`.
@@ -126,7 +134,12 @@ function init({
  * `(value, key)`. Initial fire is deferred via `scheduleInitialFire` so it reads
  * cache after any same-tick writes have applied.
  *
- * Returns synchronously with a `Connection` handle. Disconnecting is idempotent.
+ * This method will be deprecated soon. Please use `Onyx.connectWithoutView()` instead.
+ *
+ * @param connectOptions The options object that will define the behavior of the connection.
+ * @param connectOptions.key The Onyx key to subscribe to.
+ * @param connectOptions.callback A function that will be called when the Onyx data we are subscribed changes.
+ * @returns The `Connection` handle to use when calling `Onyx.disconnect()`.
  */
 function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Connection {
     const {key, callback} = connectOptions;
@@ -203,14 +216,45 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
 }
 
 /**
- * Alias of `connect()` for call-site naming consistency.
+ * Connects to an Onyx key given the options passed and listens to its changes.
+ *
+ * @example
+ * ```ts
+ * const connection = Onyx.connectWithoutView({
+ *     key: ONYXKEYS.SESSION,
+ *     callback: onSessionChange,
+ * });
+ * ```
+ *
+ * For a collection root key, the callback fires with the entire frozen collection
+ * object whenever any member changes; signature `(collection, collectionKey)`.
+ * For any other key, the callback fires with the value at that key; signature
+ * `(value, key)`. Initial fire is deferred via `scheduleInitialFire` so it reads
+ * cache after any same-tick writes have applied.
+ *
+ * @param connectOptions The options object that will define the behavior of the connection.
+ * @param connectOptions.key The Onyx key to subscribe to.
+ * @param connectOptions.callback A function that will be called when the Onyx data we are subscribed changes.
+ * @returns The `Connection` handle to use when calling `Onyx.disconnect()`.
  */
 function connectWithoutView<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Connection {
     return connect(connectOptions);
 }
 
 /**
- * Disconnects a subscription previously returned by `connect()` / `connectWithoutView()`.
+ * Disconnects and removes the listener from the Onyx key.
+ *
+ * @example
+ * ```ts
+ * const connection = Onyx.connectWithoutView({
+ *     key: ONYXKEYS.SESSION,
+ *     callback: onSessionChange,
+ * });
+ *
+ * Onyx.disconnect(connection);
+ * ```
+ *
+ * @param connection Connection object returned by calling `Onyx.connect()` or `Onyx.connectWithoutView()`.
  */
 function disconnect(connection: Connection): void {
     if (!connection) {
