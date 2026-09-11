@@ -71,6 +71,12 @@ type PreparedKeyValuePairs = {
 let mergeQueue: Record<OnyxKey, Array<OnyxValue<OnyxKey>>> = {};
 let mergeQueuePromise: Record<OnyxKey, Promise<void>> = {};
 
+// In-flight write operations (set/merge/mergeCollection/setCollection/multiSet/update/clear).
+// A write is added when it starts and removed when its promise settles. `scheduleInitialFire`
+// drains this set so a newly connected subscriber's initial fire reads cache only after every
+// write issued in the connect tick has applied and notified.
+const pendingWrites = new Set<Promise<unknown>>();
+
 // Optional user-provided key value states set when Onyx initializes or clears
 let defaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
 
@@ -99,27 +105,36 @@ function getState<TKey extends OnyxKey>(key: TKey): OnyxValue<TKey> {
 }
 
 /**
- * Defer initial-fire of `Onyx.connect` callbacks far enough that any Onyx writes
- * scheduled in the same synchronous tick have applied before the callback reads cache.
- *
- * FIXME: The legacy `subscribeToKey` chain (`deferredInitTask.then(getAllKeys).then(multiGet)
- * .then(sendDataToConnection)`) reached this depth incidentally via storage I/O. The
- * new store-based wrapper has no storage chain, so we have to introduce the depth
- * explicitly. The three nested `.then()`s match the legacy effective depth, enough
- * to outpace the longest in-flight write chain: `Onyx.update` -> `clearPromise.then`
- * -> per-item `Onyx.merge` -> `OnyxUtils.get(key).then(applyMerge)` is two hops to
- * apply, so the third hop guarantees initial-fire reads the post-write cache.
- *
- * Microtask depth (not `setTimeout(0)`) is required because Jest test bodies run
- * entirely in microtask land via chained `.then()`s; a macrotask-deferred initial
- * fire would not run until the chain returns to the event loop, which can be after
- * the test's assertions execute, leaving module-level Onyx subscribers stale.
+ * Registers an in-flight write so `scheduleInitialFire` can wait for it. Returns the same
+ * promise so callers can wrap a write's return value inline. The write is removed from the
+ * pending set once it settles (success or failure).
+ */
+function trackPendingWrite<T>(promise: Promise<T>): Promise<T> {
+    pendingWrites.add(promise);
+    const deregister = () => pendingWrites.delete(promise);
+    promise.then(deregister, deregister);
+    return promise;
+}
+
+/**
+ * Resolves once no write operations are in flight. Re-checks after each drain because a
+ * settling write can apply cache changes that spawn further writes (e.g. `Onyx.update`
+ * fans out into per-item merges), and those must be awaited too. Write failures are
+ * swallowed here: this only cares that writes have settled, not that they succeeded.
+ */
+function whenWritesSettled(): Promise<void> {
+    if (pendingWrites.size === 0) {
+        return Promise.resolve();
+    }
+    return Promise.all([...pendingWrites].map((promise) => promise.catch(() => undefined))).then(whenWritesSettled);
+}
+
+/**
+ * Defer a `Onyx.connect` callback's initial fire until writes issued in the same tick have
+ * applied, so it reads post-write cache.
  */
 function scheduleInitialFire(fn: () => void): void {
-    Promise.resolve()
-        .then(() => Promise.resolve())
-        .then(() => Promise.resolve())
-        .then(fn);
+    Promise.resolve().then(whenWritesSettled).then(fn);
 }
 
 // Collection member IDs that Onyx should silently ignore across all operations — reads, writes, cache, and subscriber
@@ -1627,6 +1642,7 @@ function logKeyRemoved(onyxMethod: Extract<OnyxMethod, 'set' | 'merge'>, key: On
 function clearOnyxUtilsInternals() {
     mergeQueue = {};
     mergeQueuePromise = {};
+    pendingWrites.clear();
 }
 
 const OnyxUtils = {
@@ -1634,6 +1650,8 @@ const OnyxUtils = {
     NOT_DELIVERED,
     getState,
     scheduleInitialFire,
+    trackPendingWrite,
+    whenWritesSettled,
     getMergeQueue,
     getMergeQueuePromise,
     getDefaultKeyStates,
