@@ -3419,8 +3419,8 @@ describe('Onyx', () => {
         it('should not see an un-awaited merge to the same key', async () => {
             await Onyx.set(ONYX_KEYS.TEST_KEY, {a: 1});
 
-            // merge() batches past the microtask an await yields, so awaiting the read does not fix
-            // read-after-write. Await the write, or read first.
+            // The merge is applied on a later tick than the read resolves, so awaiting the read does not
+            // make the write visible. Await the write first.
             const mergePromise = Onyx.merge(ONYX_KEYS.TEST_KEY, {b: 2});
             await expect(Onyx.get(ONYX_KEYS.TEST_KEY)).resolves.toEqual({a: 1});
 
@@ -3439,7 +3439,7 @@ describe('Onyx', () => {
 
             const value = await Onyx.get(ONYX_KEYS.TEST_KEY);
 
-            // Pinned so adding a defensive copy has to be a deliberate change.
+            // toBe rather than toEqual, so a defensive copy would fail this.
             expect(value).toBe(cache.get(ONYX_KEYS.TEST_KEY));
         });
 
@@ -3450,7 +3450,6 @@ describe('Onyx', () => {
 
             const collection = await Onyx.get(ONYX_KEYS.COLLECTION.TEST_KEY);
 
-            // A collection is shared and frozen, so the same mutation throws.
             expect(Object.isFrozen(collection)).toBe(true);
         });
     });
@@ -3561,7 +3560,7 @@ describe('Onyx.init', () => {
 
         // Pre-init state is asserted after init: asserting before it leaves the shared afterEach on an
         // Onyx.clear() that never resolves, turning any failure into a 60s timeout.
-        it('get waits for initialization and then resolves with the hydrated value', async () => {
+        it('get', async () => {
             await StorageMock.setItem(ONYX_KEYS.TEST_KEY, 'from-storage');
 
             let resolvedValue: unknown = 'not-resolved';
@@ -3578,7 +3577,7 @@ describe('Onyx.init', () => {
             expect(resolvedValue).toBe('from-storage');
         });
 
-        it('get resolves undefined after initialization when the key has no value', async () => {
+        it('get missing key', async () => {
             let resolvedValue: unknown = 'not-resolved';
             Onyx.get(ONYX_KEYS.TEST_KEY).then((value) => {
                 resolvedValue = value;
@@ -3593,14 +3592,14 @@ describe('Onyx.init', () => {
             expect(resolvedValue).toBeUndefined();
         });
 
-        it('get resolves a collection as undefined on a completely empty store', async () => {
+        it('get collection on empty store', async () => {
             Onyx.init({keys: ONYX_KEYS});
             await act(async () => waitForPromisesToResolve());
 
             await expect(Onyx.get(ONYX_KEYS.COLLECTION.TEST_KEY)).resolves.toBeUndefined();
         });
 
-        it('get waits for initialization before resolving a collection', async () => {
+        it('get collection', async () => {
             await StorageMock.setItem(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`, {id: 1});
 
             let resolvedValue: unknown = 'not-resolved';

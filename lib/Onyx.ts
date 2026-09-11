@@ -1,3 +1,4 @@
+import type {ReadonlyDeep} from 'type-fest';
 import * as Logger from './Logger';
 import cache, {TASK} from './OnyxCache';
 import Storage from './storage';
@@ -615,9 +616,10 @@ function setCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, coll
  * Reads the current value of an Onyx key once, without subscribing. Use `useOnyx()` or
  * `Onyx.connectWithoutView()` when the value has to stay current.
  *
- * The result is the cached object itself, not a copy, and is typed mutable, like `useOnyx()`. Treat it
- * as read-only: mutations are visible to every other reader of that key. A write still queued when
- * `get()` is called is not visible to it, so await the write before reading.
+ * A single key resolves to the cached object itself rather than a copy, and is typed read-only because
+ * mutating it would be visible to every other reader of that key. A collection resolves to a frozen
+ * snapshot of its members. A write still queued when `get()` is called is not visible to it, so await
+ * the write before reading.
  *
  * A collection with no members resolves to `{}`. A collection read on an empty store resolves to
  * `undefined`.
@@ -629,21 +631,21 @@ function setCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, coll
  * @param key ONYXKEY to read, either a collection key or a single key
  * @returns The current value, or `undefined` if the key has none.
  */
-function get<TKey extends OnyxKey>(key: TKey): Promise<OnyxValue<TKey>> {
+function get<TKey extends OnyxKey>(key: TKey): Promise<ReadonlyDeep<OnyxValue<TKey>>> {
     return OnyxUtils.afterInit(() => {
         if (OnyxKeys.isCollectionKey(key)) {
             const cachedCollection = OnyxUtils.tryGetCachedValue(key);
 
             if (cachedCollection) {
-                return Promise.resolve(cachedCollection as OnyxValue<TKey>);
+                return Promise.resolve(cachedCollection as ReadonlyDeep<OnyxValue<TKey>>);
             }
 
             return OnyxUtils.getAllKeys()
                 .then((allKeys) => OnyxUtils.multiGet([...allKeys].filter((memberKey) => OnyxKeys.isCollectionMemberKey(key, memberKey))))
-                .then(() => OnyxUtils.tryGetCachedValue(key) as OnyxValue<TKey>);
+                .then(() => OnyxUtils.tryGetCachedValue(key) as ReadonlyDeep<OnyxValue<TKey>>);
         }
 
-        return OnyxUtils.get(key).then((value) => (value ?? undefined) as OnyxValue<TKey>);
+        return OnyxUtils.get(key).then((value) => (value ?? undefined) as ReadonlyDeep<OnyxValue<TKey>>);
     });
 }
 
