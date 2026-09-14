@@ -851,7 +851,9 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(
     // UNAVAILABLE: there is no storage engine in this environment. The storage layer has already swapped
     // in the in-memory provider, so the write's data is not lost.
     if (errorClass === StorageErrorClass.UNAVAILABLE) {
-        Logger.logInfo(`Storage operation skipped retry; the storage engine is unavailable and the storage layer has degraded to memory-only. Error: ${error}. onyxMethod: ${onyxMethod.name}.`);
+        Logger.logInfo(
+            `Storage operation skipped retry; the storage engine is unavailable and the storage layer has degraded to memory-only. Error: ${error}. onyxMethod: ${onyxMethod.name}.`,
+        );
         return Promise.resolve();
     }
 
