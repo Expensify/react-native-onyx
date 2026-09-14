@@ -796,6 +796,8 @@ function reportStorageQuota(error?: Error): Promise<void> {
  * - DISK_PRESSURE: the device disk itself is full (or the database files are unreadable), so neither
  *   retries nor in-DB eviction can free space — the write is dropped (cache stays authoritative) with
  *   a single throttled alert + quota snapshot per burst.
+ * - UNAVAILABLE: the storage engine does not exist in this environment, so the storage layer has
+ *   already degraded to the in-memory provider. No retry.
  * - UNKNOWN: the provider couldn't classify it — log the full error shape (name + message +
  *   provider) once so it's visible, then bounded retry without eviction.
  */
@@ -843,6 +845,13 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(
 
     if (errorClass === StorageErrorClass.TRANSIENT || errorClass === StorageErrorClass.FATAL) {
         Logger.logInfo(`Storage operation skipped retry; ${errorClass} errors are handled by the connection layer. Error: ${error}. onyxMethod: ${onyxMethod.name}.`);
+        return Promise.resolve();
+    }
+
+    // UNAVAILABLE: there is no storage engine in this environment. The storage layer has already swapped
+    // in the in-memory provider, so the write's data is not lost.
+    if (errorClass === StorageErrorClass.UNAVAILABLE) {
+        Logger.logInfo(`Storage operation skipped retry; the storage engine is unavailable and the storage layer has degraded to memory-only. Error: ${error}. onyxMethod: ${onyxMethod.name}.`);
         return Promise.resolve();
     }
 

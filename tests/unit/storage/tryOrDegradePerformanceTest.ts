@@ -1,5 +1,6 @@
 import type * as LoggerModule from '../../../lib/Logger';
 import type storageModule from '../../../lib/storage';
+import {StorageErrorClass} from '../../../lib/storage/errors';
 
 // `jestSetup.js` globally mocks `lib/storage`; this suite tests the real implementation.
 jest.unmock('../../../lib/storage');
@@ -85,6 +86,42 @@ describe('storage/tryOrDegradePerformance', () => {
         const degradeLog = capturedLogs.find((log) => log.level === 'hmmm' && log.message.includes('Falling back to only using cache'));
         expect(degradeLog?.message).toContain('Cause: underlying disk is full');
         expect(degradeLog?.message).not.toContain('[object Object]');
+    });
+
+    it('should fall back to MemoryOnlyProvider when the active provider classifies the error as UNAVAILABLE', async () => {
+        const {storage, Logger} = loadIsolatedStorage();
+        const capturedLogs: CapturedLog[] = [];
+        Logger.registerLogger((data: LogData) => capturedLogs.push({level: data.level, message: data.message}));
+
+        storage.init();
+
+        const originalProvider = storage.getStorageProvider();
+        const targetError = new ReferenceError("Can't find variable: indexedDB");
+        originalProvider.classifyError = jest.fn().mockReturnValue(StorageErrorClass.UNAVAILABLE);
+        originalProvider.getAllKeys = jest.fn().mockReturnValue(Promise.reject(targetError));
+
+        await expect(storage.getAllKeys()).rejects.toBe(targetError);
+
+        expect(capturedLogs.some((log) => log.level === 'hmmm' && log.message.includes('Falling back to only using cache'))).toBe(true);
+        expect(storage.getStorageProvider().name).toBe('MemoryOnlyProvider');
+    });
+
+    it('should stop rejecting after degrading, so a missing storage engine cannot produce a rejection loop', async () => {
+        const {storage} = loadIsolatedStorage();
+
+        storage.init();
+
+        const originalProvider = storage.getStorageProvider();
+        const targetError = new ReferenceError("Can't find variable: indexedDB");
+        const getAllKeys = jest.fn().mockReturnValue(Promise.reject(targetError));
+        originalProvider.classifyError = jest.fn().mockReturnValue(StorageErrorClass.UNAVAILABLE);
+        originalProvider.getAllKeys = getAllKeys;
+
+        await expect(storage.getAllKeys()).rejects.toBe(targetError);
+
+        await expect(storage.getAllKeys()).resolves.toEqual([]);
+        await expect(storage.getAllKeys()).resolves.toEqual([]);
+        expect(getAllKeys).toHaveBeenCalledTimes(1);
     });
 
     it('propagates async rejections with unrelated messages without falling back', async () => {

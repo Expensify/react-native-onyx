@@ -3,6 +3,7 @@ import * as Logger from '../Logger';
 import PlatformStorage from './platforms';
 import InstanceSync from './InstanceSync';
 import MemoryOnlyProvider from './providers/MemoryOnlyProvider';
+import {StorageErrorClass} from './errors';
 import type StorageProvider from './providers/types';
 
 let provider = PlatformStorage as StorageProvider<unknown>;
@@ -39,8 +40,12 @@ function tryOrDegradePerformance<T>(fn: () => Promise<T> | T, waitForInitializat
     return initialization
         .then(() => fn())
         .catch((error: unknown) => {
+            if (!(error instanceof Error)) {
+                return Promise.reject(error);
+            }
+
             // catch the error if DB connection can not be established/DB can not be created
-            if (error instanceof Error && error.message.includes('IDBKeyVal store could not be created')) {
+            if (error.message.includes('IDBKeyVal store could not be created') || provider.classifyError(error) === StorageErrorClass.UNAVAILABLE) {
                 degradePerformance(error);
             }
             return Promise.reject(error);

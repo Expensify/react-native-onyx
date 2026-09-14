@@ -1,5 +1,6 @@
 import type {ValueOf} from 'type-fest';
 import {StorageErrorClass, getErrorParts} from '../../errors';
+import {INDEXED_DB_UNAVAILABLE_MESSAGE} from './isIndexedDBAvailable';
 
 /**
  * Classifies an IndexedDB write failure into the shared storage taxonomy (lib/storage/errors.ts).
@@ -8,6 +9,11 @@ import {StorageErrorClass, getErrorParts} from '../../errors';
  */
 function classifyIDBError(error: unknown): ValueOf<typeof StorageErrorClass> {
     const {name, message} = getErrorParts(error);
+
+    // The engine is absent, not broken.
+    if (message.includes("can't find variable: indexeddb") || message.includes('indexeddb is not defined') || message.includes(INDEXED_DB_UNAVAILABLE_MESSAGE.toLowerCase())) {
+        return StorageErrorClass.UNAVAILABLE;
+    }
 
     // Non-serializable data passed to IDBObjectStore.put — retrying is futile.
     if (message.includes("failed to execute 'put' on 'idbobjectstore'")) {
