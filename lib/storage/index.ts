@@ -7,6 +7,17 @@ import {StorageErrorClass} from './errors';
 import type StorageProvider from './providers/types';
 
 let provider = PlatformStorage as StorageProvider<unknown>;
+
+/**
+ * The platform provider's classifier, kept separate from `provider` on purpose.
+ *
+ * `degradePerformance` swaps `provider` for `MemoryOnlyProvider`, whose classifier returns UNKNOWN for
+ * everything. Classifying through `provider` would therefore erase the class of the very error that
+ * caused the degrade, because the swap happens before the rejection reaches `OnyxUtils.retryOperation`.
+ * Holding the original classifier keeps that error classifiable for its whole trip up the stack.
+ */
+const classifyStorageError = provider.classifyError;
+
 let shouldKeepInstancesSync = false;
 let finishInitalization: (value?: unknown) => void;
 const initPromise = new Promise((resolve) => {
@@ -45,7 +56,7 @@ function tryOrDegradePerformance<T>(fn: () => Promise<T> | T, waitForInitializat
             }
 
             // catch the error if DB connection can not be established/DB can not be created
-            if (error.message.includes('IDBKeyVal store could not be created') || provider.classifyError(error) === StorageErrorClass.UNAVAILABLE) {
+            if (error.message.includes('IDBKeyVal store could not be created') || classifyStorageError(error) === StorageErrorClass.UNAVAILABLE) {
                 degradePerformance(error);
             }
             return Promise.reject(error);
@@ -61,10 +72,10 @@ const storage: Storage = {
     },
 
     /**
-     * Classifies a write error using the active provider's own classifier. Synchronous and pure —
+     * Classifies a write error using the platform provider's own classifier. Synchronous and pure —
      * never wrapped in tryOrDegradePerformance.
      */
-    classifyError: (error) => provider.classifyError(error),
+    classifyError: (error) => classifyStorageError(error),
 
     /**
      * Initializes all providers in the list of storage providers

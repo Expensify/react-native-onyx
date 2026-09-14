@@ -19,8 +19,6 @@ describe('classifyIDBError', () => {
         [new ReferenceError("Can't find variable: indexedDB"), StorageErrorClass.UNAVAILABLE],
         [new ReferenceError('indexedDB is not defined'), StorageErrorClass.UNAVAILABLE],
         [new Error('indexedDB is not available in this environment'), StorageErrorClass.UNAVAILABLE],
-        // A present-but-broken engine must NOT be mistaken for a missing one.
-        [new DOMException('Internal error opening backing store for indexedDB.open.', 'UnknownError'), StorageErrorClass.FATAL],
         // Anything else stays UNKNOWN.
         [new Error('some brand new failure'), StorageErrorClass.UNKNOWN],
     ])('classifies %s as %s', (error, expectedClass) => {

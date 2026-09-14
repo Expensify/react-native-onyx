@@ -40,7 +40,7 @@ const provider: StorageProvider<UseStore | undefined> = {
      */
     init() {
         if (!isIndexedDBAvailable()) {
-            throw new Error('IDBKeyVal store could not be created', {cause: INDEXED_DB_UNAVAILABLE_MESSAGE});
+            throw new Error(`IDBKeyVal store could not be created: ${INDEXED_DB_UNAVAILABLE_MESSAGE}`);
         }
 
         const newIdbKeyValStore = createStore(DB_NAME, STORE_NAME);

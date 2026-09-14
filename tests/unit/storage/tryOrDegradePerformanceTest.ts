@@ -97,13 +97,28 @@ describe('storage/tryOrDegradePerformance', () => {
 
         const originalProvider = storage.getStorageProvider();
         const targetError = new ReferenceError("Can't find variable: indexedDB");
-        originalProvider.classifyError = jest.fn().mockReturnValue(StorageErrorClass.UNAVAILABLE);
         originalProvider.getAllKeys = jest.fn().mockReturnValue(Promise.reject(targetError));
 
         await expect(storage.getAllKeys()).rejects.toBe(targetError);
 
         expect(capturedLogs.some((log) => log.level === 'hmmm' && log.message.includes('Falling back to only using cache'))).toBe(true);
         expect(storage.getStorageProvider().name).toBe('MemoryOnlyProvider');
+    });
+
+    it('should still classify the error as UNAVAILABLE after degrading to MemoryOnlyProvider', async () => {
+        const {storage} = loadIsolatedStorage();
+
+        storage.init();
+
+        const targetError = new ReferenceError("Can't find variable: indexedDB");
+        storage.getStorageProvider().getAllKeys = jest.fn().mockReturnValue(Promise.reject(targetError));
+
+        await expect(storage.getAllKeys()).rejects.toBe(targetError);
+
+        // The degrade swaps the provider, but classification must keep working: `OnyxUtils.retryOperation`
+        // classifies this same error afterwards to decide not to retry it.
+        expect(storage.getStorageProvider().name).toBe('MemoryOnlyProvider');
+        expect(storage.classifyError(targetError)).toBe(StorageErrorClass.UNAVAILABLE);
     });
 
     it('should stop rejecting after degrading, so a missing storage engine cannot produce a rejection loop', async () => {
@@ -114,7 +129,6 @@ describe('storage/tryOrDegradePerformance', () => {
         const originalProvider = storage.getStorageProvider();
         const targetError = new ReferenceError("Can't find variable: indexedDB");
         const getAllKeys = jest.fn().mockReturnValue(Promise.reject(targetError));
-        originalProvider.classifyError = jest.fn().mockReturnValue(StorageErrorClass.UNAVAILABLE);
         originalProvider.getAllKeys = getAllKeys;
 
         await expect(storage.getAllKeys()).rejects.toBe(targetError);

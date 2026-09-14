@@ -67,8 +67,7 @@ describe('IDBKeyValProvider', () => {
                     thrown = error;
                 }
 
-                expect((thrown as Error).cause).toBe('indexedDB is not available in this environment');
-                expect(IDBKeyValProvider.classifyError((thrown as Error).cause)).toBe(StorageErrorClass.UNAVAILABLE);
+                expect(IDBKeyValProvider.classifyError(thrown)).toBe(StorageErrorClass.UNAVAILABLE);
             });
         });
     });
