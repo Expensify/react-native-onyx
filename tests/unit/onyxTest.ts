@@ -81,6 +81,42 @@ describe('Onyx', () => {
                 expect(keys.has(ONYX_KEYS.OTHER_TEST)).toBe(false);
             }));
 
+    it('should deliver the initial callback for a cached key while an unrelated write is still pending', async () => {
+        let resolvePendingWrite: (() => void) | undefined;
+        // `StorageMock.setItem` is already a jest.fn (see the storage manual mock), so swap its
+        // implementation and restore it afterwards rather than spying.
+        const setItemMock = StorageMock.setItem as jest.Mock;
+        const originalSetItemImpl = setItemMock.getMockImplementation();
+        setItemMock.mockImplementation((key: OnyxKey, value: unknown) => {
+            // The write to TEST_KEY never finishes persisting; every other key persists normally.
+            if (key === ONYX_KEYS.TEST_KEY) {
+                return new Promise<void>((resolve) => {
+                    resolvePendingWrite = () => resolve();
+                });
+            }
+            return originalSetItemImpl?.(key, value);
+        });
+        const callback = jest.fn();
+
+        try {
+            await Onyx.set(ONYX_KEYS.OTHER_TEST, 'cached');
+
+            // Start a write whose persistence never settles.
+            Onyx.set(ONYX_KEYS.TEST_KEY, 'pending');
+
+            // Connecting to an already-cached, unrelated key must still receive its initial callback
+            // and not block on the unrelated pending write.
+            connection = Onyx.connectWithoutView({key: ONYX_KEYS.OTHER_TEST, callback});
+
+            await waitForPromisesToResolve();
+
+            expect(callback).toHaveBeenCalledWith('cached', ONYX_KEYS.OTHER_TEST);
+        } finally {
+            resolvePendingWrite?.();
+            setItemMock.mockImplementation(originalSetItemImpl);
+        }
+    });
+
     it('should restore a key with initial state if the key was set to null and Onyx.clear() is called', () =>
         Onyx.set(ONYX_KEYS.OTHER_TEST, 42)
             .then(() => Onyx.set(ONYX_KEYS.OTHER_TEST, null))
@@ -1455,11 +1491,11 @@ describe('Onyx', () => {
                 // Cat hasn't changed from its original value, expect only the initial connect callback
                 expect(catCallback).toHaveBeenCalledTimes(1);
 
-                // Dog was created by the merge. Onyx writes cache-first/storage-second, so the
-                // mergeCollection notification reaches the subscriber before the initial connect
-                // fire; the initial fire then reads the already-merged value and is deduped. The
-                // subscriber therefore receives the final value once.
-                expect(dogCallback).toHaveBeenCalledTimes(1);
+                // Dog does not exist when its subscription is created, and the mergeCollection that
+                // creates it is issued after connect, so the initial fire delivers `undefined` and the
+                // merge then delivers the created value.
+                expect(dogCallback).toHaveBeenCalledTimes(2);
+                expect(dogCallback).toHaveBeenNthCalledWith(1, undefined, dog);
                 expect(dogCallback).toHaveBeenLastCalledWith({name: 'Rex'}, dog);
 
                 connections.map((id) => Onyx.disconnect(id));

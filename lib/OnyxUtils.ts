@@ -71,11 +71,12 @@ type PreparedKeyValuePairs = {
 let mergeQueue: Record<OnyxKey, Array<OnyxValue<OnyxKey>>> = {};
 let mergeQueuePromise: Record<OnyxKey, Promise<void>> = {};
 
-// In-flight write operations (set/merge/mergeCollection/setCollection/multiSet/update/clear).
-// A write is added when it starts and removed when its promise settles. `scheduleInitialFire`
-// drains this set so a newly connected subscriber's initial fire reads cache only after every
-// write issued in the connect tick has applied and notified.
-const pendingWrites = new Set<Promise<unknown>>();
+// In-flight writes tracked per affected key, so a subscriber's initial fire waits only for writes
+// that can change its own value, never for unrelated (or slow) writes elsewhere.
+const pendingWritesByKey = new Map<OnyxKey, Set<Promise<unknown>>>();
+
+// In-flight writes that affect every key (Onyx.clear). Any initial fire waits for these.
+const pendingGlobalWrites = new Set<Promise<unknown>>();
 
 // Optional user-provided key value states set when Onyx initializes or clears
 let defaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
@@ -96,36 +97,81 @@ const deferredInitTask = createDeferredTask();
 const NOT_DELIVERED = Symbol('NOT_DELIVERED');
 
 /**
- * Registers an in-flight write so `scheduleInitialFire` can wait for it. Returns the same
- * promise so callers can wrap a write's return value inline. The write is removed from the
- * pending set once it settles (success or failure).
+ * Registers an in-flight write under each key it can change, so `scheduleInitialFire` waits only for
+ * the writes relevant to a connecting key. Returns the same promise so callers can wrap a write's
+ * return value inline. The write is deregistered once it settles (success or failure).
  */
-function trackPendingWrite<T>(promise: Promise<T>): Promise<T> {
-    pendingWrites.add(promise);
-    const deregister = () => pendingWrites.delete(promise);
+function trackPendingWrite<T>(keys: OnyxKey | OnyxKey[], promise: Promise<T>): Promise<T> {
+    const keyList = Array.isArray(keys) ? keys : [keys];
+    for (const key of keyList) {
+        let set = pendingWritesByKey.get(key);
+        if (!set) {
+            set = new Set();
+            pendingWritesByKey.set(key, set);
+        }
+        set.add(promise);
+    }
+    const deregister = () => {
+        for (const key of keyList) {
+            const set = pendingWritesByKey.get(key);
+            if (!set) {
+                continue;
+            }
+            set.delete(promise);
+            if (set.size === 0) {
+                pendingWritesByKey.delete(key);
+            }
+        }
+    };
     promise.then(deregister, deregister);
     return promise;
 }
 
 /**
- * Resolves once no write operations are in flight. Re-checks after each drain because a
- * settling write can apply cache changes that spawn further writes (e.g. `Onyx.update`
- * fans out into per-item merges), and those must be awaited too. Write failures are
- * swallowed here: this only cares that writes have settled, not that they succeeded.
+ * Registers an in-flight write that affects every key (Onyx.clear). Deregistered once it settles.
  */
-function whenWritesSettled(): Promise<void> {
-    if (pendingWrites.size === 0) {
-        return Promise.resolve();
-    }
-    return Promise.all([...pendingWrites].map((promise) => promise.catch(() => undefined))).then(whenWritesSettled);
+function trackPendingGlobalWrite<T>(promise: Promise<T>): Promise<T> {
+    pendingGlobalWrites.add(promise);
+    const deregister = () => pendingGlobalWrites.delete(promise);
+    promise.then(deregister, deregister);
+    return promise;
 }
 
 /**
- * Defer a `Onyx.connect` callback's initial fire until writes issued in the same tick have
- * applied, so it reads post-write cache.
+ * In-flight writes that can change the value delivered to a subscriber of `key`: writes to the key
+ * itself, writes to any member when `key` is a collection root, and global writes (clear).
  */
-function scheduleInitialFire(fn: () => void): void {
-    Promise.resolve().then(whenWritesSettled).then(fn);
+function pendingWritesForKey(key: OnyxKey): Array<Promise<unknown>> {
+    const promises = [...pendingGlobalWrites];
+    const own = pendingWritesByKey.get(key);
+    if (own) {
+        promises.push(...own);
+    }
+    if (OnyxKeys.isCollectionKey(key)) {
+        for (const [writeKey, set] of pendingWritesByKey) {
+            if (writeKey !== key && OnyxKeys.isCollectionMemberKey(key, writeKey)) {
+                promises.push(...set);
+            }
+        }
+    }
+    return promises;
+}
+
+/**
+ * Defer a `Onyx.connect` callback's initial fire until the writes relevant to `key` that are in
+ * flight this tick have applied, so it reads post-write cache and dedups against their notifications.
+ * The wait is scoped to `key` and snapshotted after one microtask, so an unrelated or slow write
+ * elsewhere cannot block or postpone this delivery, and writes issued after it do not either.
+ */
+function scheduleInitialFire(key: OnyxKey, fn: () => void): void {
+    Promise.resolve().then(() => {
+        const relevant = pendingWritesForKey(key);
+        if (relevant.length === 0) {
+            fn();
+            return;
+        }
+        Promise.all(relevant.map((promise) => promise.catch(() => undefined))).then(fn);
+    });
 }
 
 // Collection member IDs that Onyx should silently ignore across all operations — reads, writes, cache, and subscriber
@@ -1632,7 +1678,8 @@ function logKeyRemoved(onyxMethod: Extract<OnyxMethod, 'set' | 'merge'>, key: On
 function clearOnyxUtilsInternals() {
     mergeQueue = {};
     mergeQueuePromise = {};
-    pendingWrites.clear();
+    pendingWritesByKey.clear();
+    pendingGlobalWrites.clear();
 }
 
 const OnyxUtils = {
@@ -1640,7 +1687,7 @@ const OnyxUtils = {
     NOT_DELIVERED,
     scheduleInitialFire,
     trackPendingWrite,
-    whenWritesSettled,
+    trackPendingGlobalWrite,
     getMergeQueue,
     getMergeQueuePromise,
     getDefaultKeyStates,
