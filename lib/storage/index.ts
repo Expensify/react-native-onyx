@@ -44,6 +44,14 @@ function degradePerformance(error: Error) {
 }
 
 /**
+ * Whether an error means the storage engine itself is unusable, which is what justifies dropping it.
+ */
+function shouldDegradeOn(error: unknown): error is Error {
+    // catch the error if DB connection can not be established/DB can not be created
+    return error instanceof Error && (error.message.includes('IDBKeyVal store could not be created') || classifyStorageError(error) === StorageErrorClass.UNAVAILABLE);
+}
+
+/**
  * Runs a piece of code and degrades performance if certain errors are thrown
  */
 function tryOrDegradePerformance<T>(fn: () => Promise<T> | T, waitForInitialization = true): Promise<T> {
@@ -51,12 +59,7 @@ function tryOrDegradePerformance<T>(fn: () => Promise<T> | T, waitForInitializat
     return initialization
         .then(() => fn())
         .catch((error: unknown) => {
-            if (!(error instanceof Error)) {
-                return Promise.reject(error);
-            }
-
-            // catch the error if DB connection can not be established/DB can not be created
-            if (error.message.includes('IDBKeyVal store could not be created') || classifyStorageError(error) === StorageErrorClass.UNAVAILABLE) {
+            if (shouldDegradeOn(error)) {
                 degradePerformance(error);
             }
             return Promise.reject(error);
@@ -80,11 +83,24 @@ const storage: Storage = {
     /**
      * Initializes all providers in the list of storage providers
      * and enables fallback providers if necessary
+     *
+     * The result is consumed here rather than dropped: `tryOrDegradePerformance` re-rejects on purpose so
+     * that the caller of a storage method sees its own failure, but nobody awaits `init`. Leaving that
+     * rejection unconsumed would report an unhandled rejection — and fire the app's global rejection
+     * handler — on every session where the engine is missing and the degrade to memory-only succeeded.
      */
     init() {
-        tryOrDegradePerformance(provider.init, false).finally(() => {
-            finishInitalization();
-        });
+        tryOrDegradePerformance(provider.init, false).then(
+            finishInitalization,
+            (error: unknown) => {
+                finishInitalization();
+                // A degrade already logged itself. Anything else left no usable storage provider, so it
+                // stays visible — but as a log, not as an unhandled rejection.
+                if (!shouldDegradeOn(error)) {
+                    Logger.logAlert(`Storage initialization failed. Original error: ${error instanceof Error ? error.message : String(error)}`);
+                }
+            },
+        );
     },
 
     /**

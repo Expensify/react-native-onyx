@@ -138,6 +138,34 @@ describe('storage/tryOrDegradePerformance', () => {
         expect(getAllKeys).toHaveBeenCalledTimes(1);
     });
 
+    it('should consume a failing initialization so the memory-only fallback does not raise an unhandled rejection', async () => {
+        const {storage} = loadIsolatedStorage();
+
+        const unhandled: unknown[] = [];
+        const onUnhandledRejection = (reason: unknown) => unhandled.push(reason);
+        process.on('unhandledRejection', onUnhandledRejection);
+
+        try {
+            storage.getStorageProvider().init = () => {
+                throw new Error('IDBKeyVal store could not be created: indexedDB is not available in this environment');
+            };
+            storage.init();
+
+            // Node reports a rejection as unhandled once the microtask queue drains, so yield to the
+            // macrotask queue before asserting.
+            await new Promise((resolve) => {
+                setTimeout(resolve, 0);
+            });
+
+            expect(unhandled).toEqual([]);
+            // The degrade still happened, and initialization still completed so callers are not left waiting.
+            expect(storage.getStorageProvider().name).toBe('MemoryOnlyProvider');
+            await expect(storage.getAllKeys()).resolves.toEqual([]);
+        } finally {
+            process.off('unhandledRejection', onUnhandledRejection);
+        }
+    });
+
     it('propagates async rejections with unrelated messages without falling back', async () => {
         const {storage, Logger} = loadIsolatedStorage();
         const capturedLogs: CapturedLog[] = [];
