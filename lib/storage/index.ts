@@ -90,17 +90,14 @@ const storage: Storage = {
      * handler — on every session where the engine is missing and the degrade to memory-only succeeded.
      */
     init() {
-        tryOrDegradePerformance(provider.init, false).then(
-            finishInitalization,
-            (error: unknown) => {
-                finishInitalization();
-                // A degrade already logged itself. Anything else left no usable storage provider, so it
-                // stays visible — but as a log, not as an unhandled rejection.
-                if (!shouldDegradeOn(error)) {
-                    Logger.logAlert(`Storage initialization failed. Original error: ${error instanceof Error ? error.message : String(error)}`);
-                }
-            },
-        );
+        tryOrDegradePerformance(provider.init, false).then(finishInitalization, (error: unknown) => {
+            finishInitalization();
+            // A degrade already logged itself. Anything else left no usable storage provider, so it
+            // stays visible — but as a log, not as an unhandled rejection.
+            if (!shouldDegradeOn(error)) {
+                Logger.logAlert(`Storage initialization failed. Original error: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        });
     },
 
     /**
