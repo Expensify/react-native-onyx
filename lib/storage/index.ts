@@ -9,12 +9,8 @@ import type StorageProvider from './providers/types';
 let provider = PlatformStorage as StorageProvider<unknown>;
 
 /**
- * The platform provider's classifier, kept separate from `provider` on purpose.
- *
- * `degradePerformance` swaps `provider` for `MemoryOnlyProvider`, whose classifier returns UNKNOWN for
- * everything. Classifying through `provider` would therefore erase the class of the very error that
- * caused the degrade, because the swap happens before the rejection reaches `OnyxUtils.retryOperation`.
- * Holding the original classifier keeps that error classifiable for its whole trip up the stack.
+ * Held separately from `provider` so `degradePerformance` swapping it for `MemoryOnlyProvider`
+ * doesn't erase the class of the error that caused the swap.
  */
 const classifyStorageError = provider.classifyError;
 
@@ -84,16 +80,11 @@ const storage: Storage = {
      * Initializes all providers in the list of storage providers
      * and enables fallback providers if necessary
      *
-     * The result is consumed here rather than dropped: `tryOrDegradePerformance` re-rejects on purpose so
-     * that the caller of a storage method sees its own failure, but nobody awaits `init`. Leaving that
-     * rejection unconsumed would report an unhandled rejection — and fire the app's global rejection
-     * handler — on every session where the engine is missing and the degrade to memory-only succeeded.
+     * The rejection is consumed here: an unconsumed one would fire the app's global unhandled-rejection handler.
      */
     init() {
         tryOrDegradePerformance(provider.init, false).then(finishInitalization, (error: unknown) => {
             finishInitalization();
-            // A degrade already logged itself. Anything else left no usable storage provider, so it
-            // stays visible — but as a log, not as an unhandled rejection.
             if (!shouldDegradeOn(error)) {
                 Logger.logAlert(`Storage initialization failed. Original error: ${error instanceof Error ? error.message : String(error)}`);
             }
