@@ -21,6 +21,10 @@ const StorageErrorClass = {
     DISK_PRESSURE: 'diskPressure',
     /** Non-serializable payload. Never retriable — the same data will always fail. */
     INVALID_DATA: 'invalidData',
+    /** Engine-level write fault or a permanently invalid payload that no retry, reopen, or
+     *  eviction can fix, and that must not crash the caller (unlike INVALID_DATA). Owner:
+     *  operation layer — skip the write quietly, never retry. */
+    UNRECOVERABLE: 'unrecoverable',
     /** Backing-store corruption. Owner: connection layer — budgeted heal, then give up. */
     FATAL: 'fatal',
     /** Unmatched by the active provider. Owner: operation layer — bounded retry, and log the shape so
