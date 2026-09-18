@@ -79,20 +79,18 @@ describe('Onyx', () => {
 
         it('propagates storage read failures', async () => {
             const error = new Error('Storage read failed');
-            const getAll = jest.spyOn(StorageMock, 'getAll').mockRejectedValueOnce(error);
+            jest.mocked(StorageMock.getAll).mockRejectedValueOnce(error);
 
             await expect(Onyx.exportState()).rejects.toBe(error);
-            getAll.mockRestore();
         });
 
         it('excludes stale persisted values for keys now configured as RAM-only', async () => {
-            const getAll = jest.spyOn(StorageMock, 'getAll').mockResolvedValueOnce([
+            jest.mocked(StorageMock.getAll).mockResolvedValueOnce([
                 [ONYX_KEYS.TEST_KEY, 'persisted'],
                 [ONYX_KEYS.RAM_ONLY_TEST_KEY, 'stale'],
             ]);
 
             await expect(Onyx.exportState()).resolves.toEqual({[ONYX_KEYS.TEST_KEY]: 'persisted'});
-            getAll.mockRestore();
         });
     });
 
