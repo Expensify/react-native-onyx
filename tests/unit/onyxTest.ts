@@ -68,17 +68,15 @@ describe('Onyx', () => {
 
     it('should remove key value from OnyxCache/Storage when set is called with null value', () =>
         Onyx.set(ONYX_KEYS.OTHER_TEST, 42)
-            .then(() => OnyxUtils.getAllKeys())
-            .then((keys) => {
+            .then(() => {
+                const keys = OnyxUtils.getAllKeys();
                 expect(keys.has(ONYX_KEYS.OTHER_TEST)).toBe(true);
                 return Onyx.set(ONYX_KEYS.OTHER_TEST, null);
             })
             // Checks if cache value is removed.
             .then(() => {
                 expect(cache.get(ONYX_KEYS.OTHER_TEST)).toBeUndefined();
-                return OnyxUtils.getAllKeys();
-            })
-            .then((keys) => {
+                const keys = OnyxUtils.getAllKeys();
                 expect(keys.has(ONYX_KEYS.OTHER_TEST)).toBe(false);
             }));
 
@@ -2915,6 +2913,51 @@ describe('Onyx', () => {
         });
     });
 
+    describe('get', () => {
+        const memberOne = `${ONYX_KEYS.COLLECTION.TEST_KEY}1`;
+        const memberTwo = `${ONYX_KEYS.COLLECTION.TEST_KEY}2`;
+
+        it('reads a value out of the cache synchronously', async () => {
+            await Onyx.merge(ONYX_KEYS.TEST_KEY, {id: 1, title: 'One'});
+
+            expect(Onyx.get(ONYX_KEYS.TEST_KEY)).toEqual({id: 1, title: 'One'});
+            expect(Onyx.get(ONYX_KEYS.TEST_KEY)).toEqual(OnyxUtils.get(ONYX_KEYS.TEST_KEY));
+        });
+
+        it('returns undefined for a key that has no value', () => {
+            expect(Onyx.get(ONYX_KEYS.TEST_KEY)).toBeUndefined();
+            expect(Onyx.get(memberOne)).toBeUndefined();
+        });
+
+        it('reads every member when given a collection key', async () => {
+            await Onyx.merge(memberOne, {id: 1, title: 'One'});
+            await Onyx.merge(memberTwo, {id: 2, title: 'Two'});
+
+            expect(Onyx.get(ONYX_KEYS.COLLECTION.TEST_KEY)).toEqual({
+                [memberOne]: {id: 1, title: 'One'},
+                [memberTwo]: {id: 2, title: 'Two'},
+            });
+        });
+
+        it('agrees with a whole-collection subscriber', async () => {
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                [memberOne]: {id: 1, title: 'One'},
+                [memberTwo]: {id: 2, title: 'Two'},
+            } as GenericCollection);
+
+            let subscribed: OnyxCollection<unknown>;
+            connection = Onyx.connectWithoutView({
+                key: ONYX_KEYS.COLLECTION.TEST_KEY,
+                callback: (collection) => {
+                    subscribed = collection;
+                },
+            });
+            await waitForPromisesToResolve();
+
+            expect(Onyx.get(ONYX_KEYS.COLLECTION.TEST_KEY)).toEqual(subscribed);
+        });
+    });
+
     describe('skippable collection member ids', () => {
         it('should skip the collection member id value when using Onyx.set()', async () => {
             let testKeyValue: unknown;
@@ -3427,7 +3470,7 @@ describe('RAM-only keys should not read from storage', () => {
         });
         await act(async () => waitForPromisesToResolve());
 
-        const keys = await OnyxUtils.getAllKeys();
+        const keys = OnyxUtils.getAllKeys();
 
         expect(keys.has(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBe(false);
         expect(keys.has(`${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`)).toBe(false);
@@ -3734,7 +3777,7 @@ describe('RAM-only keys should not read from storage', () => {
         await Onyx.set(ramOnlyMember, {data: 'fresh_from_cache'});
 
         // multiGet receives individual keys (e.g. collection members), not collection base keys
-        const result = await OnyxUtils.multiGet([normalMember, ramOnlyMember]);
+        const result = OnyxUtils.multiGet([normalMember, ramOnlyMember]);
 
         // Normal key should come from storage
         expect(result.get(normalMember)).toEqual('normal_from_storage');
