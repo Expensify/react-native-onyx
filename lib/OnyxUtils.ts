@@ -916,6 +916,48 @@ function hasPendingMergeForKey(key: OnyxKey): boolean {
     return !!mergeQueue[key];
 }
 
+function cancelPendingMergesForKey(key: OnyxKey): void {
+    delete mergeQueue[key];
+    delete mergeQueuePromise[key];
+}
+
+function cancelPendingMergesForCollection(collectionKey: CollectionKeyBase): void {
+    for (const key of Object.keys(mergeQueue)) {
+        if (!OnyxKeys.isCollectionMemberKey(collectionKey, key)) {
+            continue;
+        }
+        cancelPendingMergesForKey(key);
+    }
+}
+
+function getPendingMergeEntries(keysToPreserve: OnyxKey[]): Array<[OnyxKey, Array<OnyxValue<OnyxKey>>]> {
+    return Object.entries(mergeQueue).filter(([key]) => !keysToPreserve.some((preserveKey) => OnyxKeys.isKeyMatch(preserveKey, key)));
+}
+
+function cancelPendingMerges(entries: Array<[OnyxKey, Array<OnyxValue<OnyxKey>>]>): void {
+    for (const [key, queuedChanges] of entries) {
+        if (mergeQueue[key] !== queuedChanges) {
+            continue;
+        }
+        cancelPendingMergesForKey(key);
+    }
+}
+
+function cancelPendingMergesForKeys(keys: OnyxKey[]): void {
+    for (const key of keys) {
+        cancelPendingMergesForKey(key);
+    }
+}
+
+function cancelPendingMergesForNullMembers(collection: OnyxInputKeyValueMapping): void {
+    for (const [key, value] of Object.entries(collection)) {
+        if (value !== null) {
+            continue;
+        }
+        cancelPendingMergesForKey(key);
+    }
+}
+
 /**
  * Storage expects array like: [["@MyApp_user", value_1], ["@MyApp_key", value_2]]
  * This method transforms an object like {'@MyApp_user': myUserValue, '@MyApp_key': myKeyValue}
@@ -1572,6 +1614,10 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
     }
     resultCollectionKeys = Object.keys(resultCollection);
 
+    if (!retryAttempt) {
+        cancelPendingMergesForCollection(collectionKey);
+    }
+
     return OnyxUtils.getAllKeys().then((persistedKeys) => {
         const mutableCollection: OnyxInputKeyValueMapping = {...resultCollection};
 
@@ -1673,6 +1719,10 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
         }, {});
     }
     resultCollectionKeys = Object.keys(resultCollection);
+
+    if (!retryAttempt) {
+        cancelPendingMergesForNullMembers(resultCollection);
+    }
 
     return getAllKeys()
         .then((persistedKeys) => {
@@ -1865,6 +1915,10 @@ function partialSetCollection<TKey extends CollectionKeyBase>({collectionKey, co
     }
     resultCollectionKeys = Object.keys(resultCollection);
 
+    if (!retryAttempt) {
+        cancelPendingMergesForKeys(resultCollectionKeys);
+    }
+
     return getAllKeys().then((persistedKeys) => {
         const mutableCollection: OnyxInputKeyValueMapping = {...resultCollection};
         const existingKeys = resultCollectionKeys.filter((key) => persistedKeys.has(key));
@@ -1950,6 +2004,8 @@ const OnyxUtils = {
     retryOperation,
     broadcastUpdate,
     hasPendingMergeForKey,
+    getPendingMergeEntries,
+    cancelPendingMerges,
     prepareKeyValuePairsForStorage,
     mergeChanges,
     mergeAndMarkChanges,
