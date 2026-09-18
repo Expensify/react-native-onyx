@@ -930,10 +930,6 @@ function cancelPendingMergesForCollection(collectionKey: CollectionKeyBase): voi
     }
 }
 
-/**
- * Returns the keys that currently have queued merges, excluding the ones matched by keysToPreserve.
- * Callers use this to snapshot the queue at a given moment so that merges queued afterwards are left untouched.
- */
 function getPendingMergeKeys(keysToPreserve: OnyxKey[]): OnyxKey[] {
     return Object.keys(mergeQueue).filter((key) => !keysToPreserve.some((preserveKey) => OnyxKeys.isKeyMatch(preserveKey, key)));
 }
