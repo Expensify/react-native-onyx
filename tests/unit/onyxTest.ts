@@ -2941,6 +2941,55 @@ describe('Onyx', () => {
                 expect(cache.get(member1)).toEqual({itemA: {id: 'a', childID: '1'}});
                 expect(await StorageMock.getItem(member1)).toEqual({itemA: {id: 'a', childID: '1'}});
             });
+
+            it('should not cancel a merge that was queued after Onyx.clear() was called', async () => {
+                const member1 = `${ONYX_KEYS.COLLECTION.TEST_KEY}1`;
+
+                const firstGet = createDeferredTask();
+                const secondGet = createDeferredTask();
+                const deferredGets = [firstGet, secondGet];
+                const originalGet = OnyxUtils.get;
+                jest.spyOn(OnyxUtils, 'get').mockImplementation(((key: OnyxKey) => {
+                    if (key !== member1) {
+                        return originalGet(key);
+                    }
+                    const deferred = deferredGets.shift();
+                    return deferred ? deferred.promise.then(() => undefined) : originalGet(key);
+                }) as typeof OnyxUtils.get);
+
+                const deferredGetAllKeys = createDeferredTask();
+                const originalGetAllKeys = OnyxUtils.getAllKeys;
+                let shouldParkGetAllKeys = true;
+                jest.spyOn(OnyxUtils, 'getAllKeys').mockImplementation((() => {
+                    if (!shouldParkGetAllKeys) {
+                        return originalGetAllKeys();
+                    }
+                    shouldParkGetAllKeys = false;
+                    return deferredGetAllKeys.promise.then(() => originalGetAllKeys());
+                }) as typeof OnyxUtils.getAllKeys);
+
+                const firstMergePromise = Onyx.merge(member1, {itemA: {id: 'a'}});
+                const clearPromise = Onyx.clear();
+                await waitForPromisesToResolve();
+
+                firstGet.resolve();
+                await firstMergePromise;
+                await waitForPromisesToResolve();
+
+                const secondMergePromise = Onyx.merge(member1, {itemB: {id: 'b'}});
+                await waitForPromisesToResolve();
+
+                deferredGetAllKeys.resolve();
+                await clearPromise;
+                await waitForPromisesToResolve();
+
+                secondGet.resolve();
+                await secondMergePromise;
+                await waitForPromisesToResolve();
+
+                expect(cache.get(member1)).toEqual({itemB: {id: 'b'}});
+                expect(await StorageMock.getItem(member1)).toEqual({itemB: {id: 'b'}});
+            });
         });
     });
 

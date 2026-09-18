@@ -930,12 +930,15 @@ function cancelPendingMergesForCollection(collectionKey: CollectionKeyBase): voi
     }
 }
 
-function getPendingMergeKeys(keysToPreserve: OnyxKey[]): OnyxKey[] {
-    return Object.keys(mergeQueue).filter((key) => !keysToPreserve.some((preserveKey) => OnyxKeys.isKeyMatch(preserveKey, key)));
+function getPendingMergeEntries(keysToPreserve: OnyxKey[]): Array<[OnyxKey, Array<OnyxValue<OnyxKey>>]> {
+    return Object.entries(mergeQueue).filter(([key]) => !keysToPreserve.some((preserveKey) => OnyxKeys.isKeyMatch(preserveKey, key)));
 }
 
-function cancelPendingMerges(keys: OnyxKey[]): void {
-    for (const key of keys) {
+function cancelPendingMerges(entries: Array<[OnyxKey, Array<OnyxValue<OnyxKey>>]>): void {
+    for (const [key, queuedChanges] of entries) {
+        if (mergeQueue[key] !== queuedChanges) {
+            continue;
+        }
         cancelPendingMergesForKey(key);
     }
 }
@@ -1995,7 +1998,7 @@ const OnyxUtils = {
     retryOperation,
     broadcastUpdate,
     hasPendingMergeForKey,
-    getPendingMergeKeys,
+    getPendingMergeEntries,
     cancelPendingMerges,
     prepareKeyValuePairsForStorage,
     mergeChanges,
