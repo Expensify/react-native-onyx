@@ -3,9 +3,17 @@ import * as Logger from '../Logger';
 import PlatformStorage from './platforms';
 import InstanceSync from './InstanceSync';
 import MemoryOnlyProvider from './providers/MemoryOnlyProvider';
+import {StorageErrorClass} from './errors';
 import type StorageProvider from './providers/types';
 
 let provider = PlatformStorage as StorageProvider<unknown>;
+
+/**
+ * Held separately from `provider` so `degradePerformance` swapping it for `MemoryOnlyProvider`
+ * doesn't erase the class of the error that caused the swap.
+ */
+const classifyStorageError = provider.classifyError;
+
 let shouldKeepInstancesSync = false;
 let finishInitalization: (value?: unknown) => void;
 const initPromise = new Promise((resolve) => {
@@ -32,6 +40,14 @@ function degradePerformance(error: Error) {
 }
 
 /**
+ * Whether an error means the storage engine itself is unusable, which is what justifies dropping it.
+ */
+function shouldDegradeOn(error: unknown): error is Error {
+    // catch the error if DB connection can not be established/DB can not be created
+    return error instanceof Error && (error.message.includes('IDBKeyVal store could not be created') || classifyStorageError(error) === StorageErrorClass.UNAVAILABLE);
+}
+
+/**
  * Runs a piece of code and degrades performance if certain errors are thrown
  */
 function tryOrDegradePerformance<T>(fn: () => Promise<T> | T, waitForInitialization = true): Promise<T> {
@@ -39,8 +55,7 @@ function tryOrDegradePerformance<T>(fn: () => Promise<T> | T, waitForInitializat
     return initialization
         .then(() => fn())
         .catch((error: unknown) => {
-            // catch the error if DB connection can not be established/DB can not be created
-            if (error instanceof Error && error.message.includes('IDBKeyVal store could not be created')) {
+            if (shouldDegradeOn(error)) {
                 degradePerformance(error);
             }
             return Promise.reject(error);
@@ -56,18 +71,23 @@ const storage: Storage = {
     },
 
     /**
-     * Classifies a write error using the active provider's own classifier. Synchronous and pure —
+     * Classifies a write error using the platform provider's own classifier. Synchronous and pure —
      * never wrapped in tryOrDegradePerformance.
      */
-    classifyError: (error) => provider.classifyError(error),
+    classifyError: (error) => classifyStorageError(error),
 
     /**
      * Initializes all providers in the list of storage providers
      * and enables fallback providers if necessary
+     *
+     * The rejection is consumed here: an unconsumed one would fire the app's global unhandled-rejection handler.
      */
     init() {
-        tryOrDegradePerformance(provider.init, false).finally(() => {
+        tryOrDegradePerformance(provider.init, false).then(finishInitalization, (error: unknown) => {
             finishInitalization();
+            if (!shouldDegradeOn(error)) {
+                Logger.logAlert(`Storage initialization failed. Original error: ${error instanceof Error ? error.message : String(error)}`);
+            }
         });
     },
 
