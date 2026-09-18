@@ -930,6 +930,15 @@ function cancelPendingMergesForCollection(collectionKey: CollectionKeyBase): voi
     }
 }
 
+function cancelPendingMergesExcept(keysToPreserve: OnyxKey[]): void {
+    for (const key of Object.keys(mergeQueue)) {
+        if (keysToPreserve.some((preserveKey) => OnyxKeys.isKeyMatch(preserveKey, key))) {
+            continue;
+        }
+        cancelPendingMergesForKey(key);
+    }
+}
+
 function cancelPendingMergesForNullMembers(collection: OnyxInputKeyValueMapping): void {
     for (const [key, value] of Object.entries(collection)) {
         if (value !== null) {
@@ -1985,6 +1994,7 @@ const OnyxUtils = {
     retryOperation,
     broadcastUpdate,
     hasPendingMergeForKey,
+    cancelPendingMergesExcept,
     prepareKeyValuePairsForStorage,
     mergeChanges,
     mergeAndMarkChanges,

@@ -369,6 +369,8 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
 
                 const allKeys = new Set([...cachedKeys, ...initialKeys]);
 
+                OnyxUtils.cancelPendingMergesExcept(keysToPreserve);
+
                 // The only keys that should not be cleared are:
                 // 1. Anything specifically passed in keysToPreserve (because some keys like language preferences, offline
                 //      status, or activeClients need to remain in Onyx even when signed out)
