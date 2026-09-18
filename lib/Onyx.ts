@@ -623,9 +623,7 @@ type ExportStateOptions = {
  * @param [options.includeStaleRamOnlyKeys=false] Include persisted rows for keys that are now RAM-only.
  */
 function exportState({includeStaleRamOnlyKeys = false}: ExportStateOptions = {}): Promise<Record<string, unknown>> {
-    return OnyxUtils.afterInit(() =>
-        Storage.getAll().then((entries) => Object.fromEntries(includeStaleRamOnlyKeys ? entries : entries.filter(([key]) => !OnyxKeys.isRamOnlyKey(key)))),
-    );
+    return OnyxUtils.afterInit(() => Storage.getAll().then((entries) => Object.fromEntries(includeStaleRamOnlyKeys ? entries : entries.filter(([key]) => !OnyxKeys.isRamOnlyKey(key)))));
 }
 
 const Onyx = {
