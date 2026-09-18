@@ -943,6 +943,12 @@ function cancelPendingMerges(entries: Array<[OnyxKey, Array<OnyxValue<OnyxKey>>]
     }
 }
 
+function cancelPendingMergesForKeys(keys: OnyxKey[]): void {
+    for (const key of keys) {
+        cancelPendingMergesForKey(key);
+    }
+}
+
 function cancelPendingMergesForNullMembers(collection: OnyxInputKeyValueMapping): void {
     for (const [key, value] of Object.entries(collection)) {
         if (value !== null) {
@@ -1910,7 +1916,7 @@ function partialSetCollection<TKey extends CollectionKeyBase>({collectionKey, co
     resultCollectionKeys = Object.keys(resultCollection);
 
     if (!retryAttempt) {
-        cancelPendingMergesForNullMembers(resultCollection);
+        cancelPendingMergesForKeys(resultCollectionKeys);
     }
 
     return getAllKeys().then((persistedKeys) => {

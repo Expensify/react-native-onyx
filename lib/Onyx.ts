@@ -350,11 +350,8 @@ function mergeCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, co
  * @param keysToPreserve is a list of ONYXKEYS that should not be cleared with the rest of the data
  */
 function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
-    // Captured before awaiting init so that merges issued after this call are not treated as pending by the time
-    // the clear actually runs. Those later merges are intentional writes made on the cleared store.
-    const pendingMergeEntries = OnyxUtils.getPendingMergeEntries(keysToPreserve);
-
     return OnyxUtils.afterInit(() => {
+        const pendingMergeEntries = OnyxUtils.getPendingMergeEntries(keysToPreserve);
         const defaultKeyStates = OnyxUtils.getDefaultKeyStates();
         const initialKeys = Object.keys(defaultKeyStates);
 
