@@ -9,6 +9,13 @@
 <dd><p>Minimum interval between disk-pressure alerts. One disk-pressure burst fails every queued operation
 with the identical error, so per-operation logging would amplify the very storm it reports.</p>
 </dd>
+<dt><a href="#NOT_DELIVERED">NOT_DELIVERED</a></dt>
+<dd><p>Sentinel for &quot;nothing delivered yet&quot; in <code>connect()</code>&#39;s per-subscription dedup. A Symbol
+can&#39;t collide with any real Onyx value, so the first <code>Object.is</code> check never matches and
+the initial fire runs even when a key&#39;s genuine first value is <code>undefined</code>. It only needs
+to be distinct from real values, not unique per subscription, so one module-level instance
+is reused by every connection.</p>
+</dd>
 </dl>
 
 ## Functions
@@ -16,6 +23,24 @@ with the identical error, so per-operation logging would amplify the very storm 
 <dl>
 <dt><a href="#resetDiskPressureLogThrottle">resetDiskPressureLogThrottle()</a></dt>
 <dd><p>Test-only: clears the disk-pressure log throttle so each test observes its own alert.</p>
+</dd>
+<dt><a href="#trackPendingWrite">trackPendingWrite()</a></dt>
+<dd><p>Registers an in-flight write under each key it can change, so <code>scheduleInitialFire</code> waits only for
+the writes relevant to a connecting key. Returns the same promise so callers can wrap a write&#39;s
+return value inline. The write is deregistered once it settles (success or failure).</p>
+</dd>
+<dt><a href="#trackPendingGlobalWrite">trackPendingGlobalWrite()</a></dt>
+<dd><p>Registers an in-flight write that affects every key (Onyx.clear). Deregistered once it settles.</p>
+</dd>
+<dt><a href="#pendingWritesForKey">pendingWritesForKey()</a></dt>
+<dd><p>In-flight writes that can change the value delivered to a subscriber of <code>key</code>: writes to the key
+itself, writes to any member when <code>key</code> is a collection root, and global writes (clear).</p>
+</dd>
+<dt><a href="#scheduleInitialFire">scheduleInitialFire()</a></dt>
+<dd><p>Defer a <code>Onyx.connect</code> callback&#39;s initial fire until the writes relevant to <code>key</code> that are in
+flight this tick have applied, so it reads post-write cache and dedups against their notifications.
+The wait is scoped to <code>key</code> and snapshotted after one microtask, so an unrelated or slow write
+elsewhere cannot block or postpone this delivery, and writes issued after it do not either.</p>
 </dd>
 <dt><a href="#getMergeQueue">getMergeQueue()</a></dt>
 <dd><p>Getter - returns the merge queue.</p>
@@ -62,33 +87,20 @@ The resulting collection will only contain items that are returned by the select
 to the values for those keys (correctly typed) such as <code>[OnyxCollection&lt;Report&gt;, OnyxEntry&lt;string&gt;]</code></p>
 <p>Note: just using <code>.map</code>, you&#39;d end up with <code>Array&lt;OnyxCollection&lt;Report&gt;|OnyxEntry&lt;string&gt;&gt;</code>, which is not what we want. This preserves the order of the keys provided.</p>
 </dd>
-<dt><a href="#storeKeyBySubscriptions">storeKeyBySubscriptions(subscriptionID, key)</a></dt>
-<dd><p>Stores a subscription ID associated with a given key.</p>
-</dd>
-<dt><a href="#deleteKeyBySubscriptions">deleteKeyBySubscriptions(subscriptionID)</a></dt>
-<dd><p>Deletes a subscription ID associated with its corresponding key.</p>
-</dd>
 <dt><a href="#getAllKeys">getAllKeys()</a></dt>
 <dd><p>Returns current key names stored in persisted storage</p>
 </dd>
-<dt><a href="#tryGetCachedValue">tryGetCachedValue()</a></dt>
-<dd><p>Tries to get a value from the cache. If the value is not present in cache it will return the default value or undefined.
-If the requested key is a collection, it will return an object with all the collection members.</p>
+<dt><a href="#notifyKey">notifyKey()</a></dt>
+<dd><p>Notify subscribers of a single-key write. Wrapper over <code>onyxSubscriptionManager.notifyKey()</code>
+that also performs LRU bookkeeping for eviction.</p>
 </dd>
-<dt><a href="#keysChanged">keysChanged()</a></dt>
-<dd><p>When a collection of keys change, search for any callbacks matching the collection key and trigger those callbacks</p>
-</dd>
-<dt><a href="#keyChanged">keyChanged()</a></dt>
-<dd><p>When a key change happens, search for any callbacks matching the key or collection key and trigger those callbacks</p>
-</dd>
-<dt><a href="#sendDataToConnection">sendDataToConnection()</a></dt>
-<dd><p>Sends the data obtained from the keys to the connection.</p>
-</dd>
-<dt><a href="#getCollectionDataAndSendAsObject">getCollectionDataAndSendAsObject()</a></dt>
-<dd><p>Gets the data for a given an array of matching keys, combines them into an object, and sends the result back to the subscriber.</p>
+<dt><a href="#notifyCollection">notifyCollection()</a></dt>
+<dd><p>Notify subscribers of a batch collection update. Wrapper over
+<code>onyxSubscriptionManager.notifyCollection()</code> that also performs LRU bookkeeping per
+changed member.</p>
 </dd>
 <dt><a href="#remove">remove()</a></dt>
-<dd><p>Remove a key from Onyx and update the subscribers</p>
+<dd><p>Remove a key from Onyx and update the subscribers.</p>
 </dd>
 <dt><a href="#retryOperation">retryOperation()</a></dt>
 <dd><p>Handles storage operation failures based on the error class (see lib/storage/errors.ts).
@@ -136,12 +148,6 @@ It will also mark deep nested objects that need to be entirely replaced during t
 <dt><a href="#doAllCollectionItemsBelongToSameParent">doAllCollectionItemsBelongToSameParent()</a></dt>
 <dd><p>Verify if all the collection keys belong to the same parent</p>
 </dd>
-<dt><a href="#subscribeToKey">subscribeToKey(connectOptions)</a> ⇒</dt>
-<dd><p>Subscribes to an Onyx key and listens to its changes.</p>
-</dd>
-<dt><a href="#unsubscribeFromKey">unsubscribeFromKey(subscriptionID)</a></dt>
-<dd><p>Disconnects and removes the listener from the Onyx key.</p>
-</dd>
 <dt><a href="#setWithRetry">setWithRetry(params, retryAttempt)</a></dt>
 <dd><p>Writes a value to our store with the given key.
 Serves as core implementation for <code>Onyx.set()</code> public function, the difference being
@@ -180,10 +186,50 @@ Minimum interval between disk-pressure alerts. One disk-pressure burst fails eve
 with the identical error, so per-operation logging would amplify the very storm it reports.
 
 **Kind**: global constant  
+<a name="NOT_DELIVERED"></a>
+
+## NOT\_DELIVERED
+Sentinel for "nothing delivered yet" in `connect()`'s per-subscription dedup. A Symbol
+can't collide with any real Onyx value, so the first `Object.is` check never matches and
+the initial fire runs even when a key's genuine first value is `undefined`. It only needs
+to be distinct from real values, not unique per subscription, so one module-level instance
+is reused by every connection.
+
+**Kind**: global constant  
 <a name="resetDiskPressureLogThrottle"></a>
 
 ## resetDiskPressureLogThrottle()
 Test-only: clears the disk-pressure log throttle so each test observes its own alert.
+
+**Kind**: global function  
+<a name="trackPendingWrite"></a>
+
+## trackPendingWrite()
+Registers an in-flight write under each key it can change, so `scheduleInitialFire` waits only for
+the writes relevant to a connecting key. Returns the same promise so callers can wrap a write's
+return value inline. The write is deregistered once it settles (success or failure).
+
+**Kind**: global function  
+<a name="trackPendingGlobalWrite"></a>
+
+## trackPendingGlobalWrite()
+Registers an in-flight write that affects every key (Onyx.clear). Deregistered once it settles.
+
+**Kind**: global function  
+<a name="pendingWritesForKey"></a>
+
+## pendingWritesForKey()
+In-flight writes that can change the value delivered to a subscriber of `key`: writes to the key
+itself, writes to any member when `key` is a collection root, and global writes (clear).
+
+**Kind**: global function  
+<a name="scheduleInitialFire"></a>
+
+## scheduleInitialFire()
+Defer a `Onyx.connect` callback's initial fire until the writes relevant to `key` that are in
+flight this tick have applied, so it reads post-write cache and dedups against their notifications.
+The wait is scoped to `key` and snapshotted after one microtask, so an unrelated or slow write
+elsewhere cannot block or postpone this delivery, and writes issued after it do not either.
 
 **Kind**: global function  
 <a name="getMergeQueue"></a>
@@ -284,70 +330,31 @@ to the values for those keys (correctly typed) such as `[OnyxCollection<Report>,
 Note: just using `.map`, you'd end up with `Array<OnyxCollection<Report>|OnyxEntry<string>>`, which is not what we want. This preserves the order of the keys provided.
 
 **Kind**: global function  
-<a name="storeKeyBySubscriptions"></a>
-
-## storeKeyBySubscriptions(subscriptionID, key)
-Stores a subscription ID associated with a given key.
-
-**Kind**: global function  
-
-| Param | Description |
-| --- | --- |
-| subscriptionID | A subscription ID of the subscriber. |
-| key | A key that the subscriber is subscribed to. |
-
-<a name="deleteKeyBySubscriptions"></a>
-
-## deleteKeyBySubscriptions(subscriptionID)
-Deletes a subscription ID associated with its corresponding key.
-
-**Kind**: global function  
-
-| Param | Description |
-| --- | --- |
-| subscriptionID | The subscription ID to be deleted. |
-
 <a name="getAllKeys"></a>
 
 ## getAllKeys()
 Returns current key names stored in persisted storage
 
 **Kind**: global function  
-<a name="tryGetCachedValue"></a>
+<a name="notifyKey"></a>
 
-## tryGetCachedValue()
-Tries to get a value from the cache. If the value is not present in cache it will return the default value or undefined.
-If the requested key is a collection, it will return an object with all the collection members.
-
-**Kind**: global function  
-<a name="keysChanged"></a>
-
-## keysChanged()
-When a collection of keys change, search for any callbacks matching the collection key and trigger those callbacks
+## notifyKey()
+Notify subscribers of a single-key write. Wrapper over `onyxSubscriptionManager.notifyKey()`
+that also performs LRU bookkeeping for eviction.
 
 **Kind**: global function  
-<a name="keyChanged"></a>
+<a name="notifyCollection"></a>
 
-## keyChanged()
-When a key change happens, search for any callbacks matching the key or collection key and trigger those callbacks
-
-**Kind**: global function  
-<a name="sendDataToConnection"></a>
-
-## sendDataToConnection()
-Sends the data obtained from the keys to the connection.
-
-**Kind**: global function  
-<a name="getCollectionDataAndSendAsObject"></a>
-
-## getCollectionDataAndSendAsObject()
-Gets the data for a given an array of matching keys, combines them into an object, and sends the result back to the subscriber.
+## notifyCollection()
+Notify subscribers of a batch collection update. Wrapper over
+`onyxSubscriptionManager.notifyCollection()` that also performs LRU bookkeeping per
+changed member.
 
 **Kind**: global function  
 <a name="remove"></a>
 
 ## remove()
-Remove a key from Onyx and update the subscribers
+Remove a key from Onyx and update the subscribers.
 
 **Kind**: global function  
 <a name="retryOperation"></a>
@@ -439,29 +446,6 @@ Validate the collection is not empty and has a correct type before applying merg
 Verify if all the collection keys belong to the same parent
 
 **Kind**: global function  
-<a name="subscribeToKey"></a>
-
-## subscribeToKey(connectOptions) ⇒
-Subscribes to an Onyx key and listens to its changes.
-
-**Kind**: global function  
-**Returns**: The subscription ID to use when calling `OnyxUtils.unsubscribeFromKey()`.  
-
-| Param | Description |
-| --- | --- |
-| connectOptions | The options object that will define the behavior of the connection. |
-
-<a name="unsubscribeFromKey"></a>
-
-## unsubscribeFromKey(subscriptionID)
-Disconnects and removes the listener from the Onyx key.
-
-**Kind**: global function  
-
-| Param | Description |
-| --- | --- |
-| subscriptionID | Subscription ID returned by calling `OnyxUtils.subscribeToKey()`. |
-
 <a name="setWithRetry"></a>
 
 ## setWithRetry(params, retryAttempt)

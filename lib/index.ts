@@ -1,4 +1,4 @@
-import type {ConnectOptions, OnyxUpdate} from './Onyx';
+import type {Connection, ConnectOptions, OnyxUpdate} from './Onyx';
 import Onyx from './Onyx';
 import type {
     CustomTypeOptions,
@@ -19,7 +19,6 @@ import type {
     OnyxSetCollectionInput,
 } from './types';
 import type {FetchStatus, ResultMetadata, UseOnyxResult, UseOnyxOptions} from './useOnyx';
-import type {Connection} from './OnyxConnectionManager';
 import useOnyx from './useOnyx';
 import type {OnyxSQLiteKeyValuePair} from './storage/providers/SQLiteProvider';
 

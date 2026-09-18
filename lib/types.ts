@@ -209,16 +209,6 @@ type NullishObjectDeep<ObjectType extends object> = {
  */
 type Collection<TKey extends CollectionKeyBase, TValue> = Record<`${TKey}${string}`, TValue>;
 
-/** Represents the base options used in `Onyx.connect()` method. */
-// NOTE: Any changes to this type like adding or removing options must be accounted in OnyxConnectionManager's `generateConnectionID()` method!
-type BaseConnectOptions = {
-    /**
-     * If set to `false`, the connection won't be reused between other subscribers that are listening to the same Onyx key
-     * with the same connect configurations.
-     */
-    reuseConnection?: boolean;
-};
-
 /** Represents the callback function used in `Onyx.connect()` method with a regular key. */
 type DefaultConnectCallback<TKey extends OnyxKey> = (value: OnyxEntry<KeyValueMapping[TKey]>, key: TKey) => void;
 
@@ -233,17 +223,12 @@ type CollectionConnectCallback<TKey extends OnyxKey> = (value: NonUndefined<Onyx
  * `(collection, key)`). For any other key, the callback fires with the value at
  * that key (signature `(value, key)`).
  */
-// NOTE: Any changes to this type like adding or removing options must be accounted in OnyxConnectionManager's `generateConnectionID()` method!
-type ConnectOptions<TKey extends OnyxKey> = BaseConnectOptions & {
+type ConnectOptions<TKey extends OnyxKey> = {
     /** The Onyx key to subscribe to. */
     key: TKey;
 
     /** A function that will be called when the Onyx data we are subscribed changes. */
     callback?: (value: TKey extends CollectionKeyBase ? NonUndefined<OnyxCollection<KeyValueMapping[TKey]>> : OnyxEntry<KeyValueMapping[TKey]>, key: TKey) => void;
-};
-
-type CallbackToStateMapping<TKey extends OnyxKey> = ConnectOptions<TKey> & {
-    subscriptionID: number;
 };
 
 /**
@@ -420,8 +405,17 @@ type MixedOperationsQueue = {
     set: OnyxInputKeyValueMapping;
 };
 
+/**
+ * Represents a connection to an Onyx key, returned by `Onyx.connect()`/`Onyx.connectWithoutView()`.
+ * Pass it to `Onyx.disconnect()` to stop receiving callbacks for this subscription.
+ */
+type Connection = {
+    /** Unsubscribe this connection. Idempotent. */
+    unsubscribe: () => void;
+};
+
 export type {
-    BaseConnectOptions,
+    Connection,
     Collection,
     CollectionConnectCallback,
     CollectionKey,
@@ -435,7 +429,6 @@ export type {
     InitOptions,
     Key,
     KeyValueMapping,
-    CallbackToStateMapping,
     NonNull,
     NonUndefined,
     OnyxInputKeyValueMapping,
