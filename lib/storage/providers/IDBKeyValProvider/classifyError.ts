@@ -10,7 +10,7 @@ import {INDEXED_DB_UNAVAILABLE_MESSAGE} from './isIndexedDBAvailable';
 function classifyIDBError(error: unknown): ValueOf<typeof StorageErrorClass> {
     const {name, message} = getErrorParts(error);
 
-    // The engine is absent, not broken. E.g. private tabs and Lockdown Mode on WebKit.
+    // The engine is absent, not broken e.g. private tabs and Lockdown Mode on WebKit.
     if (message.includes("can't find variable: indexeddb") || message.includes('indexeddb is not defined') || message.includes(INDEXED_DB_UNAVAILABLE_MESSAGE.toLowerCase())) {
         return StorageErrorClass.UNAVAILABLE;
     }
