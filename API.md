@@ -58,9 +58,9 @@ value will be saved to storage after the default value.</p>
 <dd><p>Sets a collection by replacing all existing collection members with new values.
 Any existing collection members not included in the new data will be removed.</p>
 </dd>
-<dt><a href="#exportState">exportState()</a></dt>
-<dd><p>Returns all persisted Onyx key-value pairs as a plain object.
-RAM-only values and writes that have not reached storage are not included.</p>
+<dt><a href="#exportState">exportState([options])</a></dt>
+<dd><p>Returns persisted Onyx key-value pairs as a plain object.
+Live RAM-only values and writes that have not reached storage are not included.</p>
 </dd>
 </dl>
 
@@ -263,8 +263,14 @@ Onyx.setCollection(ONYXKEYS.COLLECTION.REPORT, {
 ```
 <a name="exportState"></a>
 
-## exportState()
-Returns all persisted Onyx key-value pairs as a plain object.
-RAM-only values and writes that have not reached storage are not included.
+## exportState([options])
+Returns persisted Onyx key-value pairs as a plain object.
+Live RAM-only values and writes that have not reached storage are not included.
 
 **Kind**: global function  
+
+| Param | Default | Description |
+| --- | --- | --- |
+| [options] |  | Export options. |
+| [options.includeStaleRamOnlyKeys] | <code>false</code> | Include persisted rows for keys that are now RAM-only. |
+

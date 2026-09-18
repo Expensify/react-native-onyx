@@ -611,12 +611,21 @@ function setCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, coll
     return OnyxUtils.afterInit(() => OnyxUtils.setCollectionWithRetry({collectionKey, collection}));
 }
 
+type ExportStateOptions = {
+    /** Include persisted rows for keys that are now RAM-only. Defaults to false. */
+    includeStaleRamOnlyKeys?: boolean;
+};
+
 /**
- * Returns all persisted Onyx key-value pairs as a plain object.
- * RAM-only values and writes that have not reached storage are not included.
+ * Returns persisted Onyx key-value pairs as a plain object.
+ * Live RAM-only values and writes that have not reached storage are not included.
+ * @param [options] Export options.
+ * @param [options.includeStaleRamOnlyKeys=false] Include persisted rows for keys that are now RAM-only.
  */
-function exportState(): Promise<Record<string, unknown>> {
-    return OnyxUtils.afterInit(() => Storage.getAll().then((entries) => Object.fromEntries(entries.filter(([key]) => !OnyxKeys.isRamOnlyKey(key)))));
+function exportState({includeStaleRamOnlyKeys = false}: ExportStateOptions = {}): Promise<Record<string, unknown>> {
+    return OnyxUtils.afterInit(() =>
+        Storage.getAll().then((entries) => Object.fromEntries(includeStaleRamOnlyKeys ? entries : entries.filter(([key]) => !OnyxKeys.isRamOnlyKey(key)))),
+    );
 }
 
 const Onyx = {
