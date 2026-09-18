@@ -544,7 +544,17 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
  */
 function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<void> {
     return OnyxUtils.trackPendingWrite(
-        data.map((updateItem) => updateItem.key),
+        // multiSet/collection items keep their keys in `.value`, not `.key`.
+        data.flatMap((updateItem) => {
+            if (
+                updateItem.onyxMethod === OnyxUtils.METHOD.MULTI_SET ||
+                updateItem.onyxMethod === OnyxUtils.METHOD.MERGE_COLLECTION ||
+                updateItem.onyxMethod === OnyxUtils.METHOD.SET_COLLECTION
+            ) {
+                return Object.keys(updateItem.value ?? {});
+            }
+            return updateItem.key;
+        }),
         OnyxUtils.afterInit(() => {
             // The queue of operations within a single `update` call in the format of <item key - list of operations updating the item>.
             // This allows us to batch the operations per item and merge them into one operation in the order they were requested.

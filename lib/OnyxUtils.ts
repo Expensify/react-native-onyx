@@ -102,7 +102,8 @@ const NOT_DELIVERED = Symbol('NOT_DELIVERED');
  * return value inline. The write is deregistered once it settles (success or failure).
  */
 function trackPendingWrite<T>(keys: OnyxKey | OnyxKey[], promise: Promise<T>): Promise<T> {
-    const keyList = Array.isArray(keys) ? keys : [keys];
+    // Drop nullish keys (e.g. a keyless `clear` item) so they never reach `pendingWritesForKey`'s scan.
+    const keyList = (Array.isArray(keys) ? keys : [keys]).filter((key) => typeof key === 'string');
     for (const key of keyList) {
         let set = pendingWritesByKey.get(key);
         if (!set) {
