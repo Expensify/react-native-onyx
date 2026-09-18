@@ -66,6 +66,36 @@ describe('Onyx', () => {
         return Onyx.clear();
     });
 
+    describe('exportState', () => {
+        it('exports persisted values without RAM-only values', async () => {
+            await Onyx.set(ONYX_KEYS.TEST_KEY, {nested: 'value'});
+            await Onyx.set(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'not persisted');
+
+            const state = await Onyx.exportState();
+
+            expect(state[ONYX_KEYS.TEST_KEY]).toEqual({nested: 'value'});
+            expect(state).not.toHaveProperty(ONYX_KEYS.RAM_ONLY_TEST_KEY);
+        });
+
+        it('propagates storage read failures', async () => {
+            const error = new Error('Storage read failed');
+            const getAll = jest.spyOn(StorageMock, 'getAll').mockRejectedValueOnce(error);
+
+            await expect(Onyx.exportState()).rejects.toBe(error);
+            getAll.mockRestore();
+        });
+
+        it('excludes stale persisted values for keys now configured as RAM-only', async () => {
+            const getAll = jest.spyOn(StorageMock, 'getAll').mockResolvedValueOnce([
+                [ONYX_KEYS.TEST_KEY, 'persisted'],
+                [ONYX_KEYS.RAM_ONLY_TEST_KEY, 'stale'],
+            ]);
+
+            await expect(Onyx.exportState()).resolves.toEqual({[ONYX_KEYS.TEST_KEY]: 'persisted'});
+            getAll.mockRestore();
+        });
+    });
+
     it('should remove key value from OnyxCache/Storage when set is called with null value', () =>
         Onyx.set(ONYX_KEYS.OTHER_TEST, 42)
             .then(() => OnyxUtils.getAllKeys())

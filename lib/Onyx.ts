@@ -611,6 +611,14 @@ function setCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, coll
     return OnyxUtils.afterInit(() => OnyxUtils.setCollectionWithRetry({collectionKey, collection}));
 }
 
+/**
+ * Returns all persisted Onyx key-value pairs as a plain object.
+ * RAM-only values and writes that have not reached storage are not included.
+ */
+function exportState(): Promise<Record<string, unknown>> {
+    return OnyxUtils.afterInit(() => Storage.getAll().then((entries) => Object.fromEntries(entries.filter(([key]) => !OnyxKeys.isRamOnlyKey(key)))));
+}
+
 const Onyx = {
     METHOD: OnyxUtils.METHOD,
     connect,
@@ -623,6 +631,7 @@ const Onyx = {
     setCollection,
     update,
     clear,
+    exportState,
     init,
     registerLogger: Logger.registerLogger,
 };
