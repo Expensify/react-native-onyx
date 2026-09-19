@@ -1,4 +1,4 @@
-import type {ConnectOptions, ExportStateOptions, OnyxUpdate} from './Onyx';
+import type {ConnectOptions, OnyxUpdate} from './Onyx';
 import Onyx from './Onyx';
 import type {
     CustomTypeOptions,
@@ -28,7 +28,6 @@ export {useOnyx};
 export type {
     ConnectOptions,
     CustomTypeOptions,
-    ExportStateOptions,
     FetchStatus,
     KeyValueMapping,
     NullishDeep,

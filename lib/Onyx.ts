@@ -6,7 +6,6 @@ import DevTools, {initDevTools} from './DevTools';
 import type {
     CollectionKeyBase,
     ConnectOptions,
-    ExportStateOptions,
     InitOptions,
     KeyValueMapping,
     MixedOperationsQueue,
@@ -616,16 +615,14 @@ function setCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, coll
  * Returns persisted Onyx key-value pairs as a plain object.
  * Live RAM-only values and writes that have not reached storage are not included.
  * Treat the returned object and its nested values as read-only.
- * @param [options] Export options.
- * @param [options.includeStaleRamOnlyKeys=false] Include persisted rows for keys that are now RAM-only.
  */
-function exportState({includeStaleRamOnlyKeys = false}: ExportStateOptions = {}): Promise<Record<OnyxKey, OnyxValue<OnyxKey>>> {
+function exportState(): Promise<Record<OnyxKey, OnyxValue<OnyxKey>>> {
     return OnyxUtils.afterInit(() =>
         Storage.getAll().then((entries) => {
             const state: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
 
             for (const [key, value] of entries) {
-                if (!includeStaleRamOnlyKeys && OnyxKeys.isRamOnlyKey(key)) {
+                if (OnyxKeys.isRamOnlyKey(key)) {
                     continue;
                 }
                 state[key] = value;
@@ -654,4 +651,4 @@ const Onyx = {
 };
 
 export default Onyx;
-export type {OnyxUpdate, ConnectOptions, ExportStateOptions, SetOptions};
+export type {OnyxUpdate, ConnectOptions, SetOptions};

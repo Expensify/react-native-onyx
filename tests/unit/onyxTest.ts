@@ -93,17 +93,7 @@ describe('Onyx', () => {
             await expect(Onyx.exportState()).rejects.toBe(error);
         });
 
-        it('includes stale persisted RAM-only values when requested without using current RAM-only values', async () => {
-            await Onyx.set(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'current');
-            jest.mocked(StorageMock.getAll).mockResolvedValueOnce([
-                [ONYX_KEYS.TEST_KEY, 'persisted'],
-                [ONYX_KEYS.RAM_ONLY_TEST_KEY, 'stale'],
-            ]);
-
-            await expect(Onyx.exportState({includeStaleRamOnlyKeys: true})).resolves.toEqual({[ONYX_KEYS.TEST_KEY]: 'persisted', [ONYX_KEYS.RAM_ONLY_TEST_KEY]: 'stale'});
-        });
-
-        it('excludes stale persisted RAM-only values by default', async () => {
+        it('excludes stale persisted RAM-only values', async () => {
             const staleCollectionMember = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
             jest.mocked(StorageMock.getAll).mockResolvedValueOnce([
                 [ONYX_KEYS.TEST_KEY, 'persisted'],
