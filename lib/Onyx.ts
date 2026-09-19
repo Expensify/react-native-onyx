@@ -6,6 +6,7 @@ import DevTools, {initDevTools} from './DevTools';
 import type {
     CollectionKeyBase,
     ConnectOptions,
+    ExportStateOptions,
     InitOptions,
     KeyValueMapping,
     MixedOperationsQueue,
@@ -611,19 +612,28 @@ function setCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, coll
     return OnyxUtils.afterInit(() => OnyxUtils.setCollectionWithRetry({collectionKey, collection}));
 }
 
-type ExportStateOptions = {
-    /** Include persisted rows for keys that are now RAM-only. Defaults to false. */
-    includeStaleRamOnlyKeys?: boolean;
-};
-
 /**
  * Returns persisted Onyx key-value pairs as a plain object.
  * Live RAM-only values and writes that have not reached storage are not included.
+ * Treat the returned object and its nested values as read-only.
  * @param [options] Export options.
  * @param [options.includeStaleRamOnlyKeys=false] Include persisted rows for keys that are now RAM-only.
  */
-function exportState({includeStaleRamOnlyKeys = false}: ExportStateOptions = {}): Promise<Record<string, unknown>> {
-    return OnyxUtils.afterInit(() => Storage.getAll().then((entries) => Object.fromEntries(includeStaleRamOnlyKeys ? entries : entries.filter(([key]) => !OnyxKeys.isRamOnlyKey(key)))));
+function exportState({includeStaleRamOnlyKeys = false}: ExportStateOptions = {}): Promise<Record<OnyxKey, OnyxValue<OnyxKey>>> {
+    return OnyxUtils.afterInit(() =>
+        Storage.getAll().then((entries) => {
+            const state: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
+
+            for (const [key, value] of entries) {
+                if (!includeStaleRamOnlyKeys && OnyxKeys.isRamOnlyKey(key)) {
+                    continue;
+                }
+                state[key] = value;
+            }
+
+            return state;
+        }),
+    );
 }
 
 const Onyx = {
@@ -644,4 +654,4 @@ const Onyx = {
 };
 
 export default Onyx;
-export type {OnyxUpdate, ConnectOptions, SetOptions};
+export type {OnyxUpdate, ConnectOptions, ExportStateOptions, SetOptions};

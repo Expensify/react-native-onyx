@@ -60,7 +60,8 @@ Any existing collection members not included in the new data will be removed.</p
 </dd>
 <dt><a href="#exportState">exportState([options])</a></dt>
 <dd><p>Returns persisted Onyx key-value pairs as a plain object.
-Live RAM-only values and writes that have not reached storage are not included.</p>
+Live RAM-only values and writes that have not reached storage are not included.
+Treat the returned object and its nested values as read-only.</p>
 </dd>
 </dl>
 
@@ -266,6 +267,7 @@ Onyx.setCollection(ONYXKEYS.COLLECTION.REPORT, {
 ## exportState([options])
 Returns persisted Onyx key-value pairs as a plain object.
 Live RAM-only values and writes that have not reached storage are not included.
+Treat the returned object and its nested values as read-only.
 
 **Kind**: global function  
 

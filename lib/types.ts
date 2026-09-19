@@ -327,6 +327,14 @@ type SetOptions = {
     skipCacheCheck?: boolean;
 };
 
+/**
+ * Represents the options used in `Onyx.exportState()` method.
+ */
+type ExportStateOptions = {
+    /** Include persisted rows for keys that are now RAM-only. Defaults to false. */
+    includeStaleRamOnlyKeys?: boolean;
+};
+
 type SetParams<TKey extends OnyxKey> = {
     key: TKey;
     value: OnyxSetInput<TKey>;
@@ -431,6 +439,7 @@ export type {
     DeepRecord,
     DefaultConnectCallback,
     ExtractOnyxCollectionValue,
+    ExportStateOptions,
     GenericFunction,
     InitOptions,
     Key,
