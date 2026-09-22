@@ -2882,6 +2882,35 @@ describe('Onyx', () => {
                 expect(cache.get(member1)).toBeUndefined();
                 expect(await StorageMock.getItem(member1)).toBeNull();
             });
+
+            it('should keep the key deleted when a pending merge read resolves after multiSet removed it', async () => {
+                const member1 = `${ONYX_KEYS.COLLECTION.TEST_KEY}1`;
+                const member2 = `${ONYX_KEYS.COLLECTION.TEST_KEY}2`;
+
+                await Onyx.merge(member1, {itemA: {id: 'a', stale: 'SHOULD BE GONE'}});
+                await Onyx.merge(member2, {itemB: {id: 'b'}});
+                await waitForPromisesToResolve();
+
+                const staleValue = lodashCloneDeep(cache.get(member1));
+
+                const deferredGet = createDeferredTask();
+                const originalGet = OnyxUtils.get;
+                jest.spyOn(OnyxUtils, 'get').mockImplementation(((key: OnyxKey) =>
+                    key === member1 ? deferredGet.promise.then(() => staleValue) : originalGet(key)) as typeof OnyxUtils.get);
+
+                const mergePromise = Onyx.merge(member1, {itemA: {childID: '1'}});
+
+                await Onyx.multiSet({[member1]: null, [member2]: {itemB: {touched: true}}});
+                await waitForPromisesToResolve();
+
+                deferredGet.resolve();
+                await mergePromise;
+                await waitForPromisesToResolve();
+
+                expect(cache.get(member1)).toBeUndefined();
+                expect(await StorageMock.getItem(member1)).toBeNull();
+                expect(cache.get(member2)).toEqual({itemB: {touched: true}});
+            });
         });
 
         describe('concurrency with Onyx.clear', () => {

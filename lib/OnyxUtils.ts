@@ -1471,6 +1471,10 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
 
     const {pairs: keyValuePairsToSet, keysToRemove: removalCandidates} = OnyxUtils.prepareKeyValuePairsForStorage(newData, true);
 
+    if (!retryAttempt) {
+        cancelPendingMergesForKeys(removalCandidates);
+    }
+
     // Removals of keys that are neither cached nor persisted are no-ops and skipped. When the key
     // index has not been loaded yet (empty set), keep the removal to be safe.
     const persistedKeys = cache.getAllKeys();
