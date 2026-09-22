@@ -3,6 +3,7 @@ import type {UseStore} from 'idb-keyval';
 import * as Logger from '../../../Logger';
 import {StorageErrorClass} from '../../errors';
 import classifyIDBError from './classifyError';
+import isIndexedDBAvailable, {INDEXED_DB_UNAVAILABLE_MESSAGE} from './isIndexedDBAvailable';
 
 const HEAL_ATTEMPTS_MAX = 3;
 
@@ -56,6 +57,11 @@ function createStore(dbName: string, storeName: string): UseStore {
 
     const getDB = () => {
         if (dbp) return dbp;
+
+        if (!isIndexedDBAvailable()) {
+            return Promise.reject(new Error(INDEXED_DB_UNAVAILABLE_MESSAGE));
+        }
+
         const request = indexedDB.open(dbName);
         request.onupgradeneeded = () => request.result.createObjectStore(storeName);
         return cacheOpenPromise(IDB.promisifyRequest(request));
@@ -161,6 +167,8 @@ function createStore(dbName: string, storeName: string): UseStore {
     //   Mirrors Dexie's PR1398_maxLoop pattern: https://github.com/dexie/Dexie.js/blob/master/src/functions/temp-transaction.ts
     // - CAPACITY / UNKNOWN are NOT the connection layer's responsibility — propagate to the operation
     //   layer (OnyxUtils.retryOperation) without retrying here, to avoid compounding retries.
+    // - UNAVAILABLE (no IndexedDB engine at all) is nobody's to recover — propagate so the storage
+    //   layer can degrade to memory-only once.
     // Note: concurrent store() calls share the heal budget. Under overlapping failures each caller
     // decrements independently, so the budget may drain faster than one-per-incident. This is
     // acceptable — same as Dexie's approach — and the budget resets on any success.

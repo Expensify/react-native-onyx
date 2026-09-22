@@ -15,6 +15,10 @@ describe('classifyIDBError', () => {
         // Transient connection failures.
         [new DOMException('Connection to Indexed Database server lost. Refresh the page to try again', 'UnknownError'), StorageErrorClass.TRANSIENT],
         [new DOMException('IDB write transaction aborted without an error', 'AbortError'), StorageErrorClass.TRANSIENT],
+        // No IndexedDB engine at all — the three wordings we can receive.
+        [new ReferenceError("Can't find variable: indexedDB"), StorageErrorClass.UNAVAILABLE],
+        [new ReferenceError('indexedDB is not defined'), StorageErrorClass.UNAVAILABLE],
+        [new Error('indexedDB is not available in this environment'), StorageErrorClass.UNAVAILABLE],
         // Anything else stays UNKNOWN.
         [new Error('some brand new failure'), StorageErrorClass.UNKNOWN],
     ])('classifies %s as %s', (error, expectedClass) => {
