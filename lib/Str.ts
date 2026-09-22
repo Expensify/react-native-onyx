@@ -17,8 +17,8 @@ function startsWith(haystack: string, needle: string) {
  */
 function result(parameter: string): string;
 function result<TFunction extends (...a: TArgs) => unknown, TArgs extends unknown[]>(parameter: TFunction, ...args: TArgs): ReturnType<TFunction>;
-function result<TFunction extends (...a: TArgs) => unknown, TArgs extends unknown[]>(parameter: TFunction, ...args: TArgs): ReturnType<TFunction> | string {
-    return typeof parameter === 'function' ? (parameter(...args) as ReturnType<TFunction>) : parameter;
+function result(parameter: string | ((...args: unknown[]) => unknown), ...args: unknown[]): unknown {
+    return typeof parameter === 'function' ? parameter(...args) : parameter;
 }
 
 /**
