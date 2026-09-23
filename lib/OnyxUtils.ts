@@ -77,6 +77,7 @@ type PreparedKeyValuePairs = {
 // Key/value store of Onyx key and arrays of values to merge
 let mergeQueue: Record<OnyxKey, Array<OnyxValue<OnyxKey>>> = {};
 let mergeQueuePromise: Record<OnyxKey, Promise<void>> = {};
+const mergeQueuesWithStaleRead = new WeakSet<Array<OnyxValue<OnyxKey>>>();
 
 // Holds a mapping of all the React components that want their state subscribed to a store key
 let callbackToStateMapping: Record<string, CallbackToStateMapping<OnyxKey>> = {};
@@ -941,17 +942,30 @@ function cancelPendingMergesForCollection(collectionKey: CollectionKeyBase): voi
     }
 }
 
-function getPendingMergeEntries(keysToPreserve: OnyxKey[]): Array<[OnyxKey, Array<OnyxValue<OnyxKey>>]> {
-    return Object.entries(mergeQueue).filter(([key]) => !keysToPreserve.some((preserveKey) => OnyxKeys.isKeyMatch(preserveKey, key)));
+type PendingMergeEntry = [OnyxKey, Array<OnyxValue<OnyxKey>>, number];
+
+function getPendingMergeEntries(keysToPreserve: OnyxKey[]): PendingMergeEntry[] {
+    return Object.entries(mergeQueue)
+        .filter(([key]) => !keysToPreserve.some((preserveKey) => OnyxKeys.isKeyMatch(preserveKey, key)))
+        .map(([key, queuedChanges]) => [key, queuedChanges, queuedChanges.length]);
 }
 
-function cancelPendingMerges(entries: Array<[OnyxKey, Array<OnyxValue<OnyxKey>>]>): void {
-    for (const [key, queuedChanges] of entries) {
+function cancelPendingMerges(entries: PendingMergeEntry[]): void {
+    for (const [key, queuedChanges, capturedLength] of entries) {
         if (mergeQueue[key] !== queuedChanges) {
             continue;
         }
-        cancelPendingMergesForKey(key);
+        if (queuedChanges.length === capturedLength) {
+            cancelPendingMergesForKey(key);
+            continue;
+        }
+        queuedChanges.splice(0, capturedLength);
+        mergeQueuesWithStaleRead.add(queuedChanges);
     }
+}
+
+function hasStaleMergeRead(queuedChanges: Array<OnyxValue<OnyxKey>>): boolean {
+    return mergeQueuesWithStaleRead.has(queuedChanges);
 }
 
 function cancelPendingMergesForKeys(keys: OnyxKey[]): void {
@@ -2021,6 +2035,7 @@ const OnyxUtils = {
     hasPendingMergeForKey,
     getPendingMergeEntries,
     cancelPendingMerges,
+    hasStaleMergeRead,
     prepareKeyValuePairsForStorage,
     mergeChanges,
     mergeAndMarkChanges,

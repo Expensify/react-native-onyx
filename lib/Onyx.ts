@@ -265,7 +265,8 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
             // Other writers (notably Onyx.update's mergeCollection path, which doesn't participate in mergeQueue)
             // can land between get() resolving and this callback running. Applying the delta on top of the value
             // captured back then and broadcasting it would overwrite those writes wholesale, so re-read the cache.
-            const existingValue = cache.hasCacheForKey(key) ? (cache.get(key) as OnyxInput<TKey> | undefined) : valueFromGet;
+            const baseValue = OnyxUtils.hasStaleMergeRead(queuedChanges) ? undefined : valueFromGet;
+            const existingValue = cache.hasCacheForKey(key) ? (cache.get(key) as OnyxInput<TKey> | undefined) : baseValue;
 
             try {
                 const validChanges = mergeQueue[key].filter((change) => {
