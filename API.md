@@ -58,6 +58,11 @@ value will be saved to storage after the default value.</p>
 <dd><p>Sets a collection by replacing all existing collection members with new values.
 Any existing collection members not included in the new data will be removed.</p>
 </dd>
+<dt><a href="#exportState">exportState()</a></dt>
+<dd><p>Returns persisted Onyx key-value pairs as a plain object.
+Live RAM-only values and writes that have not reached storage are not included.
+Treat the returned object and its nested values as read-only.</p>
+</dd>
 </dl>
 
 <a name="init"></a>
@@ -257,3 +262,11 @@ Onyx.setCollection(ONYXKEYS.COLLECTION.REPORT, {
     [`${ONYXKEYS.COLLECTION.REPORT}2`]: report2,
 });
 ```
+<a name="exportState"></a>
+
+## exportState()
+Returns persisted Onyx key-value pairs as a plain object.
+Live RAM-only values and writes that have not reached storage are not included.
+Treat the returned object and its nested values as read-only.
+
+**Kind**: global function  

@@ -66,6 +66,45 @@ describe('Onyx', () => {
         return Onyx.clear();
     });
 
+    describe('exportState', () => {
+        it('exports persisted values without current RAM-only values', async () => {
+            await Onyx.set(ONYX_KEYS.TEST_KEY, {nested: 'value'});
+            await Onyx.set(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'not persisted');
+
+            const state = await Onyx.exportState();
+
+            expect(state[ONYX_KEYS.TEST_KEY]).toEqual({nested: 'value'});
+            expect(state).not.toHaveProperty(ONYX_KEYS.RAM_ONLY_TEST_KEY);
+        });
+
+        it('exports persisted collection members', async () => {
+            const collectionMemberKey = `${ONYX_KEYS.COLLECTION.TEST_KEY}1`;
+            await Onyx.set(collectionMemberKey, {nested: 'value'});
+
+            const state = await Onyx.exportState();
+
+            expect(state[collectionMemberKey]).toEqual({nested: 'value'});
+        });
+
+        it('propagates storage read failures', async () => {
+            const error = new Error('Storage read failed');
+            jest.mocked(StorageMock.getAll).mockRejectedValueOnce(error);
+
+            await expect(Onyx.exportState()).rejects.toBe(error);
+        });
+
+        it('excludes stale persisted RAM-only values', async () => {
+            const staleCollectionMember = `${ONYX_KEYS.COLLECTION.RAM_ONLY_COLLECTION}1`;
+            jest.mocked(StorageMock.getAll).mockResolvedValueOnce([
+                [ONYX_KEYS.TEST_KEY, 'persisted'],
+                [ONYX_KEYS.RAM_ONLY_TEST_KEY, 'stale'],
+                [staleCollectionMember, 'stale collection member'],
+            ]);
+
+            await expect(Onyx.exportState()).resolves.toEqual({[ONYX_KEYS.TEST_KEY]: 'persisted'});
+        });
+    });
+
     it('should remove key value from OnyxCache/Storage when set is called with null value', () =>
         Onyx.set(ONYX_KEYS.OTHER_TEST, 42)
             .then(() => OnyxUtils.getAllKeys())
@@ -3698,6 +3737,20 @@ describe('Onyx.init', () => {
             await act(async () => waitForPromisesToResolve());
 
             expect(cache.get(`${ONYX_KEYS.COLLECTION.TEST_KEY}entry1`)).toEqual('test_1');
+        });
+
+        it('exportState', async () => {
+            await StorageMock.setItem(ONYX_KEYS.TEST_KEY, 'persisted');
+            jest.mocked(StorageMock.getAll).mockClear();
+
+            const exportPromise = Onyx.exportState();
+            await act(async () => waitForPromisesToResolve());
+
+            expect(StorageMock.getAll).not.toHaveBeenCalled();
+
+            Onyx.init({keys: ONYX_KEYS});
+
+            await expect(exportPromise).resolves.toEqual({[ONYX_KEYS.TEST_KEY]: 'persisted'});
         });
     });
 });
