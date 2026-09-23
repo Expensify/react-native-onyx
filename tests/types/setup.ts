@@ -11,8 +11,10 @@ type OnyxValues = {
     [ONYX_KEYS.TEST_KEY]: string;
 };
 
+// The optional list member makes the write-back checks in get.ts depend on the input types accepting
+// read-only data, because a readonly array is not assignable to a mutable one.
 type OnyxCollectionValues = {
-    [ONYX_KEYS.COLLECTION.TEST_KEY]: {str: string};
+    [ONYX_KEYS.COLLECTION.TEST_KEY]: {str: string; list?: string[]};
 };
 
 declare module '../../dist/types' {

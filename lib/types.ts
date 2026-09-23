@@ -1,4 +1,4 @@
-import type {Merge} from 'type-fest';
+import type {Merge, ReadonlyDeep} from 'type-fest';
 import type OnyxUtils from './OnyxUtils';
 import type {OnyxMethod} from './OnyxUtils';
 import type {FastMergeReplaceNullPatch} from './utils';
@@ -261,8 +261,9 @@ type OnyxCollectionInputValue<TOnyxValue> = OnyxInputValue<Record<string, TOnyxV
  * Represents an input value that can be passed to Onyx methods, that can be either `TOnyxValue` or `null`.
  * Setting a key to `null` will remove the key from the store.
  * `undefined` is not allowed for setting values, because it will have no effect on the data.
+ * Values are deeply read-only so that data read with `Onyx.get()` can be passed straight back in.
  */
-type OnyxInput<TKey extends OnyxKey> = OnyxInputValue<NullishDeep<KeyValueMapping[TKey]>>;
+type OnyxInput<TKey extends OnyxKey> = ReadonlyDeep<OnyxInputValue<NullishDeep<KeyValueMapping[TKey]>>>;
 
 /**
  * Represents a mapping object where each `OnyxKey` maps to either a value of its corresponding type in `KeyValueMapping` or `null`.
