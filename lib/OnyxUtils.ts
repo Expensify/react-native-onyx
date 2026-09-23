@@ -150,7 +150,7 @@ function pendingWritesForKey(key: OnyxKey): Array<Promise<unknown>> {
     }
     if (OnyxKeys.isCollectionKey(key)) {
         for (const [writeKey, set] of pendingWritesByKey) {
-            if (writeKey !== key && OnyxKeys.isCollectionMemberKey(key, writeKey)) {
+            if (writeKey !== key && OnyxKeys.getCollectionKey(writeKey) === key) {
                 promises.push(...set);
             }
         }
