@@ -334,22 +334,29 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
                 return mergeQueue[key] ? mergeQueuePromise[key] : Promise.resolve();
             }
 
-            // Merge attempts are batched together. The delta should be applied after a single call to get() to prevent a race condition.
-            // Using the initial value from storage in subsequent merge attempts will lead to an incorrect final merged value.
+            // Merge attempts are batched together. The delta should be applied after a single read of the
+            // existing value to prevent a race condition. Using the initial value from storage in subsequent
+            // merge attempts will lead to an incorrect final merged value.
             if (mergeQueue[key]) {
                 mergeQueue[key].push(changes);
                 return mergeQueuePromise[key];
             }
             mergeQueue[key] = [changes];
 
-            mergeQueuePromise[key] = OnyxUtils.get(key).then((valueFromGet) => {
+            // Eager hydration means an uncached key has nothing stored, and a storage round trip would land
+            // this write after the same update's cached keys, where subscribers can see a half-applied batch.
+            // A running `Onyx.clear` resets keys, so read what it leaves.
+            const readMergeBase = () => (cache.hasCacheForKey(key) ? (cache.get(key) as OnyxValue<TKey>) : undefined);
+            const pendingClear = cache.getTaskPromise(TASK.CLEAR);
+
+            mergeQueuePromise[key] = (pendingClear ? pendingClear.then(readMergeBase) : Promise.resolve(readMergeBase())).then((valueFromGet) => {
                 // Calls to Onyx.set after a merge will terminate the current merge process and clear the merge queue
                 if (mergeQueue[key] == null) {
                     return Promise.resolve();
                 }
 
                 // Other writers (notably Onyx.update's mergeCollection path, which doesn't participate in mergeQueue)
-                // can land between get() resolving and this callback running. Applying the delta on top of the value
+                // can land between the read above and this callback running. Applying the delta on top of the value
                 // captured back then and broadcasting it would overwrite those writes wholesale, so re-read the cache.
                 const existingValue = cache.hasCacheForKey(key) ? (cache.get(key) as OnyxInput<TKey> | undefined) : valueFromGet;
 
