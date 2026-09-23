@@ -104,6 +104,8 @@ progress or failures storm — the per-operation budget alone cannot stop a sess
 <li>DISK_PRESSURE: the device disk itself is full (or the database files are unreadable), so neither
 retries nor in-DB eviction can free space — the write is dropped (cache stays authoritative) with
 a single throttled alert + quota snapshot per burst.</li>
+<li>UNAVAILABLE: the storage engine does not exist in this environment, so the storage layer has
+already degraded to the in-memory provider. No retry.</li>
 <li>UNKNOWN: the provider couldn&#39;t classify it — log the full error shape (name + message +
 provider) once so it&#39;s visible, then bounded retry without eviction.</li>
 </ul>
@@ -365,6 +367,8 @@ capacity recovery (eviction) so that a given failure is retried by exactly one l
 - DISK_PRESSURE: the device disk itself is full (or the database files are unreadable), so neither
   retries nor in-DB eviction can free space — the write is dropped (cache stays authoritative) with
   a single throttled alert + quota snapshot per burst.
+- UNAVAILABLE: the storage engine does not exist in this environment, so the storage layer has
+  already degraded to the in-memory provider. No retry.
 - UNKNOWN: the provider couldn't classify it — log the full error shape (name + message +
   provider) once so it's visible, then bounded retry without eviction.
 

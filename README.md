@@ -288,6 +288,10 @@ function signOut() {
 }
 ```
 
+## Export persisted state
+
+`Onyx.exportState()` returns a plain object containing persisted keys and values from the active storage provider. It works on native and web without opening another database connection. The export excludes stale persisted rows for keys that are now RAM-only. Current RAM-only values and writes still in progress are never included. Treat the returned object and its nested values as read-only because some providers return references to their stored values. The result can contain sensitive data; callers should redact it before sharing.
+
 ## Storage Providers
 `Onyx.get`, `Onyx.set`, and the rest of the API accesses the underlying storage
 differently depending on the platform

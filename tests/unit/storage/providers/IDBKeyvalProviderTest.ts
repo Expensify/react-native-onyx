@@ -1,6 +1,7 @@
 import * as IDB from 'idb-keyval';
 import IDBKeyValProvider from '../../../../lib/storage/providers/IDBKeyValProvider';
 import utils from '../../../../lib/utils';
+import {StorageErrorClass} from '../../../../lib/storage/errors';
 import type {GenericDeepRecord} from '../../../types';
 
 const ONYXKEYS = {
@@ -36,6 +37,39 @@ describe('IDBKeyValProvider', () => {
     beforeEach(async () => {
         IDBKeyValProvider.init();
         await IDB.clear(IDBKeyValProvider.store);
+    });
+
+    describe('init', () => {
+        function withoutIndexedDB(callback: () => void) {
+            const descriptor = Object.getOwnPropertyDescriptor(window, 'indexedDB');
+            delete (window as {indexedDB?: unknown}).indexedDB;
+            try {
+                callback();
+            } finally {
+                if (descriptor) {
+                    Object.defineProperty(window, 'indexedDB', descriptor);
+                }
+            }
+        }
+
+        it('should throw the store-could-not-be-created sentinel when there is no indexedDB global', () => {
+            withoutIndexedDB(() => {
+                expect(() => IDBKeyValProvider.init()).toThrow('IDBKeyVal store could not be created');
+            });
+        });
+
+        it('should classify its own missing-engine error as UNAVAILABLE', () => {
+            withoutIndexedDB(() => {
+                let thrown: unknown;
+                try {
+                    IDBKeyValProvider.init();
+                } catch (error) {
+                    thrown = error;
+                }
+
+                expect(IDBKeyValProvider.classifyError(thrown)).toBe(StorageErrorClass.UNAVAILABLE);
+            });
+        });
     });
 
     describe('getItem', () => {

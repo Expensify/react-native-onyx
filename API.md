@@ -70,6 +70,11 @@ finished, so a read issued after them sees the new value without awaiting the wr
 <p>A collection with no members resolves to <code>{}</code>. A collection read on an empty store resolves to
 <code>undefined</code>.</p>
 </dd>
+<dt><a href="#exportState">exportState()</a></dt>
+<dd><p>Returns persisted Onyx key-value pairs as a plain object.
+Live RAM-only values and writes that have not reached storage are not included.
+Treat the returned object and its nested values as read-only.</p>
+</dd>
 </dl>
 
 <a name="init"></a>
@@ -298,3 +303,12 @@ A collection with no members resolves to `{}`. A collection read on an empty sto
 const report = await Onyx.get(`${ONYXKEYS.COLLECTION.REPORT}${reportID}`);
 const allReports = await Onyx.get(ONYXKEYS.COLLECTION.REPORT);
 ```
+
+<a name="exportState"></a>
+
+## exportState()
+Returns persisted Onyx key-value pairs as a plain object.
+Live RAM-only values and writes that have not reached storage are not included.
+Treat the returned object and its nested values as read-only.
+
+**Kind**: global function
