@@ -54,14 +54,18 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
     // Reactive cache presence, so the first value landing re-renders even when the selector output is unchanged.
     const isCached = useSyncExternalStore(subscribe, () => cache.hasCacheForKey(key));
 
-    // Loading only on a key's first render when a merge is in flight and nothing is cached yet.
+    // Loading while a first value is still on its way: nothing cached and a merge in flight.
     // eslint-disable-next-line react-hooks/refs
     const isLoading = connectedKeyRef.current !== key && !isCached && OnyxUtils.hasPendingMergeForKey(key);
     const loadingStatus: FetchStatus = isLoading ? 'loading' : 'loaded';
 
+    // Only advance the marker once a value exists, so an unrelated re-render can't end loading early.
     useEffect(() => {
+        if (!isCached) {
+            return;
+        }
         connectedKeyRef.current = key;
-    }, [key]);
+    }, [isCached, key]);
 
     // Blank the value while loading: the pending merge isn't in cache yet.
     const result = isLoading ? undefined : (value as NonNullable<TReturnValue> | undefined);
