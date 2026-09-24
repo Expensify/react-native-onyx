@@ -633,6 +633,70 @@ function exportState(): Promise<Record<OnyxKey, OnyxValue<OnyxKey>>> {
     );
 }
 
+/**
+ * Reads the current value of an Onyx key once, without subscribing. Use `useOnyx()` or
+ * `Onyx.connectWithoutView()` when the value has to stay current.
+ *
+ * A single key resolves to the cached object itself rather than a copy, so mutating it would be visible
+ * to every other reader of that key. A collection resolves to a frozen snapshot of its members.
+ *
+ * merge() queues its changes for a later tick, so a read issued before the merge resolves will not see
+ * them. Await the merge first. set() and multiSet() reach the cache before returning, once init() has
+ * finished, so a read issued after them sees the new value without awaiting the write.
+ *
+ * A collection with no members resolves to `{}`. A collection read on an empty store resolves to
+ * `undefined`.
+ *
+ * @example
+ * const report = await Onyx.get(`${ONYXKEYS.COLLECTION.REPORT}${reportID}`);
+ * const allReports = await Onyx.get(ONYXKEYS.COLLECTION.REPORT);
+ *
+ * @param key ONYXKEY to read, either a collection key or a single key
+ * @returns The current value, or `undefined` if the key has none.
+ */
+function get<TKey extends OnyxKey>(key: TKey): Promise<OnyxValue<TKey>> {
+    return OnyxUtils.afterInit(() => {
+        if (OnyxKeys.isCollectionKey(key)) {
+            const cachedCollection = OnyxUtils.tryGetCachedValue(key);
+
+            if (cachedCollection) {
+                return Promise.resolve(cachedCollection as OnyxValue<TKey>);
+            }
+
+            return OnyxUtils.getAllKeys()
+                .then((allKeys) => OnyxUtils.multiGet([...allKeys].filter((memberKey) => OnyxKeys.isCollectionMemberKey(key, memberKey))))
+                .then(() => OnyxUtils.tryGetCachedValue(key) as OnyxValue<TKey>);
+        }
+
+        return OnyxUtils.get(key).then((value) => (value ?? undefined) as OnyxValue<TKey>);
+    });
+}
+
+/**
+ * Reads several Onyx keys at once, without subscribing. Use `useOnyx()` or `Onyx.connectWithoutView()` when
+ * the values have to stay current.
+ *
+ * Values come back in the order of the keys given, and each is what get() returns for its key.
+ *
+ * Unlike multiSet(), which writes in one batch, this reads keys one at a time: a key missing from the cache
+ * costs its own storage read. To read a whole collection, call get(collectionKey) once instead of listing its
+ * members.
+ *
+ * @example
+ * const [session, wallet, report] = await Onyx.multiGet([
+ *     ONYXKEYS.SESSION,
+ *     ONYXKEYS.WALLET,
+ *     `${ONYXKEYS.COLLECTION.REPORT}${reportID}`,
+ * ]);
+ *
+ * @param keys ONYXKEYS to read, in any mix of collection keys and single keys
+ * @returns The values in the order of their keys, each `undefined` where a key has no value.
+ */
+function multiGet<const Keys extends readonly OnyxKey[]>(keys: Keys): Promise<{[Index in keyof Keys]: OnyxValue<Keys[Index]>}> {
+    // map() widens the key tuple to an array, so the per-slot value types survive only through the cast.
+    return Promise.all(keys.map((key) => get(key))) as Promise<{[Index in keyof Keys]: OnyxValue<Keys[Index]>}>;
+}
+
 const Onyx = {
     METHOD: OnyxUtils.METHOD,
     connect,
@@ -647,6 +711,8 @@ const Onyx = {
     clear,
     exportState,
     init,
+    get,
+    multiGet,
     registerLogger: Logger.registerLogger,
 };
 
