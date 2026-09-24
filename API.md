@@ -63,6 +63,17 @@ Any existing collection members not included in the new data will be removed.</p
 Live RAM-only values and writes that have not reached storage are not included.
 Treat the returned object and its nested values as read-only.</p>
 </dd>
+<dt><a href="#get">get(key)</a> ⇒</dt>
+<dd><p>Reads the current value of an Onyx key once, without subscribing. Use <code>useOnyx()</code> or
+<code>Onyx.connectWithoutView()</code> when the value has to stay current.</p>
+<p>A single key resolves to the cached object itself rather than a copy, so mutating it would be visible
+to every other reader of that key. A collection resolves to a frozen snapshot of its members.</p>
+<p>merge() queues its changes for a later tick, so a read issued before the merge resolves will not see
+them. Await the merge first. set() and multiSet() reach the cache before returning, once init() has
+finished, so a read issued after them sees the new value without awaiting the write.</p>
+<p>A collection with no members resolves to <code>{}</code>. A collection read on an empty store resolves to
+<code>undefined</code>.</p>
+</dd>
 </dl>
 
 <a name="init"></a>
@@ -270,3 +281,31 @@ Live RAM-only values and writes that have not reached storage are not included.
 Treat the returned object and its nested values as read-only.
 
 **Kind**: global function  
+<a name="get"></a>
+
+## get(key) ⇒
+Reads the current value of an Onyx key once, without subscribing. Use `useOnyx()` or
+`Onyx.connectWithoutView()` when the value has to stay current.
+
+A single key resolves to the cached object itself rather than a copy, so mutating it would be visible
+to every other reader of that key. A collection resolves to a frozen snapshot of its members.
+
+merge() queues its changes for a later tick, so a read issued before the merge resolves will not see
+them. Await the merge first. set() and multiSet() reach the cache before returning, once init() has
+finished, so a read issued after them sees the new value without awaiting the write.
+
+A collection with no members resolves to `{}`. A collection read on an empty store resolves to
+`undefined`.
+
+**Kind**: global function  
+**Returns**: The current value, or `undefined` if the key has none.  
+
+| Param | Description |
+| --- | --- |
+| key | ONYXKEY to read, either a collection key or a single key |
+
+**Example**  
+```js
+const report = await Onyx.get(`${ONYXKEYS.COLLECTION.REPORT}${reportID}`);
+const allReports = await Onyx.get(ONYXKEYS.COLLECTION.REPORT);
+```
