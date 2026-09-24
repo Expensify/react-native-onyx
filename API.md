@@ -74,6 +74,14 @@ finished, so a read issued after them sees the new value without awaiting the wr
 <p>A collection with no members resolves to <code>{}</code>. A collection read on an empty store resolves to
 <code>undefined</code>.</p>
 </dd>
+<dt><a href="#multiGet">multiGet(keys)</a> ⇒</dt>
+<dd><p>Reads several Onyx keys at once, without subscribing. Use <code>useOnyx()</code> or <code>Onyx.connectWithoutView()</code> when
+the values have to stay current.</p>
+<p>Values come back in the order of the keys given, and each is what get() returns for its key.</p>
+<p>Unlike multiSet(), which writes in one batch, this reads keys one at a time: a key missing from the cache
+costs its own storage read. To read a whole collection, call get(collectionKey) once instead of listing its
+members.</p>
+</dd>
 </dl>
 
 <a name="init"></a>
@@ -308,4 +316,31 @@ A collection with no members resolves to `{}`. A collection read on an empty sto
 ```js
 const report = await Onyx.get(`${ONYXKEYS.COLLECTION.REPORT}${reportID}`);
 const allReports = await Onyx.get(ONYXKEYS.COLLECTION.REPORT);
+```
+<a name="multiGet"></a>
+
+## multiGet(keys) ⇒
+Reads several Onyx keys at once, without subscribing. Use `useOnyx()` or `Onyx.connectWithoutView()` when
+the values have to stay current.
+
+Values come back in the order of the keys given, and each is what get() returns for its key.
+
+Unlike multiSet(), which writes in one batch, this reads keys one at a time: a key missing from the cache
+costs its own storage read. To read a whole collection, call get(collectionKey) once instead of listing its
+members.
+
+**Kind**: global function  
+**Returns**: The values in the order of their keys, each `undefined` where a key has no value.  
+
+| Param | Description |
+| --- | --- |
+| keys | ONYXKEYS to read, in any mix of collection keys and single keys |
+
+**Example**  
+```js
+const [session, wallet, report] = await Onyx.multiGet([
+    ONYXKEYS.SESSION,
+    ONYXKEYS.WALLET,
+    `${ONYXKEYS.COLLECTION.REPORT}${reportID}`,
+]);
 ```

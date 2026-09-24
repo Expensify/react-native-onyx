@@ -3529,6 +3529,65 @@ describe('Onyx', () => {
             expect(Object.isFrozen(collection)).toBe(true);
         });
     });
+
+    describe('multiGet', () => {
+        it('should resolve the values of several keys in the order the keys were given', async () => {
+            await Onyx.set(ONYX_KEYS.TEST_KEY, 'value');
+            await Onyx.set(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`, {id: 1});
+
+            await expect(Onyx.multiGet([`${ONYX_KEYS.COLLECTION.TEST_KEY}1`, ONYX_KEYS.TEST_KEY])).resolves.toEqual([{id: 1}, 'value']);
+        });
+
+        it('should resolve a collection key listed alongside single keys', async () => {
+            await Onyx.setCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {id: 1},
+                [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {id: 2},
+            } as GenericCollection);
+            await Onyx.set(ONYX_KEYS.TEST_KEY, 'value');
+
+            await expect(Onyx.multiGet([ONYX_KEYS.TEST_KEY, ONYX_KEYS.COLLECTION.TEST_KEY])).resolves.toEqual([
+                'value',
+                {
+                    [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {id: 1},
+                    [`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]: {id: 2},
+                },
+            ]);
+        });
+
+        it('should resolve a key with no value to undefined without failing the others', async () => {
+            await Onyx.set(ONYX_KEYS.TEST_KEY, 'value');
+
+            await expect(Onyx.multiGet([ONYX_KEYS.TEST_KEY, 'neverWrittenKey'])).resolves.toEqual(['value', undefined]);
+        });
+
+        it('should fall back to storage per key when the cache holds none of them', async () => {
+            const memberKey = `${ONYX_KEYS.COLLECTION.TEST_KEY}1`;
+            await Onyx.set(ONYX_KEYS.TEST_KEY, {a: 1});
+            await Onyx.set(memberKey, {b: 2});
+
+            cache.drop(ONYX_KEYS.TEST_KEY);
+            cache.drop(memberKey);
+            cache.clearNullishStorageKeys();
+
+            await expect(Onyx.multiGet([ONYX_KEYS.TEST_KEY, memberKey])).resolves.toEqual([{a: 1}, {b: 2}]);
+        });
+
+        it('should resolve an empty key list to an empty array', async () => {
+            await expect(Onyx.multiGet([])).resolves.toEqual([]);
+        });
+
+        it('should not subscribe to the keys it reads', async () => {
+            await Onyx.set(ONYX_KEYS.TEST_KEY, 'first');
+            await Onyx.multiGet([ONYX_KEYS.TEST_KEY]);
+
+            const sendDataToConnectionSpy = jest.spyOn(OnyxUtils, 'sendDataToConnection');
+            await Onyx.set(ONYX_KEYS.TEST_KEY, 'second');
+
+            expect(sendDataToConnectionSpy).not.toHaveBeenCalled();
+
+            sendDataToConnectionSpy.mockRestore();
+        });
+    });
 });
 
 // Separate describe block for Onyx.init to control initialization during each test.
