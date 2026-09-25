@@ -30,6 +30,7 @@ import type {
 } from './types';
 import OnyxUtils from './OnyxUtils';
 import OnyxKeys from './OnyxKeys';
+import PendingWrites from './PendingWrites';
 import logMessages from './logMessages';
 import onyxSubscriptionManager from './OnyxSubscriptionManager';
 import OnyxMerge from './OnyxMerge';
@@ -167,7 +168,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
             unsubscribeFn = onyxSubscriptionManager.subscribe(key, (value, k) => {
                 deliverCollection(value as unknown as OnyxValue<TKey>, k as TKey);
             });
-            OnyxUtils.scheduleInitialSubscriberNotification(key, () => {
+            PendingWrites.scheduleInitialSubscriberNotification(key, () => {
                 if (!active) {
                     return;
                 }
@@ -188,7 +189,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
         unsubscribeFn = onyxSubscriptionManager.subscribe(key, (value, k) => {
             deliverValue(value, k as TKey);
         });
-        OnyxUtils.scheduleInitialSubscriberNotification(key, () => {
+        PendingWrites.scheduleInitialSubscriberNotification(key, () => {
             if (!active) {
                 return;
             }
@@ -271,7 +272,7 @@ function disconnect(connection: Connection): void {
  * @param options optional configuration object
  */
 function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options?: SetOptions): Promise<void> {
-    return OnyxUtils.trackPendingWrite(
+    return PendingWrites.trackPendingWrite(
         key,
         OnyxUtils.afterInit(() => OnyxUtils.setWithRetry({key, value, options})),
     );
@@ -285,7 +286,7 @@ function set<TKey extends OnyxKey>(key: TKey, value: OnyxSetInput<TKey>, options
  * @param data object keyed by ONYXKEYS and the values to set
  */
 function multiSet(data: OnyxMultiSetInput): Promise<void> {
-    return OnyxUtils.trackPendingWrite(
+    return PendingWrites.trackPendingWrite(
         Object.keys(data),
         OnyxUtils.afterInit(() => OnyxUtils.multiSetWithRetry(data)),
     );
@@ -308,7 +309,7 @@ function multiSet(data: OnyxMultiSetInput): Promise<void> {
  * Onyx.merge(ONYXKEYS.POLICY, {name: 'My Workspace'}); // -> {id: 1, name: 'My Workspace'}
  */
 function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): Promise<void> {
-    return OnyxUtils.trackPendingWrite(
+    return PendingWrites.trackPendingWrite(
         key,
         OnyxUtils.afterInit(() => {
             const skippableCollectionMemberIDs = OnyxUtils.getSkippableCollectionMemberIDs();
@@ -419,7 +420,7 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
  * @param collection Object collection keyed by individual collection member keys and values
  */
 function mergeCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collection: OnyxMergeCollectionInput<TKey>): Promise<void> {
-    return OnyxUtils.trackPendingWrite(
+    return PendingWrites.trackPendingWrite(
         Object.keys(collection),
         OnyxUtils.afterInit(() => OnyxUtils.mergeCollectionWithPatches({collectionKey, collection})),
     );
@@ -447,7 +448,7 @@ function mergeCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, co
  * @param keysToPreserve is a list of ONYXKEYS that should not be cleared with the rest of the data
  */
 function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
-    return OnyxUtils.trackPendingGlobalWrite(
+    return PendingWrites.trackPendingGlobalWrite(
         OnyxUtils.afterInit(() => {
             const defaultKeyStates = OnyxUtils.getDefaultKeyStates();
             const initialKeys = Object.keys(defaultKeyStates);
@@ -550,7 +551,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
  * @returns resolves when all operations are complete
  */
 function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<void> {
-    return OnyxUtils.trackPendingWrite(
+    return PendingWrites.trackPendingWrite(
         // multiSet/collection items keep their keys in `.value`, not `.key`.
         data.flatMap((updateItem) => {
             if (
@@ -720,7 +721,7 @@ function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<vo
  * @param collection Object collection keyed by individual collection member keys and values
  */
 function setCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, collection: OnyxSetCollectionInput<TKey>): Promise<void> {
-    return OnyxUtils.trackPendingWrite(
+    return PendingWrites.trackPendingWrite(
         Object.keys(collection),
         OnyxUtils.afterInit(() => OnyxUtils.setCollectionWithRetry({collectionKey, collection})),
     );

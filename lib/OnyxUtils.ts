@@ -5,6 +5,7 @@ import * as Logger from './Logger';
 import type Onyx from './Onyx';
 import cache, {TASK} from './OnyxCache';
 import OnyxKeys from './OnyxKeys';
+import PendingWrites from './PendingWrites';
 import StorageCircuitBreaker from './StorageCircuitBreaker';
 import onyxSubscriptionManager from './OnyxSubscriptionManager';
 import Storage from './storage';
@@ -71,13 +72,6 @@ type PreparedKeyValuePairs = {
 let mergeQueue: Record<OnyxKey, Array<OnyxValue<OnyxKey>>> = {};
 let mergeQueuePromise: Record<OnyxKey, Promise<void>> = {};
 
-// In-flight writes tracked per affected key, so a subscriber's initial fire waits only for writes
-// that can change its own value, never for unrelated (or slow) writes elsewhere.
-const pendingWritesByKey = new Map<OnyxKey, Set<Promise<unknown>>>();
-
-// In-flight writes that affect every key (Onyx.clear). Any initial fire waits for these.
-const pendingGlobalWrites = new Set<Promise<unknown>>();
-
 // Optional user-provided key value states set when Onyx initializes or clears
 let defaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
 
@@ -95,85 +89,6 @@ const deferredInitTask = createDeferredTask();
  */
 // eslint-disable-next-line rulesdir/no-negated-variables
 const NOT_DELIVERED = Symbol('NOT_DELIVERED');
-
-/**
- * Registers an in-flight write under each key it can change, so `scheduleInitialSubscriberNotification` waits only for
- * the writes relevant to a connecting key. Returns the same promise so callers can wrap a write's
- * return value inline. The write is deregistered once it settles (success or failure).
- */
-function trackPendingWrite<T>(keys: OnyxKey | OnyxKey[], pendingWrite: Promise<T>): Promise<T> {
-    // Drop nullish keys (e.g. a keyless `clear` item) so they never reach `getPendingWritesForKey`'s scan.
-    const keyList = (Array.isArray(keys) ? keys : [keys]).filter((key) => typeof key === 'string');
-    for (const key of keyList) {
-        let pendingWritesForKey = pendingWritesByKey.get(key);
-        if (!pendingWritesForKey) {
-            pendingWritesForKey = new Set();
-            pendingWritesByKey.set(key, pendingWritesForKey);
-        }
-        pendingWritesForKey.add(pendingWrite);
-    }
-    const deregister = () => {
-        for (const key of keyList) {
-            const pendingWritesForKey = pendingWritesByKey.get(key);
-            if (!pendingWritesForKey) {
-                continue;
-            }
-            pendingWritesForKey.delete(pendingWrite);
-            if (pendingWritesForKey.size === 0) {
-                pendingWritesByKey.delete(key);
-            }
-        }
-    };
-    pendingWrite.then(deregister, deregister);
-    return pendingWrite;
-}
-
-/**
- * Registers an in-flight write that affects every key (Onyx.clear). Deregistered once it settles.
- */
-function trackPendingGlobalWrite<T>(pendingGlobalWrite: Promise<T>): Promise<T> {
-    pendingGlobalWrites.add(pendingGlobalWrite);
-    const deregister = () => pendingGlobalWrites.delete(pendingGlobalWrite);
-    pendingGlobalWrite.then(deregister, deregister);
-    return pendingGlobalWrite;
-}
-
-/**
- * In-flight writes that can change the value delivered to a subscriber of `key`: writes to the key
- * itself, writes to any member when `key` is a collection root, and global writes (clear).
- */
-function getPendingWritesForKey(key: OnyxKey): Array<Promise<unknown>> {
-    const promises = [...pendingGlobalWrites];
-    const own = pendingWritesByKey.get(key);
-    if (own) {
-        promises.push(...own);
-    }
-    if (OnyxKeys.isCollectionKey(key)) {
-        for (const [writeKey, set] of pendingWritesByKey) {
-            if (writeKey !== key && OnyxKeys.getCollectionKey(writeKey) === key) {
-                promises.push(...set);
-            }
-        }
-    }
-    return promises;
-}
-
-/**
- * Defer a `Onyx.connect` callback's initial fire until the writes relevant to `key` that are in
- * flight this tick have applied, so it reads post-write cache and dedups against their notifications.
- * The wait is scoped to `key` and snapshotted after one microtask, so an unrelated or slow write
- * elsewhere cannot block or postpone this delivery, and writes issued after it do not either.
- */
-function scheduleInitialSubscriberNotification(key: OnyxKey, fn: () => void): void {
-    Promise.resolve().then(() => {
-        const relevant = getPendingWritesForKey(key);
-        if (relevant.length === 0) {
-            fn();
-            return;
-        }
-        Promise.all(relevant.map((promise) => promise.catch(() => undefined))).then(fn);
-    });
-}
 
 // Collection member IDs that Onyx should silently ignore across all operations — reads, writes, cache, and subscriber
 // notifications. This is used to filter out keys formed from invalid/default IDs (e.g. "-1", "0",
@@ -1679,16 +1594,12 @@ function logKeyRemoved(onyxMethod: Extract<OnyxMethod, 'set' | 'merge'>, key: On
 function clearOnyxUtilsInternals() {
     mergeQueue = {};
     mergeQueuePromise = {};
-    pendingWritesByKey.clear();
-    pendingGlobalWrites.clear();
+    PendingWrites.clearPendingWrites();
 }
 
 const OnyxUtils = {
     METHOD,
     NOT_DELIVERED,
-    scheduleInitialSubscriberNotification,
-    trackPendingWrite,
-    trackPendingGlobalWrite,
     getMergeQueue,
     getMergeQueuePromise,
     getDefaultKeyStates,
