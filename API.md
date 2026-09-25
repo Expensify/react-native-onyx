@@ -92,7 +92,7 @@ const connection = Onyx.connect({
 For a collection root key, the callback fires with the entire frozen collection
 object whenever any member changes; signature `(collection, collectionKey)`.
 For any other key, the callback fires with the value at that key; signature
-`(value, key)`. Initial fire is deferred via `scheduleInitialFire` so it reads
+`(value, key)`. Initial fire is deferred via `scheduleInitialSubscriberNotification` so it reads
 cache after any same-tick writes have applied.
 <a name="connectWithoutView"></a>
 
@@ -119,7 +119,7 @@ const connection = Onyx.connectWithoutView({
 For a collection root key, the callback fires with the entire frozen collection
 object whenever any member changes; signature `(collection, collectionKey)`.
 For any other key, the callback fires with the value at that key; signature
-`(value, key)`. Initial fire is deferred via `scheduleInitialFire` so it reads
+`(value, key)`. Initial fire is deferred via `scheduleInitialSubscriberNotification` so it reads
 cache after any same-tick writes have applied.
 <a name="disconnect"></a>
 

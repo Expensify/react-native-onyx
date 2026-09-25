@@ -24,24 +24,6 @@ is reused by every connection.</p>
 <dt><a href="#resetDiskPressureLogThrottle">resetDiskPressureLogThrottle()</a></dt>
 <dd><p>Test-only: clears the disk-pressure log throttle so each test observes its own alert.</p>
 </dd>
-<dt><a href="#trackPendingWrite">trackPendingWrite()</a></dt>
-<dd><p>Registers an in-flight write under each key it can change, so <code>scheduleInitialFire</code> waits only for
-the writes relevant to a connecting key. Returns the same promise so callers can wrap a write&#39;s
-return value inline. The write is deregistered once it settles (success or failure).</p>
-</dd>
-<dt><a href="#trackPendingGlobalWrite">trackPendingGlobalWrite()</a></dt>
-<dd><p>Registers an in-flight write that affects every key (Onyx.clear). Deregistered once it settles.</p>
-</dd>
-<dt><a href="#pendingWritesForKey">pendingWritesForKey()</a></dt>
-<dd><p>In-flight writes that can change the value delivered to a subscriber of <code>key</code>: writes to the key
-itself, writes to any member when <code>key</code> is a collection root, and global writes (clear).</p>
-</dd>
-<dt><a href="#scheduleInitialFire">scheduleInitialFire()</a></dt>
-<dd><p>Defer a <code>Onyx.connect</code> callback&#39;s initial fire until the writes relevant to <code>key</code> that are in
-flight this tick have applied, so it reads post-write cache and dedups against their notifications.
-The wait is scoped to <code>key</code> and snapshotted after one microtask, so an unrelated or slow write
-elsewhere cannot block or postpone this delivery, and writes issued after it do not either.</p>
-</dd>
 <dt><a href="#getMergeQueue">getMergeQueue()</a></dt>
 <dd><p>Getter - returns the merge queue.</p>
 </dd>
@@ -200,36 +182,6 @@ is reused by every connection.
 
 ## resetDiskPressureLogThrottle()
 Test-only: clears the disk-pressure log throttle so each test observes its own alert.
-
-**Kind**: global function  
-<a name="trackPendingWrite"></a>
-
-## trackPendingWrite()
-Registers an in-flight write under each key it can change, so `scheduleInitialFire` waits only for
-the writes relevant to a connecting key. Returns the same promise so callers can wrap a write's
-return value inline. The write is deregistered once it settles (success or failure).
-
-**Kind**: global function  
-<a name="trackPendingGlobalWrite"></a>
-
-## trackPendingGlobalWrite()
-Registers an in-flight write that affects every key (Onyx.clear). Deregistered once it settles.
-
-**Kind**: global function  
-<a name="pendingWritesForKey"></a>
-
-## pendingWritesForKey()
-In-flight writes that can change the value delivered to a subscriber of `key`: writes to the key
-itself, writes to any member when `key` is a collection root, and global writes (clear).
-
-**Kind**: global function  
-<a name="scheduleInitialFire"></a>
-
-## scheduleInitialFire()
-Defer a `Onyx.connect` callback's initial fire until the writes relevant to `key` that are in
-flight this tick have applied, so it reads post-write cache and dedups against their notifications.
-The wait is scoped to `key` and snapshotted after one microtask, so an unrelated or slow write
-elsewhere cannot block or postpone this delivery, and writes issued after it do not either.
 
 **Kind**: global function  
 <a name="getMergeQueue"></a>
