@@ -9,7 +9,7 @@ Awesome persistent storage solution wrapped in a Pub/Sub library.
 - Onyx allows other code to subscribe to changes in data, and then publishes change events whenever data is changed
 - Anything needing to read Onyx data needs to:
     1. Know what key the data is stored in (for web, you can find this by looking in the JS console > Application > local storage)
-    2. Subscribe to changes of the data for a particular key or set of keys. React function components use the `useOnyx()` hook and non-React libs use `Onyx.connect()`.
+    2. Subscribe to changes of the data for a particular key or set of keys. React function components use the `useOnyx()` hook and non-React libs use `Onyx.connectWithoutView()`.
     3. Get initialized with the current value of that key from persistent storage (Onyx does this by calling `setState()` or triggering the `callback` with the values currently on disk as part of the connection process)
 - Subscribing to Onyx keys is done using a constant defined in `ONYXKEYS`. Each Onyx key represents either a collection of items or a specific entry in storage. For example, since all reports are stored as individual keys like `report_1234`, if code needs to know about all the reports (e.g. display a list of them in the nav menu), then it would subscribe to the key `ONYXKEYS.COLLECTION.REPORT`.
 
@@ -120,20 +120,20 @@ You should avoid arrays as much as possible. They do not work well with `merge()
 
 ## Subscribing to data changes
 
-To set up a basic subscription for a given key use the `Onyx.connect()` method.
+To set up a basic subscription for a given key outside of a React component use the `Onyx.connectWithoutView()` method. It returns a connection handle.
 
 ```javascript
 let session;
-const connectionID = Onyx.connect({
+const connection = Onyx.connectWithoutView({
     key: ONYXKEYS.SESSION,
     callback: (val) => session = val || {},
 });
 ```
 
-To teardown the subscription call `Onyx.disconnect()` with the `connectionID` returned from `Onyx.connect()`. It's recommended to clean up subscriptions anytime you are connecting from within a function to prevent memory leaks.
+To teardown the subscription call `Onyx.disconnect()` with the connection returned from `Onyx.connectWithoutView()`. It's recommended to clean up subscriptions anytime you are connecting from within a function to prevent memory leaks.
 
 ```javascript
-Onyx.disconnect(connectionID);
+Onyx.disconnect(connection);
 ```
 
 We can also access values inside React function components via the `useOnyx()` [hook](https://react.dev/reference/react/hooks). When the data changes the component will re-render.
@@ -204,7 +204,7 @@ export default App;
   
 * It is VERY important to NOT use empty string default values like `report.policyID || ''`. This results in the key returned to `useOnyx` as `policies_`, which subscribes to the ENTIRE POLICY COLLECTION and is most assuredly not what you were intending. You can use a default of `0` (as long as you are reasonably sure that there is never a policyID=0). This allows Onyx to return `undefined` as the value of the policy key, which is handled by `useOnyx` appropriately.
 
-It's also beneficial to use a [selector](https://github.com/Expensify/react-native-onyx/blob/main/API.md#connectmapping--number) with the mapping in case you need to grab a single item in a collection (like a single report action).
+It's also beneficial to use `useOnyx()`'s `selector` option in case you need to grab a single item in a collection (like a single report action).
 
 ## Collections
 
@@ -257,7 +257,7 @@ export default MyComponent;
 This will add a prop to the component called `allReports` which is an object of collection member key/values. Changes to the individual member keys will modify the entire object and new props will be passed with each individual key update. The prop doesn't update on the initial rendering of the component until the entire collection has been read out of Onyx.
 
 ```js
-Onyx.connect({key: ONYXKEYS.COLLECTION.REPORT}, callback: (allReports, collectionKey) => {...});
+Onyx.connectWithoutView({key: ONYXKEYS.COLLECTION.REPORT, callback: (allReports, collectionKey) => {...}});
 ```
 
 This will fire the callback once with the entire collection initially and later with an updated version of the collection when individual keys update.
@@ -293,7 +293,7 @@ function signOut() {
 `Onyx.exportState()` returns a plain object containing persisted keys and values from the active storage provider. It works on native and web without opening another database connection. The export excludes stale persisted rows for keys that are now RAM-only. Current RAM-only values and writes still in progress are never included. Treat the returned object and its nested values as read-only because some providers return references to their stored values. The result can contain sensitive data; callers should redact it before sharing.
 
 ## Storage Providers
-`Onyx.get`, `Onyx.set`, and the rest of the API accesses the underlying storage
+`Onyx.set`, `Onyx.merge`, and the rest of the API accesses the underlying storage
 differently depending on the platform
 
 Under the hood storage access calls are delegated to a [`StorageProvider`](lib/storage/index.js)
