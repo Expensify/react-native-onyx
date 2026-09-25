@@ -133,7 +133,7 @@ function init({
  * For a collection root key, the callback fires with the entire frozen collection
  * object whenever any member changes; signature `(collection, collectionKey)`.
  * For any other key, the callback fires with the value at that key; signature
- * `(value, key)`. Initial fire is deferred via `scheduleInitialFire` so it reads
+ * `(value, key)`. Initial fire is deferred via `scheduleInitialSubscriberNotification` so it reads
  * cache after any same-tick writes have applied.
  *
  * @param connectOptions The options object that will define the behavior of the connection.
@@ -147,7 +147,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
     let active = true;
     let unsubscribeFn: (() => void) | null = null;
 
-    const wireUp = () => {
+    const startSubscription = () => {
         if (!active) {
             return;
         }
@@ -167,7 +167,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
             unsubscribeFn = onyxSubscriptionManager.subscribe(key, (value, k) => {
                 deliverCollection(value as unknown as OnyxValue<TKey>, k as TKey);
             });
-            OnyxUtils.scheduleInitialFire(key, () => {
+            OnyxUtils.scheduleInitialSubscriberNotification(key, () => {
                 if (!active) {
                     return;
                 }
@@ -188,7 +188,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
         unsubscribeFn = onyxSubscriptionManager.subscribe(key, (value, k) => {
             deliverValue(value, k as TKey);
         });
-        OnyxUtils.scheduleInitialFire(key, () => {
+        OnyxUtils.scheduleInitialSubscriberNotification(key, () => {
             if (!active) {
                 return;
             }
@@ -197,7 +197,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
     };
 
     OnyxUtils.afterInit(() => {
-        wireUp();
+        startSubscription();
         return Promise.resolve();
     });
 
@@ -229,7 +229,7 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
  * For a collection root key, the callback fires with the entire frozen collection
  * object whenever any member changes; signature `(collection, collectionKey)`.
  * For any other key, the callback fires with the value at that key; signature
- * `(value, key)`. Initial fire is deferred via `scheduleInitialFire` so it reads
+ * `(value, key)`. Initial fire is deferred via `scheduleInitialSubscriberNotification` so it reads
  * cache after any same-tick writes have applied.
  *
  * @param connectOptions The options object that will define the behavior of the connection.

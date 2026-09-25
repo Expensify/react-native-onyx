@@ -97,52 +97,52 @@ const deferredInitTask = createDeferredTask();
 const NOT_DELIVERED = Symbol('NOT_DELIVERED');
 
 /**
- * Registers an in-flight write under each key it can change, so `scheduleInitialFire` waits only for
+ * Registers an in-flight write under each key it can change, so `scheduleInitialSubscriberNotification` waits only for
  * the writes relevant to a connecting key. Returns the same promise so callers can wrap a write's
  * return value inline. The write is deregistered once it settles (success or failure).
  */
-function trackPendingWrite<T>(keys: OnyxKey | OnyxKey[], promise: Promise<T>): Promise<T> {
-    // Drop nullish keys (e.g. a keyless `clear` item) so they never reach `pendingWritesForKey`'s scan.
+function trackPendingWrite<T>(keys: OnyxKey | OnyxKey[], pendingWrite: Promise<T>): Promise<T> {
+    // Drop nullish keys (e.g. a keyless `clear` item) so they never reach `getPendingWritesForKey`'s scan.
     const keyList = (Array.isArray(keys) ? keys : [keys]).filter((key) => typeof key === 'string');
     for (const key of keyList) {
-        let set = pendingWritesByKey.get(key);
-        if (!set) {
-            set = new Set();
-            pendingWritesByKey.set(key, set);
+        let pendingWritesForKey = pendingWritesByKey.get(key);
+        if (!pendingWritesForKey) {
+            pendingWritesForKey = new Set();
+            pendingWritesByKey.set(key, pendingWritesForKey);
         }
-        set.add(promise);
+        pendingWritesForKey.add(pendingWrite);
     }
     const deregister = () => {
         for (const key of keyList) {
-            const set = pendingWritesByKey.get(key);
-            if (!set) {
+            const pendingWritesForKey = pendingWritesByKey.get(key);
+            if (!pendingWritesForKey) {
                 continue;
             }
-            set.delete(promise);
-            if (set.size === 0) {
+            pendingWritesForKey.delete(pendingWrite);
+            if (pendingWritesForKey.size === 0) {
                 pendingWritesByKey.delete(key);
             }
         }
     };
-    promise.then(deregister, deregister);
-    return promise;
+    pendingWrite.then(deregister, deregister);
+    return pendingWrite;
 }
 
 /**
  * Registers an in-flight write that affects every key (Onyx.clear). Deregistered once it settles.
  */
-function trackPendingGlobalWrite<T>(promise: Promise<T>): Promise<T> {
-    pendingGlobalWrites.add(promise);
-    const deregister = () => pendingGlobalWrites.delete(promise);
-    promise.then(deregister, deregister);
-    return promise;
+function trackPendingGlobalWrite<T>(pendingGlobalWrite: Promise<T>): Promise<T> {
+    pendingGlobalWrites.add(pendingGlobalWrite);
+    const deregister = () => pendingGlobalWrites.delete(pendingGlobalWrite);
+    pendingGlobalWrite.then(deregister, deregister);
+    return pendingGlobalWrite;
 }
 
 /**
  * In-flight writes that can change the value delivered to a subscriber of `key`: writes to the key
  * itself, writes to any member when `key` is a collection root, and global writes (clear).
  */
-function pendingWritesForKey(key: OnyxKey): Array<Promise<unknown>> {
+function getPendingWritesForKey(key: OnyxKey): Array<Promise<unknown>> {
     const promises = [...pendingGlobalWrites];
     const own = pendingWritesByKey.get(key);
     if (own) {
@@ -164,9 +164,9 @@ function pendingWritesForKey(key: OnyxKey): Array<Promise<unknown>> {
  * The wait is scoped to `key` and snapshotted after one microtask, so an unrelated or slow write
  * elsewhere cannot block or postpone this delivery, and writes issued after it do not either.
  */
-function scheduleInitialFire(key: OnyxKey, fn: () => void): void {
+function scheduleInitialSubscriberNotification(key: OnyxKey, fn: () => void): void {
     Promise.resolve().then(() => {
-        const relevant = pendingWritesForKey(key);
+        const relevant = getPendingWritesForKey(key);
         if (relevant.length === 0) {
             fn();
             return;
@@ -1686,7 +1686,7 @@ function clearOnyxUtilsInternals() {
 const OnyxUtils = {
     METHOD,
     NOT_DELIVERED,
-    scheduleInitialFire,
+    scheduleInitialSubscriberNotification,
     trackPendingWrite,
     trackPendingGlobalWrite,
     getMergeQueue,
