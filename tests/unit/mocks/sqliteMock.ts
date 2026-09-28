@@ -158,7 +158,11 @@ function executeAsyncWithDelay<Result>(run: () => Result): Promise<Result> {
     return scheduledDelay.until.then(run);
 }
 
-function makeConnection({name, connection, readOnly = false}: OpenOptions): Pick<NitroSQLiteConnection, 'execute' | 'executeAsync' | 'executeBatchAsync' | 'prepare' | 'transaction' | 'close'> {
+function makeConnection({
+    name,
+    connection,
+    readOnly = false,
+}: OpenOptions): Pick<NitroSQLiteConnection, 'execute' | 'executeAsync' | 'executeBatchAsync' | 'prepare' | 'transaction' | 'close'> {
     if (connection !== 'independent' && defaultConnectionNames.has(name)) {
         throw new Error(`Database ${name} is already open`);
     }
