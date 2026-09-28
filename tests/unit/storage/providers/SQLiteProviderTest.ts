@@ -7,7 +7,7 @@
 import SQLiteProvider from '../../../../lib/storage/providers/SQLiteProvider';
 import utils from '../../../../lib/utils';
 import type {GenericDeepRecord} from '../../../types';
-import {resetAllDatabases} from '../../mocks/sqliteMock';
+import {delayAsyncExecutionAfter, delayNextAsyncExecution, getAsyncQueries, getOpenOptions, getPreparedQueries, resetAllDatabases} from '../../mocks/sqliteMock';
 
 // `jest.mock` is hoisted by Jest above the imports — register the SQLite mock
 // (overriding the global jestSetup.js mock) and a tiny device-info stub.
@@ -51,6 +51,51 @@ describe('SQLiteProvider', () => {
 
     afterAll(() => {
         resetAllDatabases();
+    });
+
+    describe('NitroSQLite 10 connections and statements', () => {
+        it('opens a separate read-only connection after configuring the writer', () => {
+            expect(getOpenOptions()).toEqual([
+                {name: 'OnyxDB', connection: undefined, readOnly: false},
+                {name: 'OnyxDB', connection: 'independent', readOnly: true},
+            ]);
+        });
+
+        it('reuses prepared statements for repeated single-key operations', async () => {
+            const preparedQueries = getPreparedQueries();
+            expect(preparedQueries).toHaveLength(3);
+
+            await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, 'first');
+            await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY_2, 'second');
+            expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY)).toBe('first');
+            expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY_2)).toBe('second');
+            await SQLiteProvider.removeItem(ONYXKEYS.TEST_KEY);
+
+            expect(getPreparedQueries()).toEqual(preparedQueries);
+        });
+
+        it('waits for an already queued write before reading on the independent connection', async () => {
+            let releaseWrite: () => void = () => undefined;
+            const writeGate = new Promise<void>((resolve) => {
+                releaseWrite = resolve;
+            });
+            delayNextAsyncExecution(writeGate);
+
+            const write = SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, 'committed');
+            const read = SQLiteProvider.getItem(ONYXKEYS.TEST_KEY);
+
+            await Promise.resolve();
+            expect(getAsyncQueries().filter(({readOnly}) => readOnly)).toHaveLength(0);
+
+            releaseWrite();
+            await write;
+            expect(await read).toBe('committed');
+        });
+
+        it('does not block later reads after a failed write', async () => {
+            await expect(SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, undefined as unknown as null)).rejects.toThrow();
+            await expect(SQLiteProvider.getAllKeys()).resolves.toEqual([]);
+        });
     });
 
     describe('getItem', () => {
@@ -362,14 +407,37 @@ describe('SQLiteProvider', () => {
                 const entries = createKeyValueEntries(5);
                 await SQLiteProvider.multiSet(entries);
 
-                const executeAsyncSpy = jest.spyOn(SQLiteProvider.store!, 'executeAsync');
-                executeAsyncSpy.mockClear();
+                const queryCountBeforeRead = getAsyncQueries().length;
 
                 const keys = entries.map(([key]) => key);
                 await SQLiteProvider.multiGet(keys);
 
-                const inQueries = executeAsyncSpy.mock.calls.filter(([sql]) => typeof sql === 'string' && sql.includes('WHERE record_key IN'));
+                const inQueries = getAsyncQueries()
+                    .slice(queryCountBeforeRead)
+                    .filter(({sql, readOnly}) => readOnly && sql.includes('WHERE record_key IN'));
                 expect(inQueries).toHaveLength(3);
+            });
+
+            it('reads all chunks from one snapshot while another connection writes', async () => {
+                const entries = createKeyValueEntries(5);
+                await SQLiteProvider.multiSet(entries);
+
+                let releaseRead: () => void = () => undefined;
+                const readGate = new Promise<void>((resolve) => {
+                    releaseRead = resolve;
+                });
+                delayAsyncExecutionAfter(1, readGate);
+
+                const keys = entries.map(([key]) => key);
+                const read = SQLiteProvider.multiGet(keys);
+                await Promise.resolve();
+                await Promise.resolve();
+
+                await SQLiteProvider.setItem(keys[2], 99);
+                releaseRead();
+
+                expect(await read).toContainEqual([keys[2], 2]);
+                expect(await SQLiteProvider.getItem(keys[2])).toBe(99);
             });
         });
 
