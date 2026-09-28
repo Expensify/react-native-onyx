@@ -2,6 +2,7 @@ import {deepEqual} from 'fast-equals';
 import {useCallback, useEffect, useMemo, useRef, useSyncExternalStore} from 'react';
 import {useSyncExternalStoreWithSelector} from 'use-sync-external-store/with-selector';
 
+import type {ValueOf} from 'type-fest';
 import type {OnyxKey, OnyxValue} from './types';
 
 import cache from './OnyxCache';
@@ -19,8 +20,8 @@ type UseOnyxOptions<TKey extends OnyxKey, TReturnValue> = {
 };
 
 /**
- * `loading` only on a key's first connection while a merge is in flight and nothing is cached yet
- * (the merge will produce the first value); `loaded` otherwise.
+ * `loading` while the key's first value is still on its way: `Onyx.init` hasn't hydrated the cache yet,
+ * or nothing is cached and a merge is in flight. `loaded` otherwise.
  */
 type FetchStatus = 'loading' | 'loaded';
 
@@ -30,10 +31,36 @@ type ResultMetadata = {
 
 type UseOnyxResult<TValue> = [NonNullable<TValue> | undefined, ResultMetadata];
 
+function isOnyxInitialised(): boolean {
+    return OnyxUtils.getDeferredInitTask().isResolved;
+}
+
+/**
+ * What can be said about a key's value, as a single value so that init finishing re-renders a
+ * subscriber even when its key has no value and nothing else about it changed.
+ */
+const AVAILABILITY = {
+    /** `Onyx.init` hasn't hydrated the cache yet, so nothing can be said about the key. */
+    UNKNOWN: 0,
+    /** The cache is hydrated and the key has no value. */
+    ABSENT: 1,
+    /** The cache is hydrated and the key has a value. */
+    PRESENT: 2,
+} as const;
+
+type Availability = ValueOf<typeof AVAILABILITY>;
+
+function getAvailability(key: OnyxKey): Availability {
+    if (!isOnyxInitialised()) {
+        return AVAILABILITY.UNKNOWN;
+    }
+    return cache.hasCacheForKey(key) ? AVAILABILITY.PRESENT : AVAILABILITY.ABSENT;
+}
+
 /**
  * Subscribes a component to an Onyx key, re-rendering when the value changes (for a collection key,
  * when any member changes; the value is the frozen collection object). Returns `[value, {status}]`,
- * `status` `loading` only on the first connection while a merge is in flight and nothing is cached yet.
+ * `status` `loading` until the key's first value can be known.
  */
 function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey, options?: UseOnyxOptions<TKey, TReturnValue>): UseOnyxResult<TReturnValue> {
     const selector = options?.selector;
@@ -41,7 +68,29 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
     // First-render marker for the loading gate below.
     const connectedKeyRef = useRef<OnyxKey | null>(null);
 
-    const subscribe = useCallback((onStoreChange: () => void) => onyxSubscriptionManager.subscribe(key, onStoreChange), [key]);
+    const subscribe = useCallback(
+        (onStoreChange: () => void) => {
+            const unsubscribe = onyxSubscriptionManager.subscribe(key, onStoreChange);
+
+            // `Onyx.init` hydrates the cache without notifying anyone, so a subscriber that mounted
+            // before it finished would never hear about the stored value. Re-read once init lands.
+            let isActive = true;
+            if (!isOnyxInitialised()) {
+                OnyxUtils.getDeferredInitTask().promise.then(() => {
+                    if (!isActive) {
+                        return;
+                    }
+                    onStoreChange();
+                });
+            }
+
+            return () => {
+                isActive = false;
+                unsubscribe();
+            };
+        },
+        [key],
+    );
     const getSnapshot = useCallback(() => onyxSubscriptionManager.getState(key) as OnyxValue<TKey> | undefined, [key]);
 
     const select = useCallback((data: OnyxValue<TKey> | undefined): TReturnValue | undefined => (selector ? selector(data) : (data as TReturnValue | undefined)) ?? undefined, [selector]);
@@ -51,12 +100,14 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
 
     const value = useSyncExternalStoreWithSelector<OnyxValue<TKey> | undefined, TReturnValue | undefined>(subscribe, getSnapshot, undefined, select, isEqual);
 
-    // Reactive cache presence, so the first value landing re-renders even when the selector output is unchanged.
-    const isCached = useSyncExternalStore(subscribe, () => cache.hasCacheForKey(key));
+    // Reactive availability, so the first value landing re-renders even when the selector output is unchanged.
+    const availability = useSyncExternalStore(subscribe, () => getAvailability(key));
+    const isCached = availability === AVAILABILITY.PRESENT;
 
-    // Loading while a first value is still on its way: nothing cached and a merge in flight.
+    // Loading while a first value is still on its way: init hasn't hydrated yet, or nothing is cached
+    // and a merge is in flight.
     // eslint-disable-next-line react-hooks/refs
-    const isLoading = connectedKeyRef.current !== key && !isCached && OnyxUtils.hasPendingMergeForKey(key);
+    const isLoading = !isOnyxInitialised() || (connectedKeyRef.current !== key && !isCached && OnyxUtils.hasPendingMergeForKey(key));
     const loadingStatus: FetchStatus = isLoading ? 'loading' : 'loaded';
 
     // Only advance the marker once a value exists, so an unrelated re-render can't end loading early.

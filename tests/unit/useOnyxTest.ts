@@ -5,6 +5,7 @@ import type {UseOnyxSelector} from '../../lib/useOnyx';
 import type GenericCollection from '../utils/GenericCollection';
 
 import Onyx, {useOnyx} from '../../lib';
+import {resetDeferredInitTask} from '../../lib/OnyxUtils';
 import StorageMock from '../../lib/storage';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
@@ -1133,6 +1134,53 @@ describe('useOnyx', () => {
 
             expect(existing.current[0]).toEqual('test2');
             expect(fresh.current[0]).toEqual('test2');
+        });
+    });
+    describe('before Onyx.init has finished', () => {
+        // Providers above the app's migration gate subscribe during a cold start, before the cache has
+        // been hydrated, so put Onyx back to "not initialised" for these.
+        beforeEach(async () => {
+            // `Onyx.clear()` waits for init, so clear storage directly before taking init away.
+            await StorageMock.clear();
+            resetDeferredInitTask();
+        });
+
+        afterEach(async () => {
+            Onyx.init({keys: ONYXKEYS});
+            await act(async () => waitForPromisesToResolve());
+        });
+
+        it('should report loading until init hydrates the cache, then deliver the stored value', async () => {
+            // Given a value already in storage and a subscriber mounted before init runs
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'from storage');
+
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
+
+            // Then it reports loading rather than claiming the key has no value
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loading');
+
+            // When init hydrates the cache
+            Onyx.init({keys: ONYXKEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            // Then the subscriber sees what was in storage
+            expect(result.current[0]).toEqual('from storage');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should stop reporting loading once init finishes, even when the key has no stored value', async () => {
+            // Given a subscriber to a key that storage has nothing for
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
+            expect(result.current[1].status).toEqual('loading');
+
+            // When init finishes without producing a value for it
+            Onyx.init({keys: ONYXKEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            // Then it reports loaded with no value, rather than sitting on a skeleton forever
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
         });
     });
 });

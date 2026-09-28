@@ -77,8 +77,8 @@ let defaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
 
 let snapshotKey: OnyxKey | null = null;
 
-// Connections can be made before `Onyx.init`. They would wait for this task before resolving
-const deferredInitTask = createDeferredTask();
+// Connections can be made before `Onyx.init`. They would wait for this task before resolving.
+let deferredInitTask = createDeferredTask();
 
 /**
  * Sentinel for "nothing delivered yet" in `connect()`'s per-subscription dedup. A Symbol
@@ -1589,6 +1589,13 @@ function logKeyRemoved(onyxMethod: Extract<OnyxMethod, 'set' | 'merge'>, key: On
 }
 
 /**
+ * Put Onyx back to "not initialised" state, useful for tests that need a cold start.
+ */
+function resetDeferredInitTask() {
+    deferredInitTask = createDeferredTask();
+}
+
+/**
  * Clear internal variables used in this file, useful in test environments.
  */
 function clearOnyxUtilsInternals() {
@@ -1644,4 +1651,4 @@ const OnyxUtils = {
 
 export type {OnyxMethod};
 export default OnyxUtils;
-export {clearOnyxUtilsInternals};
+export {clearOnyxUtilsInternals, resetDeferredInitTask};
