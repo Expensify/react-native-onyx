@@ -637,15 +637,7 @@ function exportState(): Promise<Record<OnyxKey, OnyxValue<OnyxKey>>> {
  * Reads the current value of an Onyx key once, without subscribing. Use `useOnyx()` or
  * `Onyx.connectWithoutView()` when the value has to stay current.
  *
- * A single key resolves to the cached object itself rather than a copy, so mutating it would be visible
- * to every other reader of that key. A collection resolves to a frozen snapshot of its members.
- *
- * merge() queues its changes for a later tick, so a read issued before the merge resolves will not see
- * them. Await the merge first. set() and multiSet() reach the cache before returning, once init() has
- * finished, so a read issued after them sees the new value without awaiting the write.
- *
- * A collection with no members resolves to `{}`. A collection read on an empty store resolves to
- * `undefined`.
+ * The value is the cached one rather than a copy, so treat it as read-only.
  *
  * @example
  * const report = await Onyx.get(`${ONYXKEYS.COLLECTION.REPORT}${reportID}`);
