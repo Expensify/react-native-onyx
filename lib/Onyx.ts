@@ -727,6 +727,28 @@ function setCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, coll
     );
 }
 
+/**
+ * Returns persisted Onyx key-value pairs as a plain object.
+ * Live RAM-only values and writes that have not reached storage are not included.
+ * Treat the returned object and its nested values as read-only.
+ */
+function exportState(): Promise<Record<OnyxKey, OnyxValue<OnyxKey>>> {
+    return OnyxUtils.afterInit(() =>
+        Storage.getAll().then((entries) => {
+            const state: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
+
+            for (const [key, value] of entries) {
+                if (OnyxKeys.isRamOnlyKey(key)) {
+                    continue;
+                }
+                state[key] = value;
+            }
+
+            return state;
+        }),
+    );
+}
+
 const Onyx = {
     METHOD: OnyxUtils.METHOD,
     connect,
@@ -739,6 +761,7 @@ const Onyx = {
     setCollection,
     update,
     clear,
+    exportState,
     init,
     registerLogger: Logger.registerLogger,
 };
