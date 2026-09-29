@@ -66,7 +66,9 @@ Treat the returned object and its nested values as read-only.</p>
 <dt><a href="#get">get(key)</a> ⇒</dt>
 <dd><p>Reads the current value of an Onyx key once, without subscribing. Use <code>useOnyx()</code> or
 <code>Onyx.connectWithoutView()</code> when the value has to stay current.</p>
-<p>The value is the cached one rather than a copy, so treat it as read-only.</p>
+<p>The read is served from the cache, which <code>init()</code> fills with the whole store, so it returns what a
+subscription to the same key would deliver. The value is the cached one rather than a copy, so treat
+it as read-only.</p>
 </dd>
 <dt><a href="#multiGet">multiGet(keys)</a> ⇒</dt>
 <dd><p>Reads several Onyx keys at once, without subscribing. Use <code>useOnyx()</code> or <code>Onyx.connectWithoutView()</code> when
@@ -289,7 +291,9 @@ Treat the returned object and its nested values as read-only.
 Reads the current value of an Onyx key once, without subscribing. Use `useOnyx()` or
 `Onyx.connectWithoutView()` when the value has to stay current.
 
-The value is the cached one rather than a copy, so treat it as read-only.
+The read is served from the cache, which `init()` fills with the whole store, so it returns what a
+subscription to the same key would deliver. The value is the cached one rather than a copy, so treat
+it as read-only.
 
 **Kind**: global function  
 **Returns**: The current value, or `undefined` if the key has none.  

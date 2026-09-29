@@ -637,7 +637,9 @@ function exportState(): Promise<Record<OnyxKey, OnyxValue<OnyxKey>>> {
  * Reads the current value of an Onyx key once, without subscribing. Use `useOnyx()` or
  * `Onyx.connectWithoutView()` when the value has to stay current.
  *
- * The value is the cached one rather than a copy, so treat it as read-only.
+ * The read is served from the cache, which `init()` fills with the whole store, so it returns what a
+ * subscription to the same key would deliver. The value is the cached one rather than a copy, so treat
+ * it as read-only.
  *
  * @example
  * const report = await Onyx.get(`${ONYXKEYS.COLLECTION.REPORT}${reportID}`);
@@ -647,21 +649,7 @@ function exportState(): Promise<Record<OnyxKey, OnyxValue<OnyxKey>>> {
  * @returns The current value, or `undefined` if the key has none.
  */
 function get<TKey extends OnyxKey>(key: TKey): Promise<OnyxValue<TKey>> {
-    return OnyxUtils.afterInit(() => {
-        if (OnyxKeys.isCollectionKey(key)) {
-            const cachedCollection = OnyxUtils.tryGetCachedValue(key);
-
-            if (cachedCollection) {
-                return Promise.resolve(cachedCollection as OnyxValue<TKey>);
-            }
-
-            return OnyxUtils.getAllKeys()
-                .then((allKeys) => OnyxUtils.multiGet([...allKeys].filter((memberKey) => OnyxKeys.isCollectionMemberKey(key, memberKey))))
-                .then(() => OnyxUtils.tryGetCachedValue(key) as OnyxValue<TKey>);
-        }
-
-        return OnyxUtils.get(key).then((value) => (value ?? undefined) as OnyxValue<TKey>);
-    });
+    return OnyxUtils.afterInit(() => Promise.resolve((OnyxUtils.tryGetCachedValue(key) ?? undefined) as OnyxValue<TKey>));
 }
 
 /**

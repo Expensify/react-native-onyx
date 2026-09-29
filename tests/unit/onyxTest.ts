@@ -3289,12 +3289,6 @@ describe('Onyx', () => {
             await expect(Onyx.get(ONYX_KEYS.TEST_KEY)).resolves.toBeUndefined();
         });
 
-        it('should fall back to storage when the key is not in cache', async () => {
-            await StorageMock.setItem(ONYX_KEYS.TEST_KEY, {a: 1});
-
-            await expect(Onyx.get(ONYX_KEYS.TEST_KEY)).resolves.toEqual({a: 1});
-        });
-
         it('should read a whole collection assembled from its member keys', async () => {
             await Onyx.setCollection(ONYX_KEYS.COLLECTION.TEST_KEY, {
                 [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {id: 1},
@@ -3307,19 +3301,14 @@ describe('Onyx', () => {
             });
         });
 
-        it('should fall back to storage for a collection the cache holds nothing for', async () => {
-            const memberKeys = [`${ONYX_KEYS.COLLECTION.TEST_KEY}1`, `${ONYX_KEYS.COLLECTION.TEST_KEY}2`];
-            await StorageMock.setItem(memberKeys[0], {id: 1});
-            await StorageMock.setItem(memberKeys[1], {id: 2});
+        it('should not read a key the cache does not hold, the same as a subscription', async () => {
+            const memberKey = `${ONYX_KEYS.COLLECTION.TEST_KEY}1`;
+            await StorageMock.setItem(ONYX_KEYS.TEST_KEY, {a: 1});
+            await StorageMock.setItem(memberKey, {id: 1});
 
-            // getAllKeys() short-circuits while the cache holds any key, and a collection the cache
-            // knows no members of reads as {}, so the storage fallback is only reachable from an empty key list.
-            cache.setAllKeys([]);
-
-            await expect(Onyx.get(ONYX_KEYS.COLLECTION.TEST_KEY)).resolves.toEqual({
-                [memberKeys[0]]: {id: 1},
-                [memberKeys[1]]: {id: 2},
-            });
+            await expect(Onyx.get(ONYX_KEYS.TEST_KEY)).resolves.toBeUndefined();
+            await expect(Onyx.get(memberKey)).resolves.toBeUndefined();
+            await expect(Onyx.get(ONYX_KEYS.COLLECTION.TEST_KEY)).resolves.toEqual({});
         });
 
         it('should not read stale storage data for RAM-only keys', async () => {
