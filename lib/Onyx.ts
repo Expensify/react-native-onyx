@@ -253,18 +253,20 @@ function merge<TKey extends OnyxKey>(key: TKey, changes: OnyxMergeInput<TKey>): 
             mergeQueue[key].push(changes);
             return mergeQueuePromise[key];
         }
-        mergeQueue[key] = [changes];
+        const queuedChanges: Array<OnyxValue<OnyxKey>> = [changes];
+        mergeQueue[key] = queuedChanges;
 
         mergeQueuePromise[key] = OnyxUtils.get(key).then((valueFromGet) => {
             // Calls to Onyx.set after a merge will terminate the current merge process and clear the merge queue
-            if (mergeQueue[key] == null) {
+            if (mergeQueue[key] !== queuedChanges) {
                 return Promise.resolve();
             }
 
             // Other writers (notably Onyx.update's mergeCollection path, which doesn't participate in mergeQueue)
             // can land between get() resolving and this callback running. Applying the delta on top of the value
             // captured back then and broadcasting it would overwrite those writes wholesale, so re-read the cache.
-            const existingValue = cache.hasCacheForKey(key) ? (cache.get(key) as OnyxInput<TKey> | undefined) : valueFromGet;
+            const baseValue = OnyxUtils.hasStaleMergeRead(queuedChanges) ? undefined : valueFromGet;
+            const existingValue = cache.hasCacheForKey(key) ? (cache.get(key) as OnyxInput<TKey> | undefined) : baseValue;
 
             try {
                 const validChanges = mergeQueue[key].filter((change) => {
@@ -350,6 +352,7 @@ function mergeCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, co
  */
 function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
     return OnyxUtils.afterInit(() => {
+        const pendingMergeEntries = OnyxUtils.getPendingMergeEntries(keysToPreserve);
         const defaultKeyStates = OnyxUtils.getDefaultKeyStates();
         const initialKeys = Object.keys(defaultKeyStates);
 
@@ -367,6 +370,8 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                 > = {};
 
                 const allKeys = new Set([...cachedKeys, ...initialKeys]);
+
+                OnyxUtils.cancelPendingMerges(pendingMergeEntries);
 
                 // The only keys that should not be cleared are:
                 // 1. Anything specifically passed in keysToPreserve (because some keys like language preferences, offline
