@@ -1,8 +1,9 @@
 import * as IDB from 'idb-keyval';
-import createStore from '../../../../lib/storage/providers/IDBKeyValProvider/createStore';
+
 import * as Logger from '../../../../lib/Logger';
 import {StorageErrorClass} from '../../../../lib/storage/errors';
 import classifyIDBError from '../../../../lib/storage/providers/IDBKeyValProvider/classifyError';
+import createStore from '../../../../lib/storage/providers/IDBKeyValProvider/createStore';
 
 const STORE_NAME = 'teststore';
 let testDbCounter = 0;
@@ -550,6 +551,42 @@ describe('createStore', () => {
 
             expect(logAlertSpy).not.toHaveBeenCalled();
             expect(logInfoSpy).not.toHaveBeenCalledWith('IDB error not recoverable at the connection layer, propagating', expect.objectContaining({errorClass: 'capacity'}));
+        });
+
+        /**
+         * Chromium also reports persistence failures as `UnknownError: Internal error.` with no cause
+         * attached. Those used to land in UNKNOWN, so every operation burned its whole retry budget
+         * without ever reopening the connection (App #102272). They now reuse this heal path.
+         */
+        it('should heal a cause-less `Internal error.` UnknownError by reopening the connection', async () => {
+            const store = createStore(uniqueDBName(), STORE_NAME);
+
+            await store('readwrite', (s) => {
+                s.put('value', 'key1');
+                return IDB.promisifyRequest(s.transaction);
+            });
+
+            const original = IDBDatabase.prototype.transaction;
+            let callCount = 0;
+            jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
+                callCount++;
+                if (callCount === 1) {
+                    throw new DOMException('Internal error.', 'UnknownError');
+                }
+                return original.apply(this, args);
+            });
+
+            const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
+
+            expect(result).toBe('value');
+            expect(callCount).toBe(2);
+            // The heal log carries the message so telemetry can tell this wording apart from
+            // backing-store corruption and measure whether the reopen actually fixed it.
+            expect(logInfoSpy).toHaveBeenCalledWith(
+                'IDB heal: backing store error detected — dropping cached connection and reopening (2 attempts left)',
+                expect.objectContaining({dbName: expect.any(String), errorMessage: 'Internal error.'}),
+            );
+            expect(logInfoSpy).toHaveBeenCalledWith('IDB heal: successfully recovered after backing store error', expect.objectContaining({dbName: expect.any(String)}));
         });
     });
 

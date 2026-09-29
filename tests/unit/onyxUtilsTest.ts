@@ -1,15 +1,17 @@
 import {act} from '@testing-library/react-native';
-import Onyx from '../../lib';
-import OnyxUtils from '../../lib/OnyxUtils';
-import type {GenericDeepRecord} from '../types';
-import utils from '../../lib/utils';
+
 import type {Collection, OnyxCollection} from '../../lib/types';
+import type {GenericDeepRecord} from '../types';
 import type GenericCollection from '../utils/GenericCollection';
-import OnyxCache from '../../lib/OnyxCache';
+
+import Onyx from '../../lib';
+import createDeferredTask from '../../lib/createDeferredTask';
 import * as Logger from '../../lib/Logger';
+import OnyxCache from '../../lib/OnyxCache';
+import OnyxUtils from '../../lib/OnyxUtils';
 import StorageMock from '../../lib/storage';
 import StorageCircuitBreaker from '../../lib/StorageCircuitBreaker';
-import createDeferredTask from '../../lib/createDeferredTask';
+import utils from '../../lib/utils';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 const testObject: GenericDeepRecord = {
@@ -860,6 +862,22 @@ describe('OnyxUtils', () => {
                 `Storage operation skipped retry; fatal errors are handled by the connection layer. Error: ${nonRetriableIdbError}. onyxMethod: setWithRetry.`,
             );
             expect(logAlertSpy).not.toHaveBeenCalled();
+        });
+
+        it('should skip retry for a cause-less `Internal error.` instead of exhausting the retry budget', async () => {
+            const logAlertSpy = jest.spyOn(Logger, 'logAlert');
+            const logInfoSpy = jest.spyOn(Logger, 'logInfo');
+            // Chromium reports this persistence failure with no cause (App #102272). It used to land in
+            // UNKNOWN, so every write burned all 6 attempts and then alerted, without the connection
+            // layer ever reopening the database.
+            const internalError = Object.assign(new Error('Internal error.'), {name: 'UnknownError'});
+            StorageMock.setItem = jest.fn().mockRejectedValue(internalError);
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+
+            expect(logInfoSpy).toHaveBeenCalledWith(`Storage operation skipped retry; fatal errors are handled by the connection layer. Error: ${internalError}. onyxMethod: setWithRetry.`);
+            const unclassifiedAlerts = logAlertSpy.mock.calls.filter((call) => typeof call[0] === 'string' && call[0].startsWith('Unclassified storage error'));
+            expect(unclassifiedAlerts).toHaveLength(0);
         });
 
         it('should include the error in logAlert for IDBObjectStore invalid data errors', async () => {

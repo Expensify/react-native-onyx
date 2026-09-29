@@ -1,5 +1,5 @@
-import classifyIDBError from '../../../../lib/storage/providers/IDBKeyValProvider/classifyError';
 import {StorageErrorClass} from '../../../../lib/storage/errors';
+import classifyIDBError from '../../../../lib/storage/providers/IDBKeyValProvider/classifyError';
 
 describe('classifyIDBError', () => {
     it.each([
@@ -12,6 +12,14 @@ describe('classifyIDBError', () => {
         [new DOMException('The quota has been exceeded.', 'QuotaExceededError'), StorageErrorClass.CAPACITY],
         // Backing-store corruption.
         [new DOMException('Internal error opening backing store for indexedDB.open.', 'UnknownError'), StorageErrorClass.FATAL],
+        // Chromium persistence failure without a cause. The connection layer recovers it by reopening,
+        // so it must not fall through to UNKNOWN (where every operation would burn its retry budget).
+        [new DOMException('Internal error.', 'UnknownError'), StorageErrorClass.FATAL],
+        [new DOMException('Internal error', 'UnknownError'), StorageErrorClass.FATAL],
+        // Any other UnknownError wording keeps its own class instead of being pulled into the reopen path.
+        [new DOMException('Internal error while reading blob', 'UnknownError'), StorageErrorClass.UNKNOWN],
+        // Only the `UnknownError` name maps, so a same-worded error from another class is untouched.
+        [new DOMException('Internal error.', 'SyntaxError'), StorageErrorClass.UNKNOWN],
         // Transient connection failures.
         [new DOMException('Connection to Indexed Database server lost. Refresh the page to try again', 'UnknownError'), StorageErrorClass.TRANSIENT],
         [new DOMException('IDB write transaction aborted without an error', 'AbortError'), StorageErrorClass.TRANSIENT],
