@@ -1,5 +1,5 @@
-import {StorageErrorClass} from '../../../../lib/storage/errors';
 import classifyIDBError from '../../../../lib/storage/providers/IDBKeyValProvider/classifyError';
+import {StorageErrorClass} from '../../../../lib/storage/errors';
 
 describe('classifyIDBError', () => {
     it.each([

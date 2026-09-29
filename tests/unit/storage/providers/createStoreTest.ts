@@ -1,9 +1,8 @@
 import * as IDB from 'idb-keyval';
-
+import createStore from '../../../../lib/storage/providers/IDBKeyValProvider/createStore';
 import * as Logger from '../../../../lib/Logger';
 import {StorageErrorClass} from '../../../../lib/storage/errors';
 import classifyIDBError from '../../../../lib/storage/providers/IDBKeyValProvider/classifyError';
-import createStore from '../../../../lib/storage/providers/IDBKeyValProvider/createStore';
 
 const STORE_NAME = 'teststore';
 let testDbCounter = 0;

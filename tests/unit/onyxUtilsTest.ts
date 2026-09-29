@@ -1,17 +1,15 @@
 import {act} from '@testing-library/react-native';
-
-import type {Collection, OnyxCollection} from '../../lib/types';
-import type {GenericDeepRecord} from '../types';
-import type GenericCollection from '../utils/GenericCollection';
-
 import Onyx from '../../lib';
-import createDeferredTask from '../../lib/createDeferredTask';
-import * as Logger from '../../lib/Logger';
-import OnyxCache from '../../lib/OnyxCache';
 import OnyxUtils from '../../lib/OnyxUtils';
+import type {GenericDeepRecord} from '../types';
+import utils from '../../lib/utils';
+import type {Collection, OnyxCollection} from '../../lib/types';
+import type GenericCollection from '../utils/GenericCollection';
+import OnyxCache from '../../lib/OnyxCache';
+import * as Logger from '../../lib/Logger';
 import StorageMock from '../../lib/storage';
 import StorageCircuitBreaker from '../../lib/StorageCircuitBreaker';
-import utils from '../../lib/utils';
+import createDeferredTask from '../../lib/createDeferredTask';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 const testObject: GenericDeepRecord = {

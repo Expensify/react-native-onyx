@@ -1,7 +1,5 @@
-import type {UseStore} from 'idb-keyval';
-
 import * as IDB from 'idb-keyval';
-
+import type {UseStore} from 'idb-keyval';
 import * as Logger from '../../../Logger';
 import {StorageErrorClass} from '../../errors';
 import classifyIDBError from './classifyError';
