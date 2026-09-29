@@ -553,12 +553,7 @@ describe('createStore', () => {
             expect(logInfoSpy).not.toHaveBeenCalledWith('IDB error not recoverable at the connection layer, propagating', expect.objectContaining({errorClass: 'capacity'}));
         });
 
-        /**
-         * Chromium also reports persistence failures as `UnknownError: Internal error.` with no cause
-         * attached. Those used to land in UNKNOWN, so every operation burned its whole retry budget
-         * without ever reopening the connection (App #102272). They now reuse this heal path.
-         */
-        it('should heal a cause-less `Internal error.` UnknownError by reopening the connection', async () => {
+        it('should heal an `Internal error.` UnknownError by reopening the connection', async () => {
             const store = createStore(uniqueDBName(), STORE_NAME);
 
             await store('readwrite', (s) => {
@@ -580,8 +575,6 @@ describe('createStore', () => {
 
             expect(result).toBe('value');
             expect(callCount).toBe(2);
-            // The heal log carries the message so telemetry can tell this wording apart from
-            // backing-store corruption and measure whether the reopen actually fixed it.
             expect(logInfoSpy).toHaveBeenCalledWith(
                 'IDB heal: backing store error detected — dropping cached connection and reopening (2 attempts left)',
                 expect.objectContaining({dbName: expect.any(String), errorMessage: 'Internal error.'}),

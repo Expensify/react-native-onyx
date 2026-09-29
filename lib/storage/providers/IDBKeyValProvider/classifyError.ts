@@ -38,13 +38,8 @@ function classifyIDBError(error: unknown): ValueOf<typeof StorageErrorClass> {
         return StorageErrorClass.FATAL;
     }
 
-    // Chromium persistence failure with no cause attached: `UnknownError` whose message is exactly
-    // `Internal error.`. Unlike the backing-store wording above it is reported for both reads and
-    // writes on an already-open connection, and it used to land in UNKNOWN, where every operation
-    // burned its full retry budget without ever reopening the connection. The logs of the affected
-    // sessions show a fresh connection resolving most of these, so it belongs to the connection
-    // layer (budgeted reopen). Matched exactly so that no other `UnknownError` wording is pulled in.
-    if (name === 'unknownerror' && (message === 'internal error.' || message === 'internal error')) {
+    // Chromium persistence failure with no cause attached, recovered by a fresh connection.
+    if (name === 'unknownerror' && message === 'internal error.') {
         return StorageErrorClass.FATAL;
     }
 

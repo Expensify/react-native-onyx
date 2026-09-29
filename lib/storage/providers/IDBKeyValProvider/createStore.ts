@@ -193,9 +193,6 @@ function createStore(dbName: string, storeName: string): UseStore {
 
                 if (errorClass === StorageErrorClass.FATAL && healAttemptsRemaining > 0) {
                     healAttemptsRemaining--;
-                    // The message is logged so telemetry can tell which FATAL wording triggered the heal
-                    // (backing-store corruption vs. the cause-less `Internal error.`), and whether the
-                    // reopen actually fixed it.
                     Logger.logInfo(`IDB heal: backing store error detected — dropping cached connection and reopening (${healAttemptsRemaining} attempts left)`, {
                         dbName,
                         storeName,

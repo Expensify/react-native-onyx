@@ -864,12 +864,9 @@ describe('OnyxUtils', () => {
             expect(logAlertSpy).not.toHaveBeenCalled();
         });
 
-        it('should skip retry for a cause-less `Internal error.` instead of exhausting the retry budget', async () => {
+        it('should skip retry for an `Internal error.` UnknownError instead of exhausting the retry budget', async () => {
             const logAlertSpy = jest.spyOn(Logger, 'logAlert');
             const logInfoSpy = jest.spyOn(Logger, 'logInfo');
-            // Chromium reports this persistence failure with no cause (App #102272). It used to land in
-            // UNKNOWN, so every write burned all 6 attempts and then alerted, without the connection
-            // layer ever reopening the database.
             const internalError = Object.assign(new Error('Internal error.'), {name: 'UnknownError'});
             StorageMock.setItem = jest.fn().mockRejectedValue(internalError);
 
