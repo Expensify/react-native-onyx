@@ -158,6 +158,9 @@ that this internal function allows passing an additional <code>mergeReplaceNullP
 Any existing collection members not included in the new data will not be removed.
 Retries on failure.</p>
 </dd>
+<dt><a href="#resetDeferredInitTask">resetDeferredInitTask()</a></dt>
+<dd><p>Put Onyx back to &quot;not initialised&quot; state, useful for tests that need a cold start.</p>
+</dd>
 <dt><a href="#clearOnyxUtilsInternals">clearOnyxUtilsInternals()</a></dt>
 <dd><p>Clear internal variables used in this file, useful in test environments.</p>
 </dd>
@@ -483,6 +486,12 @@ Retries on failure.
 | params.collection | Object collection keyed by individual collection member keys and values |
 | retryAttempt | retry attempt |
 
+<a name="resetDeferredInitTask"></a>
+
+## resetDeferredInitTask()
+Put Onyx back to "not initialised" state, useful for tests that need a cold start.
+
+**Kind**: global function  
 <a name="clearOnyxUtilsInternals"></a>
 
 ## clearOnyxUtilsInternals()
