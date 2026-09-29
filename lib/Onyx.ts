@@ -656,11 +656,8 @@ function get<TKey extends OnyxKey>(key: TKey): Promise<OnyxValue<TKey>> {
  * Reads several Onyx keys at once, without subscribing. Use `useOnyx()` or `Onyx.connectWithoutView()` when
  * the values have to stay current.
  *
- * Values come back in the order of the keys given, and each is what get() returns for its key.
- *
- * Unlike multiSet(), which writes in one batch, this reads keys one at a time: a key missing from the cache
- * costs its own storage read. To read a whole collection, call get(collectionKey) once instead of listing its
- * members.
+ * Values come back in the order of the keys given, and each is what get() returns for its key. To read a
+ * whole collection, pass the collection key rather than listing its members.
  *
  * @example
  * const [session, wallet, report] = await Onyx.multiGet([
@@ -674,7 +671,7 @@ function get<TKey extends OnyxKey>(key: TKey): Promise<OnyxValue<TKey>> {
  */
 function multiGet<const Keys extends readonly OnyxKey[]>(keys: Keys): Promise<{[Index in keyof Keys]: OnyxValue<Keys[Index]>}> {
     // map() widens the key tuple to an array, so the per-slot value types survive only through the cast.
-    return Promise.all(keys.map((key) => get(key))) as Promise<{[Index in keyof Keys]: OnyxValue<Keys[Index]>}>;
+    return OnyxUtils.afterInit(() => Promise.resolve(keys.map((key) => OnyxUtils.tryGetCachedValue(key) ?? undefined) as {[Index in keyof Keys]: OnyxValue<Keys[Index]>}));
 }
 
 const Onyx = {

@@ -73,10 +73,8 @@ it as read-only.</p>
 <dt><a href="#multiGet">multiGet(keys)</a> ⇒</dt>
 <dd><p>Reads several Onyx keys at once, without subscribing. Use <code>useOnyx()</code> or <code>Onyx.connectWithoutView()</code> when
 the values have to stay current.</p>
-<p>Values come back in the order of the keys given, and each is what get() returns for its key.</p>
-<p>Unlike multiSet(), which writes in one batch, this reads keys one at a time: a key missing from the cache
-costs its own storage read. To read a whole collection, call get(collectionKey) once instead of listing its
-members.</p>
+<p>Values come back in the order of the keys given, and each is what get() returns for its key. To read a
+whole collection, pass the collection key rather than listing its members.</p>
 </dd>
 </dl>
 
@@ -313,11 +311,8 @@ const allReports = await Onyx.get(ONYXKEYS.COLLECTION.REPORT);
 Reads several Onyx keys at once, without subscribing. Use `useOnyx()` or `Onyx.connectWithoutView()` when
 the values have to stay current.
 
-Values come back in the order of the keys given, and each is what get() returns for its key.
-
-Unlike multiSet(), which writes in one batch, this reads keys one at a time: a key missing from the cache
-costs its own storage read. To read a whole collection, call get(collectionKey) once instead of listing its
-members.
+Values come back in the order of the keys given, and each is what get() returns for its key. To read a
+whole collection, pass the collection key rather than listing its members.
 
 **Kind**: global function  
 **Returns**: The values in the order of their keys, each `undefined` where a key has no value.  
