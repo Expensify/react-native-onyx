@@ -1,17 +1,13 @@
 /**
- * Integration test for `SQLiteProvider` using a Node-side SQLite engine.
- *
- * Pattern mirrors `IDBKeyvalProviderTest.ts` — real provider code + real
- * SQLite engine (via better-sqlite3) standing in for `react-native-nitro-sqlite`.
+ * Integration test for `SQLiteProvider` using NitroSQLite's Node mock.
  */
 import SQLiteProvider from '../../../../lib/storage/providers/SQLiteProvider';
 import utils from '../../../../lib/utils';
 import type {GenericDeepRecord} from '../../../types';
-import {resetAllDatabases} from '../../mocks/sqliteMock';
+import {resetAllDatabases} from 'react-native-nitro-sqlite/mock';
 
-// `jest.mock` is hoisted by Jest above the imports — register the SQLite mock
-// (overriding the global jestSetup.js mock) and a tiny device-info stub.
-jest.mock('react-native-nitro-sqlite', () => require('../../mocks/sqliteMock'));
+// Override the global native stub with NitroSQLite's in-memory mock.
+jest.mock('react-native-nitro-sqlite', () => require('react-native-nitro-sqlite/mock'));
 jest.mock('react-native-device-info', () => ({getFreeDiskStorage: () => 12345}));
 
 const ONYXKEYS = {

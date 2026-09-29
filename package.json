@@ -95,7 +95,7 @@
     "react-native": "0.76.3",
     "react-native-device-info": "^10.3.0",
     "react-native-nitro-modules": "^0.35.0",
-    "react-native-nitro-sqlite": "^9.6.0",
+    "react-native-nitro-sqlite": "git+https://github.com/margelo/react-native-nitro-sqlite.git#69b513c434ca7b2ebd1293dff348dc7cfb2f74af",
     "react-test-renderer": "18.2.0",
     "reassure": "1.4.0",
     "ts-node": "^10.9.2",
