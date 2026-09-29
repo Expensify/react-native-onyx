@@ -11,5 +11,5 @@ inputs:
         description: Whether the workflow is validating a Reassure stability check or not.
         required: true
 runs:
-    using: 'node20'
+    using: 'node24'
     main: './index.js'

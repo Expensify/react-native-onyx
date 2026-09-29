@@ -1,5 +1,6 @@
 import type * as LoggerModule from '../../../lib/Logger';
 import type storageModule from '../../../lib/storage';
+import {StorageErrorClass} from '../../../lib/storage/errors';
 
 // `jestSetup.js` globally mocks `lib/storage`; this suite tests the real implementation.
 jest.unmock('../../../lib/storage');
@@ -85,6 +86,84 @@ describe('storage/tryOrDegradePerformance', () => {
         const degradeLog = capturedLogs.find((log) => log.level === 'hmmm' && log.message.includes('Falling back to only using cache'));
         expect(degradeLog?.message).toContain('Cause: underlying disk is full');
         expect(degradeLog?.message).not.toContain('[object Object]');
+    });
+
+    it('should fall back to MemoryOnlyProvider when the active provider classifies the error as UNAVAILABLE', async () => {
+        const {storage, Logger} = loadIsolatedStorage();
+        const capturedLogs: CapturedLog[] = [];
+        Logger.registerLogger((data: LogData) => capturedLogs.push({level: data.level, message: data.message}));
+
+        storage.init();
+
+        const originalProvider = storage.getStorageProvider();
+        const targetError = new ReferenceError("Can't find variable: indexedDB");
+        originalProvider.getAllKeys = jest.fn().mockReturnValue(Promise.reject(targetError));
+
+        await expect(storage.getAllKeys()).rejects.toBe(targetError);
+
+        expect(capturedLogs.some((log) => log.level === 'hmmm' && log.message.includes('Falling back to only using cache'))).toBe(true);
+        expect(storage.getStorageProvider().name).toBe('MemoryOnlyProvider');
+    });
+
+    it('should still classify the error as UNAVAILABLE after degrading to MemoryOnlyProvider', async () => {
+        const {storage} = loadIsolatedStorage();
+
+        storage.init();
+
+        const targetError = new ReferenceError("Can't find variable: indexedDB");
+        storage.getStorageProvider().getAllKeys = jest.fn().mockReturnValue(Promise.reject(targetError));
+
+        await expect(storage.getAllKeys()).rejects.toBe(targetError);
+
+        // The degrade swaps the provider, but classification must keep working: `OnyxUtils.retryOperation`
+        // classifies this same error afterwards to decide not to retry it.
+        expect(storage.getStorageProvider().name).toBe('MemoryOnlyProvider');
+        expect(storage.classifyError(targetError)).toBe(StorageErrorClass.UNAVAILABLE);
+    });
+
+    it('should stop rejecting after degrading, so a missing storage engine cannot produce a rejection loop', async () => {
+        const {storage} = loadIsolatedStorage();
+
+        storage.init();
+
+        const originalProvider = storage.getStorageProvider();
+        const targetError = new ReferenceError("Can't find variable: indexedDB");
+        const getAllKeys = jest.fn().mockReturnValue(Promise.reject(targetError));
+        originalProvider.getAllKeys = getAllKeys;
+
+        await expect(storage.getAllKeys()).rejects.toBe(targetError);
+
+        await expect(storage.getAllKeys()).resolves.toEqual([]);
+        await expect(storage.getAllKeys()).resolves.toEqual([]);
+        expect(getAllKeys).toHaveBeenCalledTimes(1);
+    });
+
+    it('should consume a failing initialization so the memory-only fallback does not raise an unhandled rejection', async () => {
+        const {storage} = loadIsolatedStorage();
+
+        const unhandled: unknown[] = [];
+        const onUnhandledRejection = (reason: unknown) => unhandled.push(reason);
+        process.on('unhandledRejection', onUnhandledRejection);
+
+        try {
+            storage.getStorageProvider().init = () => {
+                throw new Error('IDBKeyVal store could not be created: indexedDB is not available in this environment');
+            };
+            storage.init();
+
+            // Node reports a rejection as unhandled once the microtask queue drains, so yield to the
+            // macrotask queue before asserting.
+            await new Promise((resolve) => {
+                setTimeout(resolve, 0);
+            });
+
+            expect(unhandled).toEqual([]);
+            // The degrade still happened, and initialization still completed so callers are not left waiting.
+            expect(storage.getStorageProvider().name).toBe('MemoryOnlyProvider');
+            await expect(storage.getAllKeys()).resolves.toEqual([]);
+        } finally {
+            process.off('unhandledRejection', onUnhandledRejection);
+        }
     });
 
     it('propagates async rejections with unrelated messages without falling back', async () => {

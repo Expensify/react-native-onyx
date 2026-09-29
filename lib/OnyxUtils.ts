@@ -71,6 +71,7 @@ type PreparedKeyValuePairs = {
 // Key/value store of Onyx key and arrays of values to merge
 let mergeQueue: Record<OnyxKey, Array<OnyxValue<OnyxKey>>> = {};
 let mergeQueuePromise: Record<OnyxKey, Promise<void>> = {};
+const mergeQueuesWithStaleRead = new WeakSet<Array<OnyxValue<OnyxKey>>>();
 
 // Optional user-provided key value states set when Onyx initializes or clears
 let defaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
@@ -574,6 +575,8 @@ function reportStorageQuota(error?: Error): Promise<void> {
  * - DISK_PRESSURE: the device disk itself is full (or the database files are unreadable), so neither
  *   retries nor in-DB eviction can free space — the write is dropped (cache stays authoritative) with
  *   a single throttled alert + quota snapshot per burst.
+ * - UNAVAILABLE: the storage engine does not exist in this environment, so the storage layer has
+ *   already degraded to the in-memory provider. No retry.
  * - UNKNOWN: the provider couldn't classify it — log the full error shape (name + message +
  *   provider) once so it's visible, then bounded retry without eviction.
  */
@@ -621,6 +624,15 @@ function retryOperation<TMethod extends RetriableOnyxOperation>(
 
     if (errorClass === StorageErrorClass.TRANSIENT || errorClass === StorageErrorClass.FATAL) {
         Logger.logInfo(`Storage operation skipped retry; ${errorClass} errors are handled by the connection layer. Error: ${error}. onyxMethod: ${onyxMethod.name}.`);
+        return Promise.resolve();
+    }
+
+    // UNAVAILABLE: there is no storage engine in this environment. The storage layer has already swapped
+    // in the in-memory provider, so the write's data is not lost.
+    if (errorClass === StorageErrorClass.UNAVAILABLE) {
+        Logger.logInfo(
+            `Storage operation skipped retry; the storage engine is unavailable and the storage layer has degraded to memory-only. Error: ${error}. onyxMethod: ${onyxMethod.name}.`,
+        );
         return Promise.resolve();
     }
 
@@ -692,6 +704,61 @@ function broadcastUpdate<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>
 
 function hasPendingMergeForKey(key: OnyxKey): boolean {
     return !!mergeQueue[key];
+}
+
+function cancelPendingMergesForKey(key: OnyxKey): void {
+    delete mergeQueue[key];
+    delete mergeQueuePromise[key];
+}
+
+function cancelPendingMergesForCollection(collectionKey: CollectionKeyBase): void {
+    for (const key of Object.keys(mergeQueue)) {
+        if (!OnyxKeys.isCollectionMemberKey(collectionKey, key)) {
+            continue;
+        }
+        cancelPendingMergesForKey(key);
+    }
+}
+
+type PendingMergeEntry = [OnyxKey, Array<OnyxValue<OnyxKey>>, number];
+
+function getPendingMergeEntries(keysToPreserve: OnyxKey[]): PendingMergeEntry[] {
+    return Object.entries(mergeQueue)
+        .filter(([key]) => !keysToPreserve.some((preserveKey) => OnyxKeys.isKeyMatch(preserveKey, key)))
+        .map(([key, queuedChanges]) => [key, queuedChanges, queuedChanges.length]);
+}
+
+function cancelPendingMerges(entries: PendingMergeEntry[]): void {
+    for (const [key, queuedChanges, capturedLength] of entries) {
+        if (mergeQueue[key] !== queuedChanges) {
+            continue;
+        }
+        if (queuedChanges.length === capturedLength) {
+            cancelPendingMergesForKey(key);
+            continue;
+        }
+        queuedChanges.splice(0, capturedLength);
+        mergeQueuesWithStaleRead.add(queuedChanges);
+    }
+}
+
+function hasStaleMergeRead(queuedChanges: Array<OnyxValue<OnyxKey>>): boolean {
+    return mergeQueuesWithStaleRead.has(queuedChanges);
+}
+
+function cancelPendingMergesForKeys(keys: OnyxKey[]): void {
+    for (const key of keys) {
+        cancelPendingMergesForKey(key);
+    }
+}
+
+function cancelPendingMergesForNullMembers(collection: OnyxInputKeyValueMapping): void {
+    for (const [key, value] of Object.entries(collection)) {
+        if (value !== null) {
+            continue;
+        }
+        cancelPendingMergesForKey(key);
+    }
 }
 
 /**
@@ -1105,6 +1172,10 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
 
     const {pairs: keyValuePairsToSet, keysToRemove: removalCandidates} = OnyxUtils.prepareKeyValuePairsForStorage(newData, true);
 
+    if (!retryAttempt) {
+        cancelPendingMergesForKeys(removalCandidates);
+    }
+
     // Removals of keys that are neither cached nor persisted are no-ops and skipped. When the key
     // index has not been loaded yet (empty set), keep the removal to be safe.
     const persistedKeys = cache.getAllKeys();
@@ -1247,6 +1318,10 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
     }
     resultCollectionKeys = Object.keys(resultCollection);
 
+    if (!retryAttempt) {
+        cancelPendingMergesForCollection(collectionKey);
+    }
+
     return OnyxUtils.getAllKeys().then((persistedKeys) => {
         const mutableCollection: OnyxInputKeyValueMapping = {...resultCollection};
 
@@ -1347,6 +1422,10 @@ function mergeCollectionWithPatches<TKey extends CollectionKeyBase>(
         }, {});
     }
     resultCollectionKeys = Object.keys(resultCollection);
+
+    if (!retryAttempt) {
+        cancelPendingMergesForNullMembers(resultCollection);
+    }
 
     return getAllKeys()
         .then((persistedKeys) => {
@@ -1538,6 +1617,10 @@ function partialSetCollection<TKey extends CollectionKeyBase>({collectionKey, co
     }
     resultCollectionKeys = Object.keys(resultCollection);
 
+    if (!retryAttempt) {
+        cancelPendingMergesForKeys(resultCollectionKeys);
+    }
+
     return getAllKeys().then((persistedKeys) => {
         const mutableCollection: OnyxInputKeyValueMapping = {...resultCollection};
         const existingKeys = resultCollectionKeys.filter((key) => persistedKeys.has(key));
@@ -1625,6 +1708,9 @@ const OnyxUtils = {
     retryOperation,
     broadcastUpdate,
     hasPendingMergeForKey,
+    getPendingMergeEntries,
+    cancelPendingMerges,
+    hasStaleMergeRead,
     prepareKeyValuePairsForStorage,
     mergeChanges,
     mergeAndMarkChanges,

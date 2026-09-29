@@ -1,6 +1,8 @@
 import * as IDB from 'idb-keyval';
 import createStore from '../../../../lib/storage/providers/IDBKeyValProvider/createStore';
 import * as Logger from '../../../../lib/Logger';
+import {StorageErrorClass} from '../../../../lib/storage/errors';
+import classifyIDBError from '../../../../lib/storage/providers/IDBKeyValProvider/classifyError';
 
 const STORE_NAME = 'teststore';
 let testDbCounter = 0;
@@ -37,6 +39,58 @@ describe('createStore', () => {
 
     afterEach(() => {
         jest.restoreAllMocks();
+    });
+
+    describe('missing indexedDB global', () => {
+        async function withoutIndexedDB(callback: () => Promise<void>) {
+            const descriptor = Object.getOwnPropertyDescriptor(window, 'indexedDB');
+            delete (window as {indexedDB?: unknown}).indexedDB;
+            try {
+                await callback();
+            } finally {
+                if (descriptor) {
+                    Object.defineProperty(window, 'indexedDB', descriptor);
+                }
+            }
+        }
+
+        it('should reject with a classifiable error instead of a bare ReferenceError', async () => {
+            const store = createStore(uniqueDBName(), STORE_NAME);
+
+            await withoutIndexedDB(async () => {
+                const operation = store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
+
+                await expect(operation).rejects.toThrow('indexedDB is not available in this environment');
+                await expect(operation.catch((error: unknown) => classifyIDBError(error))).resolves.toBe(StorageErrorClass.UNAVAILABLE);
+            });
+        });
+
+        it('should not retry or heal when the engine is missing', async () => {
+            const store = createStore(uniqueDBName(), STORE_NAME);
+
+            await withoutIndexedDB(async () => {
+                await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('key1')))).rejects.toThrow('indexedDB is not available in this environment');
+            });
+
+            expect(logInfoSpy).not.toHaveBeenCalledWith(expect.stringContaining('IDB transient error'), expect.anything());
+            expect(logInfoSpy).not.toHaveBeenCalledWith(expect.stringContaining('IDB heal'), expect.anything());
+            expect(logAlertSpy).not.toHaveBeenCalled();
+        });
+
+        it('should keep working once the engine is back', async () => {
+            const store = createStore(uniqueDBName(), STORE_NAME);
+
+            await withoutIndexedDB(async () => {
+                await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('key1')))).rejects.toThrow('indexedDB is not available in this environment');
+            });
+
+            await store('readwrite', (s) => {
+                s.put('value', 'key1');
+                return IDB.promisifyRequest(s.transaction);
+            });
+
+            await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('key1')))).resolves.toBe('value');
+        });
     });
 
     describe('InvalidStateError retry', () => {

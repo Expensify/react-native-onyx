@@ -4,8 +4,9 @@
  * provider's `classifyError`). This module deliberately holds NO string matchers: it is the common
  * taxonomy the two reacting layers agree on, while the per-engine knowledge lives with the engine.
  *
- * - the connection layer (`createStore`) recovers TRANSIENT and FATAL errors by reopening the DB, and
- * - the operation layer (`OnyxUtils.retryOperation`) recovers CAPACITY by eviction and retries UNKNOWN.
+ * - the connection layer (`createStore`) recovers TRANSIENT and FATAL errors by reopening the DB,
+ * - the operation layer (`OnyxUtils.retryOperation`) recovers CAPACITY by eviction and retries UNKNOWN, and
+ * - the storage layer (`lib/storage/index.ts`) reacts to UNAVAILABLE by degrading to memory-only.
  *
  * This module has no Onyx dependencies (and no engine dependencies) so it can live in the storage
  * layer, and be imported by every provider, without creating an import cycle.
@@ -23,6 +24,11 @@ const StorageErrorClass = {
     INVALID_DATA: 'invalidData',
     /** Backing-store corruption. Owner: connection layer — budgeted heal, then give up. */
     FATAL: 'fatal',
+    /** The storage engine itself does not exist in this environment (for example `indexedDB` is an
+     *  undeclared global in Chrome for iOS private tabs and in Lockdown Mode). Never retriable — the
+     *  engine cannot appear mid-session. Owner: the storage layer — degrade
+     *  to the in-memory provider. */
+    UNAVAILABLE: 'unavailable',
     /** Unmatched by the active provider. Owner: operation layer — bounded retry, and log the shape so
      *  recurring cases can be promoted into one of the classes above. */
     UNKNOWN: 'unknown',
