@@ -1,5 +1,4 @@
 import type {ValueOf} from 'type-fest';
-
 import {StorageErrorClass, getErrorParts} from '../../errors';
 import {INDEXED_DB_UNAVAILABLE_MESSAGE} from './isIndexedDBAvailable';
 
