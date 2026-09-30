@@ -868,11 +868,11 @@ describe('Onyx', () => {
                 expect(Object.keys(first!)).toHaveLength(0);
             });
 
-            it('should return undefined for empty collections when no keys are loaded', async () => {
+            it('should return the frozen empty collection object for empty collections once init has registered the collection key', async () => {
                 await initOnyx();
 
                 const result = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
-                expect(result).toBeUndefined();
+                expect(result).toEqual({});
             });
 
             it('should return a new reference when a member is removed and another added simultaneously', async () => {
