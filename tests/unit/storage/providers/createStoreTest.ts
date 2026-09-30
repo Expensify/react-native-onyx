@@ -551,6 +551,35 @@ describe('createStore', () => {
             expect(logAlertSpy).not.toHaveBeenCalled();
             expect(logInfoSpy).not.toHaveBeenCalledWith('IDB error not recoverable at the connection layer, propagating', expect.objectContaining({errorClass: 'capacity'}));
         });
+
+        it('should heal an `Internal error.` UnknownError by reopening the connection', async () => {
+            const store = createStore(uniqueDBName(), STORE_NAME);
+
+            await store('readwrite', (s) => {
+                s.put('value', 'key1');
+                return IDB.promisifyRequest(s.transaction);
+            });
+
+            const original = IDBDatabase.prototype.transaction;
+            let callCount = 0;
+            jest.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (this: IDBDatabase, ...args) {
+                callCount++;
+                if (callCount === 1) {
+                    throw new DOMException('Internal error.', 'UnknownError');
+                }
+                return original.apply(this, args);
+            });
+
+            const result = await store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
+
+            expect(result).toBe('value');
+            expect(callCount).toBe(2);
+            expect(logInfoSpy).toHaveBeenCalledWith(
+                'IDB heal: backing store error detected — dropping cached connection and reopening (2 attempts left)',
+                expect.objectContaining({dbName: expect.any(String), errorMessage: 'Internal error.'}),
+            );
+            expect(logInfoSpy).toHaveBeenCalledWith('IDB heal: successfully recovered after backing store error', expect.objectContaining({dbName: expect.any(String)}));
+        });
     });
 
     describe('connection lost recovery (transient, unbudgeted)', () => {

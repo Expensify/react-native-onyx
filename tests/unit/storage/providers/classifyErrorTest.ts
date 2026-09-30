@@ -12,6 +12,8 @@ describe('classifyIDBError', () => {
         [new DOMException('The quota has been exceeded.', 'QuotaExceededError'), StorageErrorClass.CAPACITY],
         // Backing-store corruption.
         [new DOMException('Internal error opening backing store for indexedDB.open.', 'UnknownError'), StorageErrorClass.FATAL],
+        [new DOMException('Internal error.', 'UnknownError'), StorageErrorClass.FATAL],
+        [new DOMException('Internal error.', 'SyntaxError'), StorageErrorClass.UNKNOWN],
         // Transient connection failures.
         [new DOMException('Connection to Indexed Database server lost. Refresh the page to try again', 'UnknownError'), StorageErrorClass.TRANSIENT],
         [new DOMException('IDB write transaction aborted without an error', 'AbortError'), StorageErrorClass.TRANSIENT],

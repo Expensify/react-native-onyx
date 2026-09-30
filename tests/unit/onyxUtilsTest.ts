@@ -647,6 +647,19 @@ describe('OnyxUtils', () => {
             expect(logAlertSpy).not.toHaveBeenCalled();
         });
 
+        it('should skip retry for an `Internal error.` UnknownError instead of exhausting the retry budget', async () => {
+            const logAlertSpy = jest.spyOn(Logger, 'logAlert');
+            const logInfoSpy = jest.spyOn(Logger, 'logInfo');
+            const internalError = Object.assign(new Error('Internal error.'), {name: 'UnknownError'});
+            StorageMock.setItem = jest.fn().mockRejectedValue(internalError);
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+
+            expect(logInfoSpy).toHaveBeenCalledWith(`Storage operation skipped retry; fatal errors are handled by the connection layer. Error: ${internalError}. onyxMethod: setWithRetry.`);
+            const unclassifiedAlerts = logAlertSpy.mock.calls.filter((call) => typeof call[0] === 'string' && call[0].startsWith('Unclassified storage error'));
+            expect(unclassifiedAlerts).toHaveLength(0);
+        });
+
         it('should include the error in logAlert for IDBObjectStore invalid data errors', async () => {
             const logAlertSpy = jest.spyOn(Logger, 'logAlert');
             StorageMock.setItem = jest.fn().mockRejectedValueOnce(invalidDataError);
