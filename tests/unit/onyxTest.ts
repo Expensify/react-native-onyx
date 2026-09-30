@@ -11,6 +11,7 @@ import Onyx from '../../lib';
 import type {Connection} from '../../lib/Onyx';
 import createDeferredTask from '../../lib/createDeferredTask';
 import * as Logger from '../../lib/Logger';
+import onyxSubscriptionManager from '../../lib/OnyxSubscriptionManager';
 import OnyxUtils from '../../lib/OnyxUtils';
 import StorageMock from '../../lib/storage';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
@@ -3761,15 +3762,17 @@ describe('Onyx', () => {
 
         it('should not subscribe to the key it reads', async () => {
             await Onyx.set(ONYX_KEYS.TEST_KEY, 'first');
-            await Onyx.get(ONYX_KEYS.TEST_KEY);
 
-            const sendDataToConnectionSpy = jest.spyOn(OnyxUtils, 'sendDataToConnection');
+            const hadListeners = onyxSubscriptionManager.hasListenersForKey(ONYX_KEYS.TEST_KEY);
+            await expect(Onyx.get(ONYX_KEYS.TEST_KEY)).resolves.toEqual('first');
+
+            // The read must not register a listener of its own, so the registry is left as it was.
+            expect(onyxSubscriptionManager.hasListenersForKey(ONYX_KEYS.TEST_KEY)).toBe(hadListeners);
+
+            // A later write still reads back, so the read stayed correct without holding a listener.
             await Onyx.set(ONYX_KEYS.TEST_KEY, 'second');
 
-            expect(sendDataToConnectionSpy).not.toHaveBeenCalled();
             await expect(Onyx.get(ONYX_KEYS.TEST_KEY)).resolves.toEqual('second');
-
-            sendDataToConnectionSpy.mockRestore();
         });
 
         it('should not see an un-awaited merge to the same key', async () => {
@@ -3963,11 +3966,13 @@ describe('Onyx.init', () => {
                 expect(resolvedValue).toBe('from-storage');
             });
 
-            it('should resolve a collection to undefined while the store is empty', async () => {
+            it('should resolve a collection to an empty object while the store is empty', async () => {
                 Onyx.init({keys: ONYX_KEYS});
                 await act(async () => waitForPromisesToResolve());
 
-                await expect(Onyx.get(ONYX_KEYS.COLLECTION.TEST_KEY)).resolves.toBeUndefined();
+                // init seeds a frozen empty snapshot for every declared collection, which is the
+                // post-init "loaded" signal a subscriber reads too.
+                await expect(Onyx.get(ONYX_KEYS.COLLECTION.TEST_KEY)).resolves.toEqual({});
             });
         });
 
