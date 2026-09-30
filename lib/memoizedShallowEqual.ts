@@ -8,7 +8,7 @@ import {shallowEqual} from 'fast-equals';
  * the O(keys) walk and the rest resolve in O(1). WeakMap keys make stale entries impossible to
  * read (lookup requires holding both exact objects) and let GC reclaim them.
  */
-const shallowEqualVerdicts = new WeakMap<object, WeakMap<object, boolean>>();
+const shallowEqualVerdicts = new WeakMap<WeakKey, WeakMap<WeakKey, boolean>>();
 
 /**
  * Identity-pair-memoized shallowEqual: same (a, b) references → cached verdict, no walk.
