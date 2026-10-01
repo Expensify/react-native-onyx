@@ -120,6 +120,14 @@ describe('storage/tryOrDegradePerformance', () => {
         await expect(storage.getItem('key')).resolves.toEqual({test: 'data'});
     });
 
+    it('should fall back to MemoryOnlyProvider when degradeToMemoryOnly is called', () => {
+        const {storage} = loadIsolatedStorage();
+
+        storage.degradeToMemoryOnly(new DOMException('Internal error.', 'UnknownError'));
+
+        expect(storage.getStorageProvider().name).toBe('MemoryOnlyProvider');
+    });
+
     it('should still classify the error as UNAVAILABLE after degrading to MemoryOnlyProvider', async () => {
         const {storage} = loadIsolatedStorage();
 

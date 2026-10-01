@@ -920,6 +920,12 @@ function initializeWithDefaultKeyStates(): Promise<void> {
         .catch((error) => {
             Logger.logAlert(`Failed to load data from storage during init. The app will boot with default key states only. Error: ${error}`);
 
+            // The connection layer already reopened once and the read still failed. The session now runs on
+            // defaults, so writing it into a database we could not read gains nothing.
+            if (Storage.classifyError(error) === StorageErrorClass.FATAL) {
+                Storage.degradeToMemoryOnly(error);
+            }
+
             // Populate the key index so getAllKeys() returns correct results for default keys.
             // Without this, subscribers that check getAllKeys() would see an empty set even
             // though we have default values in cache.
