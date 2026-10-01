@@ -349,10 +349,15 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             return trackWrite(provider.store.executeAsync(buildDeleteQuery(keyChunk), keyChunk).then(() => undefined));
         }
 
-        const commands: BatchQueryCommand[] = keyChunks.map((keyChunk) => ({
-            query: buildDeleteQuery(keyChunk),
-            params: keyChunk,
-        }));
+        const firstChunk = keyChunks[0];
+        const lastChunk = keyChunks[keyChunks.length - 1];
+        const hasSmallerLastChunk = lastChunk.length < firstChunk.length;
+        // NitroSQLite reuses one prepared statement for each grouped parameter set.
+        // Only the final partial chunk needs a different number of placeholders.
+        const commands: BatchQueryCommand[] = [{query: buildDeleteQuery(firstChunk), params: hasSmallerLastChunk ? keyChunks.slice(0, -1) : keyChunks}];
+        if (hasSmallerLastChunk) {
+            commands.push({query: buildDeleteQuery(lastChunk), params: lastChunk});
+        }
 
         return trackWrite(provider.store.executeBatchAsync(commands).then(() => undefined));
     },

@@ -184,6 +184,25 @@ describe('SQLiteProvider', () => {
             expect(sortedActual).toEqual(sortedExpected);
         });
 
+        it('rolls back all grouped writes when a later parameter set fails', async () => {
+            // Given a constraint that rejects the second insert in a grouped batch.
+            SQLiteProvider.store!.execute(`CREATE TRIGGER reject_insert BEFORE INSERT ON keyvaluepairs
+                WHEN NEW.record_key = '${ONYXKEYS.TEST_KEY_2}' BEGIN SELECT RAISE(ABORT, 'rejected insert'); END;`);
+
+            // When the first insert succeeds but the second one is rejected.
+            await expect(
+                SQLiteProvider.multiSet([
+                    [ONYXKEYS.TEST_KEY, 'first'],
+                    [ONYXKEYS.TEST_KEY_2, 'second'],
+                ]),
+            ).rejects.toThrow('rejected insert');
+
+            // Then the batch is atomic and its failure does not block subsequent reads or writes.
+            expect(await SQLiteProvider.getAllKeys()).toEqual([]);
+            await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, 'recovered');
+            expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY)).toBe('recovered');
+        });
+
         // SQLite-specific regression: `multiSet` substitutes null for undefined
         // before serializing, otherwise JSON.stringify(undefined) === undefined
         // and the row would store a literal "undefined" string.
@@ -445,6 +464,34 @@ describe('SQLiteProvider', () => {
                 expect(inQueries).toHaveLength(3);
             });
 
+            it('releases a failed snapshot transaction before the next read', async () => {
+                // Given several chunks and a query failure inside the read transaction.
+                const entries = createKeyValueEntries(5);
+                await SQLiteProvider.multiSet(entries);
+                const reader = getOpenedConnection(1);
+                const transaction = reader.transaction.bind(reader);
+                jest.spyOn(reader, 'transaction').mockImplementationOnce((callback) =>
+                    transaction((tx) => {
+                        const executeAsync = tx.executeAsync.bind(tx);
+                        let queryCount = 0;
+                        jest.spyOn(tx, 'executeAsync').mockImplementation((query, params) => {
+                            if (++queryCount === 2) {
+                                return Promise.reject(new Error('failed snapshot query'));
+                            }
+                            return executeAsync(query, params);
+                        });
+                        return callback(tx);
+                    }),
+                );
+                const keys = entries.map(([key]) => key);
+
+                // When one chunk fails, the original error reaches the caller.
+                await expect(SQLiteProvider.multiGet(keys)).rejects.toThrow('failed snapshot query');
+
+                // Then rollback releases the reader and the next snapshot returns all values.
+                await expect(SQLiteProvider.multiGet(keys)).resolves.toEqual(expect.arrayContaining(entries));
+            });
+
             it('reads all chunks from one snapshot while another connection writes', async () => {
                 const entries = createKeyValueEntries(5);
                 await SQLiteProvider.multiSet(entries);
@@ -501,6 +548,37 @@ describe('SQLiteProvider', () => {
                 expect(await SQLiteProvider.getAllKeys()).toEqual([]);
             });
 
+            it('removes every key when all grouped chunks have the same size', async () => {
+                // Given an exact number of full chunks and a key outside the removal list.
+                const entries = createKeyValueEntries(6);
+                await SQLiteProvider.multiSet([...entries, [ONYXKEYS.TEST_KEY, 'keep']]);
+
+                // When all full chunks run through the same batch statement.
+                await SQLiteProvider.removeItems(entries.map(([key]) => key));
+
+                // Then every requested key is gone and unrelated data remains.
+                expect(await SQLiteProvider.getAllKeys()).toEqual([ONYXKEYS.TEST_KEY]);
+                expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY)).toBe('keep');
+            });
+
+            it('rolls back earlier chunks when a later grouped delete fails', async () => {
+                // Given a trigger that rejects a key in the second full chunk.
+                const entries = createKeyValueEntries(5);
+                await SQLiteProvider.multiSet(entries);
+                SQLiteProvider.store!.execute(`CREATE TRIGGER reject_delete BEFORE DELETE ON keyvaluepairs
+                    WHEN OLD.record_key = '${entries[2][0]}' BEGIN SELECT RAISE(ABORT, 'rejected delete'); END;`);
+                const keys = entries.map(([key]) => key);
+
+                // When a later delete fails after the first chunk has executed.
+                await expect(SQLiteProvider.removeItems(keys)).rejects.toThrow('rejected delete');
+
+                // Then the entire batch rolls back and the writer remains usable.
+                expect(await SQLiteProvider.multiGet(keys)).toEqual(expect.arrayContaining(entries));
+                SQLiteProvider.store!.execute('DROP TRIGGER reject_delete;');
+                await SQLiteProvider.removeItems(keys);
+                expect(await SQLiteProvider.getAllKeys()).toEqual([]);
+            });
+
             it('should use executeAsync when keys fit in a single chunk', async () => {
                 const entries = createKeyValueEntries(2);
                 await SQLiteProvider.multiSet(entries);
@@ -533,8 +611,11 @@ describe('SQLiteProvider', () => {
                 expect(executeBatchAsyncSpy).toHaveBeenCalledTimes(1);
 
                 const batchCommands = executeBatchAsyncSpy.mock.calls[0][0];
-                expect(batchCommands).toHaveLength(3);
+                expect(batchCommands).toHaveLength(2);
+                expect(batchCommands[0].params).toEqual([keys.slice(0, 2), keys.slice(2, 4)]);
+                expect(batchCommands[1].params).toEqual(keys.slice(4));
                 expect(batchCommands.every((command) => command.query.includes('DELETE FROM keyvaluepairs WHERE record_key IN'))).toBe(true);
+                expect(await SQLiteProvider.getAllKeys()).toEqual([]);
             });
         });
     });
@@ -542,6 +623,21 @@ describe('SQLiteProvider', () => {
     // SQLite-specific: the IN-list is parameterised, so a key containing SQL
     // fragments must be treated as a literal record_key.
     describe('SQL-injection safety', () => {
+        it('preserves embedded NUL characters in keys and JSON values', async () => {
+            // Given a key with a NUL byte and a JSON value containing the same character.
+            const key = 'nul\0key';
+            const value = {text: 'before\0after'};
+
+            // When both are stored through a grouped parameter set.
+            await SQLiteProvider.multiSet([[key, value]]);
+
+            // Then prepared reads, bulk reads, and exports retain the complete key and value.
+            expect(await SQLiteProvider.getItem(key)).toEqual(value);
+            expect(await SQLiteProvider.multiGet([key])).toEqual([[key, value]]);
+            expect(await SQLiteProvider.getAllKeys()).toEqual([key]);
+            expect(await SQLiteProvider.getAll()).toEqual([[key, value]]);
+        });
+
         it('should treat a key containing SQL fragments as a literal record_key', async () => {
             const nastyKey = "'; DROP TABLE keyvaluepairs; --";
             await SQLiteProvider.setItem(nastyKey as string, 'survived');

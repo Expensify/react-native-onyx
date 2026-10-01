@@ -1,4 +1,5 @@
 import classifyIDBError from '../../../../lib/storage/providers/IDBKeyValProvider/classifyError';
+import classifySQLiteError from '../../../../lib/storage/providers/classifySQLiteError';
 import {StorageErrorClass} from '../../../../lib/storage/errors';
 
 describe('classifyIDBError', () => {
@@ -25,5 +26,30 @@ describe('classifyIDBError', () => {
         [new Error('some brand new failure'), StorageErrorClass.UNKNOWN],
     ])('classifies %s as %s', (error, expectedClass) => {
         expect(classifyIDBError(error)).toBe(expectedClass);
+    });
+});
+
+describe('classifySQLiteError', () => {
+    it.each([
+        [new Error('database or disk is full'), StorageErrorClass.CAPACITY],
+        [new Error('[NativeNitroSQLiteException][SqlExecutionError] database or disk is full'), StorageErrorClass.CAPACITY],
+        [new Error('disk I/O error'), StorageErrorClass.DISK_PRESSURE],
+        [new Error('unable to open database file'), StorageErrorClass.DISK_PRESSURE],
+        [Object.assign(new Error('Cannot create the database'), {type: 'DatabaseCannotBeOpened'}), StorageErrorClass.DISK_PRESSURE],
+        [{type: 'DatabaseCannotBeOpened', message: 'Permission denied'}, StorageErrorClass.DISK_PRESSURE],
+        // Encryption configuration and closed-connection errors do not mean that storage is unavailable.
+        [{type: 'EncryptionNotEnabled', message: 'SEE is not enabled'}, StorageErrorClass.UNKNOWN],
+        [{type: 'DatabaseCannotBeDecrypted', message: 'Wrong key'}, StorageErrorClass.UNKNOWN],
+        [{type: 'DatabaseNotOpen', message: 'Database is closed'}, StorageErrorClass.UNKNOWN],
+        [new Error('some brand new failure'), StorageErrorClass.UNKNOWN],
+        [null, StorageErrorClass.UNKNOWN],
+        [undefined, StorageErrorClass.UNKNOWN],
+    ])('classifies %s as %s', (error, expectedClass) => {
+        // Given either a structured native error or a legacy SQLite message.
+        // When classifying without loading the optional native dependency.
+        const errorClass = classifySQLiteError(error);
+
+        // Then native open failures share the existing disk-pressure recovery behavior.
+        expect(errorClass).toBe(expectedClass);
     });
 });
