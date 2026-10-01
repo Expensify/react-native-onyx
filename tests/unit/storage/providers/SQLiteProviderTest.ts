@@ -1,13 +1,26 @@
 /**
  * Integration test for `SQLiteProvider` using NitroSQLite's Node mock.
  */
+import {open} from 'react-native-nitro-sqlite';
+import type {NitroSQLiteConnection, PreparedStatement} from 'react-native-nitro-sqlite';
 import SQLiteProvider from '../../../../lib/storage/providers/SQLiteProvider';
 import utils from '../../../../lib/utils';
 import type {GenericDeepRecord} from '../../../types';
-import {delayAsyncExecutionAfter, delayNextAsyncExecution, getAsyncQueries, getOpenOptions, getPreparedQueries, resetAllDatabases} from 'react-native-nitro-sqlite/mock';
+// Jest resolves the package export, which TypeScript's legacy Node resolution cannot resolve.
+const {resetAllDatabases} = jest.requireActual<{resetAllDatabases: () => void}>('react-native-nitro-sqlite/mock');
 
 // Override the global native stub with NitroSQLite's mock.
-jest.mock('react-native-nitro-sqlite', () => require('react-native-nitro-sqlite/mock'));
+jest.mock('react-native-nitro-sqlite', () => {
+    const sqliteMock = jest.requireActual<{open: (options: Parameters<typeof open>[0]) => Pick<NitroSQLiteConnection, 'prepare'>}>('react-native-nitro-sqlite/mock');
+    return {
+        ...sqliteMock,
+        open: jest.fn((options: Parameters<typeof open>[0]) => {
+            const connection = sqliteMock.open(options);
+            jest.spyOn(connection, 'prepare');
+            return connection;
+        }),
+    };
+});
 jest.mock('react-native-device-info', () => ({getFreeDiskStorage: () => 12345}));
 
 const ONYXKEYS = {
@@ -42,6 +55,7 @@ describe('SQLiteProvider', () => {
 
     beforeEach(() => {
         resetAllDatabases();
+        jest.mocked(open).mockClear();
         SQLiteProvider.init();
     });
 
@@ -51,15 +65,14 @@ describe('SQLiteProvider', () => {
 
     describe('NitroSQLite 10 connections and statements', () => {
         it('opens a separate read-only connection after configuring the writer', () => {
-            expect(getOpenOptions()).toEqual([
-                {name: 'OnyxDB', connection: undefined, readOnly: false},
-                {name: 'OnyxDB', connection: 'independent', readOnly: true},
-            ]);
+            expect(jest.mocked(open).mock.calls).toEqual([[{name: 'OnyxDB'}], [{name: 'OnyxDB', connection: 'independent', readOnly: true}]]);
         });
 
         it('reuses prepared statements for repeated single-key operations', async () => {
-            const preparedQueries = getPreparedQueries();
-            expect(preparedQueries).toHaveLength(3);
+            const writerPrepare = jest.mocked(getOpenedConnection(0).prepare);
+            const readerPrepare = jest.mocked(getOpenedConnection(1).prepare);
+            expect(writerPrepare).toHaveBeenCalledTimes(2);
+            expect(readerPrepare).toHaveBeenCalledTimes(1);
 
             await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, 'first');
             await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY_2, 'second');
@@ -67,7 +80,8 @@ describe('SQLiteProvider', () => {
             expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY_2)).toBe('second');
             await SQLiteProvider.removeItem(ONYXKEYS.TEST_KEY);
 
-            expect(getPreparedQueries()).toEqual(preparedQueries);
+            expect(writerPrepare).toHaveBeenCalledTimes(2);
+            expect(readerPrepare).toHaveBeenCalledTimes(1);
         });
 
         it('waits for an already queued write before reading on the independent connection', async () => {
@@ -75,13 +89,19 @@ describe('SQLiteProvider', () => {
             const writeGate = new Promise<void>((resolve) => {
                 releaseWrite = resolve;
             });
-            delayNextAsyncExecution(writeGate);
+            const setItemStatement = getPreparedStatement(getOpenedConnection(0), 0);
+            const executeWrite = setItemStatement.executeAsync.bind(setItemStatement);
+            jest.spyOn(setItemStatement, 'executeAsync').mockImplementationOnce(async (params) => {
+                await writeGate;
+                return executeWrite(params);
+            });
+            const executeRead = jest.spyOn(getPreparedStatement(getOpenedConnection(1), 0), 'executeAsync');
 
             const write = SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, 'committed');
             const read = SQLiteProvider.getItem(ONYXKEYS.TEST_KEY);
 
             await Promise.resolve();
-            expect(getAsyncQueries().filter(({readOnly}) => readOnly)).toHaveLength(0);
+            expect(executeRead).not.toHaveBeenCalled();
 
             releaseWrite();
             await write;
@@ -378,6 +398,7 @@ describe('SQLiteProvider', () => {
 
         beforeEach(() => {
             resetAllDatabases();
+            jest.mocked(open).mockClear();
             SQLiteProvider.init();
 
             jest.spyOn(utils, 'chunkArray').mockImplementation((items, _maxChunkSize) => originalChunkArray(items, CHUNK_SIZE));
@@ -403,14 +424,24 @@ describe('SQLiteProvider', () => {
                 const entries = createKeyValueEntries(5);
                 await SQLiteProvider.multiSet(entries);
 
-                const queryCountBeforeRead = getAsyncQueries().length;
+                const reader = getOpenedConnection(1);
+                const transaction = reader.transaction.bind(reader);
+                const queries: string[] = [];
+                jest.spyOn(reader, 'transaction').mockImplementation((callback) =>
+                    transaction((tx) => {
+                        const executeAsync = tx.executeAsync.bind(tx);
+                        jest.spyOn(tx, 'executeAsync').mockImplementation((query, params) => {
+                            queries.push(query);
+                            return executeAsync(query, params);
+                        });
+                        return callback(tx);
+                    }),
+                );
 
                 const keys = entries.map(([key]) => key);
                 await SQLiteProvider.multiGet(keys);
 
-                const inQueries = getAsyncQueries()
-                    .slice(queryCountBeforeRead)
-                    .filter(({sql, readOnly}) => readOnly && sql.includes('WHERE record_key IN'));
+                const inQueries = queries.filter((query) => query.includes('WHERE record_key IN'));
                 expect(inQueries).toHaveLength(3);
             });
 
@@ -422,12 +453,34 @@ describe('SQLiteProvider', () => {
                 const readGate = new Promise<void>((resolve) => {
                     releaseRead = resolve;
                 });
-                delayAsyncExecutionAfter(1, readGate);
+                let firstReadCompleted: () => void = () => undefined;
+                const firstRead = new Promise<void>((resolve) => {
+                    firstReadCompleted = resolve;
+                });
+                const reader = getOpenedConnection(1);
+                const transaction = reader.transaction.bind(reader);
+                jest.spyOn(reader, 'transaction').mockImplementation((callback) =>
+                    transaction((tx) => {
+                        const executeAsync = tx.executeAsync.bind(tx);
+                        let queryCount = 0;
+                        jest.spyOn(tx, 'executeAsync').mockImplementation(async (query, params) => {
+                            const isFirstQuery = queryCount++ === 0;
+                            if (!isFirstQuery) {
+                                await readGate;
+                            }
+                            const result = await executeAsync(query, params);
+                            if (isFirstQuery) {
+                                firstReadCompleted();
+                            }
+                            return result;
+                        });
+                        return callback(tx);
+                    }),
+                );
 
                 const keys = entries.map(([key]) => key);
                 const read = SQLiteProvider.multiGet(keys);
-                await Promise.resolve();
-                await Promise.resolve();
+                await firstRead;
 
                 await SQLiteProvider.setItem(keys[2], 99);
                 releaseRead();
@@ -529,3 +582,19 @@ describe('SQLiteProvider', () => {
         });
     });
 });
+
+function getOpenedConnection(index: number): NitroSQLiteConnection {
+    const result = jest.mocked(open).mock.results[index];
+    if (!result || result.type !== 'return') {
+        throw new Error(`Connection ${index} was not opened`);
+    }
+    return result.value;
+}
+
+function getPreparedStatement(connection: NitroSQLiteConnection, index: number): PreparedStatement {
+    const result = jest.mocked(connection.prepare).mock.results[index];
+    if (!result || result.type !== 'return') {
+        throw new Error(`Statement ${index} was not prepared`);
+    }
+    return result.value;
+}
