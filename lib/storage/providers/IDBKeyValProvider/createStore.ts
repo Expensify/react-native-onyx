@@ -194,6 +194,7 @@ function createStore(dbName: string, storeName: string): UseStore {
                     Logger.logInfo(`IDB heal: backing store error detected — dropping cached connection and reopening (${healAttemptsRemaining} attempts left)`, {
                         dbName,
                         storeName,
+                        errorMessage: error instanceof Error ? error.message : String(error),
                     });
                     dbp = undefined;
                     return executeTransaction(txMode, callback).then((result) => {

@@ -37,6 +37,11 @@ function classifyIDBError(error: unknown): ValueOf<typeof StorageErrorClass> {
         return StorageErrorClass.FATAL;
     }
 
+    // Chromium persistence failure with no cause attached, recovered by a fresh connection.
+    if (name === 'unknownerror' && message === 'internal error.') {
+        return StorageErrorClass.FATAL;
+    }
+
     // Transient connection/transport failures — the cached connection is stale and a reopen fixes it:
     // - InvalidStateError: connection closed between getDB() resolving and db.transaction().
     // - AbortError: write transaction aborted (connection close / versionchange / sibling abort).

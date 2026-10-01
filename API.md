@@ -78,36 +78,40 @@ Connects to an Onyx key given the options passed and listens to its changes.
 This method will be deprecated soon. Please use `Onyx.connectWithoutView()` instead.
 
 **Kind**: global function  
-**Returns**: The connection object to use when calling `Onyx.disconnect()`.  
+**Returns**: The `Connection` handle to use when calling `Onyx.disconnect()`.  
 
 | Param | Description |
 | --- | --- |
 | connectOptions | The options object that will define the behavior of the connection. |
 | connectOptions.key | The Onyx key to subscribe to. |
 | connectOptions.callback | A function that will be called when the Onyx data we are subscribed changes. |
-| connectOptions.selector | This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook.**        Using this setting on `useOnyx()` can have very positive performance benefits because the component will only re-render        when the subset of data changes. Otherwise, any change of data on any property would normally        cause the component to re-render (and that can be expensive from a performance standpoint). |
 
 **Example**  
 ```ts
-const connection = Onyx.connectWithoutView({
+const connection = Onyx.connect({
     key: ONYXKEYS.SESSION,
     callback: onSessionChange,
 });
 ```
+
+For a collection root key, the callback fires with the entire frozen collection
+object whenever any member changes; signature `(collection, collectionKey)`.
+For any other key, the callback fires with the value at that key; signature
+`(value, key)`. Initial fire is deferred via `scheduleInitialSubscriberNotification` so it reads
+cache after any same-tick writes have applied.
 <a name="connectWithoutView"></a>
 
 ## connectWithoutView(connectOptions) ⇒
 Connects to an Onyx key given the options passed and listens to its changes.
 
 **Kind**: global function  
-**Returns**: The connection object to use when calling `Onyx.disconnect()`.  
+**Returns**: The `Connection` handle to use when calling `Onyx.disconnect()`.  
 
 | Param | Description |
 | --- | --- |
 | connectOptions | The options object that will define the behavior of the connection. |
 | connectOptions.key | The Onyx key to subscribe to. |
 | connectOptions.callback | A function that will be called when the Onyx data we are subscribed changes. |
-| connectOptions.selector | This will be used to subscribe to a subset of an Onyx key's data. **Only used inside `useOnyx()` hook.**        Using this setting on `useOnyx()` can have very positive performance benefits because the component will only re-render        when the subset of data changes. Otherwise, any change of data on any property would normally        cause the component to re-render (and that can be expensive from a performance standpoint). |
 
 **Example**  
 ```ts
@@ -116,6 +120,12 @@ const connection = Onyx.connectWithoutView({
     callback: onSessionChange,
 });
 ```
+
+For a collection root key, the callback fires with the entire frozen collection
+object whenever any member changes; signature `(collection, collectionKey)`.
+For any other key, the callback fires with the value at that key; signature
+`(value, key)`. Initial fire is deferred via `scheduleInitialSubscriberNotification` so it reads
+cache after any same-tick writes have applied.
 <a name="disconnect"></a>
 
 ## disconnect(connection)
