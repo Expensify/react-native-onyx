@@ -105,6 +105,29 @@ describe('storage/tryOrDegradePerformance', () => {
         expect(storage.getStorageProvider().name).toBe('MemoryOnlyProvider');
     });
 
+    it('should fall back to MemoryOnlyProvider once the IndexedDB heal budget is exhausted', async () => {
+        const {storage} = loadIsolatedStorage();
+
+        storage.init();
+
+        const targetError = new Error('IndexedDB heal budget exhausted: Internal error.', {cause: new DOMException('Internal error.', 'UnknownError')});
+        storage.getStorageProvider().setItem = jest.fn().mockReturnValue(Promise.reject(targetError));
+
+        await expect(storage.setItem('key', {test: 'data'})).rejects.toBe(targetError);
+
+        expect(storage.getStorageProvider().name).toBe('MemoryOnlyProvider');
+        await storage.setItem('key', {test: 'data'});
+        await expect(storage.getItem('key')).resolves.toEqual({test: 'data'});
+    });
+
+    it('should fall back to MemoryOnlyProvider when degradeToMemoryOnly is called', () => {
+        const {storage} = loadIsolatedStorage();
+
+        storage.degradeToMemoryOnly(new DOMException('Internal error.', 'UnknownError'));
+
+        expect(storage.getStorageProvider().name).toBe('MemoryOnlyProvider');
+    });
+
     it('should still classify the error as UNAVAILABLE after degrading to MemoryOnlyProvider', async () => {
         const {storage} = loadIsolatedStorage();
 

@@ -22,6 +22,7 @@ const initPromise = new Promise((resolve) => {
 
 type Storage = {
     getStorageProvider: () => StorageProvider<unknown>;
+    degradeToMemoryOnly: (error: Error) => void;
 } & Omit<StorageProvider<unknown>, 'name' | 'store'>;
 
 /**
@@ -69,6 +70,11 @@ const storage: Storage = {
     getStorageProvider() {
         return provider;
     },
+
+    /**
+     * Swaps the provider for `MemoryOnlyProvider` when the caller knows storage is unusable for this session.
+     */
+    degradeToMemoryOnly: (error) => degradePerformance(error),
 
     /**
      * Classifies a write error using the platform provider's own classifier. Synchronous and pure —

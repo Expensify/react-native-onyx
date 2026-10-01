@@ -567,16 +567,16 @@ function reportStorageQuota(error?: Error): Promise<void> {
  * The connection layer (createStore) owns connection/transport recovery; this operation layer owns
  * capacity recovery (eviction) so that a given failure is retried by exactly one layer:
  * - INVALID_DATA: logs an alert and throws (the same data will always fail).
- * - TRANSIENT / FATAL: the connection layer already retried (transient) or exhausted its heal budget
- *   and alerted (fatal). Retrying here would only re-amplify, so we skip the write quietly.
+ * - TRANSIENT / FATAL: the connection layer already retried (transient) or spent a heal attempt
+ *   (fatal). Retrying here would only re-amplify, so we skip the write quietly.
  * - CAPACITY: evicts the least recently accessed evictable key and retries, under a session-level
  *   circuit breaker (see lib/StorageCircuitBreaker.ts) that halts the loop once eviction stops making
  *   progress or failures storm — the per-operation budget alone cannot stop a session-wide storm.
  * - DISK_PRESSURE: the device disk itself is full (or the database files are unreadable), so neither
  *   retries nor in-DB eviction can free space — the write is dropped (cache stays authoritative) with
  *   a single throttled alert + quota snapshot per burst.
- * - UNAVAILABLE: the storage engine does not exist in this environment, so the storage layer has
- *   already degraded to the in-memory provider. No retry.
+ * - UNAVAILABLE: the storage engine does not exist in this environment or its heal budget ran out, so
+ *   the storage layer has already degraded to the in-memory provider. No retry.
  * - UNKNOWN: the provider couldn't classify it — log the full error shape (name + message +
  *   provider) once so it's visible, then bounded retry without eviction.
  */
@@ -919,6 +919,12 @@ function initializeWithDefaultKeyStates(): Promise<void> {
         })
         .catch((error) => {
             Logger.logAlert(`Failed to load data from storage during init. The app will boot with default key states only. Error: ${error}`);
+
+            // The connection layer already reopened once and the read still failed. The session now runs on
+            // defaults, so writing it into a database we could not read gains nothing.
+            if (Storage.classifyError(error) === StorageErrorClass.FATAL) {
+                Storage.degradeToMemoryOnly(error);
+            }
 
             // Populate the key index so getAllKeys() returns correct results for default keys.
             // Without this, subscribers that check getAllKeys() would see an empty set even

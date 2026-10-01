@@ -471,7 +471,11 @@ describe('createStore', () => {
 
             // Budget exhausted — 4th call should NOT attempt healing, but should log budget exhausted
             logAlertSpy.mockClear();
-            await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('k')))).rejects.toThrow('Internal error opening backing store');
+            const exhaustedError = await store('readonly', (s) => IDB.promisifyRequest(s.get('k'))).catch((error: unknown) => error);
+            expect(exhaustedError).toBeInstanceOf(Error);
+            expect((exhaustedError as Error).message).toBe('IndexedDB heal budget exhausted: Internal error opening backing store for indexedDB.open.');
+            expect((exhaustedError as Error).cause).toBeInstanceOf(DOMException);
+            expect(classifyIDBError(exhaustedError)).toBe(StorageErrorClass.UNAVAILABLE);
             expect(logAlertSpy).toHaveBeenCalledWith(expect.stringContaining('heal budget exhausted'), expect.anything());
             expect(logAlertSpy).not.toHaveBeenCalledWith(expect.stringContaining('dropping cached connection and reopening'), expect.anything());
         });
