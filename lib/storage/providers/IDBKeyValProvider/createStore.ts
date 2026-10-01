@@ -2,7 +2,7 @@ import * as IDB from 'idb-keyval';
 import type {UseStore} from 'idb-keyval';
 import * as Logger from '../../../Logger';
 import {StorageErrorClass} from '../../errors';
-import classifyIDBError from './classifyError';
+import classifyIDBError, {IDB_HEAL_EXHAUSTED_MESSAGE} from './classifyError';
 import isIndexedDBAvailable, {INDEXED_DB_UNAVAILABLE_MESSAGE} from './isIndexedDBAvailable';
 
 const HEAL_ATTEMPTS_MAX = 3;
@@ -163,7 +163,8 @@ function createStore(dbName: string, storeName: string): UseStore {
     //   stale. Drop it and retry once with a fresh one. Unbudgeted: a single reopen is always worth it
     //   and is bounded per operation.
     // - FATAL (Chromium backing-store corruption) — reopening can recover transient corruption, but
-    //   repeating forever is futile, so the heal is budgeted (3 attempts, reset on success).
+    //   repeating forever is futile, so the heal is budgeted (3 attempts, reset on success). Once the
+    //   budget is spent the error is rethrown as UNAVAILABLE so the storage layer degrades to memory-only.
     //   Mirrors Dexie's PR1398_maxLoop pattern: https://github.com/dexie/Dexie.js/blob/master/src/functions/temp-transaction.ts
     // - CAPACITY / UNKNOWN are NOT the connection layer's responsibility — propagate to the operation
     //   layer (OnyxUtils.retryOperation) without retrying here, to avoid compounding retries.
@@ -204,11 +205,16 @@ function createStore(dbName: string, storeName: string): UseStore {
                 }
 
                 if (errorClass === StorageErrorClass.FATAL) {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
                     Logger.logAlert('IDB heal: backing store error — heal budget exhausted, giving up', {
                         dbName,
                         storeName,
+                        errorMessage,
                     });
-                } else if (errorClass === StorageErrorClass.UNKNOWN) {
+                    throw new Error(`${IDB_HEAL_EXHAUSTED_MESSAGE}: ${errorMessage}`, {cause: error});
+                }
+
+                if (errorClass === StorageErrorClass.UNKNOWN) {
                     // UNKNOWN — unexpected at this layer; record it so it's visible. CAPACITY is the
                     // expected propagation path (the operation layer owns its logging, and suppresses it
                     // entirely once the circuit breaker is open), so we do NOT log it here — doing so was a
