@@ -44,5 +44,3 @@ async function writeBackWhatWasRead() {
     await Onyx.set(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`, member);
     await Onyx.merge(`${ONYX_KEYS.COLLECTION.TEST_KEY}1`, member);
 }
-
-export {readsArePositional, mixedKeysKeepTheirOwnTypes, singleKeyListResolvesToTuple, writeBackWhatWasRead};
