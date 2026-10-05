@@ -3,6 +3,9 @@ import Onyx from '../../lib';
 import onyxSubscriptionManager from '../../lib/OnyxSubscriptionManager';
 import cache from '../../lib/OnyxCache';
 import * as Logger from '../../lib/Logger';
+import OnyxKeys from '../../lib/OnyxKeys';
+import StorageMock from '../../lib/storage';
+import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 // We need access to some internal properties of `onyxSubscriptionManager` during the tests but they are private,
 // so this workaround allows us to have access to them. The maps are created once in the constructor
@@ -331,6 +334,102 @@ describe('OnyxSubscriptionManager', () => {
             expect(throwingCallback).toHaveBeenCalledTimes(1);
             expect(healthyCallback).toHaveBeenCalledTimes(1);
             expect(logAlertSpy).toHaveBeenCalled();
+        });
+    });
+    describe('cache miss reporting', () => {
+        let logHmmmSpy: jest.SpyInstance;
+
+        beforeEach(() => {
+            logHmmmSpy = jest.spyOn(Logger, 'logHmmm');
+        });
+
+        const forgetValueButKeepKey = (key: string) => {
+            cache.drop(key);
+            cache.clearNullishStorageKeys();
+            cache.setAllKeys([key]);
+        };
+
+        it('should report once when the cache has no value but storage does', async () => {
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'from-storage');
+            forgetValueButKeepKey(ONYXKEYS.TEST_KEY);
+
+            expect(onyxSubscriptionManager.getState(ONYXKEYS.TEST_KEY)).toBeUndefined();
+            onyxSubscriptionManager.getState(ONYXKEYS.TEST_KEY);
+            await waitForPromisesToResolve();
+
+            expect(logHmmmSpy).toHaveBeenCalledTimes(1);
+            expect(logHmmmSpy).toHaveBeenCalledWith(expect.stringContaining(ONYXKEYS.TEST_KEY));
+        });
+
+        it('should report again after Onyx.clear, which ends the session the report belonged to', async () => {
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'from-storage');
+            forgetValueButKeepKey(ONYXKEYS.TEST_KEY);
+            onyxSubscriptionManager.getState(ONYXKEYS.TEST_KEY);
+            await waitForPromisesToResolve();
+            expect(logHmmmSpy).toHaveBeenCalledTimes(1);
+
+            await Onyx.clear();
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'from-storage');
+            forgetValueButKeepKey(ONYXKEYS.TEST_KEY);
+            onyxSubscriptionManager.getState(ONYXKEYS.TEST_KEY);
+            await waitForPromisesToResolve();
+
+            expect(logHmmmSpy).toHaveBeenCalledTimes(2);
+        });
+
+        it('should report the collection prefix rather than the member key', async () => {
+            await StorageMock.setItem(MEMBER_1, {id: 1});
+            forgetValueButKeepKey(MEMBER_1);
+
+            onyxSubscriptionManager.getState(MEMBER_1);
+            await waitForPromisesToResolve();
+
+            expect(logHmmmSpy).toHaveBeenCalledWith(expect.stringContaining(COLLECTION));
+            expect(logHmmmSpy).not.toHaveBeenCalledWith(expect.stringContaining(MEMBER_1));
+        });
+
+        it('should not report when storage has no value either', async () => {
+            forgetValueButKeepKey(ONYXKEYS.TEST_KEY);
+
+            onyxSubscriptionManager.getState(ONYXKEYS.TEST_KEY);
+            await waitForPromisesToResolve();
+
+            expect(logHmmmSpy).not.toHaveBeenCalled();
+        });
+
+        it('should not report a key the index does not know, which means init has not loaded it', async () => {
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'from-storage');
+            cache.drop(ONYXKEYS.TEST_KEY);
+            cache.clearNullishStorageKeys();
+
+            onyxSubscriptionManager.getState(ONYXKEYS.TEST_KEY);
+            await waitForPromisesToResolve();
+
+            expect(logHmmmSpy).not.toHaveBeenCalled();
+        });
+
+        it('should not report a key marked nullish, whose value is absent by definition', async () => {
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'from-storage');
+            forgetValueButKeepKey(ONYXKEYS.TEST_KEY);
+            cache.addNullishStorageKey(ONYXKEYS.TEST_KEY);
+
+            onyxSubscriptionManager.getState(ONYXKEYS.TEST_KEY);
+            await waitForPromisesToResolve();
+
+            expect(logHmmmSpy).not.toHaveBeenCalled();
+        });
+
+        it('should not report a RAM-only key, whose stored data is deliberately ignored', async () => {
+            OnyxKeys.setRamOnlyKeys(new Set([ONYXKEYS.TEST_KEY]));
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'stale');
+            forgetValueButKeepKey(ONYXKEYS.TEST_KEY);
+
+            onyxSubscriptionManager.getState(ONYXKEYS.TEST_KEY);
+            await waitForPromisesToResolve();
+
+            expect(logHmmmSpy).not.toHaveBeenCalled();
+
+            OnyxKeys.setRamOnlyKeys(new Set());
         });
     });
 });

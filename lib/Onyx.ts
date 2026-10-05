@@ -533,6 +533,8 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                         .then(() => {
                             DevTools.clearState(keysToPreserve);
 
+                            onyxSubscriptionManager.resetCacheMissReports();
+
                             // Notify the subscribers for each key/value group so they can receive the new values
                             for (const [key, value] of Object.entries(keyValuesToResetIndividually)) {
                                 OnyxUtils.notifyKey(key, value);

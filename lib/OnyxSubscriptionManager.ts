@@ -3,6 +3,7 @@ import type {CollectionKeyBase, KeyValueMapping, OnyxCollection, OnyxKey, OnyxVa
 import * as Logger from './Logger';
 import cache from './OnyxCache';
 import OnyxKeys from './OnyxKeys';
+import Storage from './storage';
 
 /**
  * Listener fired when an exact key's value changes.
@@ -14,6 +15,32 @@ type Listener<TKey extends OnyxKey = OnyxKey> = (value: OnyxValue<TKey>, key: TK
  * This way a single Map can hold listeners for every key type.
  */
 type GenericListener = (value: unknown, key: OnyxKey) => void;
+
+const reportedCacheMisses = new Set<OnyxKey>();
+
+function reportCacheMissIfStorageHasValue(key: OnyxKey): void {
+    if (OnyxKeys.isRamOnlyKey(key) || !cache.getAllKeys().has(key) || cache.hasNullishStorageKey(key)) {
+        return;
+    }
+
+    const reportKey = OnyxKeys.getCollectionKey(key) ?? key;
+    if (reportedCacheMisses.has(reportKey)) {
+        return;
+    }
+    reportedCacheMisses.add(reportKey);
+
+    Storage.getItem(key)
+        .then((value) => {
+            if (value === undefined || value === null) {
+                return;
+            }
+
+            Logger.logHmmm(`Cache held no value for a key storage still has: ${reportKey}`);
+        })
+        .catch((error: unknown) => {
+            Logger.logInfo(`Could not check storage for a suspected cache miss on ${reportKey}. Error: ${String(error)}`);
+        });
+}
 
 /**
  * OnyxSubscriptionManager is a registry for Onyx subscriptions.
@@ -37,7 +64,13 @@ class OnyxSubscriptionManager {
         if (OnyxKeys.isCollectionKey(key)) {
             return cache.getCollectionData(key) as OnyxValue<TKey>;
         }
-        return cache.get(key) as OnyxValue<TKey>;
+
+        const value = cache.get(key) as OnyxValue<TKey>;
+        if (value === undefined) {
+            reportCacheMissIfStorageHasValue(key);
+        }
+
+        return value;
     }
 
     /**
@@ -160,6 +193,11 @@ class OnyxSubscriptionManager {
      */
     clearAll(): void {
         this.keyListeners.clear();
+        this.resetCacheMissReports();
+    }
+
+    resetCacheMissReports(): void {
+        reportedCacheMisses.clear();
     }
 
     /**
