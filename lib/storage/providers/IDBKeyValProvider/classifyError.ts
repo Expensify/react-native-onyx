@@ -2,7 +2,6 @@ import type {ValueOf} from 'type-fest';
 import {StorageErrorClass, getErrorParts} from '../../errors';
 import {INDEXED_DB_UNAVAILABLE_MESSAGE} from './isIndexedDBAvailable';
 
-/** Thrown by `createStore` once the FATAL heal budget is spent, so the storage layer degrades to memory-only. */
 const IDB_HEAL_EXHAUSTED_MESSAGE = 'IndexedDB heal budget exhausted';
 
 /**
@@ -18,7 +17,6 @@ function classifyIDBError(error: unknown): ValueOf<typeof StorageErrorClass> {
         return StorageErrorClass.UNAVAILABLE;
     }
 
-    // The engine exists but reopening it did not recover it, so it is unusable for this session.
     if (message.includes(IDB_HEAL_EXHAUSTED_MESSAGE.toLowerCase())) {
         return StorageErrorClass.UNAVAILABLE;
     }

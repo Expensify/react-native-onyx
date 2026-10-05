@@ -71,9 +71,6 @@ const storage: Storage = {
         return provider;
     },
 
-    /**
-     * Swaps the provider for `MemoryOnlyProvider` when the caller knows storage is unusable for this session.
-     */
     degradeToMemoryOnly: (error) => degradePerformance(error),
 
     /**

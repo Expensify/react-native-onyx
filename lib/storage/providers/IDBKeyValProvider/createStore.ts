@@ -163,8 +163,7 @@ function createStore(dbName: string, storeName: string): UseStore {
     //   stale. Drop it and retry once with a fresh one. Unbudgeted: a single reopen is always worth it
     //   and is bounded per operation.
     // - FATAL (Chromium backing-store corruption) — reopening can recover transient corruption, but
-    //   repeating forever is futile, so the heal is budgeted (3 attempts, reset on success). Once the
-    //   budget is spent the error is rethrown as UNAVAILABLE so the storage layer degrades to memory-only.
+    //   repeating forever is futile, so the heal is budgeted (3 attempts, reset on success).
     //   Mirrors Dexie's PR1398_maxLoop pattern: https://github.com/dexie/Dexie.js/blob/master/src/functions/temp-transaction.ts
     // - CAPACITY / UNKNOWN are NOT the connection layer's responsibility — propagate to the operation
     //   layer (OnyxUtils.retryOperation) without retrying here, to avoid compounding retries.
