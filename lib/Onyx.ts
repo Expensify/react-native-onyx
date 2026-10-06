@@ -64,12 +64,15 @@ function init({
             const individual: Array<[OnyxKey, OnyxEntry<KeyValueMapping[OnyxKey]>]> = [];
             const collectionBatches = new Map<string, {partial: NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>>; previous: NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>>}>();
 
-            for (const [key, value] of pairs) {
+            for (const [key, valueFromStorage] of pairs) {
                 // RAM-only keys should never sync from storage as they may have stale persisted data
                 // from before the key was migrated to RAM-only.
                 if (OnyxKeys.isRamOnlyKey(key)) {
                     continue;
                 }
+
+                // Storage can hold nested nulls, but cached values must not.
+                const value = utils.removeNestedNullValues(valueFromStorage);
 
                 const collectionKey = OnyxKeys.getCollectionKey(key);
                 const isCollectionMember = !!collectionKey && OnyxKeys.isCollectionMemberKey(collectionKey, key);
@@ -489,7 +492,8 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                         //      since collection key subscribers need to be updated differently
                         if (!isKeyToPreserve) {
                             const oldValue = cache.get(key);
-                            const newValue = defaultKeyStates[key] ?? null;
+                            // Cached values must not hold nested nulls, so the default key state is cleaned first.
+                            const newValue = utils.removeNestedNullValues(defaultKeyStates[key] ?? null);
                             if (newValue !== oldValue) {
                                 cache.set(key, newValue);
 
