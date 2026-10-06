@@ -18,7 +18,10 @@ function classifySQLiteError(error: unknown): ValueOf<typeof StorageErrorClass> 
         return StorageErrorClass.CAPACITY;
     }
 
-    if (message.includes('disk i/o error') || message.includes('unable to open database file')) {
+    // NitroSQLite 10.1 exposes native open failures even when their message differs
+    // from SQLite's standard wording. Keep this classifier free of native imports.
+    const hasDatabaseOpenError = typeof error === 'object' && error !== null && 'type' in error && error.type === 'DatabaseCannotBeOpened';
+    if (hasDatabaseOpenError || message.includes('disk i/o error') || message.includes('unable to open database file')) {
         return StorageErrorClass.DISK_PRESSURE;
     }
 

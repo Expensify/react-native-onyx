@@ -75,7 +75,7 @@
     "@typescript-eslint/eslint-plugin": "^8.51.0",
     "@typescript-eslint/parser": "^8.51.0",
     "@vercel/ncc": "0.38.1",
-    "better-sqlite3": "^12.10.0",
+    "better-sqlite3": "^12.11.1",
     "date-fns": "^4.1.0",
     "eslint": "^9.39.2",
     "eslint-config-expensify": "2.0.108",
@@ -97,7 +97,7 @@
     "react-native": "0.76.3",
     "react-native-device-info": "^10.3.0",
     "react-native-nitro-modules": "^0.35.0",
-    "react-native-nitro-sqlite": "^9.6.0",
+    "react-native-nitro-sqlite": "10.1.0",
     "react-test-renderer": "18.2.0",
     "reassure": "1.4.0",
     "ts-node": "^10.9.2",
@@ -110,7 +110,7 @@
     "react-native": ">=0.75.0",
     "react-native-device-info": "^10.3.0",
     "react-native-nitro-modules": ">=0.35.0",
-    "react-native-nitro-sqlite": "^9.6.0"
+    "react-native-nitro-sqlite": "^10.1.0"
   },
   "peerDependenciesMeta": {
     "idb-keyval": {
