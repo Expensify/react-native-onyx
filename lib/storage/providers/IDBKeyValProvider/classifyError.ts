@@ -17,6 +17,7 @@ function classifyIDBError(error: unknown): ValueOf<typeof StorageErrorClass> {
         return StorageErrorClass.UNAVAILABLE;
     }
 
+    // Reopen budget spent on FATAL errors, so the store is treated as gone for the rest of the session.
     if (message.includes(IDB_HEAL_EXHAUSTED_MESSAGE.toLowerCase())) {
         return StorageErrorClass.UNAVAILABLE;
     }
