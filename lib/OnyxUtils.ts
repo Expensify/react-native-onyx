@@ -300,8 +300,10 @@ function get<TKey extends OnyxKey, TValue extends OnyxValue<TKey>>(key: TKey): P
                 return undefined;
             }
 
-            cache.set(key, val);
-            return val;
+            // Storage can hold nested nulls (e.g. SQLite's JSON_REPLACE of marked objects), but cached values must not.
+            const valueWithoutNestedNullValues = utils.removeNestedNullValues(val) as TValue;
+            cache.set(key, valueWithoutNestedNullValues);
+            return valueWithoutNestedNullValues;
         })
         .catch((err) => Logger.logInfo(`Unable to get item from persistent storage. Key: ${key} Error: ${err}`));
 
@@ -402,10 +404,15 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
                         continue;
                     }
 
-                    dataMap.set(key, value as OnyxValue<TKey>);
                     temp[key] = value as OnyxValue<TKey>;
                 }
                 cache.merge(temp);
+
+                // Hand out what the cache now holds, which has the nested null values removed, so callers and cache agree.
+                for (const key of Object.keys(temp)) {
+                    const cachedValue = cache.get(key);
+                    dataMap.set(key as TKey, (cachedValue !== undefined ? cachedValue : temp[key]) as OnyxValue<TKey>);
+                }
                 return dataMap;
             })
     );
@@ -781,7 +788,7 @@ function prepareKeyValuePairsForStorage(
             continue;
         }
 
-        const valueWithoutNestedNullValues = shouldRemoveNestedNulls ?? true ? utils.removeNestedNullValues(value) : value;
+        const valueWithoutNestedNullValues = shouldRemoveNestedNulls ?? true ? utils.removeNestedNullValues(value, cache.get(key)) : value;
 
         if (valueWithoutNestedNullValues !== undefined) {
             pairs.push([key, valueWithoutNestedNullValues, replaceNullPatches?.[key]]);
@@ -1115,7 +1122,7 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
         return Promise.resolve();
     }
 
-    const valueWithoutNestedNullValues = utils.removeNestedNullValues(value) as OnyxValue<TKey>;
+    const valueWithoutNestedNullValues = utils.removeNestedNullValues(value, existingValue) as OnyxValue<TKey>;
     const hasChanged = options?.skipCacheCheck ? true : cache.hasValueChanged(key, valueWithoutNestedNullValues);
 
     OnyxUtils.logKeyChanged(OnyxUtils.METHOD.SET, key, value, hasChanged);
