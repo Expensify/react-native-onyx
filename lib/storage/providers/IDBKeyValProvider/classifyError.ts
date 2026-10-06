@@ -1,8 +1,6 @@
 import type {ValueOf} from 'type-fest';
 import {StorageErrorClass, getErrorParts} from '../../errors';
-import {INDEXED_DB_UNAVAILABLE_MESSAGE} from './isIndexedDBAvailable';
-
-const IDB_HEAL_EXHAUSTED_MESSAGE = 'IndexedDB heal budget exhausted';
+import IDBErrorMessage from './errorMessages';
 
 /**
  * Classifies an IndexedDB write failure into the shared storage taxonomy (lib/storage/errors.ts).
@@ -13,12 +11,12 @@ function classifyIDBError(error: unknown): ValueOf<typeof StorageErrorClass> {
     const {name, message} = getErrorParts(error);
 
     // The engine is absent, not broken e.g. private tabs and Lockdown Mode on WebKit.
-    if (message.includes("can't find variable: indexeddb") || message.includes('indexeddb is not defined') || message.includes(INDEXED_DB_UNAVAILABLE_MESSAGE.toLowerCase())) {
+    if (message.includes("can't find variable: indexeddb") || message.includes('indexeddb is not defined') || message.includes(IDBErrorMessage.UNAVAILABLE.toLowerCase())) {
         return StorageErrorClass.UNAVAILABLE;
     }
 
     // Reopen budget spent on FATAL errors, so the store is treated as gone for the rest of the session.
-    if (message.includes(IDB_HEAL_EXHAUSTED_MESSAGE.toLowerCase())) {
+    if (message.includes(IDBErrorMessage.HEAL_EXHAUSTED.toLowerCase())) {
         return StorageErrorClass.UNAVAILABLE;
     }
 
@@ -68,4 +66,3 @@ function classifyIDBError(error: unknown): ValueOf<typeof StorageErrorClass> {
 }
 
 export default classifyIDBError;
-export {IDB_HEAL_EXHAUSTED_MESSAGE};

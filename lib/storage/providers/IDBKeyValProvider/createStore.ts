@@ -2,8 +2,9 @@ import * as IDB from 'idb-keyval';
 import type {UseStore} from 'idb-keyval';
 import * as Logger from '../../../Logger';
 import {StorageErrorClass} from '../../errors';
-import classifyIDBError, {IDB_HEAL_EXHAUSTED_MESSAGE} from './classifyError';
-import isIndexedDBAvailable, {INDEXED_DB_UNAVAILABLE_MESSAGE} from './isIndexedDBAvailable';
+import classifyIDBError from './classifyError';
+import IDBErrorMessage from './errorMessages';
+import isIndexedDBAvailable from './isIndexedDBAvailable';
 
 const HEAL_ATTEMPTS_MAX = 3;
 
@@ -59,7 +60,7 @@ function createStore(dbName: string, storeName: string): UseStore {
         if (dbp) return dbp;
 
         if (!isIndexedDBAvailable()) {
-            return Promise.reject(new Error(INDEXED_DB_UNAVAILABLE_MESSAGE));
+            return Promise.reject(new Error(IDBErrorMessage.UNAVAILABLE));
         }
 
         const request = indexedDB.open(dbName);
@@ -210,7 +211,7 @@ function createStore(dbName: string, storeName: string): UseStore {
                         storeName,
                         errorMessage,
                     });
-                    throw new Error(`${IDB_HEAL_EXHAUSTED_MESSAGE}: ${errorMessage}`, {cause: error});
+                    throw new Error(`${IDBErrorMessage.HEAL_EXHAUSTED}: ${errorMessage}`, {cause: error});
                 }
 
                 if (errorClass === StorageErrorClass.UNKNOWN) {
