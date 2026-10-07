@@ -407,7 +407,7 @@ type MixedOperationsQueue = {
 
 /**
  * Represents a connection to an Onyx key, returned by `Onyx.connect()`/`Onyx.connectWithoutView()`.
- * Pass it to `Onyx.disconnect()` to stop receiving callbacks for this subscription.
+ * Call its `unsubscribe()` to stop receiving callbacks for this subscription.
  */
 type Connection = {
     /** Unsubscribe this connection. Idempotent. */

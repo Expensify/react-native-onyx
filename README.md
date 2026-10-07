@@ -130,10 +130,10 @@ const connection = Onyx.connectWithoutView({
 });
 ```
 
-To teardown the subscription call `Onyx.disconnect()` with the connection returned from `Onyx.connectWithoutView()`. It's recommended to clean up subscriptions anytime you are connecting from within a function to prevent memory leaks.
+To teardown the subscription call `unsubscribe()` on the connection returned from `Onyx.connectWithoutView()`. It's recommended to clean up subscriptions anytime you are connecting from within a function to prevent memory leaks.
 
 ```javascript
-Onyx.disconnect(connection);
+connection.unsubscribe();
 ```
 
 We can also access values inside React function components via the `useOnyx()` [hook](https://react.dev/reference/react/hooks). When the data changes the component will re-render.
