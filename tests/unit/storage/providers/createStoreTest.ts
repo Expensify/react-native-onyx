@@ -3,6 +3,7 @@ import createStore from '../../../../lib/storage/providers/IDBKeyValProvider/cre
 import * as Logger from '../../../../lib/Logger';
 import {StorageErrorClass} from '../../../../lib/storage/errors';
 import classifyIDBError from '../../../../lib/storage/providers/IDBKeyValProvider/classifyError';
+import IDBErrorMessage from '../../../../lib/storage/providers/IDBKeyValProvider/errorMessages';
 
 const STORE_NAME = 'teststore';
 let testDbCounter = 0;
@@ -60,7 +61,7 @@ describe('createStore', () => {
             await withoutIndexedDB(async () => {
                 const operation = store('readonly', (s) => IDB.promisifyRequest(s.get('key1')));
 
-                await expect(operation).rejects.toThrow('indexedDB is not available in this environment');
+                await expect(operation).rejects.toThrow(IDBErrorMessage.UNAVAILABLE);
                 await expect(operation.catch((error: unknown) => classifyIDBError(error))).resolves.toBe(StorageErrorClass.UNAVAILABLE);
             });
         });
@@ -69,7 +70,7 @@ describe('createStore', () => {
             const store = createStore(uniqueDBName(), STORE_NAME);
 
             await withoutIndexedDB(async () => {
-                await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('key1')))).rejects.toThrow('indexedDB is not available in this environment');
+                await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('key1')))).rejects.toThrow(IDBErrorMessage.UNAVAILABLE);
             });
 
             expect(logInfoSpy).not.toHaveBeenCalledWith(expect.stringContaining('IDB transient error'), expect.anything());
@@ -81,7 +82,7 @@ describe('createStore', () => {
             const store = createStore(uniqueDBName(), STORE_NAME);
 
             await withoutIndexedDB(async () => {
-                await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('key1')))).rejects.toThrow('indexedDB is not available in this environment');
+                await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('key1')))).rejects.toThrow(IDBErrorMessage.UNAVAILABLE);
             });
 
             await store('readwrite', (s) => {
@@ -471,7 +472,11 @@ describe('createStore', () => {
 
             // Budget exhausted — 4th call should NOT attempt healing, but should log budget exhausted
             logAlertSpy.mockClear();
-            await expect(store('readonly', (s) => IDB.promisifyRequest(s.get('k')))).rejects.toThrow('Internal error opening backing store');
+            const exhaustedError = await store('readonly', (s) => IDB.promisifyRequest(s.get('k'))).catch((error: unknown) => error);
+            expect(exhaustedError).toBeInstanceOf(Error);
+            expect((exhaustedError as Error).message).toBe('IndexedDB heal budget exhausted: Internal error opening backing store for indexedDB.open.');
+            expect((exhaustedError as Error).cause).toBeInstanceOf(DOMException);
+            expect(classifyIDBError(exhaustedError)).toBe(StorageErrorClass.UNAVAILABLE);
             expect(logAlertSpy).toHaveBeenCalledWith(expect.stringContaining('heal budget exhausted'), expect.anything());
             expect(logAlertSpy).not.toHaveBeenCalledWith(expect.stringContaining('dropping cached connection and reopening'), expect.anything());
         });

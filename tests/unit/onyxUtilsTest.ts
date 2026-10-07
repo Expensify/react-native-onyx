@@ -1555,6 +1555,25 @@ describe('OnyxUtils', () => {
         });
     });
 
+    describe('initializeWithDefaultKeyStates', () => {
+        it('should degrade to memory-only when the init read fails with a FATAL error', async () => {
+            const internalError = Object.assign(new Error('Internal error.'), {name: 'UnknownError'});
+            jest.mocked(StorageMock.getAll).mockRejectedValueOnce(internalError);
+
+            await OnyxUtils.initializeWithDefaultKeyStates();
+
+            expect(StorageMock.degradeToMemoryOnly).toHaveBeenCalledWith(internalError);
+        });
+
+        it('should not degrade to memory-only when the init read fails with an UNKNOWN error', async () => {
+            jest.mocked(StorageMock.getAll).mockRejectedValueOnce(new Error('some brand new failure'));
+
+            await OnyxUtils.initializeWithDefaultKeyStates();
+
+            expect(StorageMock.degradeToMemoryOnly).not.toHaveBeenCalled();
+        });
+    });
+
     describe('afterInit', () => {
         beforeEach(() => {
             // Resets the deferred init task before each test.
