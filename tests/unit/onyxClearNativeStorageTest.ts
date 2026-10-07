@@ -41,7 +41,7 @@ describe('Set data while storage is clearing', () => {
 
     afterEach(() => {
         if (connection) {
-            Onyx.disconnect(connection);
+            connection.unsubscribe();
         }
         return Onyx.clear();
     });

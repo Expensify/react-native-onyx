@@ -43,7 +43,7 @@ describe('Set data while storage is clearing', () => {
 
     afterEach(() => {
         if (connection) {
-            Onyx.disconnect(connection);
+            connection.unsubscribe();
         }
         return Onyx.clear();
     });
@@ -229,7 +229,7 @@ describe('Set data while storage is clearing', () => {
                 // When onyx is cleared
                 .then(() => Onyx.clear())
                 .then(() => {
-                    Onyx.disconnect(testConnection);
+                    testConnection.unsubscribe();
                 })
                 .then(() => {
                     // Then the collection callback should only have been called three times:
