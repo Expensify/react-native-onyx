@@ -63,6 +63,19 @@ Any existing collection members not included in the new data will be removed.</p
 Live RAM-only values and writes that have not reached storage are not included.
 Treat the returned object and its nested values as read-only.</p>
 </dd>
+<dt><a href="#get">get(key)</a> ⇒</dt>
+<dd><p>Reads the current value of an Onyx key once, without subscribing. Use <code>useOnyx()</code> or
+<code>Onyx.connectWithoutView()</code> when the value has to stay current.</p>
+<p>The read is served from the cache, which <code>init()</code> fills with the whole store, so it returns what a
+subscription to the same key would deliver. The value is the cached one rather than a copy, so treat
+it as read-only.</p>
+</dd>
+<dt><a href="#multiGet">multiGet(keys)</a> ⇒</dt>
+<dd><p>Reads several Onyx keys at once, without subscribing. Use <code>useOnyx()</code> or <code>Onyx.connectWithoutView()</code> when
+the values have to stay current.</p>
+<p>Values come back in the order of the keys given, and each is what get() returns for its key. To read a
+whole collection, pass the collection key rather than listing its members.</p>
+</dd>
 </dl>
 
 <a name="init"></a>
@@ -280,3 +293,49 @@ Live RAM-only values and writes that have not reached storage are not included.
 Treat the returned object and its nested values as read-only.
 
 **Kind**: global function  
+<a name="get"></a>
+
+## get(key) ⇒
+Reads the current value of an Onyx key once, without subscribing. Use `useOnyx()` or
+`Onyx.connectWithoutView()` when the value has to stay current.
+
+The read is served from the cache, which `init()` fills with the whole store, so it returns what a
+subscription to the same key would deliver. The value is the cached one rather than a copy, so treat
+it as read-only.
+
+**Kind**: global function  
+**Returns**: The current value, or `undefined` if the key has none.  
+
+| Param | Description |
+| --- | --- |
+| key | ONYXKEY to read, either a collection key or a single key |
+
+**Example**  
+```js
+const report = await Onyx.get(`${ONYXKEYS.COLLECTION.REPORT}${reportID}`);
+const allReports = await Onyx.get(ONYXKEYS.COLLECTION.REPORT);
+```
+<a name="multiGet"></a>
+
+## multiGet(keys) ⇒
+Reads several Onyx keys at once, without subscribing. Use `useOnyx()` or `Onyx.connectWithoutView()` when
+the values have to stay current.
+
+Values come back in the order of the keys given, and each is what get() returns for its key. To read a
+whole collection, pass the collection key rather than listing its members.
+
+**Kind**: global function  
+**Returns**: The values in the order of their keys, each `undefined` where a key has no value.  
+
+| Param | Description |
+| --- | --- |
+| keys | ONYXKEYS to read, in any mix of collection keys and single keys |
+
+**Example**  
+```js
+const [session, wallet, report] = await Onyx.multiGet([
+    ONYXKEYS.SESSION,
+    ONYXKEYS.WALLET,
+    `${ONYXKEYS.COLLECTION.REPORT}${reportID}`,
+]);
+```

@@ -98,6 +98,30 @@ describe('Onyx', () => {
         });
     });
 
+    describe('get', () => {
+        const COLLECTION_READS = 1000;
+
+        test('1k calls for the whole collection of 10k heavy objects', async () => {
+            await measureAsyncFunction(() => Promise.all(Array.from({length: COLLECTION_READS}, () => Onyx.get(collectionKey))), {
+                beforeEach: async () => {
+                    await Onyx.multiSet(mockedReportActionsMap);
+                },
+                afterEach: clearOnyxAfterEachMeasure,
+            });
+        });
+
+        test('10k calls for individual collection members', async () => {
+            const memberKeys = Object.keys(mockedReportActionsMap);
+
+            await measureAsyncFunction(() => Promise.all(memberKeys.map((memberKey) => Onyx.get(memberKey))), {
+                beforeEach: async () => {
+                    await Onyx.multiSet(mockedReportActionsMap);
+                },
+                afterEach: clearOnyxAfterEachMeasure,
+            });
+        });
+    });
+
     describe('update', () => {
         test('one call with 5k sets and 5k merges updates', async () => {
             const changedReportActions = Object.fromEntries(Object.entries(mockedReportActionsMap).map(([k, v]) => [k, createRandomReportAction(Number(v.reportActionID))] as const));

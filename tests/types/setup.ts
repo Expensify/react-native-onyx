@@ -11,8 +11,10 @@ type OnyxValues = {
     [ONYX_KEYS.TEST_KEY]: string;
 };
 
+// The optional list member lets get.ts check that a value read back is mutable, because only a mutable
+// array has push.
 type OnyxCollectionValues = {
-    [ONYX_KEYS.COLLECTION.TEST_KEY]: {str: string};
+    [ONYX_KEYS.COLLECTION.TEST_KEY]: {str: string; list?: string[]};
 };
 
 declare module '../../dist/types' {
