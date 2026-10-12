@@ -1,7 +1,7 @@
 /**
  * Integration test for `SQLiteProvider` using NitroSQLite's Node mock.
  */
-import {NitroSQLiteExceptionType} from 'react-native-nitro-sqlite/errors';
+import {NitroSQLiteError, NitroSQLiteExceptionType} from 'react-native-nitro-sqlite/errors';
 import {open} from 'react-native-nitro-sqlite';
 import type {NitroSQLiteConnection, PreparedStatement} from 'react-native-nitro-sqlite';
 import SQLiteProvider from '../../../../lib/storage/providers/SQLiteProvider';
@@ -64,9 +64,47 @@ describe('SQLiteProvider', () => {
         resetAllDatabases();
     });
 
-    describe('NitroSQLite 10 connections and statements', () => {
+    describe('read connections and prepared statement reuse', () => {
         it('opens a separate read-only connection after configuring the writer', () => {
             expect(jest.mocked(open).mock.calls).toEqual([[{name: 'OnyxDB'}], [{name: 'OnyxDB', connection: 'independent', readOnly: true}]]);
+        });
+
+        it('configures the reader cache and shares the writer WAL mode', () => {
+            // Given an initialized writer and independent read-only connection.
+            const reader = getOpenedConnection(1);
+
+            // When querying the connection settings used for reads.
+            const cacheSize = reader.execute<{cache_size: number}>('PRAGMA cache_size;').rows?.item(0)?.cache_size;
+            const journalMode = reader.execute<{journal_mode: string}>('PRAGMA journal_mode;').rows?.item(0)?.journal_mode;
+
+            // Then the reader has the configured cache budget and sees the database in WAL mode.
+            expect(cacheSize).toBe(-20000);
+            expect(journalMode).toBe('wal');
+        });
+
+        it('keeps reads and writes working when the independent reader cannot open', async () => {
+            // Given a working writer and a failure opening a second connection.
+            resetAllDatabases();
+            const openConnection = jest.mocked(open).getMockImplementation()!;
+            jest.mocked(open)
+                .mockImplementationOnce(openConnection)
+                .mockImplementationOnce(() => {
+                    throw new NitroSQLiteError(`[NativeNitroSQLiteException][${NitroSQLiteExceptionType.DatabaseCannotBeOpened}] Cannot open read connection`);
+                });
+
+            // When initialization falls back to the writer and a read follows a queued write.
+            SQLiteProvider.init();
+            const write = SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, 'committed');
+            const read = SQLiteProvider.getItem(ONYXKEYS.TEST_KEY);
+            await write;
+
+            // Then prepared and bulk reads still see committed data, and deletes still work.
+            expect(await read).toBe('committed');
+            expect(await SQLiteProvider.multiGet([ONYXKEYS.TEST_KEY])).toEqual([[ONYXKEYS.TEST_KEY, 'committed']]);
+            expect(await SQLiteProvider.getAllKeys()).toEqual([ONYXKEYS.TEST_KEY]);
+            expect(await SQLiteProvider.getAll()).toEqual([[ONYXKEYS.TEST_KEY, 'committed']]);
+            await SQLiteProvider.removeItem(ONYXKEYS.TEST_KEY);
+            expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY)).toBeNull();
         });
 
         it('reuses prepared statements for repeated single-key operations', async () => {

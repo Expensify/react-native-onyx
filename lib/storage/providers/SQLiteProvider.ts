@@ -18,6 +18,11 @@ type CompileOptionsResult = {
     compile_options: string;
 };
 
+/** The result of aggregating all stored key/value pairs into one JSON string. */
+type AggregatedKeyValuePairsResult = {
+    aggregated: string | null;
+};
+
 /**
  * The type of the key-value pair stored in the SQLite database
  * @property record_key - the key of the record
@@ -57,7 +62,7 @@ let removeItemStatement: PreparedStatement | undefined;
 let pendingWrite: Promise<void> = Promise.resolve();
 let pendingWriteCount = 0;
 
-function trackWrite<Result>(operation: Promise<Result>): Promise<Result> {
+function trackWrite<TResult>(operation: Promise<TResult>): Promise<TResult> {
     // All writes use the same NitroSQLite connection queue and finish in call order.
     // A failed write still releases later reads; its caller receives the rejection.
     pendingWriteCount++;
@@ -72,7 +77,7 @@ function trackWrite<Result>(operation: Promise<Result>): Promise<Result> {
     return operation;
 }
 
-function readAfterPendingWrites<Result>(read: () => Promise<Result>): Promise<Result> {
+function readAfterPendingWrites<TResult>(read: () => Promise<TResult>): Promise<TResult> {
     // Capture the writes already queued when the read was requested. New writes can run
     // alongside this read on the separate connection once those writes have committed.
     return pendingWriteCount === 0 ? read() : pendingWrite.then(read);
@@ -133,7 +138,7 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
      */
     name: 'SQLiteProvider',
     /**
-     * Classifies a SQLite write failure into the shared storage taxonomy.
+     * Classifies a SQLite failure into the shared storage taxonomy.
      */
     classifyError: classifySQLiteError,
     /**
@@ -158,7 +163,18 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
         sqliteMaxVariableNumber = maxVariableNumber > 0 ? maxVariableNumber : SQLITE_MAX_VARIABLE_NUMBER;
 
         // WAL lets the read-only handle read committed data while the writer is active.
-        readStore = open({name: DB_NAME, connection: 'independent', readOnly: true});
+        try {
+            readStore = open({name: DB_NAME, connection: 'independent', readOnly: true});
+        } catch {
+            // A second connection is an optimization; the writer can still serve reads.
+            readStore = provider.store;
+        }
+
+        if (readStore !== provider.store) {
+            // Cache size is connection-local. WAL is shared, and synchronous only controls writes.
+            readStore.execute('PRAGMA CACHE_SIZE=-20000;');
+        }
+
         getItemStatement = readStore.prepare('SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key = ?;');
         setItemStatement = provider.store.prepare('REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);');
         removeItemStatement = provider.store.prepare('DELETE FROM keyvaluepairs WHERE record_key = ?;');
@@ -312,7 +328,7 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
         // once, instead of returning every row and parsing each one individually in JavaScript.
         const reader = readStore;
         return readAfterPendingWrites(() =>
-            reader.executeAsync<{aggregated: string | null}>('SELECT json_group_array(json_array(record_key, json(valueJSON))) AS aggregated FROM keyvaluepairs;'),
+            reader.executeAsync<AggregatedKeyValuePairsResult>('SELECT json_group_array(json_array(record_key, json(valueJSON))) AS aggregated FROM keyvaluepairs;'),
         ).then(({rows}) => {
             const aggregated = rows?.item(0)?.aggregated;
             if (aggregated == null) {

@@ -36,13 +36,16 @@ describe('classifySQLiteError', () => {
         [new Error(`[NativeNitroSQLiteException][${NitroSQLiteExceptionType.SqlExecutionError}] database or disk is full`), StorageErrorClass.CAPACITY],
         [new Error('disk I/O error'), StorageErrorClass.DISK_PRESSURE],
         [new Error('unable to open database file'), StorageErrorClass.DISK_PRESSURE],
-        [new NitroSQLiteError(`[NativeNitroSQLiteException][${NitroSQLiteExceptionType.DatabaseCannotBeOpened}] Cannot create the database`), StorageErrorClass.DISK_PRESSURE],
-        [{type: NitroSQLiteExceptionType.DatabaseCannotBeOpened, message: 'Permission denied'}, StorageErrorClass.DISK_PRESSURE],
+        [new NitroSQLiteError(`[NativeNitroSQLiteException][${NitroSQLiteExceptionType.DatabaseCannotBeOpened}] Cannot create the database`), StorageErrorClass.UNAVAILABLE],
+        [new NitroSQLiteError(`[NativeNitroSQLiteException][${NitroSQLiteExceptionType.DatabaseCannotBeOpened}] database or disk is full`), StorageErrorClass.UNAVAILABLE],
+        [{type: NitroSQLiteExceptionType.DatabaseCannotBeOpened, message: 'Permission denied'}, StorageErrorClass.UNAVAILABLE],
         // Encryption configuration and closed-connection errors do not mean that storage is unavailable.
         [{type: NitroSQLiteExceptionType.EncryptionNotEnabled, message: 'SEE is not enabled'}, StorageErrorClass.UNKNOWN],
         [{type: NitroSQLiteExceptionType.DatabaseCannotBeDecrypted, message: 'Wrong key'}, StorageErrorClass.UNKNOWN],
         [{type: NitroSQLiteExceptionType.DatabaseNotOpen, message: 'Database is closed'}, StorageErrorClass.UNKNOWN],
         [new Error('some brand new failure'), StorageErrorClass.UNKNOWN],
+        [{type: null}, StorageErrorClass.UNKNOWN],
+        ['DatabaseCannotBeOpened', StorageErrorClass.UNKNOWN],
         [null, StorageErrorClass.UNKNOWN],
         [undefined, StorageErrorClass.UNKNOWN],
     ])('classifies %s as %s', (error, expectedClass) => {
@@ -50,7 +53,7 @@ describe('classifySQLiteError', () => {
         // When classifying without initializing the native module.
         const errorClass = classifySQLiteError(error);
 
-        // Then native open failures share the existing disk-pressure recovery behavior.
+        // Then native open failures use memory storage, while write failures retain their recovery class.
         expect(errorClass).toBe(expectedClass);
     });
 });
