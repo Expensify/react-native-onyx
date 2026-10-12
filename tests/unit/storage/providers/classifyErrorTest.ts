@@ -1,3 +1,4 @@
+import {NitroSQLiteError, NitroSQLiteExceptionType} from 'react-native-nitro-sqlite/errors';
 import classifyIDBError from '../../../../lib/storage/providers/IDBKeyValProvider/classifyError';
 import classifySQLiteError from '../../../../lib/storage/providers/classifySQLiteError';
 import {StorageErrorClass} from '../../../../lib/storage/errors';
@@ -32,21 +33,21 @@ describe('classifyIDBError', () => {
 describe('classifySQLiteError', () => {
     it.each([
         [new Error('database or disk is full'), StorageErrorClass.CAPACITY],
-        [new Error('[NativeNitroSQLiteException][SqlExecutionError] database or disk is full'), StorageErrorClass.CAPACITY],
+        [new Error(`[NativeNitroSQLiteException][${NitroSQLiteExceptionType.SqlExecutionError}] database or disk is full`), StorageErrorClass.CAPACITY],
         [new Error('disk I/O error'), StorageErrorClass.DISK_PRESSURE],
         [new Error('unable to open database file'), StorageErrorClass.DISK_PRESSURE],
-        [Object.assign(new Error('Cannot create the database'), {type: 'DatabaseCannotBeOpened'}), StorageErrorClass.DISK_PRESSURE],
-        [{type: 'DatabaseCannotBeOpened', message: 'Permission denied'}, StorageErrorClass.DISK_PRESSURE],
+        [new NitroSQLiteError(`[NativeNitroSQLiteException][${NitroSQLiteExceptionType.DatabaseCannotBeOpened}] Cannot create the database`), StorageErrorClass.DISK_PRESSURE],
+        [{type: NitroSQLiteExceptionType.DatabaseCannotBeOpened, message: 'Permission denied'}, StorageErrorClass.DISK_PRESSURE],
         // Encryption configuration and closed-connection errors do not mean that storage is unavailable.
-        [{type: 'EncryptionNotEnabled', message: 'SEE is not enabled'}, StorageErrorClass.UNKNOWN],
-        [{type: 'DatabaseCannotBeDecrypted', message: 'Wrong key'}, StorageErrorClass.UNKNOWN],
-        [{type: 'DatabaseNotOpen', message: 'Database is closed'}, StorageErrorClass.UNKNOWN],
+        [{type: NitroSQLiteExceptionType.EncryptionNotEnabled, message: 'SEE is not enabled'}, StorageErrorClass.UNKNOWN],
+        [{type: NitroSQLiteExceptionType.DatabaseCannotBeDecrypted, message: 'Wrong key'}, StorageErrorClass.UNKNOWN],
+        [{type: NitroSQLiteExceptionType.DatabaseNotOpen, message: 'Database is closed'}, StorageErrorClass.UNKNOWN],
         [new Error('some brand new failure'), StorageErrorClass.UNKNOWN],
         [null, StorageErrorClass.UNKNOWN],
         [undefined, StorageErrorClass.UNKNOWN],
     ])('classifies %s as %s', (error, expectedClass) => {
         // Given either a structured native error or a legacy SQLite message.
-        // When classifying without loading the optional native dependency.
+        // When classifying without initializing the native module.
         const errorClass = classifySQLiteError(error);
 
         // Then native open failures share the existing disk-pressure recovery behavior.

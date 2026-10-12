@@ -1,6 +1,7 @@
 /**
  * Integration test for `SQLiteProvider` using NitroSQLite's Node mock.
  */
+import {NitroSQLiteExceptionType} from 'react-native-nitro-sqlite/errors';
 import {open} from 'react-native-nitro-sqlite';
 import type {NitroSQLiteConnection, PreparedStatement} from 'react-native-nitro-sqlite';
 import SQLiteProvider from '../../../../lib/storage/providers/SQLiteProvider';
@@ -670,7 +671,9 @@ describe('SQLiteProvider', () => {
         it('should still report free-disk bytes when the PRAGMAs fail (disk pressure)', async () => {
             // During disk pressure the SQLite connection itself fails, but free-disk comes from the
             // filesystem — the snapshot must survive with bytesUsed degraded instead of rejecting.
-            const executeAsyncSpy = jest.spyOn(SQLiteProvider.store!, 'executeAsync').mockRejectedValue(new Error('[NativeNitroSQLiteException][SqlExecutionError] disk I/O error'));
+            const executeAsyncSpy = jest
+                .spyOn(SQLiteProvider.store!, 'executeAsync')
+                .mockRejectedValue(new Error(`[NativeNitroSQLiteException][${NitroSQLiteExceptionType.SqlExecutionError}] disk I/O error`));
 
             await expect(SQLiteProvider.getDatabaseSize()).resolves.toEqual({bytesUsed: -1, bytesRemaining: 12345});
 
