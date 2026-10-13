@@ -1,6 +1,6 @@
 import type {ValueOf} from 'type-fest';
 import {StorageErrorClass, getErrorParts} from '../../errors';
-import IDBErrorMessage from './errorMessages';
+import IDBErrorMessage, {IDBErrorName} from './errorMessages';
 
 /**
  * Classifies an IndexedDB write failure into the shared storage taxonomy (lib/storage/errors.ts).
@@ -16,7 +16,7 @@ function classifyIDBError(error: unknown): ValueOf<typeof StorageErrorClass> {
     }
 
     // Reopen budget spent on FATAL errors, so the store is treated as gone for the rest of the session.
-    if (message.includes(IDBErrorMessage.HEAL_EXHAUSTED.toLowerCase())) {
+    if (name === IDBErrorName.HEAL_EXHAUSTED.toLowerCase()) {
         return StorageErrorClass.UNAVAILABLE;
     }
 

@@ -474,6 +474,7 @@ describe('createStore', () => {
             logAlertSpy.mockClear();
             const exhaustedError = await store('readonly', (s) => IDB.promisifyRequest(s.get('k'))).catch((error: unknown) => error);
             expect(exhaustedError).toBeInstanceOf(Error);
+            expect((exhaustedError as Error).name).toBe('IDBHealExhaustedError');
             expect((exhaustedError as Error).message).toBe('IndexedDB heal budget exhausted: Internal error opening backing store for indexedDB.open.');
             expect((exhaustedError as Error).cause).toBeInstanceOf(DOMException);
             expect(classifyIDBError(exhaustedError)).toBe(StorageErrorClass.UNAVAILABLE);

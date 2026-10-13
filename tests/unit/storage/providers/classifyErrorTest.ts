@@ -22,7 +22,8 @@ describe('classifyIDBError', () => {
         [new ReferenceError('indexedDB is not defined'), StorageErrorClass.UNAVAILABLE],
         [new Error('indexedDB is not available in this environment'), StorageErrorClass.UNAVAILABLE],
         // FATAL heal budget spent.
-        [new Error('IndexedDB heal budget exhausted: Internal error.'), StorageErrorClass.UNAVAILABLE],
+        [Object.assign(new Error('IndexedDB heal budget exhausted: Internal error.'), {name: 'IDBHealExhaustedError'}), StorageErrorClass.UNAVAILABLE],
+        [new Error('IndexedDB heal budget exhausted: Internal error.'), StorageErrorClass.UNKNOWN],
         // Anything else stays UNKNOWN.
         [new Error('some brand new failure'), StorageErrorClass.UNKNOWN],
     ])('classifies %s as %s', (error, expectedClass) => {

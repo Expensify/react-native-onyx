@@ -3,7 +3,7 @@ import type {UseStore} from 'idb-keyval';
 import * as Logger from '../../../Logger';
 import {StorageErrorClass} from '../../errors';
 import classifyIDBError from './classifyError';
-import IDBErrorMessage from './errorMessages';
+import IDBErrorMessage, {IDBErrorName} from './errorMessages';
 import isIndexedDBAvailable from './isIndexedDBAvailable';
 
 const HEAL_ATTEMPTS_MAX = 3;
@@ -211,7 +211,9 @@ function createStore(dbName: string, storeName: string): UseStore {
                         storeName,
                         errorMessage,
                     });
-                    throw new Error(`${IDBErrorMessage.HEAL_EXHAUSTED}: ${errorMessage}`, {cause: error});
+                    const healExhaustedError = new Error(`${IDBErrorMessage.HEAL_EXHAUSTED}: ${errorMessage}`, {cause: error});
+                    healExhaustedError.name = IDBErrorName.HEAL_EXHAUSTED;
+                    throw healExhaustedError;
                 }
 
                 if (errorClass === StorageErrorClass.UNKNOWN) {

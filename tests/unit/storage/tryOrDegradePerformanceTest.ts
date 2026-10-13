@@ -110,7 +110,9 @@ describe('storage/tryOrDegradePerformance', () => {
 
         storage.init();
 
-        const targetError = new Error('IndexedDB heal budget exhausted: Internal error.', {cause: new DOMException('Internal error.', 'UnknownError')});
+        const targetError = Object.assign(new Error('IndexedDB heal budget exhausted: Internal error.', {cause: new DOMException('Internal error.', 'UnknownError')}), {
+            name: 'IDBHealExhaustedError',
+        });
         storage.getStorageProvider().setItem = jest.fn().mockReturnValue(Promise.reject(targetError));
 
         await expect(storage.setItem('key', {test: 'data'})).rejects.toBe(targetError);
