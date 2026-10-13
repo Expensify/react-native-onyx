@@ -5,6 +5,7 @@ import InstanceSync from './InstanceSync';
 import MemoryOnlyProvider from './providers/MemoryOnlyProvider';
 import {StorageErrorClass} from './errors';
 import type StorageProvider from './providers/types';
+import type {StorageKeyValuePair} from './providers/types';
 
 let provider = PlatformStorage as StorageProvider<unknown>;
 
@@ -22,12 +23,17 @@ const initPromise = new Promise((resolve) => {
 
 type Storage = {
     getStorageProvider: () => StorageProvider<unknown>;
+    degradeToMemoryOnly: (error: unknown) => void;
 } & Omit<StorageProvider<unknown>, 'name' | 'store'>;
 
 /**
  * Degrade performance by removing the storage provider and only using cache
  */
 function degradePerformance(error: Error) {
+    if (provider === MemoryOnlyProvider) {
+        return;
+    }
+
     let causeMessage = '';
     if (error.cause instanceof Error) {
         causeMessage = error.cause.message;
@@ -69,6 +75,8 @@ const storage: Storage = {
     getStorageProvider() {
         return provider;
     },
+
+    degradeToMemoryOnly: (error) => degradePerformance(error instanceof Error ? error : new Error(String(error))),
 
     /**
      * Classifies a write error using the platform provider's own classifier. Synchronous and pure —
@@ -221,7 +229,12 @@ const storage: Storage = {
         if (!InstanceSync.shouldBeUsed) return;
 
         shouldKeepInstancesSync = true;
-        InstanceSync.init(onStorageKeysChanged, this);
+        InstanceSync.init((pairs: StorageKeyValuePair[]) => {
+            if (provider === MemoryOnlyProvider) {
+                return;
+            }
+            onStorageKeysChanged(pairs);
+        }, this);
     },
 };
 
