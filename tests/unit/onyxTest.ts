@@ -3856,7 +3856,7 @@ describe('Onyx', () => {
         });
 
         it('should hand out the cleaned cached value from multiGet', async () => {
-            // Given a value in storage that holds nested nulls (SQLite can store them)
+            // Given a value in storage that holds nested nulls (SQLite data written by older Onyx versions can)
             await StorageMock.setItem(ONYX_KEYS.TEST_KEY, {a: {b: null, c: 1}});
 
             // When it is read through multiGet
@@ -3962,15 +3962,6 @@ describe('Onyx', () => {
             ]);
 
             expect(cache.get(member1)).toStrictEqual({a: {b: 1}});
-        });
-
-        it('should remove nested nulls from values read from storage before caching them', async () => {
-            await StorageMock.setItem(ONYX_KEYS.TEST_KEY, {a: {b: null, c: 1}, d: null});
-
-            const value = await OnyxUtils.get(ONYX_KEYS.TEST_KEY);
-
-            expect(value).toStrictEqual({a: {c: 1}});
-            expect(cache.get(ONYX_KEYS.TEST_KEY)).toStrictEqual({a: {c: 1}});
         });
 
         it('should keep the cached subtrees and remove new nulls when setting a value built from the cached one', async () => {

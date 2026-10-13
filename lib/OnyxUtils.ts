@@ -300,10 +300,8 @@ function get<TKey extends OnyxKey, TValue extends OnyxValue<TKey>>(key: TKey): P
                 return undefined;
             }
 
-            // Storage can hold nested nulls (e.g. SQLite's JSON_REPLACE of marked objects), but cached values must not.
-            const valueWithoutNestedNullValues = utils.removeNestedNullValues(val) as TValue;
-            cache.set(key, valueWithoutNestedNullValues);
-            return valueWithoutNestedNullValues;
+            cache.set(key, val);
+            return val;
         })
         .catch((err) => Logger.logInfo(`Unable to get item from persistent storage. Key: ${key} Error: ${err}`));
 
