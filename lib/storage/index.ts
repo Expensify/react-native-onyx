@@ -5,6 +5,7 @@ import InstanceSync from './InstanceSync';
 import MemoryOnlyProvider from './providers/MemoryOnlyProvider';
 import {StorageErrorClass} from './errors';
 import type StorageProvider from './providers/types';
+import type {StorageKeyValuePair} from './providers/types';
 
 let provider = PlatformStorage as StorageProvider<unknown>;
 
@@ -228,7 +229,12 @@ const storage: Storage = {
         if (!InstanceSync.shouldBeUsed) return;
 
         shouldKeepInstancesSync = true;
-        InstanceSync.init(onStorageKeysChanged, this);
+        InstanceSync.init((pairs: StorageKeyValuePair[]) => {
+            if (provider === MemoryOnlyProvider) {
+                return;
+            }
+            onStorageKeysChanged(pairs);
+        }, this);
     },
 };
 
