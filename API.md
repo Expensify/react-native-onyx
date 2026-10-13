@@ -15,9 +15,6 @@ This method will be deprecated soon. Please use <code>Onyx.connectWithoutView()<
 <dt><a href="#connectWithoutView">connectWithoutView(connectOptions)</a> ⇒</dt>
 <dd><p>Connects to an Onyx key given the options passed and listens to its changes.</p>
 </dd>
-<dt><a href="#disconnect">disconnect(connection)</a></dt>
-<dd><p>Disconnects and removes the listener from the Onyx key.</p>
-</dd>
 <dt><a href="#set">set(key, value, options)</a></dt>
 <dd><p>Write a value to our store with the given key</p>
 </dd>
@@ -91,7 +88,7 @@ Connects to an Onyx key given the options passed and listens to its changes.
 This method will be deprecated soon. Please use `Onyx.connectWithoutView()` instead.
 
 **Kind**: global function  
-**Returns**: The `Connection` handle to use when calling `Onyx.disconnect()`.  
+**Returns**: The `Connection` handle whose `unsubscribe()` stops this subscription.  
 
 | Param | Description |
 | --- | --- |
@@ -118,7 +115,7 @@ cache after any same-tick writes have applied.
 Connects to an Onyx key given the options passed and listens to its changes.
 
 **Kind**: global function  
-**Returns**: The `Connection` handle to use when calling `Onyx.disconnect()`.  
+**Returns**: The `Connection` handle whose `unsubscribe()` stops this subscription.  
 
 | Param | Description |
 | --- | --- |
@@ -139,26 +136,6 @@ object whenever any member changes; signature `(collection, collectionKey)`.
 For any other key, the callback fires with the value at that key; signature
 `(value, key)`. Initial fire is deferred via `scheduleInitialSubscriberNotification` so it reads
 cache after any same-tick writes have applied.
-<a name="disconnect"></a>
-
-## disconnect(connection)
-Disconnects and removes the listener from the Onyx key.
-
-**Kind**: global function  
-
-| Param | Description |
-| --- | --- |
-| connection | Connection object returned by calling `Onyx.connect()` or `Onyx.connectWithoutView()`. |
-
-**Example**  
-```ts
-const connection = Onyx.connectWithoutView({
-    key: ONYXKEYS.SESSION,
-    callback: onSessionChange,
-});
-
-Onyx.disconnect(connection);
-```
 <a name="set"></a>
 
 ## set(key, value, options)

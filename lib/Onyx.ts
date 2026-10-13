@@ -140,7 +140,7 @@ function init({
  * @param connectOptions The options object that will define the behavior of the connection.
  * @param connectOptions.key The Onyx key to subscribe to.
  * @param connectOptions.callback A function that will be called when the Onyx data we are subscribed changes.
- * @returns The `Connection` handle to use when calling `Onyx.disconnect()`.
+ * @returns The `Connection` handle whose `unsubscribe()` stops this subscription.
  */
 function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Connection {
     const {key, callback} = connectOptions;
@@ -236,32 +236,10 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
  * @param connectOptions The options object that will define the behavior of the connection.
  * @param connectOptions.key The Onyx key to subscribe to.
  * @param connectOptions.callback A function that will be called when the Onyx data we are subscribed changes.
- * @returns The `Connection` handle to use when calling `Onyx.disconnect()`.
+ * @returns The `Connection` handle whose `unsubscribe()` stops this subscription.
  */
 function connectWithoutView<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Connection {
     return connect(connectOptions);
-}
-
-/**
- * Disconnects and removes the listener from the Onyx key.
- *
- * @example
- * ```ts
- * const connection = Onyx.connectWithoutView({
- *     key: ONYXKEYS.SESSION,
- *     callback: onSessionChange,
- * });
- *
- * Onyx.disconnect(connection);
- * ```
- *
- * @param connection Connection object returned by calling `Onyx.connect()` or `Onyx.connectWithoutView()`.
- */
-function disconnect(connection: Connection): void {
-    if (!connection) {
-        return;
-    }
-    connection.unsubscribe();
 }
 
 /**
@@ -801,7 +779,6 @@ const Onyx = {
     METHOD: OnyxUtils.METHOD,
     connect,
     connectWithoutView,
-    disconnect,
     set,
     multiSet,
     merge,
