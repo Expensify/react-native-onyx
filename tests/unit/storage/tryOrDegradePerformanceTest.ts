@@ -140,6 +140,19 @@ describe('storage/tryOrDegradePerformance', () => {
         expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
     });
 
+    it('should keep the message of a non-Error value passed to degradeToMemoryOnly in the degrade log', () => {
+        const {storage, Logger} = loadIsolatedStorage();
+        const capturedLogs: CapturedLog[] = [];
+        Logger.registerLogger((data: LogData) => capturedLogs.push({level: data.level, message: data.message}));
+
+        storage.degradeToMemoryOnly('Internal error opening backing store');
+
+        const degradeLog = capturedLogs.find((log) => log.message.includes('Falling back to only using cache'));
+        expect(degradeLog?.message).toContain('Error: Internal error opening backing store');
+        expect(degradeLog?.message).not.toContain('Stack: undefined');
+        expect(storage.getStorageProvider().name).toBe('MemoryOnlyProvider');
+    });
+
     it('should still classify the error as UNAVAILABLE after degrading to MemoryOnlyProvider', async () => {
         const {storage} = loadIsolatedStorage();
 
