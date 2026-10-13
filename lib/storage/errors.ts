@@ -22,12 +22,12 @@ const StorageErrorClass = {
     DISK_PRESSURE: 'diskPressure',
     /** Non-serializable payload. Never retriable — the same data will always fail. */
     INVALID_DATA: 'invalidData',
-    /** Backing-store corruption. Owner: connection layer — budgeted heal, then give up. */
+    /** Backing-store corruption. Owner: connection layer — budgeted heal, then rethrow as UNAVAILABLE. */
     FATAL: 'fatal',
     /** The storage engine itself does not exist in this environment (for example `indexedDB` is an
-     *  undeclared global in Chrome for iOS private tabs and in Lockdown Mode). Never retriable — the
-     *  engine cannot appear mid-session. Owner: the storage layer — degrade
-     *  to the in-memory provider. */
+     *  undeclared global in Chrome for iOS private tabs and in Lockdown Mode), or a FATAL heal budget
+     *  ran out. Never retriable — the engine cannot recover mid-session. Owner: the storage layer —
+     *  degrade to the in-memory provider. */
     UNAVAILABLE: 'unavailable',
     /** Unmatched by the active provider. Owner: operation layer — bounded retry, and log the shape so
      *  recurring cases can be promoted into one of the classes above. */
