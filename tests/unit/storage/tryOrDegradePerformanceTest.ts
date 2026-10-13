@@ -128,6 +128,18 @@ describe('storage/tryOrDegradePerformance', () => {
         expect(storage.getStorageProvider().name).toBe('MemoryOnlyProvider');
     });
 
+    it('should log the degrade only once when degradeToMemoryOnly is called repeatedly', () => {
+        const {storage, Logger} = loadIsolatedStorage();
+        const capturedLogs: CapturedLog[] = [];
+        Logger.registerLogger((data: LogData) => capturedLogs.push({level: data.level, message: data.message}));
+
+        storage.degradeToMemoryOnly(new DOMException('Internal error.', 'UnknownError'));
+        storage.degradeToMemoryOnly(new DOMException('Internal error.', 'UnknownError'));
+
+        expect(capturedLogs.filter((log) => log.message.includes('Falling back to only using cache'))).toHaveLength(1);
+        expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+    });
+
     it('should still classify the error as UNAVAILABLE after degrading to MemoryOnlyProvider', async () => {
         const {storage} = loadIsolatedStorage();
 

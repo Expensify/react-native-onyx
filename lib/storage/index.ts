@@ -29,6 +29,10 @@ type Storage = {
  * Degrade performance by removing the storage provider and only using cache
  */
 function degradePerformance(error: Error) {
+    if (provider === MemoryOnlyProvider) {
+        return;
+    }
+
     let causeMessage = '';
     if (error.cause instanceof Error) {
         causeMessage = error.cause.message;
