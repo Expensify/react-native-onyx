@@ -170,7 +170,9 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             // WAL lets the read-only handle read committed data while the writer is active.
             independentReader = open({name: DB_NAME, connection: 'independent', readOnly: true});
             // Cache size is connection-local. WAL is shared, and synchronous only controls writes.
-            independentReader.execute('PRAGMA CACHE_SIZE=-20000;');
+            independentReader.execute('PRAGMA CACHE_SIZE=-8000;');
+            // Reads are not retried by Onyx; allow temporary WAL locks to clear.
+            independentReader.execute('PRAGMA busy_timeout=2000;');
             getItemStatement = independentReader.prepare('SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key = ?;');
             readStore = independentReader;
         } catch {

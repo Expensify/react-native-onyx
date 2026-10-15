@@ -70,16 +70,20 @@ describe('SQLiteProvider', () => {
             expect(jest.mocked(open).mock.calls).toEqual([[{name: 'OnyxDB'}], [{name: 'OnyxDB', connection: 'independent', readOnly: true}]]);
         });
 
-        it('configures the reader cache and shares the writer WAL mode', () => {
+        it('configures a smaller reader cache, busy timeout, and shared WAL mode', () => {
             // Given an initialized writer and independent read-only connection.
             const reader = getOpenedConnection(1);
 
             // When querying the connection settings used for reads.
             const cacheSize = reader.execute<{cache_size: number}>('PRAGMA cache_size;').rows?.item(0)?.cache_size;
+            const writerCacheSize = getOpenedConnection(0).execute<{cache_size: number}>('PRAGMA cache_size;').rows?.item(0)?.cache_size;
+            const busyTimeout = reader.execute<{timeout: number}>('PRAGMA busy_timeout;').rows?.item(0)?.timeout;
             const journalMode = reader.execute<{journal_mode: string}>('PRAGMA journal_mode;').rows?.item(0)?.journal_mode;
 
             // Then the reader has the configured cache budget and sees the database in WAL mode.
-            expect(cacheSize).toBe(-20000);
+            expect(cacheSize).toBe(-8000);
+            expect(writerCacheSize).toBe(-20000);
+            expect(busyTimeout).toBe(2000);
             expect(journalMode).toBe('wal');
         });
 
