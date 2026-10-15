@@ -162,22 +162,27 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
         const maxVariableNumber = Number(getCompileOptionValue(compileOptionsResult, COMPILE_OPTIONS.MAX_VARIABLE_NUMBER));
         sqliteMaxVariableNumber = maxVariableNumber > 0 ? maxVariableNumber : SQLITE_MAX_VARIABLE_NUMBER;
 
-        // WAL lets the read-only handle read committed data while the writer is active.
-        try {
-            readStore = open({name: DB_NAME, connection: 'independent', readOnly: true});
-        } catch {
-            // A second connection is an optimization; the writer can still serve reads.
-            readStore = provider.store;
-        }
-
-        if (readStore !== provider.store) {
-            // Cache size is connection-local. WAL is shared, and synchronous only controls writes.
-            readStore.execute('PRAGMA CACHE_SIZE=-20000;');
-        }
-
-        getItemStatement = readStore.prepare('SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key = ?;');
         setItemStatement = provider.store.prepare('REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);');
         removeItemStatement = provider.store.prepare('DELETE FROM keyvaluepairs WHERE record_key = ?;');
+
+        let independentReader: NitroSQLiteConnection | undefined;
+        try {
+            // WAL lets the read-only handle read committed data while the writer is active.
+            independentReader = open({name: DB_NAME, connection: 'independent', readOnly: true});
+            // Cache size is connection-local. WAL is shared, and synchronous only controls writes.
+            independentReader.execute('PRAGMA CACHE_SIZE=-20000;');
+            getItemStatement = independentReader.prepare('SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key = ?;');
+            readStore = independentReader;
+        } catch {
+            // SQLite can report failures on first use, so protect all reader setup.
+            try {
+                independentReader?.close();
+            } catch {
+                // Reader cleanup must not prevent the writer from serving reads.
+            }
+            readStore = provider.store;
+            getItemStatement = provider.store.prepare('SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key = ?;');
+        }
         pendingWrite = Promise.resolve();
         pendingWriteCount = 0;
     },

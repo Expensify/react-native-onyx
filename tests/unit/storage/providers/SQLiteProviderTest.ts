@@ -127,6 +127,47 @@ describe('SQLiteProvider', () => {
             expect(readerPrepare).toHaveBeenCalledTimes(1);
         });
 
+        it.each([
+            {operation: 'execute', failsClose: false},
+            {operation: 'prepare', failsClose: false},
+            {operation: 'prepare', failsClose: true},
+        ] as const)('falls back when reader $operation fails, including when cleanup fails: $failsClose', async ({operation, failsClose}) => {
+            resetAllDatabases();
+            const openConnection = jest.mocked(open).getMockImplementation();
+            if (!openConnection) {
+                throw new Error('open mock implementation is missing');
+            }
+            let closeReader: jest.SpyInstance | undefined;
+            jest.mocked(open)
+                .mockImplementationOnce(openConnection)
+                .mockImplementationOnce((options) => {
+                    const reader = openConnection(options);
+                    closeReader = jest.spyOn(reader, 'close');
+                    if (failsClose) {
+                        closeReader.mockImplementationOnce(() => {
+                            throw new Error('reader cleanup failed');
+                        });
+                    }
+                    jest.spyOn(reader, operation).mockImplementationOnce(() => {
+                        throw new Error('unable to open database file');
+                    });
+                    return reader;
+                });
+
+            SQLiteProvider.init();
+            expect(closeReader).toHaveBeenCalledTimes(1);
+            const write = SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, 'committed');
+            const read = SQLiteProvider.getItem(ONYXKEYS.TEST_KEY);
+            await write;
+
+            expect(await read).toBe('committed');
+            expect(await SQLiteProvider.multiGet([ONYXKEYS.TEST_KEY])).toEqual([[ONYXKEYS.TEST_KEY, 'committed']]);
+            expect(await SQLiteProvider.getAllKeys()).toEqual([ONYXKEYS.TEST_KEY]);
+            expect(await SQLiteProvider.getAll()).toEqual([[ONYXKEYS.TEST_KEY, 'committed']]);
+            await SQLiteProvider.removeItem(ONYXKEYS.TEST_KEY);
+            expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY)).toBeNull();
+        });
+
         it('waits for an already queued write before reading on the independent connection', async () => {
             let releaseWrite: () => void = () => undefined;
             const writeGate = new Promise<void>((resolve) => {
