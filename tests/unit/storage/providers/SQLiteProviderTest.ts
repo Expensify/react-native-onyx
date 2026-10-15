@@ -57,6 +57,7 @@ describe('SQLiteProvider', () => {
 
     beforeEach(() => {
         resetAllDatabases();
+        SQLiteProvider.store = undefined;
         jest.mocked(open).mockClear();
         SQLiteProvider.init();
     });
@@ -90,6 +91,7 @@ describe('SQLiteProvider', () => {
         it('keeps reads and writes working when the independent reader cannot open', async () => {
             // Given a working writer and a failure opening a second connection.
             resetAllDatabases();
+            SQLiteProvider.store = undefined;
             const openConnection = jest.mocked(open).getMockImplementation();
             if (!openConnection) {
                 throw new Error('open mock implementation is missing');
@@ -137,6 +139,7 @@ describe('SQLiteProvider', () => {
             {operation: 'prepare', failsClose: true},
         ] as const)('falls back when reader $operation fails, including when cleanup fails: $failsClose', async ({operation, failsClose}) => {
             resetAllDatabases();
+            SQLiteProvider.store = undefined;
             const openConnection = jest.mocked(open).getMockImplementation();
             if (!openConnection) {
                 throw new Error('open mock implementation is missing');
@@ -172,7 +175,7 @@ describe('SQLiteProvider', () => {
             expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY)).toBeNull();
         });
 
-        it('waits for an already queued write before reading on the independent connection', async () => {
+        it.each([false, true])('waits for an already queued write, including after reinitialization: %s', async (reinitialize) => {
             let releaseWrite: () => void = () => undefined;
             const writeGate = new Promise<void>((resolve) => {
                 releaseWrite = resolve;
@@ -186,10 +189,17 @@ describe('SQLiteProvider', () => {
             const executeRead = jest.spyOn(getPreparedStatement(getOpenedConnection(1), 0), 'executeAsync');
 
             const write = SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, 'committed');
+            if (reinitialize) {
+                SQLiteProvider.init();
+            }
             const read = SQLiteProvider.getItem(ONYXKEYS.TEST_KEY);
 
             await Promise.resolve();
             expect(executeRead).not.toHaveBeenCalled();
+            expect(open).toHaveBeenCalledTimes(2);
+            expect(SQLiteProvider.store).toBe(getOpenedConnection(0));
+            expect(getOpenedConnection(0).prepare).toHaveBeenCalledTimes(2);
+            expect(getOpenedConnection(1).prepare).toHaveBeenCalledTimes(1);
 
             releaseWrite();
             await write;
@@ -507,6 +517,7 @@ describe('SQLiteProvider', () => {
 
         beforeEach(() => {
             resetAllDatabases();
+            SQLiteProvider.store = undefined;
             jest.mocked(open).mockClear();
             SQLiteProvider.init();
 

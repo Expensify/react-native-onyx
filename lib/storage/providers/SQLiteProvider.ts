@@ -145,6 +145,10 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
      * Initializes the storage provider
      */
     init() {
+        if (provider.store) {
+            return;
+        }
+
         provider.store = open({name: DB_NAME});
 
         provider.store.execute('CREATE TABLE IF NOT EXISTS keyvaluepairs (record_key TEXT NOT NULL PRIMARY KEY , valueJSON JSON NOT NULL) WITHOUT ROWID;');
