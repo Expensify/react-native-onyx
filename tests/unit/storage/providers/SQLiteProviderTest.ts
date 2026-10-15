@@ -4,15 +4,16 @@
 import {NitroSQLiteError, NitroSQLiteExceptionType} from 'react-native-nitro-sqlite/errors';
 import {open} from 'react-native-nitro-sqlite';
 import type {NitroSQLiteConnection, PreparedStatement} from 'react-native-nitro-sqlite';
+import type * as NitroSQLiteMock from 'react-native-nitro-sqlite/mock';
 import SQLiteProvider from '../../../../lib/storage/providers/SQLiteProvider';
 import utils from '../../../../lib/utils';
 import type {GenericDeepRecord} from '../../../types';
-// Jest resolves the package export, which TypeScript's legacy Node resolution cannot resolve.
-const {resetAllDatabases} = jest.requireActual<{resetAllDatabases: () => void}>('react-native-nitro-sqlite/mock');
+
+const {resetAllDatabases} = jest.requireActual<typeof NitroSQLiteMock>('react-native-nitro-sqlite/mock');
 
 // Override the global native stub with NitroSQLite's mock.
 jest.mock('react-native-nitro-sqlite', () => {
-    const sqliteMock = jest.requireActual<{open: (options: Parameters<typeof open>[0]) => Pick<NitroSQLiteConnection, 'prepare'>}>('react-native-nitro-sqlite/mock');
+    const sqliteMock = jest.requireActual<typeof NitroSQLiteMock>('react-native-nitro-sqlite/mock');
     return {
         ...sqliteMock,
         open: jest.fn((options: Parameters<typeof open>[0]) => {
@@ -85,7 +86,10 @@ describe('SQLiteProvider', () => {
         it('keeps reads and writes working when the independent reader cannot open', async () => {
             // Given a working writer and a failure opening a second connection.
             resetAllDatabases();
-            const openConnection = jest.mocked(open).getMockImplementation()!;
+            const openConnection = jest.mocked(open).getMockImplementation();
+            if (!openConnection) {
+                throw new Error('open mock implementation is missing');
+            }
             jest.mocked(open)
                 .mockImplementationOnce(openConnection)
                 .mockImplementationOnce(() => {
@@ -148,7 +152,9 @@ describe('SQLiteProvider', () => {
         });
 
         it('does not block later reads after a failed write', async () => {
-            await expect(SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, undefined as unknown as null)).rejects.toThrow();
+            getOpenedConnection(0).execute(`CREATE TRIGGER reject_write BEFORE INSERT ON keyvaluepairs
+                BEGIN SELECT RAISE(ABORT, 'rejected write'); END;`);
+            await expect(SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, 'value')).rejects.toThrow('rejected write');
             await expect(SQLiteProvider.getAllKeys()).resolves.toEqual([]);
         });
     });
