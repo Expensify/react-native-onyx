@@ -62,6 +62,17 @@ describe('SQLiteProvider', () => {
         it('should return null if there is no stored value for the key', async () => {
             expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY)).toBeNull();
         });
+
+        it('should remove nested nulls from a stored value', async () => {
+            // Given a stored value with nested nulls, which JSON_REPLACE patches can write
+            await SQLiteProvider.store?.executeAsync('REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);', [
+                ONYXKEYS.TEST_KEY_3,
+                JSON.stringify({a: 1, b: null, nested: {c: null, d: 'd'}, list: [null, {e: null}]}),
+            ]);
+
+            // Then the value is handed out without the nested nulls, and arrays are left as they are
+            expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY_3)).toEqual({a: 1, nested: {d: 'd'}, list: [null, {e: null}]});
+        });
     });
 
     describe('multiGet', () => {
@@ -248,6 +259,28 @@ describe('SQLiteProvider', () => {
             // Crucially: oldKey/keepMe should be gone (replace, not merge).
             expect((stored.outer as Record<string, unknown>).nested).not.toHaveProperty('oldKey');
             expect((stored.outer as Record<string, unknown>).nested).not.toHaveProperty('keepMe');
+        });
+
+        it('should apply a replacement nested inside an earlier replacement', async () => {
+            await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY_3, {outer: {oldKey: 'gone'}});
+
+            // Given the patches from a batch of merges {outer: null}, {outer: {nested: null}}, {outer: {nested: {newKey: 'newValue'}}}
+            const change = {
+                outer: {
+                    [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                    nested: {[utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true, newKey: 'newValue'},
+                },
+            };
+            const replaceNullPatches: Array<[string[], unknown]> = [
+                [['outer'], {nested: null}],
+                [['outer', 'nested'], {newKey: 'newValue'}],
+            ];
+
+            // When the patches are applied
+            await SQLiteProvider.multiMerge([[ONYXKEYS.TEST_KEY_3, change, replaceNullPatches]]);
+
+            // Then the second patch finds the path kept by the first one
+            expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY_3)).toEqual({outer: {nested: {newKey: 'newValue'}}});
         });
     });
 
