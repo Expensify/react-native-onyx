@@ -149,8 +149,7 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
 
             const value = JSON.parse(result.valueJSON);
 
-            // Stored values can hold nested nulls. Only objects whose JSON contains "null" are walked. valueJSON is a number
-            // for numeric values, so the string check only runs for objects.
+            // valueJSON is a number for numeric values, so the type is checked before includes().
             return typeof value === 'object' && value !== null && result.valueJSON.includes('null') ? utils.removeNestedNullValues(value) : value;
         });
     },

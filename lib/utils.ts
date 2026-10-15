@@ -240,14 +240,12 @@ function removeNestedNullValues<TValue extends OnyxInput<OnyxKey> | null>(value:
     }
 
     if (value === nullFreeReference) {
-        // A shared subtree only holds nulls if app code mutated a cached object in place, which Onyx doesn't support.
         if (process.env.NODE_ENV === 'development' && needsNormalization(value)) {
             Logger.logAlert('removeNestedNullValues skipped a cached subtree that holds nested null values. Onyx values must not be mutated in place.');
         }
         return value;
     }
 
-    // Dates and RegExps have no enumerable keys, so lookups on them find nothing.
     const reference = nullFreeReference !== null && typeof nullFreeReference === 'object' && !Array.isArray(nullFreeReference) ? (nullFreeReference as Record<string, unknown>) : undefined;
     let hasChanged = false;
     const result: Record<string, unknown> = {};

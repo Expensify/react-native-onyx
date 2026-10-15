@@ -71,7 +71,6 @@ function init({
                     continue;
                 }
 
-                // Storage can hold nested nulls, but cached values must not.
                 const value = utils.removeNestedNullValues(valueFromStorage);
 
                 const collectionKey = OnyxKeys.getCollectionKey(key);
@@ -492,7 +491,6 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                         //      since collection key subscribers need to be updated differently
                         if (!isKeyToPreserve) {
                             const oldValue = cache.get(key);
-                            // Cached values must not hold nested nulls.
                             const newValue = utils.removeNestedNullValues(defaultKeyStates[key] ?? null);
                             if (newValue !== oldValue) {
                                 cache.set(key, newValue);
