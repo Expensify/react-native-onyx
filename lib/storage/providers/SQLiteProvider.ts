@@ -5,7 +5,6 @@
 import type {BatchQueryCommand, NitroSQLiteConnection, QueryResult} from 'react-native-nitro-sqlite';
 import {open} from 'react-native-nitro-sqlite';
 import {getFreeDiskStorage} from 'react-native-device-info';
-import type {OnyxKey, OnyxValue} from '../../types';
 import type {FastMergeReplaceNullPatch} from '../../utils';
 import utils from '../../utils';
 import type StorageProvider from './types';
@@ -93,8 +92,7 @@ function objectMarkRemover(key: string, value: unknown) {
 function generateJSONReplaceSQLQueries(key: string, patches: FastMergeReplaceNullPatch[]): string[][] {
     const queries = patches.map(([pathArray, value]) => {
         const jsonPath = `$.${pathArray.join('.')}`;
-        // JSON_REPLACE stores the object as is, so nested nulls are removed first.
-        return [jsonPath, JSON.stringify(utils.removeNestedNullValues(value as OnyxValue<OnyxKey>)), key];
+        return [jsonPath, JSON.stringify(value), key];
     });
 
     return queries;
