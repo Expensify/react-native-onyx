@@ -71,7 +71,7 @@ function init({
                     continue;
                 }
 
-                const value = utils.removeNestedNullValues(valueFromStorage);
+                const value = utils.needsNormalization(valueFromStorage) ? utils.removeNestedNullValues(valueFromStorage) : valueFromStorage;
 
                 const collectionKey = OnyxKeys.getCollectionKey(key);
                 const isCollectionMember = !!collectionKey && OnyxKeys.isCollectionMemberKey(collectionKey, key);
