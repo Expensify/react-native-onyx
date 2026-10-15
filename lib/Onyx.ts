@@ -492,7 +492,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                         //      since collection key subscribers need to be updated differently
                         if (!isKeyToPreserve) {
                             const oldValue = cache.get(key);
-                            // Cached values must not hold nested nulls, so the default key state is cleaned first.
+                            // Cached values must not hold nested nulls.
                             const newValue = utils.removeNestedNullValues(defaultKeyStates[key] ?? null);
                             if (newValue !== oldValue) {
                                 cache.set(key, newValue);

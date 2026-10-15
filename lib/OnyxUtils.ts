@@ -406,7 +406,7 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
                 }
                 cache.merge(temp);
 
-                // Hand out what the cache now holds, which has the nested null values removed, so callers and cache agree.
+                // Return the cached values, which have nested nulls removed.
                 for (const key of Object.keys(temp)) {
                     const cachedValue = cache.get(key);
                     dataMap.set(key as TKey, (cachedValue !== undefined ? cachedValue : temp[key]) as OnyxValue<TKey>);

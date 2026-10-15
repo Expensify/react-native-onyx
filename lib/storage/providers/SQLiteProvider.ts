@@ -93,8 +93,7 @@ function objectMarkRemover(key: string, value: unknown) {
 function generateJSONReplaceSQLQueries(key: string, patches: FastMergeReplaceNullPatch[]): string[][] {
     const queries = patches.map(([pathArray, value]) => {
         const jsonPath = `$.${pathArray.join('.')}`;
-        // The replacement object was built in "mark" mode, so it can still hold nested nulls. Unlike JSON_PATCH,
-        // JSON_REPLACE would store them as they are.
+        // JSON_REPLACE stores the object as is, so nested nulls are removed first.
         return [jsonPath, JSON.stringify(utils.removeNestedNullValues(value as OnyxValue<OnyxKey>)), key];
     });
 
@@ -150,9 +149,8 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
 
             const value = JSON.parse(result.valueJSON);
 
-            // Older Onyx versions could store nested nulls through JSON_REPLACE, but values handed to the cache must not hold
-            // any. Objects without "null" in their JSON can't hold one, so the walk is skipped for them. Numeric values come
-            // back as numbers because of the column's affinity, so the string check only runs for objects.
+            // Stored values can hold nested nulls. Only objects whose JSON contains "null" are walked. valueJSON is a number
+            // for numeric values, so the string check only runs for objects.
             return typeof value === 'object' && value !== null && result.valueJSON.includes('null') ? utils.removeNestedNullValues(value) : value;
         });
     },

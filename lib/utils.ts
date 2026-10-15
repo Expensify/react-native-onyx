@@ -157,7 +157,7 @@ function mergeObject<TObject extends Record<string, unknown>>(
             // of the merged object only.
             const sourcePropertyWithoutMark = {...sourceProperty};
             delete sourcePropertyWithoutMark.ONYX_INTERNALS__REPLACE_OBJECT_MARK;
-            // The replacement object was built in "mark" mode, so it can still hold nested nulls.
+            // Built in "mark" mode, so it can still hold nested nulls.
             destination[key] = options.shouldRemoveNestedNulls ? removeNestedNullValues(sourcePropertyWithoutMark) : sourcePropertyWithoutMark;
             continue;
         }
@@ -231,12 +231,8 @@ function needsNormalization(value: unknown): boolean {
 /**
  * Deep removes the nested null values from the given value. Returns the original reference if no nulls were found.
  *
- * If `nullFreeReference` is given, any (nested) object of `value` that is the same reference as the object at the same
- * path in `nullFreeReference` is returned as is, without being traversed. Callers pass the current cache value here,
- * which relies on cached values never holding nested nulls. The cache write paths uphold that: `cache.set()` callers
- * pass values cleaned by this function or by `fastMerge()` with `shouldRemoveNestedNulls`, `cache.merge()` and
- * `cache.hydrate()` clean with `fastMerge()`, and values read from storage or default key states are cleaned before
- * being cached. `nullFreeReference` must therefore be the live cache value, read synchronously right before the call.
+ * Nested objects that are the same reference as the object at the same path in `nullFreeReference` are returned as is,
+ * without being traversed. Pass the live cache value here, since cached values never hold nested nulls.
  */
 function removeNestedNullValues<TValue extends OnyxInput<OnyxKey> | null>(value: TValue, nullFreeReference?: unknown): TValue {
     if (value === null || value === undefined || typeof value !== 'object' || Array.isArray(value)) {
@@ -251,7 +247,7 @@ function removeNestedNullValues<TValue extends OnyxInput<OnyxKey> | null>(value:
         return value;
     }
 
-    // Cheaper than isMergeableObject: Dates and RegExps have no enumerable own keys, so a property lookup on them finds nothing.
+    // Dates and RegExps have no enumerable keys, so lookups on them find nothing.
     const reference = nullFreeReference !== null && typeof nullFreeReference === 'object' && !Array.isArray(nullFreeReference) ? (nullFreeReference as Record<string, unknown>) : undefined;
     let hasChanged = false;
     const result: Record<string, unknown> = {};
