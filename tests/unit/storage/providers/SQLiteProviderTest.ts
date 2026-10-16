@@ -1,17 +1,28 @@
 /**
- * Integration test for `SQLiteProvider` using a Node-side SQLite engine.
- *
- * Pattern mirrors `IDBKeyvalProviderTest.ts` — real provider code + real
- * SQLite engine (via better-sqlite3) standing in for `react-native-nitro-sqlite`.
+ * Integration test for `SQLiteProvider` using NitroSQLite's Node mock.
  */
+import {NitroSQLiteError, NitroSQLiteExceptionType} from 'react-native-nitro-sqlite/errors';
+import {open} from 'react-native-nitro-sqlite';
+import type {NitroSQLiteConnection, PreparedStatement} from 'react-native-nitro-sqlite';
+import type * as NitroSQLiteMock from 'react-native-nitro-sqlite/mock';
 import SQLiteProvider from '../../../../lib/storage/providers/SQLiteProvider';
 import utils from '../../../../lib/utils';
 import type {GenericDeepRecord} from '../../../types';
-import {resetAllDatabases} from '../../mocks/sqliteMock';
 
-// `jest.mock` is hoisted by Jest above the imports — register the SQLite mock
-// (overriding the global jestSetup.js mock) and a tiny device-info stub.
-jest.mock('react-native-nitro-sqlite', () => require('../../mocks/sqliteMock'));
+const {resetAllDatabases} = jest.requireActual<typeof NitroSQLiteMock>('react-native-nitro-sqlite/mock');
+
+// Override the global native stub with NitroSQLite's mock.
+jest.mock('react-native-nitro-sqlite', () => {
+    const sqliteMock = jest.requireActual<typeof NitroSQLiteMock>('react-native-nitro-sqlite/mock');
+    return {
+        ...sqliteMock,
+        open: jest.fn((options: Parameters<typeof open>[0]) => {
+            const connection = sqliteMock.open(options);
+            jest.spyOn(connection, 'prepare');
+            return connection;
+        }),
+    };
+});
 jest.mock('react-native-device-info', () => ({getFreeDiskStorage: () => 12345}));
 
 const ONYXKEYS = {
@@ -46,11 +57,161 @@ describe('SQLiteProvider', () => {
 
     beforeEach(() => {
         resetAllDatabases();
+        SQLiteProvider.store = undefined;
+        jest.mocked(open).mockClear();
         SQLiteProvider.init();
     });
 
     afterAll(() => {
         resetAllDatabases();
+    });
+
+    describe('read connections and prepared statement reuse', () => {
+        it('opens a separate read-only connection after configuring the writer', () => {
+            expect(jest.mocked(open).mock.calls).toEqual([[{name: 'OnyxDB'}], [{name: 'OnyxDB', connection: 'independent', readOnly: true}]]);
+        });
+
+        it('configures a smaller reader cache, busy timeout, and shared WAL mode', () => {
+            // Given an initialized writer and independent read-only connection.
+            const reader = getOpenedConnection(1);
+
+            // When querying the connection settings used for reads.
+            const cacheSize = reader.execute<{cache_size: number}>('PRAGMA cache_size;').rows?.item(0)?.cache_size;
+            const writerCacheSize = getOpenedConnection(0).execute<{cache_size: number}>('PRAGMA cache_size;').rows?.item(0)?.cache_size;
+            const busyTimeout = reader.execute<{timeout: number}>('PRAGMA busy_timeout;').rows?.item(0)?.timeout;
+            const journalMode = reader.execute<{journal_mode: string}>('PRAGMA journal_mode;').rows?.item(0)?.journal_mode;
+
+            // Then the reader has the configured cache budget and sees the database in WAL mode.
+            expect(cacheSize).toBe(-8000);
+            expect(writerCacheSize).toBe(-20000);
+            expect(busyTimeout).toBe(2000);
+            expect(journalMode).toBe('wal');
+        });
+
+        it('keeps reads and writes working when the independent reader cannot open', async () => {
+            // Given a working writer and a failure opening a second connection.
+            resetAllDatabases();
+            SQLiteProvider.store = undefined;
+            const openConnection = jest.mocked(open).getMockImplementation();
+            if (!openConnection) {
+                throw new Error('open mock implementation is missing');
+            }
+            jest.mocked(open)
+                .mockImplementationOnce(openConnection)
+                .mockImplementationOnce(() => {
+                    throw new NitroSQLiteError(`[NativeNitroSQLiteException][${NitroSQLiteExceptionType.DatabaseCannotBeOpened}] Cannot open read connection`);
+                });
+
+            // When initialization falls back to the writer and a read follows a queued write.
+            SQLiteProvider.init();
+            const write = SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, 'committed');
+            const read = SQLiteProvider.getItem(ONYXKEYS.TEST_KEY);
+            await write;
+
+            // Then prepared and bulk reads still see committed data, and deletes still work.
+            expect(await read).toBe('committed');
+            expect(await SQLiteProvider.multiGet([ONYXKEYS.TEST_KEY])).toEqual([[ONYXKEYS.TEST_KEY, 'committed']]);
+            expect(await SQLiteProvider.getAllKeys()).toEqual([ONYXKEYS.TEST_KEY]);
+            expect(await SQLiteProvider.getAll()).toEqual([[ONYXKEYS.TEST_KEY, 'committed']]);
+            await SQLiteProvider.removeItem(ONYXKEYS.TEST_KEY);
+            expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY)).toBeNull();
+        });
+
+        it('reuses prepared statements for repeated single-key operations', async () => {
+            const writerPrepare = jest.mocked(getOpenedConnection(0).prepare);
+            const readerPrepare = jest.mocked(getOpenedConnection(1).prepare);
+            expect(writerPrepare).toHaveBeenCalledTimes(2);
+            expect(readerPrepare).toHaveBeenCalledTimes(1);
+
+            await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, 'first');
+            await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY_2, 'second');
+            expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY)).toBe('first');
+            expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY_2)).toBe('second');
+            await SQLiteProvider.removeItem(ONYXKEYS.TEST_KEY);
+
+            expect(writerPrepare).toHaveBeenCalledTimes(2);
+            expect(readerPrepare).toHaveBeenCalledTimes(1);
+        });
+
+        it.each([
+            {operation: 'execute', failsClose: false},
+            {operation: 'prepare', failsClose: false},
+            {operation: 'prepare', failsClose: true},
+        ] as const)('falls back when reader $operation fails, including when cleanup fails: $failsClose', async ({operation, failsClose}) => {
+            resetAllDatabases();
+            SQLiteProvider.store = undefined;
+            const openConnection = jest.mocked(open).getMockImplementation();
+            if (!openConnection) {
+                throw new Error('open mock implementation is missing');
+            }
+            let closeReader: jest.SpyInstance | undefined;
+            jest.mocked(open)
+                .mockImplementationOnce(openConnection)
+                .mockImplementationOnce((options) => {
+                    const reader = openConnection(options);
+                    closeReader = jest.spyOn(reader, 'close');
+                    if (failsClose) {
+                        closeReader.mockImplementationOnce(() => {
+                            throw new Error('reader cleanup failed');
+                        });
+                    }
+                    jest.spyOn(reader, operation).mockImplementationOnce(() => {
+                        throw new Error('unable to open database file');
+                    });
+                    return reader;
+                });
+
+            SQLiteProvider.init();
+            expect(closeReader).toHaveBeenCalledTimes(1);
+            const write = SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, 'committed');
+            const read = SQLiteProvider.getItem(ONYXKEYS.TEST_KEY);
+            await write;
+
+            expect(await read).toBe('committed');
+            expect(await SQLiteProvider.multiGet([ONYXKEYS.TEST_KEY])).toEqual([[ONYXKEYS.TEST_KEY, 'committed']]);
+            expect(await SQLiteProvider.getAllKeys()).toEqual([ONYXKEYS.TEST_KEY]);
+            expect(await SQLiteProvider.getAll()).toEqual([[ONYXKEYS.TEST_KEY, 'committed']]);
+            await SQLiteProvider.removeItem(ONYXKEYS.TEST_KEY);
+            expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY)).toBeNull();
+        });
+
+        it.each([false, true])('waits for an already queued write, including after reinitialization: %s', async (reinitialize) => {
+            let releaseWrite: () => void = () => undefined;
+            const writeGate = new Promise<void>((resolve) => {
+                releaseWrite = resolve;
+            });
+            const setItemStatement = getPreparedStatement(getOpenedConnection(0), 0);
+            const executeWrite = setItemStatement.executeAsync.bind(setItemStatement);
+            jest.spyOn(setItemStatement, 'executeAsync').mockImplementationOnce(async (params) => {
+                await writeGate;
+                return executeWrite(params);
+            });
+            const executeRead = jest.spyOn(getPreparedStatement(getOpenedConnection(1), 0), 'executeAsync');
+
+            const write = SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, 'committed');
+            if (reinitialize) {
+                SQLiteProvider.init();
+            }
+            const read = SQLiteProvider.getItem(ONYXKEYS.TEST_KEY);
+
+            await Promise.resolve();
+            expect(executeRead).not.toHaveBeenCalled();
+            expect(open).toHaveBeenCalledTimes(2);
+            expect(SQLiteProvider.store).toBe(getOpenedConnection(0));
+            expect(getOpenedConnection(0).prepare).toHaveBeenCalledTimes(2);
+            expect(getOpenedConnection(1).prepare).toHaveBeenCalledTimes(1);
+
+            releaseWrite();
+            await write;
+            expect(await read).toBe('committed');
+        });
+
+        it('does not block later reads after a failed write', async () => {
+            getOpenedConnection(0).execute(`CREATE TRIGGER reject_write BEFORE INSERT ON keyvaluepairs
+                BEGIN SELECT RAISE(ABORT, 'rejected write'); END;`);
+            await expect(SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, 'value')).rejects.toThrow('rejected write');
+            await expect(SQLiteProvider.getAllKeys()).resolves.toEqual([]);
+        });
     });
 
     describe('getItem', () => {
@@ -121,6 +282,25 @@ describe('SQLiteProvider', () => {
             const sortedActual = out.sort((a, b) => a[0].localeCompare(b[0]));
             const sortedExpected = [...changedEntries].sort((a, b) => a[0].localeCompare(b[0]));
             expect(sortedActual).toEqual(sortedExpected);
+        });
+
+        it('rolls back all grouped writes when a later parameter set fails', async () => {
+            // Given a constraint that rejects the second insert in a grouped batch.
+            SQLiteProvider.store!.execute(`CREATE TRIGGER reject_insert BEFORE INSERT ON keyvaluepairs
+                WHEN NEW.record_key = '${ONYXKEYS.TEST_KEY_2}' BEGIN SELECT RAISE(ABORT, 'rejected insert'); END;`);
+
+            // When the first insert succeeds but the second one is rejected.
+            await expect(
+                SQLiteProvider.multiSet([
+                    [ONYXKEYS.TEST_KEY, 'first'],
+                    [ONYXKEYS.TEST_KEY_2, 'second'],
+                ]),
+            ).rejects.toThrow('rejected insert');
+
+            // Then the batch is atomic and its failure does not block subsequent reads or writes.
+            expect(await SQLiteProvider.getAllKeys()).toEqual([]);
+            await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, 'recovered');
+            expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY)).toBe('recovered');
         });
 
         // SQLite-specific regression: `multiSet` substitutes null for undefined
@@ -337,6 +517,8 @@ describe('SQLiteProvider', () => {
 
         beforeEach(() => {
             resetAllDatabases();
+            SQLiteProvider.store = undefined;
+            jest.mocked(open).mockClear();
             SQLiteProvider.init();
 
             jest.spyOn(utils, 'chunkArray').mockImplementation((items, _maxChunkSize) => originalChunkArray(items, CHUNK_SIZE));
@@ -362,14 +544,97 @@ describe('SQLiteProvider', () => {
                 const entries = createKeyValueEntries(5);
                 await SQLiteProvider.multiSet(entries);
 
-                const executeAsyncSpy = jest.spyOn(SQLiteProvider.store!, 'executeAsync');
-                executeAsyncSpy.mockClear();
+                const reader = getOpenedConnection(1);
+                const transaction = reader.transaction.bind(reader);
+                const queries: string[] = [];
+                jest.spyOn(reader, 'transaction').mockImplementation((callback) =>
+                    transaction((tx) => {
+                        const executeAsync = tx.executeAsync.bind(tx);
+                        jest.spyOn(tx, 'executeAsync').mockImplementation((query, params) => {
+                            queries.push(query);
+                            return executeAsync(query, params);
+                        });
+                        return callback(tx);
+                    }),
+                );
 
                 const keys = entries.map(([key]) => key);
                 await SQLiteProvider.multiGet(keys);
 
-                const inQueries = executeAsyncSpy.mock.calls.filter(([sql]) => typeof sql === 'string' && sql.includes('WHERE record_key IN'));
+                const inQueries = queries.filter((query) => query.includes('WHERE record_key IN'));
                 expect(inQueries).toHaveLength(3);
+            });
+
+            it('releases a failed snapshot transaction before the next read', async () => {
+                // Given several chunks and a query failure inside the read transaction.
+                const entries = createKeyValueEntries(5);
+                await SQLiteProvider.multiSet(entries);
+                const reader = getOpenedConnection(1);
+                const transaction = reader.transaction.bind(reader);
+                jest.spyOn(reader, 'transaction').mockImplementationOnce((callback) =>
+                    transaction((tx) => {
+                        const executeAsync = tx.executeAsync.bind(tx);
+                        let queryCount = 0;
+                        jest.spyOn(tx, 'executeAsync').mockImplementation((query, params) => {
+                            if (++queryCount === 2) {
+                                return Promise.reject(new Error('failed snapshot query'));
+                            }
+                            return executeAsync(query, params);
+                        });
+                        return callback(tx);
+                    }),
+                );
+                const keys = entries.map(([key]) => key);
+
+                // When one chunk fails, the original error reaches the caller.
+                await expect(SQLiteProvider.multiGet(keys)).rejects.toThrow('failed snapshot query');
+
+                // Then rollback releases the reader and the next snapshot returns all values.
+                await expect(SQLiteProvider.multiGet(keys)).resolves.toEqual(expect.arrayContaining(entries));
+            });
+
+            it('reads all chunks from one snapshot while another connection writes', async () => {
+                const entries = createKeyValueEntries(5);
+                await SQLiteProvider.multiSet(entries);
+
+                let releaseRead: () => void = () => undefined;
+                const readGate = new Promise<void>((resolve) => {
+                    releaseRead = resolve;
+                });
+                let firstReadCompleted: () => void = () => undefined;
+                const firstRead = new Promise<void>((resolve) => {
+                    firstReadCompleted = resolve;
+                });
+                const reader = getOpenedConnection(1);
+                const transaction = reader.transaction.bind(reader);
+                jest.spyOn(reader, 'transaction').mockImplementation((callback) =>
+                    transaction((tx) => {
+                        const executeAsync = tx.executeAsync.bind(tx);
+                        let queryCount = 0;
+                        jest.spyOn(tx, 'executeAsync').mockImplementation(async (query, params) => {
+                            const isFirstQuery = queryCount++ === 0;
+                            if (!isFirstQuery) {
+                                await readGate;
+                            }
+                            const result = await executeAsync(query, params);
+                            if (isFirstQuery) {
+                                firstReadCompleted();
+                            }
+                            return result;
+                        });
+                        return callback(tx);
+                    }),
+                );
+
+                const keys = entries.map(([key]) => key);
+                const read = SQLiteProvider.multiGet(keys);
+                await firstRead;
+
+                await SQLiteProvider.setItem(keys[2], 99);
+                releaseRead();
+
+                expect(await read).toContainEqual([keys[2], 2]);
+                expect(await SQLiteProvider.getItem(keys[2])).toBe(99);
             });
         });
 
@@ -381,6 +646,37 @@ describe('SQLiteProvider', () => {
                 const keys = entries.map(([key]) => key);
                 await SQLiteProvider.removeItems(keys);
 
+                expect(await SQLiteProvider.getAllKeys()).toEqual([]);
+            });
+
+            it('removes every key when all grouped chunks have the same size', async () => {
+                // Given an exact number of full chunks and a key outside the removal list.
+                const entries = createKeyValueEntries(6);
+                await SQLiteProvider.multiSet([...entries, [ONYXKEYS.TEST_KEY, 'keep']]);
+
+                // When all full chunks run through the same batch statement.
+                await SQLiteProvider.removeItems(entries.map(([key]) => key));
+
+                // Then every requested key is gone and unrelated data remains.
+                expect(await SQLiteProvider.getAllKeys()).toEqual([ONYXKEYS.TEST_KEY]);
+                expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY)).toBe('keep');
+            });
+
+            it('rolls back earlier chunks when a later grouped delete fails', async () => {
+                // Given a trigger that rejects a key in the second full chunk.
+                const entries = createKeyValueEntries(5);
+                await SQLiteProvider.multiSet(entries);
+                SQLiteProvider.store!.execute(`CREATE TRIGGER reject_delete BEFORE DELETE ON keyvaluepairs
+                    WHEN OLD.record_key = '${entries[2][0]}' BEGIN SELECT RAISE(ABORT, 'rejected delete'); END;`);
+                const keys = entries.map(([key]) => key);
+
+                // When a later delete fails after the first chunk has executed.
+                await expect(SQLiteProvider.removeItems(keys)).rejects.toThrow('rejected delete');
+
+                // Then the entire batch rolls back and the writer remains usable.
+                expect(await SQLiteProvider.multiGet(keys)).toEqual(expect.arrayContaining(entries));
+                SQLiteProvider.store!.execute('DROP TRIGGER reject_delete;');
+                await SQLiteProvider.removeItems(keys);
                 expect(await SQLiteProvider.getAllKeys()).toEqual([]);
             });
 
@@ -416,8 +712,11 @@ describe('SQLiteProvider', () => {
                 expect(executeBatchAsyncSpy).toHaveBeenCalledTimes(1);
 
                 const batchCommands = executeBatchAsyncSpy.mock.calls[0][0];
-                expect(batchCommands).toHaveLength(3);
+                expect(batchCommands).toHaveLength(2);
+                expect(batchCommands[0].params).toEqual([keys.slice(0, 2), keys.slice(2, 4)]);
+                expect(batchCommands[1].params).toEqual(keys.slice(4));
                 expect(batchCommands.every((command) => command.query.includes('DELETE FROM keyvaluepairs WHERE record_key IN'))).toBe(true);
+                expect(await SQLiteProvider.getAllKeys()).toEqual([]);
             });
         });
     });
@@ -425,6 +724,21 @@ describe('SQLiteProvider', () => {
     // SQLite-specific: the IN-list is parameterised, so a key containing SQL
     // fragments must be treated as a literal record_key.
     describe('SQL-injection safety', () => {
+        it('preserves embedded NUL characters in keys and JSON values', async () => {
+            // Given a key with a NUL byte and a JSON value containing the same character.
+            const key = 'nul\0key';
+            const value = {text: 'before\0after'};
+
+            // When both are stored through a grouped parameter set.
+            await SQLiteProvider.multiSet([[key, value]]);
+
+            // Then prepared reads, bulk reads, and exports retain the complete key and value.
+            expect(await SQLiteProvider.getItem(key)).toEqual(value);
+            expect(await SQLiteProvider.multiGet([key])).toEqual([[key, value]]);
+            expect(await SQLiteProvider.getAllKeys()).toEqual([key]);
+            expect(await SQLiteProvider.getAll()).toEqual([[key, value]]);
+        });
+
         it('should treat a key containing SQL fragments as a literal record_key', async () => {
             const nastyKey = "'; DROP TABLE keyvaluepairs; --";
             await SQLiteProvider.setItem(nastyKey as string, 'survived');
@@ -457,7 +771,9 @@ describe('SQLiteProvider', () => {
         it('should still report free-disk bytes when the PRAGMAs fail (disk pressure)', async () => {
             // During disk pressure the SQLite connection itself fails, but free-disk comes from the
             // filesystem — the snapshot must survive with bytesUsed degraded instead of rejecting.
-            const executeAsyncSpy = jest.spyOn(SQLiteProvider.store!, 'executeAsync').mockRejectedValue(new Error('[NativeNitroSQLiteException][SqlExecutionError] disk I/O error'));
+            const executeAsyncSpy = jest
+                .spyOn(SQLiteProvider.store!, 'executeAsync')
+                .mockRejectedValue(new Error(`[NativeNitroSQLiteException][${NitroSQLiteExceptionType.SqlExecutionError}] disk I/O error`));
 
             await expect(SQLiteProvider.getDatabaseSize()).resolves.toEqual({bytesUsed: -1, bytesRemaining: 12345});
 
@@ -465,3 +781,19 @@ describe('SQLiteProvider', () => {
         });
     });
 });
+
+function getOpenedConnection(index: number): NitroSQLiteConnection {
+    const result = jest.mocked(open).mock.results[index];
+    if (!result || result.type !== 'return') {
+        throw new Error(`Connection ${index} was not opened`);
+    }
+    return result.value;
+}
+
+function getPreparedStatement(connection: NitroSQLiteConnection, index: number): PreparedStatement {
+    const result = jest.mocked(connection.prepare).mock.results[index];
+    if (!result || result.type !== 'return') {
+        throw new Error(`Statement ${index} was not prepared`);
+    }
+    return result.value;
+}

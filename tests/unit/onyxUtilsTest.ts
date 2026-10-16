@@ -1,3 +1,4 @@
+import {NitroSQLiteExceptionType} from 'react-native-nitro-sqlite/errors';
 import {act} from '@testing-library/react-native';
 import Onyx from '../../lib';
 import OnyxUtils from '../../lib/OnyxUtils';
@@ -597,22 +598,22 @@ describe('OnyxUtils', () => {
             expect(retryOperationSpy).toHaveBeenCalledTimes(1);
         });
 
-        it.each([['[NativeNitroSQLiteException][SqlExecutionError] disk I/O error'], ['[NativeNitroSQLiteException][SqlExecutionError] unable to open database file']])(
-            'should not retry disk-pressure errors (%s)',
-            async (message) => {
-                StorageMock.setItem = jest.fn().mockRejectedValue(new Error(message));
+        it.each([
+            [`[NativeNitroSQLiteException][${NitroSQLiteExceptionType.SqlExecutionError}] disk I/O error`],
+            [`[NativeNitroSQLiteException][${NitroSQLiteExceptionType.SqlExecutionError}] unable to open database file`],
+        ])('should not retry disk-pressure errors (%s)', async (message) => {
+            StorageMock.setItem = jest.fn().mockRejectedValue(new Error(message));
 
-                await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
-                // Called once (initial attempt only): retries cannot succeed while the device disk is full.
-                expect(retryOperationSpy).toHaveBeenCalledTimes(1);
-            },
-        );
+            // Called once (initial attempt only): retries cannot succeed while the device disk is full.
+            expect(retryOperationSpy).toHaveBeenCalledTimes(1);
+        });
 
         it('should log a single throttled alert with a quota snapshot for a disk-pressure burst', async () => {
             const logAlertSpy = jest.spyOn(Logger, 'logAlert');
             const logInfoSpy = jest.spyOn(Logger, 'logInfo');
-            const diskIOError = new Error('[NativeNitroSQLiteException][SqlExecutionError] disk I/O error');
+            const diskIOError = new Error(`[NativeNitroSQLiteException][${NitroSQLiteExceptionType.SqlExecutionError}] disk I/O error`);
             StorageMock.setItem = jest.fn().mockRejectedValue(diskIOError);
 
             // A burst: several operations all failing with the identical error.
