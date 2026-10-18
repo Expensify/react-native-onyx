@@ -16,6 +16,16 @@ type Listener<TKey extends OnyxKey = OnyxKey> = (value: OnyxValue<TKey>, key: TK
  */
 type GenericListener = (value: unknown, key: OnyxKey) => void;
 
+/**
+ * A collection's notifications held during a batch. `previous` keeps a member's value from before the batch,
+ * so delivery can skip member subscribers whose value ended up unchanged. A member held without a previous
+ * value always notifies.
+ */
+type HeldCollection = {
+    members: Set<OnyxKey>;
+    previous: Record<OnyxKey, unknown>;
+};
+
 const reportedCacheMisses = new Set<OnyxKey>();
 
 function reportCacheMissIfStorageHasValue(key: OnyxKey): void {
@@ -51,6 +61,12 @@ function reportCacheMissIfStorageHasValue(key: OnyxKey): void {
  */
 class OnyxSubscriptionManager {
     private keyListeners: Map<OnyxKey, Set<GenericListener>>;
+
+    private batchDepth = 0;
+
+    private heldKeys = new Set<OnyxKey>();
+
+    private heldCollections = new Map<CollectionKeyBase, HeldCollection>();
 
     constructor() {
         this.keyListeners = new Map();
@@ -112,6 +128,71 @@ class OnyxSubscriptionManager {
      *      listeners for the parent collection.
      */
     notifyKey<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>): void {
+        if (this.batchDepth === 0) {
+            this.dispatchKey(key, value);
+            return;
+        }
+
+        // A member write is held with its collection, so the collection's subscribers fire once for the batch.
+        const collectionKey = OnyxKeys.getCollectionKey(key);
+        if (collectionKey !== undefined && collectionKey !== key) {
+            this.getHeldCollection(collectionKey).members.add(key);
+            return;
+        }
+        this.heldKeys.add(key);
+    }
+
+    /**
+     * Notify of a collection-level batch update.
+     *
+     * Dispatch:
+     *   1. keyListeners.get(collectionKey): fires once with the new collection object.
+     *   2. keyListeners.get(memberKey): fires per changed member whose value differs from
+     *      the previous, preserving ref-equality on unchanged members.
+     */
+    notifyCollection<TKey extends CollectionKeyBase>(
+        collectionKey: TKey,
+        partialCollection: OnyxCollection<KeyValueMapping[TKey]>,
+        partialPreviousCollection?: OnyxCollection<KeyValueMapping[TKey]>,
+    ): void {
+        if (this.batchDepth === 0) {
+            this.dispatchCollection(collectionKey, partialCollection, partialPreviousCollection);
+            return;
+        }
+
+        const heldCollection = this.getHeldCollection(collectionKey);
+        for (const memberKey of Object.keys(partialCollection ?? {})) {
+            if (heldCollection.members.has(memberKey)) {
+                continue;
+            }
+            heldCollection.members.add(memberKey);
+            if (partialPreviousCollection && Object.prototype.hasOwnProperty.call(partialPreviousCollection, memberKey)) {
+                heldCollection.previous[memberKey] = partialPreviousCollection[memberKey];
+            }
+        }
+    }
+
+    /**
+     * Runs `applyWrites` with notifications held back, then notifies every key it wrote, so no subscriber
+     * sees the cache with only part of the writes applied. `applyWrites` must write the cache synchronously;
+     * notifications from writes that settle later are delivered when they happen.
+     *
+     * Held notifications read the cache when they are delivered, so a subscriber that writes to another key of
+     * the batch while being notified does not get overwritten by that key's older value.
+     */
+    batch<T>(applyWrites: () => T): T {
+        this.batchDepth++;
+        try {
+            return applyWrites();
+        } finally {
+            this.batchDepth--;
+            if (this.batchDepth === 0) {
+                this.deliverHeldNotifications();
+            }
+        }
+    }
+
+    private dispatchKey<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>): void {
         // 1. Exact-key listeners
         const exact = this.keyListeners.get(key);
         if (exact && exact.size > 0) {
@@ -136,15 +217,7 @@ class OnyxSubscriptionManager {
         }
     }
 
-    /**
-     * Notify of a collection-level batch update.
-     *
-     * Dispatch:
-     *   1. keyListeners.get(collectionKey): fires once with the new collection object.
-     *   2. keyListeners.get(memberKey): fires per changed member whose value differs from
-     *      the previous, preserving ref-equality on unchanged members.
-     */
-    notifyCollection<TKey extends CollectionKeyBase>(
+    private dispatchCollection<TKey extends CollectionKeyBase>(
         collectionKey: TKey,
         partialCollection: OnyxCollection<KeyValueMapping[TKey]>,
         partialPreviousCollection?: OnyxCollection<KeyValueMapping[TKey]>,
@@ -193,6 +266,8 @@ class OnyxSubscriptionManager {
      */
     clearAll(): void {
         this.keyListeners.clear();
+        this.heldKeys.clear();
+        this.heldCollections.clear();
         this.resetCacheMissReports();
     }
 
@@ -214,6 +289,31 @@ class OnyxSubscriptionManager {
         }
 
         return false;
+    }
+
+    private getHeldCollection(collectionKey: CollectionKeyBase): HeldCollection {
+        let heldCollection = this.heldCollections.get(collectionKey);
+        if (!heldCollection) {
+            heldCollection = {members: new Set(), previous: {}};
+            this.heldCollections.set(collectionKey, heldCollection);
+        }
+        return heldCollection;
+    }
+
+    private deliverHeldNotifications(): void {
+        // Snapshot and reset first, so writes made by listeners during delivery notify on their own.
+        const heldKeys = [...this.heldKeys];
+        const heldCollections = [...this.heldCollections];
+        this.heldKeys.clear();
+        this.heldCollections.clear();
+
+        for (const key of heldKeys) {
+            this.dispatchKey(key, cache.get(key));
+        }
+        for (const [collectionKey, {members, previous}] of heldCollections) {
+            const partialCollection = Object.fromEntries([...members].map((memberKey) => [memberKey, cache.get(memberKey)]));
+            this.dispatchCollection(collectionKey, partialCollection, previous as OnyxCollection<KeyValueMapping[CollectionKeyBase]>);
+        }
     }
 
     /**
