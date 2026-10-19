@@ -1209,18 +1209,15 @@ function applyMergeChanges<TKey extends OnyxKey>(
 
 /**
  * Merges `changes` into `key` as part of an `Onyx.update`, synchronously writing the cache. An `Onyx.merge` still
- * queued for the key was called before the update, so its changes are applied first and its queue is dropped.
+ * queued for the key was called after the update, so it is left to apply on top once it runs.
  */
 function mergeInUpdate(key: OnyxKey, changes: Array<OnyxValue<OnyxKey>>): Promise<void> {
     if (isSkippableCollectionMember(key)) {
         return Promise.resolve();
     }
 
-    const queuedChanges = mergeQueue[key] ?? [];
-    cancelPendingMergesForKey(key);
-
     // Top-level undefined values are ignored, as in `Onyx.merge`.
-    const definedChanges = [...queuedChanges, ...changes].filter((change) => change !== undefined);
+    const definedChanges = changes.filter((change) => change !== undefined);
     if (!definedChanges.length) {
         return Promise.resolve();
     }
@@ -1833,7 +1830,6 @@ const OnyxUtils = {
     retryOperation,
     broadcastUpdate,
     hasPendingMergeForKey,
-    cancelPendingMergesForKey,
     getPendingMergeEntries,
     cancelPendingMerges,
     hasStaleMergeRead,

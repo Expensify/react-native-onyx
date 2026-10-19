@@ -258,7 +258,7 @@ describe('Onyx.update atomicity', () => {
         expect(cache.get(POLICY_1)).toEqual({value: 2, fromMerge: true});
     });
 
-    it('includes an Onyx.merge queued before the update in the same atomic notification', async () => {
+    it('lands an Onyx.merge called before the update first, then notifies all of the update together', async () => {
         // Given a subscriber to a single key and a second key it reads
         await Onyx.multiSet({[ONYX_KEYS.FIRST]: {value: 0}, [ONYX_KEYS.SECOND]: {value: 0}});
         await waitForPromisesToResolve();
@@ -267,7 +267,7 @@ describe('Onyx.update atomicity', () => {
         await waitForPromisesToResolve();
         recorder.start();
 
-        // When an Onyx.merge is queued for the first key and an update then writes both keys
+        // When an Onyx.merge is called for the first key and an update then writes both keys
         Onyx.merge(ONYX_KEYS.FIRST, {fromMerge: true});
         await Onyx.update([
             {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.FIRST, value: {value: 1}},
@@ -276,14 +276,53 @@ describe('Onyx.update atomicity', () => {
         await waitForPromisesToResolve();
         recorder.stop();
 
-        // Then each key notifies once, and both notifications see the queued merge and the update applied
-        expect(recorder.observations).toHaveLength(2);
-        expect(recorder.observations).toEqual(
+        // Then the merge notifies on its own before the update has applied, and the update's notifications both
+        // see the merge and the whole update applied
+        expect(recorder.observations).toHaveLength(3);
+        expect(recorder.observations.at(0)).toEqual({key: ONYX_KEYS.FIRST, missing: [ONYX_KEYS.FIRST, ONYX_KEYS.SECOND]});
+        expect(recorder.observations.slice(1)).toEqual(
             expect.arrayContaining([
                 {key: ONYX_KEYS.FIRST, missing: []},
                 {key: ONYX_KEYS.SECOND, missing: []},
             ]),
         );
+    });
+
+    it('applies an Onyx.merge called right after the update on top of it', async () => {
+        // Given an existing value
+        await Onyx.set(ONYX_KEYS.FIRST, {value: 0});
+        await waitForPromisesToResolve();
+
+        // When an update merges the key and an Onyx.merge to the same field is called right after, in the same tick
+        const updatePromise = Onyx.update([{onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.FIRST, value: {value: 1, fromUpdate: true}}] as Array<OnyxUpdate<OnyxKey>>);
+        Onyx.merge(ONYX_KEYS.FIRST, {value: 2});
+        await updatePromise;
+        await waitForPromisesToResolve();
+
+        // Then the later merge wins, and the update's other fields survive
+        expect(cache.get(ONYX_KEYS.FIRST)).toEqual({value: 2, fromUpdate: true});
+    });
+
+    it('applies the update after the call returns, so code right after the call reads the previous values', async () => {
+        // Given an existing value and a subscriber to it
+        await Onyx.set(ONYX_KEYS.FIRST, {value: 0});
+        await waitForPromisesToResolve();
+        const callback = jest.fn();
+        connections.push(Onyx.connect({key: ONYX_KEYS.FIRST, callback}));
+        await waitForPromisesToResolve();
+        callback.mockClear();
+
+        // When an update is called
+        const updatePromise = Onyx.update([{onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.FIRST, value: {value: 1}}] as Array<OnyxUpdate<OnyxKey>>);
+
+        // Then nothing has changed yet when the call returns
+        expect(cache.get(ONYX_KEYS.FIRST)).toEqual({value: 0});
+        expect(callback).not.toHaveBeenCalled();
+
+        // Then the update has applied once it resolves
+        await updatePromise;
+        expect(cache.get(ONYX_KEYS.FIRST)).toEqual({value: 1});
+        expect(callback).toHaveBeenCalledTimes(1);
     });
 
     it('applies an update that follows an Onyx.clear after the clear, so the clear does not wipe it', async () => {

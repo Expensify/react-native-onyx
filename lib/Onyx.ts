@@ -614,29 +614,6 @@ function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<vo
             const applyUpdate = (): Promise<void> => {
                 try {
                     const persistedKeys = cache.getAllKeys();
-                    const mergeQueue = OnyxUtils.getMergeQueue();
-
-                    // An `Onyx.merge` still queued for a key of this update was called before it, so its changes
-                    // go in first. A set in the update replaces them, as it would once the queued merge had landed.
-                    for (const [key, operations] of Object.entries(updateQueue)) {
-                        const queuedChanges = mergeQueue[key];
-                        if (!queuedChanges) {
-                            continue;
-                        }
-
-                        if (operations[0] !== null) {
-                            let precedingOperations: Array<OnyxValue<OnyxKey>> = [];
-                            for (const change of queuedChanges) {
-                                if (change === null) {
-                                    precedingOperations = [null];
-                                } else {
-                                    precedingOperations.push(change);
-                                }
-                            }
-                            updateQueue[key] = precedingOperations.concat(operations);
-                        }
-                        OnyxUtils.cancelPendingMergesForKey(key);
-                    }
 
                     const mergeCollectionWrites: Array<() => Promise<void>> = [];
                     const partialSetCollectionWrites: Array<() => Promise<void>> = [];
@@ -733,8 +710,11 @@ function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<vo
                 return pendingClear.then(() => OnyxUtils.prepareSynchronousApply(mergeTargetKeys)).then(applyUpdate);
             }
 
+            // The update applies a microtask after the call, as it always has, so code running right after
+            // `Onyx.update()` still reads the values from before it. An `Onyx.merge` called earlier has its own
+            // microtask scheduled first, so it lands before the update.
             const prepared = OnyxUtils.prepareSynchronousApply(mergeTargetKeys);
-            return prepared ? prepared.then(applyUpdate) : applyUpdate();
+            return (prepared ?? Promise.resolve()).then(applyUpdate);
         }),
     );
 }
