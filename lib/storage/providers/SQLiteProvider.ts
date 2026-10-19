@@ -5,6 +5,7 @@
 import type {BatchQueryCommand, NitroSQLiteConnection, PreparedStatement, QueryResult} from 'react-native-nitro-sqlite';
 import {open} from 'react-native-nitro-sqlite';
 import {getFreeDiskStorage} from 'react-native-device-info';
+import * as Logger from '../../Logger';
 import type {FastMergeReplaceNullPatch} from '../../utils';
 import utils from '../../utils';
 import type StorageProvider from './types';
@@ -179,12 +180,18 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             independentReader.execute('PRAGMA busy_timeout=2000;');
             getItemStatement = independentReader.prepare('SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key = ?;');
             readStore = independentReader;
-        } catch {
+        } catch (error) {
             // SQLite can report failures on first use, so protect all reader setup.
+            Logger.logInfo('SQLite independent reader unavailable, reading through the writer.', {
+                error: error instanceof Error ? error.message : String(error),
+            });
             try {
                 independentReader?.close();
-            } catch {
+            } catch (cleanupError) {
                 // Reader cleanup must not prevent the writer from serving reads.
+                Logger.logInfo('SQLite independent reader cleanup failed.', {
+                    error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+                });
             }
             readStore = provider.store;
             getItemStatement = provider.store.prepare('SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key = ?;');
