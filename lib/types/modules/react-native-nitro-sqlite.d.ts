@@ -4,16 +4,6 @@ declare module 'react-native-nitro-sqlite/errors' {
 }
 
 declare module 'react-native-nitro-sqlite/mock' {
-    import type {NitroSQLiteConnection, NitroSQLiteConnectionOptions} from 'react-native-nitro-sqlite';
-
-    type MockConnection = Pick<
-        NitroSQLiteConnection,
-        'close' | 'delete' | 'execute' | 'executeAsync' | 'executeBatch' | 'executeBatchAsync' | 'prepare' | 'transaction'
-    >;
-    function open(options: NitroSQLiteConnectionOptions): MockConnection;
-    const NitroSQLite: {open: typeof open};
-    function resetAllDatabases(): void;
-
-    export type {MockConnection};
-    export {NitroSQLite, open, resetAllDatabases};
+    // eslint-disable-next-line import/no-unresolved -- Legacy Node type resolution uses this declaration file outside package exports.
+    export * from 'react-native-nitro-sqlite/lib/typescript/commonjs/mock';
 }
