@@ -3,7 +3,8 @@ import type {UseStore} from 'idb-keyval';
 import * as Logger from '../../../Logger';
 import {StorageErrorClass} from '../../errors';
 import classifyIDBError from './classifyError';
-import isIndexedDBAvailable, {INDEXED_DB_UNAVAILABLE_MESSAGE} from './isIndexedDBAvailable';
+import IDBErrorMessage, {IDBErrorName} from './errorMessages';
+import isIndexedDBAvailable from './isIndexedDBAvailable';
 
 const HEAL_ATTEMPTS_MAX = 3;
 
@@ -59,7 +60,7 @@ function createStore(dbName: string, storeName: string): UseStore {
         if (dbp) return dbp;
 
         if (!isIndexedDBAvailable()) {
-            return Promise.reject(new Error(INDEXED_DB_UNAVAILABLE_MESSAGE));
+            return Promise.reject(new Error(IDBErrorMessage.UNAVAILABLE));
         }
 
         const request = indexedDB.open(dbName);
@@ -204,11 +205,18 @@ function createStore(dbName: string, storeName: string): UseStore {
                 }
 
                 if (errorClass === StorageErrorClass.FATAL) {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
                     Logger.logAlert('IDB heal: backing store error — heal budget exhausted, giving up', {
                         dbName,
                         storeName,
+                        errorMessage,
                     });
-                } else if (errorClass === StorageErrorClass.UNKNOWN) {
+                    const healExhaustedError = new Error(`${IDBErrorMessage.HEAL_EXHAUSTED}: ${errorMessage}`, {cause: error});
+                    healExhaustedError.name = IDBErrorName.HEAL_EXHAUSTED;
+                    throw healExhaustedError;
+                }
+
+                if (errorClass === StorageErrorClass.UNKNOWN) {
                     // UNKNOWN — unexpected at this layer; record it so it's visible. CAPACITY is the
                     // expected propagation path (the operation layer owns its logging, and suppresses it
                     // entirely once the circuit breaker is open), so we do NOT log it here — doing so was a

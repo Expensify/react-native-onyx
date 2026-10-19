@@ -1,6 +1,7 @@
 import type * as LoggerModule from '../../../lib/Logger';
 import type storageModule from '../../../lib/storage';
 import {StorageErrorClass} from '../../../lib/storage/errors';
+import waitForPromisesToResolve from '../../utils/waitForPromisesToResolve';
 
 // `jestSetup.js` globally mocks `lib/storage`; this suite tests the real implementation.
 jest.unmock('../../../lib/storage');
@@ -105,6 +106,56 @@ describe('storage/tryOrDegradePerformance', () => {
         expect(storage.getStorageProvider().name).toBe('MemoryOnlyProvider');
     });
 
+    it('should fall back to MemoryOnlyProvider once the IndexedDB heal budget is exhausted', async () => {
+        const {storage} = loadIsolatedStorage();
+
+        storage.init();
+
+        const targetError = Object.assign(new Error('IndexedDB heal budget exhausted: Internal error.', {cause: new DOMException('Internal error.', 'UnknownError')}), {
+            name: 'IDBHealExhaustedError',
+        });
+        storage.getStorageProvider().setItem = jest.fn().mockReturnValue(Promise.reject(targetError));
+
+        await expect(storage.setItem('key', {test: 'data'})).rejects.toBe(targetError);
+
+        expect(storage.getStorageProvider().name).toBe('MemoryOnlyProvider');
+        await storage.setItem('key', {test: 'data'});
+        await expect(storage.getItem('key')).resolves.toEqual({test: 'data'});
+    });
+
+    it('should fall back to MemoryOnlyProvider when degradeToMemoryOnly is called', () => {
+        const {storage} = loadIsolatedStorage();
+
+        storage.degradeToMemoryOnly(new DOMException('Internal error.', 'UnknownError'));
+
+        expect(storage.getStorageProvider().name).toBe('MemoryOnlyProvider');
+    });
+
+    it('should log the degrade only once when degradeToMemoryOnly is called repeatedly', () => {
+        const {storage, Logger} = loadIsolatedStorage();
+        const capturedLogs: CapturedLog[] = [];
+        Logger.registerLogger((data: LogData) => capturedLogs.push({level: data.level, message: data.message}));
+
+        storage.degradeToMemoryOnly(new DOMException('Internal error.', 'UnknownError'));
+        storage.degradeToMemoryOnly(new DOMException('Internal error.', 'UnknownError'));
+
+        expect(capturedLogs.filter((log) => log.message.includes('Falling back to only using cache'))).toHaveLength(1);
+        expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('should keep the message of a non-Error value passed to degradeToMemoryOnly in the degrade log', () => {
+        const {storage, Logger} = loadIsolatedStorage();
+        const capturedLogs: CapturedLog[] = [];
+        Logger.registerLogger((data: LogData) => capturedLogs.push({level: data.level, message: data.message}));
+
+        storage.degradeToMemoryOnly('Internal error opening backing store');
+
+        const degradeLog = capturedLogs.find((log) => log.message.includes('Falling back to only using cache'));
+        expect(degradeLog?.message).toContain('Error: Internal error opening backing store');
+        expect(degradeLog?.message).not.toContain('Stack: undefined');
+        expect(storage.getStorageProvider().name).toBe('MemoryOnlyProvider');
+    });
+
     it('should still classify the error as UNAVAILABLE after degrading to MemoryOnlyProvider', async () => {
         const {storage} = loadIsolatedStorage();
 
@@ -164,6 +215,47 @@ describe('storage/tryOrDegradePerformance', () => {
         } finally {
             process.off('unhandledRejection', onUnhandledRejection);
         }
+    });
+
+    describe('cross-tab sync', () => {
+        let storage: Storage;
+        let onStorageKeysChanged: jest.Mock;
+        let storageEventHandler: (event: {key: string; newValue: string}) => void;
+
+        beforeEach(() => {
+            const addEventListenerSpy = jest.spyOn(global, 'addEventListener').mockImplementation(noop);
+            jest.isolateModules(() => {
+                jest.doMock('../../../lib/storage/InstanceSync', () => require('../../../lib/storage/InstanceSync/index.web'));
+                storage = require('../../../lib/storage').default;
+            });
+
+            onStorageKeysChanged = jest.fn();
+            storage.init();
+            storage.keepInstancesSync?.(onStorageKeysChanged);
+
+            const storageCall = addEventListenerSpy.mock.calls.find(([type]) => type === 'storage');
+            storageEventHandler = storageCall?.[1] as unknown as typeof storageEventHandler;
+        });
+
+        afterEach(() => {
+            jest.restoreAllMocks();
+        });
+
+        it("should forward another tab's changes while persistent storage is in use", async () => {
+            storageEventHandler({key: 'SYNC_ONYX', newValue: 'test_1'});
+            await waitForPromisesToResolve();
+
+            expect(onStorageKeysChanged).toHaveBeenCalledTimes(1);
+        });
+
+        it("should ignore another tab's changes after degrading to MemoryOnlyProvider", async () => {
+            storage.degradeToMemoryOnly(new DOMException('Internal error.', 'UnknownError'));
+
+            storageEventHandler({key: 'SYNC_ONYX', newValue: 'test_1'});
+            await waitForPromisesToResolve();
+
+            expect(onStorageKeysChanged).not.toHaveBeenCalled();
+        });
     });
 
     it('propagates async rejections with unrelated messages without falling back', async () => {

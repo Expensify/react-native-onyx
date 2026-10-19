@@ -5,7 +5,8 @@ import type StorageProvider from '../types';
 import type {OnyxKey, OnyxValue} from '../../../types';
 import createStore from './createStore';
 import classifyIDBError from './classifyError';
-import isIndexedDBAvailable, {INDEXED_DB_UNAVAILABLE_MESSAGE} from './isIndexedDBAvailable';
+import IDBErrorMessage from './errorMessages';
+import isIndexedDBAvailable from './isIndexedDBAvailable';
 import type {StorageKeyValuePair} from '../types';
 
 const DB_NAME = 'OnyxDB';
@@ -40,7 +41,7 @@ const provider: StorageProvider<UseStore | undefined> = {
      */
     init() {
         if (!isIndexedDBAvailable()) {
-            throw new Error(`IDBKeyVal store could not be created: ${INDEXED_DB_UNAVAILABLE_MESSAGE}`);
+            throw new Error(`IDBKeyVal store could not be created: ${IDBErrorMessage.UNAVAILABLE}`);
         }
 
         const newIdbKeyValStore = createStore(DB_NAME, STORE_NAME);
