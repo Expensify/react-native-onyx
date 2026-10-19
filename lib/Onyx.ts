@@ -638,7 +638,10 @@ function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<vo
                         OnyxUtils.cancelPendingMergesForKey(key);
                     }
 
-                    const writes: Array<() => Promise<void>> = setCollectionOperations.map((setCollectionOperation) => () => setCollectionOperation(persistedKeys));
+                    const mergeCollectionWrites: Array<() => Promise<void>> = [];
+                    const partialSetCollectionWrites: Array<() => Promise<void>> = [];
+                    const setWrites: Array<() => Promise<void>> = [];
+                    const mergeWrites: Array<() => Promise<void>> = [];
 
                     // Group all the collection-related keys and update each collection in a single `mergeCollection` call.
                     // This is needed to prevent multiple `mergeCollection` calls for the same collection and `merge` calls for the individual items of the said collection.
@@ -680,7 +683,7 @@ function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<vo
                         );
 
                         if (!utils.isEmptyObject(batchedCollectionUpdates.merge)) {
-                            writes.push(() =>
+                            mergeCollectionWrites.push(() =>
                                 OnyxUtils.mergeCollectionWithPatches(
                                     {
                                         collectionKey,
@@ -693,7 +696,7 @@ function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<vo
                             );
                         }
                         if (!utils.isEmptyObject(batchedCollectionUpdates.set)) {
-                            writes.push(() =>
+                            partialSetCollectionWrites.push(() =>
                                 OnyxUtils.partialSetCollection({collectionKey, collection: batchedCollectionUpdates.set as OnyxSetCollectionInput<OnyxKey>}, undefined, persistedKeys),
                             );
                         }
@@ -702,17 +705,21 @@ function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<vo
                     for (const [key, operations] of Object.entries(updateQueue)) {
                         if (operations[0] === null) {
                             const batchedChanges = OnyxUtils.mergeChanges(operations).result;
-                            writes.push(() => OnyxUtils.setWithRetry({key, value: batchedChanges}));
+                            setWrites.push(() => OnyxUtils.setWithRetry({key, value: batchedChanges}));
                             continue;
                         }
 
-                        writes.push(() => OnyxUtils.mergeInUpdate(key, operations));
+                        mergeWrites.push(() => OnyxUtils.mergeInUpdate(key, operations));
                     }
 
                     const snapshotWrites = OnyxUtils.updateSnapshots(data, (key, changes) => OnyxUtils.mergeInUpdate(key, [changes]));
 
-                    // We need to run the snapshot updates before the other updates so the snapshot data can be updated before the loading state in the snapshot
-                    const storageWrites = onyxSubscriptionManager.batch(() => snapshotWrites.concat(writes).map((write) => write()));
+                    const setCollectionWrites = setCollectionOperations.map((setCollectionOperation) => () => setCollectionOperation(persistedKeys));
+
+                    // The order decides which keys a collection gains first, and so the key order of its members.
+                    // Snapshot updates run before the other merges so the snapshot data is updated before the loading state in the snapshot.
+                    const writes = [...setWrites, ...snapshotWrites, ...setCollectionWrites, ...partialSetCollectionWrites, ...mergeWrites, ...mergeCollectionWrites];
+                    const storageWrites = onyxSubscriptionManager.batch(() => writes.map((write) => write()));
 
                     return Promise.all(storageWrites).then(() => undefined);
                 } catch (error) {

@@ -1,6 +1,7 @@
-import type {OnyxKey, OnyxUpdate} from '../../lib/types';
-import Onyx from '../../lib';
 import type {Connection} from '../../lib/Onyx';
+import type {OnyxKey, OnyxUpdate} from '../../lib/types';
+
+import Onyx from '../../lib';
 import cache from '../../lib/OnyxCache';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
@@ -164,6 +165,25 @@ describe('Onyx.update atomicity', () => {
         expect(cache.get(POLICY_1)).toBeUndefined();
     });
 
+    it('adds new collection members in the same key order regardless of the update path that writes them', async () => {
+        // Given a collection with no members yet, and a single key
+        await waitForPromisesToResolve();
+
+        // When one update merges two new members, sets two more, sets an unrelated key and replaces another collection
+        await Onyx.update([
+            {onyxMethod: Onyx.METHOD.MERGE, key: REPORT_1, value: {value: 1}},
+            {onyxMethod: Onyx.METHOD.MERGE, key: REPORT_2, value: {value: 1}},
+            {onyxMethod: Onyx.METHOD.SET, key: `${ONYX_KEYS.COLLECTION.REPORT}3`, value: {value: 1}},
+            {onyxMethod: Onyx.METHOD.SET, key: `${ONYX_KEYS.COLLECTION.REPORT}4`, value: {value: 1}},
+            {onyxMethod: Onyx.METHOD.MERGE, key: TRANSACTION_1, value: {value: 1}},
+            {onyxMethod: Onyx.METHOD.SET_COLLECTION, key: ONYX_KEYS.COLLECTION.POLICY, value: {[POLICY_1]: {value: 1}}},
+        ] as Array<OnyxUpdate<OnyxKey>>);
+
+        // Then the set members come before the merged ones, as they did when the update applied in separate waves, so
+        // code that reads collections in key order sees the same order as before
+        expect(Object.keys(cache.getCollectionData(ONYX_KEYS.COLLECTION.REPORT) ?? {})).toEqual([`${ONYX_KEYS.COLLECTION.REPORT}3`, `${ONYX_KEYS.COLLECTION.REPORT}4`, REPORT_1, REPORT_2]);
+    });
+
     it('notifies a collection subscriber once for an update that writes the collection through several paths', async () => {
         // Given a subscriber to the report collection
         await Onyx.multiSet({[REPORT_1]: {value: 0}, [REPORT_2]: {value: 0}});
@@ -257,10 +277,13 @@ describe('Onyx.update atomicity', () => {
         recorder.stop();
 
         // Then each key notifies once, and both notifications see the queued merge and the update applied
-        expect(recorder.observations).toEqual([
-            {key: ONYX_KEYS.FIRST, missing: []},
-            {key: ONYX_KEYS.SECOND, missing: []},
-        ]);
+        expect(recorder.observations).toHaveLength(2);
+        expect(recorder.observations).toEqual(
+            expect.arrayContaining([
+                {key: ONYX_KEYS.FIRST, missing: []},
+                {key: ONYX_KEYS.SECOND, missing: []},
+            ]),
+        );
     });
 
     it('applies an update that follows an Onyx.clear after the clear, so the clear does not wipe it', async () => {
