@@ -238,6 +238,26 @@ describe('Onyx.update atomicity', () => {
         expect(recorder.observations.map(({key}) => key).sort()).toEqual([ONYX_KEYS.FIRST, ONYX_KEYS.COLLECTION.REPORT, ONYX_KEYS.SECOND].sort());
     });
 
+    it('applies updates in call order when an earlier one has to read from storage first', async () => {
+        // Given a key in storage that was evicted from the cache, and another key with a value
+        await Onyx.multiSet({[ONYX_KEYS.FIRST]: {stored: true}, [ONYX_KEYS.SECOND]: {value: 0}});
+        await waitForPromisesToResolve();
+        cache.drop(ONYX_KEYS.FIRST);
+        cache.addKey(ONYX_KEYS.FIRST);
+
+        // When an update merging into the evicted key sets the other key, and a later update in the same tick sets it again
+        const firstUpdate = Onyx.update([
+            {onyxMethod: Onyx.METHOD.MERGE, key: ONYX_KEYS.FIRST, value: {value: 1}},
+            {onyxMethod: Onyx.METHOD.SET, key: ONYX_KEYS.SECOND, value: {value: 'first update'}},
+        ] as Array<OnyxUpdate<OnyxKey>>);
+        const secondUpdate = Onyx.update([{onyxMethod: Onyx.METHOD.SET, key: ONYX_KEYS.SECOND, value: {value: 'second update'}}] as Array<OnyxUpdate<OnyxKey>>);
+        await Promise.all([firstUpdate, secondUpdate]);
+
+        // Then the later update wins, even though the earlier one waited for the stored value before applying
+        expect(cache.get(ONYX_KEYS.SECOND)).toEqual({value: 'second update'});
+        expect(cache.get(ONYX_KEYS.FIRST)).toEqual({stored: true, value: 1});
+    });
+
     it('applies an Onyx.merge queued before the update first, keeping call order', async () => {
         // Given existing values for a single key and a collection member that the update will group
         await Onyx.multiSet({[ONYX_KEYS.FIRST]: {value: 0}, [POLICY_1]: {value: 0}});

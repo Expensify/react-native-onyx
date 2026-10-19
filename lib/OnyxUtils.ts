@@ -1257,6 +1257,40 @@ function prepareSynchronousApply(mergeTargetKeys: OnyxKey[]): Promise<void> | un
     return getAllKeys().then(loadEvictedMergeTargets);
 }
 
+/** The latest `Onyx.update` still waiting to apply because it, or an update before it, had to load from storage first. */
+let lastDelayedUpdate: Promise<void> | undefined;
+
+/**
+ * Schedules an `Onyx.update` to apply its writes once `preparation` settles, or a microtask after the call when there
+ * is nothing to prepare. Updates apply in call order: while an earlier update is still waiting, later ones wait
+ * behind it instead of overtaking it. Resolves when the promise returned by `applyUpdate` does.
+ */
+function scheduleUpdate(preparation: Promise<void> | undefined, applyUpdate: () => Promise<void>): Promise<void> {
+    const previousDelayedUpdate = lastDelayedUpdate;
+    if (!preparation && !previousDelayedUpdate) {
+        return Promise.resolve().then(applyUpdate);
+    }
+
+    let storageWrites: Promise<void> = Promise.resolve();
+    const applied = Promise.all([previousDelayedUpdate, preparation]).then(() => {
+        storageWrites = applyUpdate();
+    });
+
+    const delayedUpdate = applied.then(
+        () => undefined,
+        () => undefined,
+    );
+    lastDelayedUpdate = delayedUpdate;
+    delayedUpdate.then(() => {
+        if (lastDelayedUpdate !== delayedUpdate) {
+            return;
+        }
+        lastDelayedUpdate = undefined;
+    });
+
+    return applied.then(() => storageWrites);
+}
+
 /**
  * Sets multiple keys and values.
  * Serves as core implementation for `Onyx.multiSet()` public function, the difference being
@@ -1806,6 +1840,7 @@ function resetDeferredInitTask() {
 function clearOnyxUtilsInternals() {
     mergeQueue = {};
     mergeQueuePromise = {};
+    lastDelayedUpdate = undefined;
     PendingWrites.clearPendingWrites();
 }
 
@@ -1857,6 +1892,7 @@ const OnyxUtils = {
     applyMergeChanges,
     mergeInUpdate,
     prepareSynchronousApply,
+    scheduleUpdate,
     multiSetWithRetry,
     setCollectionWithRetry,
 };

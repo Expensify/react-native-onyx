@@ -706,15 +706,12 @@ function update<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>): Promise<vo
 
             // A running `Onyx.clear`, including one issued by this update, resets keys, so the update applies to what it leaves.
             const pendingClear = cache.getTaskPromise(TASK.CLEAR);
-            if (pendingClear) {
-                return pendingClear.then(() => OnyxUtils.prepareSynchronousApply(mergeTargetKeys)).then(applyUpdate);
-            }
+            const preparation = pendingClear ? pendingClear.then(() => OnyxUtils.prepareSynchronousApply(mergeTargetKeys)) : OnyxUtils.prepareSynchronousApply(mergeTargetKeys);
 
             // The update applies a microtask after the call, as it always has, so code running right after
             // `Onyx.update()` still reads the values from before it. An `Onyx.merge` called earlier has its own
             // microtask scheduled first, so it lands before the update.
-            const prepared = OnyxUtils.prepareSynchronousApply(mergeTargetKeys);
-            return (prepared ?? Promise.resolve()).then(applyUpdate);
+            return OnyxUtils.scheduleUpdate(preparation, applyUpdate);
         }),
     );
 }
