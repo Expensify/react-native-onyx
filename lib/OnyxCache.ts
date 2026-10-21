@@ -24,6 +24,8 @@ const FROZEN_EMPTY_COLLECTION: Readonly<NonUndefined<OnyxCollection<KeyValueMapp
 const CACHE_MERGE_OPTIONS: FastMergeOptions = {
     shouldRemoveNestedNulls: true,
     objectRemovalMode: 'replace',
+    // Keeps cached references of deep-equal arrays, so unchanged merges are no-ops.
+    shouldKeepEqualArrays: true,
 };
 
 // Task constants

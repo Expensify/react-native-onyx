@@ -1,10 +1,11 @@
-import {screen} from '@testing-library/react-native';
+import {act, screen} from '@testing-library/react-native';
 import React from 'react';
 import {Text, View} from 'react-native';
 import {measureRenders} from 'reassure';
 import type {FetchStatus, OnyxEntry, OnyxKey, OnyxValue, ResultMetadata, UseOnyxOptions} from '../../lib';
 import Onyx, {useOnyx} from '../../lib';
 import type {UseOnyxSelector} from '../../lib/useOnyx';
+import {createObjectArrayCollection} from '../utils/collections/objectArrays';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -392,6 +393,30 @@ describe('useOnyx', () => {
                     afterEach: clearOnyxAfterEachMeasure,
                 },
             );
+        });
+
+        /**
+         * Expected renders: 1.
+         *
+         * Merging deep-equal members (arrays included) keeps the cached references, so a subscriber without a selector doesn't re-render.
+         */
+        test('merging deep-equal members with arrays does not re-render', async () => {
+            const key = ONYXKEYS.COLLECTION.TEST_KEY;
+            await measureRenders(<UseOnyxWrapper onyxKey={key} />, {
+                beforeEach: async () => {
+                    await Onyx.mergeCollection(key, createObjectArrayCollection(key, 3));
+                },
+                scenario: async () => {
+                    await screen.findByText(dataMatcher(key, createObjectArrayCollection(key, 3)));
+
+                    await act(async () => {
+                        await Onyx.mergeCollection(key, createObjectArrayCollection(key, 3));
+                    });
+
+                    await screen.findByText(dataMatcher(key, createObjectArrayCollection(key, 3)));
+                },
+                afterEach: clearOnyxAfterEachMeasure,
+            });
         });
 
         /**
