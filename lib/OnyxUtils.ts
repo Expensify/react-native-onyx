@@ -402,10 +402,15 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
                         continue;
                     }
 
-                    dataMap.set(key, value as OnyxValue<TKey>);
                     temp[key] = value as OnyxValue<TKey>;
                 }
                 cache.merge(temp);
+
+                // Return the cached values, which have nested nulls removed.
+                for (const key of Object.keys(temp)) {
+                    const cachedValue = cache.get(key);
+                    dataMap.set(key as TKey, (cachedValue !== undefined ? cachedValue : temp[key]) as OnyxValue<TKey>);
+                }
                 return dataMap;
             })
     );
@@ -781,7 +786,7 @@ function prepareKeyValuePairsForStorage(
             continue;
         }
 
-        const valueWithoutNestedNullValues = shouldRemoveNestedNulls ?? true ? utils.removeNestedNullValues(value) : value;
+        const valueWithoutNestedNullValues = shouldRemoveNestedNulls ?? true ? utils.removeNestedNullValues(value, cache.get(key)) : value;
 
         if (valueWithoutNestedNullValues !== undefined) {
             pairs.push([key, valueWithoutNestedNullValues, replaceNullPatches?.[key]]);
@@ -1119,7 +1124,7 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
         return Promise.resolve();
     }
 
-    const valueWithoutNestedNullValues = utils.removeNestedNullValues(value) as OnyxValue<TKey>;
+    const valueWithoutNestedNullValues = utils.removeNestedNullValues(value, existingValue) as OnyxValue<TKey>;
     const hasChanged = options?.skipCacheCheck ? true : cache.hasValueChanged(key, valueWithoutNestedNullValues);
 
     OnyxUtils.logKeyChanged(OnyxUtils.METHOD.SET, key, value, hasChanged);
