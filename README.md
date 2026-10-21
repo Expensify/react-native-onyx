@@ -206,6 +206,14 @@ export default App;
 
 It's also beneficial to use `useOnyx()`'s `selector` option in case you need to grab a single item in a collection (like a single report action).
 
+`useOnyx()` runs a selector separately in every component that uses it. When many components select from the same key, wrap the selector with `createOnyxSelector()` at module level so they share one result per Onyx value. Pass any value the selector needs from the component as an argument instead of closing over it, because the arguments are part of the cache key:
+
+```javascript
+const accountIDByLogin = createOnyxSelector((personalDetails, login) => Object.values(personalDetails ?? {}).find((detail) => detail?.login === login)?.accountID);
+
+const [accountID] = useOnyx(ONYXKEYS.PERSONAL_DETAILS_LIST, {selector: (personalDetails) => accountIDByLogin(personalDetails, login)});
+```
+
 ## Collections
 
 Collections allow keys with similar value types to be subscribed together by subscribing to the collection key. To define one, it must be included in the `ONYXKEYS.COLLECTION` object and it must be suffixed with an underscore. Member keys should use a unique identifier or index after the collection key prefix (e.g. `report_42`).
