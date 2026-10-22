@@ -1,6 +1,7 @@
 import {deepEqual} from 'fast-equals';
 import {useCallback, useEffect, useMemo, useRef, useSyncExternalStore} from 'react';
 import onyxSubscriptionManager from './OnyxSubscriptionManager';
+import OnyxUtils from './OnyxUtils';
 import type {OnyxKey, OnyxValue} from './types';
 
 /**
@@ -92,6 +93,10 @@ function defaultSelectorEquality<T>(a: T, b: T): boolean {
  * output is equal to the previous output (per `selectorEquality`, default
  * `===` with deepEqual fallback).
  *
+ * Mounting before `Onyx.init` has hydrated the cache runs the selector against an empty
+ * state — there is no status channel to say so — and re-runs it once init lands. A consumer
+ * that must distinguish "not hydrated yet" from "absent" has to carry that in its own output.
+ *
  * `previousState` is advanced in a post-commit effect, NOT during `getSnapshot`.
  * This keeps `getSnapshot` pure (a `useSyncExternalStore` requirement): within a
  * single render `previousViewRef` is frozen, so every `getSnapshot` call computes
@@ -118,7 +123,33 @@ function useOnyxState<T>(selector: UseOnyxStateSelector<T>, options: UseOnyxStat
     // Only `subscribe` must be referentially stable for `useSyncExternalStore` (it controls
     // re-subscription). `getSnapshot` may change identity freely — React just re-reads it —
     // so it closes over the latest `selector`/`selectorEquality` directly instead of via refs.
-    const subscribe = useCallback((onStoreChange: () => void) => onyxSubscriptionManager.subscribeState(onStoreChange, depsArray), [depsArray]);
+    const subscribe = useCallback(
+        (onStoreChange: () => void) => {
+            const unsubscribe = onyxSubscriptionManager.subscribeState(onStoreChange, depsArray);
+
+            // `Onyx.init` hydrates the cache without notifying anyone, so a selector that ran before it
+            // finished saw an empty state and would never hear the stored values arrive. Re-read once
+            // init lands. Unlike `useOnyx` this needs nothing on the render side: there is no `loading`
+            // flag outside the snapshot to unstick, so React bailing out on an unchanged selector output
+            // is the right outcome.
+            const initTask = OnyxUtils.getDeferredInitTask();
+            let isActive = true;
+            if (!initTask.isResolved) {
+                initTask.promise.then(() => {
+                    if (!isActive) {
+                        return;
+                    }
+                    onStoreChange();
+                });
+            }
+
+            return () => {
+                isActive = false;
+                unsubscribe();
+            };
+        },
+        [depsArray],
+    );
 
     // `previousViewRef` is a Proxy over the dep values captured at the last committed
     // render. It is ONLY mutated in the effect below (post-commit), never in getSnapshot,

@@ -1,5 +1,7 @@
 import {act, renderHook} from '@testing-library/react-native';
 import Onyx from '../../lib';
+import {resetDeferredInitTask} from '../../lib/OnyxUtils';
+import StorageMock from '../../lib/storage';
 import useOnyxState from '../../lib/useOnyxState';
 import type {OnyxStateView} from '../../lib/useOnyxState';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
@@ -236,6 +238,68 @@ describe('useOnyxState', () => {
             await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'changed'));
 
             expect(result.current).toEqual('changed');
+        });
+    });
+
+    describe('before Onyx.init has finished', () => {
+        // Providers above the app's migration gate subscribe during a cold start, before the cache has
+        // been hydrated, so put Onyx back to "not initialised" for these.
+        beforeEach(async () => {
+            // `Onyx.clear()` waits for init, so clear storage directly before taking init away.
+            await StorageMock.clear();
+            resetDeferredInitTask();
+        });
+
+        afterEach(async () => {
+            Onyx.init({keys: ONYXKEYS});
+            await act(async () => waitForPromisesToResolve());
+        });
+
+        it('should re-run the selector once init hydrates the cache', async () => {
+            // Given values already in storage and a subscriber mounted before init runs
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'from storage');
+            await StorageMock.setItem(ONYXKEYS.OTHER_TEST, 'other from storage');
+
+            const {result} = renderHook(() =>
+                useOnyxState((state) => [state[ONYXKEYS.TEST_KEY], state[ONYXKEYS.OTHER_TEST]].join('|'), {
+                    dependencies: [ONYXKEYS.TEST_KEY, ONYXKEYS.OTHER_TEST],
+                }),
+            );
+
+            // Then the selector has only an empty state to work with, because `cache.hydrate()`
+            // notifies nobody
+            expect(result.current).toEqual('|');
+
+            // When init hydrates the cache
+            Onyx.init({keys: ONYXKEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            // Then the selector re-runs against what was in storage, rather than being stuck on the
+            // empty-state output forever
+            expect(result.current).toEqual('from storage|other from storage');
+        });
+
+        it('should report the post-init values as a change against the pre-hydration previousState', async () => {
+            // Given a value in storage and a selector that reports what changed since its last output
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'from storage');
+
+            const {result} = renderHook(() =>
+                useOnyxState(
+                    (state, previousState) => ({
+                        previous: previousState?.[ONYXKEYS.TEST_KEY],
+                        current: state[ONYXKEYS.TEST_KEY],
+                    }),
+                    {dependencies: [ONYXKEYS.TEST_KEY]},
+                ),
+            );
+
+            // When init hydrates the cache after the first committed render
+            Onyx.init({keys: ONYXKEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            // Then `previousState` holds the pre-hydration value, so hydration reads as the key
+            // appearing rather than as no change at all
+            expect(result.current).toEqual({previous: undefined, current: 'from storage'});
         });
     });
 });
