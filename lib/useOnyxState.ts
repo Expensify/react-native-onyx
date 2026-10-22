@@ -5,11 +5,9 @@ import OnyxUtils from './OnyxUtils';
 import type {OnyxKey, OnyxValue} from './types';
 
 /**
- * Read-only virtual view over the Onyx state. Property access on a key returns
- * the same value as `Onyx.getState(key)` — for collection keys the frozen snapshot,
- * for single keys the cached value, or `undefined` if not present.
- *
- * No tree is materialized. Each property access routes through the store directly.
+ * Read-only view over the Onyx state. Reading a key returns what `getState` returns: the frozen
+ * snapshot for a collection key, the cached value for a single key, `undefined` when absent.
+ * Nothing is materialized — every read routes through the store.
  */
 type OnyxStateView = {
     readonly [K in OnyxKey]: OnyxValue<K>;
@@ -19,25 +17,19 @@ type UseOnyxStateSelector<T> = (state: OnyxStateView, previousState: OnyxStateVi
 
 type UseOnyxStateOptions<T> = {
     /**
-     * Onyx keys this selector depends on. The selector re-runs only when one of
-     * these keys' values changes. Collection keys count as a single dep — any
-     * member change triggers a re-run.
+     * Keys the selector reads. It re-runs when one of them changes; a collection key counts as a
+     * single dep, so any member change triggers a re-run.
      */
     dependencies: readonly OnyxKey[];
 
     /**
-     * Custom equality function for the selector's output. Defaults to `===` with
-     * a deep-equal fallback for object outputs. When the comparison returns true,
-     * the React update is skipped.
+     * Equality for the selector's output. Defaults to `===` with a deep-equal fallback for objects.
+     * When it returns true, the React update is skipped.
      */
     selectorEquality?: (a: T, b: T) => boolean;
 };
 
-/**
- * Lazy, sealed Proxy whose getters route to `onyxSubscriptionManager.getState`. Used as both
- * `state` and `previousState`. The previousState variant captures the dep values
- * frozen at the previous selector invocation.
- */
+/** Builds a lazy, sealed Proxy over `snapshotProvider`, used for both `state` and `previousState`. */
 function createStateView(snapshotProvider: (key: OnyxKey) => OnyxValue<OnyxKey>): OnyxStateView {
     const handler: ProxyHandler<Record<string, never>> = {
         get(_target, prop) {
@@ -47,7 +39,7 @@ function createStateView(snapshotProvider: (key: OnyxKey) => OnyxValue<OnyxKey>)
             return snapshotProvider(prop);
         },
         set() {
-            // Read-only — selector must not mutate the view.
+            // Read-only: the selector must not mutate the view.
             return false;
         },
         deleteProperty() {
@@ -66,9 +58,8 @@ function createStateView(snapshotProvider: (key: OnyxKey) => OnyxValue<OnyxKey>)
 const liveStateView = createStateView((key) => onyxSubscriptionManager.getState(key as OnyxKey));
 
 /**
- * Default equality: reference equality with a deepEqual fallback for object outputs.
- * Primitives and frozen-snapshot references compare correctly with `===`. Objects that
- * the selector freshly allocates with the same content fall back to deepEqual.
+ * `===` first, which settles primitives and frozen snapshot references, then deepEqual for an object
+ * the selector freshly allocated with unchanged content.
  */
 function defaultSelectorEquality<T>(a: T, b: T): boolean {
     if (Object.is(a, b)) {
@@ -81,57 +72,37 @@ function defaultSelectorEquality<T>(a: T, b: T): boolean {
 }
 
 /**
- * Subscribe to a derived value computed from multiple Onyx keys. The selector
- * receives a virtual `state` view and a `previousState` view holding the values
- * of declared deps as of the last committed render. `previousState` may be used
- * both as a performance aid (ref-equality walks for incremental compute — structural
- * sharing makes unchanged collection members share references with the previous
- * snapshot, so the walk is O(collection_size) with O(1) per-step cost) AND as a
- * semantic input (the output is allowed to depend on it, e.g. a delta of what changed).
+ * Subscribes a component to a value derived from several Onyx keys. The selector gets a `state` view
+ * and a `previousState` view holding the declared deps as of the last committed render. It can use
+ * `previousState` to walk only what changed (structural sharing keeps unchanged collection members
+ * reference-equal, so each step is O(1)) or as a real input, say to emit a delta.
  *
- * Re-runs when any declared dep changes; skips React updates when the selector
- * output is equal to the previous output (per `selectorEquality`, default
- * `===` with deepEqual fallback).
+ * Re-runs when any declared dep changes, and skips the React update when the output is equal to the
+ * previous one, per `selectorEquality`.
  *
- * Mounting before `Onyx.init` has hydrated the cache runs the selector against an empty
- * state — there is no status channel to say so — and re-runs it once init lands. A consumer
- * that must distinguish "not hydrated yet" from "absent" has to carry that in its own output.
- *
- * `previousState` is advanced in a post-commit effect, NOT during `getSnapshot`.
- * This keeps `getSnapshot` pure (a `useSyncExternalStore` requirement): within a
- * single render `previousViewRef` is frozen, so every `getSnapshot` call computes
- * the same output regardless of how many times React invokes it. It also gives
- * `previousState` the correct meaning — "deps at the last *committed* output": a
- * store change whose output is equality-gated away never commits, so it never
- * advances `previousState` past a value the consumer never saw.
+ * Mounting before `Onyx.init` has hydrated runs the selector against an empty state and re-runs it
+ * once init lands. There is no status channel, so a consumer that must tell "not hydrated yet" from
+ * "absent" has to carry that in its own output.
  */
 function useOnyxState<T>(selector: UseOnyxStateSelector<T>, options: UseOnyxStateOptions<T>): T {
     const {dependencies, selectorEquality = defaultSelectorEquality} = options;
 
-    // Consumers usually pass an inline array literal (new reference every render), so we key
-    // the memo on the joined contents — `depsArray` only gets a new reference when the actual
-    // set of dependency keys changes, which keeps `subscribe` from re-subscribing every render.
-    // The space separator is safe because Onyx keys are identifiers/collection prefixes that
-    // never contain spaces.
-    //
-    // Keying on `depsKey` (content) rather than `dependencies` (identity) is something React
-    // Compiler can't preserve, so this hook opts out of compiler memoization and manages its
-    // own — deliberate, as it's hand-tuned for `useSyncExternalStore`.
+    // Consumers pass an inline array literal, so key the memo on the contents: `depsArray` only gets
+    // a new reference when the set of keys changes, which keeps `subscribe` from re-subscribing on
+    // every render. The space separator is safe, Onyx keys never contain spaces. React Compiler
+    // can't preserve content-keying, so this hook opts out of it and memoizes by hand.
     const depsKey = dependencies.join(' ');
     const depsArray = useMemo(() => [...dependencies], [depsKey]); // eslint-disable-line react-hooks/exhaustive-deps, react-hooks/preserve-manual-memoization
 
-    // Only `subscribe` must be referentially stable for `useSyncExternalStore` (it controls
-    // re-subscription). `getSnapshot` may change identity freely — React just re-reads it —
-    // so it closes over the latest `selector`/`selectorEquality` directly instead of via refs.
+    // Only `subscribe` has to be referentially stable, since it controls re-subscription.
+    // `getSnapshot` may change identity freely, so it closes over the latest selector directly.
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
             const unsubscribe = onyxSubscriptionManager.subscribeState(onStoreChange, depsArray);
 
             // `Onyx.init` hydrates the cache without notifying anyone, so a selector that ran before it
             // finished saw an empty state and would never hear the stored values arrive. Re-read once
-            // init lands. Unlike `useOnyx` this needs nothing on the render side: there is no `loading`
-            // flag outside the snapshot to unstick, so React bailing out on an unchanged selector output
-            // is the right outcome.
+            // init lands.
             const initTask = OnyxUtils.getDeferredInitTask();
             let isActive = true;
             if (!initTask.isResolved) {
@@ -151,18 +122,16 @@ function useOnyxState<T>(selector: UseOnyxStateSelector<T>, options: UseOnyxStat
         [depsArray],
     );
 
-    // `previousViewRef` is a Proxy over the dep values captured at the last committed
-    // render. It is ONLY mutated in the effect below (post-commit), never in getSnapshot,
-    // so it stays constant while a render's getSnapshot calls run.
+    // Mutated only in the post-commit effect below, so it stays frozen across a render's
+    // `getSnapshot` calls and every one of them computes the same output.
     const previousViewRef = useRef<OnyxStateView | undefined>(undefined);
     const lastOutputRef = useRef<{value: T} | null>(null);
 
     const getSnapshot = useCallback((): T => {
         const output = selector(liveStateView, previousViewRef.current);
 
-        // Ref-preservation: when the new output is equal to the last one, return the previous
-        // reference so React can bail out via `===`. This also keeps getSnapshot returning a
-        // stable value for an unchanged store, despite its identity changing between renders.
+        // Hand back the previous reference when the output is equal, so React bails out via `===`
+        // and an unchanged store keeps returning the same value even as `getSnapshot`'s identity moves.
         if (lastOutputRef.current !== null && selectorEquality(lastOutputRef.current.value, output)) {
             return lastOutputRef.current.value;
         }
@@ -173,9 +142,10 @@ function useOnyxState<T>(selector: UseOnyxStateSelector<T>, options: UseOnyxStat
 
     const value = useSyncExternalStore(subscribe, getSnapshot);
 
-    // After each committed render, snapshot the current dep values and expose them as
-    // `previousState` for the next selector run. Running on commit (not inside getSnapshot)
-    // keeps getSnapshot pure and makes `previousState` reflect the last delivered output.
+    // Snapshot the deps after each committed render, to serve as `previousState` on the next selector
+    // run. Doing it here rather than in `getSnapshot` keeps that function pure and gives
+    // `previousState` its meaning, the deps behind the last committed output: a change whose output
+    // the equality check swallowed never commits, so it never advances past a value nobody saw.
     useEffect(() => {
         const currentDepValues: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
         for (const dep of depsArray) {
