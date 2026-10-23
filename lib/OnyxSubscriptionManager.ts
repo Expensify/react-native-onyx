@@ -19,7 +19,7 @@ type GenericListener = (value: unknown, key: OnyxKey) => void;
 const reportedCacheMisses = new Set<OnyxKey>();
 
 function reportCacheMissIfStorageHasValue(key: OnyxKey): void {
-    if (OnyxKeys.isRamOnlyKey(key) || !cache.getAllKeys().has(key) || cache.hasNullishStorageKey(key)) {
+    if (!cache.getAllKeys().has(key) || OnyxKeys.isRamOnlyKey(key) || cache.hasNullishStorageKey(key)) {
         return;
     }
 
