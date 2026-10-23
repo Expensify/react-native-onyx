@@ -19,7 +19,8 @@ type GenericListener = (value: unknown, key: OnyxKey) => void;
 const reportedCacheMisses = new Set<OnyxKey>();
 
 function reportCacheMissIfStorageHasValue(key: OnyxKey): void {
-    if (OnyxKeys.isRamOnlyKey(key) || !cache.getAllKeys().has(key) || cache.hasNullishStorageKey(key)) {
+    // Check the key index first. `isRamOnlyKey` calls `getCollectionKey`, which throws on a non-string key.
+    if (!cache.getAllKeys().has(key) || OnyxKeys.isRamOnlyKey(key) || cache.hasNullishStorageKey(key)) {
         return;
     }
 
@@ -31,7 +32,8 @@ function reportCacheMissIfStorageHasValue(key: OnyxKey): void {
 
     Storage.getItem(key)
         .then((value) => {
-            if (value === undefined || value === null) {
+            // Storage is empty too, or a write filled the cache during the read.
+            if (value === undefined || value === null || cache.get(key) !== undefined) {
                 return;
             }
 
