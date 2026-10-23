@@ -1,8 +1,27 @@
 import {deepEqual} from 'fast-equals';
 import {useCallback, useEffect, useMemo, useRef, useSyncExternalStore} from 'react';
+
+import type {CollectionKeyBase, KeyValueMapping, OnyxCollection, OnyxKey, OnyxValue} from './types';
+
 import onyxSubscriptionManager from './OnyxSubscriptionManager';
 import OnyxUtils from './OnyxUtils';
-import type {OnyxKey, OnyxValue} from './types';
+
+/**
+ * Collection roots, mapped to the whole collection.
+ *
+ * Mapping over `OnyxKey` alone cannot type them: collection keys reach it as the template
+ * `${CollectionKeyBase}${string}`, which becomes one index signature typed off that template rather
+ * than off the key you index with. The template does not extend `CollectionKeyBase`, so `OnyxValue`
+ * resolves it to a member, and a root such as `report_` matches the signature and comes back typed
+ * as a single report. Spelling the roots out separately gives them a declared property, which wins
+ * over the index signature. Resolves to `unknown` without `CustomTypeOptions`, leaving the view as it
+ * was, since every key there is already `unknown`.
+ */
+type OnyxCollectionRootsView = string extends CollectionKeyBase
+    ? unknown
+    : {
+          readonly [K in CollectionKeyBase]: OnyxCollection<KeyValueMapping[K]>;
+      };
 
 /**
  * Read-only view over the Onyx state. Reading a key returns what `getState` returns: the frozen
@@ -11,7 +30,7 @@ import type {OnyxKey, OnyxValue} from './types';
  */
 type OnyxStateView = {
     readonly [K in OnyxKey]: OnyxValue<K>;
-};
+} & OnyxCollectionRootsView;
 
 type UseOnyxStateSelector<T> = (state: OnyxStateView, previousState: OnyxStateView | undefined) => T;
 
