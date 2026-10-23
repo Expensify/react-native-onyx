@@ -131,6 +131,10 @@ describe('OnyxSubscriptionManager', () => {
 
             expect(onyxSubscriptionManager.getState(COLLECTION)).toBe(collectionData);
         });
+
+        it('should return undefined without throwing for an undefined key', () => {
+            expect(onyxSubscriptionManager.getState(undefined as unknown as OnyxKey)).toBeUndefined();
+        });
     });
 
     describe('collection routing on notifyKey', () => {
@@ -392,6 +396,17 @@ describe('OnyxSubscriptionManager', () => {
             forgetValueButKeepKey(ONYXKEYS.TEST_KEY);
 
             onyxSubscriptionManager.getState(ONYXKEYS.TEST_KEY);
+            await waitForPromisesToResolve();
+
+            expect(logHmmmSpy).not.toHaveBeenCalled();
+        });
+
+        it('should not report when the value reached the cache before storage answered', async () => {
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'from-storage');
+            forgetValueButKeepKey(ONYXKEYS.TEST_KEY);
+
+            onyxSubscriptionManager.getState(ONYXKEYS.TEST_KEY);
+            cache.set(ONYXKEYS.TEST_KEY, 'from-storage');
             await waitForPromisesToResolve();
 
             expect(logHmmmSpy).not.toHaveBeenCalled();

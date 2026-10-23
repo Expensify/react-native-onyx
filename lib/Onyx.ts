@@ -750,7 +750,7 @@ function exportState(): Promise<Record<OnyxKey, OnyxValue<OnyxKey>>> {
  * @returns The current value, or `undefined` if the key has none.
  */
 function get<TKey extends OnyxKey>(key: TKey): Promise<OnyxValue<TKey>> {
-    return OnyxUtils.afterInit(() => Promise.resolve((onyxSubscriptionManager.getState(key) ?? undefined) as OnyxValue<TKey>));
+    return OnyxUtils.afterInit(() => Promise.resolve(onyxSubscriptionManager.getState(key) as OnyxValue<TKey>));
 }
 
 /**
@@ -772,7 +772,7 @@ function get<TKey extends OnyxKey>(key: TKey): Promise<OnyxValue<TKey>> {
  */
 function multiGet<const Keys extends readonly OnyxKey[]>(keys: Keys): Promise<{[Index in keyof Keys]: OnyxValue<Keys[Index]>}> {
     // map() widens the key tuple to an array, so the per-slot value types survive only through the cast.
-    return OnyxUtils.afterInit(() => Promise.resolve(keys.map((key) => onyxSubscriptionManager.getState(key) ?? undefined) as {[Index in keyof Keys]: OnyxValue<Keys[Index]>}));
+    return OnyxUtils.afterInit(() => Promise.resolve(keys.map((key) => onyxSubscriptionManager.getState(key)) as {[Index in keyof Keys]: OnyxValue<Keys[Index]>}));
 }
 
 const Onyx = {
