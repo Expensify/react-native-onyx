@@ -1,3 +1,4 @@
+import {deepEqual} from 'fast-equals';
 import * as Logger from './Logger';
 import cache, {TASK} from './OnyxCache';
 import Storage from './storage';
@@ -449,6 +450,21 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
 
                     const allKeys = new Set([...cachedKeys, ...initialKeys]);
 
+                    // Writes can land while storage clears (e.g. a new sign-in's session), so track them to avoid clobbering them.
+                    const valuesBeforeClear: KeyValueMapping = {};
+                    const valuesSetByClear: KeyValueMapping = {};
+                    const wasWrittenDuringClear = (key: OnyxKey): boolean => {
+                        if (!(key in valuesSetByClear)) {
+                            return false;
+                        }
+                        const currentValue = cache.get(key);
+                        if (currentValue === undefined || currentValue === valuesSetByClear[key]) {
+                            return false;
+                        }
+                        // A read can refill the cache with the old value from storage before it is removed, which is not a new write
+                        return !deepEqual(currentValue, valuesBeforeClear[key]);
+                    };
+
                     OnyxUtils.cancelPendingMerges(pendingMergeEntries);
 
                     // The only keys that should not be cleared are:
@@ -468,6 +484,8 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                         if (!isKeyToPreserve) {
                             const oldValue = cache.get(key);
                             const newValue = defaultKeyStates[key] ?? null;
+                            valuesBeforeClear[key] = oldValue;
+                            valuesSetByClear[key] = newValue;
                             if (newValue !== oldValue) {
                                 cache.set(key, newValue);
 
@@ -507,17 +525,35 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                     // Remove only the items that we want cleared from storage, and reset others to default
                     for (const key of keysToBeClearedFromStorage) cache.drop(key);
                     return Storage.removeItems(keysToBeClearedFromStorage)
-                        .then(() => Storage.multiSet(defaultKeyValuePairs))
+                        .then(() => {
+                            // Save written keys again in case `removeItems` deleted them after they were stored.
+                            const writtenKeyValuePairs = Object.keys(valuesSetByClear)
+                                .filter((key) => !OnyxKeys.isRamOnlyKey(key) && wasWrittenDuringClear(key))
+                                .map((key): [OnyxKey, OnyxValue<OnyxKey>] => [key, cache.get(key)]);
+                            return Storage.multiSet([...defaultKeyValuePairs.filter(([key]) => !wasWrittenDuringClear(key)), ...writtenKeyValuePairs]);
+                        })
                         .then(() => {
                             DevTools.clearState(keysToPreserve);
 
                             onyxSubscriptionManager.resetCacheMissReports();
 
-                            // Notify the subscribers for each key/value group so they can receive the new values
+                            // Notify the subscribers for each key/value group so they can receive the new values.
+                            // Keys written during the clear are skipped, their subscribers already have the newer value.
                             for (const [key, value] of Object.entries(keyValuesToResetIndividually)) {
+                                if (wasWrittenDuringClear(key)) {
+                                    continue;
+                                }
                                 OnyxUtils.notifyKey(key, value);
                             }
                             for (const [key, value] of Object.entries(keyValuesToResetAsCollection)) {
+                                const writtenMemberKeys = Object.keys(value.newValues).filter(wasWrittenDuringClear);
+                                for (const memberKey of writtenMemberKeys) {
+                                    delete value.newValues[memberKey];
+                                    delete value.oldValues[memberKey];
+                                }
+                                if (Object.keys(value.newValues).length === 0) {
+                                    continue;
+                                }
                                 OnyxUtils.notifyCollection(key, value.newValues, value.oldValues);
                             }
                         });
