@@ -110,7 +110,7 @@ describe('Onyx', () => {
                 afterEach: clearOnyxAfterEachMeasure,
             });
 
-            Onyx.disconnect(connection);
+            connection.unsubscribe();
         });
     });
 

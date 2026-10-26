@@ -1575,7 +1575,7 @@ describe('Onyx', () => {
         expect(catCallback).toHaveBeenCalledTimes(1);
 
         for (const id of connections) {
-            Onyx.disconnect(id);
+            id.unsubscribe();
         }
     });
 
