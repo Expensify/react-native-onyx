@@ -126,6 +126,9 @@
       "optional": true
     }
   },
+  "overrides": {
+    "simple-git": "^4.0.2"
+  },
   "engines": {
     "node": ">=20.19.5",
     "npm": ">=10.8.2"
