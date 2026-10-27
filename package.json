@@ -1,6 +1,6 @@
 {
   "name": "react-native-onyx",
-  "version": "3.0.123",
+  "version": "3.0.128",
   "author": "Expensify, Inc.",
   "homepage": "https://expensify.com",
   "description": "State management for React Native",
@@ -49,14 +49,14 @@
     "lodash.clone": "^4.5.0",
     "lodash.pick": "^4.4.0",
     "lodash.transform": "^4.6.0",
-    "underscore": "^1.13.6",
+    "underscore": "^1.13.8",
     "use-sync-external-store": "^1.6.0"
   },
   "devDependencies": {
     "@actions/core": "^1.10.1",
     "@actions/github": "^6.0.1",
     "@jest/globals": "^29.7.0",
-    "@lwc/eslint-plugin-lwc": "^3.3.0",
+    "@lwc/eslint-plugin-lwc": "^3.5.0",
     "@ngneat/falso": "^7.3.0",
     "@react-native-community/eslint-config": "^3.2.0",
     "@react-native/babel-preset": "0.76.3",
