@@ -2,6 +2,7 @@ import {measureAsyncFunction} from 'reassure';
 import type {OnyxKey, OnyxUpdate} from '../../lib';
 import Onyx from '../../lib';
 import createRandomReportAction, {getRandomReportActions} from '../utils/collections/reportActions';
+import {createObjectArrayCollection} from '../utils/collections/objectArrays';
 import type GenericCollection from '../utils/GenericCollection';
 import OnyxUtils from '../../lib/OnyxUtils';
 import createDeferredTask from '../../lib/createDeferredTask';
@@ -81,6 +82,35 @@ describe('Onyx', () => {
                 },
                 afterEach: clearOnyxAfterEachMeasure,
             });
+        });
+
+        test('one call with 1.5k deep-equal arrays and a collection subscriber that recomputes changed members', async () => {
+            const arraysCollectionKey = ONYXKEYS.COLLECTION.TEST_KEY_2;
+            const arrays = createObjectArrayCollection(arraysCollectionKey, 1500);
+            const sameArrays = createObjectArrayCollection(arraysCollectionKey, 1500);
+
+            // Stand-in for a subscriber that recomputes every member whose reference changed.
+            let previousCollection: Record<string, unknown> | undefined;
+            const connection = Onyx.connect({
+                key: arraysCollectionKey,
+                callback: (collection) => {
+                    for (const key of Object.keys(collection ?? {})) {
+                        if (collection[key] !== previousCollection?.[key]) {
+                            JSON.stringify(collection[key]);
+                        }
+                    }
+                    previousCollection = collection;
+                },
+            });
+
+            await measureAsyncFunction(() => Onyx.mergeCollection(arraysCollectionKey, sameArrays), {
+                beforeEach: async () => {
+                    await Onyx.mergeCollection(arraysCollectionKey, arrays);
+                },
+                afterEach: clearOnyxAfterEachMeasure,
+            });
+
+            connection.unsubscribe();
         });
     });
 

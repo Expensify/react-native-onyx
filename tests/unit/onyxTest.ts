@@ -1542,6 +1542,43 @@ describe('Onyx', () => {
             });
     });
 
+    it('should not call collection subscribers when every merged collection member is deep-equal and contains arrays', async () => {
+        const cat = `${ONYX_KEYS.COLLECTION.ANIMALS}cat`;
+        const dog = `${ONYX_KEYS.COLLECTION.ANIMALS}dog`;
+        const createCollection = (): GenericCollection => ({
+            [cat]: [{name: 'Fluffy', tags: ['small']}],
+            [dog]: {name: 'Rex', tags: [{id: 1}, {id: 2}]},
+        });
+
+        await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ANIMALS, createCollection());
+
+        const collectionCallback = jest.fn();
+        const catCallback = jest.fn();
+        const connections = [Onyx.connect({key: ONYX_KEYS.COLLECTION.ANIMALS, callback: collectionCallback}), Onyx.connect({key: cat, callback: catCallback})];
+        await waitForPromisesToResolve();
+        expect(collectionCallback).toHaveBeenCalledTimes(1);
+        expect(catCallback).toHaveBeenCalledTimes(1);
+
+        const cachedCat = cache.get(cat);
+        const cachedDog = cache.get(dog);
+
+        // When the same collection is merged again with new, deep-equal values
+        await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ANIMALS, createCollection());
+
+        // And then merged through Onyx.update, which batches members of the same collection
+        await Onyx.update(Object.entries(createCollection()).map(([key, value]) => ({onyxMethod: Onyx.METHOD.MERGE, key, value})) as Array<OnyxUpdate<OnyxKey>>);
+
+        // Then the cached values keep their references and no subscriber is called again
+        expect(cache.get(cat)).toBe(cachedCat);
+        expect(cache.get(dog)).toBe(cachedDog);
+        expect(collectionCallback).toHaveBeenCalledTimes(1);
+        expect(catCallback).toHaveBeenCalledTimes(1);
+
+        for (const id of connections) {
+            id.unsubscribe();
+        }
+    });
+
     it('should update Snapshot when its data changed', async () => {
         const cat = `${ONYX_KEYS.COLLECTION.ANIMALS}cat`;
         const snapshot1 = `${ONYX_KEYS.COLLECTION.SNAPSHOT}1`;
