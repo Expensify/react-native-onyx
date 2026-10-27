@@ -92,6 +92,32 @@ describe('Write data while Onyx.clear is in progress', () => {
         await expect(StorageMock.getItem(`${ONYX_KEYS.COLLECTION.TEST}1`)).resolves.toBe(NEW_VALUE);
     });
 
+    it('should keep a value written during the clear even when it equals the value from before the clear', async () => {
+        // Given keys that hold values from a previous session
+        await Onyx.multiSet({
+            [ONYX_KEYS.DEFAULT_KEY]: OLD_VALUE,
+            [ONYX_KEYS.REGULAR_KEY]: OLD_VALUE,
+        });
+
+        // When the same values are written again while the clear is running, like a re-auth restoring unchanged session data
+        holdNextRemoveItems();
+        const clearPromise = Onyx.clear();
+        await waitForPromisesToResolve();
+        Onyx.set(ONYX_KEYS.DEFAULT_KEY, OLD_VALUE);
+        Onyx.set(ONYX_KEYS.REGULAR_KEY, OLD_VALUE);
+        await waitForPromisesToResolve();
+        finishRemoveItems();
+        await clearPromise;
+        await waitForPromisesToResolve();
+
+        // Then the written values are kept, because they are new writes and not leftovers from before the clear
+        expect(defaultKeyValue).toBe(OLD_VALUE);
+        expect(regularKeyValue).toBe(OLD_VALUE);
+        expect(cache.get(ONYX_KEYS.DEFAULT_KEY)).toBe(OLD_VALUE);
+        await expect(StorageMock.getItem(ONYX_KEYS.DEFAULT_KEY)).resolves.toBe(OLD_VALUE);
+        await expect(StorageMock.getItem(ONYX_KEYS.REGULAR_KEY)).resolves.toBe(OLD_VALUE);
+    });
+
     it('should still reset keys that were not written during the clear', async () => {
         // Given keys that hold values from a previous session
         await Onyx.multiSet({
