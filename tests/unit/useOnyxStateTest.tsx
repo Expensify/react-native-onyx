@@ -1,11 +1,13 @@
 import {act, renderHook} from '@testing-library/react-native';
+
+import type {OnyxStateView} from '../../lib/useOnyxState';
+import type GenericCollection from '../utils/GenericCollection';
+
 import Onyx from '../../lib';
 import {resetDeferredInitTask} from '../../lib/OnyxUtils';
 import StorageMock from '../../lib/storage';
 import useOnyxState from '../../lib/useOnyxState';
-import type {OnyxStateView} from '../../lib/useOnyxState';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
-import type GenericCollection from '../utils/GenericCollection';
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -238,6 +240,50 @@ describe('useOnyxState', () => {
             await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'changed'));
 
             expect(result.current).toEqual('changed');
+        });
+    });
+
+    describe('re-render without a store change', () => {
+        it('should not run the selector again when the component re-renders and no dependency changed', async () => {
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'hello');
+            const selector = jest.fn((state: OnyxStateView) => state[ONYXKEYS.TEST_KEY]);
+            const {result, rerender} = renderHook((_props: {renderID: number}) => useOnyxState(selector, {dependencies: [ONYXKEYS.TEST_KEY]}), {initialProps: {renderID: 0}});
+            await act(async () => waitForPromisesToResolve());
+            const callCountAfterMount = selector.mock.calls.length;
+
+            rerender({renderID: 1});
+            rerender({renderID: 2});
+
+            expect(selector).toHaveBeenCalledTimes(callCountAfterMount);
+            expect(result.current).toEqual('hello');
+        });
+
+        it('should run the selector again when a re-render passes a new selector', async () => {
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'hello');
+            const {result, rerender} = renderHook(
+                ({suffix}: {suffix: string}) => useOnyxState((state) => `${state[ONYXKEYS.TEST_KEY] as string}${suffix}`, {dependencies: [ONYXKEYS.TEST_KEY]}),
+                {
+                    initialProps: {suffix: '!'},
+                },
+            );
+            await act(async () => waitForPromisesToResolve());
+
+            rerender({suffix: '?'});
+
+            expect(result.current).toEqual('hello?');
+        });
+
+        it('should run the selector again on a re-render after a dependency changed', async () => {
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'hello');
+            const selector = jest.fn((state: OnyxStateView) => state[ONYXKEYS.TEST_KEY]);
+            const {result} = renderHook(() => useOnyxState(selector, {dependencies: [ONYXKEYS.TEST_KEY]}));
+            await act(async () => waitForPromisesToResolve());
+            const callCountAfterMount = selector.mock.calls.length;
+
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'updated'));
+
+            expect(selector.mock.calls.length).toBeGreaterThan(callCountAfterMount);
+            expect(result.current).toEqual('updated');
         });
     });
 
