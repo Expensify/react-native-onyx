@@ -33,6 +33,9 @@ is reused by every connection.</p>
 <dt><a href="#getDefaultKeyStates">getDefaultKeyStates()</a></dt>
 <dd><p>Getter - returns the default key states.</p>
 </dd>
+<dt><a href="#getNullFreeDefaultKeyState">getNullFreeDefaultKeyState()</a></dt>
+<dd><p>Getter - returns the default key state without nested nulls, cached so clear() reuses the same references.</p>
+</dd>
 <dt><a href="#getDeferredInitTask">getDeferredInitTask()</a></dt>
 <dd><p>Getter - returns the deffered init task.</p>
 </dd>
@@ -205,6 +208,12 @@ Getter - returns the merge queue promise.
 
 ## getDefaultKeyStates()
 Getter - returns the default key states.
+
+**Kind**: global function  
+<a name="getNullFreeDefaultKeyState"></a>
+
+## getNullFreeDefaultKeyState()
+Getter - returns the default key state without nested nulls, cached so clear() reuses the same references.
 
 **Kind**: global function  
 <a name="getDeferredInitTask"></a>
