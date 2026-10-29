@@ -255,6 +255,106 @@ describe('OnyxSubscriptionManager', () => {
         });
     });
 
+    describe('batch', () => {
+        it('should hold notifications until the batch returns, then deliver each key once with its cached value', () => {
+            // Given a subscriber to a single key
+            const callback = jest.fn();
+            onyxSubscriptionManager.subscribe(ONYXKEYS.TEST_KEY, callback);
+
+            // When the key is written and notified twice inside a batch
+            onyxSubscriptionManager.batch(() => {
+                cache.set(ONYXKEYS.TEST_KEY, 'first');
+                onyxSubscriptionManager.notifyKey(ONYXKEYS.TEST_KEY, 'first');
+                cache.set(ONYXKEYS.TEST_KEY, 'second');
+                onyxSubscriptionManager.notifyKey(ONYXKEYS.TEST_KEY, 'second');
+
+                // Then nothing is delivered while the batch runs
+                expect(callback).not.toHaveBeenCalled();
+            });
+
+            // Then the subscriber fires once, with the value the cache holds at the end
+            expect(callback).toHaveBeenCalledTimes(1);
+            expect(callback).toHaveBeenCalledWith('second', ONYXKEYS.TEST_KEY);
+        });
+
+        it('should notify a collection subscriber once for member writes made through notifyKey and notifyCollection', () => {
+            // Given subscribers to a collection and to one of its members
+            const collectionCallback = jest.fn();
+            const member1Callback = jest.fn();
+            onyxSubscriptionManager.subscribe(COLLECTION, collectionCallback);
+            onyxSubscriptionManager.subscribe(MEMBER_1, member1Callback);
+
+            // When one member is notified on its own and another through a collection notification in the same batch
+            onyxSubscriptionManager.batch(() => {
+                cache.set(MEMBER_1, {id: 1});
+                onyxSubscriptionManager.notifyKey(MEMBER_1, {id: 1});
+                cache.set(MEMBER_2, {id: 2});
+                onyxSubscriptionManager.notifyCollection(COLLECTION, {[MEMBER_2]: {id: 2}});
+            });
+
+            // Then the collection subscriber fires once with both members, and the member subscriber fires once
+            expect(collectionCallback).toHaveBeenCalledTimes(1);
+            expect(collectionCallback).toHaveBeenCalledWith({[MEMBER_1]: {id: 1}, [MEMBER_2]: {id: 2}}, COLLECTION);
+            expect(member1Callback).toHaveBeenCalledTimes(1);
+            expect(member1Callback).toHaveBeenCalledWith({id: 1}, MEMBER_1);
+        });
+
+        it('should skip a member subscriber whose value ends the batch equal to its value before the batch', () => {
+            // Given a member with a value and a subscriber to it
+            const unchanged = {id: 1};
+            cache.set(MEMBER_1, unchanged);
+            const member1Callback = jest.fn();
+            onyxSubscriptionManager.subscribe(MEMBER_1, member1Callback);
+
+            // When a collection notification in a batch reports the member with its pre-batch value as previous,
+            // and the batch leaves that same value in the cache
+            onyxSubscriptionManager.batch(() => {
+                onyxSubscriptionManager.notifyCollection(COLLECTION, {[MEMBER_1]: unchanged}, {[MEMBER_1]: unchanged});
+            });
+
+            // Then the member subscriber is not notified
+            expect(member1Callback).not.toHaveBeenCalled();
+        });
+
+        it('should deliver only when the outermost batch returns', () => {
+            // Given a subscriber to a single key
+            const callback = jest.fn();
+            onyxSubscriptionManager.subscribe(ONYXKEYS.TEST_KEY, callback);
+
+            // When the key is notified inside a batch nested in another batch
+            onyxSubscriptionManager.batch(() => {
+                onyxSubscriptionManager.batch(() => {
+                    cache.set(ONYXKEYS.TEST_KEY, 'nested');
+                    onyxSubscriptionManager.notifyKey(ONYXKEYS.TEST_KEY, 'nested');
+                });
+
+                // Then the inner batch returning does not deliver it yet
+                expect(callback).not.toHaveBeenCalled();
+            });
+
+            // Then it is delivered once the outer batch returns
+            expect(callback).toHaveBeenCalledTimes(1);
+        });
+
+        it('should still deliver held notifications when the batch throws', () => {
+            // Given a subscriber to a single key
+            const callback = jest.fn();
+            onyxSubscriptionManager.subscribe(ONYXKEYS.TEST_KEY, callback);
+
+            // When a batch notifies the key and then throws
+            expect(() =>
+                onyxSubscriptionManager.batch(() => {
+                    cache.set(ONYXKEYS.TEST_KEY, 'written');
+                    onyxSubscriptionManager.notifyKey(ONYXKEYS.TEST_KEY, 'written');
+                    throw new Error('failed');
+                }),
+            ).toThrow('failed');
+
+            // Then the write that reached the cache is still delivered
+            expect(callback).toHaveBeenCalledWith('written', ONYXKEYS.TEST_KEY);
+        });
+    });
+
     describe('clearAll', () => {
         it('should wipe key and collection subscriptions', () => {
             const keyCallback = jest.fn();

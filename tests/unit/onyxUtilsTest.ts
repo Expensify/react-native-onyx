@@ -403,8 +403,8 @@ describe('OnyxUtils', () => {
 
         it('should keep cache and subscriber state consistent when a non-collection callback writes to another payload key', async () => {
             // A subscriber for keyA synchronously calls Onyx.set() on keyB during its callback.
-            // After multiSet completes, the cache must reflect the multiSet's value for keyB
-            // (multiSet wins), and the keyB subscriber's last seen value must equal the cache.
+            // Subscribers are notified once every multiSet key is in the cache, so the callback's write
+            // lands after the multiSet's and wins, and the keyB subscriber's last seen value must equal the cache.
             await Onyx.multiSet({
                 [ONYXKEYS.TEST_KEY]: 'initialA',
                 [ONYXKEYS.TEST_KEY_2]: 'initialB',
@@ -415,8 +415,7 @@ describe('OnyxUtils', () => {
                     return;
                 }
 
-                // While processing the new value of keyA, write to keyB.
-                // keyB is later in the same multiSet payload — multiSet should win.
+                // While processing the new value of keyA, write to keyB, which the same multiSet also writes.
                 Onyx.set(ONYXKEYS.TEST_KEY_2, 'callbackB');
             });
             const callbackB = jest.fn();
@@ -438,13 +437,13 @@ describe('OnyxUtils', () => {
                 [ONYXKEYS.TEST_KEY_2]: 'multiSetB',
             });
 
-            // Cache reflects multiSet's payload value for keyB (the multiSet's later cache.set wins)
-            expect(OnyxCache.get(ONYXKEYS.TEST_KEY_2)).toBe('multiSetB');
+            // Cache reflects the callback's write for keyB, which happened after the multiSet was applied
+            expect(OnyxCache.get(ONYXKEYS.TEST_KEY_2)).toBe('callbackB');
 
-            expect(callbackB.mock.calls.length).toBe(2);
-            expect(callbackB.mock.calls.at(0)?.[0]).toBe('callbackB');
-            // keyB subscriber's last received value matches the cache (no stale callback)
-            expect(callbackB.mock.calls.at(1)?.[0]).toBe('multiSetB');
+            // keyB subscriber never received the multiSet's value, which was already replaced when it was notified,
+            // and its last received value matches the cache (no stale callback)
+            expect(callbackB.mock.calls.map(([value]) => value)).not.toContain('multiSetB');
+            expect(callbackB.mock.calls.at(-1)?.[0]).toBe('callbackB');
 
             connA.unsubscribe();
             connB.unsubscribe();
@@ -1119,9 +1118,8 @@ describe('OnyxUtils', () => {
                 },
             ]);
 
-            // The fast path resolves the pre-warm synchronously (Promise.resolve()), preserving the
-            // original promise-chain depth. The Onyx.update batch must therefore broadcast exactly
-            // one merged value — not undefined first and the merged value on a later microtask.
+            // The fast path applies the merge without a pre-warm read. The Onyx.update batch must therefore
+            // broadcast exactly one merged value — not undefined first and the merged value on a later microtask.
             const broadcasts = collectionCallback.mock.calls.map((c) => c[0]);
             expect(broadcasts).toHaveLength(1);
             expect(broadcasts[0]?.[existingKey]).toEqual({value: 'merged'});

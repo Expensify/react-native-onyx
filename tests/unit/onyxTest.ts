@@ -1866,15 +1866,11 @@ describe('Onyx', () => {
 
                 expect(otherTestCallback).toHaveBeenNthCalledWith(1, {food: 'pizza', drink: 'water'}, ONYX_KEYS.OTHER_TEST);
 
+                // The update writes cat on its own and dog through a mergeCollection, and the collection subscriber
+                // is notified once, with both applied.
+                expect(animalsCollectionCallback).toHaveBeenCalledTimes(1);
                 expect(animalsCollectionCallback).toHaveBeenNthCalledWith(
                     1,
-                    {
-                        [cat]: {age: 3, sound: 'meow'},
-                    },
-                    ONYX_KEYS.COLLECTION.ANIMALS,
-                );
-                expect(animalsCollectionCallback).toHaveBeenNthCalledWith(
-                    2,
                     {
                         [cat]: {age: 3, sound: 'meow'},
                         [dog]: {size: 'M', sound: 'woof'},
