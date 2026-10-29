@@ -76,6 +76,9 @@ const mergeQueuesWithStaleRead = new WeakSet<Array<OnyxValue<OnyxKey>>>();
 // Optional user-provided key value states set when Onyx initializes or clears
 let defaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
 
+// Cache for getNullFreeDefaultKeyState()
+let nullFreeDefaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
+
 let snapshotKey: OnyxKey | null = null;
 
 // Connections can be made before `Onyx.init`. They would wait for this task before resolving.
@@ -121,6 +124,14 @@ function getMergeQueuePromise(): Record<OnyxKey, Promise<void>> {
  */
 function getDefaultKeyStates(): Record<OnyxKey, OnyxValue<OnyxKey>> {
     return defaultKeyStates;
+}
+
+/** Getter - returns the default key state without nested nulls, cached so clear() reuses the same references. */
+function getNullFreeDefaultKeyState(key: OnyxKey): OnyxValue<OnyxKey> {
+    if (!(key in nullFreeDefaultKeyStates)) {
+        nullFreeDefaultKeyStates[key] = utils.removeNestedNullValues(defaultKeyStates[key] ?? null);
+    }
+    return nullFreeDefaultKeyStates[key];
 }
 
 /**
@@ -189,8 +200,9 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
         return acc;
     }, new Set<OnyxKey>());
 
-    // Default key states for init and clear(), cleaned once so clear() keeps the same references.
-    defaultKeyStates = Object.fromEntries(Object.entries(initialKeyStates).map(([key, value]) => [key, utils.removeNestedNullValues(value)]));
+    // Set our default key states to use when initializing and clearing Onyx data
+    defaultKeyStates = initialKeyStates;
+    nullFreeDefaultKeyStates = {};
 
     DevTools.initState(initialKeyStates);
 
@@ -1697,6 +1709,7 @@ const OnyxUtils = {
     getMergeQueue,
     getMergeQueuePromise,
     getDefaultKeyStates,
+    getNullFreeDefaultKeyState,
     getDeferredInitTask,
     afterInit,
     initStoreValues,
