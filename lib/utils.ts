@@ -1,3 +1,4 @@
+import {deepEqual} from 'fast-equals';
 import type {OnyxInput, OnyxKey} from './types';
 import * as Logger from './Logger';
 
@@ -23,6 +24,12 @@ type FastMergeOptions = {
      * If set to "replace", we will completely replace the marked objects with the new value instead of merging them.
      */
     objectRemovalMode?: 'mark' | 'replace' | 'none';
+
+    /**
+     * If true, a source array deep-equal to the target array keeps the target reference, so unchanged merges return the target.
+     * Arrays inside an object are only compared when nothing else in it changed. Costs a deep comparison per array.
+     */
+    shouldKeepEqualArrays?: boolean;
 };
 
 type FastMergeMetadata = {
@@ -57,12 +64,15 @@ function fastMerge<TValue>(target: TValue, source: TValue, options?: FastMergeOp
     // otherwise "mergeObject" will throw an error,
     // because it expects an object as "source"
     if (!isMergeableObject(source)) {
-        return {result: source, replaceNullPatches: metadata.replaceNullPatches};
+        // Arrays are replaced, not merged, but a deep-equal source array keeps the target reference.
+        const result = options?.shouldKeepEqualArrays && areDeepEqualArrays(target, source) ? target : source;
+        return {result, replaceNullPatches: metadata.replaceNullPatches};
     }
 
     const optionsWithDefaults: FastMergeOptions = {
         shouldRemoveNestedNulls: options?.shouldRemoveNestedNulls ?? false,
         objectRemovalMode: options?.objectRemovalMode ?? 'none',
+        shouldKeepEqualArrays: options?.shouldKeepEqualArrays ?? false,
     };
 
     const mergedValue = mergeObject(target, source as Record<string, unknown>, optionsWithDefaults, metadata, basePath) as TValue;
@@ -93,6 +103,10 @@ function mergeObject<TObject extends Record<string, unknown>>(
     // Track whether the merge actually changed anything compared to target.
     // If nothing changed, we return the original target reference for reference stability.
     let hasChanged = !targetObject;
+
+    // Keys whose array was replaced. Compared at the end, and only if nothing else changed,
+    // since any other change gives the object a new reference anyway.
+    let replacedArrayKeys: string[] | undefined;
 
     // First we want to copy over all keys from the target into the destination object,
     // in case "target" is a mergable object.
@@ -131,8 +145,14 @@ function mergeObject<TObject extends Record<string, unknown>>(
 
         // If the source value is not a mergable object, we need to set the key directly.
         if (!isMergeableObject(sourceProperty)) {
-            if (destination[key] !== sourceProperty) {
-                hasChanged = true;
+            const destinationProperty = destination[key];
+            if (destinationProperty !== sourceProperty) {
+                if (options.shouldKeepEqualArrays && !hasChanged && Array.isArray(destinationProperty) && Array.isArray(sourceProperty)) {
+                    replacedArrayKeys ??= [];
+                    replacedArrayKeys.push(key);
+                } else {
+                    hasChanged = true;
+                }
             }
             destination[key] = sourceProperty;
             continue;
@@ -169,7 +189,20 @@ function mergeObject<TObject extends Record<string, unknown>>(
         destination[key] = merged;
     }
 
-    return hasChanged ? (destination as TObject) : (targetObject as TObject);
+    if (hasChanged) {
+        return destination as TObject;
+    }
+
+    // Only arrays were replaced. If they are all deep-equal, the merge is a no-op.
+    if (replacedArrayKeys) {
+        for (const key of replacedArrayKeys) {
+            if (!deepEqual(targetObject?.[key], destination[key])) {
+                return destination as TObject;
+            }
+        }
+    }
+
+    return targetObject as TObject;
 }
 
 /** Checks whether the given object is an object and not null/undefined. */
@@ -196,6 +229,11 @@ function isEmptyObject<T>(obj: T | EmptyValue): obj is EmptyValue {
 function isMergeableObject<TObject extends Record<string, unknown>>(value: unknown): value is TObject {
     const isNonNullObject = value != null ? typeof value === 'object' : false;
     return isNonNullObject && !(value instanceof RegExp) && !(value instanceof Date) && !Array.isArray(value);
+}
+
+/** Checks whether both values are arrays with deep-equal contents. */
+function areDeepEqualArrays(a: unknown, b: unknown): boolean {
+    return Array.isArray(a) && Array.isArray(b) && deepEqual(a, b);
 }
 
 /**

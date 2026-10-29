@@ -1,3 +1,4 @@
+import {NitroSQLiteExceptionType} from 'react-native-nitro-sqlite/errors';
 import {act} from '@testing-library/react-native';
 import Onyx from '../../lib';
 import OnyxUtils from '../../lib/OnyxUtils';
@@ -141,7 +142,7 @@ describe('OnyxUtils', () => {
                 [routeB1]: {name: 'Route B1'},
                 [routeC]: {name: 'New Route C'},
             });
-            await Onyx.disconnect(connection);
+            connection.unsubscribe();
         });
 
         it('should not replace anything in the collection with empty values', async () => {
@@ -165,7 +166,7 @@ describe('OnyxUtils', () => {
             expect(result).toEqual({
                 [routeA]: {name: 'Route A'},
             });
-            await Onyx.disconnect(connection);
+            connection.unsubscribe();
         });
 
         it('should reject collection items with invalid keys', async () => {
@@ -193,7 +194,7 @@ describe('OnyxUtils', () => {
                 [routeA]: {name: 'Route A'},
             });
 
-            await Onyx.disconnect(connection);
+            connection.unsubscribe();
         });
     });
 
@@ -222,7 +223,7 @@ describe('OnyxUtils', () => {
             expect(collection[`${ONYXKEYS.COLLECTION.TEST_KEY}2`]).toEqual({id: 2});
             expect(collection[`${ONYXKEYS.COLLECTION.TEST_KEY}3`]).toEqual({id: 3});
 
-            Onyx.disconnect(connection);
+            connection.unsubscribe();
         });
 
         it('should fire individual member-key subscribers once per key', async () => {
@@ -260,9 +261,9 @@ describe('OnyxUtils', () => {
             expect(spy3).toHaveBeenCalledTimes(1);
             expect(spy3).toHaveBeenCalledWith({id: 3}, `${ONYXKEYS.COLLECTION.TEST_KEY}3`);
 
-            Onyx.disconnect(conn1);
-            Onyx.disconnect(conn2);
-            Onyx.disconnect(conn3);
+            conn1.unsubscribe();
+            conn2.unsubscribe();
+            conn3.unsubscribe();
         });
 
         it('should notify non-collection keys individually alongside batched collection updates', async () => {
@@ -294,8 +295,8 @@ describe('OnyxUtils', () => {
             expect(singleKeyCallback).toHaveBeenCalledTimes(1);
             expect(singleKeyCallback).toHaveBeenCalledWith('standalone', ONYXKEYS.TEST_KEY);
 
-            Onyx.disconnect(connCollection);
-            Onyx.disconnect(connSingle);
+            connCollection.unsubscribe();
+            connSingle.unsubscribe();
         });
 
         it('should batch notifications per-collection when members span multiple collections', async () => {
@@ -326,8 +327,8 @@ describe('OnyxUtils', () => {
             expect(testCallback).toHaveBeenCalledTimes(1);
             expect(routesCallback).toHaveBeenCalledTimes(1);
 
-            Onyx.disconnect(connTest);
-            Onyx.disconnect(connRoutes);
+            connTest.unsubscribe();
+            connRoutes.unsubscribe();
         });
 
         it('should pass previous values to keysChanged so unchanged members skip notification', async () => {
@@ -367,8 +368,8 @@ describe('OnyxUtils', () => {
             // because keysChanged sees the same reference as previousCollection[key]
             expect(spy2).not.toHaveBeenCalled();
 
-            Onyx.disconnect(conn1);
-            Onyx.disconnect(conn2);
+            conn1.unsubscribe();
+            conn2.unsubscribe();
         });
 
         it('should not fire again for a collection subscriber that disconnects itself in its callback', async () => {
@@ -382,7 +383,7 @@ describe('OnyxUtils', () => {
             await waitForPromisesToResolve();
             callback.mockReset();
             callback.mockImplementation(() => {
-                Onyx.disconnect(connection);
+                connection.unsubscribe();
             });
 
             // First batch fires the collection callback once, which disconnects the subscriber.
@@ -445,8 +446,8 @@ describe('OnyxUtils', () => {
             // keyB subscriber's last received value matches the cache (no stale callback)
             expect(callbackB.mock.calls.at(1)?.[0]).toBe('multiSetB');
 
-            Onyx.disconnect(connA);
-            Onyx.disconnect(connB);
+            connA.unsubscribe();
+            connB.unsubscribe();
         });
     });
 
@@ -597,22 +598,22 @@ describe('OnyxUtils', () => {
             expect(retryOperationSpy).toHaveBeenCalledTimes(1);
         });
 
-        it.each([['[NativeNitroSQLiteException][SqlExecutionError] disk I/O error'], ['[NativeNitroSQLiteException][SqlExecutionError] unable to open database file']])(
-            'should not retry disk-pressure errors (%s)',
-            async (message) => {
-                StorageMock.setItem = jest.fn().mockRejectedValue(new Error(message));
+        it.each([
+            [`[NativeNitroSQLiteException][${NitroSQLiteExceptionType.SqlExecutionError}] disk I/O error`],
+            [`[NativeNitroSQLiteException][${NitroSQLiteExceptionType.SqlExecutionError}] unable to open database file`],
+        ])('should not retry disk-pressure errors (%s)', async (message) => {
+            StorageMock.setItem = jest.fn().mockRejectedValue(new Error(message));
 
-                await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
+            await Onyx.set(ONYXKEYS.TEST_KEY, {test: 'data'});
 
-                // Called once (initial attempt only): retries cannot succeed while the device disk is full.
-                expect(retryOperationSpy).toHaveBeenCalledTimes(1);
-            },
-        );
+            // Called once (initial attempt only): retries cannot succeed while the device disk is full.
+            expect(retryOperationSpy).toHaveBeenCalledTimes(1);
+        });
 
         it('should log a single throttled alert with a quota snapshot for a disk-pressure burst', async () => {
             const logAlertSpy = jest.spyOn(Logger, 'logAlert');
             const logInfoSpy = jest.spyOn(Logger, 'logInfo');
-            const diskIOError = new Error('[NativeNitroSQLiteException][SqlExecutionError] disk I/O error');
+            const diskIOError = new Error(`[NativeNitroSQLiteException][${NitroSQLiteExceptionType.SqlExecutionError}] disk I/O error`);
             StorageMock.setItem = jest.fn().mockRejectedValue(diskIOError);
 
             // A burst: several operations all failing with the identical error.

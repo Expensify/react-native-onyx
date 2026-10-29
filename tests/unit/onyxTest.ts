@@ -62,7 +62,7 @@ describe('Onyx', () => {
 
     afterEach(() => {
         if (connection) {
-            Onyx.disconnect(connection);
+            connection.unsubscribe();
         }
         return Onyx.clear();
     });
@@ -355,7 +355,7 @@ describe('Onyx', () => {
                 // Expect that the connection to a key with a default value that wasn't changed is not called on clear
                 expect(mockCallback).toHaveBeenCalledTimes(0);
 
-                return Onyx.disconnect(otherTestConnection);
+                return otherTestConnection.unsubscribe();
             });
     });
 
@@ -401,7 +401,7 @@ describe('Onyx', () => {
             .then(() => {
                 expect(testKeyValue).toBe('test');
                 if (connection) {
-                    Onyx.disconnect(connection);
+                    connection.unsubscribe();
                 }
                 return Onyx.set(ONYX_KEYS.TEST_KEY, 'test updated');
             })
@@ -1280,7 +1280,7 @@ describe('Onyx', () => {
                 // We set an initial value of 42 for ONYX_KEYS.OTHER_TEST in Onyx.init()
                 expect(otherTestCallback).toHaveBeenNthCalledWith(1, 42, ONYX_KEYS.OTHER_TEST);
                 expect(otherTestCallback).toHaveBeenNthCalledWith(2, 'pizza', ONYX_KEYS.OTHER_TEST);
-                for (const id of connections) Onyx.disconnect(id);
+                for (const id of connections) id.unsubscribe();
             }),
         );
     });
@@ -1539,8 +1539,45 @@ describe('Onyx', () => {
                 expect(dogCallback).toHaveBeenNthCalledWith(1, undefined, dog);
                 expect(dogCallback).toHaveBeenLastCalledWith({name: 'Rex'}, dog);
 
-                connections.map((id) => Onyx.disconnect(id));
+                connections.map((id) => id.unsubscribe());
             });
+    });
+
+    it('should not call collection subscribers when every merged collection member is deep-equal and contains arrays', async () => {
+        const cat = `${ONYX_KEYS.COLLECTION.ANIMALS}cat`;
+        const dog = `${ONYX_KEYS.COLLECTION.ANIMALS}dog`;
+        const createCollection = (): GenericCollection => ({
+            [cat]: [{name: 'Fluffy', tags: ['small']}],
+            [dog]: {name: 'Rex', tags: [{id: 1}, {id: 2}]},
+        });
+
+        await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ANIMALS, createCollection());
+
+        const collectionCallback = jest.fn();
+        const catCallback = jest.fn();
+        const connections = [Onyx.connect({key: ONYX_KEYS.COLLECTION.ANIMALS, callback: collectionCallback}), Onyx.connect({key: cat, callback: catCallback})];
+        await waitForPromisesToResolve();
+        expect(collectionCallback).toHaveBeenCalledTimes(1);
+        expect(catCallback).toHaveBeenCalledTimes(1);
+
+        const cachedCat = cache.get(cat);
+        const cachedDog = cache.get(dog);
+
+        // When the same collection is merged again with new, deep-equal values
+        await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ANIMALS, createCollection());
+
+        // And then merged through Onyx.update, which batches members of the same collection
+        await Onyx.update(Object.entries(createCollection()).map(([key, value]) => ({onyxMethod: Onyx.METHOD.MERGE, key, value})) as Array<OnyxUpdate<OnyxKey>>);
+
+        // Then the cached values keep their references and no subscriber is called again
+        expect(cache.get(cat)).toBe(cachedCat);
+        expect(cache.get(dog)).toBe(cachedDog);
+        expect(collectionCallback).toHaveBeenCalledTimes(1);
+        expect(catCallback).toHaveBeenCalledTimes(1);
+
+        for (const id of connections) {
+            id.unsubscribe();
+        }
     });
 
     it('should update Snapshot when its data changed', async () => {
@@ -1770,7 +1807,7 @@ describe('Onyx', () => {
                     ONYX_KEYS.COLLECTION.ROUTES,
                 );
 
-                connections.map((id) => Onyx.disconnect(id));
+                connections.map((id) => id.unsubscribe());
             });
         });
 
@@ -1857,7 +1894,7 @@ describe('Onyx', () => {
                     ONYX_KEYS.COLLECTION.PEOPLE,
                 );
 
-                connections.map((id) => Onyx.disconnect(id));
+                connections.map((id) => id.unsubscribe());
             });
         });
 
@@ -2428,8 +2465,8 @@ describe('Onyx', () => {
             expect(individualCallback1).toHaveBeenCalledWith({id: '1', name: 'Updated Item 1'}, key1);
             expect(individualCallback2).toHaveBeenCalledWith({id: '2', name: 'Updated Item 2'}, key2);
 
-            Onyx.disconnect(connection1);
-            Onyx.disconnect(connection2);
+            connection1.unsubscribe();
+            connection2.unsubscribe();
         });
 
         it('should not save a RAM-only collection to storage', async () => {
@@ -4186,7 +4223,7 @@ describe('RAM-only keys should not read from storage', () => {
         expect(receivedValue).toBeUndefined();
         expect(cache.get(ONYX_KEYS.RAM_ONLY_TEST_KEY)).toBeUndefined();
 
-        Onyx.disconnect(connection);
+        connection.unsubscribe();
     });
 
     it('should not return stale storage data for RAM-only collection members via multiGet', async () => {
@@ -4216,7 +4253,7 @@ describe('RAM-only keys should not read from storage', () => {
         expect(cache.get(collectionMember1)).toBeUndefined();
         expect(cache.get(collectionMember2)).toBeUndefined();
 
-        Onyx.disconnect(connection);
+        connection.unsubscribe();
     });
 
     it('should not include stale RAM-only keys in getAllKeys results', async () => {
@@ -4297,7 +4334,7 @@ describe('RAM-only keys should not read from storage', () => {
         // Should never receive the stale value
         expect(receivedValues.every((v) => v === undefined || v === null)).toBe(true);
 
-        Onyx.disconnect(connection);
+        connection.unsubscribe();
     });
 
     it('should still work correctly for normal keys when RAM-only keys have stale storage data', async () => {
@@ -4333,8 +4370,8 @@ describe('RAM-only keys should not read from storage', () => {
         // RAM-only key should NOT read stale value from storage
         expect(ramOnlyValue).toBeUndefined();
 
-        Onyx.disconnect(connection1);
-        Onyx.disconnect(connection2);
+        connection1.unsubscribe();
+        connection2.unsubscribe();
     });
 
     it('should not sync RAM-only keys from other instances via keepInstancesSync', async () => {
@@ -4381,8 +4418,8 @@ describe('RAM-only keys should not read from storage', () => {
 
         expect(normalValue).toEqual('synced_normal_value');
 
-        Onyx.disconnect(connection);
-        Onyx.disconnect(connection2);
+        connection.unsubscribe();
+        connection2.unsubscribe();
     });
 
     it('should notify collection-root and collection member subscribers when a collection member syncs from another instance', async () => {
@@ -4429,8 +4466,8 @@ describe('RAM-only keys should not read from storage', () => {
         // The collection member subscriber must receive the synced data.
         expect(collectionMember2).toEqual({name: 'entry 2 changed'});
 
-        Onyx.disconnect(collectionConn);
-        Onyx.disconnect(collectionMember2Conn);
+        collectionConn.unsubscribe();
+        collectionMember2Conn.unsubscribe();
     });
 
     it('should notify a collection-root subscriber once when multiple members sync from another instance', async () => {
@@ -4471,7 +4508,7 @@ describe('RAM-only keys should not read from storage', () => {
         expect(collection[`${ONYX_KEYS.COLLECTION.TEST_KEY}2`]).toEqual({name: 'entry 2'});
         expect(collection[`${ONYX_KEYS.COLLECTION.TEST_KEY}3`]).toEqual({name: 'entry 3 changed'});
 
-        Onyx.disconnect(connection);
+        connection.unsubscribe();
     });
 
     it('should notify subscribers with undefined when a collection member is removed in another instance', async () => {
@@ -4516,8 +4553,8 @@ describe('RAM-only keys should not read from storage', () => {
         // The collection-root subscriber must receive the collection without the removed member.
         expect(collection).toEqual({[`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]: {name: 'entry 1'}});
 
-        Onyx.disconnect(collectionConn);
-        Onyx.disconnect(collectionMember2Conn);
+        collectionConn.unsubscribe();
+        collectionMember2Conn.unsubscribe();
     });
 
     it('should serve RAM-only keys from cache and normal keys from storage in multiGet', async () => {
@@ -4575,7 +4612,7 @@ describe('RAM-only keys should not read from storage', () => {
         const storageValue = await StorageMock.getItem(ONYX_KEYS.RAM_ONLY_TEST_KEY);
         expect(storageValue).toEqual('stale_value');
 
-        Onyx.disconnect(connection);
+        connection.unsubscribe();
     });
 });
 
@@ -4673,7 +4710,7 @@ describe('null-free cache with init options', () => {
         expect(cache.get(ONYX_KEYS.OTHER_TEST)).toBe(valueAfterFirstClear);
         expect(callback).toHaveBeenCalledTimes(1);
 
-        Onyx.disconnect(connection);
+        connection.unsubscribe();
     });
 
     it('should remove nested nulls from a value synced from another instance', async () => {
@@ -4698,6 +4735,6 @@ describe('null-free cache with init options', () => {
         expect(cache.get(ONYX_KEYS.TEST_KEY)).toStrictEqual({a: {c: 1}});
         expect(receivedValue).toStrictEqual({a: {c: 1}});
 
-        Onyx.disconnect(connection);
+        connection.unsubscribe();
     });
 });

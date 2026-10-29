@@ -2,9 +2,10 @@
  * The SQLiteStorage provider stores everything in a key/value store by
  * converting the value to a JSON string
  */
-import type {BatchQueryCommand, NitroSQLiteConnection, QueryResult} from 'react-native-nitro-sqlite';
+import type {BatchQueryCommand, NitroSQLiteConnection, PreparedStatement, QueryResult} from 'react-native-nitro-sqlite';
 import {open} from 'react-native-nitro-sqlite';
 import {getFreeDiskStorage} from 'react-native-device-info';
+import * as Logger from '../../Logger';
 import type {FastMergeReplaceNullPatch} from '../../utils';
 import utils from '../../utils';
 import type StorageProvider from './types';
@@ -16,6 +17,11 @@ import classifySQLiteError from './classifySQLiteError';
  */
 type CompileOptionsResult = {
     compile_options: string;
+};
+
+/** The result of aggregating all stored key/value pairs into one JSON string. */
+type AggregatedKeyValuePairsResult = {
+    aggregated: string | null;
 };
 
 /**
@@ -50,6 +56,33 @@ const COMPILE_OPTIONS = {
 
 /** SQLite's maximum number of bound parameters per statement, read once from PRAGMA compile_options in init(). */
 let sqliteMaxVariableNumber = SQLITE_MAX_VARIABLE_NUMBER;
+let readStore: NitroSQLiteConnection | undefined;
+let getItemStatement: PreparedStatement | undefined;
+let setItemStatement: PreparedStatement | undefined;
+let removeItemStatement: PreparedStatement | undefined;
+let pendingWrite: Promise<void> = Promise.resolve();
+let pendingWriteCount = 0;
+
+function trackWrite<TResult>(operation: Promise<TResult>): Promise<TResult> {
+    // All writes use the same NitroSQLite connection queue and finish in call order.
+    // A failed write still releases later reads; its caller receives the rejection.
+    pendingWriteCount++;
+    pendingWrite = operation.then(
+        () => {
+            pendingWriteCount--;
+        },
+        () => {
+            pendingWriteCount--;
+        },
+    );
+    return operation;
+}
+
+function readAfterPendingWrites<TResult>(read: () => Promise<TResult>): Promise<TResult> {
+    // Capture the writes already queued when the read was requested. New writes can run
+    // alongside this read on the separate connection once those writes have committed.
+    return pendingWriteCount === 0 ? read() : pendingWrite.then(read);
+}
 
 /**
  * Returns the value of a compile option from the rows returned by `PRAGMA compile_options`.
@@ -106,13 +139,17 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
      */
     name: 'SQLiteProvider',
     /**
-     * Classifies a SQLite write failure into the shared storage taxonomy.
+     * Classifies a SQLite failure into the shared storage taxonomy.
      */
     classifyError: classifySQLiteError,
     /**
      * Initializes the storage provider
      */
     init() {
+        if (provider.store) {
+            return;
+        }
+
         provider.store = open({name: DB_NAME});
 
         provider.store.execute('CREATE TABLE IF NOT EXISTS keyvaluepairs (record_key TEXT NOT NULL PRIMARY KEY , valueJSON JSON NOT NULL) WITHOUT ROWID;');
@@ -129,13 +166,46 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
         // stores it in a global variable, that is going to be used during runtime.
         const maxVariableNumber = Number(getCompileOptionValue(compileOptionsResult, COMPILE_OPTIONS.MAX_VARIABLE_NUMBER));
         sqliteMaxVariableNumber = maxVariableNumber > 0 ? maxVariableNumber : SQLITE_MAX_VARIABLE_NUMBER;
+
+        setItemStatement = provider.store.prepare('REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);');
+        removeItemStatement = provider.store.prepare('DELETE FROM keyvaluepairs WHERE record_key = ?;');
+
+        let independentReader: NitroSQLiteConnection | undefined;
+        try {
+            // WAL lets the read-only handle read committed data while the writer is active.
+            independentReader = open({name: DB_NAME, connection: 'independent', readOnly: true});
+            // Cache size is connection-local. WAL is shared, and synchronous only controls writes.
+            independentReader.execute('PRAGMA CACHE_SIZE=-8000;');
+            // Reads are not retried by Onyx; allow temporary WAL locks to clear.
+            independentReader.execute('PRAGMA busy_timeout=2000;');
+            getItemStatement = independentReader.prepare('SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key = ?;');
+            readStore = independentReader;
+        } catch (error) {
+            // SQLite can report failures on first use, so protect all reader setup.
+            Logger.logInfo('SQLite independent reader unavailable, reading through the writer.', {
+                error: error instanceof Error ? error.message : String(error),
+            });
+            try {
+                independentReader?.close();
+            } catch (cleanupError) {
+                // Reader cleanup must not prevent the writer from serving reads.
+                Logger.logInfo('SQLite independent reader cleanup failed.', {
+                    error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+                });
+            }
+            readStore = provider.store;
+            getItemStatement = provider.store.prepare('SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key = ?;');
+        }
+        pendingWrite = Promise.resolve();
+        pendingWriteCount = 0;
     },
     getItem(key) {
-        if (!provider.store) {
+        const statement = getItemStatement;
+        if (!statement) {
             throw new Error('Store is not initialized!');
         }
 
-        return provider.store.executeAsync<OnyxSQLiteKeyValuePair>('SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key = ?;', [key]).then(({rows}) => {
+        return readAfterPendingWrites(() => statement.executeAsync<OnyxSQLiteKeyValuePair>([key])).then(({rows}) => {
             if (!rows || rows?.length === 0) {
                 return null;
             }
@@ -152,7 +222,7 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
         });
     },
     multiGet(keys) {
-        if (!provider.store) {
+        if (!readStore) {
             throw new Error('Store is not initialized!');
         }
 
@@ -161,18 +231,23 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
         }
 
         const keyChunks = utils.chunkArray(keys, sqliteMaxVariableNumber);
+        const reader = readStore;
+        const commands = keyChunks.map((keyChunk) => ({
+            query: `SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key IN (${keyChunk.map(() => '?').join(',')});`,
+            params: keyChunk,
+        }));
 
-        return Promise.all(
-            keyChunks.map((keyChunk) => {
-                if (!provider.store) {
-                    throw new Error('Store is not initialized!');
-                }
+        const readChunks = () => {
+            if (commands.length === 1) {
+                const {query, params} = commands[0];
+                return reader.executeAsync<OnyxSQLiteKeyValuePair>(query, params).then((result) => [result]);
+            }
 
-                const placeholders = keyChunk.map(() => '?').join(',');
-                const command = `SELECT record_key, valueJSON FROM keyvaluepairs WHERE record_key IN (${placeholders});`;
-                return provider.store.executeAsync<OnyxSQLiteKeyValuePair>(command, keyChunk);
-            }),
-        ).then((results) => {
+            // Keep all chunks on one snapshot even if the writer commits between queries.
+            return reader.transaction((tx) => Promise.all(commands.map(({query, params}) => tx.executeAsync<OnyxSQLiteKeyValuePair>(query, params))));
+        };
+
+        return readAfterPendingWrites(readChunks).then((results) => {
             const result = results.flatMap(
                 ({rows}) =>
                     // eslint-disable-next-line no-underscore-dangle
@@ -182,11 +257,11 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
         });
     },
     setItem(key, value) {
-        if (!provider.store) {
+        if (!setItemStatement) {
             throw new Error('Store is not initialized!');
         }
 
-        return provider.store.executeAsync('REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);', [key, JSON.stringify(value)]).then(() => undefined);
+        return trackWrite(setItemStatement.executeAsync([key, JSON.stringify(value)]).then(() => undefined));
     },
     multiSet(pairs) {
         if (!provider.store) {
@@ -198,7 +273,7 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
         if (utils.isEmptyObject(params)) {
             return Promise.resolve();
         }
-        return provider.store.executeBatchAsync([{query, params}]).then(() => undefined);
+        return trackWrite(provider.store.executeBatchAsync([{query, params}]).then(() => undefined));
     },
     multiMerge(pairs) {
         if (!provider.store) {
@@ -247,46 +322,48 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
             commands.push({query: replaceQuery, params: replaceQueryArguments});
         }
 
-        return provider.store.executeBatchAsync(commands).then(() => undefined);
+        return trackWrite(provider.store.executeBatchAsync(commands).then(() => undefined));
     },
     mergeItem(key, change, replaceNullPatches) {
         // Since Onyx already merged the existing value with the changes, we can just set the value directly.
         return provider.multiMerge([[key, change, replaceNullPatches]]);
     },
     getAllKeys() {
-        if (!provider.store) {
+        if (!readStore) {
             throw new Error('Store is not initialized!');
         }
 
-        return provider.store.executeAsync('SELECT record_key FROM keyvaluepairs;').then(({rows}) => {
+        const reader = readStore;
+        return readAfterPendingWrites(() => reader.executeAsync('SELECT record_key FROM keyvaluepairs;')).then(({rows}) => {
             // eslint-disable-next-line no-underscore-dangle
             const result = rows?._array.map((row) => row.record_key);
             return (result ?? []) as StorageKeyList;
         });
     },
     getAll() {
-        if (!provider.store) {
+        if (!readStore) {
             throw new Error('Store is not initialized!');
         }
 
         // Aggregate the whole table into a single JSON string in SQLite so we only run JSON.parse
         // once, instead of returning every row and parsing each one individually in JavaScript.
-        return provider.store
-            .executeAsync<{aggregated: string | null}>('SELECT json_group_array(json_array(record_key, json(valueJSON))) AS aggregated FROM keyvaluepairs;')
-            .then(({rows}) => {
-                const aggregated = rows?.item(0)?.aggregated;
-                if (aggregated == null) {
-                    return [];
-                }
-                return JSON.parse(aggregated) as StorageKeyValuePair[];
-            });
+        const reader = readStore;
+        return readAfterPendingWrites(() =>
+            reader.executeAsync<AggregatedKeyValuePairsResult>('SELECT json_group_array(json_array(record_key, json(valueJSON))) AS aggregated FROM keyvaluepairs;'),
+        ).then(({rows}) => {
+            const aggregated = rows?.item(0)?.aggregated;
+            if (aggregated == null) {
+                return [];
+            }
+            return JSON.parse(aggregated) as StorageKeyValuePair[];
+        });
     },
     removeItem(key) {
-        if (!provider.store) {
+        if (!removeItemStatement) {
             throw new Error('Store is not initialized!');
         }
 
-        return provider.store.executeAsync('DELETE FROM keyvaluepairs WHERE record_key = ?;', [key]).then(() => undefined);
+        return trackWrite(removeItemStatement.executeAsync([key]).then(() => undefined));
     },
     removeItems(keys) {
         if (!provider.store) {
@@ -306,22 +383,27 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
 
         if (keyChunks.length === 1) {
             const keyChunk = keyChunks[0];
-            return provider.store.executeAsync(buildDeleteQuery(keyChunk), keyChunk).then(() => undefined);
+            return trackWrite(provider.store.executeAsync(buildDeleteQuery(keyChunk), keyChunk).then(() => undefined));
         }
 
-        const commands: BatchQueryCommand[] = keyChunks.map((keyChunk) => ({
-            query: buildDeleteQuery(keyChunk),
-            params: keyChunk,
-        }));
+        const firstChunk = keyChunks[0];
+        const lastChunk = keyChunks[keyChunks.length - 1];
+        const hasSmallerLastChunk = lastChunk.length < firstChunk.length;
+        // NitroSQLite reuses one prepared statement for each grouped parameter set.
+        // Only the final partial chunk needs a different number of placeholders.
+        const commands: BatchQueryCommand[] = [{query: buildDeleteQuery(firstChunk), params: hasSmallerLastChunk ? keyChunks.slice(0, -1) : keyChunks}];
+        if (hasSmallerLastChunk) {
+            commands.push({query: buildDeleteQuery(lastChunk), params: lastChunk});
+        }
 
-        return provider.store.executeBatchAsync(commands).then(() => undefined);
+        return trackWrite(provider.store.executeBatchAsync(commands).then(() => undefined));
     },
     clear() {
         if (!provider.store) {
             throw new Error('Store is not initialized!');
         }
 
-        return provider.store.executeAsync('DELETE FROM keyvaluepairs;', []).then(() => undefined);
+        return trackWrite(provider.store.executeAsync('DELETE FROM keyvaluepairs;', []).then(() => undefined));
     },
     getDatabaseSize() {
         if (!provider.store) {

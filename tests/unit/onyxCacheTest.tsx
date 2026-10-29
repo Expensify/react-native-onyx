@@ -970,6 +970,37 @@ describe('Onyx', () => {
                 expect(before).toBe(after);
             });
 
+            it('should keep the cached array reference and not mark collection dirty when merged array is deep-equal', async () => {
+                await initOnyx();
+                const memberKey = `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`;
+                await Onyx.set(memberKey, [{name: 'item', data: {value: 1}}]);
+
+                const cachedValue = cache.get(memberKey);
+                const before = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+
+                // Merge a new, deep-equal array
+                cache.merge({[memberKey]: [{name: 'item', data: {value: 1}}]});
+
+                expect(cache.get(memberKey)).toBe(cachedValue);
+                // A rebuild would reuse the snapshot too, so check the dirty set directly.
+                expect((cache as unknown as {dirtyCollections: Set<string>}).dirtyCollections.has(ONYX_KEYS.COLLECTION.MOCK_COLLECTION)).toBe(false);
+                expect(cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION)).toBe(before);
+            });
+
+            it('should replace the cached array when merged array differs', async () => {
+                await initOnyx();
+                const memberKey = `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`;
+                await Onyx.set(memberKey, [{name: 'item', data: {value: 1}}]);
+
+                const before = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+                const newValue = [{name: 'item', data: {value: 2}}];
+
+                cache.merge({[memberKey]: newValue});
+
+                expect(cache.get(memberKey)).toBe(newValue);
+                expect(cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION)).not.toBe(before);
+            });
+
             it('should mark collection dirty when a member value changes', async () => {
                 await initOnyx();
                 await Onyx.set(`${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`, {id: 1});

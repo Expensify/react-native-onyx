@@ -52,6 +52,8 @@ const testMergeChanges: DeepObject[] = [
     },
 ];
 
+const KEEP_EQUAL_ARRAYS = {shouldKeepEqualArrays: true};
+
 describe('utils', () => {
     describe('fastMerge', () => {
         describe('primitives', () => {
@@ -308,6 +310,137 @@ describe('utils', () => {
                 expect(result.result.a).not.toBe(target.a);
                 expect(result.result.a.b).not.toBe(target.a.b);
                 expect(result.result.a.b).toEqual({c: 99, d: 2});
+            });
+
+            it('should return the source array when "shouldKeepEqualArrays" is not set', () => {
+                const source = [1, 2];
+                expect(utils.fastMerge([1, 2], source).result).toBe(source);
+
+                const nestedSource = {a: [1]};
+                const result = utils.fastMerge<GenericDeepRecord>({a: [1]}, nestedSource);
+                expect(result.result.a).toBe(nestedSource.a);
+            });
+
+            it('should return the target array when the source array is deep-equal', () => {
+                const target = [1, 2];
+                const result = utils.fastMerge(target, [1, 2], KEEP_EQUAL_ARRAYS);
+                expect(result.result).toBe(target);
+            });
+
+            it('should return the source array when the source array differs', () => {
+                const target = [1, 2];
+                const source = [1, 3];
+                const result = utils.fastMerge(target, source, KEEP_EQUAL_ARRAYS);
+                expect(result.result).toBe(source);
+            });
+
+            it('should return the target array when merging an empty array into an empty array', () => {
+                const target: unknown[] = [];
+                const result = utils.fastMerge(target, [], KEEP_EQUAL_ARRAYS);
+                expect(result.result).toBe(target);
+            });
+
+            it('should return the target object when a nested array is deep-equal', () => {
+                const nestedArray = [{x: 1}];
+                const target = {a: nestedArray, b: 1};
+                const source = {a: [{x: 1}]};
+                const result = utils.fastMerge<GenericDeepRecord>(target, source, KEEP_EQUAL_ARRAYS);
+                expect(result.result).toBe(target);
+                expect(result.result.a).toBe(nestedArray);
+            });
+
+            it.each([
+                ['before', {b: 2, a: [1]}],
+                ['after', {a: [1], b: 2}],
+            ])('should not compare a nested array when a sibling %s it changes', (_, source) => {
+                const target = {a: [1], b: 1};
+                const result = utils.fastMerge<GenericDeepRecord>(target, source, KEEP_EQUAL_ARRAYS);
+                expect(result.result).toEqual({a: [1], b: 2});
+                expect(result.result.a).toBe(source.a);
+            });
+
+            it('should not compare a nested array when a target key is removed', () => {
+                const target = {a: [1], b: 1};
+                const source = {a: [1], b: null};
+                const result = utils.fastMerge<GenericDeepRecord>(target, source, {...KEEP_EQUAL_ARRAYS, shouldRemoveNestedNulls: true});
+                expect(result.result).toEqual({a: [1]});
+                expect(result.result.a).toBe(source.a);
+            });
+
+            it('should preserve a nested object with deep-equal arrays when a sibling of that object changes', () => {
+                const nestedObject = {a: [1]};
+                const target = {x: nestedObject, b: 1};
+                const source = {x: {a: [1]}, b: 2};
+                const result = utils.fastMerge<GenericDeepRecord>(target, source, KEEP_EQUAL_ARRAYS);
+                expect(result.result).not.toBe(target);
+                expect(result.result.x).toBe(nestedObject);
+            });
+
+            it('should return a new object when one of several nested arrays differs', () => {
+                const target = {a: [1], b: [2], c: 'c'};
+                const source = {a: [1], b: [3]};
+                const result = utils.fastMerge<GenericDeepRecord>(target, source, KEEP_EQUAL_ARRAYS);
+                expect(result.result).not.toBe(target);
+                expect(result.result).toEqual({a: [1], b: [3], c: 'c'});
+            });
+
+            it('should return the target object when several nested arrays are deep-equal', () => {
+                const target = {a: [1], b: [{c: 2}], d: 'd'};
+                const result = utils.fastMerge<GenericDeepRecord>(target, {a: [1], b: [{c: 2}], d: 'd'}, KEEP_EQUAL_ARRAYS);
+                expect(result.result).toBe(target);
+            });
+
+            it('should return the source array when a nested array differs', () => {
+                const target = {a: [{x: 1}], b: 1};
+                const source = {a: [{x: 2}]};
+                const result = utils.fastMerge<GenericDeepRecord>(target, source, KEEP_EQUAL_ARRAYS);
+                expect(result.result).not.toBe(target);
+                expect(result.result.a).toBe(source.a);
+            });
+
+            it('should treat arrays of objects with a different key order as deep-equal', () => {
+                const target = [{a: 1, b: 2}];
+                const result = utils.fastMerge<unknown[]>(target, [{b: 2, a: 1}], KEEP_EQUAL_ARRAYS);
+                expect(result.result).toBe(target);
+            });
+
+            it('should compare null elements inside arrays as they are', () => {
+                const target = [null, {a: null}];
+                expect(utils.fastMerge<unknown[]>(target, [null, {a: null}], {...KEEP_EQUAL_ARRAYS, shouldRemoveNestedNulls: true}).result).toBe(target);
+
+                const source = [null, {a: 1}];
+                expect(utils.fastMerge<unknown[]>(target, source, {...KEEP_EQUAL_ARRAYS, shouldRemoveNestedNulls: true}).result).toBe(source);
+            });
+
+            it.each([
+                ['an extra key in the source', [{a: 1}], [{a: 1, b: 2}]],
+                ['a missing key in the source', [{a: 1, b: 2}], [{a: 1}]],
+                ['an undefined value instead of a missing key', [{a: 1}], [{a: 1, b: undefined}]],
+                ['a different key with the same key count', [{a: 1}], [{b: 1}]],
+                ['a different nested array length', [{a: [1, 2]}], [{a: [1]}]],
+                ['an array instead of an object', [{0: 1}], [[1]]],
+                ['a different primitive type', [1], ['1']],
+                ['a different Date', [new Date(1)], [new Date(2)]],
+                ['a different Map', [new Map([['a', 1]])], [new Map([['a', 2]])]],
+            ])('should return the source array when the arrays differ by %s', (_, target, source) => {
+                expect(utils.fastMerge<unknown[]>(target, source, KEEP_EQUAL_ARRAYS).result).toBe(source);
+            });
+
+            it.each([
+                ['nested arrays and objects', [{a: [1, {b: [2, 3]}], c: {d: 'e'}}], [{a: [1, {b: [2, 3]}], c: {d: 'e'}}]],
+                ['objects without a prototype', [Object.assign(Object.create(null) as object, {a: 1})], [{a: 1}]],
+                ['Dates', [new Date(1)], [new Date(1)]],
+                ['Maps', [new Map([['a', {b: 1}]])], [new Map([['a', {b: 1}]])]],
+                ['booleans, strings and nulls', [true, 'a', null], [true, 'a', null]],
+            ])('should return the target array when the arrays contain deep-equal %s', (_, target, source) => {
+                expect(utils.fastMerge<unknown[]>(target, source, KEEP_EQUAL_ARRAYS).result).toBe(target);
+            });
+
+            it('should replace an array with an object and an object with an array', () => {
+                const arraySource = [1];
+                const objectSource = {0: 1};
+                expect(utils.fastMerge<unknown>({0: 1}, arraySource).result).toBe(arraySource);
+                expect(utils.fastMerge<unknown>([1], objectSource).result).toEqual({0: 1});
             });
         });
     });

@@ -1,4 +1,6 @@
+import {NitroSQLiteError, NitroSQLiteExceptionType} from 'react-native-nitro-sqlite/errors';
 import classifyIDBError from '../../../../lib/storage/providers/IDBKeyValProvider/classifyError';
+import classifySQLiteError from '../../../../lib/storage/providers/classifySQLiteError';
 import {StorageErrorClass} from '../../../../lib/storage/errors';
 
 describe('classifyIDBError', () => {
@@ -28,5 +30,33 @@ describe('classifyIDBError', () => {
         [new Error('some brand new failure'), StorageErrorClass.UNKNOWN],
     ])('classifies %s as %s', (error, expectedClass) => {
         expect(classifyIDBError(error)).toBe(expectedClass);
+    });
+});
+
+describe('classifySQLiteError', () => {
+    it.each([
+        [new Error('database or disk is full'), StorageErrorClass.CAPACITY],
+        [new Error(`[NativeNitroSQLiteException][${NitroSQLiteExceptionType.SqlExecutionError}] database or disk is full`), StorageErrorClass.CAPACITY],
+        [new Error('disk I/O error'), StorageErrorClass.DISK_PRESSURE],
+        [new Error('unable to open database file'), StorageErrorClass.DISK_PRESSURE],
+        [new NitroSQLiteError(`[NativeNitroSQLiteException][${NitroSQLiteExceptionType.DatabaseCannotBeOpened}] Cannot create the database`), StorageErrorClass.UNAVAILABLE],
+        [new NitroSQLiteError(`[NativeNitroSQLiteException][${NitroSQLiteExceptionType.DatabaseCannotBeOpened}] database or disk is full`), StorageErrorClass.UNAVAILABLE],
+        [{type: NitroSQLiteExceptionType.DatabaseCannotBeOpened, message: 'Permission denied'}, StorageErrorClass.UNAVAILABLE],
+        // Encryption configuration and closed-connection errors do not mean that storage is unavailable.
+        [{type: NitroSQLiteExceptionType.EncryptionNotEnabled, message: 'SEE is not enabled'}, StorageErrorClass.UNKNOWN],
+        [{type: NitroSQLiteExceptionType.DatabaseCannotBeDecrypted, message: 'Wrong key'}, StorageErrorClass.UNKNOWN],
+        [{type: NitroSQLiteExceptionType.DatabaseNotOpen, message: 'Database is closed'}, StorageErrorClass.UNKNOWN],
+        [new Error('some brand new failure'), StorageErrorClass.UNKNOWN],
+        [{type: null}, StorageErrorClass.UNKNOWN],
+        ['DatabaseCannotBeOpened', StorageErrorClass.UNKNOWN],
+        [null, StorageErrorClass.UNKNOWN],
+        [undefined, StorageErrorClass.UNKNOWN],
+    ])('classifies %s as %s', (error, expectedClass) => {
+        // Given either a structured native error or a legacy SQLite message.
+        // When classifying without initializing the native module.
+        const errorClass = classifySQLiteError(error);
+
+        // Then native open failures use memory storage, while write failures retain their recovery class.
+        expect(errorClass).toBe(expectedClass);
     });
 });
