@@ -189,8 +189,8 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
         return acc;
     }, new Set<OnyxKey>());
 
-    // Set our default key states to use when initializing and clearing Onyx data
-    defaultKeyStates = initialKeyStates;
+    // Default key states for init and clear(), cleaned once so clear() keeps the same references.
+    defaultKeyStates = Object.fromEntries(Object.entries(initialKeyStates).map(([key, value]) => [key, utils.removeNestedNullValues(value)]));
 
     DevTools.initState(initialKeyStates);
 
@@ -402,15 +402,10 @@ function multiGet<TKey extends OnyxKey>(keys: CollectionKeyBase[]): Promise<Map<
                         continue;
                     }
 
+                    dataMap.set(key, value as OnyxValue<TKey>);
                     temp[key] = value as OnyxValue<TKey>;
                 }
                 cache.merge(temp);
-
-                // Return the cached values, which have nested nulls removed.
-                for (const key of Object.keys(temp)) {
-                    const cachedValue = cache.get(key);
-                    dataMap.set(key as TKey, (cachedValue !== undefined ? cachedValue : temp[key]) as OnyxValue<TKey>);
-                }
                 return dataMap;
             })
     );

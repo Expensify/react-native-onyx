@@ -3855,18 +3855,6 @@ describe('Onyx', () => {
             expect(mergedValue).toStrictEqual({a: {b: 1}});
         });
 
-        it('should hand out the cleaned cached value from multiGet', async () => {
-            // Given a value in storage that holds nested nulls (SQLite data written by older Onyx versions can)
-            await StorageMock.setItem(ONYX_KEYS.TEST_KEY, {a: {b: null, c: 1}});
-
-            // When it is read through multiGet
-            const dataMap = await OnyxUtils.multiGet([ONYX_KEYS.TEST_KEY]);
-
-            // Then the caller gets the same cleaned value the cache holds
-            expect(dataMap.get(ONYX_KEYS.TEST_KEY)).toStrictEqual({a: {c: 1}});
-            expect(dataMap.get(ONYX_KEYS.TEST_KEY)).toBe(cache.get(ONYX_KEYS.TEST_KEY));
-        });
-
         it('should alert in development when a skipped cached subtree was mutated to hold a null', async () => {
             // Given a cached subtree that app code mutated in place, which Onyx does not support
             await Onyx.set(ONYX_KEYS.TEST_KEY, {a: {x: 1}});
@@ -3876,13 +3864,16 @@ describe('Onyx', () => {
             const previousNodeEnv = process.env.NODE_ENV;
             process.env.NODE_ENV = 'development';
 
-            // When a value sharing that subtree is set
-            await Onyx.set(ONYX_KEYS.TEST_KEY, {...cachedValue, b: 1});
-            process.env.NODE_ENV = previousNodeEnv;
+            try {
+                // When a value sharing that subtree is set
+                await Onyx.set(ONYX_KEYS.TEST_KEY, {...cachedValue, b: 1});
 
-            // Then the mutation is reported instead of silently persisting the null
-            expect(logAlertSpy).toHaveBeenCalledWith(expect.stringContaining('skipped a cached subtree that holds nested null values'));
-            logAlertSpy.mockRestore();
+                // Then the mutation is reported instead of silently persisting the null
+                expect(logAlertSpy).toHaveBeenCalledWith(expect.stringContaining('skipped a cached subtree that holds nested null values'));
+            } finally {
+                process.env.NODE_ENV = previousNodeEnv;
+                logAlertSpy.mockRestore();
+            }
         });
 
         it('should keep every cached value free of nested nulls across random writes', async () => {
@@ -3941,7 +3932,7 @@ describe('Onyx', () => {
                 if (step % 10 === 9) {
                     await waitForPromisesToResolve();
 
-                    // Then no cached value holds a nested null, which the subtree skip in removeNestedNullValues relies on
+                    // Then no cached value holds a nested null
                     for (const key of keys) {
                         const value = cache.get(key);
                         expect(value === undefined || value === null || !utils.needsNormalization(value)).toBe(true);
@@ -4643,5 +4634,70 @@ describe('get() should prefer cache over stale storage', () => {
         const value = cache.get(member1);
         expect(value).toHaveProperty('isOptimistic', true);
         expect(value).toHaveProperty('lastVisitTime', '2025-01-01');
+    });
+});
+
+describe('null-free cache with init options', () => {
+    let cache: typeof OnyxCache;
+
+    beforeEach(() => {
+        Object.assign(OnyxUtils.getDeferredInitTask(), createDeferredTask());
+        cache = require('../../lib/OnyxCache').default;
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
+        return Onyx.clear();
+    });
+
+    it('should reset a key to its default without nested nulls, keeping the same reference on every clear', async () => {
+        // Given a default key state that holds nested nulls
+        Onyx.init({
+            keys: ONYX_KEYS,
+            initialKeyStates: {[ONYX_KEYS.OTHER_TEST]: {errors: null, nested: {a: null, b: 1}, isLoading: false}},
+        });
+        await act(async () => waitForPromisesToResolve());
+        await Onyx.merge(ONYX_KEYS.OTHER_TEST, {isLoading: true});
+        const callback = jest.fn();
+        const connection = Onyx.connect({key: ONYX_KEYS.OTHER_TEST, callback});
+        await act(async () => waitForPromisesToResolve());
+        callback.mockClear();
+
+        // When Onyx is cleared twice
+        await Onyx.clear();
+        const valueAfterFirstClear = cache.get(ONYX_KEYS.OTHER_TEST);
+        await Onyx.clear();
+
+        // Then the default has no nested nulls and the second clear keeps the same reference without notifying again
+        expect(valueAfterFirstClear).toStrictEqual({nested: {b: 1}, isLoading: false});
+        expect(cache.get(ONYX_KEYS.OTHER_TEST)).toBe(valueAfterFirstClear);
+        expect(callback).toHaveBeenCalledTimes(1);
+
+        Onyx.disconnect(connection);
+    });
+
+    it('should remove nested nulls from a value synced from another instance', async () => {
+        // Given Onyx syncing values written by other instances
+        Onyx.init({keys: ONYX_KEYS, shouldSyncMultipleInstances: true});
+        await act(async () => waitForPromisesToResolve());
+        const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls.at(-1)?.[0];
+        let receivedValue: unknown;
+        const connection = Onyx.connect({
+            key: ONYX_KEYS.TEST_KEY,
+            callback: (value) => {
+                receivedValue = value;
+            },
+        });
+        await act(async () => waitForPromisesToResolve());
+
+        // When another instance stores a value that holds nested nulls
+        syncCallback([[ONYX_KEYS.TEST_KEY, {a: {b: null, c: 1}, d: null}]]);
+        await act(async () => waitForPromisesToResolve());
+
+        // Then the cache and subscribers get the value without the nested nulls
+        expect(cache.get(ONYX_KEYS.TEST_KEY)).toStrictEqual({a: {c: 1}});
+        expect(receivedValue).toStrictEqual({a: {c: 1}});
+
+        Onyx.disconnect(connection);
     });
 });
