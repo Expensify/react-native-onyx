@@ -99,6 +99,18 @@ describe('OnyxUtils', () => {
 
     afterEach(() => jest.clearAllMocks());
 
+    describe('get', () => {
+        it('should mark a key as known empty when storage returns null for it', async () => {
+            // The key is indexed but has no cached value, and the provider reports a missing row as null.
+            OnyxCache.setAllKeys([ONYXKEYS.TEST_KEY]);
+
+            await expect(OnyxUtils.get(ONYXKEYS.TEST_KEY)).resolves.toBeUndefined();
+
+            expect(OnyxCache.hasNullishStorageKey(ONYXKEYS.TEST_KEY)).toBe(true);
+            expect(OnyxCache.get(ONYXKEYS.TEST_KEY)).toBeUndefined();
+        });
+    });
+
     describe('partialSetCollection', () => {
         beforeEach(() => {
             Onyx.clear();

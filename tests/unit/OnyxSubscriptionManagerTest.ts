@@ -426,6 +426,36 @@ describe('OnyxSubscriptionManager', () => {
             expect(logHmmmSpy).toHaveBeenCalledTimes(1);
         });
 
+        it('should not read storage for a key another tab removed, and still report a later real miss on its collection', async () => {
+            type SyncHandler = (pairs: Array<[OnyxKey, unknown]>) => void;
+            const syncCalls = (StorageMock.keepInstancesSync as jest.Mock).mock.calls as Array<[SyncHandler]>;
+            const syncHandler = syncCalls[syncCalls.length - 1]?.[0];
+            if (!syncHandler) {
+                throw new Error('Onyx.init did not register a sync handler');
+            }
+            const getItemMock = jest.mocked(StorageMock.getItem);
+
+            await Onyx.set(MEMBER_1, {id: 1});
+            await StorageMock.removeItem(MEMBER_1);
+            getItemMock.mockClear();
+            // Another tab removed the key. Its sync read found no row.
+            syncHandler([[MEMBER_1, undefined]]);
+
+            expect(onyxSubscriptionManager.getState(MEMBER_1)).toBeUndefined();
+            await waitForPromisesToResolve();
+            expect(getItemMock).not.toHaveBeenCalled();
+            expect(logHmmmSpy).not.toHaveBeenCalled();
+
+            await StorageMock.setItem(MEMBER_2, {id: 2});
+            cache.drop(MEMBER_2);
+            cache.setAllKeys([MEMBER_1, MEMBER_2]);
+            onyxSubscriptionManager.getState(MEMBER_2);
+            await waitForPromisesToResolve();
+
+            expect(logHmmmSpy).toHaveBeenCalledTimes(1);
+            expect(logHmmmSpy).toHaveBeenCalledWith(expect.stringContaining(COLLECTION));
+        });
+
         it('should not report a key the index does not know, which means init has not loaded it', async () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'from-storage');
             cache.drop(ONYXKEYS.TEST_KEY);

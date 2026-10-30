@@ -79,6 +79,10 @@ function init({
                 // Capture the previous cached value before cache.set() so notifyCollection() can diff old vs new per member.
                 const previousValue = isCollectionMember ? cache.get(key) : undefined;
                 cache.set(key, value);
+                if (value === null || value === undefined) {
+                    // The read found no row, so storage is known empty for this key, not lost from the cache.
+                    cache.addNullishStorageKey(key);
+                }
 
                 if (isCollectionMember && collectionKey) {
                     let batch = collectionBatches.get(collectionKey);

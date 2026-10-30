@@ -307,7 +307,7 @@ function get<TKey extends OnyxKey, TValue extends OnyxValue<TKey>>(key: TKey): P
                 return cachedValue;
             }
 
-            if (val === undefined) {
+            if (val === undefined || val === null) {
                 cache.addNullishStorageKey(key);
                 return undefined;
             }

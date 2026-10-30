@@ -219,6 +219,31 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
         });
 
+        it('should report loaded for a key another tab removed while a merge to it is pending', async () => {
+            type SyncHandler = (pairs: Array<[OnyxKey, unknown]>) => void;
+            const syncCalls = (StorageMock.keepInstancesSync as jest.Mock).mock.calls as Array<[SyncHandler]>;
+            const syncHandler = syncCalls[syncCalls.length - 1]?.[0];
+            if (!syncHandler) {
+                throw new Error('Onyx.init did not register a sync handler');
+            }
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'before');
+            await StorageMock.removeItem(ONYXKEYS.TEST_KEY);
+            syncHandler([[ONYXKEYS.TEST_KEY, undefined]]);
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'after');
+
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
+
+            // The removal is a known state, so the hook does not report loading for the pending merge.
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loaded');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('after');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
         it('should initially return undefined and then return cached value after multiple merge operations', async () => {
             Onyx.merge(ONYXKEYS.TEST_KEY, 'test1');
             Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');
