@@ -5,6 +5,7 @@ import cache from '../../lib/OnyxCache';
 import * as Logger from '../../lib/Logger';
 import OnyxKeys from '../../lib/OnyxKeys';
 import StorageMock from '../../lib/storage';
+import createDeferredTask from '../../lib/createDeferredTask';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 // We need access to some internal properties of `onyxSubscriptionManager` during the tests but they are private,
@@ -395,6 +396,56 @@ describe('OnyxSubscriptionManager', () => {
             await waitForPromisesToResolve();
 
             expect(logHmmmSpy).not.toHaveBeenCalled();
+        });
+
+        it('should keep a value this tab is still writing when a sync read reports the key as removed', async () => {
+            type SyncHandler = (pairs: Array<[OnyxKey, unknown]>) => void;
+            const syncCalls = (StorageMock.keepInstancesSync as jest.Mock).mock.calls as Array<[SyncHandler]>;
+            const syncHandler = syncCalls[syncCalls.length - 1]?.[0];
+            if (!syncHandler) {
+                throw new Error('Onyx.init did not register a sync handler');
+            }
+
+            // Keep the local storage write pending while the sync result arrives.
+            const setItemMock = jest.mocked(StorageMock.setItem);
+            const writeStorage = setItemMock.getMockImplementation();
+            const storageWrite = createDeferredTask();
+            setItemMock.mockImplementationOnce((key, value) => storageWrite.promise.then(() => writeStorage?.(key, value)));
+
+            const localWrite = Onyx.set(ONYXKEYS.TEST_KEY, 'local');
+            await waitForPromisesToResolve();
+            syncHandler([[ONYXKEYS.TEST_KEY, undefined]]);
+
+            expect(cache.get(ONYXKEYS.TEST_KEY)).toBe('local');
+            expect(cache.hasNullishStorageKey(ONYXKEYS.TEST_KEY)).toBe(false);
+
+            storageWrite.resolve();
+            await localWrite;
+            expect(await StorageMock.getItem(ONYXKEYS.TEST_KEY)).toBe('local');
+        });
+
+        it('should not read storage for a key another tab removed, and still report a later real miss on its collection', async () => {
+            const getItemMock = jest.mocked(StorageMock.getItem);
+            getItemMock.mockClear();
+
+            // A removal synced from another tab arrives as cache.set(key, undefined).
+            await Onyx.set(MEMBER_1, {id: 1});
+            await StorageMock.removeItem(MEMBER_1);
+            cache.set(MEMBER_1, undefined);
+
+            onyxSubscriptionManager.getState(MEMBER_1);
+            await waitForPromisesToResolve();
+            expect(getItemMock).not.toHaveBeenCalled();
+            expect(logHmmmSpy).not.toHaveBeenCalled();
+
+            await StorageMock.setItem(MEMBER_2, {id: 2});
+            cache.drop(MEMBER_2);
+            cache.setAllKeys([MEMBER_1, MEMBER_2]);
+            onyxSubscriptionManager.getState(MEMBER_2);
+            await waitForPromisesToResolve();
+
+            expect(logHmmmSpy).toHaveBeenCalledTimes(1);
+            expect(logHmmmSpy).toHaveBeenCalledWith(expect.stringContaining(COLLECTION));
         });
 
         it('should not report a key the index does not know, which means init has not loaded it', async () => {
