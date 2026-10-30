@@ -76,6 +76,9 @@ const mergeQueuesWithStaleRead = new WeakSet<Array<OnyxValue<OnyxKey>>>();
 // Optional user-provided key value states set when Onyx initializes or clears
 let defaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
 
+// Cache for getNullFreeDefaultKeyState()
+let nullFreeDefaultKeyStates: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
+
 let snapshotKey: OnyxKey | null = null;
 
 // Connections can be made before `Onyx.init`. They would wait for this task before resolving.
@@ -121,6 +124,14 @@ function getMergeQueuePromise(): Record<OnyxKey, Promise<void>> {
  */
 function getDefaultKeyStates(): Record<OnyxKey, OnyxValue<OnyxKey>> {
     return defaultKeyStates;
+}
+
+/** Getter - returns the default key state without nested nulls, cached so clear() reuses the same references. */
+function getNullFreeDefaultKeyState(key: OnyxKey): OnyxValue<OnyxKey> {
+    if (!(key in nullFreeDefaultKeyStates)) {
+        nullFreeDefaultKeyStates[key] = utils.removeNestedNullValues(defaultKeyStates[key] ?? null);
+    }
+    return nullFreeDefaultKeyStates[key];
 }
 
 /**
@@ -191,6 +202,7 @@ function initStoreValues(keys: DeepRecord<string, OnyxKey>, initialKeyStates: Pa
 
     // Set our default key states to use when initializing and clearing Onyx data
     defaultKeyStates = initialKeyStates;
+    nullFreeDefaultKeyStates = {};
 
     DevTools.initState(initialKeyStates);
 
@@ -781,7 +793,7 @@ function prepareKeyValuePairsForStorage(
             continue;
         }
 
-        const valueWithoutNestedNullValues = shouldRemoveNestedNulls ?? true ? utils.removeNestedNullValues(value) : value;
+        const valueWithoutNestedNullValues = shouldRemoveNestedNulls ?? true ? utils.removeNestedNullValues(value, cache.get(key)) : value;
 
         if (valueWithoutNestedNullValues !== undefined) {
             pairs.push([key, valueWithoutNestedNullValues, replaceNullPatches?.[key]]);
@@ -1119,7 +1131,7 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
         return Promise.resolve();
     }
 
-    const valueWithoutNestedNullValues = utils.removeNestedNullValues(value) as OnyxValue<TKey>;
+    const valueWithoutNestedNullValues = utils.removeNestedNullValues(value, existingValue) as OnyxValue<TKey>;
     const hasChanged = options?.skipCacheCheck ? true : cache.hasValueChanged(key, valueWithoutNestedNullValues);
 
     OnyxUtils.logKeyChanged(OnyxUtils.METHOD.SET, key, value, hasChanged);
@@ -1697,6 +1709,7 @@ const OnyxUtils = {
     getMergeQueue,
     getMergeQueuePromise,
     getDefaultKeyStates,
+    getNullFreeDefaultKeyState,
     getDeferredInitTask,
     afterInit,
     initStoreValues,
