@@ -71,6 +71,12 @@ function init({
                     continue;
                 }
 
+                // The sync read started when the other tab's event arrived. A local write issued since then is newer
+                // than its empty result, and the other tab will pick that write up through its own sync.
+                if ((value === null || value === undefined) && PendingWrites.getPendingWritesForKey(key).length > 0) {
+                    continue;
+                }
+
                 const collectionKey = OnyxKeys.getCollectionKey(key);
                 const isCollectionMember = !!collectionKey && OnyxKeys.isCollectionMemberKey(collectionKey, key);
 

@@ -45,7 +45,7 @@ class OnyxCache {
     /** Cache of all the storage keys available in persistent storage */
     private storageKeys: Set<OnyxKey>;
 
-    /** A list of keys where a nullish value has been fetched from storage before, but the key still exists in cache */
+    /** A list of keys where a nullish value has been fetched from storage or written to cache, but the key still exists in cache */
     private nullishStorageKeys: Set<OnyxKey>;
 
     /** A map of cached values */
@@ -166,18 +166,17 @@ class OnyxCache {
     /**
      * Set's a key value in cache
      * Adds the key to the storage keys list as well
+     * A nullish value marks the key as known empty in storage
      */
     set(key: OnyxKey, value: OnyxValue<OnyxKey>): OnyxValue<OnyxKey> {
         this.addKey(key);
-
-        // When a key is explicitly set in cache, we can remove it from the list of nullish keys,
-        // since it will either be set to a non nullish value or removed from the cache completely.
-        this.nullishStorageKeys.delete(key);
 
         const collectionKey = OnyxKeys.getCollectionKey(key);
         const oldValue = this.storageMap[key];
 
         if (value === null || value === undefined) {
+            // Stays indexed so `clear` still removes it from storage.
+            this.nullishStorageKeys.add(key);
             delete this.storageMap[key];
 
             if (collectionKey && oldValue !== undefined) {
@@ -186,6 +185,7 @@ class OnyxCache {
             return undefined;
         }
 
+        this.nullishStorageKeys.delete(key);
         this.storageMap[key] = value;
 
         if (collectionKey && oldValue !== value) {
@@ -198,6 +198,7 @@ class OnyxCache {
     /** Forget the cached value for the given key */
     drop(key: OnyxKey): void {
         delete this.storageMap[key];
+        this.nullishStorageKeys.delete(key);
 
         const collectionKey = OnyxKeys.getCollectionKey(key);
         if (collectionKey) {
@@ -258,7 +259,7 @@ class OnyxCache {
                     // the same semantics as the old `cache.merge(allDataFromStorage)` init path: the value
                     // loaded from disk is the merge source, so it wins on any overlapping leaf key.
                     // Note: this only covers non-null writes. A `cache.set(key, null)` that lands before hydrate
-                    // clears the nullish marker too, so a deletion racing init is still undone - same as before.
+                    // marks the key nullish and the non-null branch below clears that mark, so a deletion racing init is still undone - same as before.
                     const merged = utils.fastMerge(existing, value, CACHE_MERGE_OPTIONS).result;
 
                     // fastMerge is reference-stable: returns the original target when

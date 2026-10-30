@@ -3728,6 +3728,16 @@ describe('Onyx', () => {
     });
 
     describe('clear', () => {
+        it('should leave no known-empty mark behind for a cleared key', async () => {
+            await Onyx.set(ONYX_KEYS.TEST_KEY, 'value');
+
+            await Onyx.clear();
+
+            expect(cache.hasNullishStorageKey(ONYX_KEYS.TEST_KEY)).toBe(false);
+            expect(cache.hasCacheForKey(ONYX_KEYS.TEST_KEY)).toBe(false);
+            expect(cache.getAllKeys().has(ONYX_KEYS.TEST_KEY)).toBe(false);
+        });
+
         it('should handle RAM-only keys with defaults correctly during clear', async () => {
             // Set a value for RAM-only key
             await Onyx.set(ONYX_KEYS.RAM_ONLY_TEST_KEY, 'some value');

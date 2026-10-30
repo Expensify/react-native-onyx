@@ -199,9 +199,40 @@ describe('Onyx', () => {
                 // Then the value should be overwritten
                 expect(cache.get('mockKey2')).toEqual({value: []});
             });
+
+            it('should mark a key written as null or undefined as known empty while keeping it indexed', () => {
+                cache.set('mockKey', {value: 'mockValue'});
+                cache.set('mockKey2', {value: 'mockValue'});
+                cache.set('mockKey', null);
+                cache.set('mockKey2', undefined);
+
+                expect(cache.get('mockKey')).toBeUndefined();
+                expect(cache.get('mockKey2')).toBeUndefined();
+                expect(cache.hasNullishStorageKey('mockKey')).toBe(true);
+                expect(cache.hasNullishStorageKey('mockKey2')).toBe(true);
+                expect(cache.hasCacheForKey('mockKey')).toBe(true);
+                expect(cache.getAllKeys()).toEqual(new Set(['mockKey', 'mockKey2']));
+            });
+
+            it('should clear the known-empty mark when a value is written again', () => {
+                cache.set('mockKey', null);
+                cache.set('mockKey', {value: 'mockValue'});
+
+                expect(cache.hasNullishStorageKey('mockKey')).toBe(false);
+                expect(cache.get('mockKey')).toEqual({value: 'mockValue'});
+            });
         });
 
         describe('drop', () => {
+            it('should clear the known-empty mark along with the key', () => {
+                cache.set('mockKey', null);
+                cache.drop('mockKey');
+
+                expect(cache.hasNullishStorageKey('mockKey')).toBe(false);
+                expect(cache.hasCacheForKey('mockKey')).toBe(false);
+                expect(cache.getAllKeys().has('mockKey')).toBe(false);
+            });
+
             it('should remove the key from cache', () => {
                 // Given cache with some items
                 cache.set('mockKey', {items: ['mockValue', 'mockValue2']});
