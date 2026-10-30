@@ -405,11 +405,13 @@ describe('OnyxSubscriptionManager', () => {
         it('should report when a merge lands on the lost value before storage answers', async () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, {a: 1, b: 2});
             forgetValueButKeepKey(ONYXKEYS.TEST_KEY);
-            const getItemMock = StorageMock.getItem as jest.Mock;
-            const readStorage = getItemMock.getMockImplementation() as (key: OnyxKey) => Promise<unknown>;
+
+            // Park the diagnostic's storage read so the merge below lands on the empty cache before it answers.
+            const getItemMock = jest.mocked(StorageMock.getItem);
+            const readStorage = getItemMock.getMockImplementation();
             const storageAnswer = createDeferredTask();
-            getItemMock.mockImplementationOnce((key: OnyxKey) => {
-                const storedValue = readStorage(key);
+            getItemMock.mockImplementationOnce((key) => {
+                const storedValue = readStorage?.(key);
                 return storageAnswer.promise.then(() => storedValue);
             });
 
@@ -418,7 +420,9 @@ describe('OnyxSubscriptionManager', () => {
             storageAnswer.resolve();
             await waitForPromisesToResolve();
 
+            // The merge built on nothing, so {a, b} is gone from cache and storage. The log is the only trace.
             expect(cache.get(ONYXKEYS.TEST_KEY)).toEqual({c: 3});
+            expect(await StorageMock.getItem(ONYXKEYS.TEST_KEY)).toEqual({c: 3});
             expect(logHmmmSpy).toHaveBeenCalledTimes(1);
         });
 
