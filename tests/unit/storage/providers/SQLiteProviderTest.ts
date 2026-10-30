@@ -209,7 +209,7 @@ describe('SQLiteProvider', () => {
         it('does not block later reads after a failed write', async () => {
             getOpenedConnection(0).execute(`CREATE TRIGGER reject_write BEFORE INSERT ON keyvaluepairs
                 BEGIN SELECT RAISE(ABORT, 'rejected write'); END;`);
-            await expect(SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, 'value')).rejects.toThrow('rejected write');
+            await expect(SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, 'value')).rejects.toMatchObject({message: 'rejected write'});
             await expect(SQLiteProvider.getAllKeys()).resolves.toEqual([]);
         });
     });
@@ -295,7 +295,7 @@ describe('SQLiteProvider', () => {
                     [ONYXKEYS.TEST_KEY, 'first'],
                     [ONYXKEYS.TEST_KEY_2, 'second'],
                 ]),
-            ).rejects.toThrow('rejected insert');
+            ).rejects.toMatchObject({message: 'rejected insert'});
 
             // Then the batch is atomic and its failure does not block subsequent reads or writes.
             expect(await SQLiteProvider.getAllKeys()).toEqual([]);
@@ -671,7 +671,7 @@ describe('SQLiteProvider', () => {
                 const keys = entries.map(([key]) => key);
 
                 // When a later delete fails after the first chunk has executed.
-                await expect(SQLiteProvider.removeItems(keys)).rejects.toThrow('rejected delete');
+                await expect(SQLiteProvider.removeItems(keys)).rejects.toMatchObject({message: 'rejected delete'});
 
                 // Then the entire batch rolls back and the writer remains usable.
                 expect(await SQLiteProvider.multiGet(keys)).toEqual(expect.arrayContaining(entries));
