@@ -81,4 +81,43 @@ function memberIsNotACollection() {
     );
 }
 
-export {readCollectionRoot, readCollectionMember, readSingleKey, readPreviousState, rootIsNotAMember, memberIsNotACollection};
+function cannotReadAnUndeclaredSingleKey() {
+    return useOnyxState(
+        // @ts-expect-error the selector only gets the keys its dependencies declared
+        (state) => state[ONYX_KEYS.TEST_KEY],
+        {dependencies: [ONYX_KEYS.COLLECTION.TEST_KEY]},
+    );
+}
+
+function cannotReadAnUndeclaredCollection() {
+    return useOnyxState(
+        // @ts-expect-error the selector only gets the keys its dependencies declared
+        (state) => state[ONYX_KEYS.COLLECTION.TEST_KEY],
+        {dependencies: [ONYX_KEYS.TEST_KEY]},
+    );
+}
+
+function cannotReadAnUndeclaredKeyFromPreviousState() {
+    return useOnyxState(
+        // @ts-expect-error previousState is narrowed to the declared keys too
+        (state, previousState) => previousState?.[ONYX_KEYS.COLLECTION.TEST_KEY],
+        {dependencies: [ONYX_KEYS.TEST_KEY]},
+    );
+}
+
+function aDeclaredRootGrantsItsMembers() {
+    return useOnyxState((state) => state[`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]?.str, {dependencies: [ONYX_KEYS.COLLECTION.TEST_KEY]});
+}
+
+export {
+    readCollectionRoot,
+    readCollectionMember,
+    readSingleKey,
+    readPreviousState,
+    rootIsNotAMember,
+    memberIsNotACollection,
+    cannotReadAnUndeclaredSingleKey,
+    cannotReadAnUndeclaredCollection,
+    cannotReadAnUndeclaredKeyFromPreviousState,
+    aDeclaredRootGrantsItsMembers,
+};
