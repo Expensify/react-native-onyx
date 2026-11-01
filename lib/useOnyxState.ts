@@ -81,6 +81,8 @@ type SnapshotCache<T> = {
     value: T;
     selector: UseOnyxStateSelector<T>;
     previousView: OnyxStateView | undefined;
+    /** Whether the run that produced `value` read `previousState`. A run that ignored it can't care that it moved. */
+    readPreviousState: boolean;
     depValues: Array<OnyxValue<OnyxKey>>;
 };
 
@@ -167,31 +169,39 @@ function useOnyxState<T>(selector: UseOnyxStateSelector<T>, options: UseOnyxStat
     const previousViewRef = useRef<OnyxStateView | undefined>(undefined);
     const lastSnapshotRef = useRef<SnapshotCache<T> | null>(null);
 
-    // A selector declared with only `state` never reads `previousState`, so a new view must not count as
-    // an input change for it. Length 0 (rest or unknown params) is treated as reading it.
-    const readsPreviousState = selector.length !== 1;
+    // Flipped by the `previousState` view when the selector reads a key off it. Read straight after the
+    // selector returns, so it describes that run only.
+    const previousStateReadRef = useRef(false);
 
     const getSnapshot = useCallback((): T => {
         const lastSnapshot = lastSnapshotRef.current;
-        const previousView = readsPreviousState ? previousViewRef.current : undefined;
+        const previousView = previousViewRef.current;
 
         // React calls `getSnapshot` on every render, not only after a store change. When the selector,
         // `previousState` and every dep are the same references as last time, the output can't differ,
         // so skip the selector and its reads through the state view. A parent re-rendering a list of rows
-        // otherwise re-runs every row's selector.
-        if (lastSnapshot !== null && lastSnapshot.selector === selector && lastSnapshot.previousView === previousView && areDepValuesUnchanged(depsArray, lastSnapshot.depValues)) {
+        // otherwise re-runs every row's selector. A selector that ignored `previousState` last time is
+        // not affected by it moving, so it stays cached when only the view changed.
+        if (
+            lastSnapshot !== null &&
+            lastSnapshot.selector === selector &&
+            (!lastSnapshot.readPreviousState || lastSnapshot.previousView === previousView) &&
+            areDepValuesUnchanged(depsArray, lastSnapshot.depValues)
+        ) {
             return lastSnapshot.value;
         }
 
         const depValues = depsArray.map((dep) => onyxSubscriptionManager.getState(dep));
+        previousStateReadRef.current = false;
         const output = selector(liveStateView, previousView);
+        const readPreviousState = previousStateReadRef.current;
 
         // Hand back the previous reference when the output is equal, so React bails out via `===`
         // and an unchanged store keeps returning the same value even as `getSnapshot`'s identity moves.
         const value = lastSnapshot !== null && selectorEquality(lastSnapshot.value, output) ? lastSnapshot.value : output;
-        lastSnapshotRef.current = {value, selector, previousView, depValues};
+        lastSnapshotRef.current = {value, selector, previousView, readPreviousState, depValues};
         return value;
-    }, [selector, selectorEquality, depsArray, readsPreviousState]);
+    }, [selector, selectorEquality, depsArray]);
 
     const value = useSyncExternalStore(subscribe, getSnapshot);
 
@@ -201,15 +211,15 @@ function useOnyxState<T>(selector: UseOnyxStateSelector<T>, options: UseOnyxStat
     // the equality check swallowed never commits, so it never advances past a value nobody saw. Running
     // only on output changes also keeps a re-render from a parent from allocating a new view.
     useEffect(() => {
-        if (!readsPreviousState) {
-            return;
-        }
         const currentDepValues: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
         for (const dep of depsArray) {
             currentDepValues[dep] = onyxSubscriptionManager.getState(dep);
         }
-        previousViewRef.current = createStateView((key) => currentDepValues[key]);
-    }, [value, depsArray, readsPreviousState]);
+        previousViewRef.current = createStateView((key) => {
+            previousStateReadRef.current = true;
+            return currentDepValues[key];
+        });
+    }, [value, depsArray]);
 
     return value;
 }

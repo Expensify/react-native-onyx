@@ -285,6 +285,22 @@ describe('useOnyxState', () => {
             expect(selector.mock.calls.length).toBeGreaterThan(callCountAfterMount);
             expect(result.current).toEqual('updated');
         });
+
+        it('should still pass previousState to a selector that declares it with a default value', async () => {
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'first');
+            // `Function.length` stops counting at the first defaulted parameter, so this selector reports
+            // an arity of 1 even though it reads `previousState`.
+            const {result} = renderHook(() =>
+                useOnyxState((state, previousState = undefined) => `${state[ONYXKEYS.TEST_KEY] as string}/${(previousState?.[ONYXKEYS.TEST_KEY] as string) ?? 'none'}`, {
+                    dependencies: [ONYXKEYS.TEST_KEY],
+                }),
+            );
+            await act(async () => waitForPromisesToResolve());
+
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'second'));
+
+            expect(result.current).toEqual('second/first');
+        });
     });
 
     describe('before Onyx.init has finished', () => {
