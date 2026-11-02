@@ -219,7 +219,7 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
         });
 
-        it('should report loaded for a key another tab removed while a merge to it is pending', async () => {
+        it('should keep reporting loading for a key another tab removed while a merge to it is pending', async () => {
             type SyncHandler = (pairs: Array<[OnyxKey, unknown]>) => void;
             const syncCalls = (StorageMock.keepInstancesSync as jest.Mock).mock.calls as Array<[SyncHandler]>;
             const syncHandler = syncCalls[syncCalls.length - 1]?.[0];
@@ -234,9 +234,9 @@ describe('useOnyx', () => {
 
             const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
 
-            // The removal is a known state, so the hook does not report loading for the pending merge.
+            // Same as after a local removal: the pending merge keeps the hook loading until it lands.
             expect(result.current[0]).toBeUndefined();
-            expect(result.current[1].status).toEqual('loaded');
+            expect(result.current[1].status).toEqual('loading');
 
             await act(async () => waitForPromisesToResolve());
 
