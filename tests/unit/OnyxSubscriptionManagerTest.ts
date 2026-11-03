@@ -5,6 +5,7 @@ import cache from '../../lib/OnyxCache';
 import * as Logger from '../../lib/Logger';
 import OnyxKeys from '../../lib/OnyxKeys';
 import StorageMock from '../../lib/storage';
+import createDeferredTask from '../../lib/createDeferredTask';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 
 // We need access to some internal properties of `onyxSubscriptionManager` during the tests but they are private,
@@ -130,6 +131,10 @@ describe('OnyxSubscriptionManager', () => {
             jest.spyOn(cache, 'getCollectionData').mockReturnValue(collectionData);
 
             expect(onyxSubscriptionManager.getState(COLLECTION)).toBe(collectionData);
+        });
+
+        it('should return undefined without throwing for an undefined key', () => {
+            expect(onyxSubscriptionManager.getState(undefined as unknown as OnyxKey)).toBeUndefined();
         });
     });
 
@@ -395,6 +400,30 @@ describe('OnyxSubscriptionManager', () => {
             await waitForPromisesToResolve();
 
             expect(logHmmmSpy).not.toHaveBeenCalled();
+        });
+
+        it('should report when a merge lands on the lost value before storage answers', async () => {
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, {a: 1, b: 2});
+            forgetValueButKeepKey(ONYXKEYS.TEST_KEY);
+
+            // Park the diagnostic's storage read so the merge below lands on the empty cache before it answers.
+            const getItemMock = jest.mocked(StorageMock.getItem);
+            const readStorage = getItemMock.getMockImplementation();
+            const storageAnswer = createDeferredTask();
+            getItemMock.mockImplementationOnce((key) => {
+                const storedValue = readStorage?.(key);
+                return storageAnswer.promise.then(() => storedValue);
+            });
+
+            onyxSubscriptionManager.getState(ONYXKEYS.TEST_KEY);
+            await Onyx.merge(ONYXKEYS.TEST_KEY, {c: 3});
+            storageAnswer.resolve();
+            await waitForPromisesToResolve();
+
+            // The merge built on nothing, so {a, b} is gone from cache and storage. The log is the only trace.
+            expect(cache.get(ONYXKEYS.TEST_KEY)).toEqual({c: 3});
+            expect(await StorageMock.getItem(ONYXKEYS.TEST_KEY)).toEqual({c: 3});
+            expect(logHmmmSpy).toHaveBeenCalledTimes(1);
         });
 
         it('should not report a key the index does not know, which means init has not loaded it', async () => {
