@@ -1,5 +1,3 @@
-import type {ReadonlyDeep} from 'type-fest';
-
 /**
  * A directed transition graph keyed by state name.
  * Use `as const` when defining a graph so illegal transitions are caught at compile time.
@@ -34,13 +32,13 @@ type TransitionsFrom<Graph extends TransitionGraph, Current extends keyof Graph 
  * loadingMachine.transition('success');
  */
 class StateMachine<const Graph extends TransitionGraph, Current extends keyof Graph & string> {
-    /** The current state. Deeply readonly and owned by this state machine instance. */
-    readonly state: ReadonlyDeep<Current>;
+    /** The current state. Owned by this state machine instance. */
+    readonly state: Current;
 
     private readonly transitions: Graph;
 
     constructor(currentState: Current, transitions: Graph) {
-        this.state = currentState as ReadonlyDeep<Current>;
+        this.state = currentState;
         this.transitions = transitions;
         Object.freeze(this);
     }
@@ -50,7 +48,7 @@ class StateMachine<const Graph extends TransitionGraph, Current extends keyof Gr
      * Only transitions declared in the graph for the current state are accepted.
      */
     transition<Target extends TransitionsFrom<Graph, Current>>(target: Target): StateMachine<Graph, Target> {
-        const validTargets = this.transitions[this.state as Current];
+        const validTargets = this.transitions[this.state];
         if (!validTargets?.includes(target)) {
             throw new Error(`Illegal transition from "${String(this.state)}" to "${String(target)}"`);
         }
