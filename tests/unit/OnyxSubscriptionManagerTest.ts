@@ -426,29 +426,35 @@ describe('OnyxSubscriptionManager', () => {
             expect(logHmmmSpy).toHaveBeenCalledTimes(1);
         });
 
-        it('should not read storage for a key another tab removed, and still report a later real miss on its collection', async () => {
-            type SyncHandler = (pairs: Array<[OnyxKey, unknown]>) => void;
-            const syncCalls = (StorageMock.keepInstancesSync as jest.Mock).mock.calls as Array<[SyncHandler]>;
-            const syncHandler = syncCalls[syncCalls.length - 1]?.[0];
-            if (!syncHandler) {
-                throw new Error('Onyx.init did not register a sync handler');
-            }
+        it('should not read storage or report for a key another tab removed', async () => {
+            const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls.at(-1)?.[0];
+            expect(syncCallback).toBeDefined();
             const getItemMock = jest.mocked(StorageMock.getItem);
 
             await Onyx.set(MEMBER_1, {id: 1});
             await StorageMock.removeItem(MEMBER_1);
             getItemMock.mockClear();
-            // Another tab removed the key. Its sync read found no row.
-            syncHandler([[MEMBER_1, undefined]]);
+            syncCallback([[MEMBER_1, undefined]]);
 
             expect(onyxSubscriptionManager.getState(MEMBER_1)).toBeUndefined();
             await waitForPromisesToResolve();
+
             expect(getItemMock).not.toHaveBeenCalled();
             expect(logHmmmSpy).not.toHaveBeenCalled();
+        });
+
+        it('should still report a real miss on a collection after another tab removed one of its members', async () => {
+            const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls.at(-1)?.[0];
+            expect(syncCallback).toBeDefined();
+
+            await Onyx.set(MEMBER_1, {id: 1});
+            await StorageMock.removeItem(MEMBER_1);
+            syncCallback([[MEMBER_1, undefined]]);
+            onyxSubscriptionManager.getState(MEMBER_1);
+            await waitForPromisesToResolve();
 
             await StorageMock.setItem(MEMBER_2, {id: 2});
-            cache.drop(MEMBER_2);
-            cache.setAllKeys([MEMBER_1, MEMBER_2]);
+            forgetValueButKeepKey(MEMBER_2);
             onyxSubscriptionManager.getState(MEMBER_2);
             await waitForPromisesToResolve();
 
@@ -456,30 +462,29 @@ describe('OnyxSubscriptionManager', () => {
             expect(logHmmmSpy).toHaveBeenCalledWith(expect.stringContaining(COLLECTION));
         });
 
-        it('should log once when another tab removes a key this tab is still writing, and not during a local clear', async () => {
-            type SyncHandler = (pairs: Array<[OnyxKey, unknown]>) => void;
-            const syncCalls = (StorageMock.keepInstancesSync as jest.Mock).mock.calls as Array<[SyncHandler]>;
-            const syncHandler = syncCalls[syncCalls.length - 1]?.[0];
-            if (!syncHandler) {
-                throw new Error('Onyx.init did not register a sync handler');
-            }
+        it('should log once when another tab removes a key this tab is still writing', async () => {
+            const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls.at(-1)?.[0];
+            expect(syncCallback).toBeDefined();
 
             await Onyx.set(MEMBER_1, {id: 1});
             const mergePromise = Onyx.merge(MEMBER_1, {id: 2});
-            // The write is in flight, so the removal collides with it.
-            syncHandler([[MEMBER_1, undefined]]);
+            syncCallback([[MEMBER_1, undefined]]);
             await mergePromise;
 
             expect(logHmmmSpy).toHaveBeenCalledTimes(1);
             expect(logHmmmSpy).toHaveBeenCalledWith(expect.stringContaining(MEMBER_1));
+        });
 
-            await Onyx.set(MEMBER_2, {id: 2});
+        it('should not log a removal from another tab during a local clear', async () => {
+            const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls.at(-1)?.[0];
+            expect(syncCallback).toBeDefined();
+
+            await Onyx.set(MEMBER_1, {id: 1});
             const clearPromise = Onyx.clear();
-            // A global write is not a write to this key, so a removal during a local clear stays quiet.
-            syncHandler([[MEMBER_2, undefined]]);
+            syncCallback([[MEMBER_1, undefined]]);
             await clearPromise;
 
-            expect(logHmmmSpy).toHaveBeenCalledTimes(1);
+            expect(logHmmmSpy).not.toHaveBeenCalled();
         });
 
         it('should not report a key the index does not know, which means init has not loaded it', async () => {
