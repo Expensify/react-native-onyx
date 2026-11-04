@@ -91,7 +91,6 @@ let deferredInitTask = createDeferredTask();
  * to be distinct from real values, not unique per subscription, so one module-level instance
  * is reused by every connection.
  */
-// eslint-disable-next-line rulesdir/no-negated-variables
 const NOT_DELIVERED = Symbol('NOT_DELIVERED');
 
 // Collection member IDs that Onyx should silently ignore across all operations — reads, writes, cache, and subscriber
