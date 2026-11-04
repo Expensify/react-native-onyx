@@ -456,6 +456,32 @@ describe('OnyxSubscriptionManager', () => {
             expect(logHmmmSpy).toHaveBeenCalledWith(expect.stringContaining(COLLECTION));
         });
 
+        it('should log once when another tab removes a key this tab is still writing, and not during a local clear', async () => {
+            type SyncHandler = (pairs: Array<[OnyxKey, unknown]>) => void;
+            const syncCalls = (StorageMock.keepInstancesSync as jest.Mock).mock.calls as Array<[SyncHandler]>;
+            const syncHandler = syncCalls[syncCalls.length - 1]?.[0];
+            if (!syncHandler) {
+                throw new Error('Onyx.init did not register a sync handler');
+            }
+
+            await Onyx.set(MEMBER_1, {id: 1});
+            const mergePromise = Onyx.merge(MEMBER_1, {id: 2});
+            // The write is in flight, so the removal collides with it.
+            syncHandler([[MEMBER_1, undefined]]);
+            await mergePromise;
+
+            expect(logHmmmSpy).toHaveBeenCalledTimes(1);
+            expect(logHmmmSpy).toHaveBeenCalledWith(expect.stringContaining(MEMBER_1));
+
+            await Onyx.set(MEMBER_2, {id: 2});
+            const clearPromise = Onyx.clear();
+            // A global write is not a write to this key, so a removal during a local clear stays quiet.
+            syncHandler([[MEMBER_2, undefined]]);
+            await clearPromise;
+
+            expect(logHmmmSpy).toHaveBeenCalledTimes(1);
+        });
+
         it('should not report a key the index does not know, which means init has not loaded it', async () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'from-storage');
             cache.drop(ONYXKEYS.TEST_KEY);

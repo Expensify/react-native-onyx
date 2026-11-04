@@ -79,6 +79,9 @@ function init({
                 // Capture the previous cached value before cache.set() so notifyCollection() can diff old vs new per member.
                 const previousValue = isCollectionMember ? cache.get(key) : undefined;
                 if (value === null || value === undefined) {
+                    if (PendingWrites.hasPendingWriteForKey(key)) {
+                        Logger.logHmmm(`Sync removed a key while this tab was writing it: ${key}`);
+                    }
                     // Drop like a local removal, so the key leaves the index instead of lingering as an indexed key with no value.
                     cache.drop(key);
                 } else {
