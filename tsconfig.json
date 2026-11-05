@@ -2,7 +2,7 @@
     "$schema": "https://json.schemastore.org/tsconfig",
     "compilerOptions": {
         "target": "es2015",
-        "module": "commonjs",
+        "module": "esnext",
         "types": ["react-native", "react", "jest", "node"],
         "lib": ["esnext", "dom"],
         "allowJs": true,
@@ -10,7 +10,7 @@
         "jsx": "react",
         "isolatedModules": true,
         "strict": true,
-        "moduleResolution": "node",
+        "moduleResolution": "bundler",
         "resolveJsonModule": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
