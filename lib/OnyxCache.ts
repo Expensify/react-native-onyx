@@ -48,6 +48,9 @@ class OnyxCache {
     /** A list of keys where a nullish value has been fetched from storage before, but the key still exists in cache */
     private nullishStorageKeys: Set<OnyxKey>;
 
+    /** Keys another instance removed, which explains why the cache has no value for them. They still count as uncached, unlike nullish keys. */
+    private removedInOtherInstanceKeys: Set<OnyxKey>;
+
     /** A map of cached values */
     private storageMap: Record<OnyxKey, OnyxValue<OnyxKey>>;
 
@@ -72,6 +75,7 @@ class OnyxCache {
     constructor() {
         this.storageKeys = new Set();
         this.nullishStorageKeys = new Set();
+        this.removedInOtherInstanceKeys = new Set();
         this.storageMap = {};
         this.pendingPromises = new Map();
         this.collectionSnapshots = new Map();
@@ -87,6 +91,8 @@ class OnyxCache {
             'addNullishStorageKey',
             'hasNullishStorageKey',
             'clearNullishStorageKeys',
+            'addRemovedInOtherInstanceKey',
+            'hasRemovedInOtherInstanceKey',
             'set',
             'drop',
             'merge',
@@ -153,6 +159,16 @@ class OnyxCache {
         this.nullishStorageKeys = new Set();
     }
 
+    /** Records that another instance removed this key */
+    addRemovedInOtherInstanceKey(key: OnyxKey): void {
+        this.removedInOtherInstanceKeys.add(key);
+    }
+
+    /** Whether another instance removed this key and it hasn't changed here since */
+    hasRemovedInOtherInstanceKey(key: OnyxKey): boolean {
+        return this.removedInOtherInstanceKeys.has(key);
+    }
+
     /** Check whether cache has data for the given key */
     hasCacheForKey(key: OnyxKey): boolean {
         return this.storageMap[key] !== undefined || this.hasNullishStorageKey(key);
@@ -173,6 +189,7 @@ class OnyxCache {
         // When a key is explicitly set in cache, we can remove it from the list of nullish keys,
         // since it will either be set to a non nullish value or removed from the cache completely.
         this.nullishStorageKeys.delete(key);
+        this.removedInOtherInstanceKeys.delete(key);
 
         const collectionKey = OnyxKeys.getCollectionKey(key);
         const oldValue = this.storageMap[key];
@@ -210,6 +227,7 @@ class OnyxCache {
         }
 
         this.storageKeys.delete(key);
+        this.removedInOtherInstanceKeys.delete(key);
         OnyxKeys.deregisterMemberKey(key);
     }
 
@@ -249,6 +267,7 @@ class OnyxCache {
                 }
             } else {
                 this.nullishStorageKeys.delete(key);
+                this.removedInOtherInstanceKeys.delete(key);
 
                 const existing = this.storageMap[key];
 
@@ -320,6 +339,7 @@ class OnyxCache {
                 }
             } else {
                 this.nullishStorageKeys.delete(key);
+                this.removedInOtherInstanceKeys.delete(key);
 
                 // Per-key merge instead of spreading the entire storageMap
                 const existing = this.storageMap[key];

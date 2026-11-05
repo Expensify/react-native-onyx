@@ -467,6 +467,39 @@ describe('OnyxSubscriptionManager', () => {
             expect(logHmmmSpy).toHaveBeenCalledWith(expect.stringContaining(COLLECTION));
         });
 
+        it('should not report when another tab removes a key and writes it back before this tab reads it', async () => {
+            // Given another tab removed a key and this tab applied that removal
+            const syncCallback = getSyncCallback();
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'first');
+            await StorageMock.removeItem(ONYXKEYS.TEST_KEY);
+            syncCallback([[ONYXKEYS.TEST_KEY, undefined]]);
+
+            // When that tab writes the key back, and this tab reads it before the sync for that write arrives
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'second');
+            onyxSubscriptionManager.getState(ONYXKEYS.TEST_KEY);
+            await waitForPromisesToResolve();
+
+            // Then nothing is reported, because nothing was lost
+            expect(logHmmmSpy).not.toHaveBeenCalled();
+        });
+
+        it('should report a key lost after another tab removed it and it got a value again', async () => {
+            // Given a key another tab removed, which then got a value again
+            const syncCallback = getSyncCallback();
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'first');
+            await StorageMock.removeItem(ONYXKEYS.TEST_KEY);
+            syncCallback([[ONYXKEYS.TEST_KEY, undefined]]);
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'second');
+
+            // When the cache then has no value for it while storage still does
+            jest.spyOn(cache, 'get').mockReturnValueOnce(undefined);
+            expect(onyxSubscriptionManager.getState(ONYXKEYS.TEST_KEY)).toBeUndefined();
+            await waitForPromisesToResolve();
+
+            // Then this is a real miss, and the old removal doesn't hide it
+            expect(logHmmmSpy).toHaveBeenCalledTimes(1);
+        });
+
         it('should not report a key the index does not know, which means init has not loaded it', async () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'from-storage');
             cache.drop(ONYXKEYS.TEST_KEY);

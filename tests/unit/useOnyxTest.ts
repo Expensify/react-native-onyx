@@ -5,6 +5,7 @@ import type {UseOnyxSelector} from '../../lib/useOnyx';
 import type GenericCollection from '../utils/GenericCollection';
 
 import Onyx, {useOnyx} from '../../lib';
+import cache from '../../lib/OnyxCache';
 import {resetDeferredInitTask} from '../../lib/OnyxUtils';
 import StorageMock from '../../lib/storage';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
@@ -231,6 +232,28 @@ describe('useOnyx', () => {
             const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
 
             // Same as after a local removal: the pending merge keeps the hook loading until it lands.
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loading');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('after');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
+        it('should keep reporting loading for a known-empty key another tab removed while a merge to it is pending', async () => {
+            const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls.at(-1)?.[0];
+            expect(syncCallback).toBeDefined();
+
+            // Given a key this tab knows is empty, which another tab then removes
+            cache.addNullishStorageKey(ONYXKEYS.TEST_KEY);
+            syncCallback([[ONYXKEYS.TEST_KEY, undefined]]);
+
+            // When a merge to it is pending as a subscriber mounts
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'after');
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
+
+            // Then the subscriber waits for the merge instead of seeing a loaded key with no value
             expect(result.current[0]).toBeUndefined();
             expect(result.current[1].status).toEqual('loading');
 
