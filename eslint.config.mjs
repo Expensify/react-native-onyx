@@ -15,7 +15,7 @@ const expensifyConfigDirectory = path.dirname(require.resolve('eslint-config-exp
 rulesdir.RULES_DIR = path.resolve(expensifyConfigDirectory, 'eslint-plugin-expensify');
 
 export default defineConfig([
-    globalIgnores(['dist/**', 'node_modules/**', '**/*.d.ts', '**/*.config.js', '**/*.config.cjs', 'tests/types/**/*.ts', 'cpp/**', 'bench-results/**', '.github/**']),
+    globalIgnores(['dist/**', 'node_modules/**', '**/*.d.ts', '**/*.config.js', '**/*.config.cjs', 'tests/types/**/*.ts', 'cpp/**', 'bench-results/**', '.github/**', 'lint-parity/**']),
     ...browserConfig,
     ...reactConfig,
     ...tsExpensifyConfig,
