@@ -10,12 +10,28 @@ import globals from 'globals';
 import {createRequire} from 'node:module';
 import path from 'node:path';
 
+// oxlint-disable-next-line import/extensions -- Oxlint's port flags this; eslint-plugin-import skips paths its resolver cannot resolve without the extension.
+import {downgradeDebtRules} from './config/lintDebt.mjs';
+
 const require = createRequire(import.meta.url);
 const expensifyConfigDirectory = path.dirname(require.resolve('eslint-config-expensify'));
 rulesdir.RULES_DIR = path.resolve(expensifyConfigDirectory, 'eslint-plugin-expensify');
 
-export default defineConfig([
-    globalIgnores(['dist/**', 'node_modules/**', '**/*.d.ts', '**/*.config.js', '**/*.config.cjs', 'tests/types/**/*.ts', 'cpp/**', 'bench-results/**', '.github/**', 'lint-parity/**', 'oxlint.config.mts', 'config/oxlint/**']),
+const configs = defineConfig([
+    globalIgnores([
+        'dist/**',
+        'node_modules/**',
+        '**/*.d.ts',
+        '**/*.config.js',
+        '**/*.config.cjs',
+        'tests/types/**/*.ts',
+        'cpp/**',
+        'bench-results/**',
+        '.github/**',
+        'lint-parity/**',
+        'oxlint.config.mts',
+        'config/oxlint/**',
+    ]),
     ...browserConfig,
     ...reactConfig,
     ...tsExpensifyConfig,
@@ -133,3 +149,7 @@ export default defineConfig([
     },
     prettierConfig,
 ]);
+
+// Count-threshold gate: rules with existing violations report as warnings, and `npm run lint` fails above
+// the warning count it passes to --max-warnings. See config/lintDebt.mjs.
+export default configs.map((entry) => (entry.rules ? {...entry, rules: downgradeDebtRules(entry.rules)} : entry));

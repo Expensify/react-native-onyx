@@ -16,8 +16,12 @@
  * - rulesdir/boolean-conditional-rendering: dropped, no Oxlint equivalent.
  */
 import {defineConfig} from 'oxlint';
+import type {OxlintConfig} from 'oxlint';
 
-export default defineConfig({
+import {downgradeDebtRules} from './config/lintDebt.mjs';
+import {oxlintConfigRuleToESLintRuleIDs} from './config/oxlint/ruleNames.mjs';
+
+const config = defineConfig({
     plugins: ['typescript', 'import', 'jsx-a11y', 'unicorn', 'react'],
     jsPlugins: [
         {
@@ -1241,7 +1245,7 @@ export default defineConfig({
         {
             files: ['**/*.ts', '**/*.tsx', '**/*.cts', '**/*.mts'],
             rules: {
-                'hosted/no-types': 'error',
+                'hosted/no-types': 'warn',
             },
         },
         {
@@ -1259,7 +1263,7 @@ export default defineConfig({
                 'core/dot-notation': 'off',
                 'core/no-return-await': 'off',
                 'hosted/no-extraneous-dependencies': [
-                    'error',
+                    'warn',
                     {
                         devDependencies: [
                             'tests/**',
@@ -1315,7 +1319,7 @@ export default defineConfig({
                 ],
                 'hosted/named': 'off',
                 'hosted/naming-convention': [
-                    'error',
+                    'warn',
                     {
                         selector: ['variable', 'property'],
                         format: null,
@@ -1371,7 +1375,7 @@ export default defineConfig({
             files: ['tests/**/*'],
             rules: {
                 'hosted/naming-convention': [
-                    'error',
+                    'warn',
                     {
                         selector: ['variable', 'property'],
                         format: null,
@@ -1422,3 +1426,14 @@ export default defineConfig({
         },
     ],
 });
+
+// Count-threshold gate: rules with existing violations report as warnings, and `npm run lint:oxlint` fails above
+// the warning count it passes to --max-warnings. See config/lintDebt.mjs.
+// Annotated because the inferred type is too large for TypeScript to serialize (declaration: true).
+const gatedConfig: OxlintConfig = defineConfig({
+    ...config,
+    rules: downgradeDebtRules(config.rules, oxlintConfigRuleToESLintRuleIDs),
+    overrides: config.overrides?.map((override) => ({...override, rules: downgradeDebtRules(override.rules, oxlintConfigRuleToESLintRuleIDs)})),
+});
+
+export default gatedConfig;

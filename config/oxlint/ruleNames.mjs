@@ -131,4 +131,43 @@ function oxlintCodeToESLintRuleID(code, filename = '') {
     return `${NATIVE_PLUGIN_PREFIX[plugin] ?? plugin}/${rule}`;
 }
 
+// Native Oxlint rules configured in place of ESLint rules that cannot run in Oxlint.
+const STAND_INS = {
+    'unicorn/prefer-at': 'rulesdir/prefer-at',
+};
+
+/**
+ * Maps a rule key as written in oxlint.config.mts (like `typescript/no-explicit-any`, `hosted/naming-convention`
+ * or `no-unused-vars`) to the ESLint rule ids it stands for. A native rule that ESLint runs as both a core rule
+ * and a typescript-eslint extension maps to both.
+ * @param {string} key
+ * @returns {string[]}
+ */
+function oxlintConfigRuleToESLintRuleIDs(key) {
+    if (STAND_INS[key]) {
+        return [STAND_INS[key]];
+    }
+    const slash = key.indexOf('/');
+    if (slash === -1) {
+        const name = OXLINT_RULE_RENAMES[key] ?? key;
+        return TS_EXTENSION_RULES.has(key) ? [name, `@typescript-eslint/${key}`] : [name];
+    }
+    const plugin = key.slice(0, slash);
+    const name = key.slice(slash + 1);
+    if (plugin === 'core') {
+        return [name];
+    }
+    if (plugin === 'hosted') {
+        return [`${HOSTED_RULE_ORIGIN[name]}/${name}`];
+    }
+    if (plugin === 'typescript') {
+        return [`@typescript-eslint/${name}`];
+    }
+    if (plugin === 'react' && REACT_HOOKS_RULES.has(name)) {
+        return [`react-hooks/${name}`];
+    }
+    return [key];
+}
+
+export {STAND_INS, oxlintConfigRuleToESLintRuleIDs};
 export {HOSTED_RULE_ORIGIN, OXLINT_RULE_RENAMES, REACT_HOOKS_RULES, TS_EXTENSION_RULES, hostedRuleNames, oxlintCodeToESLintRuleID};

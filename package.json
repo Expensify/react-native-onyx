@@ -29,7 +29,8 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "prepare": "npm run build",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 713",
+    "lint:oxlint": "oxlint --type-aware --max-warnings 665",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:types": "npm run build && tsc --noEmit --project tsconfig.test.json",
