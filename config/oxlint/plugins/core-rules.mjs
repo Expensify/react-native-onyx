@@ -5,7 +5,8 @@
  * Adapted from Expensify/App config/oxlint/plugins/core-rules.mjs.
  *
  * no-invalid-this is left out, as in App: it calls sourceCode.getJSDocComment, which Oxlint's plugin
- * bridge does not support.
+ * bridge does not support. Verified on oxlint 1.90.0: enabling it makes the JS plugin throw on any file with
+ * a function, which drops every JS-plugin finding for that file.
  */
 import {builtinRules} from 'eslint/use-at-your-own-risk';
 
@@ -25,6 +26,7 @@ const NAMES = [
     'no-unreachable-loop',
     'no-restricted-exports',
     'no-undef',
+    'dot-notation',
 ];
 
 const plugin = {

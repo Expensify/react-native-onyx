@@ -19,6 +19,8 @@ const HOSTED_RULE_ORIGIN = {
     export: 'import',
     named: 'import',
     order: 'import',
+    // Native import/prefer-default-export ignores `export type {...}`; ESLint's reports it (tests/types.ts).
+    'prefer-default-export': 'import',
     'no-types': 'jsdoc',
     'check-param-names': 'jsdoc',
     'check-types': 'jsdoc',
@@ -65,6 +67,24 @@ const TS_EXTENSION_RULES = new Set([
     'no-use-before-define',
     'no-useless-constructor',
 ]);
+// eslint-plugin-react-hooks rules that Oxlint implements inside its native `react` plugin.
+const REACT_HOOKS_RULES = new Set([
+    'rules-of-hooks',
+    'exhaustive-deps',
+    'static-components',
+    'use-memo',
+    'preserve-manual-memoization',
+    'incompatible-library',
+    'immutability',
+    'globals',
+    'refs',
+    'set-state-in-effect',
+    'error-boundaries',
+    'purity',
+    'set-state-in-render',
+    'unsupported-syntax',
+]);
+
 const TS_FILE = /\.(ts|tsx|mts|cts)$/;
 
 const OXLINT_DIAGNOSTIC_CODE = /^([\w@/.-]+)\((.+)\)$/;
@@ -98,6 +118,9 @@ function oxlintCodeToESLintRuleID(code, filename = '') {
     if (plugin === 'eslint' || plugin === 'core') {
         return OXLINT_RULE_RENAMES[rule] ?? rule;
     }
+    if (plugin === 'react' && REACT_HOOKS_RULES.has(rule)) {
+        return `react-hooks/${rule}`;
+    }
     if (plugin === 'hosted') {
         const origin = HOSTED_RULE_ORIGIN[rule];
         if (!origin) {
@@ -108,4 +131,4 @@ function oxlintCodeToESLintRuleID(code, filename = '') {
     return `${NATIVE_PLUGIN_PREFIX[plugin] ?? plugin}/${rule}`;
 }
 
-export {HOSTED_RULE_ORIGIN, OXLINT_RULE_RENAMES, TS_EXTENSION_RULES, hostedRuleNames, oxlintCodeToESLintRuleID};
+export {HOSTED_RULE_ORIGIN, OXLINT_RULE_RENAMES, REACT_HOOKS_RULES, TS_EXTENSION_RULES, hostedRuleNames, oxlintCodeToESLintRuleID};

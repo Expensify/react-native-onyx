@@ -9,6 +9,7 @@
  * - core/*: ESLint core rules, with ESLint's own code.
  * - hosted/*: rules from ESLint plugins (typescript-eslint naming-convention, import, jsdoc, react).
  * - rulesdir/*: eslint-plugin-expensify rules that need no type information.
+ * - es/*: eslint-plugin-es, loaded as is (JS files only).
  *
  * Type-aware eslint-plugin-expensify rules cannot run in a JS plugin (Oxlint gives JS plugins no TypeScript program):
  * - rulesdir/prefer-at: unicorn/prefer-at stands in for it and covers fewer cases.
@@ -30,6 +31,10 @@ export default defineConfig({
         {
             name: 'hosted',
             specifier: './config/oxlint/plugins/hosted-rules.mjs',
+        },
+        {
+            name: 'es',
+            specifier: 'eslint-plugin-es',
         },
     ],
     categories: {
@@ -372,7 +377,6 @@ export default defineConfig({
             },
         ],
         'import/newline-after-import': 'error',
-        'import/prefer-default-export': 'error',
         'import/no-absolute-path': 'error',
         'import/no-webpack-loader-syntax': 'error',
         'import/no-named-default': 'error',
@@ -725,6 +729,12 @@ export default defineConfig({
                 allowKeywords: true,
             },
         ],
+        'core/dot-notation': [
+            'error',
+            {
+                allowKeywords: true,
+            },
+        ],
         'core/no-octal': 'error',
         'core/no-octal-escape': 'error',
         'core/no-return-await': 'error',
@@ -766,6 +776,7 @@ export default defineConfig({
                 groups: [['builtin', 'external', 'internal']],
             },
         ],
+        'hosted/prefer-default-export': 'error',
         'hosted/no-useless-path-segments': [
             'error',
             {
@@ -884,6 +895,8 @@ export default defineConfig({
             plugins: ['jsdoc'],
             rules: {
                 'no-redeclare': 'error',
+                'es/no-nullish-coalescing-operators': 'error',
+                'es/no-optional-chaining': 'error',
                 'jsdoc/require-param': 'error',
                 'jsdoc/require-param-type': 'error',
                 'jsdoc/check-tag-names': 'error',
@@ -1243,6 +1256,7 @@ export default defineConfig({
                 'core/no-dupe-args': 'off',
                 'core/no-new-symbol': 'off',
                 'core/no-undef': 'off',
+                'core/dot-notation': 'off',
                 'core/no-return-await': 'off',
                 'hosted/no-extraneous-dependencies': [
                     'error',
