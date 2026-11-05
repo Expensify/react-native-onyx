@@ -5,8 +5,8 @@
  *
  * Rules that call `ESLintUtils.getParserServices` (type-aware rules such as `prefer-at` and
  * `boolean-conditional-rendering`) cannot run here: Oxlint JS plugins get no TypeScript program.
- * They are listed in TYPE_AWARE_RULES and left out, so enabling one fails loudly at config load
- * instead of silently reporting nothing. `oxlint.config.mts` uses native stand-ins for them.
+ * They are detected by source, collected in TYPE_AWARE_RULES and not registered; `oxlint.config.mts` uses a
+ * native stand-in where one exists.
  */
 import fs from 'node:fs';
 import {createRequire} from 'node:module';
