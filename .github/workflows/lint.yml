@@ -16,6 +16,7 @@ jobs:
               uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e
               with:
                   node-version-file: ".nvmrc"
+                  check-latest: true
                   cache: npm
                   cache-dependency-path: package-lock.json
 

@@ -23,6 +23,7 @@ runs:
     - uses: actions/setup-node@13427813f706a0f6c9b74603b31103c40ab1c35a
       with:
         node-version-file: '.nvmrc'
+        check-latest: true
         cache: npm
         cache-dependency-path: |
           normalized-package-lock.json
