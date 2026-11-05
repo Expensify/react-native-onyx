@@ -1,37 +1,15 @@
 /**
  * Runs rules from ESLint plugins (typescript-eslint, import, jsdoc, react) inside Oxlint, using the plugins'
  * own code, for rules Oxlint has no native version of. Oxlint reserves those plugin names for its own
- * ports, so all of them load under `hosted`; config/oxlint/ruleNames.mjs maps them back to ESLint ids.
- * Adapted from Expensify/App config/oxlint/plugins/hosted-rules.mjs (React Compiler gating removed).
+ * ports, so all of them load under `hosted`; HOSTED_RULE_ORIGIN in config/oxlint/derive.mjs maps them back.
+ * config/oxlint/derive.mjs picks the rules. Adapted from Expensify/App config/oxlint/plugins/hosted-rules.mjs.
  */
-import {createRequire} from 'node:module';
-import path from 'node:path';
-import {fileURLToPath} from 'node:url';
+import {STUBBED_PARSER_SERVICES, hostedRuleIds, pluginRules, splitRuleId} from '../derive.mjs';
+import {withEslintDirectiveIDs} from '../eslintDirectives.mjs';
 
-import {withEslintDirectiveIDsFor} from '../eslintDirectives.mjs';
-import {hostedRuleNames} from '../ruleNames.mjs';
-
-const require = createRequire(import.meta.url);
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
-
-/**
- * Loads the rules of an installed ESLint plugin, so Oxlint runs the same rule code as ESLint.
- * @param {string} packageName
- * @returns {Record<string, import('eslint').Rule.RuleModule>}
- */
-function rulesOf(packageName) {
-    const mod = require(require.resolve(packageName, {paths: [repoRoot]}));
-    return mod?.rules ?? mod?.default?.rules ?? {};
-}
-
-const react = rulesOf('eslint-plugin-react');
-const importPlugin = rulesOf('eslint-plugin-import');
-const jsdoc = rulesOf('eslint-plugin-jsdoc');
-const typescriptEslint = rulesOf('@typescript-eslint/eslint-plugin');
-
-// naming-convention asks for parser services, which Oxlint JS plugins lack. getParserServices(context, true)
+// Type-checked rules such as naming-convention ask for parser services, which Oxlint JS plugins lack. getParserServices(context, true)
 // tolerates a missing `program` but fails on missing node maps and reads context.languageOptions first, so
-// both are stubbed. Onyx's naming-convention options use no `types` selector, so the type checker is never hit.
+// both are stubbed. Only rules listed in STUBBED_PARSER_SERVICES get this, because they never reach the type checker.
 const STUB_PARSER_SERVICES = {
     esTreeNodeToTSNodeMap: new Map(),
     tsNodeToESTreeNodeMap: new Map(),
@@ -62,34 +40,19 @@ function withStubbedParserServices(rule) {
     };
 }
 
-/**
- * Picks `names` from an ESLint plugin and makes `eslint-disable` comments that use the ESLint id
- * (`<eslintPrefix>/<name>`) apply to them.
- * @param {Record<string, import('eslint').Rule.RuleModule>} rules
- * @param {string} eslintPrefix
- * @returns {Record<string, import('eslint').Rule.RuleModule>}
- */
-function hostRules(rules, eslintPrefix) {
-    const names = hostedRuleNames(eslintPrefix);
-    for (const name of names) {
-        if (!rules[name]) {
-            throw new Error(`${eslintPrefix}/${name} not found in the installed ESLint plugin`);
-        }
-    }
-    return withEslintDirectiveIDsFor(Object.fromEntries(names.map((name) => [name, rules[name]])), (name) => `${eslintPrefix}/${name}`);
-}
-
 const plugin = {
     meta: {
         name: 'hosted',
         version: '0.0.1',
     },
-    rules: {
-        ...hostRules(react, 'react'),
-        ...hostRules(importPlugin, 'import'),
-        ...hostRules(jsdoc, 'jsdoc'),
-        ...hostRules({'naming-convention': withStubbedParserServices(typescriptEslint['naming-convention'])}, '@typescript-eslint'),
-    },
+    rules: Object.fromEntries(
+        hostedRuleIds.map((ruleId) => {
+            const {prefix, name} = splitRuleId(ruleId);
+            const rule = pluginRules(prefix)[name];
+            // Makes `eslint-disable` comments that use the ESLint id apply to the hosted rule.
+            return [name, withEslintDirectiveIDs(STUBBED_PARSER_SERVICES.has(ruleId) ? withStubbedParserServices(rule) : rule, ruleId)];
+        }),
+    ),
 };
 
 export default plugin;
