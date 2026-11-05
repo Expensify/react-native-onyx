@@ -219,6 +219,27 @@ describe('useOnyx', () => {
             expect(result.current[1].status).toEqual('loaded');
         });
 
+        it('should keep reporting loading for a key another tab removed while a merge to it is pending', async () => {
+            const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls.at(-1)?.[0];
+            expect(syncCallback).toBeDefined();
+
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'before');
+            await StorageMock.removeItem(ONYXKEYS.TEST_KEY);
+            syncCallback([[ONYXKEYS.TEST_KEY, undefined]]);
+            Onyx.merge(ONYXKEYS.TEST_KEY, 'after');
+
+            const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
+
+            // Same as after a local removal: the pending merge keeps the hook loading until it lands.
+            expect(result.current[0]).toBeUndefined();
+            expect(result.current[1].status).toEqual('loading');
+
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current[0]).toEqual('after');
+            expect(result.current[1].status).toEqual('loaded');
+        });
+
         it('should initially return undefined and then return cached value after multiple merge operations', async () => {
             Onyx.merge(ONYXKEYS.TEST_KEY, 'test1');
             Onyx.merge(ONYXKEYS.TEST_KEY, 'test2');

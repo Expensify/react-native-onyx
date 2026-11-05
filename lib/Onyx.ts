@@ -76,9 +76,14 @@ function init({
                 const collectionKey = OnyxKeys.getCollectionKey(key);
                 const isCollectionMember = !!collectionKey && OnyxKeys.isCollectionMemberKey(collectionKey, key);
 
-                // Capture the previous cached value before cache.set() so notifyCollection() can diff old vs new per member.
+                // Capture the previous cached value before the cache changes so notifyCollection() can diff old vs new per member.
                 const previousValue = isCollectionMember ? cache.get(key) : undefined;
-                cache.set(key, value);
+                if (value === null || value === undefined) {
+                    // Drop like a local removal, so the key leaves the index instead of lingering as an indexed key with no value.
+                    cache.drop(key);
+                } else {
+                    cache.set(key, value);
+                }
 
                 if (isCollectionMember && collectionKey) {
                     let batch = collectionBatches.get(collectionKey);

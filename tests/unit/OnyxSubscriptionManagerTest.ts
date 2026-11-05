@@ -354,6 +354,13 @@ describe('OnyxSubscriptionManager', () => {
             cache.setAllKeys([key]);
         };
 
+        // The handler Onyx.init registered for changes another tab wrote to storage.
+        const getSyncCallback = (): ((pairs: Array<[OnyxKey, unknown]>) => void) => {
+            const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls.at(-1)?.[0] as ((pairs: Array<[OnyxKey, unknown]>) => void) | undefined;
+            expect(syncCallback).toBeDefined();
+            return syncCallback as (pairs: Array<[OnyxKey, unknown]>) => void;
+        };
+
         it('should report once when the cache has no value but storage does', async () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'from-storage');
             forgetValueButKeepKey(ONYXKEYS.TEST_KEY);
@@ -424,6 +431,40 @@ describe('OnyxSubscriptionManager', () => {
             expect(cache.get(ONYXKEYS.TEST_KEY)).toEqual({c: 3});
             expect(await StorageMock.getItem(ONYXKEYS.TEST_KEY)).toEqual({c: 3});
             expect(logHmmmSpy).toHaveBeenCalledTimes(1);
+        });
+
+        it('should not read storage or report for a key another tab removed', async () => {
+            const syncCallback = getSyncCallback();
+            const getItemMock = jest.mocked(StorageMock.getItem);
+
+            await Onyx.set(MEMBER_1, {id: 1});
+            await StorageMock.removeItem(MEMBER_1);
+            getItemMock.mockClear();
+            syncCallback([[MEMBER_1, undefined]]);
+
+            expect(onyxSubscriptionManager.getState(MEMBER_1)).toBeUndefined();
+            await waitForPromisesToResolve();
+
+            expect(getItemMock).not.toHaveBeenCalled();
+            expect(logHmmmSpy).not.toHaveBeenCalled();
+        });
+
+        it('should still report a real miss on a collection after another tab removed one of its members', async () => {
+            const syncCallback = getSyncCallback();
+
+            await Onyx.set(MEMBER_1, {id: 1});
+            await StorageMock.removeItem(MEMBER_1);
+            syncCallback([[MEMBER_1, undefined]]);
+            onyxSubscriptionManager.getState(MEMBER_1);
+            await waitForPromisesToResolve();
+
+            await StorageMock.setItem(MEMBER_2, {id: 2});
+            forgetValueButKeepKey(MEMBER_2);
+            onyxSubscriptionManager.getState(MEMBER_2);
+            await waitForPromisesToResolve();
+
+            expect(logHmmmSpy).toHaveBeenCalledTimes(1);
+            expect(logHmmmSpy).toHaveBeenCalledWith(expect.stringContaining(COLLECTION));
         });
 
         it('should not report a key the index does not know, which means init has not loaded it', async () => {
