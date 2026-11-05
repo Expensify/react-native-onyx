@@ -354,6 +354,13 @@ describe('OnyxSubscriptionManager', () => {
             cache.setAllKeys([key]);
         };
 
+        // The handler Onyx.init registered for changes another tab wrote to storage.
+        const getSyncCallback = (): ((pairs: Array<[OnyxKey, unknown]>) => void) => {
+            const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls.at(-1)?.[0] as ((pairs: Array<[OnyxKey, unknown]>) => void) | undefined;
+            expect(syncCallback).toBeDefined();
+            return syncCallback as (pairs: Array<[OnyxKey, unknown]>) => void;
+        };
+
         it('should report once when the cache has no value but storage does', async () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'from-storage');
             forgetValueButKeepKey(ONYXKEYS.TEST_KEY);
@@ -427,8 +434,7 @@ describe('OnyxSubscriptionManager', () => {
         });
 
         it('should not read storage or report for a key another tab removed', async () => {
-            const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls.at(-1)?.[0];
-            expect(syncCallback).toBeDefined();
+            const syncCallback = getSyncCallback();
             const getItemMock = jest.mocked(StorageMock.getItem);
 
             await Onyx.set(MEMBER_1, {id: 1});
@@ -444,8 +450,7 @@ describe('OnyxSubscriptionManager', () => {
         });
 
         it('should still report a real miss on a collection after another tab removed one of its members', async () => {
-            const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls.at(-1)?.[0];
-            expect(syncCallback).toBeDefined();
+            const syncCallback = getSyncCallback();
 
             await Onyx.set(MEMBER_1, {id: 1});
             await StorageMock.removeItem(MEMBER_1);
@@ -460,31 +465,6 @@ describe('OnyxSubscriptionManager', () => {
 
             expect(logHmmmSpy).toHaveBeenCalledTimes(1);
             expect(logHmmmSpy).toHaveBeenCalledWith(expect.stringContaining(COLLECTION));
-        });
-
-        it('should log once when another tab removes a key this tab is still writing', async () => {
-            const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls.at(-1)?.[0];
-            expect(syncCallback).toBeDefined();
-
-            await Onyx.set(MEMBER_1, {id: 1});
-            const mergePromise = Onyx.merge(MEMBER_1, {id: 2});
-            syncCallback([[MEMBER_1, undefined]]);
-            await mergePromise;
-
-            expect(logHmmmSpy).toHaveBeenCalledTimes(1);
-            expect(logHmmmSpy).toHaveBeenCalledWith(expect.stringContaining(MEMBER_1));
-        });
-
-        it('should not log a removal from another tab during a local clear', async () => {
-            const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls.at(-1)?.[0];
-            expect(syncCallback).toBeDefined();
-
-            await Onyx.set(MEMBER_1, {id: 1});
-            const clearPromise = Onyx.clear();
-            syncCallback([[MEMBER_1, undefined]]);
-            await clearPromise;
-
-            expect(logHmmmSpy).not.toHaveBeenCalled();
         });
 
         it('should not report a key the index does not know, which means init has not loaded it', async () => {

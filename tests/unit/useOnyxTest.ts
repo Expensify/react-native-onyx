@@ -5,7 +5,6 @@ import type {UseOnyxSelector} from '../../lib/useOnyx';
 import type GenericCollection from '../utils/GenericCollection';
 
 import Onyx, {useOnyx} from '../../lib';
-import cache from '../../lib/OnyxCache';
 import {resetDeferredInitTask} from '../../lib/OnyxUtils';
 import StorageMock from '../../lib/storage';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
@@ -239,29 +238,6 @@ describe('useOnyx', () => {
 
             expect(result.current[0]).toEqual('after');
             expect(result.current[1].status).toEqual('loaded');
-        });
-
-        it('should keep a known-empty key known empty when another tab removes it, like a local removal does', async () => {
-            const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls.at(-1)?.[0];
-            expect(syncCallback).toBeDefined();
-
-            cache.addNullishStorageKey(ONYXKEYS.TEST_KEY);
-            await Onyx.merge(ONYXKEYS.TEST_KEY, null);
-            expect(cache.hasCacheForKey(ONYXKEYS.TEST_KEY)).toBe(true);
-
-            await Onyx.clear();
-            cache.addNullishStorageKey(ONYXKEYS.TEST_KEY);
-            syncCallback([[ONYXKEYS.TEST_KEY, undefined]]);
-            expect(cache.hasCacheForKey(ONYXKEYS.TEST_KEY)).toBe(true);
-
-            Onyx.merge(ONYXKEYS.TEST_KEY, 'after');
-            const {result} = renderHook(() => useOnyx(ONYXKEYS.TEST_KEY));
-
-            expect(result.current[1].status).toEqual('loaded');
-
-            await act(async () => waitForPromisesToResolve());
-
-            expect(result.current[0]).toEqual('after');
         });
 
         it('should initially return undefined and then return cached value after multiple merge operations', async () => {

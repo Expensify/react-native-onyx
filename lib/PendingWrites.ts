@@ -64,11 +64,6 @@ function addWriteListener(listener: (keys: OnyxKey[]) => void): () => void {
     return () => writeListeners.delete(listener);
 }
 
-/** True while a write to exactly this key is in flight. Ignores global writes such as clear. */
-function hasPendingWriteForKey(key: OnyxKey): boolean {
-    return pendingWritesByKey.has(key);
-}
-
 /**
  * In-flight writes that can change the value delivered to a subscriber of `key`: writes to the key
  * itself, writes to any member when `key` is a collection root, and global writes (clear).
@@ -123,7 +118,6 @@ export default {
     trackPendingGlobalWrite,
     addWriteListener,
     getPendingWritesForKey,
-    hasPendingWriteForKey,
     scheduleInitialSubscriberNotification,
     clearPendingWrites,
 };
