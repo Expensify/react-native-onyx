@@ -212,7 +212,7 @@ function isEmptyObject<T>(obj: T | EmptyValue): obj is EmptyValue {
     }
 
     // Use for-in loop to avoid an unnecessary array allocation from Object.keys()
-    // eslint-disable-next-line no-restricted-syntax
+    /* eslint-disable-next-line no-restricted-syntax */ /* oxlint-disable-next-line core/no-restricted-syntax */
     for (const key in obj) {
         if (Object.hasOwn(obj, key)) {
             return false;
@@ -246,7 +246,7 @@ function needsNormalization(value: unknown): boolean {
     }
 
     // Use for-in loop to avoid an unnecessary array allocation from Object.keys()
-    // eslint-disable-next-line no-restricted-syntax, guard-for-in
+    /* eslint-disable-next-line no-restricted-syntax, guard-for-in */ /* oxlint-disable-next-line core/no-restricted-syntax */
     for (const key in value) {
         if (key === ONYX_INTERNALS__REPLACE_OBJECT_MARK) {
             return true;
@@ -288,7 +288,7 @@ function removeNestedNullValues<TValue extends OnyxInput<OnyxKey> | null>(value:
     let hasChanged = false;
     const result: Record<string, unknown> = {};
 
-    // eslint-disable-next-line no-restricted-syntax, guard-for-in
+    /* eslint-disable-next-line no-restricted-syntax, guard-for-in */ /* oxlint-disable-next-line core/no-restricted-syntax */
     for (const key in value) {
         const propertyValue = value[key];
 

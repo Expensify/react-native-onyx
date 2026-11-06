@@ -9,14 +9,13 @@
 import {builtinRules} from 'eslint/use-at-your-own-risk';
 
 import {coreRuleNames} from '../derive.mjs';
-import {withEslintDirectiveIDsFor} from '../eslintDirectives.mjs';
 
 const plugin = {
     meta: {
         name: 'core',
         version: '0.0.1',
     },
-    rules: withEslintDirectiveIDsFor(Object.fromEntries(coreRuleNames.map((name) => [name, builtinRules.get(name)])), (name) => name),
+    rules: Object.fromEntries(coreRuleNames.map((name) => [name, builtinRules.get(name)])),
 };
 
 export default plugin;

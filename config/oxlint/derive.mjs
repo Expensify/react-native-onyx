@@ -154,14 +154,11 @@ for (const ruleId of [...skipped, ...ALWAYS_HOSTED]) {
     throw new Error(`Oxlint cannot run ${ruleId} natively or as a JS plugin. Add it to NOT_PORTED or STAND_INS in config/oxlint/derive.mjs.`);
 }
 
-// Hosted rules share the `hosted` namespace, so this maps each one back to its ESLint plugin.
-const HOSTED_RULE_ORIGIN = {};
-for (const ruleId of hostedRuleIds) {
-    const {prefix, name} = splitRuleId(ruleId);
-    if (HOSTED_RULE_ORIGIN[name]) {
-        throw new Error(`hosted/${name} would stand for both ${HOSTED_RULE_ORIGIN[name]}/${name} and ${ruleId}`);
-    }
-    HOSTED_RULE_ORIGIN[name] = prefix;
+// Hosted rules share the `hosted` namespace, so two ESLint plugins must not bring the same rule name.
+const hostedNames = hostedRuleIds.map((ruleId) => splitRuleId(ruleId).name);
+const duplicateName = hostedNames.find((name, index) => hostedNames.indexOf(name) !== index);
+if (duplicateName) {
+    throw new Error(`Two hosted rules would both be named hosted/${duplicateName}`);
 }
 
 /**
@@ -336,4 +333,4 @@ const oxlintConfig = {
     ],
 };
 
-export {HOSTED_RULE_ORIGIN, STAND_INS, STUBBED_PARSER_SERVICES, coreRuleNames, hostedRuleIds, oxlintConfig, pluginRules, splitRuleId};
+export {STUBBED_PARSER_SERVICES, coreRuleNames, hostedRuleIds, oxlintConfig, pluginRules, splitRuleId};

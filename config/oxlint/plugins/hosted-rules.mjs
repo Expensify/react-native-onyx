@@ -1,11 +1,9 @@
 /**
  * Runs rules from ESLint plugins (typescript-eslint, import, jsdoc, react) inside Oxlint, using the plugins'
  * own code, for rules Oxlint has no native version of. Oxlint reserves those plugin names for its own
- * ports, so all of them load under `hosted`; HOSTED_RULE_ORIGIN in config/oxlint/derive.mjs maps them back.
- * config/oxlint/derive.mjs picks the rules. Adapted from Expensify/App config/oxlint/plugins/hosted-rules.mjs.
+ * ports, so all of them load under `hosted`. config/oxlint/derive.mjs picks the rules. Adapted from Expensify/App config/oxlint/plugins/hosted-rules.mjs.
  */
 import {STUBBED_PARSER_SERVICES, hostedRuleIds, pluginRules, splitRuleId} from '../derive.mjs';
-import {withEslintDirectiveIDs} from '../eslintDirectives.mjs';
 
 // Type-checked rules such as naming-convention ask for parser services, which Oxlint JS plugins lack. getParserServices(context, true)
 // tolerates a missing `program` but fails on missing node maps and reads context.languageOptions first, so
@@ -49,8 +47,7 @@ const plugin = {
         hostedRuleIds.map((ruleId) => {
             const {prefix, name} = splitRuleId(ruleId);
             const rule = pluginRules(prefix)[name];
-            // Makes `eslint-disable` comments that use the ESLint id apply to the hosted rule.
-            return [name, withEslintDirectiveIDs(STUBBED_PARSER_SERVICES.has(ruleId) ? withStubbedParserServices(rule) : rule, ruleId)];
+            return [name, STUBBED_PARSER_SERVICES.has(ruleId) ? withStubbedParserServices(rule) : rule];
         }),
     ),
 };

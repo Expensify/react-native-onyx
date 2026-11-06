@@ -2,11 +2,10 @@
  * Count-threshold lint gate (experiment, replaces a seatbelt baseline).
  *
  * Every rule that had violations when eslint-config-expensify 4.x was adopted is downgraded from `error` to
- * `warn` in both eslint.config.mjs and oxlint.config.mts, and CI runs the linters with `--max-warnings <total>`
+ * `warn` in eslint.config.mjs and in config/oxlint/sourceConfig.mjs (which the Oxlint config is derived from), and
+ * CI runs the linters with `--max-warnings <total>`
  * (see the `lint` and `lint:oxlint` scripts in package.json). Errors still fail on their own, so any rule
  * not listed here stays strict. Shrink this list (and the thresholds) as rules reach zero.
- *
- * Rule ids are ESLint ids; oxlint.config.mts maps its own keys to them with config/oxlint/ruleNames.mjs.
  */
 const LINT_DEBT_RULES = new Set([
     '@typescript-eslint/consistent-type-definitions',
