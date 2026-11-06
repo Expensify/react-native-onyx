@@ -1,5 +1,6 @@
 // Oxlint's config is generated from this file (see derive.mjs). It is a copy of eslint.config.mjs without the
 // rulesdir setup, so Oxlint keeps working after eslint.config.mjs is deleted. Until then, change both files together.
+// Unlike ESLint, Oxlint keeps existing violations as errors: the seatbelt (seatbelt.mjs) grandfathers them per file.
 import browserConfig from 'eslint-config-expensify/browser';
 import jestConfig from 'eslint-config-expensify/jest';
 import reactConfig from 'eslint-config-expensify/react';
@@ -9,9 +10,7 @@ import prettierConfig from 'eslint-config-prettier';
 import {defineConfig, globalIgnores} from 'eslint/config';
 import globals from 'globals';
 
-import downgradeDebtRules from '../lintDebt.mjs';
-
-const configs = defineConfig([
+export default defineConfig([
     globalIgnores([
         'dist/**',
         'node_modules/**',
@@ -137,5 +136,3 @@ const configs = defineConfig([
     },
     prettierConfig,
 ]);
-
-export default configs.map((entry) => (entry.rules ? {...entry, rules: downgradeDebtRules(entry.rules)} : entry));

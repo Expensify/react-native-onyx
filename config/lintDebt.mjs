@@ -1,6 +1,6 @@
-// Rules that already had violations when eslint-config-expensify 4.x was adopted report as warnings instead of
-// errors, and the `lint` and `lint:oxlint` scripts fail above the current warning count. Remove a rule here, and
-// lower the counts, once it reaches zero.
+// ESLint only: rules that already had violations when eslint-config-expensify 4.x was adopted report as warnings
+// instead of errors, and `npm run lint:eslint` fails above the current warning count. Oxlint uses the seatbelt
+// (config/oxlint/seatbelt.mjs) instead. Remove a rule here, and lower the count, once it reaches zero.
 const LINT_DEBT_RULES = new Set([
     '@typescript-eslint/consistent-type-definitions',
     '@typescript-eslint/naming-convention',
