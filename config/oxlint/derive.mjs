@@ -1,15 +1,16 @@
-// Oxlint's config, generated from sourceConfig.mjs each time Oxlint runs, so updating eslint-config-expensify needs no
-// manual changes. @oxlint/migrate turns each ESLint rule into Oxlint's built-in version. Rules Oxlint has no built-in
+// Oxlint's config, generated from the eslint-config-expensify presets (presets.mjs) each time Oxlint runs, so updating
+// eslint-config-expensify needs no manual changes. @oxlint/migrate turns each ESLint rule into Oxlint's built-in version. Rules Oxlint has no built-in
 // version of run with ESLint's own code through the plugins in ./plugins, with the same settings as in ESLint.
 // A rule that cannot run either way must be listed in NOT_PORTED or STAND_INS, otherwise Oxlint stops with an error,
 // so no rule is dropped without a decision. The plugin files read their rule lists from this module.
+// oxlint.config.mts adds Onyx's own settings in Oxlint format through extendOxlintConfig.
 import migrate from '@oxlint/migrate';
 import {builtinRules} from 'eslint/use-at-your-own-risk';
 import {createRequire} from 'node:module';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
-import eslintConfig from './sourceConfig.mjs';
+import eslintConfig from './presets.mjs';
 
 const require = createRequire(import.meta.url);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -171,20 +172,21 @@ function fixRules(rules = {}, isTypeScriptBlock = false) {
     return out;
 }
 
+const isObject = (value) => value && typeof value === 'object' && !Array.isArray(value);
+const mergeSettings = (target, source) => {
+    for (const [key, value] of Object.entries(source)) {
+        target[key] = isObject(value) && isObject(target[key]) ? mergeSettings({...target[key]}, value) : value;
+    }
+    return target;
+};
+
 // ESLint's import rules (run as hosted) read these settings. Oxlint cannot set settings per file pattern, so all
 // blocks are merged into one. `import/parsers` is skipped because Oxlint parses the files itself.
 function importSettings() {
-    const isObject = (value) => value && typeof value === 'object' && !Array.isArray(value);
-    const merge = (target, source) => {
-        for (const [key, value] of Object.entries(source)) {
-            target[key] = isObject(value) && isObject(target[key]) ? merge({...target[key]}, value) : value;
-        }
-        return target;
-    };
     const settings = {};
     for (const block of eslintConfig) {
         const entries = Object.entries(block.settings ?? {}).filter(([key]) => key.startsWith('import/') && key !== 'import/parsers');
-        merge(settings, Object.fromEntries(entries));
+        mergeSettings(settings, Object.fromEntries(entries));
     }
     return settings;
 }
@@ -291,4 +293,43 @@ const oxlintConfig = {
     ],
 };
 
-export {STUBBED_PARSER_SERVICES, coreRuleNames, hostedRuleIds, oxlintConfig, pluginRules, splitRuleId};
+const oxlintSchema = require(path.join(path.dirname(require.resolve('oxlint/package.json')), 'configuration_schema.json'));
+const builtInRules = new Set(Object.keys(oxlintSchema.definitions.DummyRuleMap.properties));
+const otherJsPlugins = new Set(oxlintConfig.jsPlugins.map((plugin) => plugin.name).filter((name) => name !== 'core' && name !== 'hosted'));
+
+// A rule name written by hand must match how Oxlint runs that rule. If a preset update moves a rule between Oxlint's
+// built-in version and `hosted/` or `core/`, the old name would be ignored silently, so it fails here instead.
+function checkRuleName(rule) {
+    const slash = rule.indexOf('/');
+    const plugin = slash === -1 ? '' : rule.slice(0, slash);
+    const name = rule.slice(slash + 1);
+    let known;
+    if (plugin === 'core') {
+        known = coreRuleNames.includes(name);
+    } else if (plugin === 'hosted') {
+        known = hostedNames.includes(name);
+    } else {
+        // A built-in name is ignored when ESLint's code runs that rule instead.
+        known = otherJsPlugins.has(plugin) || (builtInRules.has(rule) && !ALWAYS_HOSTED.has(rule) && !coreRuleNames.includes(rule));
+    }
+    if (!known) {
+        throw new Error(`oxlint.config.mts sets "${rule}", which is not a rule Oxlint runs here. Check whether it runs as hosted/, core/ or built in.`);
+    }
+}
+
+/**
+ * Adds Onyx's own ignores, settings and overrides, written in Oxlint format, to the config generated from the presets.
+ * @param {Pick<import('oxlint').OxlintConfig, 'ignorePatterns' | 'settings' | 'overrides'>} extra
+ * @returns {import('oxlint').OxlintConfig}
+ */
+function extendOxlintConfig({ignorePatterns = [], settings = {}, overrides = []}) {
+    overrides.flatMap((override) => Object.keys(override.rules ?? {})).forEach(checkRuleName);
+    return {
+        ...oxlintConfig,
+        ignorePatterns: [...(oxlintConfig.ignorePatterns ?? []), ...ignorePatterns],
+        settings: mergeSettings({...oxlintConfig.settings}, settings),
+        overrides: [...oxlintConfig.overrides, ...overrides],
+    };
+}
+
+export {STUBBED_PARSER_SERVICES, coreRuleNames, extendOxlintConfig, hostedRuleIds, oxlintConfig, pluginRules, splitRuleId};

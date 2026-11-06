@@ -30,7 +30,6 @@
   "scripts": {
     "prepare": "npm run build",
     "lint": "node config/oxlint/lint.mjs",
-    "lint:eslint": "eslint . --max-warnings 713",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:lint": "node --test config/oxlint/seatbelt.test.mjs",
