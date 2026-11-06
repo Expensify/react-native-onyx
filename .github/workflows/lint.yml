@@ -40,7 +40,7 @@ jobs:
                   CI: true
 
             # On main, lint rewrites the seatbelt file when merged PRs fixed grandfathered errors. os-botify commits it
-            # back, through the same GitHub App token and contents API the publish workflow uses for version bumps.
+            # back the same way the publish workflow commits version bumps.
             - name: Check for tightened seatbelt baseline
               id: seatbelt
               if: github.event_name == 'push'

@@ -1,10 +1,8 @@
-// Seatbelt ratchet for Oxlint, ported from Expensify/App scripts/lint/processors/Seatbelt.ts (which follows
-// justjake/eslint-seatbelt). config/oxlint/oxlint.seatbelt.tsv records, per file and rule, how many errors are
-// allowed. Errors up to that count report as warnings; one more fails the run. Counts can only go down, unless
-// SEATBELT_INCREASE names the rule.
+// config/oxlint/oxlint.seatbelt.tsv records, per file and rule, how many errors are allowed. Errors up to that count
+// report as warnings; one more fails the run. Counts can only go down, unless SEATBELT_INCREASE names the rule.
 //
-// As in App, local runs only read the file, so fixing errors leaves the working tree clean. CI writes it, and the
-// lint job on main commits the tightened file back as os-botify (.github/workflows/lint.yml).
+// Local runs only read the file, so fixing errors leaves the working tree clean. CI writes it, and the lint job on
+// main commits the tightened file back as os-botify (.github/workflows/lint.yml).
 //
 // Env: SEATBELT_INCREASE=<rules|all> allows and records an increase (commit the file with your change),
 // SEATBELT_READ_ONLY=0 writes locally, SEATBELT_FROZEN=1 fails on any difference from the file, SEATBELT_KEEP=<rules|all>
@@ -314,11 +312,7 @@ const readText = (file) => {
     }
 };
 
-/**
- * @param {Array<{filePath: string, ruleID: string | null, severity: 1 | 2, message: string, line: number, column: number}>} messages
- * @param {ReturnType<typeof resolveSeatbeltOptions>} options
- * @param {Iterable<string>} lintedFilenames absolute paths of every linted file, including clean ones
- */
+// lintedFilenames must include files without findings, so rows for fully fixed files are removed.
 function applySeatbelt(messages, options, lintedFilenames) {
     if (options.disable) {
         const existing = readText(options.seatbeltFile) ?? DEFAULT_FILE_HEADER;
@@ -353,7 +347,7 @@ function applySeatbelt(messages, options, lintedFilenames) {
         }
     }
 
-    // Rows for files that no longer exist are dropped (justjake/eslint-seatbelt#15).
+    // Rows for files that no longer exist are dropped.
     let pruned = 0;
     for (const relativeFilename of [...data.keys()]) {
         if (fs.existsSync(toAbsolutePath(options.seatbeltFile, relativeFilename))) {
@@ -380,7 +374,6 @@ function applySeatbelt(messages, options, lintedFilenames) {
     return {messages: canonicalizeMessages(transformed), tsv, wrote: shouldWrite, changed: anyChanged};
 }
 
-// Same parsing as eslint-seatbelt: unset or empty is unset; "0", "false" and "no" are false; anything else is true.
 function readBooleanEnvVar(value) {
     if (value === undefined || value === '') {
         return undefined;
@@ -388,8 +381,6 @@ function readBooleanEnvVar(value) {
     return !['0', 'false', 'no'].includes(value.toLowerCase());
 }
 
-// Same parsing as eslint-seatbelt: unset is unset, empty is no rules, "all"/"1"/"true" is every rule, otherwise a
-// comma- or space-separated list of rule IDs.
 function parseRuleSetEnvVar(value) {
     if (value === undefined) {
         return undefined;
@@ -400,7 +391,6 @@ function parseRuleSetEnvVar(value) {
     return ['all', '1', 'true'].includes(value.toLowerCase()) ? 'all' : new Set(value.split(/[\s,]+/g).filter(Boolean));
 }
 
-// Same defaults as App: read-only outside CI unless an increase is allowed, never frozen unless asked.
 function resolveSeatbeltOptions(projectRoot, env = process.env) {
     const allowIncreaseRules = parseRuleSetEnvVar(env.SEATBELT_INCREASE) ?? new Set();
     const isIncreaseSet = allowIncreaseRules === 'all' || allowIncreaseRules.size > 0;

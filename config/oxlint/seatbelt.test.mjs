@@ -1,4 +1,4 @@
-// Ported from Expensify/App tests/tooling/lintSeatbelt.test.ts. Run with `npm run test:lint`.
+// Runs on Node's test runner, not Jest: `npm run test:lint`.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';

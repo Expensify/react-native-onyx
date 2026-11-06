@@ -33,7 +33,7 @@
     "lint:eslint": "eslint . --max-warnings 713",
     "typecheck": "tsc --noEmit",
     "test": "jest",
-    "test:lint": "node --test config/oxlint/",
+    "test:lint": "node --test config/oxlint/seatbelt.test.mjs",
     "test:types": "npm run build && tsc --noEmit --project tsconfig.test.json",
     "perf-test": "npx reassure",
     "build": "tsc -p tsconfig.build.json",

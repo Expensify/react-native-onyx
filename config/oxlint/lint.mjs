@@ -1,5 +1,4 @@
-// Runs Oxlint, then the seatbelt ratchet (seatbelt.mjs), then prints the result. Ported from Expensify/App
-// scripts/lint/ without App's sharding, React Compiler filter and no-deprecated stratification.
+// Runs Oxlint, applies the seatbelt (seatbelt.mjs) and prints the result.
 //
 //   npm run lint                          lint the whole repo
 //   npm run lint -- lib/Onyx.ts tests     lint the given paths
