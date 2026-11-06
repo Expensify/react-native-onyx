@@ -8,5 +8,5 @@ import type {DeepRecord} from '../lib/types';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type GenericDeepRecord = DeepRecord<string, any>;
 
-// eslint-disable-next-line import/prefer-default-export
+// oxlint-disable-next-line hosted/prefer-default-export
 export type {GenericDeepRecord};

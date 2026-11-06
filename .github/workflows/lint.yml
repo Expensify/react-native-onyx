@@ -3,9 +3,13 @@ name: Lint JavaScript
 on:
     pull_request:
         types: [opened, synchronize]
+    push:
+        branches: [main]
 
 jobs:
     lint:
+        # os-botify commits version bumps and seatbelt tightening to main; those commits need no lint run.
+        if: ${{ github.actor != 'os-botify[bot]' }}
         runs-on: ubuntu-latest
         steps:
             # v5.0.0
@@ -21,10 +25,7 @@ jobs:
 
             - run: npm ci
 
-            - run: npm run lint
-              env:
-                  CI: true
-
+            # Runs before lint, which may rewrite the seatbelt file and would fail this diff check.
             - name: Verify there's no Prettier diff
               run: |
                 npm run prettier -- --loglevel silent
@@ -33,3 +34,43 @@ jobs:
                   echo 'Error: Prettier diff detected! Please run `npm run prettier` and commit the changes.'
                   exit 1
                 fi
+
+            - run: npm run lint
+              env:
+                  CI: true
+
+            # On main, lint rewrites the seatbelt file when merged PRs fixed grandfathered errors. os-botify commits it
+            # back the same way the publish workflow commits version bumps.
+            - name: Check for tightened seatbelt baseline
+              id: seatbelt
+              if: github.event_name == 'push'
+              run: |
+                if git diff --quiet config/oxlint/oxlint.seatbelt.tsv; then
+                  echo "tightened=false" >> "$GITHUB_OUTPUT"
+                  echo "::notice::oxlint.seatbelt.tsv unchanged; skipping auto-commit."
+                else
+                  echo "tightened=true" >> "$GITHUB_OUTPUT"
+                fi
+
+            - name: Generate os-botify token
+              id: token
+              if: steps.seatbelt.outputs.tightened == 'true'
+              uses: actions/create-github-app-token@9d97a4282b2c51a2f4f0465b9326399f53c890d4
+              with:
+                  app-id: ${{ secrets.OS_BOTIFY_APP_ID }}
+                  private-key: ${{ secrets.OS_BOTIFY_PRIVATE_KEY }}
+
+            # If another commit changed the file meanwhile, the API rejects the stale sha. The next push to main
+            # tightens again, so this step is allowed to fail.
+            - name: Auto-commit tightened seatbelt baseline
+              if: steps.seatbelt.outputs.tightened == 'true'
+              continue-on-error: true
+              run: |
+                file=config/oxlint/oxlint.seatbelt.tsv
+                gh api --method PUT "/repos/${{ github.repository }}/contents/$file" \
+                  --field message="Auto-tighten oxlint seatbelt baseline" \
+                  --field content="$(base64 -w0 "$file")" \
+                  --field branch=main \
+                  --field sha="$(git rev-parse "HEAD:$file")"
+              env:
+                  GITHUB_TOKEN: ${{ steps.token.outputs.token }}
