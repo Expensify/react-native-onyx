@@ -28,7 +28,6 @@ const configs = defineConfig([
         'cpp/**',
         'bench-results/**',
         '.github/**',
-        'lint-parity/**',
         'oxlint.config.mts',
         'config/oxlint/**',
     ]),

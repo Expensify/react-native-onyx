@@ -1,5 +1,5 @@
-// Oxlint's source config, in ESLint format so @oxlint/migrate can convert it. It copies eslint.config.mjs without
-// the rulesdir setup, so Oxlint keeps working once ESLint is removed. Until then, keep the two in sync.
+// Oxlint's config is generated from this file (see derive.mjs). It is a copy of eslint.config.mjs without the
+// rulesdir setup, so Oxlint keeps working after eslint.config.mjs is deleted. Until then, change both files together.
 import browserConfig from 'eslint-config-expensify/browser';
 import jestConfig from 'eslint-config-expensify/jest';
 import reactConfig from 'eslint-config-expensify/react';
@@ -22,7 +22,6 @@ const configs = defineConfig([
         'cpp/**',
         'bench-results/**',
         '.github/**',
-        'lint-parity/**',
         'oxlint.config.mts',
         'config/oxlint/**',
     ]),

@@ -1,9 +1,10 @@
-// Oxlint reserves the react, import, jsdoc and typescript plugin names for its own ports, so the ESLint versions
-// of rules it lacks load here under `hosted`.
+// Oxlint has built-in plugins named react, import, jsdoc and typescript, so ESLint's versions of rules Oxlint lacks
+// load here under the name `hosted`.
 import {STUBBED_PARSER_SERVICES, hostedRuleIds, pluginRules, splitRuleId} from '../derive.mjs';
 
-// Oxlint gives JS plugins no TypeScript program. typescript-eslint's getParserServices(context, true) accepts a
-// missing program but still needs the node maps and reads context.languageOptions, so both are stubbed.
+// typescript-eslint rules call getParserServices, which needs type information Oxlint plugins do not get. Called as
+// getParserServices(context, true) it accepts a missing TypeScript program, but still reads these two maps and
+// context.languageOptions, so they get empty placeholders.
 const STUB_PARSER_SERVICES = {
     esTreeNodeToTSNodeMap: new Map(),
     tsNodeToESTreeNodeMap: new Map(),
@@ -14,7 +15,7 @@ function withStubbedParserServices(rule) {
         ...rule,
         create(context) {
             const sourceCode = context.sourceCode ?? context.getSourceCode();
-            // Not a Proxy: Oxlint makes `parserServices` read-only and non-configurable.
+            // Oxlint makes `parserServices` read-only, so a Proxy cannot replace it; a new object built on top can.
             const stubbedSourceCode = Object.create(sourceCode, {
                 parserServices: {value: STUB_PARSER_SERVICES},
             });
