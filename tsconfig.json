@@ -17,5 +17,11 @@
         "declaration": true,
         "outDir": "./dist"
     },
+    "ts-node": {
+        "compilerOptions": {
+            "module": "commonjs",
+            "moduleResolution": "node"
+        }
+    },
     "exclude": ["**/node_modules/**/*", "**/dist/**/*", "tests/types/**/*.ts"]
 }
