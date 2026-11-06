@@ -1,12 +1,6 @@
-/**
- * Count-threshold lint gate (experiment, replaces a seatbelt baseline).
- *
- * Every rule that had violations when eslint-config-expensify 4.x was adopted is downgraded from `error` to
- * `warn` in eslint.config.mjs and in config/oxlint/sourceConfig.mjs (which the Oxlint config is derived from), and
- * CI runs the linters with `--max-warnings <total>`
- * (see the `lint` and `lint:oxlint` scripts in package.json). Errors still fail on their own, so any rule
- * not listed here stays strict. Shrink this list (and the thresholds) as rules reach zero.
- */
+// Rules that already had violations when eslint-config-expensify 4.x was adopted report as warnings instead of
+// errors, and the `lint` and `lint:oxlint` scripts fail above the current warning count. Remove a rule here, and
+// lower the counts, once it reaches zero.
 const LINT_DEBT_RULES = new Set([
     '@typescript-eslint/consistent-type-definitions',
     '@typescript-eslint/naming-convention',
@@ -37,12 +31,6 @@ const LINT_DEBT_RULES = new Set([
 
 const isError = (severity) => severity === 'error' || severity === 2;
 
-/**
- * Turns an `error` rule entry into `warn`, keeping its options. `off` and `warn` entries are returned as is,
- * so a rule is never switched on where the shared config turned it off.
- * @param {unknown} entry a rule entry such as `'error'` or `['error', {...}]`
- * @returns {unknown}
- */
 function downgradeToWarn(entry) {
     if (Array.isArray(entry)) {
         return isError(entry[0]) ? ['warn', ...entry.slice(1)] : entry;
@@ -51,18 +39,12 @@ function downgradeToWarn(entry) {
 }
 
 /**
- * Downgrades the debt rules in a rules object. `toESLintIds` maps a rule key to the ESLint ids it stands for.
- * @template {Record<string, unknown> | undefined} T
+ * @template {Record<string, unknown>} T
  * @param {T} rules
- * @param {(key: string) => string[]} [toESLintIds]
  * @returns {T}
  */
-function downgradeDebtRules(rules, toESLintIds) {
-    if (!rules) {
-        return rules;
-    }
-    const isDebt = (key) => (toESLintIds ? toESLintIds(key) : [key]).some((id) => LINT_DEBT_RULES.has(id));
-    return /** @type {T} */ (Object.fromEntries(Object.entries(rules).map(([key, entry]) => [key, isDebt(key) ? downgradeToWarn(entry) : entry])));
+function downgradeDebtRules(rules) {
+    return /** @type {T} */ (Object.fromEntries(Object.entries(rules).map(([ruleId, entry]) => [ruleId, LINT_DEBT_RULES.has(ruleId) ? downgradeToWarn(entry) : entry])));
 }
 
-export {LINT_DEBT_RULES, downgradeDebtRules, downgradeToWarn};
+export default downgradeDebtRules;

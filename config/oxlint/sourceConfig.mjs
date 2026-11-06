@@ -1,11 +1,5 @@
-/**
- * Source of the Oxlint config: the eslint-config-expensify presets plus Onyx's own blocks, in ESLint flat-config
- * format. config/oxlint/derive.mjs converts it with @oxlint/migrate every time Oxlint loads, so bumping
- * eslint-config-expensify updates Oxlint without editing any rule by hand. Onyx-specific changes go here.
- *
- * It does not need eslint.config.mjs. Until ESLint is removed, keep the Onyx blocks below in sync with it
- * (the lint-parity comparison shows any drift).
- */
+// Oxlint's source config, in ESLint format so @oxlint/migrate can convert it. It copies eslint.config.mjs without
+// the rulesdir setup, so Oxlint keeps working once ESLint is removed. Until then, keep the two in sync.
 import browserConfig from 'eslint-config-expensify/browser';
 import jestConfig from 'eslint-config-expensify/jest';
 import reactConfig from 'eslint-config-expensify/react';
@@ -15,7 +9,7 @@ import prettierConfig from 'eslint-config-prettier';
 import {defineConfig, globalIgnores} from 'eslint/config';
 import globals from 'globals';
 
-import {downgradeDebtRules} from '../lintDebt.mjs';
+import downgradeDebtRules from '../lintDebt.mjs';
 
 const configs = defineConfig([
     globalIgnores([
@@ -61,8 +55,8 @@ const configs = defineConfig([
             globals: globals.node,
         },
     },
-    // Flat config replaces the whole naming-convention array, so this repeats eslint-config-expensify/typescript
-    // and adds objectLiteralProperty exceptions for Onyx key strings (underscores) and numeric collection IDs.
+    // A later block replaces the whole naming-convention array, so this repeats eslint-config-expensify/typescript
+    // and allows Onyx key strings (underscores) and numeric collection IDs as object keys.
     {
         files: ['tests/**/*'],
         rules: {
@@ -145,6 +139,4 @@ const configs = defineConfig([
     prettierConfig,
 ]);
 
-// Count-threshold gate: rules with existing violations report as warnings, and `npm run lint:oxlint` fails above
-// the warning count it passes to --max-warnings. See config/lintDebt.mjs.
 export default configs.map((entry) => (entry.rules ? {...entry, rules: downgradeDebtRules(entry.rules)} : entry));

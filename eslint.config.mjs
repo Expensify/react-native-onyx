@@ -10,8 +10,8 @@ import globals from 'globals';
 import {createRequire} from 'node:module';
 import path from 'node:path';
 
-// oxlint-disable-next-line import/extensions -- Oxlint's port flags this; eslint-plugin-import skips paths its resolver cannot resolve without the extension.
-import {downgradeDebtRules} from './config/lintDebt.mjs';
+// oxlint-disable-next-line import/extensions -- Oxlint's port reports this import; ESLint's skips it because its resolver cannot resolve the path.
+import downgradeDebtRules from './config/lintDebt.mjs';
 
 const require = createRequire(import.meta.url);
 const expensifyConfigDirectory = path.dirname(require.resolve('eslint-config-expensify'));
@@ -66,8 +66,8 @@ const configs = defineConfig([
             globals: globals.node,
         },
     },
-    // Flat config replaces the whole naming-convention array, so this repeats eslint-config-expensify/typescript
-    // and adds objectLiteralProperty exceptions for Onyx key strings (underscores) and numeric collection IDs.
+    // A later block replaces the whole naming-convention array, so this repeats eslint-config-expensify/typescript
+    // and allows Onyx key strings (underscores) and numeric collection IDs as object keys.
     {
         files: ['tests/**/*'],
         rules: {
@@ -150,6 +150,4 @@ const configs = defineConfig([
     prettierConfig,
 ]);
 
-// Count-threshold gate: rules with existing violations report as warnings, and `npm run lint` fails above
-// the warning count it passes to --max-warnings. See config/lintDebt.mjs.
 export default configs.map((entry) => (entry.rules ? {...entry, rules: downgradeDebtRules(entry.rules)} : entry));
