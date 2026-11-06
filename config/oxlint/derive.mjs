@@ -32,7 +32,21 @@ const HOSTABLE_PLUGINS = {
 const ALWAYS_HOSTED = new Set([
     // Oxlint's built-in version skips `export type {...}`, which ESLint reports (tests/types.ts).
     'import/prefer-default-export',
+    // Oxlint's built-in version also reports components defined inside `jest.mock()` factories.
+    'react/function-component-definition',
+    // Oxlint's built-in version reports on the JSX provider instead of the value, so on a different line.
+    'react/jsx-no-constructed-context-values',
 ]);
+
+// @oxlint/migrate warnings that are safe to ignore. Any other warning may mean a preset rule was lost or changed scope,
+// so loading stops. Dropped settings are accepted only if derive.mjs restores them (`import/*`; `import/parsers` is not
+// needed because Oxlint parses files itself) or if the presets set them to the value ESLint uses by default anyway.
+const EXPECTED_WARNINGS = [/^special parser detected: @babel\/eslint-parser$/, /^react\.version "detect"/, /^Added \d+ globals/];
+const DROPPED_SETTINGS_WARNINGS = [/^Settings not migrated/, /^Settings found under a 'files' pattern/];
+const DEFAULT_SETTINGS = {'react.pragma': 'React'};
+
+// Oxlint also accepts these prefixes for rules it runs under another plugin name (prefix: ESLint prefix).
+const ESLINT_PREFIX_OF = {eslint: '', 'import-x': 'import', typescript: '@typescript-eslint'};
 
 // typescript-eslint rules that ask for type information, which Oxlint plugins do not get. naming-convention works
 // with empty placeholders instead (hosted-rules.mjs) as long as Onyx's options do not use the `types` selector.
@@ -74,12 +88,39 @@ function splitRuleId(ruleId) {
 // migrate runs twice. With type information on, it replaces ESLint core rules like dot-notation with their
 // typescript-eslint versions, which the presets switch off for JS files, where ESLint uses the core rule. The run
 // without type information reports those core rules as missing in Oxlint, so they run from ESLint's code.
+function isExpectedWarning(warning) {
+    if (EXPECTED_WARNINGS.some((pattern) => pattern.test(warning))) {
+        return true;
+    }
+    if (!DROPPED_SETTINGS_WARNINGS.some((pattern) => pattern.test(warning))) {
+        return false;
+    }
+    const valuesInPresets = (key) =>
+        eslintConfig.flatMap((block) => {
+            const value = key.split('.').reduce((object, part) => (object && typeof object === 'object' ? object[part] : undefined), block.settings);
+            return value === undefined ? [] : [value];
+        });
+    const keys = [...warning.matchAll(/`([^`]+)`/g)].map((match) => match[1]);
+    return keys.length > 0 && keys.every((key) => key.startsWith('import/') || (key in DEFAULT_SETTINGS && valuesInPresets(key).every((value) => value === DEFAULT_SETTINGS[key])));
+}
+
+// Oxlint override `files` are plain globs; ESLint also allows AND patterns (nested arrays) and functions.
+for (const block of eslintConfig) {
+    if (block.files?.some((pattern) => typeof pattern !== 'string')) {
+        throw new Error('A preset block uses `files` that are not plain globs, which Oxlint cannot express');
+    }
+}
+
 async function runMigrate() {
     const skipped = new Set();
     const run = async (typeAware) => {
         const skippedHere = new Map();
         const reporter = {
-            addWarning: () => {},
+            addWarning: (warning) => {
+                if (!isExpectedWarning(warning)) {
+                    throw new Error(`@oxlint/migrate: ${warning}\nCheck what it means for the presets' rules, then handle it in config/oxlint/derive.mjs.`);
+                }
+            },
             getWarnings: () => [],
             markSkipped: (rule, category) => skippedHere.set(`${rule}\0${category}`, rule),
             removeSkipped: (rule, category) => skippedHere.delete(`${rule}\0${category}`),
@@ -111,12 +152,20 @@ for (const ruleId of [...skipped, ...ALWAYS_HOSTED]) {
         coreRuleNames.push(name);
         continue;
     }
-    const rule = HOSTABLE_PLUGINS[prefix] ? pluginRules(prefix)[name] : undefined;
+    const pluginPackage = HOSTABLE_PLUGINS[prefix];
+    const rule = pluginPackage ? pluginRules(prefix)[name] : undefined;
     if (rule && (!rule.meta?.docs?.requiresTypeChecking || STUBBED_PARSER_SERVICES.has(ruleId))) {
         hostedRuleIds.push(ruleId);
         continue;
     }
-    throw new Error(`Oxlint cannot run ${ruleId} natively or as a JS plugin. Add it to NOT_PORTED or STAND_INS in config/oxlint/derive.mjs.`);
+    let fix = 'If an installed ESLint plugin has it, add that plugin to HOSTABLE_PLUGINS; otherwise add the rule to NOT_PORTED or STAND_INS';
+    if (rule) {
+        fix =
+            'It needs type information, which Oxlint plugins do not get. Add it to NOT_PORTED or STAND_INS, or to STUBBED_PARSER_SERVICES if it only uses types for options the presets do not set';
+    } else if (pluginPackage) {
+        fix = `${pluginPackage} has no such rule. Add it to NOT_PORTED or STAND_INS`;
+    }
+    throw new Error(`Oxlint cannot run ${ruleId} natively or as a JS plugin. ${fix} in config/oxlint/derive.mjs.`);
 }
 
 // All hosted rules share the `hosted/` prefix, so two plugins cannot both bring a rule with the same name.
@@ -243,9 +292,6 @@ function replayJsPluginRules() {
             Object.assign(rules, Object.fromEntries(hits));
             continue;
         }
-        if (block.files.some(Array.isArray)) {
-            throw new Error('ESLint `files` with nested arrays (AND patterns) cannot be expressed in Oxlint');
-        }
         hits.forEach(([rule]) => scopedRules.add(rule));
         overrides.push({files: block.files, rules: Object.fromEntries(hits)});
     }
@@ -293,27 +339,19 @@ const oxlintConfig = {
     ],
 };
 
-const oxlintSchema = require(path.join(path.dirname(require.resolve('oxlint/package.json')), 'configuration_schema.json'));
-const builtInRules = new Set(Object.keys(oxlintSchema.definitions.DummyRuleMap.properties));
-const otherJsPlugins = new Set(oxlintConfig.jsPlugins.map((plugin) => plugin.name).filter((name) => name !== 'core' && name !== 'hosted'));
+// The name a rule runs under when ESLint's code runs it (`hosted/` or `core/`), or undefined if it runs as written.
+function getRunningName(rule) {
+    const {prefix, name} = splitRuleId(rule);
+    const eslintPrefix = prefix in ESLINT_PREFIX_OF ? ESLINT_PREFIX_OF[prefix] : prefix;
+    return jsPluginRuleFor(eslintPrefix ? `${eslintPrefix}/${name}` : name);
+}
 
-// A rule name written by hand must match how Oxlint runs that rule. If a preset update moves a rule between Oxlint's
-// built-in version and `hosted/` or `core/`, the old name would be ignored silently, so it fails here instead.
+// Oxlint itself rejects rule names it doesn't know. This catches the case it can't: a valid name for a rule that runs
+// from ESLint's code under another name here, so the setting would do nothing or run a second copy.
 function checkRuleName(rule) {
-    const slash = rule.indexOf('/');
-    const plugin = slash === -1 ? '' : rule.slice(0, slash);
-    const name = rule.slice(slash + 1);
-    let known;
-    if (plugin === 'core') {
-        known = coreRuleNames.includes(name);
-    } else if (plugin === 'hosted') {
-        known = hostedNames.includes(name);
-    } else {
-        // A built-in name is ignored when ESLint's code runs that rule instead.
-        known = otherJsPlugins.has(plugin) || (builtInRules.has(rule) && !ALWAYS_HOSTED.has(rule) && !coreRuleNames.includes(rule));
-    }
-    if (!known) {
-        throw new Error(`oxlint.config.mts sets "${rule}", which is not a rule Oxlint runs here. Check whether it runs as hosted/, core/ or built in.`);
+    const runningName = getRunningName(rule);
+    if (runningName) {
+        throw new Error(`oxlint.config.mts sets "${rule}", but this rule runs as "${runningName}". Use that name instead.`);
     }
 }
 
@@ -322,7 +360,10 @@ function checkRuleName(rule) {
  * @param {Pick<import('oxlint').OxlintConfig, 'ignorePatterns' | 'settings' | 'overrides'>} extra
  * @returns {import('oxlint').OxlintConfig}
  */
-function extendOxlintConfig({ignorePatterns = [], settings = {}, overrides = []}) {
+function extendOxlintConfig({ignorePatterns = [], settings = {}, overrides = [], ...unsupported}) {
+    if (Object.keys(unsupported).length) {
+        throw new Error(`extendOxlintConfig does not handle ${Object.keys(unsupported).join(', ')}. Put rules, env and globals in overrides.`);
+    }
     overrides.flatMap((override) => Object.keys(override.rules ?? {})).forEach(checkRuleName);
     return {
         ...oxlintConfig,
