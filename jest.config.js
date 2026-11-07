@@ -10,7 +10,7 @@ module.exports = {
         __DEV__: true,
         WebSocket: {},
     },
-    testEnvironment: './jest-test-environment.ts',
+    testEnvironment: './jest-test-environment.js',
     setupFiles: ['fake-indexeddb/auto'],
     setupFilesAfterEnv: ['./jestSetup.js'],
     testTimeout: 60000,

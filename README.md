@@ -15,6 +15,15 @@ Awesome persistent storage solution wrapped in a Pub/Sub library.
 
 # Getting Started
 
+## Development compiler
+
+Builds, type checks, declaration tests, and GitHub Action compilation use TypeScript 7.1 beta.
+Docs and the Jest environment run directly in Node.js without a TypeScript loader.
+The private `tools/eslint` workspace temporarily pins TypeScript 5.9.2 because typescript-eslint
+requires the legacy JavaScript compiler API. This compiler is only for lint tooling, not builds
+or declaration tests. Remove the workspace isolation when
+[native API support](https://github.com/typescript-eslint/typescript-eslint/pull/12803) is available.
+
 ## Installation
 
 Onyx is published to [`npm`](https://www.npmjs.com/package/react-native-onyx)

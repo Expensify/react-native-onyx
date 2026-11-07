@@ -7,13 +7,20 @@
 ACTIONS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../actions/javascript" &>/dev/null && pwd)"
 readonly ACTIONS_DIR
 
+ROOT_DIR="$(cd -- "$ACTIONS_DIR/../../.." && pwd)"
+readonly ROOT_DIR
+
+# Compile with the project compiler so ncc only bundles JavaScript.
+npx tsc -p "$ROOT_DIR/tsconfig.actions.json" || exit 1
+
 # This stores all the process IDs of the ncc commands so they can run in parallel
 ASYNC_BUILDS=()
 
 # Build all the actions in the background
 for ACTION in "$ACTIONS_DIR"/*/*.ts; do
     ACTION_DIR=$(dirname "$ACTION")
-    npx ncc build --transpile-only --external encoding "$ACTION" -o "$ACTION_DIR" &
+    COMPILED_ACTION="$ROOT_DIR/.github/actions/build/$(basename "$ACTION_DIR")/$(basename "${ACTION%.ts}").js"
+    npx ncc build --external encoding "$COMPILED_ACTION" -o "$ACTION_DIR" &
     ASYNC_BUILDS+=($!)
 done
 
