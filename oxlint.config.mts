@@ -11,17 +11,7 @@ export default await buildOxlintConfig({
     presets: ['browser', 'react', 'typescript', {preset: 'jest', files: JEST_FILES}, 'scripts', 'prettier'],
     // Onyx keeps oxlint's own exhaustive-deps, as before the switch to the package.
     nativeRules: ['react-hooks/exhaustive-deps'],
-    ignorePatterns: [
-        'dist/**',
-        'node_modules/**',
-        '**/*.d.ts',
-        '**/*.config.js',
-        '**/*.config.cjs',
-        'tests/types/**/*.ts',
-        'cpp/**',
-        'bench-results/**',
-        '.github/**',
-    ],
+    ignorePatterns: ['dist/**', 'node_modules/**', '**/*.d.ts', '**/*.config.js', '**/*.config.cjs', 'tests/types/**/*.ts', 'cpp/**', 'bench-results/**', '.github/**'],
     settings: {
         'import/resolver': {
             typescript: {
