@@ -129,13 +129,17 @@ describe('serializeSeatbeltTSV', () => {
 describe('applySeatbelt', () => {
     const dirs = [];
     afterEach(() => {
-        dirs.splice(0).forEach((dir) => fs.rmSync(dir, {recursive: true, force: true}));
+        for (const dir of dirs.splice(0)) {
+            fs.rmSync(dir, {recursive: true, force: true});
+        }
     });
 
     function setup(tsv, files = ['src.ts']) {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lint-seatbelt-'));
         dirs.push(dir);
-        files.forEach((file) => fs.writeFileSync(path.join(dir, file), 'x\n'));
+        for (const file of files) {
+            fs.writeFileSync(path.join(dir, file), 'x\n');
+        }
         const tsvPath = path.join(dir, 'oxlint.seatbelt.tsv');
         fs.writeFileSync(tsvPath, tsv);
         return {dir, tsvPath, file: (name) => path.join(dir, name)};

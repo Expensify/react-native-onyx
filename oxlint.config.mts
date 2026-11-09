@@ -21,8 +21,6 @@ export default await buildOxlintConfig({
         'cpp/**',
         'bench-results/**',
         '.github/**',
-        'oxlint.config.mts',
-        'config/oxlint/**',
     ],
     settings: {
         'import/resolver': {
@@ -48,6 +46,22 @@ export default await buildOxlintConfig({
                 // A `_` prefix marks parameters kept on purpose, as the old ESLint config allowed. The other options
                 // repeat the typescript preset, because an override replaces them.
                 'no-unused-vars': ['error', {vars: 'all', args: 'after-used', argsIgnorePattern: '^_', caughtErrors: 'none', ignoreRestSiblings: true, reportVarsOnlyUsedAsTypes: true}],
+            },
+        },
+        // Node tooling that runs on the current Node, so the old-browser `es/*` rules do not apply. Rule names are
+        // quoted keys, `.mjs` imports need their extension in Node, and the lint CLI prints its result with console.
+        {
+            files: ['oxlint.config.mts', 'config/oxlint/**/*'],
+            env: {
+                node: true,
+            },
+            rules: {
+                'es/no-nullish-coalescing-operators': 'off',
+                'es/no-optional-chaining': 'off',
+                'hosted/naming-convention': 'off',
+                'hosted/no-extraneous-dependencies': 'off',
+                'import/extensions': 'off',
+                'no-console': 'off',
             },
         },
         {
