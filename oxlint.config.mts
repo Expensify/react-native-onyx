@@ -1,5 +1,7 @@
-// Rules come from the eslint-config-expensify presets, converted by eslint-config-expensify/oxlint. This file only
-// adds Onyx's own ignores, settings and overrides.
+// Rules come from eslint-config-expensify's presets, converted to oxlint by buildOxlintConfig. Onyx leaves out the
+// expensify preset on purpose. The presets don't match the rules in the old eslint.config.mjs: some rules it turned
+// off are on now (their findings are in config/oxlint/oxlint.seatbelt.tsv), and a few it turned on are not set.
+// Below are Onyx's own ignores, settings and rule overrides.
 import {buildOxlintConfig} from 'eslint-config-expensify/oxlint';
 
 // The jest preset applies to Onyx's test and mock files only.
@@ -36,6 +38,16 @@ export default await buildOxlintConfig({
             rules: {
                 'hosted/prop-types': 'off',
                 'hosted/require-default-props': 'off',
+            },
+        },
+        {
+            files: ['**/*.ts', '**/*.tsx'],
+            rules: {
+                // The old ESLint config checked imports in TS files, and oxlint has no rule of its own for it.
+                'hosted/no-unresolved': 'error',
+                // A `_` prefix marks parameters kept on purpose, as the old ESLint config allowed. The other options
+                // repeat the typescript preset, because an override replaces them.
+                'no-unused-vars': ['error', {vars: 'all', args: 'after-used', argsIgnorePattern: '^_', caughtErrors: 'none', ignoreRestSiblings: true, reportVarsOnlyUsedAsTypes: true}],
             },
         },
         {

@@ -30,14 +30,12 @@
 "../../lib/OnyxUtils.ts"	"typescript/prefer-nullish-coalescing"	3
 "../../lib/StateMachine.ts"	"typescript/no-unsafe-type-assertion"	2
 "../../lib/storage/__mocks__/index.ts"	"typescript/no-unsafe-argument"	1
-"../../lib/storage/InstanceSync/index.ts"	"no-unused-vars"	1
 "../../lib/storage/InstanceSync/index.web.ts"	"hosted/no-types"	1
 "../../lib/storage/InstanceSync/index.web.ts"	"typescript/no-unsafe-type-assertion"	1
 "../../lib/storage/InstanceSync/index.web.ts"	"typescript/restrict-template-expressions"	1
 "../../lib/storage/providers/IDBKeyValProvider/index.ts"	"typescript/no-unsafe-return"	1
 "../../lib/storage/providers/IDBKeyValProvider/index.ts"	"typescript/no-unsafe-type-assertion"	3
 "../../lib/storage/providers/MemoryOnlyProvider.ts"	"typescript/no-unsafe-type-assertion"	5
-"../../lib/storage/providers/NoopProvider.ts"	"no-unused-vars"	1
 "../../lib/storage/providers/NoopProvider.ts"	"typescript/no-unsafe-type-assertion"	1
 "../../lib/storage/providers/SQLiteProvider.ts"	"hosted/naming-convention"	4
 "../../lib/storage/providers/SQLiteProvider.ts"	"typescript/no-unsafe-assignment"	1
@@ -118,7 +116,6 @@
 "../../tests/unit/storage/providers/IDBKeyvalProviderTest.ts"	"typescript/no-unsafe-type-assertion"	4
 "../../tests/unit/storage/providers/IDBKeyvalProviderTest.ts"	"typescript/unbound-method"	2
 "../../tests/unit/storage/providers/SQLiteProviderTest.ts"	"hosted/naming-convention"	3
-"../../tests/unit/storage/providers/SQLiteProviderTest.ts"	"no-unused-vars"	1
 "../../tests/unit/storage/providers/SQLiteProviderTest.ts"	"typescript/no-non-null-assertion"	8
 "../../tests/unit/storage/providers/SQLiteProviderTest.ts"	"typescript/no-unnecessary-type-assertion"	7
 "../../tests/unit/storage/providers/SQLiteProviderTest.ts"	"typescript/no-unsafe-member-access"	2
