@@ -1,8 +1,14 @@
-// Rules come from the eslint-config-expensify presets (config/oxlint/presets.mjs), converted on every run by
-// config/oxlint/derive.mjs. This file only adds Onyx's own ignores, settings and overrides.
-import {extendOxlintConfig} from './config/oxlint/derive.mjs';
+// Rules come from the eslint-config-expensify presets, converted by eslint-config-expensify/oxlint. This file only
+// adds Onyx's own ignores, settings and overrides.
+import {buildOxlintConfig} from 'eslint-config-expensify/oxlint';
 
-export default extendOxlintConfig({
+// The jest preset applies to Onyx's test and mock files only.
+const JEST_FILES = ['tests/**', 'lib/**/__mocks__/**', 'jestSetup.js', 'jest-sequencer.js', 'jest-test-environment.ts'];
+
+export default await buildOxlintConfig({
+    presets: ['browser', 'react', 'typescript', {preset: 'jest', files: JEST_FILES}, 'scripts', 'prettier'],
+    // Onyx keeps oxlint's own exhaustive-deps, as before the switch to the package.
+    nativeRules: ['react-hooks/exhaustive-deps'],
     ignorePatterns: [
         'dist/**',
         'node_modules/**',
