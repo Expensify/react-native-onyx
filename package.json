@@ -79,7 +79,7 @@
     "better-sqlite3": "^12.11.1",
     "date-fns": "^4.1.0",
     "eslint": "^9.39.2",
-    "eslint-config-expensify": "github:callstack-internal/eslint-config-expensify#cba226899a8c1507cb4541d709bbf6fb92ed6520",
+    "eslint-config-expensify": "github:callstack-internal/eslint-config-expensify#238520a834ab54ad13b971447964e44a1f7bb8d9",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-jsx-a11y": "^6.10.2",
