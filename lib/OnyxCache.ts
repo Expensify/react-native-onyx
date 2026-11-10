@@ -169,6 +169,12 @@ class OnyxCache {
         return this.removedInOtherInstanceKeys.has(key);
     }
 
+    /** A write here replaces what the cache knew about the key being empty, including another instance's removal */
+    private forgetEmptyMarks(key: OnyxKey): void {
+        this.nullishStorageKeys.delete(key);
+        this.removedInOtherInstanceKeys.delete(key);
+    }
+
     /** Check whether cache has data for the given key */
     hasCacheForKey(key: OnyxKey): boolean {
         return this.storageMap[key] !== undefined || this.hasNullishStorageKey(key);
@@ -188,8 +194,7 @@ class OnyxCache {
 
         // When a key is explicitly set in cache, we can remove it from the list of nullish keys,
         // since it will either be set to a non nullish value or removed from the cache completely.
-        this.nullishStorageKeys.delete(key);
-        this.removedInOtherInstanceKeys.delete(key);
+        this.forgetEmptyMarks(key);
 
         const collectionKey = OnyxKeys.getCollectionKey(key);
         const oldValue = this.storageMap[key];
@@ -266,8 +271,7 @@ class OnyxCache {
                     affectedCollections.add(collectionKey);
                 }
             } else {
-                this.nullishStorageKeys.delete(key);
-                this.removedInOtherInstanceKeys.delete(key);
+                this.forgetEmptyMarks(key);
 
                 const existing = this.storageMap[key];
 
@@ -338,8 +342,7 @@ class OnyxCache {
                     affectedCollections.add(collectionKey);
                 }
             } else {
-                this.nullishStorageKeys.delete(key);
-                this.removedInOtherInstanceKeys.delete(key);
+                this.forgetEmptyMarks(key);
 
                 // Per-key merge instead of spreading the entire storageMap
                 const existing = this.storageMap[key];

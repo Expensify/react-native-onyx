@@ -28,6 +28,7 @@ const MEMBER_2 = `${COLLECTION}2`;
 
 Onyx.init({
     keys: ONYXKEYS,
+    shouldSyncMultipleInstances: true,
 });
 
 beforeEach(() => Onyx.clear());
@@ -498,6 +499,23 @@ describe('OnyxSubscriptionManager', () => {
 
             // Then this is a real miss, and the old removal doesn't hide it
             expect(logHmmmSpy).toHaveBeenCalledTimes(1);
+        });
+
+        it('should not report a key whose removal and re-add by another tab straddle a clear that keeps it', async () => {
+            // Given a key another tab removed
+            const syncCallback = getSyncCallback();
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'first');
+            await StorageMock.removeItem(ONYXKEYS.TEST_KEY);
+            syncCallback([[ONYXKEYS.TEST_KEY, undefined]]);
+
+            // When that tab writes it back, and this tab clears while keeping the key before that sync arrives
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'second');
+            await Onyx.clear([ONYXKEYS.TEST_KEY]);
+            onyxSubscriptionManager.getState(ONYXKEYS.TEST_KEY);
+            await waitForPromisesToResolve();
+
+            // Then the pending write-back isn't reported as a lost value
+            expect(logHmmmSpy).not.toHaveBeenCalled();
         });
 
         it('should not report a key the index does not know, which means init has not loaded it', async () => {

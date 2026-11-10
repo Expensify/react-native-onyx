@@ -26,6 +26,7 @@ Onyx.init({
     keys: ONYXKEYS,
     skippableCollectionMemberIDs: ['skippable-id'],
     ramOnlyKeys: [ONYXKEYS.RAM_ONLY_KEY, ONYXKEYS.COLLECTION.RAM_ONLY_COLLECTION, ONYXKEYS.RAM_ONLY_WITH_INITIAL_VALUE],
+    shouldSyncMultipleInstances: true,
 });
 
 beforeEach(async () => {
