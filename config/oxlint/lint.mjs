@@ -96,8 +96,7 @@ function lint(targets, fix) {
     return report.diagnostics.map(toLintMessage);
 }
 
-function formatStylish(messages, errorCount, showWarnings) {
-    const warningCount = messages.length - errorCount;
+function formatStylish(messages, errorCount, warningCount, showWarnings) {
     const visible = showWarnings ? messages : messages.filter((message) => message.severity === LINT_SEVERITY.ERROR);
     const lines = visible.map((message) => {
         const location = `${path.relative(projectRoot, message.filePath)}:${message.line}:${message.column}`;
@@ -128,9 +127,10 @@ if (!lintedFiles.length) {
 
 const {messages} = applySeatbelt(lint(targets, values.fix), resolveSeatbeltOptions(projectRoot), lintedFiles);
 const errorCount = messages.filter((message) => message.severity === LINT_SEVERITY.ERROR).length;
+const warningCount = messages.length - errorCount;
 if (values.format === 'json') {
-    console.log(JSON.stringify({messages, errorCount, warningCount: messages.length - errorCount}));
+    console.log(JSON.stringify({messages, errorCount, warningCount}));
 } else {
-    console.log(formatStylish(messages, errorCount, values['show-warnings']));
+    console.log(formatStylish(messages, errorCount, warningCount, values['show-warnings']));
 }
 process.exitCode = errorCount > 0 ? 1 : 0;

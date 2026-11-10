@@ -7,6 +7,7 @@ import {buildOxlintConfig, getPresetRuleEntry} from 'eslint-config-expensify/oxl
 // The jest preset applies to Onyx's test and mock files only.
 const JEST_FILES = ['tests/**', 'lib/**/__mocks__/**', 'jestSetup.js', 'jest-sequencer.js', 'jest-test-environment.ts'];
 
+// Onyx's tsconfig rejects a standalone top-level await (TS1378), so the preset rule entries are awaited inline below.
 export default await buildOxlintConfig({
     presets: ['browser', 'react', 'typescript', {preset: 'jest', files: JEST_FILES}, 'scripts', 'prettier'],
     // Onyx keeps oxlint's own exhaustive-deps, as before the switch to the package.
@@ -46,8 +47,8 @@ export default await buildOxlintConfig({
                 ],
             },
         },
-        // Node tooling that runs on the current Node, so the old-browser `es/*` rules do not apply. Rule names are
-        // quoted keys, `.mjs` imports need their extension in Node, and the lint CLI prints its result with console.
+        // Node tooling that runs on the current Node, so the old-browser `es/*` rules do not apply. `.mjs` imports need
+        // their extension in Node, and the lint CLI prints its result with console.
         {
             files: ['oxlint.config.mts', 'config/oxlint/**/*'],
             env: {
@@ -60,7 +61,8 @@ export default await buildOxlintConfig({
                 'no-console': 'off',
             },
         },
-        // The presets already leave these off for the .mjs scripts; the config file is TypeScript.
+        // The presets turn these on only for TypeScript files, and the config file is TypeScript: its rule names are
+        // quoted keys, and it imports eslint-config-expensify, a devDependency.
         {
             files: ['oxlint.config.mts'],
             rules: {
