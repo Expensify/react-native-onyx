@@ -2,7 +2,7 @@
 // expensify preset on purpose. The presets don't match the rules in the old eslint.config.mjs: some rules it turned
 // off are on now (their findings are in config/oxlint/oxlint.seatbelt.tsv), and a few it turned on are not set.
 // Below are Onyx's own ignores, settings and rule overrides.
-import {buildOxlintConfig} from 'eslint-config-expensify/oxlint';
+import {buildOxlintConfig, getPresetRuleEntry} from 'eslint-config-expensify/oxlint';
 
 // The jest preset applies to Onyx's test and mock files only.
 const JEST_FILES = ['tests/**', 'lib/**/__mocks__/**', 'jestSetup.js', 'jest-sequencer.js', 'jest-test-environment.ts'];
@@ -33,9 +33,17 @@ export default await buildOxlintConfig({
             rules: {
                 // The old ESLint config checked imports in TS files, and oxlint has no rule of its own for it.
                 'hosted/no-unresolved': 'error',
-                // A `_` prefix marks parameters kept on purpose, as the old ESLint config allowed. The other options
-                // repeat the typescript preset, because an override replaces them.
-                'no-unused-vars': ['error', {vars: 'all', args: 'after-used', argsIgnorePattern: '^_', caughtErrors: 'none', ignoreRestSiblings: true, reportVarsOnlyUsedAsTypes: true}],
+                // The typescript preset's options, plus a `_` prefix for parameters kept on purpose, as the old ESLint
+                // config allowed. An override replaces the whole setting, so it starts from the preset's. oxlint's
+                // no-unused-vars needs reportVarsOnlyUsedAsTypes to report what typescript-eslint's does.
+                'no-unused-vars': [
+                    'error',
+                    {
+                        ...(await getPresetRuleEntry<[Record<string, unknown>]>('typescript', '@typescript-eslint/no-unused-vars'))[1],
+                        argsIgnorePattern: '^_',
+                        reportVarsOnlyUsedAsTypes: true,
+                    },
+                ],
             },
         },
         // Node tooling that runs on the current Node, so the old-browser `es/*` rules do not apply. Rule names are
@@ -48,10 +56,16 @@ export default await buildOxlintConfig({
             rules: {
                 'es/no-nullish-coalescing-operators': 'off',
                 'es/no-optional-chaining': 'off',
-                'hosted/naming-convention': 'off',
-                'hosted/no-extraneous-dependencies': 'off',
                 'import/extensions': 'off',
                 'no-console': 'off',
+            },
+        },
+        // The presets already leave these off for the .mjs scripts; the config file is TypeScript.
+        {
+            files: ['oxlint.config.mts'],
+            rules: {
+                'hosted/naming-convention': 'off',
+                'hosted/no-extraneous-dependencies': 'off',
             },
         },
         {
@@ -60,29 +74,13 @@ export default await buildOxlintConfig({
                 node: true,
             },
         },
-        // Overriding replaces the whole naming-convention array, so this repeats eslint-config-expensify/typescript
-        // and allows Onyx key strings (underscores) and numeric collection IDs as object keys.
+        // The typescript preset's naming-convention, plus Onyx key strings (underscores) and numeric collection IDs as
+        // object keys in tests. An override replaces the whole setting, so it starts from the preset's.
         {
             files: ['tests/**/*'],
             rules: {
                 'hosted/naming-convention': [
-                    'error',
-                    {
-                        selector: ['variable', 'property'],
-                        format: null,
-                        filter: {
-                            regex: '^__esModule$',
-                            match: true,
-                        },
-                    },
-                    {
-                        selector: ['variable', 'property'],
-                        format: ['camelCase', 'UPPER_CASE', 'PascalCase'],
-                        filter: {
-                            regex: '^private_[a-z][a-zA-Z0-9]*$',
-                            match: false,
-                        },
-                    },
+                    ...(await getPresetRuleEntry('typescript', '@typescript-eslint/naming-convention')),
                     {
                         selector: 'objectLiteralProperty',
                         format: null,
@@ -99,24 +97,11 @@ export default await buildOxlintConfig({
                             match: true,
                         },
                     },
-                    {
-                        selector: 'function',
-                        format: ['camelCase', 'PascalCase'],
-                    },
-                    {
-                        selector: ['typeLike', 'enumMember'],
-                        format: ['PascalCase'],
-                    },
-                    {
-                        selector: ['parameter', 'method'],
-                        format: ['camelCase', 'PascalCase'],
-                        leadingUnderscore: 'allow',
-                    },
                 ],
             },
         },
         {
-            files: ['tests/**/*', 'jestSetup.js', 'lib/**/__mocks__/**/*'],
+            files: JEST_FILES,
             rules: {
                 'import/extensions': 'off',
             },

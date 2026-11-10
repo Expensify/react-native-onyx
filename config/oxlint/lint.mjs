@@ -96,8 +96,7 @@ function lint(targets, fix) {
     return report.diagnostics.map(toLintMessage);
 }
 
-function formatStylish(messages, showWarnings) {
-    const errorCount = messages.filter((message) => message.severity === LINT_SEVERITY.ERROR).length;
+function formatStylish(messages, errorCount, showWarnings) {
     const warningCount = messages.length - errorCount;
     const visible = showWarnings ? messages : messages.filter((message) => message.severity === LINT_SEVERITY.ERROR);
     const lines = visible.map((message) => {
@@ -106,7 +105,7 @@ function formatStylish(messages, showWarnings) {
         return `${location}\n  ${level}  ${message.message}${message.ruleID ? `  ${message.ruleID}` : ''}`;
     });
     const summary = `${errorCount} error${errorCount === 1 ? '' : 's'}${showWarnings ? `, ${warningCount} warning${warningCount === 1 ? '' : 's'}` : ''}`;
-    return {text: [...lines, summary].join('\n\n'), errorCount};
+    return [...lines, summary].join('\n\n');
 }
 
 const {values, positionals} = parseArgs({
@@ -132,6 +131,6 @@ const errorCount = messages.filter((message) => message.severity === LINT_SEVERI
 if (values.format === 'json') {
     console.log(JSON.stringify({messages, errorCount, warningCount: messages.length - errorCount}));
 } else {
-    console.log(formatStylish(messages, values['show-warnings']).text);
+    console.log(formatStylish(messages, errorCount, values['show-warnings']));
 }
 process.exitCode = errorCount > 0 ? 1 : 0;
