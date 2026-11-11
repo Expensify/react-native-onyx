@@ -78,7 +78,11 @@ function init({
 
                 // Capture the previous cached value before cache.set() so notifyCollection() can diff old vs new per member.
                 const previousValue = isCollectionMember ? cache.get(key) : undefined;
+                // The key stays indexed because this answer can predate a write of ours still on its way to storage, and only indexed keys get deleted by Onyx.clear and collection sweeps.
                 cache.set(key, value);
+                if (value === null || value === undefined) {
+                    cache.addRemovedInOtherInstanceKey(key);
+                }
 
                 if (isCollectionMember && collectionKey) {
                     let batch = collectionBatches.get(collectionKey);
