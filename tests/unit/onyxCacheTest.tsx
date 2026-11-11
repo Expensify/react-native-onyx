@@ -217,6 +217,33 @@ describe('Onyx', () => {
             });
         });
 
+        describe('keys removed in another instance', () => {
+            it('should not count as cached, unlike a nullish key', () => {
+                // Given a key another instance removed
+                cache.addRemovedInOtherInstanceKey('mockKey');
+
+                // Then it is marked, and reads still treat the key as having nothing cached
+                expect(cache.hasRemovedInOtherInstanceKey('mockKey')).toBe(true);
+                expect(cache.hasCacheForKey('mockKey')).toBe(false);
+            });
+
+            it.each<[string, (onyxCache: typeof OnyxCache) => void]>([
+                ['set', (onyxCache) => onyxCache.set('mockKey', 'value')],
+                ['merge', (onyxCache) => onyxCache.merge({mockKey: {a: 1}})],
+                ['hydrate', (onyxCache) => onyxCache.hydrate({mockKey: 'value'})],
+                ['drop', (onyxCache) => onyxCache.drop('mockKey')],
+            ])('should forget the mark on %s, because the removal no longer explains a missing value', (_name, change) => {
+                // Given a key another instance removed
+                cache.addRemovedInOtherInstanceKey('mockKey');
+
+                // When the key changes state here
+                change(cache);
+
+                // Then the old removal is forgotten
+                expect(cache.hasRemovedInOtherInstanceKey('mockKey')).toBe(false);
+            });
+        });
+
         describe('merge', () => {
             it('should create the value in cache when it does not exist', () => {
                 // Given empty cache
@@ -968,6 +995,37 @@ describe('Onyx', () => {
 
                 const after = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
                 expect(before).toBe(after);
+            });
+
+            it('should keep the cached array reference and not mark collection dirty when merged array is deep-equal', async () => {
+                await initOnyx();
+                const memberKey = `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`;
+                await Onyx.set(memberKey, [{name: 'item', data: {value: 1}}]);
+
+                const cachedValue = cache.get(memberKey);
+                const before = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+
+                // Merge a new, deep-equal array
+                cache.merge({[memberKey]: [{name: 'item', data: {value: 1}}]});
+
+                expect(cache.get(memberKey)).toBe(cachedValue);
+                // A rebuild would reuse the snapshot too, so check the dirty set directly.
+                expect((cache as unknown as {dirtyCollections: Set<string>}).dirtyCollections.has(ONYX_KEYS.COLLECTION.MOCK_COLLECTION)).toBe(false);
+                expect(cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION)).toBe(before);
+            });
+
+            it('should replace the cached array when merged array differs', async () => {
+                await initOnyx();
+                const memberKey = `${ONYX_KEYS.COLLECTION.MOCK_COLLECTION}1`;
+                await Onyx.set(memberKey, [{name: 'item', data: {value: 1}}]);
+
+                const before = cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION);
+                const newValue = [{name: 'item', data: {value: 2}}];
+
+                cache.merge({[memberKey]: newValue});
+
+                expect(cache.get(memberKey)).toBe(newValue);
+                expect(cache.getCollectionData(ONYX_KEYS.COLLECTION.MOCK_COLLECTION)).not.toBe(before);
             });
 
             it('should mark collection dirty when a member value changes', async () => {

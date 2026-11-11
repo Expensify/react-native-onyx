@@ -81,6 +81,17 @@ describe('IDBKeyValProvider', () => {
         it('should return null if there is no stored value for the key', async () => {
             expect(await IDBKeyValProvider.getItem(ONYXKEYS.TEST_KEY)).toBeNull();
         });
+
+        it('should remove nested nulls from a stored value', async () => {
+            // Given a value in storage that holds nested nulls
+            await IDB.set(ONYXKEYS.TEST_KEY_3, {a: 1, b: null, nested: {c: null, d: 'd'}, list: [null, {e: null}]}, IDBKeyValProvider.store);
+
+            // When it is read
+            const value = await IDBKeyValProvider.getItem(ONYXKEYS.TEST_KEY_3);
+
+            // Then the nested nulls are removed, and arrays are left as they are
+            expect(value).toEqual({a: 1, nested: {d: 'd'}, list: [null, {e: null}]});
+        });
     });
 
     describe('multiGet', () => {

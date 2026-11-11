@@ -8,6 +8,9 @@ const pendingWritesByKey = new Map<OnyxKey, Set<Promise<unknown>>>();
 // In-flight writes that affect every key (Onyx.clear). Any initial notification waits for these.
 const pendingGlobalWrites = new Set<Promise<unknown>>();
 
+// Told about every write as it is issued, so Onyx.clear can tell writes apart from reads refilling the cache.
+const writeListeners = new Set<(keys: OnyxKey[]) => void>();
+
 /**
  * Registers an in-flight write under each key it can change, so `scheduleInitialSubscriberNotification`
  * waits only for the writes relevant to a connecting key. Returns the same promise so callers can wrap a
@@ -16,6 +19,9 @@ const pendingGlobalWrites = new Set<Promise<unknown>>();
 function trackPendingWrite<T>(keys: OnyxKey | OnyxKey[], pendingWrite: Promise<T>): Promise<T> {
     // Drop nullish keys (e.g. a keyless `clear` item) so they never reach `getPendingWritesForKey`'s scan.
     const keyList = (Array.isArray(keys) ? keys : [keys]).filter((key) => typeof key === 'string');
+    for (const listener of writeListeners) {
+        listener(keyList);
+    }
     for (const key of keyList) {
         let pendingWritesForKey = pendingWritesByKey.get(key);
         if (!pendingWritesForKey) {
@@ -48,6 +54,14 @@ function trackPendingGlobalWrite<T>(pendingGlobalWrite: Promise<T>): Promise<T> 
     const deregister = () => pendingGlobalWrites.delete(pendingGlobalWrite);
     pendingGlobalWrite.then(deregister, deregister);
     return pendingGlobalWrite;
+}
+
+/**
+ * Calls `listener` with the keys of every write issued from now on, until the returned function is called.
+ */
+function addWriteListener(listener: (keys: OnyxKey[]) => void): () => void {
+    writeListeners.add(listener);
+    return () => writeListeners.delete(listener);
 }
 
 /**
@@ -96,11 +110,13 @@ function scheduleInitialSubscriberNotification(key: OnyxKey, notify: () => void)
 function clearPendingWrites(): void {
     pendingWritesByKey.clear();
     pendingGlobalWrites.clear();
+    writeListeners.clear();
 }
 
 export default {
     trackPendingWrite,
     trackPendingGlobalWrite,
+    addWriteListener,
     getPendingWritesForKey,
     scheduleInitialSubscriberNotification,
     clearPendingWrites,

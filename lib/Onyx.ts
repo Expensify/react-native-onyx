@@ -64,19 +64,25 @@ function init({
             const individual: Array<[OnyxKey, OnyxEntry<KeyValueMapping[OnyxKey]>]> = [];
             const collectionBatches = new Map<string, {partial: NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>>; previous: NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>>}>();
 
-            for (const [key, value] of pairs) {
+            for (const [key, valueFromStorage] of pairs) {
                 // RAM-only keys should never sync from storage as they may have stale persisted data
                 // from before the key was migrated to RAM-only.
                 if (OnyxKeys.isRamOnlyKey(key)) {
                     continue;
                 }
 
+                const value = utils.needsNormalization(valueFromStorage) ? utils.removeNestedNullValues(valueFromStorage) : valueFromStorage;
+
                 const collectionKey = OnyxKeys.getCollectionKey(key);
                 const isCollectionMember = !!collectionKey && OnyxKeys.isCollectionMemberKey(collectionKey, key);
 
                 // Capture the previous cached value before cache.set() so notifyCollection() can diff old vs new per member.
                 const previousValue = isCollectionMember ? cache.get(key) : undefined;
+                // The key stays indexed because this answer can predate a write of ours still on its way to storage, and only indexed keys get deleted by Onyx.clear and collection sweeps.
                 cache.set(key, value);
+                if (value === null || value === undefined) {
+                    cache.addRemovedInOtherInstanceKey(key);
+                }
 
                 if (isCollectionMember && collectionKey) {
                     let batch = collectionBatches.get(collectionKey);
@@ -428,7 +434,16 @@ function mergeCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, co
  * @param keysToPreserve is a list of ONYXKEYS that should not be cleared with the rest of the data
  */
 function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
-    return PendingWrites.trackPendingGlobalWrite(
+    // Writes can land while storage clears (e.g. a new sign-in's session), so record them to avoid clobbering them.
+    // Matching on values instead would confuse them with reads refilling the cache from storage.
+    const keysWrittenDuringClear = new Set<OnyxKey>();
+    const removeWriteListener = PendingWrites.addWriteListener((keys) => {
+        for (const key of keys) {
+            keysWrittenDuringClear.add(key);
+        }
+    });
+
+    const clearPromise = PendingWrites.trackPendingGlobalWrite(
         OnyxUtils.afterInit(() => {
             const pendingMergeEntries = OnyxUtils.getPendingMergeEntries(keysToPreserve);
             const defaultKeyStates = OnyxUtils.getDefaultKeyStates();
@@ -449,6 +464,17 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
 
                     const allKeys = new Set([...cachedKeys, ...initialKeys]);
 
+                    // A write issued before the reset below is overwritten by it, so only a cache value that differs from
+                    // what clear set counts as a write that landed after the reset.
+                    const valuesSetByClear: KeyValueMapping = {};
+                    const wasWrittenDuringClear = (key: OnyxKey): boolean => {
+                        if (!keysWrittenDuringClear.has(key) || !(key in valuesSetByClear)) {
+                            return false;
+                        }
+                        const currentValue = cache.get(key);
+                        return currentValue !== undefined && currentValue !== valuesSetByClear[key];
+                    };
+
                     OnyxUtils.cancelPendingMerges(pendingMergeEntries);
 
                     // The only keys that should not be cleared are:
@@ -467,7 +493,8 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                         //      since collection key subscribers need to be updated differently
                         if (!isKeyToPreserve) {
                             const oldValue = cache.get(key);
-                            const newValue = defaultKeyStates[key] ?? null;
+                            const newValue = OnyxUtils.getNullFreeDefaultKeyState(key);
+                            valuesSetByClear[key] = newValue;
                             if (newValue !== oldValue) {
                                 cache.set(key, newValue);
 
@@ -507,17 +534,35 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                     // Remove only the items that we want cleared from storage, and reset others to default
                     for (const key of keysToBeClearedFromStorage) cache.drop(key);
                     return Storage.removeItems(keysToBeClearedFromStorage)
-                        .then(() => Storage.multiSet(defaultKeyValuePairs))
+                        .then(() => {
+                            // Save written keys again in case `removeItems` deleted them after they were stored.
+                            const writtenKeyValuePairs = Object.keys(valuesSetByClear)
+                                .filter((key) => !OnyxKeys.isRamOnlyKey(key) && wasWrittenDuringClear(key))
+                                .map((key): [OnyxKey, OnyxValue<OnyxKey>] => [key, cache.get(key)]);
+                            return Storage.multiSet([...defaultKeyValuePairs.filter(([key]) => !wasWrittenDuringClear(key)), ...writtenKeyValuePairs]);
+                        })
                         .then(() => {
                             DevTools.clearState(keysToPreserve);
 
                             onyxSubscriptionManager.resetCacheMissReports();
 
-                            // Notify the subscribers for each key/value group so they can receive the new values
+                            // Notify the subscribers for each key/value group so they can receive the new values.
+                            // Keys written during the clear are skipped, their subscribers already have the newer value.
                             for (const [key, value] of Object.entries(keyValuesToResetIndividually)) {
+                                if (wasWrittenDuringClear(key)) {
+                                    continue;
+                                }
                                 OnyxUtils.notifyKey(key, value);
                             }
                             for (const [key, value] of Object.entries(keyValuesToResetAsCollection)) {
+                                const writtenMemberKeys = Object.keys(value.newValues).filter(wasWrittenDuringClear);
+                                for (const memberKey of writtenMemberKeys) {
+                                    delete value.newValues[memberKey];
+                                    delete value.oldValues[memberKey];
+                                }
+                                if (Object.keys(value.newValues).length === 0) {
+                                    continue;
+                                }
                                 OnyxUtils.notifyCollection(key, value.newValues, value.oldValues);
                             }
                         });
@@ -527,6 +572,8 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
             return cache.captureTask(TASK.CLEAR, promise) as Promise<void>;
         }),
     );
+    clearPromise.then(removeWriteListener, removeWriteListener);
+    return clearPromise;
 }
 
 /**
@@ -750,7 +797,7 @@ function exportState(): Promise<Record<OnyxKey, OnyxValue<OnyxKey>>> {
  * @returns The current value, or `undefined` if the key has none.
  */
 function get<TKey extends OnyxKey>(key: TKey): Promise<OnyxValue<TKey>> {
-    return OnyxUtils.afterInit(() => Promise.resolve((onyxSubscriptionManager.getState(key) ?? undefined) as OnyxValue<TKey>));
+    return OnyxUtils.afterInit(() => Promise.resolve(onyxSubscriptionManager.getState(key) as OnyxValue<TKey>));
 }
 
 /**
@@ -772,7 +819,7 @@ function get<TKey extends OnyxKey>(key: TKey): Promise<OnyxValue<TKey>> {
  */
 function multiGet<const Keys extends readonly OnyxKey[]>(keys: Keys): Promise<{[Index in keyof Keys]: OnyxValue<Keys[Index]>}> {
     // map() widens the key tuple to an array, so the per-slot value types survive only through the cast.
-    return OnyxUtils.afterInit(() => Promise.resolve(keys.map((key) => onyxSubscriptionManager.getState(key) ?? undefined) as {[Index in keyof Keys]: OnyxValue<Keys[Index]>}));
+    return OnyxUtils.afterInit(() => Promise.resolve(keys.map((key) => onyxSubscriptionManager.getState(key)) as {[Index in keyof Keys]: OnyxValue<Keys[Index]>}));
 }
 
 const Onyx = {
