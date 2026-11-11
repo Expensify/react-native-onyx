@@ -1,6 +1,5 @@
 /*
- *  NOTE: After changes to the file it needs to be compiled using [`ncc`](https://github.com/vercel/ncc)
- *  Example: ncc build -t requireTests.ts -o index.js
+ *  Run `npm run gh-actions-build` after changes to compile and bundle this action.
  */
 
 import * as core from '@actions/core';

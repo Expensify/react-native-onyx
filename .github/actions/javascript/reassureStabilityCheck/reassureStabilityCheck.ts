@@ -1,6 +1,5 @@
 /*
- *  NOTE: After changes to the file it needs to be compiled using [`ncc`](https://github.com/vercel/ncc)
- *  Example: ncc build -t reassureStabilityCheck.ts -o index.js
+ *  Run `npm run gh-actions-build` after changes to compile and bundle this action.
  */
 
 import * as core from '@actions/core';
@@ -17,7 +16,7 @@ async function run() {
         return true;
     } catch (error) {
         console.log('error: ', error);
-        core.setFailed(error.message);
+        core.setFailed(error instanceof Error ? error : String(error));
         process.exit(1);
     }
 }

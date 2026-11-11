@@ -1,11 +1,8 @@
-import expensify from 'eslint-config-expensify';
-import tsPlugin from '@typescript-eslint/eslint-plugin';
-import tsParser from '@typescript-eslint/parser';
-import prettierConfig from 'eslint-config-prettier';
+import * as tooling from '@react-native-onyx/eslint-tooling/index.mjs';
 
 export default [
-    ...expensify,
-    prettierConfig,
+    ...tooling.expensify,
+    tooling.prettierConfig,
     {
         ignores: ['dist/**', 'node_modules/**', '.github/**', '*.d.ts', '*.config.js', '*.config.cjs', 'tests/types/**/*.ts'],
     },
@@ -37,12 +34,12 @@ export default [
     {
         files: ['**/*.ts', '**/*.tsx'],
         plugins: {
-            '@typescript-eslint': tsPlugin,
+            '@typescript-eslint': tooling.tsPlugin,
         },
         languageOptions: {
-            parser: tsParser,
+            parser: tooling.tsParser,
             parserOptions: {
-                project: './tsconfig.json',
+                project: './tools/eslint/tsconfig.json',
             },
         },
         settings: {
@@ -54,8 +51,8 @@ export default [
             },
         },
         rules: {
-            ...tsPlugin.configs.recommended.rules,
-            ...tsPlugin.configs.stylistic.rules,
+            ...tooling.tsPlugin.configs.recommended.rules,
+            ...tooling.tsPlugin.configs.stylistic.rules,
             'rulesdir/prefer-underscore-method': 'off',
             'react/jsx-props-no-spreading': 'off',
             'react/require-default-props': 'off',

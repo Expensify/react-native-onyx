@@ -10,7 +10,7 @@
         "jsx": "react",
         "isolatedModules": true,
         "strict": true,
-        "moduleResolution": "node",
+        "moduleResolution": "bundler",
         "resolveJsonModule": true,
         "esModuleInterop": true,
         "skipLibCheck": true,

@@ -1,0 +1,10 @@
+{
+    "$schema": "https://json.schemastore.org/tsconfig",
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "rootDir": "./.github/actions/javascript",
+        "outDir": "./.github/actions/build",
+        "declaration": false
+    },
+    "include": [".github/actions/javascript/**/*.ts"]
+}
