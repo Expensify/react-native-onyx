@@ -27,6 +27,7 @@ const MEMBER_2 = `${COLLECTION}2`;
 
 Onyx.init({
     keys: ONYXKEYS,
+    shouldSyncMultipleInstances: true,
 });
 
 beforeEach(() => Onyx.clear());
@@ -353,6 +354,13 @@ describe('OnyxSubscriptionManager', () => {
             cache.setAllKeys([key]);
         };
 
+        // The handler Onyx.init registered for changes another tab wrote to storage.
+        const getSyncCallback = (): ((pairs: Array<[OnyxKey, unknown]>) => void) => {
+            const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls.at(-1)?.[0] as ((pairs: Array<[OnyxKey, unknown]>) => void) | undefined;
+            expect(syncCallback).toBeDefined();
+            return syncCallback as (pairs: Array<[OnyxKey, unknown]>) => void;
+        };
+
         it('should report once when the cache has no value but storage does', async () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'from-storage');
             forgetValueButKeepKey(ONYXKEYS.TEST_KEY);
@@ -423,6 +431,90 @@ describe('OnyxSubscriptionManager', () => {
             expect(cache.get(ONYXKEYS.TEST_KEY)).toEqual({c: 3});
             expect(await StorageMock.getItem(ONYXKEYS.TEST_KEY)).toEqual({c: 3});
             expect(logHmmmSpy).toHaveBeenCalledTimes(1);
+        });
+
+        it('should not read storage or report for a key another tab removed', async () => {
+            const syncCallback = getSyncCallback();
+            const getItemMock = jest.mocked(StorageMock.getItem);
+
+            await Onyx.set(MEMBER_1, {id: 1});
+            await StorageMock.removeItem(MEMBER_1);
+            getItemMock.mockClear();
+            syncCallback([[MEMBER_1, undefined]]);
+
+            expect(onyxSubscriptionManager.getState(MEMBER_1)).toBeUndefined();
+            await waitForPromisesToResolve();
+
+            expect(getItemMock).not.toHaveBeenCalled();
+            expect(logHmmmSpy).not.toHaveBeenCalled();
+        });
+
+        it('should still report a real miss on a collection after another tab removed one of its members', async () => {
+            const syncCallback = getSyncCallback();
+
+            await Onyx.set(MEMBER_1, {id: 1});
+            await StorageMock.removeItem(MEMBER_1);
+            syncCallback([[MEMBER_1, undefined]]);
+            onyxSubscriptionManager.getState(MEMBER_1);
+            await waitForPromisesToResolve();
+
+            await StorageMock.setItem(MEMBER_2, {id: 2});
+            forgetValueButKeepKey(MEMBER_2);
+            onyxSubscriptionManager.getState(MEMBER_2);
+            await waitForPromisesToResolve();
+
+            expect(logHmmmSpy).toHaveBeenCalledTimes(1);
+            expect(logHmmmSpy).toHaveBeenCalledWith(expect.stringContaining(COLLECTION));
+        });
+
+        it('should not report when another tab removes a key and writes it back before this tab reads it', async () => {
+            // Given another tab removed a key and this tab applied that removal
+            const syncCallback = getSyncCallback();
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'first');
+            await StorageMock.removeItem(ONYXKEYS.TEST_KEY);
+            syncCallback([[ONYXKEYS.TEST_KEY, undefined]]);
+
+            // When that tab writes the key back, and this tab reads it before the sync for that write arrives
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'second');
+            onyxSubscriptionManager.getState(ONYXKEYS.TEST_KEY);
+            await waitForPromisesToResolve();
+
+            // Then nothing is reported, because nothing was lost
+            expect(logHmmmSpy).not.toHaveBeenCalled();
+        });
+
+        it('should report a key lost after another tab removed it and it got a value again', async () => {
+            // Given a key another tab removed, which then got a value again
+            const syncCallback = getSyncCallback();
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'first');
+            await StorageMock.removeItem(ONYXKEYS.TEST_KEY);
+            syncCallback([[ONYXKEYS.TEST_KEY, undefined]]);
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'second');
+
+            // When the cache then has no value for it while storage still does
+            jest.spyOn(cache, 'get').mockReturnValueOnce(undefined);
+            expect(onyxSubscriptionManager.getState(ONYXKEYS.TEST_KEY)).toBeUndefined();
+            await waitForPromisesToResolve();
+
+            // Then this is a real miss, and the old removal doesn't hide it
+            expect(logHmmmSpy).toHaveBeenCalledTimes(1);
+        });
+
+        it('should not report a key whose removal and re-add by another tab straddle a clear that keeps it', async () => {
+            // Given a key another tab removed
+            const syncCallback = getSyncCallback();
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'first');
+            await StorageMock.removeItem(ONYXKEYS.TEST_KEY);
+            syncCallback([[ONYXKEYS.TEST_KEY, undefined]]);
+
+            // When that tab writes it back, and this tab clears while keeping the key before that sync arrives
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'second');
+            await Onyx.clear([ONYXKEYS.TEST_KEY]);
+            onyxSubscriptionManager.getState(ONYXKEYS.TEST_KEY);
+            await waitForPromisesToResolve();
+
+            // Then the pending write-back isn't reported as a lost value
+            expect(logHmmmSpy).not.toHaveBeenCalled();
         });
 
         it('should not report a key the index does not know, which means init has not loaded it', async () => {

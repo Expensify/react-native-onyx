@@ -217,6 +217,33 @@ describe('Onyx', () => {
             });
         });
 
+        describe('keys removed in another instance', () => {
+            it('should not count as cached, unlike a nullish key', () => {
+                // Given a key another instance removed
+                cache.addRemovedInOtherInstanceKey('mockKey');
+
+                // Then it is marked, and reads still treat the key as having nothing cached
+                expect(cache.hasRemovedInOtherInstanceKey('mockKey')).toBe(true);
+                expect(cache.hasCacheForKey('mockKey')).toBe(false);
+            });
+
+            it.each<[string, (onyxCache: typeof OnyxCache) => void]>([
+                ['set', (onyxCache) => onyxCache.set('mockKey', 'value')],
+                ['merge', (onyxCache) => onyxCache.merge({mockKey: {a: 1}})],
+                ['hydrate', (onyxCache) => onyxCache.hydrate({mockKey: 'value'})],
+                ['drop', (onyxCache) => onyxCache.drop('mockKey')],
+            ])('should forget the mark on %s, because the removal no longer explains a missing value', (_name, change) => {
+                // Given a key another instance removed
+                cache.addRemovedInOtherInstanceKey('mockKey');
+
+                // When the key changes state here
+                change(cache);
+
+                // Then the old removal is forgotten
+                expect(cache.hasRemovedInOtherInstanceKey('mockKey')).toBe(false);
+            });
+        });
+
         describe('merge', () => {
             it('should create the value in cache when it does not exist', () => {
                 // Given empty cache

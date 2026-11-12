@@ -4616,6 +4616,80 @@ describe('RAM-only keys should not read from storage', () => {
     });
 });
 
+// A sync read can start before this instance's write reaches storage and answer after it. The answer reports the key as removed, while storage ends up holding the write.
+describe('a stale removal synced from another instance', () => {
+    const COLLECTION = ONYX_KEYS.COLLECTION.TEST_KEY;
+    const MEMBER_1 = `${COLLECTION}1`;
+    const MEMBER_2 = `${COLLECTION}2`;
+
+    const writeThenReceiveStaleRemoval = async (key: OnyxKey, value: unknown) => {
+        await Onyx.set(key, value);
+        const syncCallback = (StorageMock.keepInstancesSync as jest.Mock).mock.calls.at(-1)?.[0];
+        syncCallback([[key, undefined]]);
+    };
+
+    beforeEach(async () => {
+        Object.assign(OnyxUtils.getDeferredInitTask(), createDeferredTask());
+        Onyx.init({keys: ONYX_KEYS, shouldSyncMultipleInstances: true});
+        await act(async () => waitForPromisesToResolve());
+
+        // Another key keeps the index non-empty, as in any running app, because getAllKeys lists storage when the index is empty and that would hide a missed key.
+        await Onyx.set(ONYX_KEYS.OTHER_TEST, 'other');
+    });
+
+    afterEach(async () => {
+        await Onyx.clear();
+        await StorageMock.clear();
+    });
+
+    it('should still delete the key on Onyx.clear', async () => {
+        // Given a stored value whose key this instance was told is removed
+        await writeThenReceiveStaleRemoval(ONYX_KEYS.TEST_KEY, 'mine');
+
+        // When this instance clears, as it does on sign-out
+        await Onyx.clear();
+
+        // Then the value doesn't survive into the next session
+        expect(await StorageMock.getItem(ONYX_KEYS.TEST_KEY)).toBeNull();
+    });
+
+    it('should merge into the stored value on mergeCollection instead of overwriting it', async () => {
+        // Given a stored member whose key this instance was told is removed
+        await writeThenReceiveStaleRemoval(MEMBER_1, {a: 1, b: 2});
+
+        // When a collection merge touches that member
+        await Onyx.mergeCollection(COLLECTION, {[MEMBER_1]: {c: 3}} as GenericCollection);
+
+        // Then the stored fields are kept
+        expect(await StorageMock.getItem(MEMBER_1)).toEqual({a: 1, b: 2, c: 3});
+    });
+
+    it.each<[string, () => Promise<void>]>([
+        ['multiSet', () => Onyx.multiSet({[MEMBER_1]: null})],
+        ['mergeCollection', () => Onyx.mergeCollection(COLLECTION, {[MEMBER_1]: null} as GenericCollection)],
+    ])('should delete the stored value when %s writes null', async (_name, writeNull) => {
+        // Given a stored member whose key this instance was told is removed
+        await writeThenReceiveStaleRemoval(MEMBER_1, {a: 1});
+
+        // When a later write removes it
+        await writeNull();
+
+        // Then the row doesn't come back on the next load
+        expect(await StorageMock.getItem(MEMBER_1)).toBeNull();
+    });
+
+    it('should delete a member that setCollection leaves out', async () => {
+        // Given a stored member whose key this instance was told is removed
+        await writeThenReceiveStaleRemoval(MEMBER_1, {a: 1});
+
+        // When setCollection replaces the collection without it
+        await Onyx.setCollection(COLLECTION, {[MEMBER_2]: {b: 2}} as GenericCollection);
+
+        // Then the row doesn't come back on the next load
+        expect(await StorageMock.getItem(MEMBER_1)).toBeNull();
+    });
+});
+
 describe('get() should prefer cache over stale storage', () => {
     let cache: typeof OnyxCache;
 
