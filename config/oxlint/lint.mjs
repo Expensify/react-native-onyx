@@ -18,11 +18,20 @@ const OXLINT_BIN = path.join(projectRoot, 'node_modules', '.bin', 'oxlint');
 const FATAL_EXIT_CODE = 2;
 const JS_PLUGIN_CRASH_MESSAGE = 'Error running JS plugin';
 
+/**
+ * Prints the reason, then up to 2000 characters of the output, and exits the process with the fatal exit code.
+ * @param {string} reason - What went wrong.
+ * @param {string} [output] - Output to show after the reason.
+ */
 function fail(reason, output = '') {
     console.error([reason, output.trim().slice(0, 2000)].filter(Boolean).join('\n'));
     process.exit(FATAL_EXIT_CODE);
 }
 
+/**
+ * Runs the Oxlint binary and returns its stdout, stderr and exit code. Exits the process if the binary cannot start.
+ * @param {string[]} args - Command line arguments for Oxlint.
+ */
 function runOxlint(args) {
     const result = spawnSync(OXLINT_BIN, args, {cwd: projectRoot, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024});
     if (result.error) {
@@ -31,7 +40,10 @@ function runOxlint(args) {
     return {stdout: result.stdout ?? '', stderr: result.stderr ?? '', exitCode: result.status ?? FATAL_EXIT_CODE};
 }
 
-// Oxlint's JSON report leaves out files without findings, and the seatbelt needs them to notice fixed errors.
+/**
+ * Oxlint's JSON report leaves out files without findings, and the seatbelt needs them to notice fixed errors.
+ * @param {string[]} targets - Paths or globs passed to Oxlint.
+ */
 function listLintedFiles(targets) {
     return runOxlint(['--debug=files', ...targets])
         .stdout.split('\n')
@@ -40,8 +52,11 @@ function listLintedFiles(targets) {
         .map((file) => path.resolve(projectRoot, file));
 }
 
-// `typescript(no-explicit-any)` becomes `typescript/no-explicit-any` and `eslint(no-undef)` becomes `no-undef`,
-// the names oxlint.config uses, so baseline rows can be matched to config and disable comments by name.
+/**
+ * `typescript(no-explicit-any)` becomes `typescript/no-explicit-any` and `eslint(no-undef)` becomes `no-undef`,
+ * the names oxlint.config uses, so baseline rows can be matched to config and disable comments by name.
+ * @param {string} code - Rule code from an Oxlint diagnostic.
+ */
 function toRuleID(code) {
     const match = /^([\w@/.-]+)\((.+)\)$/.exec(code);
     if (!match) {
@@ -64,6 +79,12 @@ function toLintMessage(diagnostic) {
     };
 }
 
+/**
+ * Runs Oxlint with type-aware rules on the targets and returns its findings as lint messages.
+ * Exits the process if Oxlint crashes or its output is unusable.
+ * @param {string[]} targets - Paths or globs to lint.
+ * @param {boolean} fix - Whether to apply Oxlint's auto-fixes.
+ */
 function lint(targets, fix) {
     const {stdout, stderr, exitCode} = runOxlint(['--type-aware', '--format', 'json', ...(fix ? ['--fix'] : []), ...targets]);
     // Oxlint exits 1 for findings. Anything higher, or no JSON at all, means it crashed or rejected the config.
@@ -81,8 +102,8 @@ function lint(targets, fix) {
     if (!Array.isArray(report?.diagnostics)) {
         fail('Oxlint JSON output has no `diagnostics` array.', stdout);
     }
-    // A JS plugin crash also has no rule, but no location either. It would hide every JS plugin finding in the
-    // file, so it fails the run instead of passing as a parse error.
+    // A JS plugin crash has no rule and no location. It hides every JS plugin finding in the file, so fail the run
+    // instead of reporting a parse error.
     const crashes = report.diagnostics.filter((diagnostic) => !diagnostic.code && (diagnostic.message.startsWith(JS_PLUGIN_CRASH_MESSAGE) || !diagnostic.labels?.length));
     if (crashes.length) {
         fail(
@@ -96,6 +117,13 @@ function lint(targets, fix) {
     return report.diagnostics.map(toLintMessage);
 }
 
+/**
+ * Formats messages as `file:line:column` blocks followed by an error count. Warnings are listed and counted only with showWarnings.
+ * @param {object[]} messages - Findings after the seatbelt.
+ * @param {number} errorCount - Number of errors in messages.
+ * @param {number} warningCount - Number of warnings in messages.
+ * @param {boolean} showWarnings - Whether to list and count warnings.
+ */
 function formatStylish(messages, errorCount, warningCount, showWarnings) {
     const visible = showWarnings ? messages : messages.filter((message) => message.severity === LINT_SEVERITY.ERROR);
     const lines = visible.map((message) => {

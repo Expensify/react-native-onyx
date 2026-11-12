@@ -39,8 +39,7 @@ jobs:
               env:
                   CI: true
 
-            # On main, lint rewrites the seatbelt file when merged PRs fixed grandfathered errors. os-botify commits it
-            # back the same way the publish workflow commits version bumps.
+            # On main, lint rewrites the seatbelt file when merged PRs fixed grandfathered errors. os-botify commits it back.
             - name: Check for tightened seatbelt baseline
               id: seatbelt
               if: github.event_name == 'push'
