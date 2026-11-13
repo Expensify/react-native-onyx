@@ -250,7 +250,7 @@ class OnyxCache {
         const affectedCollections = new Set<OnyxKey>();
 
         // Use for-in loop to avoid an unnecessary array allocation from Object.keys()
-        // eslint-disable-next-line no-restricted-syntax, guard-for-in
+        // oxlint-disable-next-line core/no-restricted-syntax, guard-for-in
         for (const key in data) {
             const value = data[key];
             this.addKey(key);
@@ -321,7 +321,7 @@ class OnyxCache {
         const affectedCollections = new Set<OnyxKey>();
 
         // Use for-in loop to avoid an unnecessary array allocation from Object.entries()
-        // eslint-disable-next-line no-restricted-syntax, guard-for-in
+        // oxlint-disable-next-line core/no-restricted-syntax, guard-for-in
         for (const key in data) {
             const value = data[key];
             this.addKey(key);
@@ -545,7 +545,7 @@ class OnyxCache {
         // We can't rely on count comparison alone — if one key is removed and another added,
         // the counts match but the snapshot content is different.
         if (!hasMemberChanges && previousSnapshot) {
-            // eslint-disable-next-line no-restricted-syntax
+            // oxlint-disable-next-line core/no-restricted-syntax
             for (const key in previousSnapshot) {
                 if (!(key in members)) {
                     hasMemberChanges = true;
