@@ -173,10 +173,7 @@ function getMembersOfCollection(collectionKey: OnyxKey): Set<OnyxKey> | undefine
  * @returns A tuple of [collectionKey, memberId]
  * @throws If the key is not a valid collection member key
  */
-function splitCollectionMemberKey<TKey extends CollectionKey>(
-    key: TKey,
-    collectionKey?: string,
-): [TKey extends `${infer Prefix}_${string}` ? `${Prefix}_` : never, string];
+function splitCollectionMemberKey<TKey extends CollectionKey>(key: TKey, collectionKey?: string): [TKey extends `${infer Prefix}_${string}` ? `${Prefix}_` : never, string];
 function splitCollectionMemberKey(key: string, collectionKey?: string): [string, string] {
     if (collectionKey && !isCollectionMemberKey(collectionKey, key)) {
         throw new Error(`Invalid '${collectionKey}' collection key provided, it isn't compatible with '${key}' key.`);
