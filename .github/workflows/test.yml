@@ -1,34 +1,34 @@
 name: Test JavaScript
 
 on:
-    pull_request:
-        types: [opened, synchronize]
+  pull_request:
+    types: [opened, synchronize]
 
 jobs:
-    test:
-        runs-on: ubuntu-latest
-        steps:
-            # v5.0.0
-            - uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      # v5.0.0
+      - uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
 
-            # 4.3.0
-            - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-              with:
-                  path: ~/.npm
-                  key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-                  restore-keys: |
-                      ${{ runner.os }}-node-
+      # 4.3.0
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
 
-            - name: Setup Node
-              # v4
-              uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e
-              with:
-                  node-version-file: ".nvmrc"
+      - name: Setup Node
+        # v4
+        uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e
+        with:
+          node-version-file: '.nvmrc'
 
-            - run: npm ci
+      - run: npm ci
 
-            - run: npm run test
-              env:
-                  CI: true
+      - run: npm run test
+        env:
+          CI: true
 
-            - run: npm run test:types
+      - run: npm run test:types

@@ -28,7 +28,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "prepare": "npm run build",
+    "prepare": "npm run build && lefthook install",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "jest",
@@ -39,7 +39,7 @@
     "prebuild:docs": "npm run build",
     "build:docs": "ts-node buildDocs.ts",
     "lint-tests": "eslint tests/**",
-    "prettier": "prettier --write .",
+    "fmt": "oxfmt --write .",
     "gh-actions-build": "./.github/scripts/buildActions.sh"
   },
   "dependencies": {
@@ -89,8 +89,9 @@
     "jest-cli": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "jsdoc-to-markdown": "^7.1.0",
+    "lefthook": "2.1.9",
     "nodemon": "^3.0.3",
-    "prettier": "^2.8.8",
+    "oxfmt": "^0.55.0",
     "prop-types": "^15.7.2",
     "react": "18.2.0",
     "react-native": "0.76.3",
