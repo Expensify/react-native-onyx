@@ -1,27 +1,27 @@
 name: TypeScript Checks
 
 on:
-    pull_request:
-        types: [opened, synchronize]
+  pull_request:
+    types: [opened, synchronize]
 
 jobs:
-    typecheck:
-        runs-on: ubuntu-latest
-        steps:
-            # v5.0.0
-            - uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      # v5.0.0
+      - uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
 
-            - name: Setup Node
-              # v4
-              uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e
-              with:
-                  node-version-file: ".nvmrc"
-                  cache: npm
-                  cache-dependency-path: package-lock.json
+      - name: Setup Node
+        # v4
+        uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+          cache-dependency-path: package-lock.json
 
-            - run: npm ci
+      - run: npm ci
 
-            - name: Type check with TypeScript
-              run: npm run typecheck
-              env:
-                CI: true
+      - name: Type check with TypeScript
+        run: npm run typecheck
+        env:
+          CI: true

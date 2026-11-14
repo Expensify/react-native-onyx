@@ -3,7 +3,7 @@ description: Set up Node
 
 inputs:
   IS_HYBRID_BUILD:
-    description: "Indicates if node is set up for hybrid app"
+    description: 'Indicates if node is set up for hybrid app'
     required: false
     default: 'false'
 
@@ -35,7 +35,7 @@ runs:
         key: ${{format('{0}-node-modules-{1}', runner.os, hashFiles('package-lock.json', 'patches/**'))}}
 
     - name: Install root project node packages
-      if:  steps.cache-node-modules.outputs.cache-hit != 'true'
+      if: steps.cache-node-modules.outputs.cache-hit != 'true'
       uses: nick-fields/retry@3f757583fb1b1f940bc8ef4bf4734c8dc02a5847
       with:
         timeout_minutes: 30
