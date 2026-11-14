@@ -1,0 +1,13 @@
+assert_lefthook_installed: true
+
+pre-commit:
+    commands:
+        oxfmt:
+            priority: 1
+            glob:
+                - '*.{j,mj,cj}s'
+                - '*.{ts,tsx,mts,cts}'
+                - '*.json'
+                - '*.{yml,yaml}'
+            run: npx oxfmt --write --no-error-on-unmatched-pattern {staged_files}
+            stage_fixed: true
