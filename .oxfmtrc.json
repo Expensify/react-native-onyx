@@ -1,0 +1,18 @@
+{
+    "tabWidth": 4,
+    "singleQuote": true,
+    "trailingComma": "all",
+    "bracketSpacing": false,
+    "arrowParens": "always",
+    "printWidth": 190,
+    "singleAttributePerLine": true,
+    "ignorePatterns": [".github/actions/javascript/**/index.js", "dist/**", "package.json", "package-lock.json", "*.html", "*.css", "*.scss", "*.md"],
+    "overrides": [
+        {
+            "files": ["*.yml", "*.yaml"],
+            "options": {
+                "tabWidth": 2
+            }
+        }
+    ]
+}
