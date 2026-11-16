@@ -2,7 +2,7 @@ import {buildOxlintConfig, getPresetRuleEntry} from 'eslint-config-expensify/oxl
 
 const JEST_FILES = ['tests/**', 'lib/**/__mocks__/**', 'jestSetup.js', 'jest-sequencer.js', 'jest-test-environment.ts'];
 
-// Onyx's tsconfig rejects a standalone top-level await (TS1378), so the preset rule entries are awaited inline below.
+// A standalone top-level await fails typecheck (TS1378), so the preset entries are awaited inline.
 export default await buildOxlintConfig({
     presets: ['browser', 'react', 'typescript', {preset: 'jest', files: JEST_FILES}, 'scripts', 'prettier'],
     nativeRules: ['react-hooks/exhaustive-deps'],
@@ -28,7 +28,7 @@ export default await buildOxlintConfig({
             rules: {
                 // oxlint has no import resolution rule, so the hosted one checks TS imports.
                 'hosted/no-unresolved': 'error',
-                // The preset's options plus a `_` args prefix. oxlint needs reportVarsOnlyUsedAsTypes to match typescript-eslint.
+                // The preset's options plus a `_` args prefix, and reportVarsOnlyUsedAsTypes to match typescript-eslint.
                 'no-unused-vars': [
                     'error',
                     {
@@ -39,7 +39,7 @@ export default await buildOxlintConfig({
                 ],
             },
         },
-        // Node tooling: the old-browser es/* rules do not apply, .mjs imports need extensions, the CLI uses console.
+        // Node scripts: skip the old-browser es/* rules, allow .mjs extensions and console.
         {
             files: ['oxlint.config.mts', 'config/oxlint/**/*'],
             env: {
@@ -52,7 +52,7 @@ export default await buildOxlintConfig({
                 'no-console': 'off',
             },
         },
-        // The presets enable these for TypeScript files only. This config is TypeScript, with quoted rule keys and a devDependency import.
+        // This config is TypeScript, so the presets apply these to it: it has quoted rule keys and imports a devDependency.
         {
             files: ['oxlint.config.mts'],
             rules: {
@@ -66,7 +66,7 @@ export default await buildOxlintConfig({
                 node: true,
             },
         },
-        // The preset's naming-convention plus underscored Onyx keys and numeric collection IDs as object keys in tests.
+        // The preset's naming-convention plus underscored Onyx keys and numeric collection IDs in tests.
         {
             files: ['tests/**/*'],
             rules: {

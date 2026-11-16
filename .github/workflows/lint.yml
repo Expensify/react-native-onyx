@@ -59,8 +59,7 @@ jobs:
           app-id: ${{ secrets.OS_BOTIFY_APP_ID }}
           private-key: ${{ secrets.OS_BOTIFY_PRIVATE_KEY }}
 
-      # Skipped if main moved since this commit was linted, so lowered counts are not written on top of newer code.
-      # A skipped or rejected commit is fine, because the next push to main lowers the baseline again.
+      # Skipped if main moved since the linted commit. A skipped or failed commit is retried by the next push to main.
       - name: Auto-commit tightened seatbelt baseline
         if: steps.seatbelt.outputs.tightened == 'true'
         continue-on-error: true

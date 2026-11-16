@@ -1,4 +1,3 @@
-// Runs Oxlint, applies the seatbelt (seatbelt.mjs) and prints the result.
 import {spawnSync} from 'node:child_process';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -34,8 +33,7 @@ function listLintedFiles(targets) {
         .map((file) => path.resolve(projectRoot, file));
 }
 
-// `typescript(no-explicit-any)` becomes `typescript/no-explicit-any`, `eslint(no-undef)` becomes `no-undef`: the names
-// used in the config and in disable comments.
+// Oxlint prints `typescript(rule)` and `eslint(rule)`, while config and disable comments use `typescript/rule` and `rule`.
 function toRuleID(code) {
     const match = /^([\w@/.-]+)\((.+)\)$/.exec(code);
     if (!match) {
@@ -75,8 +73,7 @@ function lint(targets, fix) {
     if (!Array.isArray(report?.diagnostics)) {
         fail('Oxlint JSON output has no `diagnostics` array.', stdout);
     }
-    // A JS plugin crash has no rule and no location. It hides every JS plugin finding in the file, so fail the run
-    // instead of reporting a parse error.
+    // A JS plugin crash has no rule and hides that file's JS plugin findings, so fail instead of reporting a parse error.
     const crashes = report.diagnostics.filter((diagnostic) => !diagnostic.code && (diagnostic.message.startsWith(JS_PLUGIN_CRASH_MESSAGE) || !diagnostic.labels?.length));
     if (crashes.length) {
         fail(

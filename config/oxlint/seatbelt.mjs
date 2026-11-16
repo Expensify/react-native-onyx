@@ -24,7 +24,7 @@ const LINT_SEVERITY = {WARNING: 1, ERROR: 2};
 const toRelativePath = (baseFile, filename) => (path.isAbsolute(filename) ? path.relative(path.dirname(baseFile), filename) : filename);
 const toAbsolutePath = (baseFile, filename) => (path.isAbsolute(filename) ? filename : path.resolve(path.dirname(baseFile), filename));
 
-// Comments before the first row are the header, comments after the last row are trailing, and any other comment moves with the row below it.
+// Comments before the first row are the header and after the last row trailing. Others move with the row below.
 function parseTSV(text) {
     const rows = [];
     const leading = [];
@@ -293,7 +293,7 @@ function frozenRemovedRuleMessages(filename, seatbeltFile, removedRules, maxErro
     }));
 }
 
-// Writes through a temp file and a rename so an interrupted run cannot leave a half-written baseline. Falls back to a direct write on EXDEV.
+// A temp file plus rename, so an interrupted run cannot leave a half-written baseline. Writes directly on EXDEV.
 function writeTSVAtomically(seatbeltFile, tsv) {
     const tempPath = `${seatbeltFile}.${process.pid}.${Date.now()}.tmp`;
     fs.writeFileSync(tempPath, tsv);
