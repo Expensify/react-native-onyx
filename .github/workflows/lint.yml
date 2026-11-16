@@ -59,12 +59,14 @@ jobs:
           app-id: ${{ secrets.OS_BOTIFY_APP_ID }}
           private-key: ${{ secrets.OS_BOTIFY_PRIVATE_KEY }}
 
-      # A stale sha is rejected by the API; the next push to main retries, so failure is fine.
+      # Skipped if main moved since this commit was linted, so lowered counts never land on newer code. A skipped or
+      # rejected commit is fine: the next push to main tightens again.
       - name: Auto-commit tightened seatbelt baseline
         if: steps.seatbelt.outputs.tightened == 'true'
         continue-on-error: true
         run: |
           file=config/oxlint/oxlint.seatbelt.tsv
+          [ "$(git ls-remote origin main | cut -f1)" = "$GITHUB_SHA" ] || { echo "::notice::main moved, skipping"; exit 0; }
           gh api --method PUT "/repos/${{ github.repository }}/contents/$file" \
             --field message="Auto-tighten oxlint seatbelt baseline" \
             --field content="$(base64 -w0 "$file")" \
