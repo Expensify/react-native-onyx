@@ -32,18 +32,7 @@ function run(tsv, findings, {files = ['src.ts'], ...overrides} = {}) {
         line,
         column: 1,
     }));
-    const options = {
-        seatbeltFile,
-        projectRoot: dir,
-        disable: false,
-        frozen: false,
-        readOnly: true,
-        allowIncreaseRules: new Set(),
-        keepRules: new Set(),
-        quiet: false,
-        verbose: false,
-        ...overrides,
-    };
+    const options = {...resolveSeatbeltOptions(dir, {}), seatbeltFile, ...overrides};
     const result = applySeatbelt(
         messages,
         options,
@@ -71,7 +60,7 @@ describe('applySeatbelt', () => {
 
     it('fails on any difference when frozen, and neither writes nor prunes', () => {
         const tsv = `"gone.ts"\t"no-console"\t1\n"src.ts"\t"no-console"\t5\n"src.ts"\t"no-debugger"\t1\n`;
-        const {messages, wrote, onDisk, seatbeltFile} = run(
+        const {messages, onDisk, seatbeltFile} = run(
             tsv,
             [
                 ['no-console', 1],
@@ -82,7 +71,6 @@ describe('applySeatbelt', () => {
         assert.ok(messages.length > 0);
         assert.ok(messages.every((message) => message.severity === LINT_SEVERITY.ERROR && message.message.includes('SEATBELT_FROZEN')));
         assert.ok(messages.some((message) => message.ruleID === 'no-debugger' && message.message.includes(seatbeltFile)));
-        assert.equal(wrote, false);
         assert.equal(onDisk, tsv);
     });
 
@@ -101,17 +89,15 @@ describe('applySeatbelt', () => {
         ];
 
         const ci = run(tsv, findings, {readOnly: false});
-        assert.equal(ci.wrote, true);
         assert.equal(ci.onDisk, tsv.replace(`"no-console"\t2`, `"no-console"\t1`));
 
         const local = run(tsv, findings, {readOnly: true});
-        assert.equal(local.wrote, false);
         assert.equal(local.onDisk, tsv);
     });
 
     it('fails an increase without SEATBELT_INCREASE and does not write', () => {
         const tsv = `"src.ts"\t"no-console"\t1\n`;
-        const {messages, wrote, onDisk} = run(
+        const {messages, onDisk} = run(
             tsv,
             [
                 ['no-console', 1],
@@ -120,12 +106,11 @@ describe('applySeatbelt', () => {
             {readOnly: false},
         );
         assert.deepEqual(summarize(messages), ['no-console:1:warning', 'no-console:2:error']);
-        assert.equal(wrote, false);
         assert.equal(onDisk, tsv);
     });
 
     it('records an increase when SEATBELT_INCREASE names the rule', () => {
-        const {messages, wrote, onDisk} = run(
+        const {messages, onDisk} = run(
             `# header\n\n"src.ts"\t"no-console"\t1\n`,
             [
                 ['no-console', 1],
@@ -134,7 +119,6 @@ describe('applySeatbelt', () => {
             {readOnly: false, allowIncreaseRules: new Set(['no-console'])},
         );
         assert.ok(messages.every((message) => message.severity === LINT_SEVERITY.WARNING));
-        assert.equal(wrote, true);
         assert.equal(onDisk, `# header\n\n"src.ts"\t"no-console"\t2\n`);
     });
 
@@ -145,9 +129,8 @@ describe('applySeatbelt', () => {
 
     it('does nothing when disabled', () => {
         const tsv = `"src.ts"\t"no-console"\t1\n`;
-        const {messages, wrote, onDisk} = run(tsv, [['no-console', 1]], {disable: true, readOnly: false});
+        const {messages, onDisk} = run(tsv, [['no-console', 1]], {disable: true, readOnly: false});
         assert.deepEqual(summarize(messages), ['no-console:1:error']);
-        assert.equal(wrote, false);
         assert.equal(onDisk, tsv);
     });
 });

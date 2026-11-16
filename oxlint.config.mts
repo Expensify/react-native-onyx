@@ -6,7 +6,7 @@ const JEST_FILES = ['tests/**', 'lib/**/__mocks__/**', 'jestSetup.js', 'jest-seq
 export default await buildOxlintConfig({
     presets: ['browser', 'react', 'typescript', {preset: 'jest', files: JEST_FILES}, 'scripts', 'prettier'],
     nativeRules: ['react-hooks/exhaustive-deps'],
-    ignorePatterns: ['dist/**', 'node_modules/**', '**/*.d.ts', '**/*.config.js', '**/*.config.cjs', 'tests/types/**/*.ts', 'cpp/**', 'bench-results/**', '.github/**'],
+    ignorePatterns: ['dist/**', 'node_modules/**', '**/*.d.ts', '**/*.config.js', '**/*.config.cjs', 'tests/types/**/*.ts', '.github/**'],
     settings: {
         'import/resolver': {
             typescript: {
@@ -52,7 +52,7 @@ export default await buildOxlintConfig({
                 'no-console': 'off',
             },
         },
-        // Presets enable these for TS files only; this config is TS with quoted rule keys and a devDependency import.
+        // The presets enable these for TypeScript files only. This config is TypeScript, with quoted rule keys and a devDependency import.
         {
             files: ['oxlint.config.mts'],
             rules: {
@@ -61,7 +61,7 @@ export default await buildOxlintConfig({
             },
         },
         {
-            files: ['.prettierrc.cjs', 'jest-sequencer.js', 'jestSetup.js', 'jest-test-environment.ts', 'buildDocs.ts'],
+            files: ['jest-sequencer.js', 'jestSetup.js', 'jest-test-environment.ts', 'buildDocs.ts'],
             env: {
                 node: true,
             },

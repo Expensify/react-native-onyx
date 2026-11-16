@@ -1,5 +1,5 @@
 // config/oxlint/oxlint.seatbelt.tsv records, per file and rule, how many errors are allowed. Errors up to that count
-// report as warnings; one more fails the run. Counts can only go down, unless SEATBELT_INCREASE names the rule.
+// report as warnings, and one more fails the run. Counts can only go down, unless SEATBELT_INCREASE names the rule.
 //
 // Local runs only read the file. CI writes it, and the lint job on main commits it back (.github/workflows/lint.yml).
 //
@@ -24,7 +24,7 @@ const LINT_SEVERITY = {WARNING: 1, ERROR: 2};
 const toRelativePath = (baseFile, filename) => (path.isAbsolute(filename) ? path.relative(path.dirname(baseFile), filename) : filename);
 const toAbsolutePath = (baseFile, filename) => (path.isAbsolute(filename) ? filename : path.resolve(path.dirname(baseFile), filename));
 
-// Comments before the first row are the header, after the last row trailing; any other comment stays with the row below it.
+// Comments before the first row are the header, comments after the last row are trailing, and any other comment moves with the row below it.
 function parseTSV(text) {
     const rows = [];
     const leading = [];
@@ -293,7 +293,7 @@ function frozenRemovedRuleMessages(filename, seatbeltFile, removedRules, maxErro
     }));
 }
 
-// A temp file plus rename avoids a half-written baseline; falls back to a direct write on EXDEV.
+// Writes through a temp file and a rename so an interrupted run cannot leave a half-written baseline. Falls back to a direct write on EXDEV.
 function writeTSVAtomically(seatbeltFile, tsv) {
     const tempPath = `${seatbeltFile}.${process.pid}.${Date.now()}.tmp`;
     fs.writeFileSync(tempPath, tsv);
@@ -319,8 +319,7 @@ const readText = (file) => {
 // lintedFilenames includes files without findings, so rows for fully fixed files get removed.
 function applySeatbelt(messages, options, lintedFilenames) {
     if (options.disable) {
-        const existing = readText(options.seatbeltFile) ?? DEFAULT_FILE_HEADER;
-        return {messages, tsv: existing.endsWith('\n') || !existing ? existing : `${existing}\n`, wrote: false, changed: false};
+        return {messages};
     }
 
     const existingText = readText(options.seatbeltFile);
@@ -374,7 +373,7 @@ function applySeatbelt(messages, options, lintedFilenames) {
     if (shouldWrite) {
         writeTSVAtomically(options.seatbeltFile, tsv);
     }
-    return {messages: canonicalizeMessages(transformed), tsv, wrote: shouldWrite, changed: anyChanged};
+    return {messages: canonicalizeMessages(transformed)};
 }
 
 function readBooleanEnvVar(value) {
@@ -399,7 +398,6 @@ function resolveSeatbeltOptions(projectRoot, env = process.env) {
     const isIncreaseSet = allowIncreaseRules === 'all' || allowIncreaseRules.size > 0;
     return {
         seatbeltFile: path.join(projectRoot, SEATBELT_TSV_RELATIVE),
-        projectRoot,
         disable: readBooleanEnvVar(env.SEATBELT_DISABLE) ?? false,
         frozen: readBooleanEnvVar(env.SEATBELT_FROZEN) ?? false,
         readOnly: isIncreaseSet ? false : (readBooleanEnvVar(env.SEATBELT_READ_ONLY) ?? !readBooleanEnvVar(env.CI)),

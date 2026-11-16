@@ -3,7 +3,7 @@ name: Lint JavaScript
 on:
   pull_request:
     types: [opened, synchronize]
-  # Called by publish.yml on push to main, so the baseline is tightened before the version bump.
+  # Called by publish.yml on push to main, so the baseline is lowered before the version bump.
   workflow_call:
 
 jobs:
@@ -53,13 +53,14 @@ jobs:
       - name: Generate os-botify token
         id: token
         if: steps.seatbelt.outputs.tightened == 'true'
+        # v1.5.0
         uses: actions/create-github-app-token@9d97a4282b2c51a2f4f0465b9326399f53c890d4
         with:
           app-id: ${{ secrets.OS_BOTIFY_APP_ID }}
           private-key: ${{ secrets.OS_BOTIFY_PRIVATE_KEY }}
 
-      # Skipped if main moved since this commit was linted, so lowered counts never land on newer code. A skipped or
-      # rejected commit is fine: the next push to main tightens again.
+      # Skipped if main moved since this commit was linted, so lowered counts are not written on top of newer code.
+      # A skipped or rejected commit is fine, because the next push to main lowers the baseline again.
       - name: Auto-commit tightened seatbelt baseline
         if: steps.seatbelt.outputs.tightened == 'true'
         continue-on-error: true
