@@ -154,7 +154,14 @@ const provider: StorageProvider<UseStore | undefined> = {
         return (
             IDB.get(key, provider.store)
                 // idb-keyval returns undefined for missing items, but this needs to return null so that idb-keyval does the same thing as SQLiteStorage.
-                .then((val) => (val === undefined ? null : val))
+                .then((val) => {
+                    if (val === undefined) {
+                        return null;
+                    }
+
+                    // Stored values can hold nested nulls, but values handed to the cache must not.
+                    return utils.needsNormalization(val) ? utils.removeNestedNullValues(val) : val;
+                })
         );
     },
     removeItem(key) {

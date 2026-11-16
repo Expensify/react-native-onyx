@@ -209,7 +209,7 @@ describe('SQLiteProvider', () => {
         it('does not block later reads after a failed write', async () => {
             getOpenedConnection(0).execute(`CREATE TRIGGER reject_write BEFORE INSERT ON keyvaluepairs
                 BEGIN SELECT RAISE(ABORT, 'rejected write'); END;`);
-            await expect(SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, 'value')).rejects.toThrow('rejected write');
+            await expect(SQLiteProvider.setItem(ONYXKEYS.TEST_KEY, 'value')).rejects.toMatchObject({message: 'rejected write'});
             await expect(SQLiteProvider.getAllKeys()).resolves.toEqual([]);
         });
     });
@@ -222,6 +222,17 @@ describe('SQLiteProvider', () => {
 
         it('should return null if there is no stored value for the key', async () => {
             expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY)).toBeNull();
+        });
+
+        it('should remove nested nulls from a stored value', async () => {
+            // Given a stored value with nested nulls, which JSON_REPLACE patches can write
+            await SQLiteProvider.store?.executeAsync('REPLACE INTO keyvaluepairs (record_key, valueJSON) VALUES (?, ?);', [
+                ONYXKEYS.TEST_KEY_3,
+                JSON.stringify({a: 1, b: null, nested: {c: null, d: 'd'}, list: [null, {e: null}]}),
+            ]);
+
+            // Then the value is handed out without the nested nulls, and arrays are left as they are
+            expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY_3)).toEqual({a: 1, nested: {d: 'd'}, list: [null, {e: null}]});
         });
     });
 
@@ -295,7 +306,7 @@ describe('SQLiteProvider', () => {
                     [ONYXKEYS.TEST_KEY, 'first'],
                     [ONYXKEYS.TEST_KEY_2, 'second'],
                 ]),
-            ).rejects.toThrow('rejected insert');
+            ).rejects.toMatchObject({message: 'rejected insert'});
 
             // Then the batch is atomic and its failure does not block subsequent reads or writes.
             expect(await SQLiteProvider.getAllKeys()).toEqual([]);
@@ -428,6 +439,28 @@ describe('SQLiteProvider', () => {
             // Crucially: oldKey/keepMe should be gone (replace, not merge).
             expect((stored.outer as Record<string, unknown>).nested).not.toHaveProperty('oldKey');
             expect((stored.outer as Record<string, unknown>).nested).not.toHaveProperty('keepMe');
+        });
+
+        it('should apply a replacement nested inside an earlier replacement', async () => {
+            await SQLiteProvider.setItem(ONYXKEYS.TEST_KEY_3, {outer: {oldKey: 'gone'}});
+
+            // Given the patches from a batch of merges {outer: null}, {outer: {nested: null}}, {outer: {nested: {newKey: 'newValue'}}}
+            const change = {
+                outer: {
+                    [utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true,
+                    nested: {[utils.ONYX_INTERNALS__REPLACE_OBJECT_MARK]: true, newKey: 'newValue'},
+                },
+            };
+            const replaceNullPatches: Array<[string[], unknown]> = [
+                [['outer'], {nested: null}],
+                [['outer', 'nested'], {newKey: 'newValue'}],
+            ];
+
+            // When the patches are applied
+            await SQLiteProvider.multiMerge([[ONYXKEYS.TEST_KEY_3, change, replaceNullPatches]]);
+
+            // Then the second patch finds the path kept by the first one
+            expect(await SQLiteProvider.getItem(ONYXKEYS.TEST_KEY_3)).toEqual({outer: {nested: {newKey: 'newValue'}}});
         });
     });
 
@@ -671,7 +704,7 @@ describe('SQLiteProvider', () => {
                 const keys = entries.map(([key]) => key);
 
                 // When a later delete fails after the first chunk has executed.
-                await expect(SQLiteProvider.removeItems(keys)).rejects.toThrow('rejected delete');
+                await expect(SQLiteProvider.removeItems(keys)).rejects.toMatchObject({message: 'rejected delete'});
 
                 // Then the entire batch rolls back and the writer remains usable.
                 expect(await SQLiteProvider.multiGet(keys)).toEqual(expect.arrayContaining(entries));

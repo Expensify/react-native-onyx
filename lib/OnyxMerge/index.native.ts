@@ -37,9 +37,10 @@ const applyMerge: ApplyMerge = <TKey extends OnyxKey, TValue extends OnyxInput<T
         return Promise.resolve({mergedValue});
     }
 
-    // For native platforms we use `mergeItem` that will take advantage of JSON_PATCH and JSON_REPLACE SQL operations to
-    // merge the object in a performant way.
-    return Storage.mergeItem(key, batchedChanges as OnyxValue<TKey>, replaceNullPatches).then(() => ({
+    // Delta writes retain nulls on insert and old fields after a whole-value reset.
+    const storagePromise = baseValue === undefined ? Storage.setItem(key, mergedValue as OnyxValue<TKey>) : Storage.mergeItem(key, batchedChanges as OnyxValue<TKey>, replaceNullPatches);
+
+    return storagePromise.then(() => ({
         mergedValue,
     }));
 };

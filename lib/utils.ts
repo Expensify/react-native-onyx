@@ -1,5 +1,6 @@
 import {deepEqual} from 'fast-equals';
 import type {OnyxInput, OnyxKey} from './types';
+import * as Logger from './Logger';
 
 type EmptyObject = Record<string, never>;
 type EmptyValue = EmptyObject | null | undefined;
@@ -176,7 +177,8 @@ function mergeObject<TObject extends Record<string, unknown>>(
             // of the merged object only.
             const sourcePropertyWithoutMark = {...sourceProperty};
             delete sourcePropertyWithoutMark.ONYX_INTERNALS__REPLACE_OBJECT_MARK;
-            destination[key] = sourcePropertyWithoutMark;
+            // Built in "mark" mode, so it can still hold nested nulls.
+            destination[key] = options.shouldRemoveNestedNulls ? removeNestedNullValues(sourcePropertyWithoutMark) : sourcePropertyWithoutMark;
             continue;
         }
 
@@ -264,12 +266,25 @@ function needsNormalization(value: unknown): boolean {
     return false;
 }
 
-/** Deep removes the nested null values from the given value. Returns the original reference if no nulls were found. */
-function removeNestedNullValues<TValue extends OnyxInput<OnyxKey> | null>(value: TValue): TValue {
+/**
+ * Deep removes nested null values from the given value, leaving arrays as they are. Returns the original reference if no nulls were found.
+ *
+ * Objects that are the same reference as the object at the same path in `nullFreeReference` are returned without being traversed,
+ * so `nullFreeReference` must hold no nested nulls outside arrays (pass the live cache value).
+ */
+function removeNestedNullValues<TValue extends OnyxInput<OnyxKey> | null>(value: TValue, nullFreeReference?: unknown): TValue {
     if (value === null || value === undefined || typeof value !== 'object' || Array.isArray(value)) {
         return value;
     }
 
+    if (value === nullFreeReference) {
+        if (process.env.NODE_ENV === 'development' && needsNormalization(value)) {
+            Logger.logAlert('removeNestedNullValues skipped a cached subtree that holds nested null values. Onyx values must not be mutated in place.');
+        }
+        return value;
+    }
+
+    const reference = nullFreeReference !== null && typeof nullFreeReference === 'object' && !Array.isArray(nullFreeReference) ? (nullFreeReference as Record<string, unknown>) : undefined;
     let hasChanged = false;
     const result: Record<string, unknown> = {};
 
@@ -283,7 +298,7 @@ function removeNestedNullValues<TValue extends OnyxInput<OnyxKey> | null>(value:
         }
 
         if (typeof propertyValue === 'object' && !Array.isArray(propertyValue)) {
-            const cleaned = removeNestedNullValues(propertyValue);
+            const cleaned = removeNestedNullValues(propertyValue, reference?.[key]);
             if (cleaned !== propertyValue) {
                 hasChanged = true;
             }

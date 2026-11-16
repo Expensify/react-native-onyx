@@ -1,8 +1,8 @@
 name: Publish package to npmjs
 
 on:
-    push:
-        branches: [main]
+  push:
+    branches: [main]
 
 permissions:
   # Required for OIDC: https://docs.npmjs.com/trusted-publishers
@@ -14,10 +14,10 @@ permissions:
 concurrency: ${{ github.workflow }}
 
 jobs:
-    publish:
-        # os-botify[bot] will update the version on `main`, so this check is important to prevent an infinite loop
-        if: ${{ github.actor != 'os-botify[bot]' }}
-        uses: Expensify/GitHub-Actions/.github/workflows/npmPublish.yml@main
-        secrets: inherit
-        with:
-            should_run_build: true
+  publish:
+    # os-botify[bot] will update the version on `main`, so this check is important to prevent an infinite loop
+    if: ${{ github.actor != 'os-botify[bot]' }}
+    uses: Expensify/GitHub-Actions/.github/workflows/npmPublish.yml@main
+    secrets: inherit
+    with:
+      should_run_build: true

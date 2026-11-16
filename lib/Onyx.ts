@@ -64,19 +64,25 @@ function init({
             const individual: Array<[OnyxKey, OnyxEntry<KeyValueMapping[OnyxKey]>]> = [];
             const collectionBatches = new Map<string, {partial: NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>>; previous: NonUndefined<OnyxCollection<KeyValueMapping[OnyxKey]>>}>();
 
-            for (const [key, value] of pairs) {
+            for (const [key, valueFromStorage] of pairs) {
                 // RAM-only keys should never sync from storage as they may have stale persisted data
                 // from before the key was migrated to RAM-only.
                 if (OnyxKeys.isRamOnlyKey(key)) {
                     continue;
                 }
 
+                const value = utils.needsNormalization(valueFromStorage) ? utils.removeNestedNullValues(valueFromStorage) : valueFromStorage;
+
                 const collectionKey = OnyxKeys.getCollectionKey(key);
                 const isCollectionMember = !!collectionKey && OnyxKeys.isCollectionMemberKey(collectionKey, key);
 
                 // Capture the previous cached value before cache.set() so notifyCollection() can diff old vs new per member.
                 const previousValue = isCollectionMember ? cache.get(key) : undefined;
+                // The key stays indexed because this answer can predate a write of ours still on its way to storage, and only indexed keys get deleted by Onyx.clear and collection sweeps.
                 cache.set(key, value);
+                if (value === null || value === undefined) {
+                    cache.addRemovedInOtherInstanceKey(key);
+                }
 
                 if (isCollectionMember && collectionKey) {
                     let batch = collectionBatches.get(collectionKey);
@@ -487,7 +493,7 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                         //      since collection key subscribers need to be updated differently
                         if (!isKeyToPreserve) {
                             const oldValue = cache.get(key);
-                            const newValue = defaultKeyStates[key] ?? null;
+                            const newValue = OnyxUtils.getNullFreeDefaultKeyState(key);
                             valuesSetByClear[key] = newValue;
                             if (newValue !== oldValue) {
                                 cache.set(key, newValue);
@@ -791,7 +797,7 @@ function exportState(): Promise<Record<OnyxKey, OnyxValue<OnyxKey>>> {
  * @returns The current value, or `undefined` if the key has none.
  */
 function get<TKey extends OnyxKey>(key: TKey): Promise<OnyxValue<TKey>> {
-    return OnyxUtils.afterInit(() => Promise.resolve((onyxSubscriptionManager.getState(key) ?? undefined) as OnyxValue<TKey>));
+    return OnyxUtils.afterInit(() => Promise.resolve(onyxSubscriptionManager.getState(key) as OnyxValue<TKey>));
 }
 
 /**
@@ -813,7 +819,7 @@ function get<TKey extends OnyxKey>(key: TKey): Promise<OnyxValue<TKey>> {
  */
 function multiGet<const Keys extends readonly OnyxKey[]>(keys: Keys): Promise<{[Index in keyof Keys]: OnyxValue<Keys[Index]>}> {
     // map() widens the key tuple to an array, so the per-slot value types survive only through the cast.
-    return OnyxUtils.afterInit(() => Promise.resolve(keys.map((key) => onyxSubscriptionManager.getState(key) ?? undefined) as {[Index in keyof Keys]: OnyxValue<Keys[Index]>}));
+    return OnyxUtils.afterInit(() => Promise.resolve(keys.map((key) => onyxSubscriptionManager.getState(key)) as {[Index in keyof Keys]: OnyxValue<Keys[Index]>}));
 }
 
 const Onyx = {

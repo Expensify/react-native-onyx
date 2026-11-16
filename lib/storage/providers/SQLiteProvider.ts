@@ -215,7 +215,10 @@ const provider: StorageProvider<NitroSQLiteConnection | undefined> = {
                 return null;
             }
 
-            return JSON.parse(result.valueJSON);
+            const value = JSON.parse(result.valueJSON);
+
+            // valueJSON is a number for numeric values, so the type is checked before includes().
+            return typeof value === 'object' && value !== null && result.valueJSON.includes('null') ? utils.removeNestedNullValues(value) : value;
         });
     },
     multiGet(keys) {
