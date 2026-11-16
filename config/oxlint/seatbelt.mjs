@@ -103,7 +103,6 @@ function serializeSeatbeltTSV(data, comments, trailingComments = '') {
     return serializeTSV({leadingComments: comments, trailingComments, rows});
 }
 
-// Built once from the file's lines and cached in fileState.maxErrors, where updateMaxErrors also stores new counts.
 function getMaxErrors(data, relativeFilename) {
     const fileState = data.get(relativeFilename);
     if (!fileState) {
@@ -352,7 +351,6 @@ function applySeatbelt(messages, options, lintedFilenames) {
         }
     }
 
-    // Rows for files that no longer exist are dropped.
     let pruned = 0;
     for (const relativeFilename of [...data.keys()]) {
         if (fs.existsSync(toAbsolutePath(options.seatbeltFile, relativeFilename))) {

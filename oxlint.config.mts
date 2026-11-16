@@ -1,5 +1,3 @@
-// Rules come from eslint-config-expensify's presets (the expensify preset is not used). Existing findings are baselined in
-// config/oxlint/oxlint.seatbelt.tsv.
 import {buildOxlintConfig, getPresetRuleEntry} from 'eslint-config-expensify/oxlint';
 
 const JEST_FILES = ['tests/**', 'lib/**/__mocks__/**', 'jestSetup.js', 'jest-sequencer.js', 'jest-test-environment.ts'];
@@ -7,7 +5,6 @@ const JEST_FILES = ['tests/**', 'lib/**/__mocks__/**', 'jestSetup.js', 'jest-seq
 // Onyx's tsconfig rejects a standalone top-level await (TS1378), so the preset rule entries are awaited inline below.
 export default await buildOxlintConfig({
     presets: ['browser', 'react', 'typescript', {preset: 'jest', files: JEST_FILES}, 'scripts', 'prettier'],
-    // Keep oxlint's built-in exhaustive-deps instead of the hosted copy.
     nativeRules: ['react-hooks/exhaustive-deps'],
     ignorePatterns: ['dist/**', 'node_modules/**', '**/*.d.ts', '**/*.config.js', '**/*.config.cjs', 'tests/types/**/*.ts', 'cpp/**', 'bench-results/**', '.github/**'],
     settings: {
@@ -29,7 +26,7 @@ export default await buildOxlintConfig({
         {
             files: ['**/*.ts', '**/*.tsx'],
             rules: {
-                // oxlint has no import resolution rule of its own, so the hosted one checks imports in TS files.
+                // oxlint has no import resolution rule, so the hosted one checks TS imports.
                 'hosted/no-unresolved': 'error',
                 // The preset's options plus a `_` args prefix. oxlint needs reportVarsOnlyUsedAsTypes to match typescript-eslint.
                 'no-unused-vars': [

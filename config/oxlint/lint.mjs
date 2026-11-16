@@ -1,10 +1,4 @@
 // Runs Oxlint, applies the seatbelt (seatbelt.mjs) and prints the result.
-//
-//   npm run lint                          lint the whole repo
-//   npm run lint -- lib/Onyx.ts tests     lint the given paths
-//   npm run lint -- --show-warnings       also print the grandfathered warnings
-//   npm run lint -- --format=json         print a JSON report
-//   npm run lint -- --fix                 apply Oxlint's auto-fixes
 import {spawnSync} from 'node:child_process';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';

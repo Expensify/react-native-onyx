@@ -39,7 +39,6 @@ jobs:
         env:
           CI: true
 
-      # On main, lint rewrites the seatbelt file when fixes landed; os-botify commits it back.
       - name: Check for tightened seatbelt baseline
         id: seatbelt
         if: github.event_name == 'push'
