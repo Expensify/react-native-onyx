@@ -3,8 +3,8 @@ name: Lint JavaScript
 on:
   pull_request:
     types: [opened, synchronize]
-  push:
-    branches: [main]
+  # Called by publish.yml on push to main, so the baseline is tightened before the version bump.
+  workflow_call:
 
 jobs:
   lint:

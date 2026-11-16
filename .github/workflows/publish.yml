@@ -14,7 +14,12 @@ permissions:
 concurrency: ${{ github.workflow }}
 
 jobs:
+  lint:
+    uses: ./.github/workflows/lint.yml
+    secrets: inherit
+
   publish:
+    needs: lint
     # os-botify[bot] will update the version on `main`, so this check is important to prevent an infinite loop
     if: ${{ github.actor != 'os-botify[bot]' }}
     uses: Expensify/GitHub-Actions/.github/workflows/npmPublish.yml@main
