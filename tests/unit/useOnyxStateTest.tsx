@@ -364,4 +364,103 @@ describe('useOnyxState', () => {
             expect(result.current).toEqual({previous: undefined, current: 'from storage'});
         });
     });
+
+    describe('auto-tracked dependencies', () => {
+        it('should return the value and update when a read key changes', async () => {
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'hello');
+            const {result} = renderHook(() => useOnyxState((state) => state[ONYXKEYS.TEST_KEY]));
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current).toEqual('hello');
+
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'updated'));
+
+            expect(result.current).toEqual('updated');
+        });
+
+        it('should not run the selector when a sibling of the read member changes', async () => {
+            await Onyx.mergeCollection(COLLECTION, {[MEMBER_1]: {id: 1}, [MEMBER_2]: {id: 2}} as GenericCollection);
+            const selector = jest.fn((state: OnyxStateView) => (state[MEMBER_1] as {id: number} | undefined)?.id);
+            const {result} = renderHook(() => useOnyxState(selector));
+            await act(async () => waitForPromisesToResolve());
+            const callCountAfterMount = selector.mock.calls.length;
+
+            await act(async () => Onyx.merge(MEMBER_2, {id: 22}));
+            await act(async () => Onyx.mergeCollection(COLLECTION, {[MEMBER_2]: {id: 222}} as GenericCollection));
+
+            expect(selector).toHaveBeenCalledTimes(callCountAfterMount);
+            expect(result.current).toEqual(1);
+
+            await act(async () => Onyx.merge(MEMBER_1, {id: 11}));
+
+            expect(result.current).toEqual(11);
+        });
+
+        it('should follow a lookup to the key it points at', async () => {
+            await Onyx.mergeCollection(COLLECTION, {[MEMBER_1]: {name: 'one'}, [MEMBER_2]: {name: 'two'}} as GenericCollection);
+            await Onyx.set(ONYXKEYS.TEST_KEY, '1');
+            const selector = jest.fn((state: OnyxStateView) => (state[`${COLLECTION}${state[ONYXKEYS.TEST_KEY] as string}`] as {name: string} | undefined)?.name);
+            const {result} = renderHook(() => useOnyxState(selector));
+            await act(async () => waitForPromisesToResolve());
+
+            expect(result.current).toEqual('one');
+
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, '2'));
+            expect(result.current).toEqual('two');
+
+            const callCountAfterSwitch = selector.mock.calls.length;
+            await act(async () => Onyx.merge(MEMBER_1, {name: 'one changed'}));
+            expect(selector).toHaveBeenCalledTimes(callCountAfterSwitch);
+
+            await act(async () => Onyx.merge(MEMBER_2, {name: 'two changed'}));
+            expect(result.current).toEqual('two changed');
+        });
+
+        it('should start listening to a key a branch reads for the first time', async () => {
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'off');
+            const {result} = renderHook(() => useOnyxState((state) => (state[ONYXKEYS.TEST_KEY] === 'on' ? state[ONYXKEYS.OTHER_TEST] : 'disabled')));
+            await act(async () => waitForPromisesToResolve());
+
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'on'));
+            expect(result.current).toBeUndefined();
+
+            await act(async () => Onyx.set(ONYXKEYS.OTHER_TEST, 'value'));
+            expect(result.current).toEqual('value');
+        });
+
+        it('should re-run on any member write when the selector reads the collection root', async () => {
+            const {result} = renderHook(() => useOnyxState((state) => Object.keys(state[COLLECTION] ?? {}).length));
+            await act(async () => waitForPromisesToResolve());
+
+            await act(async () => Onyx.merge(MEMBER_1, {id: 1}));
+            expect(result.current).toEqual(1);
+
+            await act(async () => Onyx.merge(MEMBER_2, {id: 2}));
+            expect(result.current).toEqual(2);
+        });
+
+        it('should keep tracking per hook when several hooks are mounted', async () => {
+            const {result} = renderHook(() => ({
+                first: useOnyxState((state) => state[ONYXKEYS.TEST_KEY]),
+                second: useOnyxState((state) => state[ONYXKEYS.OTHER_TEST]),
+            }));
+            await act(async () => waitForPromisesToResolve());
+
+            await act(async () => Onyx.set(ONYXKEYS.OTHER_TEST, 'b'));
+            expect(result.current).toEqual({first: undefined, second: 'b'});
+
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'a'));
+            expect(result.current).toEqual({first: 'a', second: 'b'});
+        });
+
+        it('should expose the tracked keys through previousState after a change', async () => {
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'first');
+            const {result} = renderHook(() => useOnyxState((state, previousState) => `${previousState?.[ONYXKEYS.TEST_KEY] as string}->${state[ONYXKEYS.TEST_KEY] as string}`));
+            await act(async () => waitForPromisesToResolve());
+
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'second'));
+
+            expect(result.current).toEqual('first->second');
+        });
+    });
 });

@@ -62,8 +62,13 @@ type UseOnyxStateOptions<T, TDependencies extends readonly OnyxKey[] = readonly 
      * Keys the selector reads. It re-runs when one of them changes; a collection key counts as a
      * single dep, so any member change triggers a re-run. The selector's `state` only carries these
      * keys, so reading anything else is a type error rather than a value that silently goes stale.
+     *
+     * Omit it to track the keys automatically: each selector run records the keys it read from `state`,
+     * and the hook subscribes to exactly those. A run's output depends only on what it read, so a key
+     * it skipped can't change it until a key it did read changes and the selector runs again. Reading
+     * `report_1` then subscribes to that member only, not the whole `report_` collection.
      */
-    dependencies: TDependencies;
+    dependencies?: TDependencies;
 
     /**
      * Equality for the selector's output. Defaults to `===` with a deep-equal fallback for objects.
@@ -98,7 +103,13 @@ function createStateView(snapshotProvider: (key: OnyxKey) => OnyxValue<OnyxKey>)
     return new Proxy<Record<string, never>>({}, handler) as unknown as OnyxStateView;
 }
 
-const liveStateView = createStateView((key) => onyxSubscriptionManager.getState(key as OnyxKey));
+/** Collects the keys the running auto-tracked selector reads from `liveStateView`, `null` when nothing is recording. */
+let activeRecorder: Set<OnyxKey> | null = null;
+
+const liveStateView = createStateView((key) => {
+    activeRecorder?.add(key as OnyxKey);
+    return onyxSubscriptionManager.getState(key as OnyxKey);
+});
 
 type SnapshotCache<T, TDependencies extends readonly OnyxKey[]> = {
     value: T;
@@ -106,8 +117,32 @@ type SnapshotCache<T, TDependencies extends readonly OnyxKey[]> = {
     previousView: OnyxStateView | undefined;
     /** Whether the run that produced `value` read `previousState`. A run that ignored it can't care that it moved. */
     readPreviousState: boolean;
+    /** The declared deps, or the keys the run read when auto-tracking. Same reference while the set is unchanged. */
+    deps: readonly OnyxKey[];
     depValues: Array<OnyxValue<OnyxKey>>;
 };
+
+type StateSubscription = {
+    onStoreChange: () => void;
+    keys: readonly OnyxKey[];
+    unsubscribe: () => void;
+};
+
+/** Runs the selector with `liveStateView` recording, and returns the set of keys it read. */
+function recordReads<T>(run: () => T): {output: T; keys: Set<OnyxKey>} {
+    const keys = new Set<OnyxKey>();
+    const outerRecorder = activeRecorder;
+    activeRecorder = keys;
+    try {
+        return {output: run(), keys};
+    } finally {
+        activeRecorder = outerRecorder;
+    }
+}
+
+function isSameKeySet(keys: readonly OnyxKey[], recorded: Set<OnyxKey>): boolean {
+    return keys.length === recorded.size && keys.every((key) => recorded.has(key));
+}
 
 /** True when every dep still reads as the same reference it had when `depValues` was taken. */
 function areDepValuesUnchanged(deps: readonly OnyxKey[], depValues: Array<OnyxValue<OnyxKey>>): boolean {
@@ -142,28 +177,38 @@ function defaultSelectorEquality<T>(a: T, b: T): boolean {
  * `previousState` to walk only what changed (structural sharing keeps unchanged collection members
  * reference-equal, so each step is O(1)) or as a real input, say to emit a delta.
  *
- * Re-runs when any declared dep changes, and skips the React update when the output is equal to the
+ * Re-runs when any declared or tracked dep changes, and skips the React update when the output is equal to the
  * previous one, per `selectorEquality`.
  *
  * Mounting before `Onyx.init` has hydrated runs the selector against an empty state and re-runs it
  * once init lands. There is no status channel, so a consumer that must tell "not hydrated yet" from
  * "absent" has to carry that in its own output.
  */
-function useOnyxState<T, const TDependencies extends readonly OnyxKey[]>(selector: UseOnyxStateSelector<T, TDependencies>, options: UseOnyxStateOptions<T, TDependencies>): T {
+function useOnyxState<T, const TDependencies extends readonly OnyxKey[]>(selector: UseOnyxStateSelector<T, TDependencies>, options: UseOnyxStateOptions<T, TDependencies> = {}): T {
     const {dependencies, selectorEquality = defaultSelectorEquality} = options;
 
     // Consumers pass an inline array literal, so key the memo on the contents: `depsArray` only gets
     // a new reference when the set of keys changes, which keeps `subscribe` from re-subscribing on
     // every render. The space separator is safe, Onyx keys never contain spaces. React Compiler
     // can't preserve content-keying, so this hook opts out of it and memoizes by hand.
-    const depsKey = dependencies.join(' ');
-    const depsArray = useMemo(() => [...dependencies], [depsKey]); // eslint-disable-line react-hooks/exhaustive-deps, react-hooks/preserve-manual-memoization
+    // `undefined` means the deps are auto-tracked.
+    const depsKey = dependencies?.join(' ');
+    const depsArray = useMemo(() => (dependencies ? [...dependencies] : undefined), [depsKey]); // eslint-disable-line react-hooks/exhaustive-deps, react-hooks/preserve-manual-memoization
+
+    // Mutated only in the post-commit effect below, so it stays frozen across a render's
+    // `getSnapshot` calls and every one of them computes the same output.
+    const previousViewRef = useRef<OnyxStateView | undefined>(undefined);
+    const lastSnapshotRef = useRef<SnapshotCache<T, TDependencies> | null>(null);
+    const subscriptionRef = useRef<StateSubscription | null>(null);
 
     // Only `subscribe` has to be referentially stable, since it controls re-subscription.
     // `getSnapshot` may change identity freely, so it closes over the latest selector directly.
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
-            const unsubscribe = onyxSubscriptionManager.subscribeState(onStoreChange, depsArray);
+            // React subscribes after the commit, so the snapshot behind the committed value is already there.
+            const keys = depsArray ?? lastSnapshotRef.current?.deps ?? [];
+            const subscription: StateSubscription = {onStoreChange, keys, unsubscribe: onyxSubscriptionManager.subscribeState(onStoreChange, keys)};
+            subscriptionRef.current = subscription;
 
             // `Onyx.init` hydrates the cache without notifying anyone, so a selector that ran before it
             // finished saw an empty state and would never hear the stored values arrive. Re-read once
@@ -181,16 +226,14 @@ function useOnyxState<T, const TDependencies extends readonly OnyxKey[]>(selecto
 
             return () => {
                 isActive = false;
-                unsubscribe();
+                subscription.unsubscribe();
+                if (subscriptionRef.current === subscription) {
+                    subscriptionRef.current = null;
+                }
             };
         },
         [depsArray],
     );
-
-    // Mutated only in the post-commit effect below, so it stays frozen across a render's
-    // `getSnapshot` calls and every one of them computes the same output.
-    const previousViewRef = useRef<OnyxStateView | undefined>(undefined);
-    const lastSnapshotRef = useRef<SnapshotCache<T, TDependencies> | null>(null);
 
     // Flipped by the `previousState` view when the selector reads a key off it. Read straight after the
     // selector returns, so it describes that run only.
@@ -209,26 +252,55 @@ function useOnyxState<T, const TDependencies extends readonly OnyxKey[]>(selecto
             lastSnapshot !== null &&
             lastSnapshot.selector === selector &&
             (!lastSnapshot.readPreviousState || lastSnapshot.previousView === previousView) &&
-            areDepValuesUnchanged(depsArray, lastSnapshot.depValues)
+            (depsArray === undefined || lastSnapshot.deps === depsArray) &&
+            areDepValuesUnchanged(lastSnapshot.deps, lastSnapshot.depValues)
         ) {
             return lastSnapshot.value;
         }
 
-        const depValues = depsArray.map((dep) => onyxSubscriptionManager.getState(dep));
         previousStateReadRef.current = false;
         // The views carry every key at runtime; the narrowing is a constraint on what a selector may
         // read, so hand them over as the declared shape.
-        const output = selector(liveStateView as OnyxStateViewFor<TDependencies>, previousView as OnyxStateViewFor<TDependencies> | undefined);
+        const runSelector = () => selector(liveStateView as OnyxStateViewFor<TDependencies>, previousView as OnyxStateViewFor<TDependencies> | undefined);
+        let output: T;
+        let deps: readonly OnyxKey[];
+        if (depsArray) {
+            output = runSelector();
+            deps = depsArray;
+        } else {
+            const run = recordReads(runSelector);
+            output = run.output;
+            // Keep the previous array while the set is unchanged, so the effect below can tell by reference.
+            deps = lastSnapshot !== null && isSameKeySet(lastSnapshot.deps, run.keys) ? lastSnapshot.deps : [...run.keys];
+        }
         const readPreviousState = previousStateReadRef.current;
+        const depValues = deps.map((dep) => onyxSubscriptionManager.getState(dep));
 
         // Hand back the previous reference when the output is equal, so React bails out via `===`
         // and an unchanged store keeps returning the same value even as `getSnapshot`'s identity moves.
         const value = lastSnapshot !== null && selectorEquality(lastSnapshot.value, output) ? lastSnapshot.value : output;
-        lastSnapshotRef.current = {value, selector, previousView, readPreviousState, depValues};
+        lastSnapshotRef.current = {value, selector, previousView, readPreviousState, deps, depValues};
         return value;
     }, [selector, selectorEquality, depsArray]);
 
     const value = useSyncExternalStore(subscribe, getSnapshot);
+
+    // Auto-tracking: move the subscription to the keys the latest run read. It runs after the commit, so a
+    // write that landed in between on a newly read key fired nobody; comparing the values the run saw with
+    // the current ones catches it, the same check React does when it first subscribes.
+    useEffect(() => {
+        const subscription = subscriptionRef.current;
+        const lastSnapshot = lastSnapshotRef.current;
+        if (depsArray !== undefined || subscription === null || lastSnapshot === null || subscription.keys === lastSnapshot.deps) {
+            return;
+        }
+        subscription.unsubscribe();
+        subscription.keys = lastSnapshot.deps;
+        subscription.unsubscribe = onyxSubscriptionManager.subscribeState(subscription.onStoreChange, lastSnapshot.deps);
+        if (!areDepValuesUnchanged(lastSnapshot.deps, lastSnapshot.depValues)) {
+            subscription.onStoreChange();
+        }
+    });
 
     // Snapshot the deps after a commit that changed the output, to serve as `previousState` on the next
     // selector run. Doing it here rather than in `getSnapshot` keeps that function pure and gives
@@ -237,7 +309,7 @@ function useOnyxState<T, const TDependencies extends readonly OnyxKey[]>(selecto
     // only on output changes also keeps a re-render from a parent from allocating a new view.
     useEffect(() => {
         const currentDepValues: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
-        for (const dep of depsArray) {
+        for (const dep of depsArray ?? lastSnapshotRef.current?.deps ?? []) {
             currentDepValues[dep] = onyxSubscriptionManager.getState(dep);
         }
         previousViewRef.current = createStateView((key) => {

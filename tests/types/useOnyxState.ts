@@ -109,6 +109,10 @@ function aDeclaredRootGrantsItsMembers() {
     return useOnyxState((state) => state[`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]?.str, {dependencies: [ONYX_KEYS.COLLECTION.TEST_KEY]});
 }
 
+function autoTrackedReadsAnyKey() {
+    return useOnyxState((state) => `${state[ONYX_KEYS.TEST_KEY] ?? ''}${state[`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]?.str ?? ''}`);
+}
+
 export {
     readCollectionRoot,
     readCollectionMember,
@@ -120,4 +124,5 @@ export {
     cannotReadAnUndeclaredCollection,
     cannotReadAnUndeclaredKeyFromPreviousState,
     aDeclaredRootGrantsItsMembers,
+    autoTrackedReadsAnyKey,
 };
