@@ -11,7 +11,6 @@ import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 // We need access to some internal properties of `onyxSubscriptionManager` during the tests but they are private,
 // so this workaround allows us to have access to them. The maps are created once in the constructor
 // and only ever `.clear()`ed (never reassigned), so capturing the references here stays valid.
-// eslint-disable-next-line dot-notation
 const keyListeners = onyxSubscriptionManager['keyListeners'];
 
 const ONYXKEYS = {
