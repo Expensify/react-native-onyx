@@ -1,4 +1,5 @@
 import {act, renderHook} from '@testing-library/react-native';
+import {useLayoutEffect} from 'react';
 
 import type {OnyxStateView} from '../../lib/useOnyxState';
 import type GenericCollection from '../utils/GenericCollection';
@@ -400,6 +401,63 @@ describe('useOnyxState', () => {
 
             await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'a'));
             expect(result.current).toEqual({first: 'a', second: 'b'});
+        });
+
+        it('should start listening to a newly read key when the output stays the same', async () => {
+            // Given a branch that reads OTHER_TEST only once TEST_KEY is 'on', and returns null either way
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'off');
+            const {result} = renderHook(() => useOnyxState((state) => (state[ONYXKEYS.TEST_KEY] === 'on' ? (state[ONYXKEYS.OTHER_TEST] ?? null) : null)));
+            await act(async () => waitForPromisesToResolve());
+
+            // When the branch flips without changing the output, so nothing re-renders
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'on'));
+            expect(result.current).toBeNull();
+
+            // Then a write to the newly read key still reaches the hook
+            await act(async () => Onyx.set(ONYXKEYS.OTHER_TEST, 'value'));
+            expect(result.current).toEqual('value');
+        });
+
+        it('should follow a pointer that arrives before the record it points at', async () => {
+            // Given a selector that looks up a member through a pointer key, with neither stored yet
+            const {result} = renderHook(() =>
+                useOnyxState((state) => (state[ONYXKEYS.TEST_KEY] ? ((state[`${COLLECTION}${state[ONYXKEYS.TEST_KEY] as string}`] as {name: string} | undefined)?.name ?? null) : null)),
+            );
+            await act(async () => waitForPromisesToResolve());
+
+            // When the pointer lands first, the output stays null
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, '1'));
+            expect(result.current).toBeNull();
+
+            // Then the record it points at still updates the hook when it arrives
+            await act(async () => Onyx.merge(MEMBER_1, {name: 'one'}));
+            expect(result.current).toEqual('one');
+        });
+    });
+
+    describe('previousState after a write between commit and effects', () => {
+        it('should keep the values the committed run saw, not a later write', async () => {
+            // Given a selector that reports the previous and current value of TEST_KEY
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'a');
+            const {result} = renderHook(() => {
+                const value = useOnyxState((state, previousState) => `${previousState?.[ONYXKEYS.TEST_KEY] as string}->${state[ONYXKEYS.TEST_KEY] as string}`);
+                // Layout effects run after the commit but before passive effects, which is where the hook builds previousState
+                useLayoutEffect(() => {
+                    if (value !== 'a->b') {
+                        return;
+                    }
+                    Onyx.set(ONYXKEYS.TEST_KEY, 'c');
+                }, [value]);
+                return value;
+            });
+            await act(async () => waitForPromisesToResolve());
+
+            // When 'b' commits and 'c' is written before the passive effects run
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'b'));
+            await act(async () => waitForPromisesToResolve());
+
+            // Then previousState holds 'b', the value behind the committed output, so the b->c change is not lost
+            expect(result.current).toEqual('b->c');
         });
     });
 });

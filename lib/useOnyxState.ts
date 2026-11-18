@@ -88,9 +88,10 @@ type SnapshotCache<T> = {
 };
 
 type StateSubscription = {
-    onStoreChange: () => void;
     keys: readonly OnyxKey[];
     unsubscribe: () => void;
+    /** Moves the subscription to the keys the latest selector run read. */
+    syncKeys: () => void;
 };
 
 /** Runs the selector with `liveStateView` recording, and returns the set of keys it read. */
@@ -165,9 +166,33 @@ function useOnyxState<T>(selector: UseOnyxStateSelector<T>, options: UseOnyxStat
     // Only `subscribe` has to be referentially stable, since it controls re-subscription.
     // `getSnapshot` may change identity freely, so it closes over the latest selector directly.
     const subscribe = useCallback((onStoreChange: () => void) => {
+        // React's store-change handler calls `getSnapshot` synchronously, so once it returns the latest
+        // run's keys are in `lastSnapshotRef`. Moving the subscription here rather than only after a
+        // commit matters when a run reads a new key but returns an equal output: nothing commits then.
+        const handleStoreChange = () => {
+            onStoreChange();
+            subscription.syncKeys();
+        };
+
         // React subscribes after the commit, so the snapshot behind the committed value is already there.
         const keys = lastSnapshotRef.current?.deps ?? [];
-        const subscription: StateSubscription = {onStoreChange, keys, unsubscribe: onyxSubscriptionManager.subscribeState(onStoreChange, keys)};
+        const subscription: StateSubscription = {
+            keys,
+            unsubscribe: onyxSubscriptionManager.subscribeState(handleStoreChange, keys),
+            syncKeys: () => {
+                const lastSnapshot = lastSnapshotRef.current;
+                if (lastSnapshot === null || subscription.keys === lastSnapshot.deps) {
+                    return;
+                }
+                subscription.unsubscribe();
+                subscription.keys = lastSnapshot.deps;
+                subscription.unsubscribe = onyxSubscriptionManager.subscribeState(handleStoreChange, lastSnapshot.deps);
+                // A write that landed on a newly read key before this point fired nobody.
+                if (!areDepValuesUnchanged(lastSnapshot.deps, lastSnapshot.depValues)) {
+                    handleStoreChange();
+                }
+            },
+        };
         subscriptionRef.current = subscription;
 
         // `Onyx.init` hydrates the cache without notifying anyone, so a selector that ran before it
@@ -180,7 +205,7 @@ function useOnyxState<T>(selector: UseOnyxStateSelector<T>, options: UseOnyxStat
                 if (!isActive) {
                     return;
                 }
-                onStoreChange();
+                handleStoreChange();
             });
         }
 
@@ -230,39 +255,32 @@ function useOnyxState<T>(selector: UseOnyxStateSelector<T>, options: UseOnyxStat
     }, [selector, selectorEquality]);
 
     const value = useSyncExternalStore(subscribe, getSnapshot);
+    // The run behind `value`. A store change between the commit and the effects below can overwrite the ref.
+    const renderedSnapshot = lastSnapshotRef.current;
 
-    // Move the subscription to the keys the latest run read. It runs after the commit, so a
-    // write that landed in between on a newly read key fired nobody; comparing the values the run saw with
-    // the current ones catches it, the same check React does when it first subscribes.
+    // A render can run the selector without a store change, say with a new selector, so the keys can move here too.
     useEffect(() => {
-        const subscription = subscriptionRef.current;
-        const lastSnapshot = lastSnapshotRef.current;
-        if (subscription === null || lastSnapshot === null || subscription.keys === lastSnapshot.deps) {
-            return;
-        }
-        subscription.unsubscribe();
-        subscription.keys = lastSnapshot.deps;
-        subscription.unsubscribe = onyxSubscriptionManager.subscribeState(subscription.onStoreChange, lastSnapshot.deps);
-        if (!areDepValuesUnchanged(lastSnapshot.deps, lastSnapshot.depValues)) {
-            subscription.onStoreChange();
-        }
+        subscriptionRef.current?.syncKeys();
     });
 
     // Snapshot the deps after a commit that changed the output, to serve as `previousState` on the next
     // selector run. Doing it here rather than in `getSnapshot` keeps that function pure and gives
     // `previousState` its meaning, the deps behind the last committed output: a change whose output
     // the equality check swallowed never commits, so it never advances past a value nobody saw. Running
-    // only on output changes also keeps a re-render from a parent from allocating a new view.
+    // only on output changes also keeps a re-render from a parent from allocating a new view. The values
+    // come from the committed run, not the store, so a write landing before this effect still reads as a change.
     useEffect(() => {
-        const currentDepValues: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
-        for (const dep of lastSnapshotRef.current?.deps ?? []) {
-            currentDepValues[dep] = onyxSubscriptionManager.getState(dep);
+        const committedDepValues: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
+        if (renderedSnapshot !== null) {
+            for (const [index, dep] of renderedSnapshot.deps.entries()) {
+                committedDepValues[dep] = renderedSnapshot.depValues[index];
+            }
         }
         previousViewRef.current = createStateView((key) => {
             previousStateReadRef.current = true;
-            return currentDepValues[key];
+            return committedDepValues[key];
         });
-    }, [value]);
+    }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
 
     return value;
 }
