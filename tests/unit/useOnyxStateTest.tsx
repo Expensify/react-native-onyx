@@ -32,14 +32,14 @@ describe('useOnyxState', () => {
         it('should return the derived value from a single dependency', async () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, 'hello');
 
-            const {result} = renderHook(() => useOnyxState((state) => state[ONYXKEYS.TEST_KEY], {dependencies: [ONYXKEYS.TEST_KEY]}));
+            const {result} = renderHook(() => useOnyxState((state) => state[ONYXKEYS.TEST_KEY]));
             await act(async () => waitForPromisesToResolve());
 
             expect(result.current).toEqual('hello');
         });
 
         it('should update when the dependency changes', async () => {
-            const {result} = renderHook(() => useOnyxState((state) => state[ONYXKEYS.TEST_KEY], {dependencies: [ONYXKEYS.TEST_KEY]}));
+            const {result} = renderHook(() => useOnyxState((state) => state[ONYXKEYS.TEST_KEY]));
             await act(async () => waitForPromisesToResolve());
 
             await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'updated'));
@@ -51,7 +51,7 @@ describe('useOnyxState', () => {
             let renderCount = 0;
             const {result} = renderHook(() => {
                 renderCount += 1;
-                return useOnyxState((state) => state[ONYXKEYS.TEST_KEY], {dependencies: [ONYXKEYS.TEST_KEY]});
+                return useOnyxState((state) => state[ONYXKEYS.TEST_KEY]);
             });
             await act(async () => waitForPromisesToResolve());
 
@@ -64,9 +64,7 @@ describe('useOnyxState', () => {
         });
 
         it('should re-run when any of multiple dependencies change', async () => {
-            const {result} = renderHook(() =>
-                useOnyxState((state) => `${state[ONYXKEYS.TEST_KEY] ?? ''}-${state[ONYXKEYS.OTHER_TEST] ?? ''}`, {dependencies: [ONYXKEYS.TEST_KEY, ONYXKEYS.OTHER_TEST]}),
-            );
+            const {result} = renderHook(() => useOnyxState((state) => `${state[ONYXKEYS.TEST_KEY] ?? ''}-${state[ONYXKEYS.OTHER_TEST] ?? ''}`));
             await act(async () => waitForPromisesToResolve());
 
             await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'a'));
@@ -79,7 +77,7 @@ describe('useOnyxState', () => {
 
     describe('collection dependency', () => {
         it('should re-run when any member of a collection dependency changes', async () => {
-            const {result} = renderHook(() => useOnyxState((state) => Object.keys(state[COLLECTION] ?? {}).length, {dependencies: [COLLECTION]}));
+            const {result} = renderHook(() => useOnyxState((state) => Object.keys(state[COLLECTION] ?? {}).length));
             await act(async () => waitForPromisesToResolve());
 
             expect(result.current).toEqual(0);
@@ -92,7 +90,7 @@ describe('useOnyxState', () => {
         });
 
         it('should re-run on a mergeCollection write', async () => {
-            const {result} = renderHook(() => useOnyxState((state) => Object.keys(state[COLLECTION] ?? {}).length, {dependencies: [COLLECTION]}));
+            const {result} = renderHook(() => useOnyxState((state) => Object.keys(state[COLLECTION] ?? {}).length));
             await act(async () => waitForPromisesToResolve());
 
             await act(async () => Onyx.mergeCollection(COLLECTION, {[MEMBER_1]: {id: 1}, [MEMBER_2]: {id: 2}} as GenericCollection));
@@ -105,13 +103,10 @@ describe('useOnyxState', () => {
         it('should pass undefined as previousState on the first selector run', async () => {
             const observed: Array<OnyxStateView | undefined> = [];
             renderHook(() =>
-                useOnyxState(
-                    (state, previousState) => {
-                        observed.push(previousState);
-                        return state[ONYXKEYS.TEST_KEY];
-                    },
-                    {dependencies: [ONYXKEYS.TEST_KEY]},
-                ),
+                useOnyxState((state, previousState) => {
+                    observed.push(previousState);
+                    return state[ONYXKEYS.TEST_KEY];
+                }),
             );
             await act(async () => waitForPromisesToResolve());
 
@@ -124,15 +119,12 @@ describe('useOnyxState', () => {
 
             let sawCurrentBWithPreviousA = false;
             renderHook(() =>
-                useOnyxState(
-                    (state, previousState) => {
-                        if (state[ONYXKEYS.TEST_KEY] === 'b' && previousState?.[ONYXKEYS.TEST_KEY] === 'a') {
-                            sawCurrentBWithPreviousA = true;
-                        }
-                        return state[ONYXKEYS.TEST_KEY];
-                    },
-                    {dependencies: [ONYXKEYS.TEST_KEY]},
-                ),
+                useOnyxState((state, previousState) => {
+                    if (state[ONYXKEYS.TEST_KEY] === 'b' && previousState?.[ONYXKEYS.TEST_KEY] === 'a') {
+                        sawCurrentBWithPreviousA = true;
+                    }
+                    return state[ONYXKEYS.TEST_KEY];
+                }),
             );
             await act(async () => waitForPromisesToResolve());
 
@@ -150,16 +142,13 @@ describe('useOnyxState', () => {
             await Onyx.mergeCollection(COLLECTION, {[MEMBER_1]: {v: 1}, [MEMBER_2]: {v: 1}} as GenericCollection);
 
             const {result} = renderHook(() =>
-                useOnyxState(
-                    (state, previousState) => {
-                        const current = (state[COLLECTION] ?? {}) as Record<string, unknown>;
-                        const previous = (previousState?.[COLLECTION] ?? {}) as Record<string, unknown>;
-                        return Object.keys(current)
-                            .filter((memberKey) => current[memberKey] !== previous[memberKey])
-                            .sort();
-                    },
-                    {dependencies: [COLLECTION]},
-                ),
+                useOnyxState((state, previousState) => {
+                    const current = (state[COLLECTION] ?? {}) as Record<string, unknown>;
+                    const previous = (previousState?.[COLLECTION] ?? {}) as Record<string, unknown>;
+                    return Object.keys(current)
+                        .filter((memberKey) => current[memberKey] !== previous[memberKey])
+                        .sort();
+                }),
             );
             await act(async () => waitForPromisesToResolve());
 
@@ -173,16 +162,13 @@ describe('useOnyxState', () => {
             await Onyx.mergeCollection(COLLECTION, {[MEMBER_1]: {v: 1}, [MEMBER_2]: {v: 1}} as GenericCollection);
 
             const {result} = renderHook(() =>
-                useOnyxState(
-                    (state, previousState) => {
-                        const current = (state[COLLECTION] ?? {}) as Record<string, unknown>;
-                        const previous = (previousState?.[COLLECTION] ?? {}) as Record<string, unknown>;
-                        return Object.keys(current)
-                            .filter((memberKey) => current[memberKey] !== previous[memberKey])
-                            .sort();
-                    },
-                    {dependencies: [COLLECTION]},
-                ),
+                useOnyxState((state, previousState) => {
+                    const current = (state[COLLECTION] ?? {}) as Record<string, unknown>;
+                    const previous = (previousState?.[COLLECTION] ?? {}) as Record<string, unknown>;
+                    return Object.keys(current)
+                        .filter((memberKey) => current[memberKey] !== previous[memberKey])
+                        .sort();
+                }),
             );
             await act(async () => waitForPromisesToResolve());
 
@@ -198,7 +184,7 @@ describe('useOnyxState', () => {
 
     describe('selectorEquality', () => {
         it('should preserve the output reference when the new output is deep-equal (default equality)', async () => {
-            const {result} = renderHook(() => useOnyxState((state) => ({length: ((state[ONYXKEYS.TEST_KEY] as string) ?? '').length}), {dependencies: [ONYXKEYS.TEST_KEY]}));
+            const {result} = renderHook(() => useOnyxState((state) => ({length: ((state[ONYXKEYS.TEST_KEY] as string) ?? '').length})));
             await act(async () => waitForPromisesToResolve());
 
             await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'aa'));
@@ -214,7 +200,6 @@ describe('useOnyxState', () => {
         it('should never update after the first value when a custom equality always returns true', async () => {
             const {result} = renderHook(() =>
                 useOnyxState((state) => state[ONYXKEYS.TEST_KEY] ?? 'none', {
-                    dependencies: [ONYXKEYS.TEST_KEY],
                     selectorEquality: () => true,
                 }),
             );
@@ -231,7 +216,6 @@ describe('useOnyxState', () => {
         it('should update when a custom equality reports the output changed', async () => {
             const {result} = renderHook(() =>
                 useOnyxState((state) => state[ONYXKEYS.TEST_KEY] ?? 'none', {
-                    dependencies: [ONYXKEYS.TEST_KEY],
                     selectorEquality: (a, b) => a === b,
                 }),
             );
@@ -247,7 +231,7 @@ describe('useOnyxState', () => {
         it('should not run the selector again when the component re-renders and no dependency changed', async () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, 'hello');
             const selector = jest.fn((state: OnyxStateView) => state[ONYXKEYS.TEST_KEY]);
-            const {result, rerender} = renderHook((_props: {renderID: number}) => useOnyxState(selector, {dependencies: [ONYXKEYS.TEST_KEY]}), {initialProps: {renderID: 0}});
+            const {result, rerender} = renderHook((_props: {renderID: number}) => useOnyxState(selector), {initialProps: {renderID: 0}});
             await act(async () => waitForPromisesToResolve());
             const callCountAfterMount = selector.mock.calls.length;
 
@@ -260,12 +244,9 @@ describe('useOnyxState', () => {
 
         it('should run the selector again when a re-render passes a new selector', async () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, 'hello');
-            const {result, rerender} = renderHook(
-                ({suffix}: {suffix: string}) => useOnyxState((state) => `${state[ONYXKEYS.TEST_KEY] as string}${suffix}`, {dependencies: [ONYXKEYS.TEST_KEY]}),
-                {
-                    initialProps: {suffix: '!'},
-                },
-            );
+            const {result, rerender} = renderHook(({suffix}: {suffix: string}) => useOnyxState((state) => `${state[ONYXKEYS.TEST_KEY] as string}${suffix}`), {
+                initialProps: {suffix: '!'},
+            });
             await act(async () => waitForPromisesToResolve());
 
             rerender({suffix: '?'});
@@ -276,7 +257,7 @@ describe('useOnyxState', () => {
         it('should run the selector again on a re-render after a dependency changed', async () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, 'hello');
             const selector = jest.fn((state: OnyxStateView) => state[ONYXKEYS.TEST_KEY]);
-            const {result} = renderHook(() => useOnyxState(selector, {dependencies: [ONYXKEYS.TEST_KEY]}));
+            const {result} = renderHook(() => useOnyxState(selector));
             await act(async () => waitForPromisesToResolve());
             const callCountAfterMount = selector.mock.calls.length;
 
@@ -291,9 +272,7 @@ describe('useOnyxState', () => {
             // `Function.length` stops counting at the first defaulted parameter, so this selector reports
             // an arity of 1 even though it reads `previousState`.
             const {result} = renderHook(() =>
-                useOnyxState((state, previousState = undefined) => `${state[ONYXKEYS.TEST_KEY] as string}/${(previousState?.[ONYXKEYS.TEST_KEY] as string) ?? 'none'}`, {
-                    dependencies: [ONYXKEYS.TEST_KEY],
-                }),
+                useOnyxState((state, previousState = undefined) => `${state[ONYXKEYS.TEST_KEY] as string}/${(previousState?.[ONYXKEYS.TEST_KEY] as string) ?? 'none'}`),
             );
             await act(async () => waitForPromisesToResolve());
 
@@ -322,11 +301,7 @@ describe('useOnyxState', () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'from storage');
             await StorageMock.setItem(ONYXKEYS.OTHER_TEST, 'other from storage');
 
-            const {result} = renderHook(() =>
-                useOnyxState((state) => [state[ONYXKEYS.TEST_KEY], state[ONYXKEYS.OTHER_TEST]].join('|'), {
-                    dependencies: [ONYXKEYS.TEST_KEY, ONYXKEYS.OTHER_TEST],
-                }),
-            );
+            const {result} = renderHook(() => useOnyxState((state) => [state[ONYXKEYS.TEST_KEY], state[ONYXKEYS.OTHER_TEST]].join('|')));
 
             // Then the selector has only an empty state to work with, because `cache.hydrate()`
             // notifies nobody
@@ -346,13 +321,10 @@ describe('useOnyxState', () => {
             await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'from storage');
 
             const {result} = renderHook(() =>
-                useOnyxState(
-                    (state, previousState) => ({
-                        previous: previousState?.[ONYXKEYS.TEST_KEY],
-                        current: state[ONYXKEYS.TEST_KEY],
-                    }),
-                    {dependencies: [ONYXKEYS.TEST_KEY]},
-                ),
+                useOnyxState((state, previousState) => ({
+                    previous: previousState?.[ONYXKEYS.TEST_KEY],
+                    current: state[ONYXKEYS.TEST_KEY],
+                })),
             );
 
             // When init hydrates the cache after the first committed render
@@ -365,19 +337,7 @@ describe('useOnyxState', () => {
         });
     });
 
-    describe('auto-tracked dependencies', () => {
-        it('should return the value and update when a read key changes', async () => {
-            await Onyx.set(ONYXKEYS.TEST_KEY, 'hello');
-            const {result} = renderHook(() => useOnyxState((state) => state[ONYXKEYS.TEST_KEY]));
-            await act(async () => waitForPromisesToResolve());
-
-            expect(result.current).toEqual('hello');
-
-            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'updated'));
-
-            expect(result.current).toEqual('updated');
-        });
-
+    describe('key tracking', () => {
         it('should not run the selector when a sibling of the read member changes', async () => {
             await Onyx.mergeCollection(COLLECTION, {[MEMBER_1]: {id: 1}, [MEMBER_2]: {id: 2}} as GenericCollection);
             const selector = jest.fn((state: OnyxStateView) => (state[MEMBER_1] as {id: number} | undefined)?.id);
@@ -428,17 +388,6 @@ describe('useOnyxState', () => {
             expect(result.current).toEqual('value');
         });
 
-        it('should re-run on any member write when the selector reads the collection root', async () => {
-            const {result} = renderHook(() => useOnyxState((state) => Object.keys(state[COLLECTION] ?? {}).length));
-            await act(async () => waitForPromisesToResolve());
-
-            await act(async () => Onyx.merge(MEMBER_1, {id: 1}));
-            expect(result.current).toEqual(1);
-
-            await act(async () => Onyx.merge(MEMBER_2, {id: 2}));
-            expect(result.current).toEqual(2);
-        });
-
         it('should keep tracking per hook when several hooks are mounted', async () => {
             const {result} = renderHook(() => ({
                 first: useOnyxState((state) => state[ONYXKEYS.TEST_KEY]),
@@ -451,16 +400,6 @@ describe('useOnyxState', () => {
 
             await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'a'));
             expect(result.current).toEqual({first: 'a', second: 'b'});
-        });
-
-        it('should expose the tracked keys through previousState after a change', async () => {
-            await Onyx.set(ONYXKEYS.TEST_KEY, 'first');
-            const {result} = renderHook(() => useOnyxState((state, previousState) => `${previousState?.[ONYXKEYS.TEST_KEY] as string}->${state[ONYXKEYS.TEST_KEY] as string}`));
-            await act(async () => waitForPromisesToResolve());
-
-            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'second'));
-
-            expect(result.current).toEqual('first->second');
         });
     });
 });

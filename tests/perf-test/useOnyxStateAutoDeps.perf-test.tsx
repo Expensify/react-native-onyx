@@ -5,14 +5,11 @@ import React from 'react';
 import {Text, View} from 'react-native';
 import {measureRenders} from 'reassure';
 
-import type {OnyxKey} from '../../lib';
 import type {OnyxStateView} from '../../lib/useOnyxState';
 
 import Onyx from '../../lib';
 import useOnyxState from '../../lib/useOnyxState';
 
-/** `collection` declares `report_`, `member` hand-declares `report_<id>`, `auto` omits `dependencies`. */
-const MODE = (process.env.UOS_DEPS ?? 'auto') as 'collection' | 'member' | 'auto';
 const COLLECTION_KEY = 'report_';
 const UPDATES = 5;
 
@@ -27,22 +24,12 @@ const seedCollection = async (size: number) => {
 
 let selectorRuns = 0;
 
-function depsFor(key: OnyxKey) {
-    if (MODE === 'collection') {
-        return {dependencies: [COLLECTION_KEY] as OnyxKey[]};
-    }
-    if (MODE === 'member') {
-        return {dependencies: [key]};
-    }
-    return undefined;
-}
-
 function Row({index}: {index: number}) {
     const key = memberKey(index);
     const name = useOnyxState((state: OnyxStateView) => {
         selectorRuns++;
         return (state[key] as Report | undefined)?.name;
-    }, depsFor(key));
+    });
     return <Text>{`row ${index}: ${name ?? ''}`}</Text>;
 }
 
@@ -60,13 +47,10 @@ function Rows({count}: {count: number}) {
 }
 
 function CollectionCount() {
-    const count = useOnyxState(
-        (state: OnyxStateView) => {
-            selectorRuns++;
-            return Object.keys((state[COLLECTION_KEY] as Record<string, Report> | undefined) ?? {}).length;
-        },
-        MODE === 'auto' ? undefined : {dependencies: [COLLECTION_KEY] as OnyxKey[]},
-    );
+    const count = useOnyxState((state: OnyxStateView) => {
+        selectorRuns++;
+        return Object.keys((state[COLLECTION_KEY] as Record<string, Report> | undefined) ?? {}).length;
+    });
     return <Text>{`count: ${count}`}</Text>;
 }
 
@@ -98,7 +82,7 @@ describe('useOnyxState auto-tracked deps (issue 3020)', () => {
     afterAll(() => {
         const output = process.env.UPDATE_TIMINGS_FILE;
         if (output) {
-            fs.writeFileSync(output, JSON.stringify({mode: MODE, stats}));
+            fs.writeFileSync(output, JSON.stringify({stats}));
         }
     });
 
