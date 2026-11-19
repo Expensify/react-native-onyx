@@ -135,6 +135,14 @@ It will also mark deep nested objects that need to be entirely replaced during t
 <dt><a href="#doAllCollectionItemsBelongToSameParent">doAllCollectionItemsBelongToSameParent()</a></dt>
 <dd><p>Verify if all the collection keys belong to the same parent</p>
 </dd>
+<dt><a href="#persistDeferredValue">persistDeferredValue()</a></dt>
+<dd><p>Writes the value the cache holds for <code>key</code> now to storage, for a set that deferred its storage write. Reading
+the cache at write time stores the latest of a burst of sets, includes merges applied since, and skips keys
+removed or cleared in the meantime.</p>
+<p>A failed write is logged and dropped rather than retried through <code>setWithRetry</code>, since that would write the
+captured value back into the cache over any newer one. The cache stays authoritative, and the next deferred set
+of the key writes it again.</p>
+</dd>
 <dt><a href="#setWithRetry">setWithRetry(params, retryAttempt)</a></dt>
 <dd><p>Writes a value to our store with the given key.
 Serves as core implementation for <code>Onyx.set()</code> public function, the difference being
@@ -412,6 +420,18 @@ Validate the collection is not empty and has a correct type before applying merg
 
 ## doAllCollectionItemsBelongToSameParent()
 Verify if all the collection keys belong to the same parent
+
+**Kind**: global function  
+<a name="persistDeferredValue"></a>
+
+## persistDeferredValue()
+Writes the value the cache holds for `key` now to storage, for a set that deferred its storage write. Reading
+the cache at write time stores the latest of a burst of sets, includes merges applied since, and skips keys
+removed or cleared in the meantime.
+
+A failed write is logged and dropped rather than retried through `setWithRetry`, since that would write the
+captured value back into the cache over any newer one. The cache stays authoritative, and the next deferred set
+of the key writes it again.
 
 **Kind**: global function  
 <a name="setWithRetry"></a>
