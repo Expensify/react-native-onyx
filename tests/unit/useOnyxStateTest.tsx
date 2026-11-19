@@ -133,6 +133,50 @@ describe('useOnyxState', () => {
 
             expect(sawCurrentBWithPreviousA).toBeTruthy();
         });
+
+        it('should keep previousState at the last committed output when an equal output is swallowed', async () => {
+            // Given a committed 'small' output computed from 0, and a selector that records the previousState it gets
+            await Onyx.set(ONYXKEYS.TEST_KEY, 0);
+            let lastPrevious: unknown;
+            renderHook(() =>
+                useOnyxState((state, previousState) => {
+                    lastPrevious = previousState?.[ONYXKEYS.TEST_KEY];
+                    return (state[ONYXKEYS.TEST_KEY] as number) >= 10 ? 'big' : 'small';
+                }),
+            );
+            await act(async () => waitForPromisesToResolve());
+
+            // When a write keeps the output equal, so nothing commits, and a second write changes it
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 1));
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 20));
+
+            // Then previousState still holds 0, so a diff covers both writes instead of losing the first one
+            expect(lastPrevious).toBe(0);
+        });
+
+        it('should pass undefined as previousState again after the hook remounts', async () => {
+            // Given a mounted hook whose previousState has advanced past a change
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'a');
+            const observed: unknown[] = [];
+            const selector = (state: OnyxStateView, previousState: OnyxStateView | undefined) => {
+                observed.push(previousState);
+                return state[ONYXKEYS.TEST_KEY];
+            };
+            const {unmount} = renderHook(() => useOnyxState(selector));
+            await act(async () => waitForPromisesToResolve());
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'b'));
+            expect(observed.at(-1)).toBeDefined();
+
+            // When it unmounts, the key changes, and it mounts again
+            unmount();
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'c'));
+            observed.length = 0;
+            renderHook(() => useOnyxState(selector));
+            await act(async () => waitForPromisesToResolve());
+
+            // Then the first run of the new mount does a full compute rather than diffing against the old mount's inputs
+            expect(observed[0]).toBeUndefined();
+        });
     });
 
     describe('previousState-dependent output (delta selectors)', () => {
@@ -179,6 +223,27 @@ describe('useOnyxState', () => {
             // A second, independent change must report only MEMBER_2 — proving `previousState`
             // advanced to the post-first-change snapshot rather than staying at the original.
             await act(async () => Onyx.merge(MEMBER_2, {v: 9}));
+            expect(result.current).toEqual([MEMBER_2]);
+        });
+
+        it('should keep a removed member in previousState so a delta can report the removal', async () => {
+            // Given two members and a delta selector that also lists members missing from the current state
+            await Onyx.mergeCollection(COLLECTION, {[MEMBER_1]: {v: 1}, [MEMBER_2]: {v: 1}} as GenericCollection);
+            const {result} = renderHook(() =>
+                useOnyxState((state, previousState) => {
+                    const current = (state[COLLECTION] ?? {}) as Record<string, unknown>;
+                    const previous = (previousState?.[COLLECTION] ?? {}) as Record<string, unknown>;
+                    return Object.keys(previous)
+                        .filter((memberKey) => !(memberKey in current))
+                        .sort();
+                }),
+            );
+            await act(async () => waitForPromisesToResolve());
+
+            // When MEMBER_2 is removed
+            await act(async () => Onyx.set(MEMBER_2, null));
+
+            // Then previousState still carries MEMBER_2, so the removal is visible to the selector
             expect(result.current).toEqual([MEMBER_2]);
         });
     });
