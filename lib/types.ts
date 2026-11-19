@@ -314,8 +314,9 @@ type SetOptions = {
     /**
      * Update the cache and notify subscribers right away, but persist to storage only once sets to the key pause
      * (and at least every few seconds). Storage then receives the latest cached value, so a burst of sets of a large,
-     * frequently recomputed value is serialized and written once instead of once per set. Use it only for values
-     * that can be rebuilt if the app closes before the write lands.
+     * frequently recomputed value is serialized and written once instead of once per set. If the app closes first,
+     * the stored copy can be a few seconds older than the rest of storage, so use it only for values that are rebuilt
+     * from their sources after a restart rather than trusted as current.
      */
     deferStorageWrite?: boolean;
 };

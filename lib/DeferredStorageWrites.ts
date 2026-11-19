@@ -1,3 +1,4 @@
+import * as Logger from './Logger';
 import type {OnyxKey} from './types';
 
 // A deferred key is persisted once writes to it pause for this long, so a burst of sets costs one storage write.
@@ -40,7 +41,9 @@ function schedule(key: OnyxKey, write: () => Promise<void>): void {
     }
     const delay = Math.max(0, Math.min(DEFERRED_WRITE_DELAY_MS, firstScheduledAt + DEFERRED_WRITE_MAX_DELAY_MS - now));
     const timer = setTimeout(() => {
-        runPendingWrite(key);
+        runPendingWrite(key).catch((error: Error) => {
+            Logger.logAlert(`Deferred storage write threw. key: ${key}. message: ${error?.message}`);
+        });
     }, delay);
     pendingDeferredWrites.set(key, {timer, firstScheduledAt, write});
 }

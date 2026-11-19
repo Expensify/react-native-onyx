@@ -1071,6 +1071,10 @@ function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, me
  * Writes the value the cache holds for `key` now to storage, for a set that deferred its storage write. Reading
  * the cache at write time stores the latest of a burst of sets, includes merges applied since, and skips keys
  * removed or cleared in the meantime.
+ *
+ * A failed write is logged and dropped rather than retried through `setWithRetry`, since that would write the
+ * captured value back into the cache over any newer one. The cache stays authoritative, and the next deferred set
+ * of the key writes it again.
  */
 function persistDeferredValue(key: OnyxKey): Promise<void> {
     const value = cache.get(key);
@@ -1079,7 +1083,9 @@ function persistDeferredValue(key: OnyxKey): Promise<void> {
     }
     return Storage.setItem(key, value)
         .then(() => StorageCircuitBreaker.recordWriteSuccess())
-        .catch((error: Error) => retryOperation(error, setWithRetry, {key, value}, undefined));
+        .catch((error: Error) => {
+            Logger.logAlert(`Deferred storage write failed and was dropped. key: ${key}. message: ${error?.message}`);
+        });
 }
 
 /**

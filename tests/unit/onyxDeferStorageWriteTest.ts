@@ -123,4 +123,18 @@ describe('Onyx.set with deferStorageWrite', () => {
         // Then storage ends with the merged value, not the older value the deferred set carried
         expect(await StorageMock.getItem(ONYX_KEYS.DERIVED)).toEqual({version: 1, extra: true});
     });
+    it('keeps the newer cached value when a deferred write fails', async () => {
+        // Given a deferred write whose storage write will fail
+        await Onyx.set(ONYX_KEYS.DERIVED, {version: 1}, {deferStorageWrite: true});
+        setItemMock.mockRejectedValueOnce(new Error('write failed'));
+        await jest.advanceTimersByTimeAsync(DeferredStorageWrites.DEFERRED_WRITE_DELAY_MS);
+
+        // When the key is set again after the failure
+        await Onyx.set(ONYX_KEYS.DERIVED, {version: 2}, {deferStorageWrite: true});
+        await jest.advanceTimersByTimeAsync(DeferredStorageWrites.DEFERRED_WRITE_DELAY_MS);
+
+        // Then the failure did not roll the cache back, and the next deferred write stored the newer value
+        expect(OnyxCache.get(ONYX_KEYS.DERIVED)).toEqual({version: 2});
+        expect(await StorageMock.getItem(ONYX_KEYS.DERIVED)).toEqual({version: 2});
+    });
 });
