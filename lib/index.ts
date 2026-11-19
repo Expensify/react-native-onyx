@@ -1,5 +1,6 @@
 import type {Connection, ConnectOptions, OnyxUpdate} from './Onyx';
 import Onyx from './Onyx';
+import createOnyxSelector from './createOnyxSelector';
 import type {
     CustomTypeOptions,
     KeyValueMapping,
@@ -23,7 +24,7 @@ import useOnyx from './useOnyx';
 import type {OnyxSQLiteKeyValuePair} from './storage/providers/SQLiteProvider';
 
 export default Onyx;
-export {useOnyx};
+export {createOnyxSelector, useOnyx};
 export type {
     ConnectOptions,
     CustomTypeOptions,
