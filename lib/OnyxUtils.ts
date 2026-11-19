@@ -6,6 +6,7 @@ import type Onyx from './Onyx';
 import cache, {TASK} from './OnyxCache';
 import OnyxKeys from './OnyxKeys';
 import PendingWrites from './PendingWrites';
+import DeferredStorageWrites from './DeferredStorageWrites';
 import StorageCircuitBreaker from './StorageCircuitBreaker';
 import onyxSubscriptionManager from './OnyxSubscriptionManager';
 import Storage from './storage';
@@ -1067,6 +1068,21 @@ function updateSnapshots<TKey extends OnyxKey>(data: Array<OnyxUpdate<TKey>>, me
 }
 
 /**
+ * Writes the value the cache holds for `key` now to storage, for a set that deferred its storage write. Reading
+ * the cache at write time stores the latest of a burst of sets, includes merges applied since, and skips keys
+ * removed or cleared in the meantime.
+ */
+function persistDeferredValue(key: OnyxKey): Promise<void> {
+    const value = cache.get(key);
+    if (value === undefined || value === null) {
+        return Promise.resolve();
+    }
+    return Storage.setItem(key, value)
+        .then(() => StorageCircuitBreaker.recordWriteSuccess())
+        .catch((error: Error) => retryOperation(error, setWithRetry, {key, value}, undefined));
+}
+
+/**
  * Writes a value to our store with the given key.
  * Serves as core implementation for `Onyx.set()` public function, the difference being
  * that this internal function allows passing an additional `retryAttempt` parameter to retry on failure.
@@ -1082,6 +1098,12 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
     // before the value was set. If Onyx.merge is currently reading the old value from storage, it will then not apply the changes.
     if (OnyxUtils.hasPendingMergeForKey(key)) {
         delete OnyxUtils.getMergeQueue()[key];
+    }
+
+    // A set that persists right away makes a deferred write of an older value obsolete. A retry is left out: it
+    // rewrites the value of a failed write, which a deferred write scheduled since then is newer than.
+    if (!options?.deferStorageWrite && !retryAttempt) {
+        DeferredStorageWrites.cancel(key);
     }
 
     if (skippableCollectionMemberIDs.size) {
@@ -1146,6 +1168,12 @@ function setWithRetry<TKey extends OnyxKey>({key, value, options}: SetParams<TKe
     // If a key is a RAM-only key or a member of RAM-only collection, we skip the step that modifies the storage
     if (OnyxKeys.isRamOnlyKey(key)) {
         OnyxUtils.sendActionToDevTools(OnyxUtils.METHOD.SET, key, valueWithoutNestedNullValues);
+        return Promise.resolve();
+    }
+
+    if (options?.deferStorageWrite) {
+        sendActionToDevTools(METHOD.SET, key, valueWithoutNestedNullValues);
+        DeferredStorageWrites.schedule(key, () => persistDeferredValue(key));
         return Promise.resolve();
     }
 
@@ -1700,6 +1728,7 @@ function clearOnyxUtilsInternals() {
     mergeQueue = {};
     mergeQueuePromise = {};
     PendingWrites.clearPendingWrites();
+    DeferredStorageWrites.cancelAll();
 }
 
 const OnyxUtils = {

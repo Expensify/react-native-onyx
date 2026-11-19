@@ -310,6 +310,14 @@ type OnyxUpdate<TKey extends OnyxKey> = {
 type SetOptions = {
     /** Skip the deep equality check against the cached value. Improves performance for large objects. */
     skipCacheCheck?: boolean;
+
+    /**
+     * Update the cache and notify subscribers right away, but persist to storage only once sets to the key pause
+     * (and at least every few seconds). Storage then receives the latest cached value, so a burst of sets of a large,
+     * frequently recomputed value is serialized and written once instead of once per set. Use it only for values
+     * that can be rebuilt if the app closes before the write lands.
+     */
+    deferStorageWrite?: boolean;
 };
 
 type SetParams<TKey extends OnyxKey> = {

@@ -31,6 +31,7 @@ import type {
 import OnyxUtils from './OnyxUtils';
 import OnyxKeys from './OnyxKeys';
 import PendingWrites from './PendingWrites';
+import DeferredStorageWrites from './DeferredStorageWrites';
 import logMessages from './logMessages';
 import onyxSubscriptionManager from './OnyxSubscriptionManager';
 import OnyxMerge from './OnyxMerge';
@@ -434,6 +435,9 @@ function mergeCollection<TKey extends CollectionKeyBase>(collectionKey: TKey, co
  * @param keysToPreserve is a list of ONYXKEYS that should not be cleared with the rest of the data
  */
 function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
+    // A deferred write landing after storage clears would bring back a value clear removed.
+    DeferredStorageWrites.cancelAll((key) => keysToPreserve.some((preserveKey) => OnyxKeys.isKeyMatch(preserveKey, key)));
+
     // Writes can land while storage clears (e.g. a new sign-in's session), so record them to avoid clobbering them.
     // Matching on values instead would confuse them with reads refilling the cache from storage.
     const keysWrittenDuringClear = new Set<OnyxKey>();
