@@ -12,6 +12,7 @@ import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 // so this workaround allows us to have access to them. The maps are created once in the constructor
 // and only ever `.clear()`ed (never reassigned), so capturing the references here stays valid.
 const keyListeners = onyxSubscriptionManager['keyListeners'];
+const stateListenersByDep = onyxSubscriptionManager['stateListenersByDep'];
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -238,6 +239,166 @@ describe('OnyxSubscriptionManager', () => {
         });
     });
 
+    describe('subscribeState', () => {
+        it('should fire a state listener when one of its deps changes', () => {
+            const callback = jest.fn();
+            onyxSubscriptionManager.subscribeState(callback, [ONYXKEYS.TEST_KEY]);
+
+            onyxSubscriptionManager.notifyKey(ONYXKEYS.TEST_KEY, 'x');
+
+            expect(callback).toHaveBeenCalledTimes(1);
+        });
+
+        it('should not fire when a non-dependency key changes', () => {
+            const callback = jest.fn();
+            onyxSubscriptionManager.subscribeState(callback, [ONYXKEYS.TEST_KEY]);
+
+            onyxSubscriptionManager.notifyKey(ONYXKEYS.OTHER_TEST, 'x');
+
+            expect(callback).not.toHaveBeenCalled();
+        });
+
+        it('should fire a listener that depends on a collection key when a member is written', () => {
+            const callback = jest.fn();
+            onyxSubscriptionManager.subscribeState(callback, [COLLECTION]);
+
+            onyxSubscriptionManager.notifyKey(MEMBER_1, {id: 1});
+
+            expect(callback).toHaveBeenCalledTimes(1);
+        });
+
+        it('should fire only once when a listener depends on both a member and its collection key', () => {
+            const callback = jest.fn();
+            onyxSubscriptionManager.subscribeState(callback, [MEMBER_1, COLLECTION]);
+
+            onyxSubscriptionManager.notifyKey(MEMBER_1, {id: 1});
+
+            expect(callback).toHaveBeenCalledTimes(1);
+        });
+
+        it('should fire collection and member state listeners once each on notifyCollection', () => {
+            jest.spyOn(cache, 'getCollectionData').mockReturnValue({[MEMBER_1]: {id: 1}, [MEMBER_2]: {id: 2}});
+
+            const collectionCallback = jest.fn();
+            const member1Callback = jest.fn();
+            const bothCallback = jest.fn();
+            onyxSubscriptionManager.subscribeState(collectionCallback, [COLLECTION]);
+            onyxSubscriptionManager.subscribeState(member1Callback, [MEMBER_1]);
+            onyxSubscriptionManager.subscribeState(bothCallback, [COLLECTION, MEMBER_1]);
+
+            onyxSubscriptionManager.notifyCollection(COLLECTION, {[MEMBER_1]: {id: 1}, [MEMBER_2]: {id: 2}});
+
+            expect(collectionCallback).toHaveBeenCalledTimes(1);
+            expect(member1Callback).toHaveBeenCalledTimes(1);
+            expect(bothCallback).toHaveBeenCalledTimes(1);
+        });
+
+        it('should not fire a member state listener on notifyCollection when that member did not change', () => {
+            // Given a batch that re-sends one member with the reference it already had and changes another
+            const unchangedMember = {id: 1};
+            const changedMember = {id: 2};
+            jest.spyOn(cache, 'getCollectionData').mockReturnValue({[MEMBER_1]: unchangedMember, [MEMBER_2]: changedMember});
+            const unchangedCallback = jest.fn();
+            const changedCallback = jest.fn();
+            onyxSubscriptionManager.subscribeState(unchangedCallback, [MEMBER_1]);
+            onyxSubscriptionManager.subscribeState(changedCallback, [MEMBER_2]);
+
+            // When the batch is dispatched with the previous values
+            onyxSubscriptionManager.notifyCollection(COLLECTION, {[MEMBER_1]: unchangedMember, [MEMBER_2]: changedMember}, {[MEMBER_1]: unchangedMember, [MEMBER_2]: {id: 0}});
+
+            // Then only the listener of the changed member fires, the same way exact-key subscribers are skipped
+            expect(unchangedCallback).not.toHaveBeenCalled();
+            expect(changedCallback).toHaveBeenCalledTimes(1);
+        });
+
+        it('should fire a member state listener on notifyCollection when the previous collection does not carry that member', () => {
+            // Given a batch whose previous collection says nothing about the member, so it cannot be proven unchanged
+            const member = {id: 1};
+            jest.spyOn(cache, 'getCollectionData').mockReturnValue({[MEMBER_1]: member});
+            const callback = jest.fn();
+            onyxSubscriptionManager.subscribeState(callback, [MEMBER_1]);
+
+            // When the batch is dispatched
+            onyxSubscriptionManager.notifyCollection(COLLECTION, {[MEMBER_1]: member}, {});
+
+            // Then the listener fires
+            expect(callback).toHaveBeenCalledTimes(1);
+        });
+
+        it('should fire a listener only once when it re-subscribes with more deps during the dispatch', () => {
+            // Given a listener on a member that, once fired, moves its subscription to the member and its collection
+            let unsubscribe: () => void = () => {};
+            const callback = jest.fn(() => {
+                unsubscribe();
+                unsubscribe = onyxSubscriptionManager.subscribeState(callback, [MEMBER_1, COLLECTION]);
+            });
+            unsubscribe = onyxSubscriptionManager.subscribeState(callback, [MEMBER_1]);
+
+            // When the member changes, which dispatches to the member dep and then to the collection dep
+            onyxSubscriptionManager.notifyKey(MEMBER_1, {id: 1});
+
+            // Then the listener fired once, because the new subscription belongs to a listener this dispatch already reached
+            expect(callback).toHaveBeenCalledTimes(1);
+        });
+
+        it('should fire a listener only once when it re-subscribes to another changed member during notifyCollection', () => {
+            // Given a listener on one member that, once fired, moves its subscription to both changed members
+            jest.spyOn(cache, 'getCollectionData').mockReturnValue({[MEMBER_1]: {id: 1}, [MEMBER_2]: {id: 2}});
+            let unsubscribe: () => void = () => {};
+            const callback = jest.fn(() => {
+                unsubscribe();
+                unsubscribe = onyxSubscriptionManager.subscribeState(callback, [MEMBER_1, MEMBER_2]);
+            });
+            unsubscribe = onyxSubscriptionManager.subscribeState(callback, [MEMBER_1]);
+
+            // When a batch changes both members
+            onyxSubscriptionManager.notifyCollection(COLLECTION, {[MEMBER_1]: {id: 1}, [MEMBER_2]: {id: 2}});
+
+            // Then the listener fired once for the whole batch
+            expect(callback).toHaveBeenCalledTimes(1);
+        });
+
+        it('should fire on a change to any of several deps', () => {
+            const callback = jest.fn();
+            onyxSubscriptionManager.subscribeState(callback, [ONYXKEYS.TEST_KEY, ONYXKEYS.OTHER_TEST]);
+
+            onyxSubscriptionManager.notifyKey(ONYXKEYS.TEST_KEY, 'a');
+            onyxSubscriptionManager.notifyKey(ONYXKEYS.OTHER_TEST, 'b');
+
+            expect(callback).toHaveBeenCalledTimes(2);
+        });
+
+        it('should stop firing after unsubscribe and clean up the dep index', () => {
+            const callback = jest.fn();
+            const unsubscribe = onyxSubscriptionManager.subscribeState(callback, [ONYXKEYS.TEST_KEY]);
+            expect(stateListenersByDep.has(ONYXKEYS.TEST_KEY)).toBeTruthy();
+
+            unsubscribe();
+            expect(stateListenersByDep.has(ONYXKEYS.TEST_KEY)).toBeFalsy();
+
+            onyxSubscriptionManager.notifyKey(ONYXKEYS.TEST_KEY, 'x');
+            expect(callback).not.toHaveBeenCalled();
+        });
+
+        it('should isolate a throwing state listener and still fire the others', () => {
+            const logAlertSpy = jest.spyOn(Logger, 'logAlert').mockImplementation(() => {
+                /* empty */
+            });
+            const throwingCallback = jest.fn(() => {
+                throw new Error('boom');
+            });
+            const healthyCallback = jest.fn();
+            onyxSubscriptionManager.subscribeState(throwingCallback, [ONYXKEYS.TEST_KEY]);
+            onyxSubscriptionManager.subscribeState(healthyCallback, [ONYXKEYS.TEST_KEY]);
+
+            expect(() => onyxSubscriptionManager.notifyKey(ONYXKEYS.TEST_KEY, 'x')).not.toThrow();
+
+            expect(throwingCallback).toHaveBeenCalledTimes(1);
+            expect(healthyCallback).toHaveBeenCalledTimes(1);
+            expect(logAlertSpy).toHaveBeenCalled();
+        });
+    });
+
     describe('hasListenersForKey', () => {
         it('should return true for an exact-key subscriber', () => {
             onyxSubscriptionManager.subscribe(ONYXKEYS.TEST_KEY, jest.fn());
@@ -256,6 +417,31 @@ describe('OnyxSubscriptionManager', () => {
         it('should return false after the last listener unsubscribes', () => {
             const unsubscribe = onyxSubscriptionManager.subscribe(ONYXKEYS.TEST_KEY, jest.fn());
             unsubscribe();
+            expect(onyxSubscriptionManager.hasListenersForKey(ONYXKEYS.TEST_KEY)).toBeFalsy();
+        });
+
+        it('should return true for a key a state listener depends on', () => {
+            // Given a state listener, which is what `useOnyxState` registers, and no exact-key subscriber
+            onyxSubscriptionManager.subscribeState(jest.fn(), [ONYXKEYS.TEST_KEY]);
+
+            // Then the key counts as listened to, because a write to it fires that listener
+            expect(onyxSubscriptionManager.hasListenersForKey(ONYXKEYS.TEST_KEY)).toBeTruthy();
+        });
+
+        it('should return true for a member key when a state listener depends on its collection', () => {
+            // Given a state listener on the collection root only
+            onyxSubscriptionManager.subscribeState(jest.fn(), [COLLECTION]);
+
+            // Then a member counts as listened to, because a member write fires collection deps
+            expect(onyxSubscriptionManager.hasListenersForKey(MEMBER_1)).toBeTruthy();
+        });
+
+        it('should return false after the last state listener unsubscribes', () => {
+            // Given a state listener that has been removed
+            const unsubscribe = onyxSubscriptionManager.subscribeState(jest.fn(), [ONYXKEYS.TEST_KEY]);
+            unsubscribe();
+
+            // Then nothing listens to the key any more
             expect(onyxSubscriptionManager.hasListenersForKey(ONYXKEYS.TEST_KEY)).toBeFalsy();
         });
     });

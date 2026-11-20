@@ -168,6 +168,34 @@ if (reportsResult.status === 'loading' || sessionResult.status === 'loading') {
 // rest of the component's code.
 ```
 
+### Deriving a value from several keys with useOnyxState()
+
+`useOnyxState()` returns one value computed from any number of Onyx keys. The selector receives a read-only `state` view and reads keys from it by name. The hook subscribes to exactly the keys the selector read, and the component re-renders only when the selector's output changes.
+
+```javascript
+import {useOnyxState} from 'react-native-onyx';
+
+const ReportTitle = ({reportID}) => {
+    const title = useOnyxState((state) => {
+        const report = state[`${ONYXKEYS.COLLECTION.REPORT}${reportID}`];
+        const policy = state[`${ONYXKEYS.COLLECTION.POLICY}${report?.policyID}`];
+        return `${report?.reportName ?? ''} (${policy?.name ?? ''})`;
+    });
+
+    return <Text>{title}</Text>;
+};
+```
+
+Things to know:
+
+* Reading a collection member key such as `report_1` subscribes to that member only. Reading a collection key such as `report_` returns the whole collection and re-runs the selector whenever any member changes.
+* The keys are recorded on every run, so a key read behind a condition or looked up through another key is followed as soon as the selector reads it.
+* Read every key while the selector runs. Reading `state` later, for example from a function the selector returned, throws.
+* `state` cannot be enumerated. `Object.keys(state)`, a spread or `for...in` throws. Read a collection key to get all its members.
+* The output is compared with the previous one by `===`, then by deep equality for objects, and an equal output keeps the previous reference. Pass `selectorEquality` in the second argument to replace this. A value returned straight from the store, such as `state[key]`, is compared by reference only.
+* The hook returns the value directly and has no `status`. Before `Onyx.init()` has loaded the stored data the selector sees an empty state, and runs again once the data is there.
+* A write that changes several of the keys one by one, such as `Onyx.multiSet()` on non-collection keys, runs the selector once per changed key. The component still renders once.
+
 ### Dependent Onyx Keys and useOnyx()
 Some components need to subscribe to multiple Onyx keys at once and sometimes, one key might rely on the data from another key. This is similar to a JOIN in SQL.
 
