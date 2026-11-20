@@ -240,7 +240,7 @@ describe('OnyxSubscriptionManager', () => {
     });
 
     describe('subscribeState', () => {
-        it('should fire a state listener when one of its declared deps changes', () => {
+        it('should fire a state listener when one of its deps changes', () => {
             const callback = jest.fn();
             onyxSubscriptionManager.subscribeState(callback, [ONYXKEYS.TEST_KEY]);
 
@@ -358,7 +358,7 @@ describe('OnyxSubscriptionManager', () => {
             expect(callback).toHaveBeenCalledTimes(1);
         });
 
-        it('should fire on a change to any of several declared deps', () => {
+        it('should fire on a change to any of several deps', () => {
             const callback = jest.fn();
             onyxSubscriptionManager.subscribeState(callback, [ONYXKEYS.TEST_KEY, ONYXKEYS.OTHER_TEST]);
 

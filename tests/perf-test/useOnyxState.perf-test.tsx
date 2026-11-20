@@ -57,7 +57,7 @@ const runUpdates = async (update: (step: number) => Promise<void>) => {
     }
 };
 
-describe('useOnyxState auto-tracked deps', () => {
+describe('useOnyxState', () => {
     beforeAll(() => {
         Onyx.init({keys: {COLLECTION: {REPORT: COLLECTION_KEY}}});
     });

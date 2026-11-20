@@ -16,7 +16,7 @@ type Listener<TKey extends OnyxKey = OnyxKey> = (value: OnyxValue<TKey>, key: TK
  */
 type GenericListener = (value: unknown, key: OnyxKey) => void;
 
-/** Listener fired when any of a state listener's declared dependency keys changes. Used by `useOnyxState`. */
+/** Listener fired when any of a state listener's dependency keys changes. Used by `useOnyxState`. */
 type StateListenerCallback = () => void;
 
 type StateListenerEntry = {
@@ -54,8 +54,8 @@ function reportCacheMissIfStorageHasValue(key: OnyxKey): void {
  * OnyxSubscriptionManager is a registry for Onyx subscriptions, backed by two indexes:
  *    - keyListeners:        exact-key listeners, keyed by OnyxKey (a single key, a collection object,
  *                           or a collection member). Notified via `notifyKey`/`notifyCollection`.
- *    - stateListenersByDep: listeners that re-evaluate when any of their declared dependency keys
- *                           change, indexed by dep key. Used by `useOnyxState`.
+ *    - stateListenersByDep: listeners that re-evaluate when any of their dependency keys change,
+ *                           indexed by dep key. Used by `useOnyxState`.
  */
 class OnyxSubscriptionManager {
     private keyListeners: Map<OnyxKey, Set<GenericListener>>;
@@ -115,8 +115,8 @@ class OnyxSubscriptionManager {
     }
 
     /**
-     * Subscribe to state-tree changes. The listener fires when any of the declared dependency keys
-     * changes. A collection key counts as a single dep: any member change fires it. Used by `useOnyxState`.
+     * Subscribe to state-tree changes. The listener fires when any of the dependency keys changes.
+     * A collection key counts as a single dep: any member change fires it. Used by `useOnyxState`.
      *
      * Returns an unsubscribe function.
      */
@@ -225,14 +225,15 @@ class OnyxSubscriptionManager {
         // Only treat a member as unchanged when `previous` actually carries it: when the
         // previous collection is omitted, a removed member reads `undefined` on both sides
         // and would otherwise be skipped even though it changed.
-        const changedMemberKeys: string[] = [];
+        const hasStateListeners = this.stateListenersByDep.size > 0;
+        const changedMemberKeys: string[] | null = hasStateListeners ? [] : null;
         for (const memberKey of changedKeys) {
             const value = collectionData?.[memberKey];
             const prev = partialPreviousCollection?.[memberKey];
             if (partialPreviousCollection && Object.prototype.hasOwnProperty.call(partialPreviousCollection, memberKey) && value === prev) {
                 continue;
             }
-            changedMemberKeys.push(memberKey);
+            changedMemberKeys?.push(memberKey);
 
             const exact = this.keyListeners.get(memberKey);
             if (!exact || exact.size === 0) {
@@ -246,7 +247,7 @@ class OnyxSubscriptionManager {
 
         // 3. State listeners, each fired at most once across the collection and its members. Members
         // that step 2 found unchanged are skipped here too.
-        if (this.stateListenersByDep.size === 0) {
+        if (changedMemberKeys === null) {
             return;
         }
         const fired = new Set<StateListenerCallback>();
@@ -320,4 +321,4 @@ class OnyxSubscriptionManager {
 const onyxSubscriptionManager = new OnyxSubscriptionManager();
 
 export default onyxSubscriptionManager;
-export type {Listener, StateListenerCallback};
+export type {Listener};

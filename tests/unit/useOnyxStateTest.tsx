@@ -178,7 +178,7 @@ describe('useOnyxState', () => {
             await act(async () => Onyx.merge(MEMBER_1, {id: 10}));
             const collectionAfter = result.current;
 
-            // Then the hook returned the new snapshot without walking both collections: the store only
+            // Then the hook returned the new snapshot without walking both collections: a merge only
             // replaces a reference when the content changed, so the comparison could never succeed
             expect(collectionAfter).not.toBe(collectionBefore);
             expect(jest.mocked(deepEqual).mock.calls.some(([a, b]) => a === collectionBefore && b === collectionAfter)).toBe(false);

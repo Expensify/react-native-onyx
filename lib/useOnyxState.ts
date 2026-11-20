@@ -35,22 +35,29 @@ type UseOnyxStateOptions<T> = {
     /**
      * Equality for the selector's output. Defaults to `===` with a deep-equal fallback for objects.
      * When it returns true, the React update is skipped.
+     *
+     * The default does not deep-compare an output that is a value read straight from the store, such
+     * as `state[key]`: a new reference there is returned as a new value, the way `useOnyx` without a
+     * selector returns it.
      */
     selectorEquality?: (a: T, b: T) => boolean;
 };
 
-/** Collects the keys the running selector reads from the state view, `null` when nothing is recording. */
-let activeRecorder: Set<OnyxKey> | null = null;
+/** Collects the keys the running selector reads from the state view and their values, `null` when nothing is recording. */
+let activeRecorder: Map<OnyxKey, OnyxValue<OnyxKey>> | null = null;
 
 /**
- * Records `key` as a dependency of the running selector. Throws when no selector is running: such a
- * read, say from a closure the selector returned, cannot be subscribed to and would never refresh.
+ * Reads `key` from the store and records it as a dependency of the running selector. Throws when no
+ * selector is running: such a read, say from a closure the selector returned, cannot be subscribed to
+ * and would never refresh.
  */
-function recordRead(key: OnyxKey): void {
+function readAndRecord(key: OnyxKey): OnyxValue<OnyxKey> {
     if (activeRecorder === null) {
         throw new Error(`useOnyxState: "${key}" was read from the state view outside a selector. Read every key while the selector runs.`);
     }
-    activeRecorder.add(key);
+    const value = onyxSubscriptionManager.getState(key);
+    activeRecorder.set(key, value);
+    return value;
 }
 
 /** A key list cannot be recorded as a dependency, so enumerating would answer once and never update. */
@@ -66,8 +73,7 @@ const liveStateView = new Proxy<Record<string, never>>(
             if (typeof prop !== 'string') {
                 return undefined;
             }
-            recordRead(prop);
-            return onyxSubscriptionManager.getState(prop);
+            return readAndRecord(prop);
         },
         set() {
             // Read-only: the selector must not mutate the view.
@@ -80,8 +86,7 @@ const liveStateView = new Proxy<Record<string, never>>(
             if (typeof prop !== 'string') {
                 return false;
             }
-            recordRead(prop);
-            return onyxSubscriptionManager.getState(prop) !== undefined;
+            return readAndRecord(prop) !== undefined;
         },
         ownKeys: throwOnEnumeration,
         getOwnPropertyDescriptor: throwOnEnumeration,
@@ -96,19 +101,19 @@ type SnapshotCache<T> = {
     depValues: Array<OnyxValue<OnyxKey>>;
 };
 
-/** Runs the selector with `liveStateView` recording, and returns the set of keys it read. */
-function recordReads<T>(run: () => T): {output: T; keys: Set<OnyxKey>} {
-    const keys = new Set<OnyxKey>();
+/** Runs the selector with `liveStateView` recording, and returns the keys it read with their values. */
+function recordReads<T>(run: () => T): {output: T; reads: Map<OnyxKey, OnyxValue<OnyxKey>>} {
+    const reads = new Map<OnyxKey, OnyxValue<OnyxKey>>();
     const outerRecorder = activeRecorder;
-    activeRecorder = keys;
+    activeRecorder = reads;
     try {
-        return {output: run(), keys};
+        return {output: run(), reads};
     } finally {
         activeRecorder = outerRecorder;
     }
 }
 
-function isSameKeySet(keys: readonly OnyxKey[], recorded: Set<OnyxKey>): boolean {
+function isSameKeySet(keys: readonly OnyxKey[], recorded: Map<OnyxKey, OnyxValue<OnyxKey>>): boolean {
     return keys.length === recorded.size && keys.every((key) => recorded.has(key));
 }
 
@@ -142,8 +147,10 @@ function defaultSelectorEquality<T>(a: T, b: T): boolean {
 /**
  * Compares a new selector output with the previous one. An output that is one of the values the
  * selector read from the store, say a whole collection, is settled by `===` under the default
- * equality: the store only replaces a reference when the content changed, so a deep comparison
- * would walk both values and always answer false.
+ * equality. `set` and `merge` only replace a reference when the content changed, so a deep comparison
+ * would walk both values and nearly always answer false. `multiSet`, `setCollection` and a write synced
+ * from another tab replace the reference even when the content is equal, and such an output then
+ * comes back as a new reference.
  */
 function isOutputEqual<T>(previousOutput: T, output: T, depValues: Array<OnyxValue<OnyxKey>>, selectorEquality: (a: T, b: T) => boolean): boolean {
     if (Object.is(previousOutput, output)) {
@@ -205,15 +212,16 @@ function useOnyxState<T>(selector: UseOnyxStateSelector<T>, options: UseOnyxStat
             }
         }
 
-        // React's store-change handler calls the committed `getSnapshot` synchronously, so once it returns
-        // the latest run's keys are in the committed snapshotter. Moving the subscription here rather
-        // than only after a commit matters when a run reads a new key but returns an equal output:
-        // nothing commits then.
+        // Moving the subscription here rather than only after a commit matters when a run reads a new key
+        // but returns an equal output: nothing commits then.
         function handleStoreChange() {
             if (!isActive) {
                 return;
             }
             onStoreChange();
+            // React's store-change handler has normally just run the committed `getSnapshot`, which makes
+            // this call a cached read. Running it here keeps the keys current without relying on that.
+            committedSnapshotterRef.current?.getSnapshot();
             syncKeys();
         }
         syncKeysRef.current = syncKeys;
@@ -252,10 +260,10 @@ function useOnyxState<T>(selector: UseOnyxStateSelector<T>, options: UseOnyxStat
                 return previous.value;
             }
 
-            const {output, keys} = recordReads(() => selector(liveStateView));
+            const {output, reads} = recordReads(() => selector(liveStateView));
             // Keep the previous array while the set is unchanged, so `syncKeys` can tell by reference.
-            const deps = previous !== null && isSameKeySet(previous.deps, keys) ? previous.deps : [...keys];
-            const depValues = deps.map((dep) => onyxSubscriptionManager.getState(dep));
+            const deps = previous !== null && isSameKeySet(previous.deps, reads) ? previous.deps : [...reads.keys()];
+            const depValues = deps.map((dep) => reads.get(dep));
 
             // Hand back the previous reference when the output is equal, so React bails out via `===`
             // and an unchanged store keeps returning the same value even as `getSnapshot`'s identity moves.
@@ -270,7 +278,7 @@ function useOnyxState<T>(selector: UseOnyxStateSelector<T>, options: UseOnyxStat
     // Declared before `useSyncExternalStore` so that on mount it runs ahead of `subscribe`, which reads it.
     useEffect(() => {
         committedSnapshotterRef.current = snapshotter;
-    });
+    }, [snapshotter]);
 
     const value = useSyncExternalStore(subscribe, snapshotter.getSnapshot);
 
