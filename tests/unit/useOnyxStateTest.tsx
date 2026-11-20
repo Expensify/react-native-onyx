@@ -327,6 +327,62 @@ describe('useOnyxState', () => {
         });
     });
 
+    describe('state view misuse', () => {
+        beforeEach(() => {
+            // React logs the error a throwing render raises; keep the test output readable.
+            jest.spyOn(console, 'error').mockImplementation(() => {});
+        });
+
+        afterEach(() => {
+            jest.restoreAllMocks();
+        });
+
+        it.each([
+            ['Object.keys', (state: OnyxStateView): unknown => Object.keys(state)],
+            ['spread', (state: OnyxStateView): unknown => ({...state})],
+            [
+                'for...in',
+                (state: OnyxStateView): unknown => {
+                    const keys: string[] = [];
+                    // eslint-disable-next-line guard-for-in, no-restricted-syntax
+                    for (const key in state) {
+                        keys.push(key);
+                    }
+                    return keys;
+                },
+            ],
+            ['hasOwnProperty', (state: OnyxStateView): unknown => Object.prototype.hasOwnProperty.call(state, ONYXKEYS.TEST_KEY)],
+        ])('should throw when the selector enumerates the state view with %s', async (_name, enumerate) => {
+            // Given a stored key, so a working enumeration would have something to list
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'value');
+
+            // When a selector enumerates the view, which cannot record a dependency
+            // Then it throws rather than answering as an empty object the hook would never update
+            expect(() => renderHook(() => useOnyxState(enumerate))).toThrow('cannot be enumerated');
+        });
+
+        it('should throw when the state view is read after the selector returned', async () => {
+            // Given a state view that outlived its selector run, as a closure returned by the selector would hold it
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'value');
+            const captured: {state?: OnyxStateView} = {};
+            renderHook(() =>
+                useOnyxState((state) => {
+                    captured.state = state;
+                    return null;
+                }),
+            );
+            const state = captured.state;
+            if (state === undefined) {
+                throw new Error('The selector did not run');
+            }
+
+            // When it is read with no selector running, so the read cannot be recorded as a dependency
+            // Then it throws rather than returning a value the hook will never refresh
+            expect(() => state[ONYXKEYS.TEST_KEY]).toThrow('outside a selector');
+            expect(() => ONYXKEYS.TEST_KEY in state).toThrow('outside a selector');
+        });
+    });
+
     describe('render that never commits', () => {
         /**
          * Mounts a row that reads TEST_KEY's length. `abandonRender` re-renders it in a transition with

@@ -39,14 +39,35 @@ type UseOnyxStateOptions<T> = {
     selectorEquality?: (a: T, b: T) => boolean;
 };
 
-/** Builds a lazy, sealed Proxy over `snapshotProvider`. */
-function createStateView(snapshotProvider: (key: OnyxKey) => OnyxValue<OnyxKey>): OnyxStateView {
-    const handler: ProxyHandler<Record<string, never>> = {
+/** Collects the keys the running selector reads from the state view, `null` when nothing is recording. */
+let activeRecorder: Set<OnyxKey> | null = null;
+
+/**
+ * Records `key` as a dependency of the running selector. Throws when no selector is running: such a
+ * read, say from a closure the selector returned, cannot be subscribed to and would never refresh.
+ */
+function recordRead(key: OnyxKey): void {
+    if (activeRecorder === null) {
+        throw new Error(`useOnyxState: "${key}" was read from the state view outside a selector. Read every key while the selector runs.`);
+    }
+    activeRecorder.add(key);
+}
+
+/** A key list cannot be recorded as a dependency, so enumerating would answer once and never update. */
+function throwOnEnumeration(): never {
+    throw new Error('useOnyxState: the state view cannot be enumerated. Read keys by name, or read a collection key to get all its members.');
+}
+
+/** Read-only Proxy over the store that records every key read through it. */
+const liveStateView = new Proxy<Record<string, never>>(
+    {},
+    {
         get(_target, prop) {
             if (typeof prop !== 'string') {
                 return undefined;
             }
-            return snapshotProvider(prop);
+            recordRead(prop);
+            return onyxSubscriptionManager.getState(prop);
         },
         set() {
             // Read-only: the selector must not mutate the view.
@@ -59,19 +80,13 @@ function createStateView(snapshotProvider: (key: OnyxKey) => OnyxValue<OnyxKey>)
             if (typeof prop !== 'string') {
                 return false;
             }
-            return snapshotProvider(prop) !== undefined;
+            recordRead(prop);
+            return onyxSubscriptionManager.getState(prop) !== undefined;
         },
-    };
-    return new Proxy<Record<string, never>>({}, handler);
-}
-
-/** Collects the keys the running selector reads from `liveStateView`, `null` when nothing is recording. */
-let activeRecorder: Set<OnyxKey> | null = null;
-
-const liveStateView = createStateView((key) => {
-    activeRecorder?.add(key);
-    return onyxSubscriptionManager.getState(key);
-});
+        ownKeys: throwOnEnumeration,
+        getOwnPropertyDescriptor: throwOnEnumeration,
+    },
+) as OnyxStateView;
 
 type SnapshotCache<T> = {
     value: T;

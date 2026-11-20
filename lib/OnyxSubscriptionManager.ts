@@ -179,7 +179,7 @@ class OnyxSubscriptionManager {
         }
 
         // 3. State listeners, fired at most once even when both the member and its collection key match.
-        const fired = new Set<StateListenerEntry>();
+        const fired = new Set<StateListenerCallback>();
         this.fireStateListenersForDep(key, fired);
         if (isCollectionMemberWrite) {
             this.fireStateListenersForDep(collectionKey, fired);
@@ -239,7 +239,7 @@ class OnyxSubscriptionManager {
         }
 
         // 3. State listeners, each affected entry fired at most once across the collection and its members.
-        const fired = new Set<StateListenerEntry>();
+        const fired = new Set<StateListenerCallback>();
         this.fireStateListenersForDep(collectionKey, fired);
         for (const memberKey of changedKeys) {
             this.fireStateListenersForDep(memberKey, fired);
@@ -263,30 +263,34 @@ class OnyxSubscriptionManager {
      * True if there are any subscribers for the given key (exact or parent collection).
      */
     hasListenersForKey(key: OnyxKey): boolean {
-        if ((this.keyListeners.get(key)?.size ?? 0) > 0) {
+        if (this.hasListenersForExactKey(key)) {
             return true;
         }
 
         const collectionKey = OnyxKeys.getCollectionKey(key);
-        if (collectionKey && collectionKey !== key && (this.keyListeners.get(collectionKey)?.size ?? 0) > 0) {
-            return true;
-        }
-
-        return false;
+        return collectionKey !== undefined && collectionKey !== key && this.hasListenersForExactKey(collectionKey);
     }
 
-    /** Fires each state listener registered on `depKey`, skipping any already fired this dispatch. */
-    private fireStateListenersForDep(depKey: OnyxKey, alreadyFired: Set<StateListenerEntry>): void {
+    private hasListenersForExactKey(key: OnyxKey): boolean {
+        return (this.keyListeners.get(key)?.size ?? 0) > 0 || (this.stateListenersByDep.get(key)?.size ?? 0) > 0;
+    }
+
+    /**
+     * Fires each state listener registered on `depKey`, skipping any already fired this dispatch.
+     * Tracked by callback rather than by entry: a listener that re-subscribes while it runs gets a
+     * new entry, which a later dep of the same dispatch would otherwise fire again.
+     */
+    private fireStateListenersForDep(depKey: OnyxKey, alreadyFired: Set<StateListenerCallback>): void {
         const set = this.stateListenersByDep.get(depKey);
         if (!set || set.size === 0) {
             return;
         }
 
         for (const entry of [...set]) {
-            if (alreadyFired.has(entry)) {
+            if (alreadyFired.has(entry.listener)) {
                 continue;
             }
-            alreadyFired.add(entry);
+            alreadyFired.add(entry.listener);
             this.safeInvoke(entry.listener, depKey);
         }
     }
