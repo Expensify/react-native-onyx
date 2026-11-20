@@ -1,7 +1,6 @@
 import {act, renderHook} from '@testing-library/react-native';
 
 import type {OnyxStateView} from '../../lib/useOnyxState';
-import type GenericCollection from '../utils/GenericCollection';
 
 import Onyx from '../../lib';
 import {resetDeferredInitTask} from '../../lib/OnyxUtils';
@@ -20,6 +19,18 @@ const ONYXKEYS = {
 const COLLECTION = ONYXKEYS.COLLECTION.TEST_KEY;
 const MEMBER_1 = `${COLLECTION}1`;
 const MEMBER_2 = `${COLLECTION}2`;
+
+function asString(value: unknown): string {
+    return typeof value === 'string' ? value : '';
+}
+
+function idOf(value: unknown): number | undefined {
+    return typeof value === 'object' && value !== null && 'id' in value && typeof value.id === 'number' ? value.id : undefined;
+}
+
+function nameOf(value: unknown): string | undefined {
+    return typeof value === 'object' && value !== null && 'name' in value && typeof value.name === 'string' ? value.name : undefined;
+}
 
 Onyx.init({
     keys: ONYXKEYS,
@@ -64,7 +75,7 @@ describe('useOnyxState', () => {
         });
 
         it('should re-run when any of multiple dependencies change', async () => {
-            const {result} = renderHook(() => useOnyxState((state) => `${state[ONYXKEYS.TEST_KEY] ?? ''}-${state[ONYXKEYS.OTHER_TEST] ?? ''}`));
+            const {result} = renderHook(() => useOnyxState((state) => `${asString(state[ONYXKEYS.TEST_KEY])}-${asString(state[ONYXKEYS.OTHER_TEST])}`));
             await act(async () => waitForPromisesToResolve());
 
             await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'a'));
@@ -93,7 +104,7 @@ describe('useOnyxState', () => {
             const {result} = renderHook(() => useOnyxState((state) => Object.keys(state[COLLECTION] ?? {}).length));
             await act(async () => waitForPromisesToResolve());
 
-            await act(async () => Onyx.mergeCollection(COLLECTION, {[MEMBER_1]: {id: 1}, [MEMBER_2]: {id: 2}} as GenericCollection));
+            await act(async () => Onyx.mergeCollection(COLLECTION, {[MEMBER_1]: {id: 1}, [MEMBER_2]: {id: 2}}));
 
             expect(result.current).toEqual(2);
         });
@@ -101,7 +112,7 @@ describe('useOnyxState', () => {
 
     describe('selectorEquality', () => {
         it('should preserve the output reference when the new output is deep-equal (default equality)', async () => {
-            const {result} = renderHook(() => useOnyxState((state) => ({length: ((state[ONYXKEYS.TEST_KEY] as string) ?? '').length})));
+            const {result} = renderHook(() => useOnyxState((state) => ({length: asString(state[ONYXKEYS.TEST_KEY]).length})));
             await act(async () => waitForPromisesToResolve());
 
             await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'aa'));
@@ -161,7 +172,7 @@ describe('useOnyxState', () => {
 
         it('should run the selector again when a re-render passes a new selector', async () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, 'hello');
-            const {result, rerender} = renderHook(({suffix}: {suffix: string}) => useOnyxState((state) => `${state[ONYXKEYS.TEST_KEY] as string}${suffix}`), {
+            const {result, rerender} = renderHook(({suffix}: {suffix: string}) => useOnyxState((state) => `${asString(state[ONYXKEYS.TEST_KEY])}${suffix}`), {
                 initialProps: {suffix: '!'},
             });
             await act(async () => waitForPromisesToResolve());
@@ -222,14 +233,14 @@ describe('useOnyxState', () => {
 
     describe('key tracking', () => {
         it('should not run the selector when a sibling of the read member changes', async () => {
-            await Onyx.mergeCollection(COLLECTION, {[MEMBER_1]: {id: 1}, [MEMBER_2]: {id: 2}} as GenericCollection);
-            const selector = jest.fn((state: OnyxStateView) => (state[MEMBER_1] as {id: number} | undefined)?.id);
+            await Onyx.mergeCollection(COLLECTION, {[MEMBER_1]: {id: 1}, [MEMBER_2]: {id: 2}});
+            const selector = jest.fn((state: OnyxStateView) => idOf(state[MEMBER_1]));
             const {result} = renderHook(() => useOnyxState(selector));
             await act(async () => waitForPromisesToResolve());
             const callCountAfterMount = selector.mock.calls.length;
 
             await act(async () => Onyx.merge(MEMBER_2, {id: 22}));
-            await act(async () => Onyx.mergeCollection(COLLECTION, {[MEMBER_2]: {id: 222}} as GenericCollection));
+            await act(async () => Onyx.mergeCollection(COLLECTION, {[MEMBER_2]: {id: 222}}));
 
             expect(selector).toHaveBeenCalledTimes(callCountAfterMount);
             expect(result.current).toEqual(1);
@@ -240,9 +251,9 @@ describe('useOnyxState', () => {
         });
 
         it('should follow a lookup to the key it points at', async () => {
-            await Onyx.mergeCollection(COLLECTION, {[MEMBER_1]: {name: 'one'}, [MEMBER_2]: {name: 'two'}} as GenericCollection);
+            await Onyx.mergeCollection(COLLECTION, {[MEMBER_1]: {name: 'one'}, [MEMBER_2]: {name: 'two'}});
             await Onyx.set(ONYXKEYS.TEST_KEY, '1');
-            const selector = jest.fn((state: OnyxStateView) => (state[`${COLLECTION}${state[ONYXKEYS.TEST_KEY] as string}`] as {name: string} | undefined)?.name);
+            const selector = jest.fn((state: OnyxStateView) => nameOf(state[`${COLLECTION}${asString(state[ONYXKEYS.TEST_KEY])}`]));
             const {result} = renderHook(() => useOnyxState(selector));
             await act(async () => waitForPromisesToResolve());
 
@@ -302,9 +313,7 @@ describe('useOnyxState', () => {
 
         it('should follow a pointer that arrives before the record it points at', async () => {
             // Given a selector that looks up a member through a pointer key, with neither stored yet
-            const {result} = renderHook(() =>
-                useOnyxState((state) => (state[ONYXKEYS.TEST_KEY] ? ((state[`${COLLECTION}${state[ONYXKEYS.TEST_KEY] as string}`] as {name: string} | undefined)?.name ?? null) : null)),
-            );
+            const {result} = renderHook(() => useOnyxState((state) => (state[ONYXKEYS.TEST_KEY] ? (nameOf(state[`${COLLECTION}${asString(state[ONYXKEYS.TEST_KEY])}`]) ?? null) : null)));
             await act(async () => waitForPromisesToResolve());
 
             // When the pointer lands first, the output stays null

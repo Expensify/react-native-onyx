@@ -6,31 +6,28 @@ import type {CollectionKeyBase, KeyValueMapping, OnyxCollection, OnyxKey, OnyxVa
 import onyxSubscriptionManager from './OnyxSubscriptionManager';
 import OnyxUtils from './OnyxUtils';
 
-/**
- * Collection roots, mapped to the whole collection.
- *
- * Mapping over `OnyxKey` alone cannot type them: collection keys reach it as the template
- * `${CollectionKeyBase}${string}`, which becomes one index signature typed off that template rather
- * than off the key you index with. The template does not extend `CollectionKeyBase`, so `OnyxValue`
- * resolves it to a member, and a root such as `report_` matches the signature and comes back typed
- * as a single report. Spelling the roots out separately gives them a declared property, which wins
- * over the index signature. Resolves to `unknown` without `CustomTypeOptions`, leaving the view as it
- * was, since every key there is already `unknown`.
- */
-type OnyxCollectionRootsView = string extends CollectionKeyBase
-    ? unknown
-    : {
-          readonly [K in CollectionKeyBase]: OnyxCollection<KeyValueMapping[K]>;
-      };
+/** Every key, mapped to what `getState` returns for it. */
+type OnyxKeysView = {
+    readonly [K in OnyxKey]: OnyxValue<K>;
+};
 
 /**
  * Read-only view over the Onyx state. Reading a key returns what `getState` returns: the frozen
  * snapshot for a collection key, the cached value for a single key, `undefined` when absent.
  * Nothing is materialized — every read routes through the store.
+ *
+ * Collection roots are spelled out on top of `OnyxKeysView`. Mapping over `OnyxKey` alone cannot type
+ * them: collection keys reach it as the template `${CollectionKeyBase}${string}`, which becomes one
+ * index signature typed off that template rather than off the key you index with. The template does
+ * not extend `CollectionKeyBase`, so `OnyxValue` resolves it to a member, and a root such as `report_`
+ * matches the signature and comes back typed as a single report. A declared property wins over the
+ * index signature. Without `CustomTypeOptions` every key is already `unknown`, so the roots are skipped.
  */
-type OnyxStateView = {
-    readonly [K in OnyxKey]: OnyxValue<K>;
-} & OnyxCollectionRootsView;
+type OnyxStateView = string extends CollectionKeyBase
+    ? OnyxKeysView
+    : OnyxKeysView & {
+          readonly [K in CollectionKeyBase]: OnyxCollection<KeyValueMapping[K]>;
+      };
 
 type UseOnyxStateSelector<T> = (state: OnyxStateView) => T;
 
@@ -65,15 +62,15 @@ function createStateView(snapshotProvider: (key: OnyxKey) => OnyxValue<OnyxKey>)
             return snapshotProvider(prop) !== undefined;
         },
     };
-    return new Proxy<Record<string, never>>({}, handler) as unknown as OnyxStateView;
+    return new Proxy<Record<string, never>>({}, handler);
 }
 
 /** Collects the keys the running selector reads from `liveStateView`, `null` when nothing is recording. */
 let activeRecorder: Set<OnyxKey> | null = null;
 
 const liveStateView = createStateView((key) => {
-    activeRecorder?.add(key as OnyxKey);
-    return onyxSubscriptionManager.getState(key as OnyxKey);
+    activeRecorder?.add(key);
+    return onyxSubscriptionManager.getState(key);
 });
 
 type SnapshotCache<T> = {

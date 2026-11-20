@@ -13,7 +13,9 @@ import useOnyxState from '../../lib/useOnyxState';
 const COLLECTION_KEY = 'report_';
 const UPDATES = 5;
 
-type Report = {reportID: string; name: string; total: number};
+function nameOf(value: unknown): string | undefined {
+    return typeof value === 'object' && value !== null && 'name' in value && typeof value.name === 'string' ? value.name : undefined;
+}
 
 const memberKey = (index: number) => `${COLLECTION_KEY}${index}`;
 
@@ -28,7 +30,7 @@ function Row({index}: {index: number}) {
     const key = memberKey(index);
     const name = useOnyxState((state: OnyxStateView) => {
         selectorRuns++;
-        return (state[key] as Report | undefined)?.name;
+        return nameOf(state[key]);
     });
     return <Text>{`row ${index}: ${name ?? ''}`}</Text>;
 }
@@ -49,7 +51,8 @@ function Rows({count}: {count: number}) {
 function CollectionCount() {
     const count = useOnyxState((state: OnyxStateView) => {
         selectorRuns++;
-        return Object.keys((state[COLLECTION_KEY] as Record<string, Report> | undefined) ?? {}).length;
+        const collection = state[COLLECTION_KEY];
+        return typeof collection === 'object' && collection !== null ? Object.keys(collection).length : 0;
     });
     return <Text>{`count: ${count}`}</Text>;
 }
