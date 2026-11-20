@@ -1,4 +1,3 @@
-/* eslint-disable dot-notation */
 import Onyx from '../../lib';
 import {getDevToolsInstance} from '../../lib/DevTools';
 import type {DevtoolsConnection, RealDevTools as RealDevToolsType} from '../../lib/DevTools';
