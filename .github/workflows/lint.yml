@@ -10,7 +10,7 @@ jobs:
   lint:
     # os-botify's version bump and seatbelt commits to main need no lint run.
     if: ${{ github.actor != 'os-botify[bot]' }}
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       # v5.0.0
       - uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
