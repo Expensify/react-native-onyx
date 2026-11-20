@@ -119,9 +119,6 @@ function isSameKeySet(keys: readonly OnyxKey[], recorded: Map<OnyxKey, OnyxValue
 
 /** True when every dep still reads as the same reference it had when `depValues` was taken. */
 function areDepValuesUnchanged(deps: readonly OnyxKey[], depValues: Array<OnyxValue<OnyxKey>>): boolean {
-    if (deps.length !== depValues.length) {
-        return false;
-    }
     for (let i = 0; i < deps.length; i++) {
         if (!Object.is(onyxSubscriptionManager.getState(deps[i]), depValues[i])) {
             return false;
@@ -131,13 +128,10 @@ function areDepValuesUnchanged(deps: readonly OnyxKey[], depValues: Array<OnyxVa
 }
 
 /**
- * `===` first, which settles primitives and frozen snapshot references, then deepEqual for an object
- * the selector freshly allocated with unchanged content.
+ * deepEqual for an object the selector freshly allocated with unchanged content. `isOutputEqual` has
+ * already settled `===`, which covers primitives and frozen snapshot references.
  */
 function defaultSelectorEquality<T>(a: T, b: T): boolean {
-    if (Object.is(a, b)) {
-        return true;
-    }
     if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') {
         return false;
     }

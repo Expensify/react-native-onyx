@@ -1,6 +1,6 @@
 import {deepEqual} from 'fast-equals';
 import {act, render, renderHook} from '@testing-library/react-native';
-import React, {startTransition, Suspense, useState} from 'react';
+import React, {startTransition, Suspense, useLayoutEffect, useState} from 'react';
 
 import type * as FastEquals from 'fast-equals';
 
@@ -197,6 +197,35 @@ describe('useOnyxState', () => {
             // Then the previous reference is kept
             expect(result.current).toBe(outputBefore);
         });
+
+        it('should return a new reference when a multiSet replaces a returned store value with equal content', async () => {
+            // Given a selector that returns the stored object itself
+            await Onyx.set(ONYXKEYS.TEST_KEY, {id: 1});
+            const {result} = renderHook(() => useOnyxState((state) => state[ONYXKEYS.TEST_KEY]));
+            await act(async () => waitForPromisesToResolve());
+            const valueBefore = result.current;
+
+            // When a multiSet writes equal content, which replaces the reference anyway
+            await act(async () => Onyx.multiSet({[ONYXKEYS.TEST_KEY]: {id: 1}}));
+
+            // Then the new reference comes back, because a returned store value is settled by `===` alone
+            expect(result.current).not.toBe(valueBefore);
+            expect(result.current).toEqual(valueBefore);
+        });
+
+        it('should keep the reference of an object the selector built when a multiSet writes equal content', async () => {
+            // Given a selector that allocates its output from a stored object
+            await Onyx.set(ONYXKEYS.TEST_KEY, {id: 1});
+            const {result} = renderHook(() => useOnyxState((state) => ({id: idOf(state[ONYXKEYS.TEST_KEY])})));
+            await act(async () => waitForPromisesToResolve());
+            const outputBefore = result.current;
+
+            // When a multiSet replaces the stored reference with equal content
+            await act(async () => Onyx.multiSet({[ONYXKEYS.TEST_KEY]: {id: 1}}));
+
+            // Then the built output is deep-compared and the previous reference is kept
+            expect(result.current).toBe(outputBefore);
+        });
     });
 
     describe('re-render without a store change', () => {
@@ -277,6 +306,22 @@ describe('useOnyxState', () => {
             // Then the selector re-runs against what was in storage, rather than being stuck on the
             // empty-state output forever
             expect(result.current).toEqual('from storage|other from storage');
+        });
+
+        it('should not run the selector when init lands after the hook unmounted', async () => {
+            // Given a subscriber that mounted before init and unmounted while init was still pending
+            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'from storage');
+            const selector = jest.fn((state: OnyxStateView) => state[ONYXKEYS.TEST_KEY]);
+            const {unmount} = renderHook(() => useOnyxState(selector));
+            unmount();
+            const callCountAfterUnmount = selector.mock.calls.length;
+
+            // When init hydrates the cache
+            Onyx.init({keys: ONYXKEYS});
+            await act(async () => waitForPromisesToResolve());
+
+            // Then the pending re-read is dropped, because nobody is left to receive it
+            expect(selector).toHaveBeenCalledTimes(callCountAfterUnmount);
         });
     });
 
@@ -372,6 +417,65 @@ describe('useOnyxState', () => {
             // Then the record it points at still updates the hook when it arrives
             await act(async () => Onyx.merge(MEMBER_1, {name: 'one'}));
             expect(result.current).toEqual('one');
+        });
+
+        it('should track a key the selector checks with the in operator', async () => {
+            // Given a selector that only asks whether a key is present
+            const {result} = renderHook(() => useOnyxState((state) => (ONYXKEYS.TEST_KEY in state ? 'present' : 'absent')));
+            await act(async () => waitForPromisesToResolve());
+            expect(result.current).toEqual('absent');
+
+            // When the key gets a value
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'value'));
+
+            // Then the hook updates, so the presence check was recorded as a dependency
+            expect(result.current).toEqual('present');
+        });
+
+        it('should pick up a write that lands on a newly read key before the subscription moves to it', async () => {
+            // Given a branch that reads OTHER_TEST only once TEST_KEY is 'on', and a flip of TEST_KEY that
+            // reaches the cache without a notification, so the next render is what runs the selector
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'off');
+            const selector = (state: OnyxStateView) => (state[ONYXKEYS.TEST_KEY] === 'on' ? (state[ONYXKEYS.OTHER_TEST] ?? null) : null);
+            const {result, rerender} = renderHook(
+                ({shouldWriteLate}: {shouldWriteLate: boolean}) => {
+                    useLayoutEffect(() => {
+                        if (!shouldWriteLate) {
+                            return;
+                        }
+                        cache.set(ONYXKEYS.OTHER_TEST, 'late');
+                    }, [shouldWriteLate]);
+                    return useOnyxState(selector);
+                },
+                {initialProps: {shouldWriteLate: false}},
+            );
+            await act(async () => waitForPromisesToResolve());
+            cache.set(ONYXKEYS.TEST_KEY, 'on');
+
+            // When that render reads OTHER_TEST for the first time with an unchanged output, and OTHER_TEST
+            // is written during the commit, before the hook has subscribed to it
+            rerender({shouldWriteLate: true});
+
+            // Then the hook still returns the written value, rather than waiting for the next write
+            expect(result.current).toEqual('late');
+        });
+    });
+
+    describe('unmount', () => {
+        it('should not run the selector on a dependency write after the hook unmounted', async () => {
+            // Given a mounted hook that then unmounts
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'hello');
+            const selector = jest.fn((state: OnyxStateView) => state[ONYXKEYS.TEST_KEY]);
+            const {unmount} = renderHook(() => useOnyxState(selector));
+            await act(async () => waitForPromisesToResolve());
+            unmount();
+            const callCountAfterUnmount = selector.mock.calls.length;
+
+            // When its dependency changes
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'changed'));
+
+            // Then the selector does not run, so the subscription went away with the component
+            expect(selector).toHaveBeenCalledTimes(callCountAfterUnmount);
         });
     });
 
