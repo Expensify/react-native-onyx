@@ -38,16 +38,6 @@ function readSingleKey() {
     return useOnyxState((state) => state[ONYX_KEYS.TEST_KEY]?.toUpperCase());
 }
 
-function readPreviousState() {
-    return useOnyxState((state, previousState) => {
-        const current = state[ONYX_KEYS.COLLECTION.TEST_KEY];
-        const previous = previousState?.[ONYX_KEYS.COLLECTION.TEST_KEY];
-
-        // Both sides are collections, so changed members can be found by reference.
-        return Object.keys(current ?? {}).filter((key) => current?.[key] !== previous?.[key]);
-    });
-}
-
 function rootIsNotAMember() {
     return useOnyxState((state) => {
         // @ts-expect-error a root reads as the whole collection, so it is not one member
@@ -70,4 +60,4 @@ function readsAnyKey() {
     return useOnyxState((state) => `${state[ONYX_KEYS.TEST_KEY] ?? ''}${state[`${ONYX_KEYS.COLLECTION.TEST_KEY}1`]?.str ?? ''}`);
 }
 
-export {readCollectionRoot, readCollectionMember, readSingleKey, readPreviousState, rootIsNotAMember, memberIsNotACollection, readsAnyKey};
+export {readCollectionRoot, readCollectionMember, readSingleKey, rootIsNotAMember, memberIsNotACollection, readsAnyKey};

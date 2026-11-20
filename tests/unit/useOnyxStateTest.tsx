@@ -1,5 +1,4 @@
 import {act, renderHook} from '@testing-library/react-native';
-import {useLayoutEffect} from 'react';
 
 import type {OnyxStateView} from '../../lib/useOnyxState';
 import type GenericCollection from '../utils/GenericCollection';
@@ -100,154 +99,6 @@ describe('useOnyxState', () => {
         });
     });
 
-    describe('previousState', () => {
-        it('should pass undefined as previousState on the first selector run', async () => {
-            const observed: Array<OnyxStateView | undefined> = [];
-            renderHook(() =>
-                useOnyxState((state, previousState) => {
-                    observed.push(previousState);
-                    return state[ONYXKEYS.TEST_KEY];
-                }),
-            );
-            await act(async () => waitForPromisesToResolve());
-
-            // The very first invocation always runs before any output has been captured.
-            expect(observed[0]).toBeUndefined();
-        });
-
-        it('should expose the prior dependency value through previousState after a change', async () => {
-            await Onyx.set(ONYXKEYS.TEST_KEY, 'a');
-
-            let sawCurrentBWithPreviousA = false;
-            renderHook(() =>
-                useOnyxState((state, previousState) => {
-                    if (state[ONYXKEYS.TEST_KEY] === 'b' && previousState?.[ONYXKEYS.TEST_KEY] === 'a') {
-                        sawCurrentBWithPreviousA = true;
-                    }
-                    return state[ONYXKEYS.TEST_KEY];
-                }),
-            );
-            await act(async () => waitForPromisesToResolve());
-
-            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'b'));
-
-            expect(sawCurrentBWithPreviousA).toBeTruthy();
-        });
-
-        it('should keep previousState at the last committed output when an equal output is swallowed', async () => {
-            // Given a committed 'small' output computed from 0, and a selector that records the previousState it gets
-            await Onyx.set(ONYXKEYS.TEST_KEY, 0);
-            let lastPrevious: unknown;
-            renderHook(() =>
-                useOnyxState((state, previousState) => {
-                    lastPrevious = previousState?.[ONYXKEYS.TEST_KEY];
-                    return (state[ONYXKEYS.TEST_KEY] as number) >= 10 ? 'big' : 'small';
-                }),
-            );
-            await act(async () => waitForPromisesToResolve());
-
-            // When a write keeps the output equal, so nothing commits, and a second write changes it
-            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 1));
-            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 20));
-
-            // Then previousState still holds 0, so a diff covers both writes instead of losing the first one
-            expect(lastPrevious).toBe(0);
-        });
-
-        it('should pass undefined as previousState again after the hook remounts', async () => {
-            // Given a mounted hook whose previousState has advanced past a change
-            await Onyx.set(ONYXKEYS.TEST_KEY, 'a');
-            const observed: unknown[] = [];
-            const selector = (state: OnyxStateView, previousState: OnyxStateView | undefined) => {
-                observed.push(previousState);
-                return state[ONYXKEYS.TEST_KEY];
-            };
-            const {unmount} = renderHook(() => useOnyxState(selector));
-            await act(async () => waitForPromisesToResolve());
-            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'b'));
-            expect(observed.at(-1)).toBeDefined();
-
-            // When it unmounts, the key changes, and it mounts again
-            unmount();
-            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'c'));
-            observed.length = 0;
-            renderHook(() => useOnyxState(selector));
-            await act(async () => waitForPromisesToResolve());
-
-            // Then the first run of the new mount does a full compute rather than diffing against the old mount's inputs
-            expect(observed[0]).toBeUndefined();
-        });
-    });
-
-    describe('previousState-dependent output (delta selectors)', () => {
-        // `previousState` is advanced post-commit, so a selector whose OUTPUT depends on it
-        // is stable: within a render the previous view is frozen, so repeated getSnapshot
-        // calls produce the same delta.
-        it('should return a stable delta of which collection members changed since the last render', async () => {
-            await Onyx.mergeCollection(COLLECTION, {[MEMBER_1]: {v: 1}, [MEMBER_2]: {v: 1}} as GenericCollection);
-
-            const {result} = renderHook(() =>
-                useOnyxState((state, previousState) => {
-                    const current = (state[COLLECTION] ?? {}) as Record<string, unknown>;
-                    const previous = (previousState?.[COLLECTION] ?? {}) as Record<string, unknown>;
-                    return Object.keys(current)
-                        .filter((memberKey) => current[memberKey] !== previous[memberKey])
-                        .sort();
-                }),
-            );
-            await act(async () => waitForPromisesToResolve());
-
-            // Change only MEMBER_2 — the delta should contain exactly MEMBER_2.
-            await act(async () => Onyx.merge(MEMBER_2, {v: 2}));
-
-            expect(result.current).toEqual([MEMBER_2]);
-        });
-
-        it('should recompute the delta on each subsequent change (previousState advances per commit)', async () => {
-            await Onyx.mergeCollection(COLLECTION, {[MEMBER_1]: {v: 1}, [MEMBER_2]: {v: 1}} as GenericCollection);
-
-            const {result} = renderHook(() =>
-                useOnyxState((state, previousState) => {
-                    const current = (state[COLLECTION] ?? {}) as Record<string, unknown>;
-                    const previous = (previousState?.[COLLECTION] ?? {}) as Record<string, unknown>;
-                    return Object.keys(current)
-                        .filter((memberKey) => current[memberKey] !== previous[memberKey])
-                        .sort();
-                }),
-            );
-            await act(async () => waitForPromisesToResolve());
-
-            await act(async () => Onyx.merge(MEMBER_1, {v: 9}));
-            expect(result.current).toEqual([MEMBER_1]);
-
-            // A second, independent change must report only MEMBER_2 — proving `previousState`
-            // advanced to the post-first-change snapshot rather than staying at the original.
-            await act(async () => Onyx.merge(MEMBER_2, {v: 9}));
-            expect(result.current).toEqual([MEMBER_2]);
-        });
-
-        it('should keep a removed member in previousState so a delta can report the removal', async () => {
-            // Given two members and a delta selector that also lists members missing from the current state
-            await Onyx.mergeCollection(COLLECTION, {[MEMBER_1]: {v: 1}, [MEMBER_2]: {v: 1}} as GenericCollection);
-            const {result} = renderHook(() =>
-                useOnyxState((state, previousState) => {
-                    const current = (state[COLLECTION] ?? {}) as Record<string, unknown>;
-                    const previous = (previousState?.[COLLECTION] ?? {}) as Record<string, unknown>;
-                    return Object.keys(previous)
-                        .filter((memberKey) => !(memberKey in current))
-                        .sort();
-                }),
-            );
-            await act(async () => waitForPromisesToResolve());
-
-            // When MEMBER_2 is removed
-            await act(async () => Onyx.set(MEMBER_2, null));
-
-            // Then previousState still carries MEMBER_2, so the removal is visible to the selector
-            expect(result.current).toEqual([MEMBER_2]);
-        });
-    });
-
     describe('selectorEquality', () => {
         it('should preserve the output reference when the new output is deep-equal (default equality)', async () => {
             const {result} = renderHook(() => useOnyxState((state) => ({length: ((state[ONYXKEYS.TEST_KEY] as string) ?? '').length})));
@@ -332,20 +183,6 @@ describe('useOnyxState', () => {
             expect(selector.mock.calls.length).toBeGreaterThan(callCountAfterMount);
             expect(result.current).toEqual('updated');
         });
-
-        it('should still pass previousState to a selector that declares it with a default value', async () => {
-            await Onyx.set(ONYXKEYS.TEST_KEY, 'first');
-            // `Function.length` stops counting at the first defaulted parameter, so this selector reports
-            // an arity of 1 even though it reads `previousState`.
-            const {result} = renderHook(() =>
-                useOnyxState((state, previousState = undefined) => `${state[ONYXKEYS.TEST_KEY] as string}/${(previousState?.[ONYXKEYS.TEST_KEY] as string) ?? 'none'}`),
-            );
-            await act(async () => waitForPromisesToResolve());
-
-            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'second'));
-
-            expect(result.current).toEqual('second/first');
-        });
     });
 
     describe('before Onyx.init has finished', () => {
@@ -380,26 +217,6 @@ describe('useOnyxState', () => {
             // Then the selector re-runs against what was in storage, rather than being stuck on the
             // empty-state output forever
             expect(result.current).toEqual('from storage|other from storage');
-        });
-
-        it('should report the post-init values as a change against the pre-hydration previousState', async () => {
-            // Given a value in storage and a selector that reports what changed since its last output
-            await StorageMock.setItem(ONYXKEYS.TEST_KEY, 'from storage');
-
-            const {result} = renderHook(() =>
-                useOnyxState((state, previousState) => ({
-                    previous: previousState?.[ONYXKEYS.TEST_KEY],
-                    current: state[ONYXKEYS.TEST_KEY],
-                })),
-            );
-
-            // When init hydrates the cache after the first committed render
-            Onyx.init({keys: ONYXKEYS});
-            await act(async () => waitForPromisesToResolve());
-
-            // Then `previousState` holds the pre-hydration value, so hydration reads as the key
-            // appearing rather than as no change at all
-            expect(result.current).toEqual({previous: undefined, current: 'from storage'});
         });
     });
 
@@ -497,32 +314,6 @@ describe('useOnyxState', () => {
             // Then the record it points at still updates the hook when it arrives
             await act(async () => Onyx.merge(MEMBER_1, {name: 'one'}));
             expect(result.current).toEqual('one');
-        });
-    });
-
-    describe('previousState after a write between commit and effects', () => {
-        it('should keep the values the committed run saw, not a later write', async () => {
-            // Given a selector that reports the previous and current value of TEST_KEY
-            await Onyx.set(ONYXKEYS.TEST_KEY, 'a');
-            const {result} = renderHook(() => {
-                const value = useOnyxState((state, previousState) => `${previousState?.[ONYXKEYS.TEST_KEY] as string}->${state[ONYXKEYS.TEST_KEY] as string}`);
-                // Layout effects run after the commit but before passive effects, which is where the hook builds previousState
-                useLayoutEffect(() => {
-                    if (value !== 'a->b') {
-                        return;
-                    }
-                    Onyx.set(ONYXKEYS.TEST_KEY, 'c');
-                }, [value]);
-                return value;
-            });
-            await act(async () => waitForPromisesToResolve());
-
-            // When 'b' commits and 'c' is written before the passive effects run
-            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'b'));
-            await act(async () => waitForPromisesToResolve());
-
-            // Then previousState holds 'b', the value behind the committed output, so the b->c change is not lost
-            expect(result.current).toEqual('b->c');
         });
     });
 });

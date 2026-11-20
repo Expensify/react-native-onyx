@@ -32,7 +32,7 @@ type OnyxStateView = {
     readonly [K in OnyxKey]: OnyxValue<K>;
 } & OnyxCollectionRootsView;
 
-type UseOnyxStateSelector<T> = (state: OnyxStateView, previousState: OnyxStateView | undefined) => T;
+type UseOnyxStateSelector<T> = (state: OnyxStateView) => T;
 
 type UseOnyxStateOptions<T> = {
     /**
@@ -42,7 +42,7 @@ type UseOnyxStateOptions<T> = {
     selectorEquality?: (a: T, b: T) => boolean;
 };
 
-/** Builds a lazy, sealed Proxy over `snapshotProvider`, used for both `state` and `previousState`. */
+/** Builds a lazy, sealed Proxy over `snapshotProvider`. */
 function createStateView(snapshotProvider: (key: OnyxKey) => OnyxValue<OnyxKey>): OnyxStateView {
     const handler: ProxyHandler<Record<string, never>> = {
         get(_target, prop) {
@@ -79,9 +79,6 @@ const liveStateView = createStateView((key) => {
 type SnapshotCache<T> = {
     value: T;
     selector: UseOnyxStateSelector<T>;
-    previousView: OnyxStateView | undefined;
-    /** Whether the run that produced `value` read `previousState`. A run that ignored it can't care that it moved. */
-    readPreviousState: boolean;
     /** The keys the run read. Same reference while the set is unchanged. */
     deps: readonly OnyxKey[];
     depValues: Array<OnyxValue<OnyxKey>>;
@@ -131,10 +128,7 @@ function defaultSelectorEquality<T>(a: T, b: T): boolean {
 }
 
 /**
- * Subscribes a component to a value derived from several Onyx keys. The selector gets a `state` view
- * and a `previousState` view holding the keys it read as of the last committed render. It can use
- * `previousState` to walk only what changed (structural sharing keeps unchanged collection members
- * reference-equal, so each step is O(1)) or as a real input, say to emit a delta.
+ * Subscribes a component to a value derived from several Onyx keys. The selector gets a `state` view.
  *
  * Each selector run records the keys it read from `state`, and the hook subscribes to exactly those.
  * A run's output depends only on what it read, so a key it skipped can't change it until a key it did
@@ -150,9 +144,6 @@ function defaultSelectorEquality<T>(a: T, b: T): boolean {
 function useOnyxState<T>(selector: UseOnyxStateSelector<T>, options: UseOnyxStateOptions<T> = {}): T {
     const {selectorEquality = defaultSelectorEquality} = options;
 
-    // Mutated only in the post-commit effect below, so it stays frozen across a render's
-    // `getSnapshot` calls and every one of them computes the same output.
-    const previousViewRef = useRef<OnyxStateView | undefined>(undefined);
     const lastSnapshotRef = useRef<SnapshotCache<T> | null>(null);
     const syncKeysRef = useRef<(() => void) | null>(null);
 
@@ -205,69 +196,35 @@ function useOnyxState<T>(selector: UseOnyxStateSelector<T>, options: UseOnyxStat
         };
     }, []);
 
-    // Flipped by the `previousState` view when the selector reads a key off it. Read straight after the
-    // selector returns, so it describes that run only.
-    const previousStateReadRef = useRef(false);
-
     const getSnapshot = useCallback((): T => {
         const lastSnapshot = lastSnapshotRef.current;
-        const previousView = previousViewRef.current;
 
-        // React calls `getSnapshot` on every render, not only after a store change. When the selector,
-        // `previousState` and every dep are the same references as last time, the output can't differ,
-        // so skip the selector and its reads through the state view. A parent re-rendering a list of rows
-        // otherwise re-runs every row's selector. A selector that ignored `previousState` last time is
-        // not affected by it moving, so it stays cached when only the view changed.
-        if (
-            lastSnapshot !== null &&
-            lastSnapshot.selector === selector &&
-            (!lastSnapshot.readPreviousState || lastSnapshot.previousView === previousView) &&
-            areDepValuesUnchanged(lastSnapshot.deps, lastSnapshot.depValues)
-        ) {
+        // React calls `getSnapshot` on every render, not only after a store change. When the selector and
+        // every dep are the same references as last time, the output can't differ, so skip the selector
+        // and its reads through the state view. A parent re-rendering a list of rows otherwise re-runs
+        // every row's selector.
+        if (lastSnapshot !== null && lastSnapshot.selector === selector && areDepValuesUnchanged(lastSnapshot.deps, lastSnapshot.depValues)) {
             return lastSnapshot.value;
         }
 
-        previousStateReadRef.current = false;
-        const {output, keys} = recordReads(() => selector(liveStateView, previousView));
-        // Keep the previous array while the set is unchanged, so the effect below can tell by reference.
+        const {output, keys} = recordReads(() => selector(liveStateView));
+        // Keep the previous array while the set is unchanged, so `syncKeys` can tell by reference.
         const deps = lastSnapshot !== null && isSameKeySet(lastSnapshot.deps, keys) ? lastSnapshot.deps : [...keys];
-        const readPreviousState = previousStateReadRef.current;
         const depValues = deps.map((dep) => onyxSubscriptionManager.getState(dep));
 
         // Hand back the previous reference when the output is equal, so React bails out via `===`
         // and an unchanged store keeps returning the same value even as `getSnapshot`'s identity moves.
         const value = lastSnapshot !== null && selectorEquality(lastSnapshot.value, output) ? lastSnapshot.value : output;
-        lastSnapshotRef.current = {value, selector, previousView, readPreviousState, deps, depValues};
+        lastSnapshotRef.current = {value, selector, deps, depValues};
         return value;
     }, [selector, selectorEquality]);
 
     const value = useSyncExternalStore(subscribe, getSnapshot);
-    // The run behind `value`. A store change between the commit and the effects below can overwrite the ref.
-    const renderedSnapshot = lastSnapshotRef.current;
 
     // A render can run the selector without a store change, say with a new selector, so the keys can move here too.
     useEffect(() => {
         syncKeysRef.current?.();
     });
-
-    // Snapshot the deps after a commit that changed the output, to serve as `previousState` on the next
-    // selector run. Doing it here rather than in `getSnapshot` keeps that function pure and gives
-    // `previousState` its meaning, the deps behind the last committed output: a change whose output
-    // the equality check swallowed never commits, so it never advances past a value nobody saw. Running
-    // only on output changes also keeps a re-render from a parent from allocating a new view. The values
-    // come from the committed run, not the store, so a write landing before this effect still reads as a change.
-    useEffect(() => {
-        const committedDepValues: Record<OnyxKey, OnyxValue<OnyxKey>> = {};
-        if (renderedSnapshot !== null) {
-            for (const [index, dep] of renderedSnapshot.deps.entries()) {
-                committedDepValues[dep] = renderedSnapshot.depValues[index];
-            }
-        }
-        previousViewRef.current = createStateView((key) => {
-            previousStateReadRef.current = true;
-            return committedDepValues[key];
-        });
-    }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
 
     return value;
 }
