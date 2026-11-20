@@ -179,6 +179,9 @@ class OnyxSubscriptionManager {
         }
 
         // 3. State listeners, fired at most once even when both the member and its collection key match.
+        if (this.stateListenersByDep.size === 0) {
+            return;
+        }
         const fired = new Set<StateListenerCallback>();
         this.fireStateListenersForDep(key, fired);
         if (isCollectionMemberWrite) {
@@ -193,7 +196,8 @@ class OnyxSubscriptionManager {
      *   1. keyListeners.get(collectionKey): fires once with the new collection object.
      *   2. keyListeners.get(memberKey): fires per changed member whose value differs from
      *      the previous, preserving ref-equality on unchanged members.
-     *   3. State listeners affected by the collection key or any changed member key, each fired at most once.
+     *   3. State listeners affected by the collection key or any member key whose value differs from
+     *      the previous, each fired at most once.
      */
     notifyCollection<TKey extends CollectionKeyBase>(
         collectionKey: TKey,
@@ -221,12 +225,14 @@ class OnyxSubscriptionManager {
         // Only treat a member as unchanged when `previous` actually carries it: when the
         // previous collection is omitted, a removed member reads `undefined` on both sides
         // and would otherwise be skipped even though it changed.
+        const changedMemberKeys: string[] = [];
         for (const memberKey of changedKeys) {
             const value = collectionData?.[memberKey];
             const prev = partialPreviousCollection?.[memberKey];
             if (partialPreviousCollection && Object.prototype.hasOwnProperty.call(partialPreviousCollection, memberKey) && value === prev) {
                 continue;
             }
+            changedMemberKeys.push(memberKey);
 
             const exact = this.keyListeners.get(memberKey);
             if (!exact || exact.size === 0) {
@@ -238,10 +244,14 @@ class OnyxSubscriptionManager {
             }
         }
 
-        // 3. State listeners, each affected entry fired at most once across the collection and its members.
+        // 3. State listeners, each fired at most once across the collection and its members. Members
+        // that step 2 found unchanged are skipped here too.
+        if (this.stateListenersByDep.size === 0) {
+            return;
+        }
         const fired = new Set<StateListenerCallback>();
         this.fireStateListenersForDep(collectionKey, fired);
-        for (const memberKey of changedKeys) {
+        for (const memberKey of changedMemberKeys) {
             this.fireStateListenersForDep(memberKey, fired);
         }
     }

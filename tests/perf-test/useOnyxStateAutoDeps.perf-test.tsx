@@ -1,6 +1,4 @@
 import {act, screen} from '@testing-library/react-native';
-import fs from 'fs';
-
 import React from 'react';
 import {Text, View} from 'react-native';
 import {measureRenders} from 'reassure';
@@ -24,14 +22,9 @@ const seedCollection = async (size: number) => {
     await Onyx.mergeCollection(COLLECTION_KEY, collection);
 };
 
-let selectorRuns = 0;
-
 function Row({index}: {index: number}) {
     const key = memberKey(index);
-    const name = useOnyxState((state: OnyxStateView) => {
-        selectorRuns++;
-        return nameOf(state[key]);
-    });
+    const name = useOnyxState((state: OnyxStateView) => nameOf(state[key]));
     return <Text>{`row ${index}: ${name ?? ''}`}</Text>;
 }
 
@@ -50,43 +43,27 @@ function Rows({count}: {count: number}) {
 
 function CollectionCount() {
     const count = useOnyxState((state: OnyxStateView) => {
-        selectorRuns++;
         const collection = state[COLLECTION_KEY];
         return typeof collection === 'object' && collection !== null ? Object.keys(collection).length : 0;
     });
     return <Text>{`count: ${count}`}</Text>;
 }
 
-const stats: Record<string, {ms: number[]; selectorRuns: number[]}> = {};
-
 const runUpdates = async (update: (step: number) => Promise<void>) => {
-    selectorRuns = 0;
-    const start = performance.now();
     for (let step = 0; step < UPDATES; step++) {
         await act(async () => {
             await update(step);
         });
     }
-    const name = expect.getState().currentTestName ?? 'unknown';
-    stats[name] ??= {ms: [], selectorRuns: []};
-    stats[name].ms.push(performance.now() - start);
-    stats[name].selectorRuns.push(selectorRuns);
 };
 
-describe('useOnyxState auto-tracked deps (issue 3020)', () => {
+describe('useOnyxState auto-tracked deps', () => {
     beforeAll(() => {
         Onyx.init({keys: {COLLECTION: {REPORT: COLLECTION_KEY}}});
     });
 
     afterEach(async () => {
         await Onyx.clear();
-    });
-
-    afterAll(() => {
-        const output = process.env.UPDATE_TIMINGS_FILE;
-        if (output) {
-            fs.writeFileSync(output, JSON.stringify({stats}));
-        }
     });
 
     describe.each([100, 1000])('%i rows', (rows) => {

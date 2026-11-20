@@ -12,7 +12,6 @@ import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
 // so this workaround allows us to have access to them. The maps are created once in the constructor
 // and only ever `.clear()`ed (never reassigned), so capturing the references here stays valid.
 const keyListeners = onyxSubscriptionManager['keyListeners'];
-// eslint-disable-next-line dot-notation
 const stateListenersByDep = onyxSubscriptionManager['stateListenersByDep'];
 
 const ONYXKEYS = {
@@ -292,6 +291,38 @@ describe('OnyxSubscriptionManager', () => {
             expect(collectionCallback).toHaveBeenCalledTimes(1);
             expect(member1Callback).toHaveBeenCalledTimes(1);
             expect(bothCallback).toHaveBeenCalledTimes(1);
+        });
+
+        it('should not fire a member state listener on notifyCollection when that member did not change', () => {
+            // Given a batch that re-sends one member with the reference it already had and changes another
+            const unchangedMember = {id: 1};
+            const changedMember = {id: 2};
+            jest.spyOn(cache, 'getCollectionData').mockReturnValue({[MEMBER_1]: unchangedMember, [MEMBER_2]: changedMember});
+            const unchangedCallback = jest.fn();
+            const changedCallback = jest.fn();
+            onyxSubscriptionManager.subscribeState(unchangedCallback, [MEMBER_1]);
+            onyxSubscriptionManager.subscribeState(changedCallback, [MEMBER_2]);
+
+            // When the batch is dispatched with the previous values
+            onyxSubscriptionManager.notifyCollection(COLLECTION, {[MEMBER_1]: unchangedMember, [MEMBER_2]: changedMember}, {[MEMBER_1]: unchangedMember, [MEMBER_2]: {id: 0}});
+
+            // Then only the listener of the changed member fires, the same way exact-key subscribers are skipped
+            expect(unchangedCallback).not.toHaveBeenCalled();
+            expect(changedCallback).toHaveBeenCalledTimes(1);
+        });
+
+        it('should fire a member state listener on notifyCollection when the previous collection does not carry that member', () => {
+            // Given a batch whose previous collection says nothing about the member, so it cannot be proven unchanged
+            const member = {id: 1};
+            jest.spyOn(cache, 'getCollectionData').mockReturnValue({[MEMBER_1]: member});
+            const callback = jest.fn();
+            onyxSubscriptionManager.subscribeState(callback, [MEMBER_1]);
+
+            // When the batch is dispatched
+            onyxSubscriptionManager.notifyCollection(COLLECTION, {[MEMBER_1]: member}, {});
+
+            // Then the listener fires
+            expect(callback).toHaveBeenCalledTimes(1);
         });
 
         it('should fire a listener only once when it re-subscribes with more deps during the dispatch', () => {

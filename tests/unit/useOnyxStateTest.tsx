@@ -1,13 +1,22 @@
+import {deepEqual} from 'fast-equals';
 import {act, render, renderHook} from '@testing-library/react-native';
 import React, {startTransition, Suspense, useState} from 'react';
+
+import type * as FastEquals from 'fast-equals';
 
 import type {OnyxStateView} from '../../lib/useOnyxState';
 
 import Onyx from '../../lib';
+import cache from '../../lib/OnyxCache';
 import {resetDeferredInitTask} from '../../lib/OnyxUtils';
 import StorageMock from '../../lib/storage';
 import useOnyxState from '../../lib/useOnyxState';
 import waitForPromisesToResolve from '../utils/waitForPromisesToResolve';
+
+jest.mock('fast-equals', () => {
+    const actual = jest.requireActual<typeof FastEquals>('fast-equals');
+    return {...actual, deepEqual: jest.fn(actual.deepEqual)};
+});
 
 const ONYXKEYS = {
     TEST_KEY: 'test',
@@ -156,6 +165,40 @@ describe('useOnyxState', () => {
         });
     });
 
+    describe('raw store value output', () => {
+        it('should not deep-compare a collection the selector returned as-is', async () => {
+            // Given a selector that returns the collection snapshot itself
+            await Onyx.mergeCollection(COLLECTION, {[MEMBER_1]: {id: 1}, [MEMBER_2]: {id: 2}});
+            const {result} = renderHook(() => useOnyxState((state) => state[COLLECTION]));
+            await act(async () => waitForPromisesToResolve());
+            const collectionBefore = result.current;
+            jest.mocked(deepEqual).mockClear();
+
+            // When a member changes, which gives the collection a new reference
+            await act(async () => Onyx.merge(MEMBER_1, {id: 10}));
+            const collectionAfter = result.current;
+
+            // Then the hook returned the new snapshot without walking both collections: the store only
+            // replaces a reference when the content changed, so the comparison could never succeed
+            expect(collectionAfter).not.toBe(collectionBefore);
+            expect(jest.mocked(deepEqual).mock.calls.some(([a, b]) => a === collectionBefore && b === collectionAfter)).toBe(false);
+        });
+
+        it('should still deep-compare an object the selector built', async () => {
+            // Given a selector that allocates its output
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'aa');
+            const {result} = renderHook(() => useOnyxState((state) => ({length: asString(state[ONYXKEYS.TEST_KEY]).length})));
+            await act(async () => waitForPromisesToResolve());
+            const outputBefore = result.current;
+
+            // When a dependency changes without changing the output's content
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'bb'));
+
+            // Then the previous reference is kept
+            expect(result.current).toBe(outputBefore);
+        });
+    });
+
     describe('re-render without a store change', () => {
         it('should not run the selector again when the component re-renders and no dependency changed', async () => {
             await Onyx.set(ONYXKEYS.TEST_KEY, 'hello');
@@ -184,14 +227,19 @@ describe('useOnyxState', () => {
         });
 
         it('should run the selector again on a re-render after a dependency changed', async () => {
+            // Given a mounted hook, and a dependency that changes in the cache without a notification,
+            // which is how `Onyx.init` hydrates it
             await Onyx.set(ONYXKEYS.TEST_KEY, 'hello');
             const selector = jest.fn((state: OnyxStateView) => state[ONYXKEYS.TEST_KEY]);
-            const {result} = renderHook(() => useOnyxState(selector));
+            const {result, rerender} = renderHook((_props: {renderID: number}) => useOnyxState(selector), {initialProps: {renderID: 0}});
             await act(async () => waitForPromisesToResolve());
             const callCountAfterMount = selector.mock.calls.length;
+            cache.set(ONYXKEYS.TEST_KEY, 'updated');
 
-            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'updated'));
+            // When the component re-renders with the same selector
+            rerender({renderID: 1});
 
+            // Then the selector runs again, because the cached output is only reused while every dependency is unchanged
             expect(selector.mock.calls.length).toBeGreaterThan(callCountAfterMount);
             expect(result.current).toEqual('updated');
         });

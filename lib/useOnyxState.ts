@@ -14,7 +14,7 @@ type OnyxKeysView = {
 /**
  * Read-only view over the Onyx state. Reading a key returns what `getState` returns: the frozen
  * snapshot for a collection key, the cached value for a single key, `undefined` when absent.
- * Nothing is materialized — every read routes through the store.
+ * Nothing is materialized, every read routes through the store.
  *
  * Collection roots are spelled out on top of `OnyxKeysView`. Mapping over `OnyxKey` alone cannot type
  * them: collection keys reach it as the template `${CollectionKeyBase}${string}`, which becomes one
@@ -139,6 +139,22 @@ function defaultSelectorEquality<T>(a: T, b: T): boolean {
     return deepEqual(a, b);
 }
 
+/**
+ * Compares a new selector output with the previous one. An output that is one of the values the
+ * selector read from the store, say a whole collection, is settled by `===` under the default
+ * equality: the store only replaces a reference when the content changed, so a deep comparison
+ * would walk both values and always answer false.
+ */
+function isOutputEqual<T>(previousOutput: T, output: T, depValues: Array<OnyxValue<OnyxKey>>, selectorEquality: (a: T, b: T) => boolean): boolean {
+    if (Object.is(previousOutput, output)) {
+        return true;
+    }
+    if (selectorEquality === defaultSelectorEquality && typeof output === 'object' && output !== null && depValues.includes(output)) {
+        return false;
+    }
+    return selectorEquality(previousOutput, output);
+}
+
 type Snapshotter<T> = {
     getSnapshot: () => T;
     /** The latest run of this snapshotter, `null` before its first one. */
@@ -243,7 +259,7 @@ function useOnyxState<T>(selector: UseOnyxStateSelector<T>, options: UseOnyxStat
 
             // Hand back the previous reference when the output is equal, so React bails out via `===`
             // and an unchanged store keeps returning the same value even as `getSnapshot`'s identity moves.
-            const value = previous !== null && selectorEquality(previous.value, output) ? previous.value : output;
+            const value = previous !== null && isOutputEqual(previous.value, output, depValues, selectorEquality) ? previous.value : output;
             own.last = {value, selector, deps, depValues};
             return value;
         }
