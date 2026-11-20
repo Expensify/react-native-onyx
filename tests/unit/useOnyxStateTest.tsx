@@ -1,4 +1,5 @@
-import {act, renderHook} from '@testing-library/react-native';
+import {act, render, renderHook} from '@testing-library/react-native';
+import React, {startTransition, Suspense, useState} from 'react';
 
 import type {OnyxStateView} from '../../lib/useOnyxState';
 
@@ -323,6 +324,107 @@ describe('useOnyxState', () => {
             // Then the record it points at still updates the hook when it arrives
             await act(async () => Onyx.merge(MEMBER_1, {name: 'one'}));
             expect(result.current).toEqual('one');
+        });
+    });
+
+    describe('render that never commits', () => {
+        /**
+         * Mounts a row that reads TEST_KEY's length. `abandonRender` re-renders it in a transition with
+         * another selector and suspends, so React runs that selector but never commits its output.
+         */
+        function renderAbandonableRow() {
+            const neverResolves = new Promise<never>(() => {});
+            const committedSelector = (state: OnyxStateView) => ({length: asString(state[ONYXKEYS.TEST_KEY]).length});
+            const abandonedSelector = (state: OnyxStateView) => ({other: state[ONYXKEYS.OTHER_TEST]});
+            const committedRenders: unknown[] = [];
+            let abandonedRenderCount = 0;
+            let showAbandoned: () => void = () => {};
+            let rerenderParent: () => void = () => {};
+
+            function Suspender(): null {
+                throw neverResolves;
+            }
+
+            function Row({isAbandoned}: {isAbandoned: boolean}) {
+                const value = useOnyxState<unknown>(isAbandoned ? abandonedSelector : committedSelector);
+                if (isAbandoned) {
+                    abandonedRenderCount += 1;
+                    return <Suspender />;
+                }
+                committedRenders.push(value);
+                return null;
+            }
+
+            function Parent() {
+                const [isAbandoned, setIsAbandoned] = useState(false);
+                const [, setTick] = useState(0);
+                showAbandoned = () => setIsAbandoned(true);
+                rerenderParent = () => setTick((tick) => tick + 1);
+                return (
+                    <Suspense fallback={null}>
+                        <Row isAbandoned={isAbandoned} />
+                    </Suspense>
+                );
+            }
+
+            render(<Parent />, {concurrentRoot: true});
+
+            return {
+                committedRenders,
+                getAbandonedRenderCount: () => abandonedRenderCount,
+                abandonRender: () => startTransition(() => showAbandoned()),
+                rerenderParent: () => rerenderParent(),
+            };
+        }
+
+        it('should keep the committed output reference when a re-render follows a render that never committed', async () => {
+            // Given a committed row, and a transition render with another selector that suspended before committing
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'a');
+            const row = renderAbandonableRow();
+            await act(async () => waitForPromisesToResolve());
+            const committedValue = row.committedRenders.at(-1);
+            const committedRenderCount = row.committedRenders.length;
+            await act(async () => row.abandonRender());
+            expect(row.getAbandonedRenderCount()).toBeGreaterThan(0);
+
+            // When the parent re-renders the row urgently with the committed selector
+            await act(async () => row.rerenderParent());
+
+            // Then the row rendered again and got the reference it committed, because the abandoned
+            // render's output must not replace the value the next run is compared against
+            expect(row.committedRenders.length).toBeGreaterThan(committedRenderCount);
+            expect(row.committedRenders.at(-1)).toBe(committedValue);
+        });
+
+        it('should not re-render on a write that leaves the output equal after a render that never committed', async () => {
+            // Given a committed row, and a transition render with another selector that suspended before committing
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'a');
+            const row = renderAbandonableRow();
+            await act(async () => waitForPromisesToResolve());
+            const committedRenderCount = row.committedRenders.length;
+            await act(async () => row.abandonRender());
+            expect(row.getAbandonedRenderCount()).toBeGreaterThan(0);
+
+            // When a dependency changes to a value of the same length, so the committed selector's output is deep-equal
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'b'));
+
+            // Then the row does not re-render, because the new output is compared against the committed one
+            expect(row.committedRenders.length).toBe(committedRenderCount);
+        });
+
+        it('should still update the row on a write that changes the output after a render that never committed', async () => {
+            // Given a committed row, and a transition render with another selector that suspended before committing
+            await Onyx.set(ONYXKEYS.TEST_KEY, 'a');
+            const row = renderAbandonableRow();
+            await act(async () => waitForPromisesToResolve());
+            await act(async () => row.abandonRender());
+            expect(row.getAbandonedRenderCount()).toBeGreaterThan(0);
+
+            // When a dependency of the committed selector changes its output
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'abc'));
+
+            // Then the row renders the new output, so the abandoned render did not move the subscription away
+            expect(row.committedRenders.at(-1)).toEqual({length: 3});
         });
     });
 });
