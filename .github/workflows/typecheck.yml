@@ -6,7 +6,7 @@ on:
 
 jobs:
   typecheck:
-    runs-on: blacksmith-4vcpu-ubuntu-2404-arm
+    runs-on: blacksmith-2vcpu-ubuntu-2404-arm
     steps:
       # v5.0.0
       - uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
