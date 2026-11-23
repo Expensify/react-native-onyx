@@ -14,14 +14,10 @@ type OnyxKeysView = {
 /**
  * Read-only view over the Onyx state. Reading a key returns what `getState` returns: the frozen
  * snapshot for a collection key, the cached value for a single key, `undefined` when absent.
- * Nothing is materialized, every read routes through the store.
  *
- * Collection roots are spelled out on top of `OnyxKeysView`. Mapping over `OnyxKey` alone cannot type
- * them: collection keys reach it as the template `${CollectionKeyBase}${string}`, which becomes one
- * index signature typed off that template rather than off the key you index with. The template does
- * not extend `CollectionKeyBase`, so `OnyxValue` resolves it to a member, and a root such as `report_`
- * matches the signature and comes back typed as a single report. A declared property wins over the
- * index signature. Without `CustomTypeOptions` every key is already `unknown`, so the roots are skipped.
+ * Collection roots are declared on top of `OnyxKeysView`. Without them TypeScript types a root such
+ * as `report_` as a single member. With no `CustomTypeOptions` every key is `unknown`, so the roots
+ * are skipped.
  */
 type OnyxStateView = string extends CollectionKeyBase
     ? OnyxKeysView
@@ -29,9 +25,9 @@ type OnyxStateView = string extends CollectionKeyBase
           readonly [K in CollectionKeyBase]: OnyxCollection<KeyValueMapping[K]>;
       };
 
-type UseOnyxStateSelector<T> = (state: OnyxStateView) => T;
+type UseOnyxStateSelector<TReturnValue> = (state: OnyxStateView) => TReturnValue;
 
-type UseOnyxStateOptions<T> = {
+type UseOnyxStateOptions<TReturnValue> = {
     /**
      * Equality for the selector's output. Defaults to `===` with a deep-equal fallback for objects.
      * When it returns true, the React update is skipped.
@@ -40,7 +36,7 @@ type UseOnyxStateOptions<T> = {
      * as `state[key]`: a new reference there is returned as a new value, the way `useOnyx` without a
      * selector returns it.
      */
-    selectorEquality?: (a: T, b: T) => boolean;
+    selectorEquality?: (a: TReturnValue, b: TReturnValue) => boolean;
 };
 
 /** Collects the keys the running selector reads from the state view and their values, `null` when nothing is recording. */
@@ -48,8 +44,7 @@ let activeRecorder: Map<OnyxKey, OnyxValue<OnyxKey>> | null = null;
 
 /**
  * Reads `key` from the store and records it as a dependency of the running selector. Throws when no
- * selector is running: such a read, say from a closure the selector returned, cannot be subscribed to
- * and would never refresh.
+ * selector is running.
  */
 function readAndRecord(key: OnyxKey): OnyxValue<OnyxKey> {
     if (activeRecorder === null) {
@@ -80,6 +75,7 @@ const liveStateView = new Proxy<Record<string, never>>(
             return false;
         },
         deleteProperty() {
+            // Read-only: the selector must not mutate the view.
             return false;
         },
         has(_target, prop) {
@@ -93,16 +89,16 @@ const liveStateView = new Proxy<Record<string, never>>(
     },
 ) as OnyxStateView;
 
-type SnapshotCache<T> = {
-    value: T;
-    selector: UseOnyxStateSelector<T>;
+type SnapshotCache<TValue> = {
+    value: TValue;
+    selector: UseOnyxStateSelector<TValue>;
     /** The keys the run read. Same reference while the set is unchanged. */
     deps: readonly OnyxKey[];
     depValues: Array<OnyxValue<OnyxKey>>;
 };
 
 /** Runs the selector with `liveStateView` recording, and returns the keys it read with their values. */
-function recordReads<T>(run: () => T): {output: T; reads: Map<OnyxKey, OnyxValue<OnyxKey>>} {
+function recordReads<TValue>(run: () => TValue): {output: TValue; reads: Map<OnyxKey, OnyxValue<OnyxKey>>} {
     const reads = new Map<OnyxKey, OnyxValue<OnyxKey>>();
     const outerRecorder = activeRecorder;
     activeRecorder = reads;
@@ -113,6 +109,7 @@ function recordReads<T>(run: () => T): {output: T; reads: Map<OnyxKey, OnyxValue
     }
 }
 
+/** True when `recorded` holds exactly the keys in `keys`. */
 function isSameKeySet(keys: readonly OnyxKey[], recorded: Map<OnyxKey, OnyxValue<OnyxKey>>): boolean {
     return keys.length === recorded.size && keys.every((key) => recorded.has(key));
 }
@@ -131,7 +128,7 @@ function areDepValuesUnchanged(deps: readonly OnyxKey[], depValues: Array<OnyxVa
  * deepEqual for an object the selector freshly allocated with unchanged content. `isOutputEqual` has
  * already settled `===`, which covers primitives and frozen snapshot references.
  */
-function defaultSelectorEquality<T>(a: T, b: T): boolean {
+function defaultSelectorEquality<TValue>(a: TValue, b: TValue): boolean {
     if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') {
         return false;
     }
@@ -141,12 +138,9 @@ function defaultSelectorEquality<T>(a: T, b: T): boolean {
 /**
  * Compares a new selector output with the previous one. An output that is one of the values the
  * selector read from the store, say a whole collection, is settled by `===` under the default
- * equality. `set` and `merge` only replace a reference when the content changed, so a deep comparison
- * would walk both values and nearly always answer false. `multiSet`, `setCollection` and a write synced
- * from another tab replace the reference even when the content is equal, and such an output then
- * comes back as a new reference.
+ * equality.
  */
-function isOutputEqual<T>(previousOutput: T, output: T, depValues: Array<OnyxValue<OnyxKey>>, selectorEquality: (a: T, b: T) => boolean): boolean {
+function isOutputEqual<TValue>(previousOutput: TValue, output: TValue, depValues: Array<OnyxValue<OnyxKey>>, selectorEquality: (a: TValue, b: TValue) => boolean): boolean {
     if (Object.is(previousOutput, output)) {
         return true;
     }
@@ -156,10 +150,15 @@ function isOutputEqual<T>(previousOutput: T, output: T, depValues: Array<OnyxVal
     return selectorEquality(previousOutput, output);
 }
 
-type Snapshotter<T> = {
-    getSnapshot: () => T;
+/** Runs one selector and caches its latest run. */
+type Snapshotter<TValue> = {
+    getSnapshot: () => TValue;
     /** The latest run of this snapshotter, `null` before its first one. */
-    peek: () => SnapshotCache<T> | null;
+    peek: () => SnapshotCache<TValue> | null;
+};
+
+type SnapshotterState<TValue> = {
+    last: SnapshotCache<TValue> | null;
 };
 
 /**
@@ -173,14 +172,13 @@ type Snapshotter<T> = {
  * Skips the React update when the output is equal to the previous one, per `selectorEquality`.
  *
  * Mounting before `Onyx.init` has hydrated runs the selector against an empty state and re-runs it
- * once init lands. There is no status channel, so a consumer that must tell "not hydrated yet" from
- * "absent" has to carry that in its own output.
+ * once init lands.
  */
-function useOnyxState<T>(selector: UseOnyxStateSelector<T>, options: UseOnyxStateOptions<T> = {}): T {
+function useOnyxState<TReturnValue>(selector: UseOnyxStateSelector<TReturnValue>, options: UseOnyxStateOptions<TReturnValue> = {}): TReturnValue {
     const {selectorEquality = defaultSelectorEquality} = options;
 
     /** The snapshotter of the last committed render. A render that never commits does not touch it. */
-    const committedSnapshotterRef = useRef<Snapshotter<T> | null>(null);
+    const committedSnapshotterRef = useRef<Snapshotter<TReturnValue> | null>(null);
     const syncKeysRef = useRef<(() => void) | null>(null);
 
     // Only `subscribe` has to be referentially stable, since it controls re-subscription.
@@ -238,10 +236,10 @@ function useOnyxState<T>(selector: UseOnyxStateSelector<T>, options: UseOnyxStat
     // by every render, because React can throw a render away (a suspended or interrupted transition).
     // A shared ref would then hold the output of a selector that never reached the screen, and the next
     // run would be compared against it instead of the committed value.
-    const snapshotter = useMemo((): Snapshotter<T> => {
-        const own: {last: SnapshotCache<T> | null} = {last: null};
+    const snapshotter = useMemo((): Snapshotter<TReturnValue> => {
+        const own: SnapshotterState<TReturnValue> = {last: null};
 
-        function getSnapshot(): T {
+        function getSnapshot(): TReturnValue {
             // The first run has nothing of its own yet, so it starts from the committed snapshot.
             const previous = own.last ?? committedSnapshotterRef.current?.peek() ?? null;
 

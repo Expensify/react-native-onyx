@@ -282,6 +282,9 @@ class OnyxSubscriptionManager {
         return collectionKey !== undefined && collectionKey !== key && this.hasListenersForExactKey(collectionKey);
     }
 
+    /**
+     * True if `key` itself has a key listener or a state listener. The parent collection is not checked.
+     */
     private hasListenersForExactKey(key: OnyxKey): boolean {
         return (this.keyListeners.get(key)?.size ?? 0) > 0 || (this.stateListenersByDep.get(key)?.size ?? 0) > 0;
     }
