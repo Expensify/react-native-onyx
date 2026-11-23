@@ -92,6 +92,7 @@ const liveStateView = new Proxy<Record<string, never>>(
 type SnapshotCache<TValue> = {
     value: TValue;
     selector: UseOnyxStateSelector<TValue>;
+    selectorEquality: (a: TValue, b: TValue) => boolean;
     /** The keys the run read. Same reference while the set is unchanged. */
     deps: readonly OnyxKey[];
     depValues: Array<OnyxValue<OnyxKey>>;
@@ -247,7 +248,7 @@ function useOnyxState<TReturnValue>(selector: UseOnyxStateSelector<TReturnValue>
             // every dep are the same references as last time, the output can't differ, so skip the selector
             // and its reads through the state view. A parent re-rendering a list of rows otherwise re-runs
             // every row's selector.
-            if (previous !== null && previous.selector === selector && areDepValuesUnchanged(previous.deps, previous.depValues)) {
+            if (previous !== null && previous.selector === selector && previous.selectorEquality === selectorEquality && areDepValuesUnchanged(previous.deps, previous.depValues)) {
                 own.last = previous;
                 return previous.value;
             }
@@ -260,7 +261,7 @@ function useOnyxState<TReturnValue>(selector: UseOnyxStateSelector<TReturnValue>
             // Hand back the previous reference when the output is equal, so React bails out via `===`
             // and an unchanged store keeps returning the same value even as `getSnapshot`'s identity moves.
             const value = previous !== null && isOutputEqual(previous.value, output, depValues, selectorEquality) ? previous.value : output;
-            own.last = {value, selector, deps, depValues};
+            own.last = {value, selector, selectorEquality, deps, depValues};
             return value;
         }
 

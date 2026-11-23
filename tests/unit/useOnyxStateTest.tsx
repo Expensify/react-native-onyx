@@ -163,6 +163,22 @@ describe('useOnyxState', () => {
 
             expect(result.current).toEqual('changed');
         });
+
+        it('should apply a new equality to an update the previous equality suppressed', async () => {
+            const selector = (state: OnyxStateView) => state[ONYXKEYS.TEST_KEY] ?? 'none';
+            const alwaysEqual: (a: unknown, b: unknown) => boolean = () => true;
+            const {result, rerender} = renderHook(({selectorEquality}) => useOnyxState(selector, {selectorEquality}), {
+                initialProps: {selectorEquality: alwaysEqual},
+            });
+            await act(async () => waitForPromisesToResolve());
+
+            await act(async () => Onyx.set(ONYXKEYS.TEST_KEY, 'changed'));
+            expect(result.current).toEqual('none');
+
+            rerender({selectorEquality: Object.is});
+
+            expect(result.current).toEqual('changed');
+        });
     });
 
     describe('raw store value output', () => {
