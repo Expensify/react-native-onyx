@@ -188,7 +188,7 @@ function useOnyxState<TReturnValue>(selector: UseOnyxStateSelector<TReturnValue>
         let isActive = true;
         // React subscribes after the commit, so the snapshot behind the committed value is already there.
         let keys = committedSnapshotterRef.current?.peek()?.deps ?? [];
-        let unsubscribe = onyxSubscriptionManager.subscribeState(handleStoreChange, keys);
+        const subscription = onyxSubscriptionManager.subscribeState(handleStoreChange, keys);
 
         /** Moves the subscription to the keys the latest selector run read. */
         function syncKeys() {
@@ -196,9 +196,8 @@ function useOnyxState<TReturnValue>(selector: UseOnyxStateSelector<TReturnValue>
             if (!isActive || lastSnapshot === null || keys === lastSnapshot.deps) {
                 return;
             }
-            unsubscribe();
             keys = lastSnapshot.deps;
-            unsubscribe = onyxSubscriptionManager.subscribeState(handleStoreChange, keys);
+            subscription.updateDeps(keys);
             // A write that landed on a newly read key before this point fired nobody.
             if (!areDepValuesUnchanged(keys, lastSnapshot.depValues)) {
                 handleStoreChange();
@@ -229,7 +228,7 @@ function useOnyxState<TReturnValue>(selector: UseOnyxStateSelector<TReturnValue>
 
         return () => {
             isActive = false;
-            unsubscribe();
+            subscription.unsubscribe();
         };
     }, []);
 

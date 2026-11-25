@@ -24,6 +24,12 @@ type StateListenerEntry = {
     deps: Set<OnyxKey>;
 };
 
+type StateSubscription = {
+    /** Moves the subscription to `deps`, adding and removing only the keys that differ. */
+    updateDeps: (deps: readonly OnyxKey[]) => void;
+    unsubscribe: () => void;
+};
+
 const reportedCacheMisses = new Set<OnyxKey>();
 
 function reportCacheMissIfStorageHasValue(key: OnyxKey): void {
@@ -118,30 +124,43 @@ class OnyxSubscriptionManager {
      * Subscribe to state-tree changes. The listener fires when any of the dependency keys changes.
      * A collection key counts as a single dep: any member change fires it. Used by `useOnyxState`.
      *
-     * Returns an unsubscribe function.
+     * Returns a handle. `updateDeps` moves the subscription to a new dep set, touching only the keys
+     * that were added or removed.
      */
-    subscribeState(listener: StateListenerCallback, deps: readonly OnyxKey[]): () => void {
+    subscribeState(listener: StateListenerCallback, deps: readonly OnyxKey[]): StateSubscription {
         const entry: StateListenerEntry = {listener, deps: new Set(deps)};
+        let isSubscribed = true;
         for (const dep of entry.deps) {
-            let set = this.stateListenersByDep.get(dep);
-            if (!set) {
-                set = new Set();
-                this.stateListenersByDep.set(dep, set);
-            }
-            set.add(entry);
+            this.addStateEntry(dep, entry);
         }
 
-        return () => {
-            for (const dep of entry.deps) {
-                const set = this.stateListenersByDep.get(dep);
-                if (!set) {
-                    continue;
+        return {
+            updateDeps: (nextDeps) => {
+                if (!isSubscribed) {
+                    return;
                 }
-                set.delete(entry);
-                if (set.size === 0) {
-                    this.stateListenersByDep.delete(dep);
+                const next = new Set(nextDeps);
+                for (const dep of entry.deps) {
+                    if (!next.has(dep)) {
+                        this.removeStateEntry(dep, entry);
+                    }
                 }
-            }
+                for (const dep of next) {
+                    if (!entry.deps.has(dep)) {
+                        this.addStateEntry(dep, entry);
+                    }
+                }
+                entry.deps = next;
+            },
+            unsubscribe: () => {
+                if (!isSubscribed) {
+                    return;
+                }
+                isSubscribed = false;
+                for (const dep of entry.deps) {
+                    this.removeStateEntry(dep, entry);
+                }
+            },
         };
     }
 
@@ -289,6 +308,26 @@ class OnyxSubscriptionManager {
         return (this.keyListeners.get(key)?.size ?? 0) > 0 || (this.stateListenersByDep.get(key)?.size ?? 0) > 0;
     }
 
+    private addStateEntry(dep: OnyxKey, entry: StateListenerEntry): void {
+        let set = this.stateListenersByDep.get(dep);
+        if (!set) {
+            set = new Set();
+            this.stateListenersByDep.set(dep, set);
+        }
+        set.add(entry);
+    }
+
+    private removeStateEntry(dep: OnyxKey, entry: StateListenerEntry): void {
+        const set = this.stateListenersByDep.get(dep);
+        if (!set) {
+            return;
+        }
+        set.delete(entry);
+        if (set.size === 0) {
+            this.stateListenersByDep.delete(dep);
+        }
+    }
+
     /**
      * Fires each state listener registered on `depKey`, skipping any already fired this dispatch.
      * Tracked by callback rather than by entry: a listener that re-subscribes while it runs gets a
@@ -324,4 +363,4 @@ class OnyxSubscriptionManager {
 const onyxSubscriptionManager = new OnyxSubscriptionManager();
 
 export default onyxSubscriptionManager;
-export type {Listener};
+export type {Listener, StateSubscription};
