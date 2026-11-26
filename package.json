@@ -28,7 +28,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "prepare": "npm run build && lefthook install",
+    "prepare": "npm run build && if git rev-parse --git-dir >/dev/null 2>&1; then lefthook install; fi",
     "lint": "node config/oxlint/lint.mjs",
     "typecheck": "tsc --noEmit",
     "test": "jest",
