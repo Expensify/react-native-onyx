@@ -1307,7 +1307,7 @@ function multiSetWithRetry(data: OnyxMultiSetInput, retryAttempt?: number): Prom
  */
 function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, collection}: SetCollectionParams<TKey>, retryAttempt?: number): Promise<void> {
     let resultCollection: OnyxInputKeyValueMapping = collection;
-    let resultCollectionKeys = Object.keys(resultCollection);
+    const resultCollectionKeys = Object.keys(resultCollection);
 
     // Confirm all the collection keys belong to the same parent
     if (!OnyxUtils.doAllCollectionItemsBelongToSameParent(collectionKey, resultCollectionKeys)) {
@@ -1331,7 +1331,7 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
             return result;
         }, {});
     }
-    resultCollectionKeys = Object.keys(resultCollection);
+    const resultCollectionKeySet = new Set(Object.keys(resultCollection));
 
     if (!retryAttempt) {
         cancelPendingMergesForCollection(collectionKey);
@@ -1344,7 +1344,7 @@ function setCollectionWithRetry<TKey extends CollectionKeyBase>({collectionKey, 
             if (!key.startsWith(collectionKey)) {
                 continue;
             }
-            if (resultCollectionKeys.includes(key)) {
+            if (resultCollectionKeySet.has(key)) {
                 continue;
             }
 

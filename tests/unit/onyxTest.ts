@@ -3373,6 +3373,29 @@ describe('Onyx', () => {
             });
         });
 
+        it('should keep, update and remove persisted members when replacing a collection', async () => {
+            const count = 1000;
+            const key = (i: number) => `${ONYX_KEYS.COLLECTION.ROUTES}${i}`;
+            const initial: GenericCollection = {};
+            const next: GenericCollection = {};
+            for (let i = 0; i < count; i++) {
+                initial[key(i)] = {v: i};
+                next[key(i + count / 2)] = {v: `new${i}`};
+            }
+            await Onyx.mergeCollection(ONYX_KEYS.COLLECTION.ROUTES, initial);
+
+            await Onyx.setCollection(ONYX_KEYS.COLLECTION.ROUTES, next);
+
+            const keys = await OnyxUtils.getAllKeys();
+            expect(keys.has(key(0))).toBe(false);
+            expect(keys.has(key(count / 2 - 1))).toBe(false);
+            expect(keys.has(key(count / 2))).toBe(true);
+            expect(keys.has(key(count + count / 2 - 1))).toBe(true);
+            expect(await StorageMock.getItem(key(0))).toBeNull();
+            expect(await StorageMock.getItem(key(count / 2))).toEqual({v: 'new0'});
+            expect(await StorageMock.getItem(key(count))).toEqual({v: `new${count / 2}`});
+        });
+
         it('should only trigger collection callback once when setCollection is called with null values', async () => {
             const mockCallback = jest.fn();
             const routeA = `${ONYX_KEYS.COLLECTION.ROUTES}A`;
