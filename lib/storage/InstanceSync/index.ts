@@ -16,6 +16,7 @@ const InstanceSync = {
     multiSet: NOOP,
     mergeItem: NOOP,
     clear: <T extends () => void>(callback: T) => Promise.resolve(callback()),
+    noteLocalWrite: NOOP,
 };
 
 export default InstanceSync;

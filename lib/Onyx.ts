@@ -111,7 +111,7 @@ function init({
             for (const [collectionKey, {partial, previous}] of collectionBatches) {
                 OnyxUtils.notifyCollection(collectionKey, partial, previous);
             }
-        });
+        }, PendingWrites.reportOtherInstanceWrite);
     }
 
     OnyxUtils.initStoreValues(keys, initialKeyStates, evictableKeys);
@@ -442,6 +442,14 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
             keysWrittenDuringClear.add(key);
         }
     });
+    // Another tab can write to shared storage too (e.g. signing in while this tab signs out). Those writes skip the
+    // listener above, so they are tracked separately: clear leaves them in storage and reads them back at the end.
+    const keysWrittenByOtherInstanceDuringClear = new Set<OnyxKey>();
+    const removeOtherInstanceWriteListener = PendingWrites.addOtherInstanceWriteListener((keys) => {
+        for (const key of keys) {
+            keysWrittenByOtherInstanceDuringClear.add(key);
+        }
+    });
 
     const clearPromise = PendingWrites.trackPendingGlobalWrite(
         OnyxUtils.afterInit(() => {
@@ -531,31 +539,70 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
                             }, {}),
                     );
 
-                    // Remove only the items that we want cleared from storage, and reset others to default
+                    // Keys another tab wrote are read back from storage instead of being written or kept from this tab.
+                    let keysWrittenByOtherInstance = new Set<OnyxKey>();
+                    const collectKeysWrittenByOtherInstance = () =>
+                        new Set(Object.keys(valuesSetByClear).filter((key) => keysWrittenByOtherInstanceDuringClear.has(key) && !OnyxKeys.isRamOnlyKey(key)));
+                    const wasWrittenOnlyByThisInstance = (key: OnyxKey): boolean => wasWrittenDuringClear(key) && !keysWrittenByOtherInstance.has(key);
+
+                    // Reset defaults before the slow removal: storage applies writes in order, so a write another tab
+                    // makes during the clear is stored after the defaults instead of being overwritten by them.
+                    keysWrittenByOtherInstance = collectKeysWrittenByOtherInstance();
+                    const resetDefaultsPromise = Storage.multiSet(defaultKeyValuePairs.filter(([key]) => !keysWrittenByOtherInstance.has(key)));
+
+                    // Remove only the items that we want cleared from storage
                     for (const key of keysToBeClearedFromStorage) cache.drop(key);
-                    return Storage.removeItems(keysToBeClearedFromStorage)
+                    return Promise.all([resetDefaultsPromise, Storage.removeItems(keysToBeClearedFromStorage)])
                         .then(() => {
-                            // Save written keys again in case `removeItems` deleted them after they were stored.
+                            keysWrittenByOtherInstance = collectKeysWrittenByOtherInstance();
+                            // Save this tab's writes again in case the clear's storage step deleted them after they were stored.
                             const writtenKeyValuePairs = Object.keys(valuesSetByClear)
-                                .filter((key) => !OnyxKeys.isRamOnlyKey(key) && wasWrittenDuringClear(key))
+                                .filter((key) => !OnyxKeys.isRamOnlyKey(key) && wasWrittenOnlyByThisInstance(key))
                                 .map((key): [OnyxKey, OnyxValue<OnyxKey>] => [key, cache.get(key)]);
-                            return Storage.multiSet([...defaultKeyValuePairs.filter(([key]) => !wasWrittenDuringClear(key)), ...writtenKeyValuePairs]);
+                            return writtenKeyValuePairs.length > 0 ? Storage.multiSet(writtenKeyValuePairs) : undefined;
                         })
                         .then(() => {
+                            // Keys reported while the storage step ran are read back too
+                            keysWrittenByOtherInstance = collectKeysWrittenByOtherInstance();
+                            return keysWrittenByOtherInstance.size > 0 ? Storage.multiGet([...keysWrittenByOtherInstance]) : [];
+                        })
+                        .then((pairsWrittenByOtherInstance) => {
+                            // Storage holds the other tab's values, so the cache and subscribers take them instead of the reset values.
+                            for (const [key, storedValue] of pairsWrittenByOtherInstance) {
+                                const value = storedValue ?? OnyxUtils.getNullFreeDefaultKeyState(key) ?? undefined;
+                                if (value === undefined) {
+                                    cache.drop(key);
+                                } else {
+                                    cache.set(key, value);
+                                }
+                                const collectionKey = OnyxKeys.getCollectionKey(key);
+                                if (collectionKey) {
+                                    if (!keyValuesToResetAsCollection[collectionKey]) {
+                                        keyValuesToResetAsCollection[collectionKey] = {oldValues: {}, newValues: {}};
+                                    }
+                                    if (!(key in keyValuesToResetAsCollection[collectionKey].oldValues)) {
+                                        keyValuesToResetAsCollection[collectionKey].oldValues[key] = valuesSetByClear[key] ?? undefined;
+                                    }
+                                    keyValuesToResetAsCollection[collectionKey].newValues[key] = value;
+                                } else {
+                                    keyValuesToResetIndividually[key] = value;
+                                }
+                            }
+
                             DevTools.clearState(keysToPreserve);
 
                             onyxSubscriptionManager.resetCacheMissReports();
 
                             // Notify the subscribers for each key/value group so they can receive the new values.
-                            // Keys written during the clear are skipped, their subscribers already have the newer value.
+                            // Keys written by this tab during the clear are skipped, their subscribers already have the newer value.
                             for (const [key, value] of Object.entries(keyValuesToResetIndividually)) {
-                                if (wasWrittenDuringClear(key)) {
+                                if (wasWrittenOnlyByThisInstance(key)) {
                                     continue;
                                 }
                                 OnyxUtils.notifyKey(key, value);
                             }
                             for (const [key, value] of Object.entries(keyValuesToResetAsCollection)) {
-                                const writtenMemberKeys = Object.keys(value.newValues).filter(wasWrittenDuringClear);
+                                const writtenMemberKeys = Object.keys(value.newValues).filter(wasWrittenOnlyByThisInstance);
                                 for (const memberKey of writtenMemberKeys) {
                                     delete value.newValues[memberKey];
                                     delete value.oldValues[memberKey];
@@ -572,7 +619,11 @@ function clear(keysToPreserve: OnyxKey[] = []): Promise<void> {
             return cache.captureTask(TASK.CLEAR, promise) as Promise<void>;
         }),
     );
-    clearPromise.then(removeWriteListener, removeWriteListener);
+    const removeListeners = () => {
+        removeWriteListener();
+        removeOtherInstanceWriteListener();
+    };
+    clearPromise.then(removeListeners, removeListeners);
     return clearPromise;
 }
 

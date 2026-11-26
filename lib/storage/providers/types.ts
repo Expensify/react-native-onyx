@@ -15,6 +15,9 @@ type DatabaseSize = {
 /** Called with the full batch of key/value pairs that changed together in a single cross-tab sync event. */
 type OnStorageKeysChanged = (pairs: StorageKeyValuePair[]) => void;
 
+/** Called with the keys another tab changed as soon as it reports them, before their values are read back from storage. */
+type OnStorageKeysAnnounced = (keys: StorageKeyList) => void;
+
 type StorageProvider<TStore> = {
     store: TStore;
 
@@ -99,9 +102,10 @@ type StorageProvider<TStore> = {
 
     /**
      * @param onStorageKeysChanged Storage synchronization mechanism keeping all opened tabs in sync
+     * @param onStorageKeysAnnounced Called with the changed keys before their values are read
      */
-    keepInstancesSync?: (onStorageKeysChanged: OnStorageKeysChanged) => void;
+    keepInstancesSync?: (onStorageKeysChanged: OnStorageKeysChanged, onStorageKeysAnnounced?: OnStorageKeysAnnounced) => void;
 };
 
 export default StorageProvider;
-export type {StorageKeyList, StorageKeyValuePair, OnStorageKeysChanged};
+export type {StorageKeyList, StorageKeyValuePair, OnStorageKeysChanged, OnStorageKeysAnnounced};
