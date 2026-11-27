@@ -6,7 +6,7 @@
 import * as Logger from '../../Logger';
 import type {OnyxKey} from '../../types';
 import NoopProvider from '../providers/NoopProvider';
-import type {StorageKeyList, OnStorageKeysChanged} from '../providers/types';
+import type {StorageKeyList, OnStorageKeysChanged, OnStorageKeysAnnounced} from '../providers/types';
 import type StorageProvider from '../providers/types';
 
 const SYNC_ONYX = 'SYNC_ONYX';
@@ -92,12 +92,47 @@ function raiseStorageSyncEvent(onyxKey: OnyxKey) {
 
 let storage = NoopProvider;
 
+// Reads for another tab's changes, with the keys this tab wrote meanwhile (newer than what the read returns).
+const readsInProgress = new Set<{keys: Set<OnyxKey>; writtenLocally: Set<OnyxKey>}>();
+
+/**
+ * Reads the keys another tab changed. Keys this tab wrote during the read are read again.
+ */
+function readChangedKeys(onyxKeys: StorageKeyList, onStorageKeysChanged: OnStorageKeysChanged) {
+    const read = {keys: new Set(onyxKeys), writtenLocally: new Set<OnyxKey>()};
+    readsInProgress.add(read);
+    storage
+        .multiGet(onyxKeys)
+        .then((pairs) => {
+            readsInProgress.delete(read);
+            onStorageKeysChanged(pairs.filter(([key]) => !read.writtenLocally.has(key)));
+            if (read.writtenLocally.size > 0) {
+                readChangedKeys(Array.from(read.writtenLocally), onStorageKeysChanged);
+            }
+        })
+        .finally(() => readsInProgress.delete(read));
+}
+
+/**
+ * Records keys this tab is about to write, so values read for another tab's event don't overwrite them.
+ */
+function noteLocalWrite(onyxKeys: StorageKeyList) {
+    for (const read of readsInProgress) {
+        for (const onyxKey of onyxKeys) {
+            if (read.keys.has(onyxKey)) {
+                read.writtenLocally.add(onyxKey);
+            }
+        }
+    }
+}
+
 const InstanceSync = {
     shouldBeUsed: true,
     /**
      * @param {Function} onStorageKeysChanged Storage synchronization mechanism keeping all opened tabs in sync
+     * @param onStorageKeysAnnounced Called with the changed keys as soon as the event arrives
      */
-    init: (onStorageKeysChanged: OnStorageKeysChanged, store: StorageProvider<unknown>) => {
+    init: (onStorageKeysChanged: OnStorageKeysChanged, store: StorageProvider<unknown>, onStorageKeysAnnounced?: OnStorageKeysAnnounced) => {
         storage = store;
 
         // Coalesce storage events into one dispatch per tick: a per-key sender would otherwise re-run
@@ -112,6 +147,8 @@ const InstanceSync = {
             }
 
             const onyxKeys = parseSyncOnyxStorageEventValue(event.newValue);
+            // Reported before the read, so a running Onyx.clear doesn't overwrite these keys meanwhile
+            onStorageKeysAnnounced?.(onyxKeys);
 
             if (pendingSyncKeys) {
                 for (const onyxKey of onyxKeys) {
@@ -124,7 +161,7 @@ const InstanceSync = {
             setTimeout(() => {
                 const keys = Array.from(pendingSyncKeys ?? []);
                 pendingSyncKeys = null;
-                storage.multiGet(keys).then((pairs) => onStorageKeysChanged(pairs));
+                readChangedKeys(keys, onStorageKeysChanged);
             }, 0);
         });
     },
@@ -134,6 +171,7 @@ const InstanceSync = {
     multiMerge: raiseStorageSyncManyKeysEvent,
     multiSet: raiseStorageSyncManyKeysEvent,
     mergeItem: raiseStorageSyncEvent,
+    noteLocalWrite,
     clear: (clearImplementation: () => void) => {
         let allKeys: StorageKeyList;
 

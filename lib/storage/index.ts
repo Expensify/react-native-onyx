@@ -5,7 +5,7 @@ import InstanceSync from './InstanceSync';
 import MemoryOnlyProvider from './providers/MemoryOnlyProvider';
 import {StorageErrorClass} from './errors';
 import type StorageProvider from './providers/types';
-import type {StorageKeyValuePair} from './providers/types';
+import type {StorageKeyList, StorageKeyValuePair} from './providers/types';
 
 let provider = PlatformStorage as StorageProvider<unknown>;
 
@@ -114,6 +114,9 @@ const storage: Storage = {
      */
     setItem: (key, value) =>
         tryOrDegradePerformance(() => {
+            if (shouldKeepInstancesSync) {
+                InstanceSync.noteLocalWrite([key]);
+            }
             const promise = provider.setItem(key, value);
 
             if (shouldKeepInstancesSync) {
@@ -128,6 +131,9 @@ const storage: Storage = {
      */
     multiSet: (pairs) =>
         tryOrDegradePerformance(() => {
+            if (shouldKeepInstancesSync) {
+                InstanceSync.noteLocalWrite(pairs.map((pair) => pair[0]));
+            }
             const promise = provider.multiSet(pairs);
 
             if (shouldKeepInstancesSync) {
@@ -142,6 +148,9 @@ const storage: Storage = {
      */
     mergeItem: (key, change, replaceNullPatches) =>
         tryOrDegradePerformance(() => {
+            if (shouldKeepInstancesSync) {
+                InstanceSync.noteLocalWrite([key]);
+            }
             const promise = provider.mergeItem(key, change, replaceNullPatches);
 
             if (shouldKeepInstancesSync) {
@@ -157,6 +166,9 @@ const storage: Storage = {
      */
     multiMerge: (pairs) =>
         tryOrDegradePerformance(() => {
+            if (shouldKeepInstancesSync) {
+                InstanceSync.noteLocalWrite(pairs.map((pair) => pair[0]));
+            }
             const promise = provider.multiMerge(pairs);
 
             if (shouldKeepInstancesSync) {
@@ -171,6 +183,9 @@ const storage: Storage = {
      */
     removeItem: (key) =>
         tryOrDegradePerformance(() => {
+            if (shouldKeepInstancesSync) {
+                InstanceSync.noteLocalWrite([key]);
+            }
             const promise = provider.removeItem(key);
 
             if (shouldKeepInstancesSync) {
@@ -185,6 +200,9 @@ const storage: Storage = {
      */
     removeItems: (keys) =>
         tryOrDegradePerformance(() => {
+            if (shouldKeepInstancesSync) {
+                InstanceSync.noteLocalWrite(keys);
+            }
             const promise = provider.removeItems(keys);
 
             if (shouldKeepInstancesSync) {
@@ -223,18 +241,28 @@ const storage: Storage = {
 
     /**
      * @param onStorageKeysChanged - Storage synchronization mechanism keeping all opened tabs in sync (web only)
+     * @param onStorageKeysAnnounced - Called with the keys another tab changed, before their values are read (web only)
      */
-    keepInstancesSync(onStorageKeysChanged) {
+    keepInstancesSync(onStorageKeysChanged, onStorageKeysAnnounced) {
         // If InstanceSync shouldn't be used, it means we're on a native platform and we don't need to keep instances in sync
         if (!InstanceSync.shouldBeUsed) return;
 
         shouldKeepInstancesSync = true;
-        InstanceSync.init((pairs: StorageKeyValuePair[]) => {
-            if (provider === MemoryOnlyProvider) {
-                return;
-            }
-            onStorageKeysChanged(pairs);
-        }, this);
+        InstanceSync.init(
+            (pairs: StorageKeyValuePair[]) => {
+                if (provider === MemoryOnlyProvider) {
+                    return;
+                }
+                onStorageKeysChanged(pairs);
+            },
+            this,
+            (keys: StorageKeyList) => {
+                if (provider === MemoryOnlyProvider) {
+                    return;
+                }
+                onStorageKeysAnnounced?.(keys);
+            },
+        );
     },
 };
 

@@ -67,15 +67,17 @@ describe('InstanceSync (web)', () => {
 
     describe('storage event parsing', () => {
         let onStorageKeysChanged: jest.Mock;
+        let onStorageKeysAnnounced: jest.Mock;
         let multiGet: jest.Mock;
         let storageEventHandler: (event: {key: string | null; newValue: string | null}) => void;
 
         beforeEach(() => {
             onStorageKeysChanged = jest.fn();
+            onStorageKeysAnnounced = jest.fn();
             multiGet = jest.fn((keys: string[]) => Promise.resolve(keys.map((key) => [key, `value_of_${key}`])));
 
             const addEventListenerSpy = jest.spyOn(global, 'addEventListener').mockImplementation(() => undefined);
-            InstanceSync.init(onStorageKeysChanged, {multiGet} as unknown as StorageProvider<unknown>);
+            InstanceSync.init(onStorageKeysChanged, {multiGet} as unknown as StorageProvider<unknown>, onStorageKeysAnnounced);
 
             const storageCall = addEventListenerSpy.mock.calls.find(([type]) => type === 'storage');
             storageEventHandler = storageCall?.[1] as unknown as typeof storageEventHandler;
@@ -135,6 +137,40 @@ describe('InstanceSync (web)', () => {
             expect(multiGet).toHaveBeenCalledTimes(2);
             expect(multiGet).toHaveBeenNthCalledWith(1, ['test_1']);
             expect(multiGet).toHaveBeenNthCalledWith(2, ['test_2']);
+        });
+
+        it('reports the changed keys as soon as the event arrives, before reading their values', async () => {
+            // Given another tab announces changed keys
+            // When the storage event arrives
+            storageEventHandler({key: SYNC_ONYX, newValue: JSON.stringify(['test_1', 'test_2'])});
+
+            // Then the keys are reported right away, because a running Onyx.clear must know about them before its storage step
+            expect(onStorageKeysAnnounced).toHaveBeenCalledWith(['test_1', 'test_2']);
+            expect(multiGet).not.toHaveBeenCalled();
+            await waitForPromisesToResolve();
+        });
+
+        it('reads a key again when this tab writes it while its value is being read', async () => {
+            // Given the read for another tab's change is still in storage's queue
+            let finishFirstRead: () => void = () => {};
+            multiGet.mockImplementationOnce(
+                (keys: string[]) =>
+                    new Promise((resolve) => {
+                        finishFirstRead = () => resolve(keys.map((key) => [key, `stale_${key}`]));
+                    }),
+            );
+            storageEventHandler({key: SYNC_ONYX, newValue: JSON.stringify(['test_1', 'test_2'])});
+            await waitForPromisesToResolve();
+
+            // When this tab writes one of the keys before that read returns
+            InstanceSync.noteLocalWrite(['test_1']);
+            finishFirstRead();
+            await waitForPromisesToResolve();
+
+            // Then the read value of that key is dropped, since it can predate this tab's write, and the key is read again
+            expect(onStorageKeysChanged).toHaveBeenNthCalledWith(1, [['test_2', 'stale_test_2']]);
+            expect(multiGet).toHaveBeenNthCalledWith(2, ['test_1']);
+            expect(onStorageKeysChanged).toHaveBeenNthCalledWith(2, [['test_1', 'value_of_test_1']]);
         });
 
         it('ignores storage events that are not SYNC_ONYX', async () => {

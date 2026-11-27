@@ -10,6 +10,8 @@ const pendingGlobalWrites = new Set<Promise<unknown>>();
 
 // Told about every write as it is issued, so Onyx.clear can tell writes apart from reads refilling the cache.
 const writeListeners = new Set<(keys: OnyxKey[]) => void>();
+// Told about keys another tab writes, so Onyx.clear doesn't overwrite them.
+const otherInstanceWriteListeners = new Set<(keys: OnyxKey[]) => void>();
 
 /**
  * Registers an in-flight write under each key it can change, so `scheduleInitialSubscriberNotification`
@@ -65,6 +67,23 @@ function addWriteListener(listener: (keys: OnyxKey[]) => void): () => void {
 }
 
 /**
+ * Calls `listener` with the keys another tab writes from now on, until the returned function is called.
+ */
+function addOtherInstanceWriteListener(listener: (keys: OnyxKey[]) => void): () => void {
+    otherInstanceWriteListeners.add(listener);
+    return () => otherInstanceWriteListeners.delete(listener);
+}
+
+/**
+ * Reports keys another tab wrote to shared storage.
+ */
+function reportOtherInstanceWrite(keys: OnyxKey[]): void {
+    for (const listener of otherInstanceWriteListeners) {
+        listener(keys);
+    }
+}
+
+/**
  * In-flight writes that can change the value delivered to a subscriber of `key`: writes to the key
  * itself, writes to any member when `key` is a collection root, and global writes (clear).
  */
@@ -111,12 +130,15 @@ function clearPendingWrites(): void {
     pendingWritesByKey.clear();
     pendingGlobalWrites.clear();
     writeListeners.clear();
+    otherInstanceWriteListeners.clear();
 }
 
 export default {
     trackPendingWrite,
     trackPendingGlobalWrite,
     addWriteListener,
+    addOtherInstanceWriteListener,
+    reportOtherInstanceWrite,
     getPendingWritesForKey,
     scheduleInitialSubscriberNotification,
     clearPendingWrites,
