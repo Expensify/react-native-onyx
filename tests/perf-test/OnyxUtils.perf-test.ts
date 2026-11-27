@@ -283,7 +283,7 @@ describe('OnyxUtils', () => {
                 beforeEach: async () => {
                     await Onyx.multiSet(mockedReportActionsMap);
                     for (const key of mockedReportActionsKeys) {
-                        unsubscribes.push(onyxSubscriptionManager.subscribe(key, jest.fn()));
+                        unsubscribes.push(onyxSubscriptionManager.subscribe(key, jest.fn()).unsubscribe);
                     }
                 },
                 afterEach: async () => {
@@ -309,7 +309,7 @@ describe('OnyxUtils', () => {
                 beforeEach: async () => {
                     await Onyx.set(key, previousReportAction);
                     for (let i = 0; i < 10000; i++) {
-                        unsubscribes.push(onyxSubscriptionManager.subscribe(key, jest.fn()));
+                        unsubscribes.push(onyxSubscriptionManager.subscribe(key, jest.fn()).unsubscribe);
                     }
                 },
                 afterEach: async () => {

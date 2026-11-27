@@ -35,7 +35,7 @@ describe('OnyxSubscriptionManager', () => {
 
             await measureFunction(
                 () => {
-                    unsubscribe = onyxSubscriptionManager.subscribe(`${collectionKey}0`, jest.fn());
+                    unsubscribe = onyxSubscriptionManager.subscribe(`${collectionKey}0`, jest.fn()).unsubscribe;
                 },
                 {
                     beforeEach: async () => {
@@ -54,7 +54,7 @@ describe('OnyxSubscriptionManager', () => {
 
             await measureFunction(
                 () => {
-                    unsubscribe = onyxSubscriptionManager.subscribe(collectionKey, jest.fn());
+                    unsubscribe = onyxSubscriptionManager.subscribe(collectionKey, jest.fn()).unsubscribe;
                 },
                 {
                     beforeEach: async () => {
@@ -76,7 +76,7 @@ describe('OnyxSubscriptionManager', () => {
 
             await measureFunction(() => unsubscribe?.(), {
                 beforeEach: async () => {
-                    unsubscribe = onyxSubscriptionManager.subscribe(key, jest.fn());
+                    unsubscribe = onyxSubscriptionManager.subscribe(key, jest.fn()).unsubscribe;
                 },
                 afterEach: clearOnyxAfterEachMeasure,
             });

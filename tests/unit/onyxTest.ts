@@ -158,6 +158,37 @@ describe('Onyx', () => {
         }
     });
 
+    it('should not deliver a superseded snapshot when another subscriber synchronously writes to the same key', async () => {
+        const key = ONYX_KEYS.RAM_ONLY_TEST_KEY;
+        const initial = {phase: 'initial'};
+        const inner = {phase: 'inner'};
+        await Onyx.set(key, initial);
+        let innerWrite: Promise<void> | undefined;
+        const writer = Onyx.connectWithoutView({
+            key,
+            callback: (value) => {
+                if (value?.phase === 'outer') {
+                    innerWrite = Onyx.set(key, inner);
+                }
+            },
+        });
+        const callback = jest.fn();
+        connection = Onyx.connectWithoutView({key, callback});
+
+        try {
+            await waitForPromisesToResolve();
+            expect(callback).toHaveBeenCalledWith(initial, key);
+            callback.mockClear();
+
+            await Onyx.set(key, {phase: 'outer'});
+            await innerWrite;
+
+            expect(callback.mock.calls).toEqual([[inner, key]]);
+        } finally {
+            writer.unsubscribe();
+        }
+    });
+
     it('should restore a key with initial state if the key was set to null and Onyx.clear() is called', () =>
         Onyx.set(ONYX_KEYS.OTHER_TEST, 42)
             .then(() => Onyx.set(ONYX_KEYS.OTHER_TEST, null))

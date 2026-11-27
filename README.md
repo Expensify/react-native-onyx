@@ -122,6 +122,8 @@ You should avoid arrays as much as possible. They do not work well with `merge()
 
 To set up a basic subscription for a given key outside of a React component use the `Onyx.connectWithoutView()` method. It returns a connection handle.
 
+`connectWithoutView()` and `connect()` deliver the latest cached value, not a stream of writes. If another subscriber synchronously overwrites the key, later callbacks can skip the superseded value. Use an explicit event stream if you need to observe every write.
+
 ```javascript
 let session;
 const connection = Onyx.connectWithoutView({

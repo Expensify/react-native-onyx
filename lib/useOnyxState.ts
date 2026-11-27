@@ -188,7 +188,7 @@ function useOnyxState<TReturnValue>(selector: UseOnyxStateSelector<TReturnValue>
         let isActive = true;
         // React subscribes after the commit, so the snapshot behind the committed value is already there.
         let keys = committedSnapshotterRef.current?.peek()?.deps ?? [];
-        const subscription = onyxSubscriptionManager.subscribeState(handleStoreChange, keys);
+        const subscription = onyxSubscriptionManager.subscribe(keys, handleStoreChange);
 
         /** Moves the subscription to the keys the latest selector run read. */
         function syncKeys() {
