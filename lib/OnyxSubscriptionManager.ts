@@ -67,15 +67,14 @@ class OnyxSubscriptionManager {
     subscribe(deps: OnyxKey | readonly OnyxKey[], listener: Listener): Subscription {
         // Give each subscription its own identity, even when callers share a callback.
         const entry = () => listener();
-        let currentDeps: readonly OnyxKey[] | Set<OnyxKey> = typeof deps === 'string' ? [deps] : new Set(deps);
-        let isSubscribed = true;
+        let currentDeps: readonly OnyxKey[] | Set<OnyxKey> | null = typeof deps === 'string' ? [deps] : new Set(deps);
         for (const dep of currentDeps) {
             this.addListener(dep, entry);
         }
 
         return {
             updateDeps: (nextDeps) => {
-                if (!isSubscribed) {
+                if (!currentDeps) {
                     return;
                 }
                 const previous = currentDeps instanceof Set ? currentDeps : new Set(currentDeps);
@@ -93,13 +92,13 @@ class OnyxSubscriptionManager {
                 currentDeps = next;
             },
             unsubscribe: () => {
-                if (!isSubscribed) {
+                if (!currentDeps) {
                     return;
                 }
-                isSubscribed = false;
                 for (const dep of currentDeps) {
                     this.removeListener(dep, entry);
                 }
+                currentDeps = null;
             },
         };
     }
@@ -216,6 +215,7 @@ class OnyxSubscriptionManager {
             return;
         }
 
+        // Copy first: a `Set` would also visit listeners subscribed during this loop.
         for (const listener of [...listeners]) {
             if (fired?.has(listener)) {
                 continue;

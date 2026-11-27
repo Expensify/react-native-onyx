@@ -195,7 +195,7 @@ Things to know:
 * Read every key while the selector runs. Reading `state` later, for example from a function the selector returned, throws.
 * `state` cannot be enumerated. `Object.keys(state)`, a spread or `for...in` throws. Read a collection key to get all its members.
 * The output is compared with the previous one by `===`, then by deep equality for objects, and an equal output keeps the previous reference. Pass `selectorEquality` in the second argument to replace this. A value returned straight from the store, such as `state[key]`, is compared by reference only.
-* The hook returns the value directly and has no `status`. Before `Onyx.init()` has loaded the stored data the selector sees an empty state, and runs again once the data is there.
+* The hook returns the value directly and has no `status`. Before `Onyx.init()` has loaded the stored data, every key reads as `undefined`, the same as a key with no value. The selector runs again once the data is there, so it needs no special handling.
 * A write that changes several of the keys one by one, such as `Onyx.multiSet()` on non-collection keys, runs the selector once per changed key. The component still renders once.
 
 ### Dependent Onyx Keys and useOnyx()

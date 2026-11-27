@@ -4,6 +4,7 @@ import {useCallback, useEffect, useMemo, useRef, useSyncExternalStore} from 'rea
 import type {CollectionKeyBase, KeyValueMapping, OnyxCollection, OnyxKey, OnyxValue} from './types';
 
 import onyxSubscriptionManager from './OnyxSubscriptionManager';
+import type {Subscription} from './OnyxSubscriptionManager';
 import OnyxUtils from './OnyxUtils';
 
 /** Every key, mapped to what `getState` returns for it. */
@@ -93,7 +94,7 @@ type SnapshotCache<TValue> = {
     value: TValue;
     selector: UseOnyxStateSelector<TValue>;
     selectorEquality: (a: TValue, b: TValue) => boolean;
-    /** The keys the run read. Same reference while the set is unchanged. */
+    /** The keys that were read in the selector run that produced `value`. Same reference while the set is unchanged. */
     deps: readonly OnyxKey[];
     depValues: Array<OnyxValue<OnyxKey>>;
 };
@@ -178,22 +179,23 @@ type SnapshotterState<TValue> = {
 function useOnyxState<TReturnValue>(selector: UseOnyxStateSelector<TReturnValue>, options: UseOnyxStateOptions<TReturnValue> = {}): TReturnValue {
     const {selectorEquality = defaultSelectorEquality} = options;
 
-    /** The snapshotter of the last committed render. A render that never commits does not touch it. */
+    // The snapshotter of the last committed render. A render that never commits does not touch it.
     const committedSnapshotterRef = useRef<Snapshotter<TReturnValue> | null>(null);
     const syncKeysRef = useRef<(() => void) | null>(null);
 
-    // Only `subscribe` has to be referentially stable, since it controls re-subscription.
-    // The snapshotter may change identity freely, so it closes over the latest selector directly.
+    // `useSyncExternalStore` unsubscribes and subscribes again whenever `subscribe` changes identity. A new
+    // `subscribe` on every render would tear down and rebuild the Onyx subscription on every render, so it has
+    // no dependencies and reads what it needs from refs. A new `getSnapshot` costs nothing, since React just
+    // calls the latest one, so the snapshotter below can use the current `selector` without a ref.
     const subscribe = useCallback((onStoreChange: () => void) => {
-        let isActive = true;
         // React subscribes after the commit, so the snapshot behind the committed value is already there.
         let keys = committedSnapshotterRef.current?.peek()?.deps ?? [];
-        const subscription = onyxSubscriptionManager.subscribe(keys, handleStoreChange);
+        let subscription: Subscription | null = onyxSubscriptionManager.subscribe(keys, handleStoreChange);
 
-        /** Moves the subscription to the keys the latest selector run read. */
+        // Subscribes to keys the selector's latest run started reading and unsubscribes from keys it stopped reading.
         function syncKeys() {
             const lastSnapshot = committedSnapshotterRef.current?.peek() ?? null;
-            if (!isActive || lastSnapshot === null || keys === lastSnapshot.deps) {
+            if (subscription === null || lastSnapshot === null || keys === lastSnapshot.deps) {
                 return;
             }
             keys = lastSnapshot.deps;
@@ -207,12 +209,12 @@ function useOnyxState<TReturnValue>(selector: UseOnyxStateSelector<TReturnValue>
         // Moving the subscription here rather than only after a commit matters when a run reads a new key
         // but returns an equal output: nothing commits then.
         function handleStoreChange() {
-            if (!isActive) {
+            if (subscription === null) {
                 return;
             }
             onStoreChange();
-            // React's store-change handler has normally just run the committed `getSnapshot`, which makes
-            // this call a cached read. Running it here keeps the keys current without relying on that.
+            // `onStoreChange` usually runs `getSnapshot` already, so this call normally returns the cached value.
+            // Calling it here keeps the keys current even when React has not run `getSnapshot` yet.
             committedSnapshotterRef.current?.getSnapshot();
             syncKeys();
         }
@@ -227,8 +229,8 @@ function useOnyxState<TReturnValue>(selector: UseOnyxStateSelector<TReturnValue>
         }
 
         return () => {
-            isActive = false;
-            subscription.unsubscribe();
+            subscription?.unsubscribe();
+            subscription = null;
         };
     }, []);
 
