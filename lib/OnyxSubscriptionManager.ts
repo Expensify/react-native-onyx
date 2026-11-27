@@ -5,16 +5,14 @@ import cache from './OnyxCache';
 import OnyxKeys from './OnyxKeys';
 import Storage from './storage';
 
-/**
- * Listener fired when an exact key's value changes.
- */
-type Listener<TKey extends OnyxKey = OnyxKey> = (value: OnyxValue<TKey>, key: TKey) => void;
+/** Signals that a subscriber should re-read its snapshot. */
+type Listener = () => void;
 
-/**
- * Generic listener, without specific types for the keys or values.
- * This way a single Map can hold listeners for every key type.
- */
-type GenericListener = (value: unknown, key: OnyxKey) => void;
+type Subscription = {
+    /** Moves the subscription to `deps`, adding and removing only the keys that differ. */
+    updateDeps: (deps: readonly OnyxKey[]) => void;
+    unsubscribe: () => void;
+};
 
 const reportedCacheMisses = new Set<OnyxKey>();
 
@@ -43,18 +41,10 @@ function reportCacheMissIfStorageHasValue(key: OnyxKey): void {
 }
 
 /**
- * OnyxSubscriptionManager is a registry for Onyx subscriptions.
- * Subscriptions are stored in `keyListeners`, a flat map keyed by OnyxKey.
- * Subscribers are notified on a per-key basis:
- *    - `notifyKey` for individual keys or collection members
- *    - `notifyCollection` for batch updates to collections
+ * Indexes snapshot listeners by dependency key. A collection key is a dependency on all its members.
  */
 class OnyxSubscriptionManager {
-    private keyListeners: Map<OnyxKey, Set<GenericListener>>;
-
-    constructor() {
-        this.keyListeners = new Map();
-    }
+    private listenersByDep = new Map<OnyxKey, Set<Listener>>();
 
     /**
      * Returns the frozen collection object for collection
@@ -73,118 +63,93 @@ class OnyxSubscriptionManager {
         return value;
     }
 
-    /**
-     * Subscribe to an exact key. For a collection root key this is "collection mode": the
-     * listener fires with the frozen collection object whenever any member changes. For a
-     * collection member key or a regular key, the listener fires when that key's value changes.
-     *
-     * Returns an unsubscribe function.
-     */
-    subscribe<TKey extends OnyxKey>(key: TKey, listener: Listener<TKey>): () => void {
-        let listeners = this.keyListeners.get(key);
-        if (!listeners) {
-            listeners = new Set();
-            this.keyListeners.set(key, listeners);
+    /** Subscribe to one or more dependencies, with one signal per dispatch. */
+    subscribe(deps: OnyxKey | readonly OnyxKey[], listener: Listener): Subscription {
+        // Give each subscription its own identity, even when callers share a callback.
+        const entry = () => listener();
+        let currentDeps: readonly OnyxKey[] | Set<OnyxKey> | null = typeof deps === 'string' ? [deps] : new Set(deps);
+        for (const dep of currentDeps) {
+            this.addListener(dep, entry);
         }
 
-        listeners.add(listener as GenericListener);
-
-        return () => {
-            const set = this.keyListeners.get(key);
-            if (!set) {
-                return;
-            }
-
-            set.delete(listener as GenericListener);
-
-            if (set.size === 0) {
-                this.keyListeners.delete(key);
-            }
+        return {
+            updateDeps: (nextDeps) => {
+                if (!currentDeps) {
+                    return;
+                }
+                const previous = currentDeps instanceof Set ? currentDeps : new Set(currentDeps);
+                const next = new Set(nextDeps);
+                for (const dep of previous) {
+                    if (!next.has(dep)) {
+                        this.removeListener(dep, entry);
+                    }
+                }
+                for (const dep of next) {
+                    if (!previous.has(dep)) {
+                        this.addListener(dep, entry);
+                    }
+                }
+                currentDeps = next;
+            },
+            unsubscribe: () => {
+                if (!currentDeps) {
+                    return;
+                }
+                for (const dep of currentDeps) {
+                    this.removeListener(dep, entry);
+                }
+                currentDeps = null;
+            },
         };
     }
 
-    /**
-     * Notify of a single-key write.
-     *
-     * Dispatch:
-     *   1. keyListeners.get(key): exact-key subscribers (always fires).
-     *   2. If key is a collection member, keyListeners.get(collectionKey): collection
-     *      listeners for the parent collection.
-     */
-    notifyKey<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>): void {
-        // 1. Exact-key listeners
-        const exact = this.keyListeners.get(key);
-        if (exact && exact.size > 0) {
-            for (const listener of [...exact]) {
-                this.safeInvoke(() => listener(value, key), key);
-            }
+    /** Signal the key and, for a member write, its parent collection. */
+    notifyKey(key: OnyxKey): void {
+        if (this.listenersByDep.size === 0) {
+            return;
         }
-
-        // 2. Collection-level routing. Only fires when the write is to a member key.
-        // Direct writes to a collection root (e.g. `Onyx.merge(COLLECTION_KEY, ...)`) are an
-        // unsupported anti-pattern; treat them as opaque single-key writes.
         const collectionKey = OnyxKeys.getCollectionKey(key);
-        const isCollectionMemberWrite = collectionKey !== undefined && collectionKey !== key;
-        if (isCollectionMemberWrite) {
-            const collectionListeners = this.keyListeners.get(collectionKey);
-            if (collectionListeners && collectionListeners.size > 0) {
-                const collectionData = cache.getCollectionData(collectionKey);
-                for (const listener of [...collectionListeners]) {
-                    this.safeInvoke(() => listener(collectionData, collectionKey), collectionKey);
-                }
-            }
+        const hasParentListeners = collectionKey !== undefined && collectionKey !== key && this.listenersByDep.has(collectionKey);
+        if (!hasParentListeners) {
+            this.dispatch(key);
+        } else if (this.listenersByDep.has(key)) {
+            this.dispatch(key, [collectionKey]);
+        } else {
+            this.dispatch(collectionKey);
         }
     }
 
-    /**
-     * Notify of a collection-level batch update.
-     *
-     * Dispatch:
-     *   1. keyListeners.get(collectionKey): fires once with the new collection object.
-     *   2. keyListeners.get(memberKey): fires per changed member whose value differs from
-     *      the previous, preserving ref-equality on unchanged members.
-     */
+    /** Signal the collection and members not known to have kept their previous reference. */
     notifyCollection<TKey extends CollectionKeyBase>(
         collectionKey: TKey,
         partialCollection: OnyxCollection<KeyValueMapping[TKey]>,
         partialPreviousCollection?: OnyxCollection<KeyValueMapping[TKey]>,
     ): void {
+        if (this.listenersByDep.size === 0) {
+            return;
+        }
         const changedKeys = Object.keys(partialCollection ?? {});
         if (changedKeys.length === 0) {
             return;
         }
-        // Read the merged collection once. `cache.getCollectionData()` returns the post-merge
-        // frozen object, which is what listeners should see (not the raw `partialCollection`
-        // input, which is just the delta and lacks fields preserved during merge).
-        const collectionData = cache.getCollectionData(collectionKey);
-
-        // 1. Collection listeners fire once with the new collection object.
-        const collectionListeners = this.keyListeners.get(collectionKey);
-        if (collectionListeners && collectionListeners.size > 0) {
-            for (const listener of [...collectionListeners]) {
-                this.safeInvoke(() => listener(collectionData, collectionKey), collectionKey);
+        let firstDep: OnyxKey | undefined = this.listenersByDep.has(collectionKey) ? collectionKey : undefined;
+        let otherDeps: OnyxKey[] | undefined;
+        for (const memberKey of changedKeys) {
+            if (memberKey === collectionKey || !this.listenersByDep.has(memberKey)) {
+                continue;
+            }
+            // Without a previous entry, undefined may mean a removal rather than a no-op.
+            if (partialPreviousCollection && Object.prototype.hasOwnProperty.call(partialPreviousCollection, memberKey) && cache.get(memberKey) === partialPreviousCollection[memberKey]) {
+                continue;
+            }
+            if (firstDep === undefined) {
+                firstDep = memberKey;
+            } else {
+                (otherDeps ??= []).push(memberKey);
             }
         }
-
-        // 2. Exact-member subscribers fire per changed key (skip if ref unchanged vs previous).
-        // Only treat a member as unchanged when `previous` actually carries it: when the
-        // previous collection is omitted, a removed member reads `undefined` on both sides
-        // and would otherwise be skipped even though it changed.
-        for (const memberKey of changedKeys) {
-            const value = collectionData?.[memberKey];
-            const prev = partialPreviousCollection?.[memberKey];
-            if (partialPreviousCollection && Object.prototype.hasOwnProperty.call(partialPreviousCollection, memberKey) && value === prev) {
-                continue;
-            }
-
-            const exact = this.keyListeners.get(memberKey);
-            if (!exact || exact.size === 0) {
-                continue;
-            }
-
-            for (const listener of [...exact]) {
-                this.safeInvoke(() => listener(value, memberKey), memberKey);
-            }
+        if (firstDep !== undefined) {
+            this.dispatch(firstDep, otherDeps);
         }
     }
 
@@ -192,7 +157,7 @@ class OnyxSubscriptionManager {
      * Wipe all subscriptions. Used by tests and `Onyx.clear()` follow-on.
      */
     clearAll(): void {
-        this.keyListeners.clear();
+        this.listenersByDep.clear();
         this.resetCacheMissReports();
     }
 
@@ -204,16 +169,60 @@ class OnyxSubscriptionManager {
      * True if there are any subscribers for the given key (exact or parent collection).
      */
     hasListenersForKey(key: OnyxKey): boolean {
-        if ((this.keyListeners.get(key)?.size ?? 0) > 0) {
+        if (this.listenersByDep.has(key)) {
             return true;
         }
 
         const collectionKey = OnyxKeys.getCollectionKey(key);
-        if (collectionKey && collectionKey !== key && (this.keyListeners.get(collectionKey)?.size ?? 0) > 0) {
-            return true;
+        return collectionKey !== undefined && collectionKey !== key && this.listenersByDep.has(collectionKey);
+    }
+
+    private addListener(dep: OnyxKey, listener: Listener): void {
+        let set = this.listenersByDep.get(dep);
+        if (!set) {
+            set = new Set();
+            this.listenersByDep.set(dep, set);
+        }
+        set.add(listener);
+    }
+
+    private removeListener(dep: OnyxKey, listener: Listener): void {
+        const set = this.listenersByDep.get(dep);
+        if (!set?.delete(listener)) {
+            return;
+        }
+        if (set.size === 0) {
+            this.listenersByDep.delete(dep);
+        }
+    }
+
+    private dispatch(firstDep: OnyxKey, otherDeps?: readonly OnyxKey[]): void {
+        // A single bucket is already deduplicated by its Set.
+        if (!otherDeps) {
+            this.fireListeners(firstDep);
+            return;
+        }
+        const fired = new Set<Listener>();
+        this.fireListeners(firstDep, fired);
+        for (const dep of otherDeps) {
+            this.fireListeners(dep, fired);
+        }
+    }
+
+    private fireListeners(dep: OnyxKey, fired?: Set<Listener>): void {
+        const listeners = this.listenersByDep.get(dep);
+        if (!listeners) {
+            return;
         }
 
-        return false;
+        // Copy first: a `Set` would also visit listeners subscribed during this loop.
+        for (const listener of [...listeners]) {
+            if (fired?.has(listener)) {
+                continue;
+            }
+            fired?.add(listener);
+            this.safeInvoke(listener, dep);
+        }
     }
 
     /**
@@ -231,4 +240,4 @@ class OnyxSubscriptionManager {
 const onyxSubscriptionManager = new OnyxSubscriptionManager();
 
 export default onyxSubscriptionManager;
-export type {Listener};
+export type {Subscription};

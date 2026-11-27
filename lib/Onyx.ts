@@ -4,11 +4,9 @@ import Storage from './storage';
 import utils from './utils';
 import DevTools, {initDevTools} from './DevTools';
 import type {
-    CollectionConnectCallback,
     CollectionKeyBase,
     Connection,
     ConnectOptions,
-    DefaultConnectCallback,
     InitOptions,
     KeyValueMapping,
     MixedOperationsQueue,
@@ -140,8 +138,10 @@ function init({
  * For a collection root key, the callback fires with the entire frozen collection
  * object whenever any member changes; signature `(collection, collectionKey)`.
  * For any other key, the callback fires with the value at that key; signature
- * `(value, key)`. Initial fire is deferred via `scheduleInitialSubscriberNotification` so it reads
- * cache after any same-tick writes have applied.
+ * `(value, key)`. The callback reads the latest snapshot and skips identical values. If another
+ * subscriber synchronously overwrites the key, later subscribers may not see the superseded
+ * value. `scheduleInitialSubscriberNotification` defers the initial cache read until relevant
+ * same-tick writes settle, without waiting for unrelated writes.
  *
  * @param connectOptions The options object that will define the behavior of the connection.
  * @param connectOptions.key The Onyx key to subscribe to.
@@ -159,48 +159,20 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
             return;
         }
 
-        if (OnyxKeys.isCollectionKey(key)) {
-            // Collection-root mode: dedup skips identical collection refs. Initial fire delivers
-            // the current collection object: frozen `{}` for an empty-but-known collection,
-            // `undefined` only if the collection key has not been seen yet.
-            let lastDeliveredCollection: unknown = OnyxUtils.NOT_DELIVERED;
-            const deliverCollection = (rawCollection: OnyxValue<TKey> | undefined, k: TKey) => {
-                if (Object.is(lastDeliveredCollection, rawCollection)) {
-                    return;
-                }
-                lastDeliveredCollection = rawCollection;
-                (callback as CollectionConnectCallback<TKey> | undefined)?.(rawCollection as NonNullable<OnyxCollection<KeyValueMapping[TKey]>>, k);
-            };
-            unsubscribeFn = onyxSubscriptionManager.subscribe(key, (value, k) => {
-                deliverCollection(value as unknown as OnyxValue<TKey>, k as TKey);
-            });
-            PendingWrites.scheduleInitialSubscriberNotification(key, () => {
-                if (!active) {
-                    return;
-                }
-                deliverCollection(onyxSubscriptionManager.getState(key) as unknown as OnyxValue<TKey>, key as TKey);
-            });
-            return;
-        }
-
-        // Non-collection key (or a specific collection member): single-value subscription.
         let lastDelivered: unknown = OnyxUtils.NOT_DELIVERED;
-        const deliverValue = (value: OnyxValue<TKey>, k: TKey | undefined) => {
+        const deliverSnapshot = () => {
+            if (!active) {
+                return;
+            }
+            const value = onyxSubscriptionManager.getState(key) as Parameters<NonNullable<ConnectOptions<TKey>['callback']>>[0];
             if (Object.is(lastDelivered, value)) {
                 return;
             }
             lastDelivered = value;
-            (callback as DefaultConnectCallback<TKey> | undefined)?.(value, k as TKey);
+            callback?.(value, key);
         };
-        unsubscribeFn = onyxSubscriptionManager.subscribe(key, (value, k) => {
-            deliverValue(value, k as TKey);
-        });
-        PendingWrites.scheduleInitialSubscriberNotification(key, () => {
-            if (!active) {
-                return;
-            }
-            deliverValue(onyxSubscriptionManager.getState(key), key);
-        });
+        unsubscribeFn = onyxSubscriptionManager.subscribe(key, deliverSnapshot).unsubscribe;
+        PendingWrites.scheduleInitialSubscriberNotification(key, deliverSnapshot);
     };
 
     OnyxUtils.afterInit(() => {
@@ -236,8 +208,10 @@ function connect<TKey extends OnyxKey>(connectOptions: ConnectOptions<TKey>): Co
  * For a collection root key, the callback fires with the entire frozen collection
  * object whenever any member changes; signature `(collection, collectionKey)`.
  * For any other key, the callback fires with the value at that key; signature
- * `(value, key)`. Initial fire is deferred via `scheduleInitialSubscriberNotification` so it reads
- * cache after any same-tick writes have applied.
+ * `(value, key)`. The callback reads the latest snapshot and skips identical values. If another
+ * subscriber synchronously overwrites the key, later subscribers may not see the superseded
+ * value. `scheduleInitialSubscriberNotification` defers the initial cache read until relevant
+ * same-tick writes settle, without waiting for unrelated writes.
  *
  * @param connectOptions The options object that will define the behavior of the connection.
  * @param connectOptions.key The Onyx key to subscribe to.

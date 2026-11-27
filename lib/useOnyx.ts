@@ -70,7 +70,7 @@ function useOnyx<TKey extends OnyxKey, TReturnValue = OnyxValue<TKey>>(key: TKey
 
     const subscribe = useCallback(
         (onStoreChange: () => void) => {
-            const unsubscribe = onyxSubscriptionManager.subscribe(key, onStoreChange);
+            const {unsubscribe} = onyxSubscriptionManager.subscribe(key, onStoreChange);
 
             // `Onyx.init` hydrates the cache without notifying anyone, so a subscriber that mounted
             // before it finished would never hear about the stored value. Re-read once init lands.

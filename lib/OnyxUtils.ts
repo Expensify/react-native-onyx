@@ -517,7 +517,7 @@ function notifyKey<TKey extends OnyxKey>(key: TKey, value: OnyxValue<TKey>): voi
     } else {
         cache.removeLastAccessedKey(key);
     }
-    onyxSubscriptionManager.notifyKey(key, value);
+    onyxSubscriptionManager.notifyKey(key);
 }
 
 /**

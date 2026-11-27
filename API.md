@@ -107,8 +107,10 @@ const connection = Onyx.connect({
 For a collection root key, the callback fires with the entire frozen collection
 object whenever any member changes; signature `(collection, collectionKey)`.
 For any other key, the callback fires with the value at that key; signature
-`(value, key)`. Initial fire is deferred via `scheduleInitialSubscriberNotification` so it reads
-cache after any same-tick writes have applied.
+`(value, key)`. The callback reads the latest snapshot and skips identical values. If another
+subscriber synchronously overwrites the key, later subscribers may not see the superseded
+value. `scheduleInitialSubscriberNotification` defers the initial cache read until relevant
+same-tick writes settle, without waiting for unrelated writes.
 <a name="connectWithoutView"></a>
 
 ## connectWithoutView(connectOptions) ⇒
@@ -134,8 +136,10 @@ const connection = Onyx.connectWithoutView({
 For a collection root key, the callback fires with the entire frozen collection
 object whenever any member changes; signature `(collection, collectionKey)`.
 For any other key, the callback fires with the value at that key; signature
-`(value, key)`. Initial fire is deferred via `scheduleInitialSubscriberNotification` so it reads
-cache after any same-tick writes have applied.
+`(value, key)`. The callback reads the latest snapshot and skips identical values. If another
+subscriber synchronously overwrites the key, later subscribers may not see the superseded
+value. `scheduleInitialSubscriberNotification` defers the initial cache read until relevant
+same-tick writes settle, without waiting for unrelated writes.
 <a name="set"></a>
 
 ## set(key, value, options)
