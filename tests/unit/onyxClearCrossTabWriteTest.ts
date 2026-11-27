@@ -151,4 +151,64 @@ describe('Another tab writes while Onyx.clear is in progress', () => {
         // Then the session ends at its default everywhere, as with a single tab
         expect(await readAll(ONYX_KEYS.SESSION, sessionValue)).toEqual({subscriber: DEFAULT_SESSION, cache: DEFAULT_SESSION, storage: DEFAULT_SESSION});
     });
+    it("should keep a session this tab saved while the clear was reading back the other tab's session", async () => {
+        // Given another tab saved a session during this tab's clear
+        await Onyx.set(ONYX_KEYS.SESSION, OLD_SESSION);
+        holdNextRemoveItems();
+        const clearPromise = Onyx.clear();
+        await waitForPromisesToResolve();
+        await StorageMock.setItem(ONYX_KEYS.SESSION, NEW_SESSION);
+        announceKeysFromOtherTab([ONYX_KEYS.SESSION]);
+
+        // When this tab saves its own session while the clear reads the other tab's one back
+        const multiGetMock = jest.mocked(StorageMock.multiGet);
+        let finishMultiGet: () => void = () => {};
+        multiGetMock.mockImplementationOnce(
+            () =>
+                new Promise((resolve) => {
+                    finishMultiGet = () => resolve([[ONYX_KEYS.SESSION, NEW_SESSION]]);
+                }),
+        );
+        finishRemoveItems();
+        await waitForPromisesToResolve();
+        const localSession = {authToken: 'local'};
+        const setPromise = Onyx.set(ONYX_KEYS.SESSION, localSession);
+        finishMultiGet();
+        await Promise.all([clearPromise, setPromise]);
+        await waitForPromisesToResolve();
+
+        // Then the older value read back doesn't replace this tab's newer session
+        expect(await readAll(ONYX_KEYS.SESSION, sessionValue)).toEqual({subscriber: localSession, cache: localSession, storage: localSession});
+    });
+
+    it('should remove nested nulls from a value read back from the other tab', async () => {
+        // Given another tab saved a session with a null field during this tab's clear, as its own clear does with defaults
+        holdNextRemoveItems();
+        const clearPromise = Onyx.clear();
+        await waitForPromisesToResolve();
+        await StorageMock.setItem(ONYX_KEYS.SESSION, {...NEW_SESSION, errors: null});
+        announceKeysFromOtherTab([ONYX_KEYS.SESSION]);
+
+        // When the clear reads it back
+        finishRemoveItems();
+        await clearPromise;
+        await waitForPromisesToResolve();
+
+        // Then the cache and subscribers get it without the null field, as from regular cross-tab sync
+        expect(sessionValue).toEqual(NEW_SESSION);
+        expect(cache.get(ONYX_KEYS.SESSION)).toEqual(NEW_SESSION);
+    });
+
+    it('should still reset defaults when storage is too full to write them before the removal', async () => {
+        // Given this tab holds the old session and storage has no room left for the defaults
+        await Onyx.set(ONYX_KEYS.SESSION, OLD_SESSION);
+        jest.mocked(StorageMock.multiSet).mockImplementationOnce(() => Promise.reject(new Error('QuotaExceededError')));
+
+        // When this tab clears
+        await Onyx.clear();
+        await waitForPromisesToResolve();
+
+        // Then the defaults are written once the removal frees space, and subscribers get them
+        expect(await readAll(ONYX_KEYS.SESSION, sessionValue)).toEqual({subscriber: DEFAULT_SESSION, cache: DEFAULT_SESSION, storage: DEFAULT_SESSION});
+    });
 });

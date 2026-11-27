@@ -92,13 +92,11 @@ function raiseStorageSyncEvent(onyxKey: OnyxKey) {
 
 let storage = NoopProvider;
 
-// Keys being read back for another tab's event. A key this tab writes meanwhile has a newer value than the read
-// may return, because the read was queued in storage before that write.
+// Reads for another tab's changes, with the keys this tab wrote meanwhile (newer than what the read returns).
 const readsInProgress = new Set<{keys: Set<OnyxKey>; writtenLocally: Set<OnyxKey>}>();
 
 /**
- * Reads the values of keys another tab changed. Keys this tab wrote during the read are read again, since storage
- * applies that second read after the local write and so returns the latest value.
+ * Reads the keys another tab changed. Keys this tab wrote during the read are read again.
  */
 function readChangedKeys(onyxKeys: StorageKeyList, onStorageKeysChanged: OnStorageKeysChanged) {
     const read = {keys: new Set(onyxKeys), writtenLocally: new Set<OnyxKey>()};
@@ -149,7 +147,7 @@ const InstanceSync = {
             }
 
             const onyxKeys = parseSyncOnyxStorageEventValue(event.newValue);
-            // Reported before the values are read, because a running Onyx.clear can overwrite them in storage by then
+            // Reported before the read, so a running Onyx.clear doesn't overwrite these keys meanwhile
             onStorageKeysAnnounced?.(onyxKeys);
 
             if (pendingSyncKeys) {

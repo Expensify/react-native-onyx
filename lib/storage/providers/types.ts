@@ -15,7 +15,7 @@ type DatabaseSize = {
 /** Called with the full batch of key/value pairs that changed together in a single cross-tab sync event. */
 type OnStorageKeysChanged = (pairs: StorageKeyValuePair[]) => void;
 
-/** Called with the keys another tab changed as soon as it reports them, before their values are read back from storage. */
+/** Called with the keys another tab changed, before their values are read. */
 type OnStorageKeysAnnounced = (keys: StorageKeyList) => void;
 
 type StorageProvider<TStore> = {

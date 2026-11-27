@@ -10,7 +10,7 @@ const pendingGlobalWrites = new Set<Promise<unknown>>();
 
 // Told about every write as it is issued, so Onyx.clear can tell writes apart from reads refilling the cache.
 const writeListeners = new Set<(keys: OnyxKey[]) => void>();
-// Told about keys another tab wrote, so Onyx.clear doesn't overwrite them in shared storage.
+// Told about keys another tab writes, so Onyx.clear doesn't overwrite them.
 const otherInstanceWriteListeners = new Set<(keys: OnyxKey[]) => void>();
 
 /**
